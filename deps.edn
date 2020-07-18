@@ -1,6 +1,12 @@
 {:paths ["src/clj"]
  :deps
- {cljfx {:mvn/version "1.7.4"}}
+ {aleph {:mvn/version "0.4.6"}
+  byte-streams {:mvn/version "0.2.4"}
+  cljfx {:mvn/version "1.7.4"}
+  com.taoensso/timbre {:mvn/version "4.10.0"}
+  digest {:mvn/version "1.4.9"}
+  gloss {:mvn/version "0.2.6"}
+  org.clojure/core.async {:mvn/version "1.2.603"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj"]

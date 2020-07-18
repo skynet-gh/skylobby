@@ -37,7 +37,13 @@
                                 :items [{:fx/type :menu-item
                                          :text "menu3 item1"}
                                         {:fx/type :menu-item
-                                         :text "menu3 item2"}]}]}
+                                         :text "menu3 item2"}]}
+                               {:fx/type :menu
+                                :text "menu4"
+                                :items [{:fx/type :menu-item
+                                         :text "menu4 item1"}
+                                        {:fx/type :menu-item
+                                         :text "menu4 item2"}]}]}
                              {:fx/type :label
                               :text "Hello world"}]}}})
 
