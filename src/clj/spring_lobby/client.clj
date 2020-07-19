@@ -18,7 +18,12 @@
 (def agent-string)
 
 (def protocol
-  (gloss/string :utf-8 :delimeters ["\n"]))
+  (gloss/compile-frame
+    (gloss/delimited-frame 
+      ["\n"]
+      (gloss/string :utf-8))
+    str
+    str)) ; TODO parse here
 
 
 ; https://stackoverflow.com/a/39188819/984393
@@ -88,23 +93,45 @@
 (parse-battleopened "BATTLEOPENED 1 0 0 skynet 192.168.1.6 8452 8 1 0 -1706632985 Spring	104.0.1-1510-g89bb8e3 maintenance	Mini_SuperSpeedMetal	deth	Balanced Annihilation V10.24	__battle__8")
 
 (defmethod handle "BATTLEOPENED" [c state m]
-  (let [[all battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname battle-name] (parse-battleopened m)
-        battle {:battle-type battle-type
-                :battle-nat-type battle-nat-type
-                :host-username host-username
-                :battle-ip battle-ip
-                :battle-port battle-port
-                :battle-maxplayers battle-maxplayers
-                :battle-passworded battle-passworded
-                :battle-rank battle-rank
+  (if-let [[all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname battle-name] (parse-battleopened m)]
+    (let [battle {:battle-id battle-id
+                  :battle-type battle-type
+                  :battle-nat-type battle-nat-type
+                  :host-username host-username
+                  :battle-ip battle-ip
+                  :battle-port battle-port
+                  :battle-maxplayers battle-maxplayers
+                  :battle-passworded battle-passworded
+                  :battle-rank battle-rank
+                  :battle-maphash battle-maphash
+                  :battle-engine battle-engine
+                  :battle-version battle-version
+                  :battle-map battle-map
+                  :battle-title battle-title
+                  :battle-modname battle-modname
+                  :battle-name battle-name}]
+      (swap! state assoc-in [:battles battle-id] battle))
+    (warn "Unable to parse BATTLEOPENED")))
+
+(defn parse-updatebattleinfo [m]
+  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
+
+#_
+(parse-updatebattleinfo "UPDATEBATTLEINFO 1 0 0 1465550451 Archers_Valley_v6")
+
+(defmethod handle "UPDATEBATTLEINFO" [c state m]
+  (let [[all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)
+        battle {:battle-id battle-id
+                :battle-spectators battle-spectators
+                :battle-locked battle-locked
                 :battle-maphash battle-maphash
-                :battle-engine battle-engine
-                :battle-version battle-version
-                :battle-map battle-map
-                :battle-title battle-title
-                :battle-modname battle-modname
-                :battle-name battle-name}]
-    (swap! state assoc-in [:battles battle-name] battle)))
+                :battle-map battle-map}]
+    (swap! state update-in [:battles battle-id] merge battle)))
+
+(defmethod handle "BATTLECLOSED" [c state m]
+  (let [[all battle-id] (re-find #"\w+ (\w+)" m)]
+    (swap! state update :battles dissoc battle-id)))
+
 
 
 (defn ping-loop [c]
@@ -122,11 +149,10 @@
     (info "print loop thread started")
     (loop []
       (if-let [d (s/take! c)]
-        (if-let [ms @d]
+        (if-let [m @d]
           (do
-            (info "messages from server:" (str "'" ms "'"))
-            (doseq [m (string/split ms #"\n")]
-              (handle c state m))
+            (info "message:" (str "'" m "'"))
+            (handle c state m)
             (recur))
           (info "print loop ended"))
         (info "print loop ended")))))
@@ -177,6 +203,8 @@
 (-> state deref :users)
 #_
 (-> state deref :battles)
+#_
+(swap! state assoc :battles {})
 #_
 (send-message c "LISTCOMPFLAGS\n")
 #_
