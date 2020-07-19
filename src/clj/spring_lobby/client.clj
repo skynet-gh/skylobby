@@ -35,7 +35,10 @@
 (defn decode-battle-status [status-str]
   (gio/decode battle-status-protocol
     (byte-streams/convert
-      (.toByteArray (.toBigInteger (bigint status-str)))
+      (.array
+        (.putInt
+          (ByteBuffer/allocate (quot Integer/SIZE Byte/SIZE))
+          (Integer/parseInt status-str)))
       ByteBuffer)))
 
 #_
