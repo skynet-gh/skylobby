@@ -1,9 +1,15 @@
 (ns user
   (:require
-    [clojure.tools.namespace.repl :refer [refresh]]))
-    ;[spring-lobby]))
+    [clojure.tools.namespace.repl :refer [refresh]]
+    [repl]
+    [spring-lobby]))
 
 
-#_
-(defn ui []
-  (spring-lobby))
+
+(defn init []
+  (alter-var-root #'repl/*renderer* spring-lobby/mount-renderer))
+
+(defn render []
+  (if repl/*renderer*
+    (repl/*renderer*)
+    (init)))
