@@ -1,14 +1,15 @@
 (ns spring-lobby
   (:require
     [cljfx.api :as fx]
-    [spring-lobby.client :as client]))
+    [spring-lobby.client :as client]
+    [taoensso.timbre :refer [info trace warn]]))
 
 
 (defonce *state
   (atom {}))
 
 (defmulti event-handler :event/type)
-  
+
 (defn battle-opts []
   {:mod-hash -1706632985
    :engine-version "104.0.1-1510-g89bb8e3 maintenance"
@@ -47,7 +48,7 @@
              {:fx/type :menu-item
               :text "menu4 item2"}]}]})
 
-(defn battle-table [{:keys [battles]}]
+(defn battles-table [{:keys [battles]}]
   {:fx/type :table-view
    :items (vec (vals battles))
    :columns
@@ -154,6 +155,79 @@
          :on-action (fn [_]
                       (client/open-battle client (battle-opts)))}]))})
 
+(defn battle-table [{:keys [battle battles users]}]
+  (let [battle-users (:users battle)
+        items (mapv (fn [[k v]] (assoc v :username k :user (get users k))) battle-users)]
+    {:fx/type :table-view
+     :items items
+     :columns
+     [{:fx/type :table-column
+       :text "Country"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:country (:user i)))})}}
+      {:fx/type :table-column
+       :text "Status"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (select-keys (:client-status (:user i)) [:bot :access]))})}}
+      {:fx/type :table-column
+       :text "Ingame"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:ingame (:client-status (:user i))))})}}
+      {:fx/type :table-column
+       :text "Faction"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:side (:battle-status i)))})}}
+      {:fx/type :table-column
+       :text "Rank"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:rank (:client-status (:user i))))})}}
+      {:fx/type :table-column
+       :text "TrueSkill"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text ""})}}
+      {:fx/type :table-column
+       :text "Color"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:team-color i))})}}
+      {:fx/type :table-column
+       :text "Nickname"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:username i))})}}
+      {:fx/type :table-column
+       :text "Player ID"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:id (:battle-status i)))})}}
+      {:fx/type :table-column
+       :text "Team ID"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:ally (:battle-status i)))})}}
+      {:fx/type :table-column
+       :text "Bonus"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [i] {:text (str (:handicap (:battle-status i)) "%")})}}]}))
+
 
 (defn root-view [{{:keys [client users battles battle]} :state}]
   {:fx/type :stage
@@ -165,14 +239,16 @@
            :root {:fx/type :v-box
                   :alignment :top-left
                   :children [{:fx/type menu-view}
-                             {:fx/type battle-table
+                             {:fx/type battles-table
                               :battles battles}
                              {:fx/type user-table
                               :users users}
+                             {:fx/type battle-table
+                              :battles battles
+                              :battle battle
+                              :users users}
                              {:fx/type client-buttons
-                              :client client}
-                             {:fx/type :label
-                              :text (with-out-str (clojure.pprint/pprint battle))}]}}})
+                              :client client}]}}})
 
 (defn mount-renderer [& args]
   (let [r (fx/create-renderer
