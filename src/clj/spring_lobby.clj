@@ -1,8 +1,16 @@
 (ns spring-lobby
   (:require
     [cljfx.api :as fx]
+    [clojure.java.io :as io]
+    [clojure.string :as string]
     [spring-lobby.client :as client]
-    [taoensso.timbre :refer [info trace warn]]))
+    [taoensso.timbre :refer [error info trace warn]])
+  (:import
+    (java.io RandomAccessFile)
+    (java.nio ByteBuffer)
+    (javax.imageio ImageIO)
+    (net.sf.sevenzipjbinding ISequentialOutStream SevenZip SevenZipNativeInitializationException)
+    (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)))
 
 
 (defonce *state
@@ -17,6 +25,55 @@
    :title "deth"
    :mod-name "Balanced Annihilation V9.79.4"
    :map-hash -1611391257})
+
+
+(SevenZip/initSevenZipFromPlatformJAR)
+
+(defn spring-root
+  "Returns the root directory for Spring"
+  []
+  (str (System/getProperty "user.home") "Spring") ; TODO make sure
+  (str "/mnt/c/Users/" (System/getProperty "user.name") "/Documents/My Games/Spring")) ; TODO remove
+
+(defn map-files []
+  (->> (io/file (str (spring-root) "/maps"))
+       file-seq
+       (filter #(.isFile %))
+       (filter #(string/ends-with? (.getName %) ".sd7"))))
+
+
+(defn open-7z [from]
+  (with-open [raf (RandomAccessFile. from "r")
+              rafis (RandomAccessFileInStream. raf)
+              archive (SevenZip/openInArchive nil rafis)]
+    (trace from "has" (.getNumberOfItems archive) "items")
+    (doseq [item (.getArchiveItems (.getSimpleInterface archive))]
+      (let [path (.getPath item)
+            from-path (.getPath (io/file from))
+            to (str (subs from-path 0 (.lastIndexOf from-path ".")) ".png")]
+        (when (string/includes? (string/lower-case path) "mini")
+          (info path))
+        (when (= "maps/mini.png" path)
+          (info "Extracting" path "to" to)
+          (with-open [baos (java.io.ByteArrayOutputStream.)]
+            (let [res (.extractSlow item
+                        (reify ISequentialOutStream
+                          (write [this data]
+                            (trace "got" (count data) "bytes")
+                            (.write baos data 0 (count data))
+                            (count data))))
+                  image (with-open [is (io/input-stream (.toByteArray baos))]
+                          (ImageIO/read is))]
+              (info "Extract result" res) 
+              (info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
+              
+#_
+(doseq [map-file (map-files)]
+  (open-7z map-file))
+
+#_
+(defn extract-7z [from])
+
 
 (defn menu-view [opts]
   {:fx/type :menu-bar

@@ -6,6 +6,8 @@
   com.taoensso/timbre {:mvn/version "4.10.0"}
   digest {:mvn/version "1.4.9"}
   gloss {:mvn/version "0.2.6"}
+  net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
+  net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.clojure/core.async {:mvn/version "1.2.603"}
   smee/binary {:mvn/version "0.5.5"}}
  :aliases
