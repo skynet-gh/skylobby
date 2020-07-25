@@ -1,15 +1,26 @@
 (ns user
   (:require
-    [clojure.tools.namespace.repl :refer [refresh]]
-    [repl]
+    [cljfx.api :as fx]
+    [clojure.core.cache :as cache]
+    [clojure.tools.namespace.repl :refer [refresh set-refresh-dirs]]
     [spring-lobby]))
 
 
+(set-refresh-dirs "src/clj" "test/clj")
 
-(defn init []
-  (alter-var-root #'repl/*renderer* spring-lobby/mount-renderer))
 
-(defn render []
-  (if repl/*renderer*
-    (repl/*renderer*)
-    (init)))
+(def ^:dynamic renderer nil)
+
+
+(defn re []
+  (when renderer
+    (fx/unmount-renderer spring-lobby/*state renderer))
+  (let [r (fx/create-renderer
+            :middleware (fx/wrap-map-desc (fn [state]
+                                            {:fx/type spring-lobby/root-view
+                                             :state state}))
+            :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+    (fx/mount-renderer spring-lobby/*state r)
+    (alter-var-root #'renderer (constantly r))))
+
+(re)

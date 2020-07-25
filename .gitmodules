@@ -1,0 +1,6 @@
+[submodule "lib/lua-parser"]
+	path = lib/lua-parser
+	url = https://github.com/bkiers/lua-parser.git
+[submodule "lib/grammars-v4"]
+	path = lib/grammars-v4
+	url = https://github.com/antlr/grammars-v4.git
