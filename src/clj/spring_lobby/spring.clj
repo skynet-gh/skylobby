@@ -1,7 +1,9 @@
 (ns spring-lobby.spring
   "Interface to run Spring."
   (:require
-    [clojure.string :as string]))
+    [clojure.string :as string]
+    [com.evocomputing.colors :as colors]
+    [taoensso.timbre :refer [error info trace warn]]))
 
 
 (defn script-data
@@ -19,11 +21,18 @@
       :numusers (count (:users battle))} ; TODO
      (concat
        (map
-         (fn [[player {:keys [battle-status]}]]
+         (fn [[player {:keys [battle-status team-color user]}]]
+           (info team-color)
            [(str "player" (:id battle-status))
             {:name player
              :team (:ally battle-status)
-             :isfromdemo false}]) ; TODO
+             :isfromdemo 0 ; TODO
+             :countrycode (:country user)
+             :rgbcolor (when-let [decimal-color (try (Integer/parseInt team-color) (catch Exception _ nil))]
+                         (info decimal-color)
+                         (let [[r g b a :as rgba] (:rgba (colors/create-color decimal-color))]
+                           (info r g b a rgba)
+                           (str r " " g " " b)))}])
          (:users battle))
        (map
          (fn [[player {:keys [battle-status]}]]
@@ -33,7 +42,11 @@
              :allyteam (:ally battle-status)
              ;:rgbcolor nil TODO
              :side (:side battle-status)}])
-         (:users battle))))})
+         (:users battle))
+       (map
+         (fn [ally]
+           [(str "allyteam" ally) {}])
+         (set (map (comp :ally :battle-status second) (:users battle))))))})
 
 (defn script-txt-inner
   ([kv]

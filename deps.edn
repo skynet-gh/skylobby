@@ -4,6 +4,7 @@
   byte-streams {:mvn/version "0.2.4"}
   clj-antlr {:mvn/version "0.2.5"}
   cljfx {:mvn/version "1.7.4"}
+  com.evocomputing/colors {:mvn/version "1.0.6"}
   com.taoensso/timbre {:mvn/version "4.10.0"}
   digest {:mvn/version "1.4.9"}
   gloss {:mvn/version "0.2.6"}
@@ -14,7 +15,7 @@
   smee/binary {:mvn/version "0.5.5"}}
  :aliases
  {:nrepl
-  {:extra-paths ["dev/clj" "test/clj"]
+  {:extra-paths ["dev/clj/repl" "dev/clj/user" "dev/clj/test" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.25.2"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
@@ -25,7 +26,7 @@
                "--middleware" "[cider.nrepl/cider-middleware,cider.nrepl/wrap-clojuredocs,cider.nrepl/wrap-classpath,cider.nrepl/wrap-complete,cider.nrepl/wrap-debug,cider.nrepl/wrap-format,cider.nrepl/wrap-info,cider.nrepl/wrap-inspect,cider.nrepl/wrap-macroexpand,cider.nrepl/wrap-ns,cider.nrepl/wrap-spec,cider.nrepl/wrap-profile,cider.nrepl/wrap-resource,cider.nrepl/wrap-refresh,cider.nrepl/wrap-stacktrace,cider.nrepl/wrap-test,cider.nrepl/wrap-trace,cider.nrepl/wrap-out,cider.nrepl/wrap-undef,cider.nrepl/wrap-version]"
                "--interactive"]}
   :test
-  {:extra-paths ["dev/clj" "test/clj"]
+  {:extra-paths ["dev/clj/test" "test/clj"]
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
                 pjstadig/humane-test-output {:mvn/version "0.10.0"}}
    :main-opts ["-m" "tests"]}}}

@@ -1,6 +1,7 @@
 (ns spring-lobby
   (:require
     [cljfx.api :as fx]
+    [clojure.core.async :as async]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
@@ -279,7 +280,8 @@
         battles-by-name (into {}
                           (map
                             (juxt :battle-name identity)
-                            (vals battles)))]
+                            (vals battles)))
+        battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))]
     (info (with-out-str (pprint battle)))
     (let [battle-by-name (get battles-by-name (:battle-name battle))
           merged (merge battle-by-name battle)
@@ -289,15 +291,26 @@
       (info (with-out-str (pprint merged)))
       (pprint script)
       (println script-txt)
-      (let [engine-file (io/file (spring-root) "engine" (:battle-version merged) "spring.exe")]
-        (println engine-file)
-        (println (.exists engine-file))
+      (let [engine-file (io/file (spring-root) "engine" (:battle-version merged) "spring.exe")
+            script-file (io/file (spring-root) "script.txt")]
         (try
-          (spit "script.txt" script-txt)
-          (let [command (str (.getAbsolutePath engine-file) " " (.getAbsolutePath (io/file "script.txt")))
+          (spit script-file script-txt)
+          (let [command (into-array String [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)])
                 runtime (Runtime/getRuntime)]
-            (println command))
-            ;(.exec runtime command))
+            (info "Running '" command "'")
+            (let [process (.exec runtime command nil (spring-root))]
+              (async/thread
+                (with-open [reader (io/reader (.getInputStream process))]
+                  (loop []
+                    (when-let [line (.readLine reader)]
+                      (info "(out)" line)
+                      (recur)))))
+              (async/thread
+                (with-open [reader (io/reader (.getErrorStream process))]
+                  (loop []
+                    (when-let [line (.readLine reader)]
+                      (info "(err)" line)
+                      (recur)))))))
           (catch Exception e
             (warn e)))))))
 
