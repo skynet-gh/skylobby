@@ -1,6 +1,7 @@
 (ns spring-lobby
   (:require
     [cljfx.api :as fx]
+    [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.core.async :as async]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
@@ -20,6 +21,7 @@
 (defonce *state
   (atom {}))
 
+(pprint @*state)
 
 (defmulti event-handler :event/type)
 
@@ -157,74 +159,82 @@
              {:fx/type :menu-item
               :text "menu4 item2"}]}]})
 
+(defmethod event-handler ::select-battle [e]
+  (info e)
+  (swap! *state assoc :selected-battle (-> e :fx/event :battle-id)))
+
 (defn battles-table [{:keys [battles users]}]
-  {:fx/type :table-view
-   :items (vec (vals battles))
-   :columns
-   [{:fx/type :table-column
-     :text "Status"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-type i))})}}
-    {:fx/type :table-column
-     :text "Country"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:country (get users (:host-username i))))})}}
-    {:fx/type :table-column
-     :text " "
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-rank i))})}}
-    {:fx/type :table-column
-     :text "Players"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (count (:users i)))})}}
-    {:fx/type :table-column
-     :text "Max"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-maxplayers i))})}}
-    {:fx/type :table-column
-     :text "Spectators"}
-    {:fx/type :table-column
-     :text "Running"}
-    {:fx/type :table-column
-     :text "Battle Name"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-title i))})}}
-    {:fx/type :table-column
-     :text "Game"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-modname i))})}}
-    {:fx/type :table-column
-     :text "Map"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-map i))})}}
-    {:fx/type :table-column
-     :text "Host"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:host-username i))})}}
-    {:fx/type :table-column
-     :text "Engine"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:battle-engine i) " " (:battle-version i))})}}]})
+  {:fx/type fx.ext.table-view/with-selection-props
+   :props {:selection-mode :single
+           :on-selected-item-changed {:event/type ::select-battle}}
+   :desc
+   {:fx/type :table-view
+    :items (vec (vals battles))
+    :columns
+    [{:fx/type :table-column
+      :text "Status"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-type i))})}}
+     {:fx/type :table-column
+      :text "Country"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:country (get users (:host-username i))))})}}
+     {:fx/type :table-column
+      :text " "
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-rank i))})}}
+     {:fx/type :table-column
+      :text "Players"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (count (:users i)))})}}
+     {:fx/type :table-column
+      :text "Max"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-maxplayers i))})}}
+     {:fx/type :table-column
+      :text "Spectators"}
+     {:fx/type :table-column
+      :text "Running"}
+     {:fx/type :table-column
+      :text "Battle Name"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-title i))})}}
+     {:fx/type :table-column
+      :text "Game"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-modname i))})}}
+     {:fx/type :table-column
+      :text "Map"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-map i))})}}
+     {:fx/type :table-column
+      :text "Host"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:host-username i))})}}
+     {:fx/type :table-column
+      :text "Engine"
+      :cell-value-factory identity
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [i] {:text (str (:battle-engine i) " " (:battle-version i))})}}]}})
 
 (defn user-table [{:keys [users]}]
   {:fx/type :table-view
@@ -295,7 +305,11 @@
 (defmethod event-handler ::leave-battle [e]
   (client/send-message (:client @*state) "LEAVEBATTLE"))
 
-(defn battles-buttons [{:keys [battle client]}]
+(defmethod event-handler ::join-battle [e]
+  (when-let [selected (-> *state deref :selected-battle)]
+    (client/send-message (:client @*state) (str "JOINBATTLE " selected))))
+
+(defn battles-buttons [{:keys [battle client selected-battle]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -305,9 +319,14 @@
          :text "Leave Battle"
          :on-action {:event/type ::leave-battle}}]
        (when client
-         [{:fx/type :button
-           :text "Host Battle"
-           :on-action {:event/type ::host-battle}}])))})
+         (concat
+           [{:fx/type :button
+             :text "Host Battle"
+             :on-action {:event/type ::host-battle}}]
+           (when selected-battle
+             [{:fx/type :button
+               :text "Join Battle"
+               :on-action {:event/type ::join-battle}}])))))})
 
 (defmethod event-handler ::start-battle [e]
   (let [{:keys [battle battles users]} @*state
@@ -435,7 +454,7 @@
            :on-action {:event/type ::start-battle}}]))}))
 
 
-(defn root-view [{{:keys [client users battles battle]} :state}]
+(defn root-view [{{:keys [client users battles battle selected-battle]} :state}]
   {:fx/type :stage
    :showing true
    :title "Alt Spring Lobby"
@@ -454,7 +473,8 @@
                               :users users}
                              {:fx/type battles-buttons
                               :battle battle
-                              :client client}
+                              :client client
+                              :selected-battle selected-battle}
                              {:fx/type battle-table
                               :battles battles
                               :battle battle
