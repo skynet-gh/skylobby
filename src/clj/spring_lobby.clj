@@ -21,6 +21,7 @@
 (defonce *state
   (atom {}))
 
+#_
 (pprint @*state)
 
 (defmulti event-handler :event/type)
@@ -271,32 +272,43 @@
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-agent i))})}}]})
 
+(defn update-disconnected []
+  (swap! *state dissoc :battle :battles :chanenls :client :client-deferred :my-channels :users))
+
 (defmethod event-handler ::disconnect [e]
   (client/disconnect (:client @*state))
-  (swap! *state dissoc :client :users :battles :battle))
+  (update-disconnected))
 
 (defmethod event-handler ::connect [e]
-  (let [client (client/connect *state)]
-    (swap! *state assoc :client client)
+  (let [client-deferred (client/client)] ; TODO host port
+    (swap! *state assoc :client-deferred client-deferred)
     (async/thread
-      (loop []
-        (if (and client (not (.isClosed client)))
-          (do
-            (debug "Client is still connected")
-            (async/<!! (async/timeout 20000))
-            (recur))
-          (do
-            (info "Client was disconnected")
-            (swap! *state dissoc :client :users :battles :battle)))))))
+      (let [client @client-deferred]
+        (client/connect *state client) ; TODO username password
+        (swap! *state assoc :client client)
+        (loop []
+          (if (and client (not (.isClosed client)))
+            (do
+              (debug "Client is still connected")
+              (async/<!! (async/timeout 20000))
+              (recur))
+            (do
+              (info "Client was disconnected")
+              (update-disconnected))))))))
 
 
-(defn client-buttons [{:keys [client]}]
+(defn client-buttons [{:keys [client client-deferred]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
    (concat
      [{:fx/type :button
-       :text (if client "Disconnect" "Connect")
+       :text (if client
+               "Disconnect"
+               (if client-deferred
+                 "Connecting..."
+                 "Connect"))
+       :disable (boolean (and (not client) client-deferred))
        :on-action {:event/type (if client ::disconnect ::connect)}}])})
 
 (defmethod event-handler ::host-battle [e]
@@ -330,46 +342,37 @@
 
 (defmethod event-handler ::start-battle [e]
   (let [{:keys [battle battles users]} @*state
-        battles-by-name (into {}
-                          (map
-                            (juxt :battle-name identity)
-                            (vals battles)))
-        battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))]
-    (info (with-out-str (pprint battle)))
-    (let [battle-by-name (get battles-by-name (:battle-name battle))
-          merged (merge battle-by-name battle)
-          script (spring/script-data merged)
-          script-txt (spring/script-txt script)]
-      (info (with-out-str (pprint battle-by-name)))
-      (info (with-out-str (pprint merged)))
-      (pprint script)
-      (println script-txt)
-      (let [engine-file (io/file (spring-root) "engine" (:battle-version merged) "spring.exe")
-            script-file (io/file (spring-root) "script.txt")]
-        (try
-          (spit script-file script-txt)
-          (let [command [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)]
-                runtime (Runtime/getRuntime)]
-            (info "Running '" command "'")
-            (let [process (.exec runtime (into-array String command) nil (spring-root))]
-              (async/thread
-                (with-open [reader (io/reader (.getInputStream process))]
-                  (loop []
-                    (if-let [line (.readLine reader)]
-                      (do
-                        (info "(spring out)" line)
-                        (recur))
-                      (info "Spring stdout stream closed")))))
-              (async/thread
-                (with-open [reader (io/reader (.getErrorStream process))]
-                  (loop []
-                    (if-let [line (.readLine reader)]
-                      (do
-                        (info "(spring err)" line)
-                        (recur))
-                      (info "Spring stderr stream closed")))))))
-          (catch Exception e
-            (warn e)))))))
+        battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))
+        battle (merge (get battles (:battle-id battle)) battle)
+        script (spring/script-data battle)
+        script-txt (spring/script-txt script)
+        engine-file (io/file (spring-root) "engine" (:battle-version battle) "spring.exe")
+        script-file (io/file (spring-root) "script.txt")]
+    (try
+      (spit script-file script-txt)
+      (let [command [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)]
+            runtime (Runtime/getRuntime)]
+        (info "Running '" command "'")
+        (let [process (.exec runtime (into-array String command) nil (spring-root))]
+          (async/thread
+            (with-open [reader (io/reader (.getInputStream process))]
+              (loop []
+                (if-let [line (.readLine reader)]
+                  (do
+                    (info "(spring out)" line)
+                    (recur))
+                  (info "Spring stdout stream closed")))))
+          (async/thread
+            (with-open [reader (io/reader (.getErrorStream process))]
+              (loop []
+                (if-let [line (.readLine reader)]
+                  (do
+                    (info "(spring err)" line)
+                    (recur))
+                  (info "Spring stderr stream closed")))))))
+      (catch Exception e
+        (warn e)))
+    (client/send-message (:client @*state) "MYSTATUS 1")))
 
 
 (defn battle-table [{:keys [battle battles users]}]
@@ -454,7 +457,7 @@
            :on-action {:event/type ::start-battle}}]))}))
 
 
-(defn root-view [{{:keys [client users battles battle selected-battle]} :state}]
+(defn root-view [{{:keys [client client-deferred users battles battle selected-battle]} :state}]
   {:fx/type :stage
    :showing true
    :title "Alt Spring Lobby"
@@ -465,7 +468,8 @@
                   :alignment :top-left
                   :children [{:fx/type menu-view}
                              {:fx/type client-buttons
-                              :client client}
+                              :client client
+                              :client-deferred client-deferred}
                              {:fx/type user-table
                               :users users}
                              {:fx/type battles-table

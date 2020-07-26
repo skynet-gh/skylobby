@@ -13,6 +13,12 @@
          (client/decode-client-status "0")))
   (is (= {:bot false,
           :access false,
+          :rank 0,
+          :away false,
+          :ingame true}
+         (client/decode-client-status "1")))
+  (is (= {:bot false,
+          :access false,
           :rank 2,
           :away false,
           :ingame false}
@@ -76,3 +82,8 @@
           "Archers_Valley_v6"]
          (rest
            (client/parse-updatebattleinfo "UPDATEBATTLEINFO 1 0 0 1465550451 Archers_Valley_v6")))))
+
+(deftest parse-joinbattle
+  (is (= ["32" "-1706632985" "__battle__1"]
+         (rest
+           (client/parse-joinbattle "JOINBATTLE 32 -1706632985 __battle__1")))))

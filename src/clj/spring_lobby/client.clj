@@ -17,8 +17,10 @@
     (java.security MessageDigest)
     (java.util Base64)))
 
-
 (def agent-string "alt-spring-lobby-0.1")
+
+(def default-address "192.168.1.6")
+(def default-port 8200)
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
@@ -86,10 +88,12 @@
       (gio/decode-stream s protocol))))
 
 (defn client
-  [host port]
-  (d/chain (tcp/client {:host host
-                        :port port})
-    #(wrap-duplex-stream protocol %)))
+  ([]
+   (client default-address default-port))
+  ([host port]
+   (d/chain (tcp/client {:host host
+                         :port port})
+     #(wrap-duplex-stream protocol %))))
 
 
 (defn send-message [c m]
@@ -126,7 +130,7 @@
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
 
 (defmethod handle "BATTLEOPENED" [c state m]
-  (if-let [[all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname battle-name] (parse-battleopened m)]
+  (if-let [[all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname channel-name] (parse-battleopened m)]
     (let [battle {:battle-id battle-id
                   :battle-type battle-type
                   :battle-nat-type battle-nat-type
@@ -142,7 +146,7 @@
                   :battle-map battle-map
                   :battle-title battle-title
                   :battle-modname battle-modname
-                  :battle-name battle-name}]
+                  :channel-name channel-name}]
       (swap! state assoc-in [:battles battle-id] battle))
     (warn "Unable to parse BATTLEOPENED")))
 
@@ -174,12 +178,43 @@
     (swap! state assoc-in [:users username :client-status] (decode-client-status client-status))))
 
 (defmethod handle "JOIN" [c state m]
-  (let [[all battle-name] (re-find #"\w+ (\w+)" m)]
-    (swap! state assoc-in [:battle :battle-name] battle-name)))
+  (let [[all channel-name] (re-find #"\w+ (\w+)" m)]
+    (swap! state assoc-in [:my-channels channel-name] {})))
 
 (defmethod handle "JOINED" [c state m]
-  (let [[all battle-name username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state assoc-in [:battle :users username] {})))
+  (let [[all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
+    (swap! state assoc-in [:channels channel-name :users username] {})))
+
+(defn parse-joinbattle [m]
+  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)" m))
+
+(defmethod handle "JOINBATTLE" [c state m]
+  (let [[all battle-id hash-code channel-name] (parse-joinbattle m)]
+    (swap! state assoc :battle {:battle-id battle-id
+                                :hash-code hash-code
+                                :channel-name channel-name})))
+
+(defmethod handle "JOINEDBATTLE" [c state m]
+  (let [[all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
+    (swap! state
+      (fn [state]
+        (let [initial-status {}
+              state (assoc-in state[:battles battle-id :users username] initial-status)]
+          (if (= battle-id (-> state :battle :battle-id))
+            (assoc-in state [:battle :users username] initial-status)
+            state))))))
+
+(defmethod handle "LEFT" [c state m]
+  (let [[all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
+    (swap! state update-in [:channels :users] dissoc username)))
+
+(defmethod handle "LEFTBATTLE" [c state m]
+  (let [[all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
+    (swap! state
+      (fn [state]
+        (-> state
+            (update-in [:battle :users] dissoc username)
+            (update-in [:battles battle-id :users] dissoc username))))))
 
 (defmethod handle "REQUESTBATTLESTATUS" [c state m]
   (send-message c "MYBATTLESTATUS 0 0")) ; TODO real status
@@ -214,23 +249,24 @@
 (defn exit [c]
   (send-message c "EXIT"))
 
-(defn login [c local-addr username password]
+(defn login
+  [client local-addr username password]
   (let [pw-md5-base64 (base64-encode (md5-bytes password))
         git-ref "b6e84c6023cbffac"
         user-id (rand-int Integer/MAX_VALUE)
         compat-flags "sp u"
         msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
                  " " agent-string "\t" user-id " " git-ref "\t" compat-flags)]
-    (send-message c msg)))
+    (send-message client msg)))
 
 
-(defn connect [state]
-  (let [address "192.168.1.6"
-        c @(client address 8200)]
-    (print-loop c state)
-    (login c address "skynet9001" "1234dogs")
-    (ping-loop c)
-    c))
+(defn connect
+  ([state]
+   (connect state (client)))
+  ([state client]
+   (print-loop client state)
+   (login client default-address "skynet9001" "1234dogs")
+   (ping-loop client)))
 
 (defn disconnect [c]
   (info "disconnecting")

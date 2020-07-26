@@ -13,20 +13,28 @@
 ; https://github.com/cljfx/cljfx/blob/master/examples/e27_selection_models.clj#L20
 
 
-(defn re []
+(defn unmount []
   (when repl/renderer
-    (fx/unmount-renderer spring-lobby/*state repl/renderer))
+    (fx/unmount-renderer spring-lobby/*state repl/renderer)))
+
+(defn mount []
+  (reset! spring-lobby/*state @repl/state)
+  (unmount)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc (fn [state]
                                             {:fx/type spring-lobby/root-view
                                              :state state}))
             :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
-    (reset! spring-lobby/*state @repl/state)
     (fx/mount-renderer spring-lobby/*state r)
     (alter-var-root #'repl/renderer (constantly r))))
 
-(re)
-
 (defn restart []
   (reset! repl/state @spring-lobby/*state)
-  (refresh :after 'user/re))
+  (refresh :after 'user/mount))
+
+
+(defn reset []
+  (unmount)
+  (reset! repl/state {})
+  (reset! spring-lobby/*state {})
+  (mount))

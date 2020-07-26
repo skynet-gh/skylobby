@@ -15,6 +15,7 @@
       :mapname (:battle-map battle)
       :hostip (:battle-ip battle)
       :hostport (:battle-port battle)
+      :myplayername "skynet9001" ; TODO
       :ishost 1 ; TODO
       :numplayers 1 ; TODO
       :startpostype 2 ; TODO
