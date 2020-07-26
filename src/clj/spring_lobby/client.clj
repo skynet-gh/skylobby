@@ -20,6 +20,8 @@
 
 (def agent-string "alt-spring-lobby-0.1")
 
+; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
+
 (def protocol
   (gloss/compile-frame
     (gloss/delimited-frame
@@ -36,6 +38,8 @@
   (gloss/compile-frame
     (gloss/bit-map :prefix 6 :side 2 :sync 2 :pad 4 :handicap 7 :mode 1 :ally 4 :id 4 :ready 1 :suffix 1)))
 
+(def default-client-status "0")
+
 (defn decode-client-status [status-str]
   (dissoc
     (gio/decode client-status-protocol
@@ -46,11 +50,6 @@
             (Byte/parseByte status-str)))
         ByteBuffer))
     :prefix))
-
-#_
-(decode-client-status "8")
-#_
-(decode-client-status "127")
 
 (defn decode-battle-status [status-str]
   (dissoc
@@ -63,16 +62,6 @@
         ByteBuffer))
     :prefix :pad :suffix))
 
-#_
-(let [f (gloss/compile-frame
-          (gloss/bit-map :prefix 6 :side 2 :sync 2 :pad 4 :handicap 7 :mode 1 :ally 4 :id 4 :ready 1 :suffix 1))]
-  (gio/decode f (byte-streams/convert (.toByteArray (.toBigInteger (bigint "8389632"))) ByteBuffer)))
-#_
-(decode-battle-status "8389632")
-#_
-(count (Integer/toBinaryString 8389632))
-#_
-(io/input-stream (.toByteArray (.toBigInteger (bigint "8389632"))))
 
 ; https://stackoverflow.com/a/39188819/984393
 (defn base64-encode [bs]
@@ -119,31 +108,22 @@
 (defn parse-adduser [m]
   (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
 
-#_
-(parse-adduser "ADDUSER skynet ?? 8 SpringLobby 0.270 (win x32)")
-#_
-(parse-adduser "ADDUSER ChanServ US None ChanServ")
-
 (defmethod handle "ADDUSER" [c state m]
-  (info (str "'" m "'"))
   (let [[all username country id user-agent] (parse-adduser m)
         user {:username username
               :country country
               :user-id id
-              :user-agent user-agent}]
+              :user-agent user-agent
+              :client-status (decode-client-status default-client-status)}]
     (swap! state assoc-in [:users username] user)))
 
 (defmethod handle "REMOVEUSER" [c state m]
-  (info (str "'" m "'"))
   (let [[all username] (re-find #"\w+ (\w+)" m)]
     (swap! state update :users dissoc username)))
 
 
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
-
-#_
-(parse-battleopened "BATTLEOPENED 1 0 0 skynet 192.168.1.6 8452 8 1 0 -1706632985 Spring	104.0.1-1510-g89bb8e3 maintenance	Mini_SuperSpeedMetal	deth	Balanced Annihilation V10.24	__battle__8")
 
 (defmethod handle "BATTLEOPENED" [c state m]
   (if-let [[all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname battle-name] (parse-battleopened m)]
@@ -169,9 +149,6 @@
 (defn parse-updatebattleinfo [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
 
-#_
-(parse-updatebattleinfo "UPDATEBATTLEINFO 1 0 0 1465550451 Archers_Valley_v6")
-
 (defmethod handle "UPDATEBATTLEINFO" [c state m]
   (let [[all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)
         battle {:battle-id battle-id
@@ -183,7 +160,14 @@
 
 (defmethod handle "BATTLECLOSED" [c state m]
   (let [[all battle-id] (re-find #"\w+ (\w+)" m)]
-    (swap! state update :battles dissoc battle-id)))
+    (swap! state
+      (fn [state]
+        (let [battle-name (-> state :battles (get battle-id) :battle-name)
+              curr-battle-name (-> state :battle :battle-name)
+              state (update state :battles dissoc battle-id)]
+          (if (= battle-name curr-battle-name)
+            (dissoc state :battle)
+            state))))))
 
 (defmethod handle "CLIENTSTATUS" [c state m]
   (let [[all username client-status] (re-find #"\w+ (\w+) (\w+)" m)]
@@ -268,31 +252,3 @@
     (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
          " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
          "\t" mod-name)))
-
-#_
-(do
-  (let [s (atom {})]
-    (def c (connect s))
-    (def state s)))
-#_
-(disconnect c)
-#_
-(-> state deref :users)
-#_
-(-> state deref :battles)
-#_
-(swap! state assoc :battles {})
-#_
-(send-message c "LISTCOMPFLAGS\n")
-#_
-(send-message c "CHANNELS\n")
-#_
-(send-message c "GETCHANNELMESSAGES\n")
-#_
-(send-message c "GETUSERINFO skynet9001\n")
-#_
-(send-message c "IGNORELIST skynet9001\n")
-#_
-(def p (print-loop c))
-#_
-(async/close! p)
