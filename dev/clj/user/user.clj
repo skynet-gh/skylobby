@@ -10,6 +10,9 @@
 (set-refresh-dirs "dev/clj/user" "dev/clj/test" "src/clj" "test/clj")
 
 
+; https://github.com/cljfx/cljfx/blob/master/examples/e27_selection_models.clj#L20
+
+
 (defn re []
   (when repl/renderer
     (fx/unmount-renderer spring-lobby/*state repl/renderer))

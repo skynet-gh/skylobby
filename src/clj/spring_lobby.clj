@@ -7,7 +7,7 @@
     [clojure.string :as string]
     [spring-lobby.client :as client]
     [spring-lobby.spring :as spring]
-    [taoensso.timbre :refer [error info trace warn]])
+    [taoensso.timbre :refer [debug error info trace warn]])
   (:import
     (java.io RandomAccessFile)
     (java.nio ByteBuffer)
@@ -15,17 +15,6 @@
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ISequentialOutStream SevenZip SevenZipNativeInitializationException)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)))
-
-
-; https://github.com/cljfx/cljfx/blob/master/examples/e27_selection_models.clj#L20
-(declare *state renderer)
-
-
-#_
-(when (and (.hasRoot #'*state)
-           (.hasRoot #'renderer))
-  (fx/unmount-renderer *state renderer))
-  ;(reset! *state (init-state)))
 
 
 (defonce *state
@@ -37,7 +26,8 @@
 
 (defn battle-opts []
   {:mod-hash -1706632985
-   :engine-version "104.0.1-1510-g89bb8e3 maintenance"
+   :engine-version "103.0"
+   ;:engine-version "104.0.1-1510-g89bb8e3 maintenance"
    :map-name "Dworld Acidic"
    :title "deth"
    :mod-name "Balanced Annihilation V9.79.4"
@@ -255,6 +245,25 @@
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-agent i))})}}]})
 
+(defmethod event-handler ::disconnect [e]
+  (client/disconnect (:client @*state))
+  (swap! *state dissoc :client :users :battles :battle))
+
+(defmethod event-handler ::connect [e]
+  (let [client (client/connect *state)]
+    (swap! *state assoc :client client)
+    (async/thread
+      (loop []
+        (if (and client (not (.isClosed client)))
+          (do
+            (debug "Client is still connected")
+            (async/<!! (async/timeout 20000))
+            (recur))
+          (do
+            (info "Client was disconnected")
+            (swap! *state dissoc :client :users :battles :battle)))))))
+
+
 (defn client-buttons [{:keys [client]}]
   {:fx/type :h-box
    :alignment :top-left
@@ -262,20 +271,29 @@
    (concat
      [{:fx/type :button
        :text (if client "Disconnect" "Connect")
-       :on-action (fn [_]
-                    (if client
-                      (do
-                        (client/disconnect client)
-                        (swap! *state dissoc :client :users :battles))
-                      (swap! *state assoc :client (client/connect *state))))}]
-     (when client
+       :on-action {:event/type (if client ::disconnect ::connect)}}])})
+
+(defmethod event-handler ::host-battle [e]
+  (client/open-battle (:client @*state) (battle-opts)))
+
+(defmethod event-handler ::leave-battle [e]
+  (client/send-message (:client @*state) "LEAVEBATTLE"))
+
+(defn battles-buttons [{:keys [battle client]}]
+  {:fx/type :h-box
+   :alignment :top-left
+   :children
+   (concat
+     (if battle
        [{:fx/type :button
-         :text "Host Battle"
-         :on-action (fn [_]
-                      (client/open-battle client (battle-opts)))}]))})
+         :text "Leave Battle"
+         :on-action {:event/type ::leave-battle}}]
+       (when client
+         [{:fx/type :button
+           :text "Host Battle"
+           :on-action {:event/type ::host-battle}}])))})
 
 (defmethod event-handler ::start-battle [e]
-  (println e)
   (let [{:keys [battle battles users]} @*state
         battles-by-name (into {}
                           (map
@@ -295,22 +313,26 @@
             script-file (io/file (spring-root) "script.txt")]
         (try
           (spit script-file script-txt)
-          (let [command (into-array String [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)])
+          (let [command [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)]
                 runtime (Runtime/getRuntime)]
             (info "Running '" command "'")
-            (let [process (.exec runtime command nil (spring-root))]
+            (let [process (.exec runtime (into-array String command) nil (spring-root))]
               (async/thread
                 (with-open [reader (io/reader (.getInputStream process))]
                   (loop []
-                    (when-let [line (.readLine reader)]
-                      (info "(out)" line)
-                      (recur)))))
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (info "(spring out)" line)
+                        (recur))
+                      (info "Spring stdout stream closed")))))
               (async/thread
                 (with-open [reader (io/reader (.getErrorStream process))]
                   (loop []
-                    (when-let [line (.readLine reader)]
-                      (info "(err)" line)
-                      (recur)))))))
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (info "(spring err)" line)
+                        (recur))
+                      (info "Spring stderr stream closed")))))))
           (catch Exception e
             (warn e)))))))
 
@@ -321,78 +343,80 @@
     {:fx/type :v-box
      :alignment :top-left
      :children
-     [{:fx/type :table-view
-       :items items
-       :columns
-       [{:fx/type :table-column
-         :text "Country"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:country (:user i)))})}}
-        {:fx/type :table-column
-         :text "Status"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (select-keys (:client-status (:user i)) [:bot :access]))})}}
-        {:fx/type :table-column
-         :text "Ingame"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:ingame (:client-status (:user i))))})}}
-        {:fx/type :table-column
-         :text "Faction"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:side (:battle-status i)))})}}
-        {:fx/type :table-column
-         :text "Rank"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:rank (:client-status (:user i))))})}}
-        {:fx/type :table-column
-         :text "TrueSkill"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text ""})}}
-        {:fx/type :table-column
-         :text "Color"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:team-color i))})}}
-        {:fx/type :table-column
-         :text "Nickname"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:username i))})}}
-        {:fx/type :table-column
-         :text "Player ID"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:id (:battle-status i)))})}}
-        {:fx/type :table-column
-         :text "Team ID"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:ally (:battle-status i)))})}}
-        {:fx/type :table-column
-         :text "Bonus"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (str (:handicap (:battle-status i)) "%")})}}]}
-      {:fx/type :button
-       :text "Start Battle"
-       :on-action {:event/type ::start-battle}}]}))
+     (concat
+       [{:fx/type :table-view
+         :items items
+         :columns
+         [{:fx/type :table-column
+           :text "Country"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:country (:user i)))})}}
+          {:fx/type :table-column
+           :text "Status"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (select-keys (:client-status (:user i)) [:bot :access]))})}}
+          {:fx/type :table-column
+           :text "Ingame"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:ingame (:client-status (:user i))))})}}
+          {:fx/type :table-column
+           :text "Faction"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:side (:battle-status i)))})}}
+          {:fx/type :table-column
+           :text "Rank"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:rank (:client-status (:user i))))})}}
+          {:fx/type :table-column
+           :text "TrueSkill"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text ""})}}
+          {:fx/type :table-column
+           :text "Color"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:team-color i))})}}
+          {:fx/type :table-column
+           :text "Nickname"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:username i))})}}
+          {:fx/type :table-column
+           :text "Player ID"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:id (:battle-status i)))})}}
+          {:fx/type :table-column
+           :text "Team ID"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:ally (:battle-status i)))})}}
+          {:fx/type :table-column
+           :text "Bonus"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:handicap (:battle-status i)) "%")})}}]}]
+       (when battle
+         [{:fx/type :button
+           :text "Start Battle"
+           :on-action {:event/type ::start-battle}}]))}))
 
 
 (defn root-view [{{:keys [client users battles battle]} :state}]
@@ -405,24 +429,16 @@
            :root {:fx/type :v-box
                   :alignment :top-left
                   :children [{:fx/type menu-view}
-                             {:fx/type battles-table
-                              :battles battles}
+                             {:fx/type client-buttons
+                              :client client}
                              {:fx/type user-table
                               :users users}
+                             {:fx/type battles-table
+                              :battles battles}
+                             {:fx/type battles-buttons
+                              :battle battle
+                              :client client}
                              {:fx/type battle-table
                               :battles battles
                               :battle battle
-                              :users users}
-                             {:fx/type client-buttons
-                              :client client}]}}})
-
-#_
-(def renderer
-  (fx/create-renderer
-    :middleware (fx/wrap-map-desc (fn [state]
-                                    {:fx/type root-view
-                                     :state state}))
-    :opts {:fx.opt/map-event-handler event-handler}))
-
-#_
-(fx/mount-renderer *state renderer)
+                              :users users}]}}})
