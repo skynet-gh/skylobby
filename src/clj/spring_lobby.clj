@@ -157,24 +157,40 @@
              {:fx/type :menu-item
               :text "menu4 item2"}]}]})
 
-(defn battles-table [{:keys [battles]}]
+(defn battles-table [{:keys [battles users]}]
   {:fx/type :table-view
    :items (vec (vals battles))
    :columns
    [{:fx/type :table-column
-     :text "Status"}
+     :text "Status"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:battle-type i))})}}
     {:fx/type :table-column
      :text "Country"
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:country i))})}}
+      :describe (fn [i] {:text (str (:country (get users (:host-username i))))})}}
     {:fx/type :table-column
-     :text " "}
+     :text " "
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:battle-rank i))})}}
     {:fx/type :table-column
-     :text "Players"}
+     :text "Players"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (count (:users i)))})}}
     {:fx/type :table-column
-     :text "Max"}
+     :text "Max"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:battle-maxplayers i))})}}
     {:fx/type :table-column
      :text "Spectators"}
     {:fx/type :table-column
@@ -434,7 +450,8 @@
                              {:fx/type user-table
                               :users users}
                              {:fx/type battles-table
-                              :battles battles}
+                              :battles battles
+                              :users users}
                              {:fx/type battles-buttons
                               :battle battle
                               :client client}
