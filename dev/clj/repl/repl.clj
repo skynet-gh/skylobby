@@ -1,5 +1,5 @@
 (ns repl)
 
 
-(def state (atom {}))
+(def state (atom nil))
 (def ^:dynamic renderer nil)

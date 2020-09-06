@@ -19,8 +19,12 @@
 (set! *warn-on-reflection* true)
 
 
+(def default-state
+  {:username "skynet9001"
+   :password "1234dogs"})
+
 (defonce *state
-  (atom {}))
+  (atom default-state))
 
 #_
 (pprint @*state)
@@ -162,7 +166,6 @@
               :text "menu4 item2"}]}]})
 
 (defmethod event-handler ::select-battle [e]
-  (info e)
   (swap! *state assoc :selected-battle (-> e :fx/event :battle-id)))
 
 (defn battles-table [{:keys [battles users]}]
@@ -346,12 +349,21 @@
   (into-array String ["SPRING_WRITEDIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\write"
                       "SPRING_DATADIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\data"]))
 
+(defmethod event-handler ::add-bot [_e]
+  (let [bot-num 1
+        bot-name "KAIK"
+        bot-version "0.13"
+        bot-status 0
+        bot-color 0
+        message (str "ADDBOT kekbot" bot-num " " bot-status " " bot-color " " bot-name "|" bot-version)]
+    (client/send-message (:client @*state) message)))
+
 (defmethod event-handler ::start-battle [_e]
-  (let [{:keys [battle battles users]} @*state
+  (let [{:keys [battle battles users username]} @*state
         battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))
         battle (merge (get battles (:battle-id battle)) battle)
         {:keys [battle-version]} battle
-        script (spring/script-data battle) ; {:SpringData "C:\\Users\\craig\\.alt-spring-lobby\\spring"}
+        script (spring/script-data battle {:myplayername username})
         script-txt (spring/script-txt script)
         engine-file (io/file (spring-root) "engine" battle-version "spring.exe")
         ;script-file (io/file (spring-root) "script.txt")
@@ -390,8 +402,13 @@
 
 
 (defn battle-table [{:keys [battle users]}]
-  (let [battle-users (:users battle)
-        items (mapv (fn [[k v]] (assoc v :username k :user (get users k))) battle-users)]
+  (let [items (concat
+                (mapv 
+                  (fn [[k v]] (assoc v :username k :user (get users k)))
+                  (:users battle))
+                (mapv 
+                  (fn [[k v]] (assoc v :username (str k "(" (:owner v) ")")))
+                  (:bots battle)))]
     {:fx/type :v-box
      :alignment :top-left
      :children
@@ -466,9 +483,15 @@
            {:fx/cell-type :table-cell
             :describe (fn [i] {:text (str (:handicap (:battle-status i)) "%")})}}]}]
        (when battle
-         [{:fx/type :button
-           :text "Start Battle"
-           :on-action {:event/type ::start-battle}}]))}))
+         [{:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type :button
+             :text "Start Battle"
+             :on-action {:event/type ::start-battle}}
+            {:fx/type :button
+             :text "Add Bot"
+             :on-action {:event/type ::add-bot}}]}]))}))
 
 
 (defn root-view [{{:keys [client client-deferred users battles battle selected-battle]} :state}]

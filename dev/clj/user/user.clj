@@ -33,8 +33,10 @@
     (alter-var-root #'repl/renderer (constantly r))))
 
 (defn restart []
+  #_
   (when-let [client (-> spring-lobby/*state deref :client)]
     (client/disconnect client))
+  #_
   (when-let [client (-> repl/state deref :client)]
     (client/disconnect client))
   (unmount)
@@ -44,6 +46,6 @@
 
 (defn reset []
   (unmount)
-  (reset! repl/state {})
-  (reset! spring-lobby/*state {})
+  (reset! repl/state spring-lobby/default-state)
+  (reset! spring-lobby/*state spring-lobby/default-state)
   (mount))

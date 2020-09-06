@@ -54,6 +54,10 @@
           "ChanServ"]
          (rest (client/parse-adduser "ADDUSER ChanServ US None ChanServ")))))
 
+(deftest parse-addbot
+  (is (= ["12" "kekbot1" "skynet9001" "0" "0" "KAIK|0.13"]
+         (rest (client/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13")))))
+
 (deftest parse-battleopened
   (is (= ["1"
           "0"

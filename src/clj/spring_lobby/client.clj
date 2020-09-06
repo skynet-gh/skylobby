@@ -3,19 +3,17 @@
     [aleph.tcp :as tcp]
     [byte-streams]
     [clojure.core.async :as async]
-    [clojure.java.io :as io]
     [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
-    [org.clojars.smee.binary.core :as b]
     [taoensso.timbre :refer [info trace warn]])
   (:import
-    (java.net InetAddress InetSocketAddress)
     (java.nio ByteBuffer)
     (java.security MessageDigest)
     (java.util Base64)))
+
 
 (def agent-string "alt-spring-lobby-0.1")
 
@@ -41,6 +39,7 @@
     (gloss/bit-map :prefix 6 :side 2 :sync 2 :pad 4 :handicap 7 :mode 1 :ally 4 :id 4 :ready 1 :suffix 1)))
 
 (def default-client-status "0")
+
 
 (defn decode-client-status [status-str]
   (dissoc
@@ -101,36 +100,60 @@
   @(s/put! c (str m "\n")))
 
 (defmulti handle
-  (fn [c state m]
+  (fn [_c _state m]
     (-> m
         (string/split #"\s")
         first)))
 
-(defmethod handle :default [c state m]
+(defmethod handle :default [_c _state m]
   (trace "no handler for message" (str "'" m "'")))
 
 (defn parse-adduser [m]
   (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
 
-(defmethod handle "ADDUSER" [c state m]
-  (let [[all username country id user-agent] (parse-adduser m)
+(defmethod handle "ADDUSER" [_c state m]
+  (let [[_all username country user-id user-agent] (parse-adduser m)
         user {:username username
               :country country
-              :user-id id
+              :user-id user-id
               :user-agent user-agent
               :client-status (decode-client-status default-client-status)}]
     (swap! state assoc-in [:users username] user)))
 
-(defmethod handle "REMOVEUSER" [c state m]
-  (let [[all username] (re-find #"\w+ (\w+)" m)]
+(defmethod handle "REMOVEUSER" [_c state m]
+  (let [[_all username] (re-find #"\w+ (\w+)" m)]
     (swap! state update :users dissoc username)))
+
+
+(defn parse-addbot [m]
+  (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+) ([^\s]+)" m))
+
+(defmethod handle "ADDBOT" [_c state m]
+  (let [[_all battle-id bot-name owner battle-status team-color ai] (parse-addbot m)
+        [_all ai-name ai-version] (when ai (re-find #"([^\s]+)\|([^\s]+)" ai))
+        bot {:bot-name bot-name
+             :owner owner
+             :battle-status (decode-battle-status battle-status)
+             :team-color team-color
+             :ai-name ai-name
+             :ai-version ai-version}]
+    (swap! state
+      (fn [state]
+        (let [state (assoc-in state [:battles battle-id :bots bot-name] bot)]
+          (if (= battle-id (-> state :battle :battle-id))
+            (assoc-in state [:battle :bots bot-name] bot)
+            state))))))
+
+(defmethod handle "REMOVEBOT" [_c state m]
+  (let [[_all botname] (re-find #"\w+ (\w+)" m)]
+    (swap! state update :bots dissoc botname)))
 
 
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
 
-(defmethod handle "BATTLEOPENED" [c state m]
-  (if-let [[all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname channel-name] (parse-battleopened m)]
+(defmethod handle "BATTLEOPENED" [_c state m]
+  (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname channel-name] (parse-battleopened m)]
     (let [battle {:battle-id battle-id
                   :battle-type battle-type
                   :battle-nat-type battle-nat-type
@@ -153,8 +176,8 @@
 (defn parse-updatebattleinfo [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
 
-(defmethod handle "UPDATEBATTLEINFO" [c state m]
-  (let [[all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)
+(defmethod handle "UPDATEBATTLEINFO" [_c state m]
+  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)
         battle {:battle-id battle-id
                 :battle-spectators battle-spectators
                 :battle-locked battle-locked
@@ -162,8 +185,8 @@
                 :battle-map battle-map}]
     (swap! state update-in [:battles battle-id] merge battle)))
 
-(defmethod handle "BATTLECLOSED" [c state m]
-  (let [[all battle-id] (re-find #"\w+ (\w+)" m)]
+(defmethod handle "BATTLECLOSED" [_c state m]
+  (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
     (swap! state
       (fn [state]
         (let [battle-name (-> state :battles (get battle-id) :battle-name)
@@ -173,29 +196,29 @@
             (dissoc state :battle)
             state))))))
 
-(defmethod handle "CLIENTSTATUS" [c state m]
-  (let [[all username client-status] (re-find #"\w+ (\w+) (\w+)" m)]
+(defmethod handle "CLIENTSTATUS" [_c state m]
+  (let [[_all username client-status] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state assoc-in [:users username :client-status] (decode-client-status client-status))))
 
-(defmethod handle "JOIN" [c state m]
-  (let [[all channel-name] (re-find #"\w+ (\w+)" m)]
+(defmethod handle "JOIN" [_c state m]
+  (let [[_all channel-name] (re-find #"\w+ (\w+)" m)]
     (swap! state assoc-in [:my-channels channel-name] {})))
 
-(defmethod handle "JOINED" [c state m]
-  (let [[all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
+(defmethod handle "JOINED" [_c state m]
+  (let [[_all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state assoc-in [:channels channel-name :users username] {})))
 
 (defn parse-joinbattle [m]
   (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)" m))
 
-(defmethod handle "JOINBATTLE" [c state m]
-  (let [[all battle-id hash-code channel-name] (parse-joinbattle m)]
+(defmethod handle "JOINBATTLE" [_c state m]
+  (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]
     (swap! state assoc :battle {:battle-id battle-id
                                 :hash-code hash-code
                                 :channel-name channel-name})))
 
-(defmethod handle "JOINEDBATTLE" [c state m]
-  (let [[all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
+(defmethod handle "JOINEDBATTLE" [_c state m]
+  (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
         (let [initial-status {}
@@ -204,23 +227,23 @@
             (assoc-in state [:battle :users username] initial-status)
             state))))))
 
-(defmethod handle "LEFT" [c state m]
-  (let [[all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
+(defmethod handle "LEFT" [_c state m]
+  (let [[_all _channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state update-in [:channels :users] dissoc username)))
 
-(defmethod handle "LEFTBATTLE" [c state m]
-  (let [[all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
+(defmethod handle "LEFTBATTLE" [_c state m]
+  (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
         (-> state
             (update-in [:battle :users] dissoc username)
             (update-in [:battles battle-id :users] dissoc username))))))
 
-(defmethod handle "REQUESTBATTLESTATUS" [c state m]
+(defmethod handle "REQUESTBATTLESTATUS" [c _state _m]
   (send-message c "MYBATTLESTATUS 0 0")) ; TODO real status
 
-(defmethod handle "CLIENTBATTLESTATUS" [c state m]
-  (let [[all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
+(defmethod handle "CLIENTBATTLESTATUS" [_c state m]
+  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
     (swap! state update-in [:battle :users username] merge {:battle-status (decode-battle-status battle-status)
                                                             :team-color team-color})))
 
@@ -261,12 +284,13 @@
 
 
 (defn connect
-  ([state]
-   (connect state (client)))
-  ([state client]
-   (print-loop client state)
-   (login client default-address "skynet9001" "1234dogs")
-   (ping-loop client)))
+  ([state-atom]
+   (connect state-atom (client)))
+  ([state-atom client]
+   (let [{:keys [username password]} @state-atom]
+     (print-loop client state-atom)
+     (login client default-address username password)
+     (ping-loop client))))
 
 (defn disconnect [c]
   (info "disconnecting")
@@ -282,8 +306,7 @@
                            host-port 8452
                            max-players 8
                            rank 0
-                           engine "Spring"}
-                      :as opts}]
+                           engine "Spring"}}]
   (send-message c
     (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
          " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title

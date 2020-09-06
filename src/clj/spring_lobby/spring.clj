@@ -13,15 +13,15 @@
   ([battle opts]
    {:game
     (into
-      {:gametype (:battle-modname battle)
-       :mapname (:battle-map battle)
-       :hostip (:battle-ip battle)
-       :hostport (:battle-port battle)
-       :myplayername "skynet9001" ; TODO
-       :ishost 1 ; TODO
-       :numplayers 1 ; TODO
-       :startpostype 2 ; TODO
-       :numusers (count (:users battle))} ; TODO
+      (sorted-map
+        :gametype (:battle-modname battle)
+        :mapname (:battle-map battle)
+        :hostip (:battle-ip battle)
+        :hostport (:battle-port battle)
+        :ishost 1 ; TODO
+        :numplayers 1 ; TODO
+        :startpostype 2 ; TODO
+        :numusers (count (:users battle))) ; TODO
       (concat
         (map
           (fn [[player {:keys [battle-status team-color user]}]]
