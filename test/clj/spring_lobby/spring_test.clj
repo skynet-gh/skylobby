@@ -34,19 +34,21 @@
     :ishost 1
     :numplayers 1
     :startpostype 2
-    :numusers 0}})
+    :numusers 0
+    :myplayername "skynet9001"}})
 
 
 (def expected-script-txt
   "[game]
 {
+\tmyplayername = skynet9001;
+\tishost = 1;
+\tstartpostype = 2;
+\tnumplayers = 1;
 \tgametype = Balanced Annihilation V9.79.4;
-\tmapname = Dworld Acidic;
 \thostip = 127.0.0.1;
 \thostport = 8452;
-\tishost = 1;
-\tnumplayers = 1;
-\tstartpostype = 2;
+\tmapname = Dworld Acidic;
 \tnumusers = 0;
 }
 

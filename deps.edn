@@ -2,15 +2,15 @@
  :deps
  {aleph {:mvn/version "0.4.6"}
   byte-streams {:mvn/version "0.2.4"}
-  clj-antlr {:mvn/version "0.2.5"}
-  cljfx {:mvn/version "1.7.4"}
+  clj-antlr {:mvn/version "0.2.6"}
+  cljfx {:mvn/version "1.7.8"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.taoensso/timbre {:mvn/version "4.10.0"}
   digest {:mvn/version "1.4.9"}
   gloss {:mvn/version "0.2.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-  org.clojure/core.async {:mvn/version "1.2.603"}
+  org.clojure/core.async {:mvn/version "1.3.610"}
   org.openjfx/javafx-controls {:mvn/version "14.0.2.1"}
   smee/binary {:mvn/version "0.5.5"}}
  :aliases

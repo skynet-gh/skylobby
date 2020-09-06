@@ -1,21 +1,22 @@
 (ns spring-lobby
   (:require
-    [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.core.async :as async]
     [clojure.java.io :as io]
-    [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [spring-lobby.client :as client]
     [spring-lobby.spring :as spring]
-    [taoensso.timbre :refer [debug error info trace warn]])
+    [taoensso.timbre :refer [debug info trace warn]])
   (:import
     (java.io RandomAccessFile)
     (java.nio ByteBuffer)
     (java.util.zip CRC32 ZipFile)
     (javax.imageio ImageIO)
-    (net.sf.sevenzipjbinding ISequentialOutStream SevenZip SevenZipNativeInitializationException)
+    (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (defonce *state
@@ -130,7 +131,7 @@
 (defn extract-7z [from])
 
 
-(defn menu-view [opts]
+(defn menu-view [_opts]
   {:fx/type :menu-bar
    :menus
    [{:fx/type :menu
@@ -258,7 +259,7 @@
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text ""})}}
+      :describe (fn [_i] {:text ""})}}
     {:fx/type :table-column
      :text "Username"
      :cell-value-factory identity
@@ -275,11 +276,11 @@
 (defn update-disconnected []
   (swap! *state dissoc :battle :battles :chanenls :client :client-deferred :my-channels :users))
 
-(defmethod event-handler ::disconnect [e]
+(defmethod event-handler ::disconnect [_e]
   (client/disconnect (:client @*state))
   (update-disconnected))
 
-(defmethod event-handler ::connect [e]
+(defmethod event-handler ::connect [_e]
   (let [client-deferred (client/client)] ; TODO host port
     (swap! *state assoc :client-deferred client-deferred)
     (async/thread
@@ -311,13 +312,13 @@
        :disable (boolean (and (not client) client-deferred))
        :on-action {:event/type (if client ::disconnect ::connect)}}])})
 
-(defmethod event-handler ::host-battle [e]
+(defmethod event-handler ::host-battle [_e]
   (client/open-battle (:client @*state) (battle-opts)))
 
-(defmethod event-handler ::leave-battle [e]
+(defmethod event-handler ::leave-battle [_e]
   (client/send-message (:client @*state) "LEAVEBATTLE"))
 
-(defmethod event-handler ::join-battle [e]
+(defmethod event-handler ::join-battle [_e]
   (when-let [selected (-> *state deref :selected-battle)]
     (client/send-message (:client @*state) (str "JOINBATTLE " selected))))
 
@@ -340,20 +341,33 @@
                :text "Join Battle"
                :on-action {:event/type ::join-battle}}])))))})
 
-(defmethod event-handler ::start-battle [e]
+; doesn't work from WSL
+(defn spring-env []
+  (into-array String ["SPRING_WRITEDIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\write"
+                      "SPRING_DATADIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\data"]))
+
+(defmethod event-handler ::start-battle [_e]
   (let [{:keys [battle battles users]} @*state
         battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))
         battle (merge (get battles (:battle-id battle)) battle)
-        script (spring/script-data battle)
+        {:keys [battle-version]} battle
+        script (spring/script-data battle) ; {:SpringData "C:\\Users\\craig\\.alt-spring-lobby\\spring"}
         script-txt (spring/script-txt script)
-        engine-file (io/file (spring-root) "engine" (:battle-version battle) "spring.exe")
-        script-file (io/file (spring-root) "script.txt")]
+        engine-file (io/file (spring-root) "engine" battle-version "spring.exe")
+        ;script-file (io/file (spring-root) "script.txt")
+        ;homedir (io/file (System/getProperty "user.home"))
+        ;script-file (io/file homedir "script.txt")
+        script-file (io/file "/mnt/c/Users/craig/.alt-spring-lobby/spring/script.txt") ; TODO remove
+        isolation-dir (io/file "/mnt/c/Users/craig/.alt-spring-lobby/spring/engine" battle-version)] ; TODO remove
+        ;homedir (io/file "C:\\Users\\craig\\.alt-spring-lobby\\spring") ; TODO remove
     (try
       (spit script-file script-txt)
-      (let [command [(.getAbsolutePath engine-file) (.getAbsolutePath script-file)]
+      (let [command [(.getAbsolutePath engine-file)
+                     "--isolation-dir" (str "C:\\Users\\craig\\.alt-spring-lobby\\spring\\engine\\" battle-version) ; TODO windows path
+                     "C:\\Users\\craig\\.alt-spring-lobby\\spring\\script.txt"] ; TODO windows path
             runtime (Runtime/getRuntime)]
         (info "Running '" command "'")
-        (let [process (.exec runtime (into-array String command) nil (spring-root))]
+        (let [process (.exec runtime (into-array String command) nil isolation-dir)]
           (async/thread
             (with-open [reader (io/reader (.getInputStream process))]
               (loop []
@@ -375,7 +389,7 @@
     (client/send-message (:client @*state) "MYSTATUS 1")))
 
 
-(defn battle-table [{:keys [battle battles users]}]
+(defn battle-table [{:keys [battle users]}]
   (let [battle-users (:users battle)
         items (mapv (fn [[k v]] (assoc v :username k :user (get users k))) battle-users)]
     {:fx/type :v-box
@@ -420,7 +434,7 @@
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text ""})}}
+            :describe (fn [_i] {:text ""})}}
           {:fx/type :table-column
            :text "Color"
            :cell-value-factory identity

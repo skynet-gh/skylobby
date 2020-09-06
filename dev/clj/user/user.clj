@@ -1,10 +1,14 @@
 (ns user
   (:require
     [cljfx.api :as fx]
-    [clojure.core.cache :as cache]
     [clojure.tools.namespace.repl :refer [refresh set-refresh-dirs]]
+    [pjstadig.humane-test-output]
     [repl]
-    [spring-lobby]))
+    [spring-lobby]
+    [spring-lobby.client :as client]))
+
+
+(pjstadig.humane-test-output/activate!)
 
 
 (set-refresh-dirs "dev/clj/user" "dev/clj/test" "src/clj" "test/clj")
@@ -29,6 +33,11 @@
     (alter-var-root #'repl/renderer (constantly r))))
 
 (defn restart []
+  (when-let [client (-> spring-lobby/*state deref :client)]
+    (client/disconnect client))
+  (when-let [client (-> repl/state deref :client)]
+    (client/disconnect client))
+  (unmount)
   (reset! repl/state @spring-lobby/*state)
   (refresh :after 'user/mount))
 

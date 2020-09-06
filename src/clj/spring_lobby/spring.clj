@@ -8,46 +8,49 @@
 
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
-  [battle]
-  {:game
-   (into
-     {:gametype (:battle-modname battle)
-      :mapname (:battle-map battle)
-      :hostip (:battle-ip battle)
-      :hostport (:battle-port battle)
-      :myplayername "skynet9001" ; TODO
-      :ishost 1 ; TODO
-      :numplayers 1 ; TODO
-      :startpostype 2 ; TODO
-      :numusers (count (:users battle))} ; TODO
-     (concat
-       (map
-         (fn [[player {:keys [battle-status team-color user]}]]
-           (info team-color)
-           [(str "player" (:id battle-status))
-            {:name player
-             :team (:ally battle-status)
-             :isfromdemo 0 ; TODO
-             :countrycode (:country user)
-             :rgbcolor (when-let [decimal-color (try (Integer/parseInt team-color) (catch Exception _ nil))]
-                         (info decimal-color)
-                         (let [[r g b a :as rgba] (:rgba (colors/create-color decimal-color))]
-                           (info r g b a rgba)
-                           (str r " " g " " b)))}])
-         (:users battle))
-       (map
-         (fn [[player {:keys [battle-status]}]]
-           [(str "team" (:id battle-status))
-            {:teamleader (:id battle-status)
-             :handicap (:handicap battle-status)
-             :allyteam (:ally battle-status)
-             ;:rgbcolor nil TODO
-             :side (:side battle-status)}])
-         (:users battle))
-       (map
-         (fn [ally]
-           [(str "allyteam" ally) {}])
-         (set (map (comp :ally :battle-status second) (:users battle))))))})
+  ([battle]
+   (script-data battle nil))
+  ([battle opts]
+   {:game
+    (into
+      {:gametype (:battle-modname battle)
+       :mapname (:battle-map battle)
+       :hostip (:battle-ip battle)
+       :hostport (:battle-port battle)
+       :myplayername "skynet9001" ; TODO
+       :ishost 1 ; TODO
+       :numplayers 1 ; TODO
+       :startpostype 2 ; TODO
+       :numusers (count (:users battle))} ; TODO
+      (concat
+        (map
+          (fn [[player {:keys [battle-status team-color user]}]]
+            (info team-color)
+            [(str "player" (:id battle-status))
+             {:name player
+              :team (:ally battle-status)
+              :isfromdemo 0 ; TODO
+              :countrycode (:country user)
+              :rgbcolor (when-let [decimal-color (try (Integer/parseInt team-color) (catch Exception _ nil))]
+                          (info decimal-color)
+                          (let [[r g b a :as rgba] (:rgba (colors/create-color decimal-color))]
+                            (info r g b a rgba)
+                            (str r " " g " " b)))}])
+          (:users battle))
+        (map
+          (fn [[player {:keys [battle-status]}]]
+            [(str "team" (:id battle-status))
+             {:teamleader (:id battle-status)
+              :handicap (:handicap battle-status)
+              :allyteam (:ally battle-status)
+              ;:rgbcolor nil TODO
+              :side (:side battle-status)}])
+          (:users battle))
+        (map
+          (fn [ally]
+            [(str "allyteam" ally) {}])
+          (set (map (comp :ally :battle-status second) (:users battle))))
+        opts))}))
 
 (defn script-txt-inner
   ([kv]
