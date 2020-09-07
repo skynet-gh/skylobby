@@ -100,12 +100,12 @@
   @(s/put! c (str m "\n")))
 
 (defmulti handle
-  (fn [_c _state m]
+  (fn [_client _state m]
     (-> m
         (string/split #"\s")
         first)))
 
-(defmethod handle :default [_c _state m]
+(defmethod handle :default [_client _state m]
   (trace "no handler for message" (str "'" m "'")))
 
 (defn parse-adduser [m]
@@ -299,6 +299,15 @@
   (exit c)
   (.close c)
   (info "connection closed?" (.isClosed c)))
+
+(defmethod handle "DENIED" [client state m]
+  (info (str "Login denied: '" m "'"))
+  (disconnect client)
+  (swap! state
+    (fn [state]
+      (-> state
+          (dissoc :client :client-deferred)
+          (assoc :login-error m)))))
 
 (defn open-battle [c {:keys [battle-type nat-type battle-password host-port max-players mod-hash rank map-hash
                              engine engine-version map-name title mod-name]

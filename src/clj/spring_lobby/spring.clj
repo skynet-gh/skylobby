@@ -1,9 +1,16 @@
 (ns spring-lobby.spring
   "Interface to run Spring."
   (:require
-    [com.evocomputing.colors :as colors]
-    [taoensso.timbre :refer [info]]))
+    [clojure.walk]
+    [com.evocomputing.colors :as colors]))
 
+
+(defn format-color [team-color]
+  (when-let [decimal-color (or (when (number? team-color) team-color)
+                               (try (Integer/parseInt team-color)
+                                    (catch Exception _ nil)))]
+    (let [[r g b _a] (:rgba (colors/create-color decimal-color))]
+      (str r " " g " " b))))
 
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
@@ -19,41 +26,37 @@
        :ishost 1 ; TODO
        :numplayers 1 ; TODO
        :startpostype 2 ; TODO
-       :numusers (count (:users battle))} ; TODO
+       :numusers (count (concat (:users battle) (:bots battle)))} ; TODO
       (concat
         (map
-          (fn [[player {:keys [battle-status team-color user]}]]
-            (info team-color)
+          (fn [[player {:keys [battle-status user]}]]
             [(str "player" (:id battle-status))
              {:name player
               :team (:ally battle-status)
               :isfromdemo 0 ; TODO
-              :countrycode (:country user)
-              :rgbcolor (when-let [decimal-color (or (when (number? team-color) team-color)
-                                                     (try (Integer/parseInt team-color) 
-                                                          (catch Exception _ nil)))]
-                          (info decimal-color)
-                          (let [[r g b a :as rgba] (:rgba (colors/create-color decimal-color))]
-                            (info r g b a rgba)
-                            (str r " " g " " b)))}])
+              :countrycode (:country user)}])
           (:users battle))
         (map
           (fn [[_player {:keys [battle-status]}]]
-            [(str "team" (:id battle-status))
+            [(str "team" (:ally battle-status))
              {:teamleader (:id battle-status)
               :handicap (:handicap battle-status)
               :allyteam (:ally battle-status)
-              ;:rgbcolor nil TODO
+              :rgbcolor (format-color (:team-color battle-status))
               :side (:side battle-status)}])
-          (:users battle))
+          (map
+            (comp first second)
+            (group-by (comp :ally :battle-status second)
+              (merge (:users battle) (:bots battle))))) ; TODO group-by :team ?
         (map
-          (fn [[_bot-name {:keys [battle-status]}]]
-            [(str "team" (:id battle-status))
-             {:teamleader (:id battle-status)
-              :handicap (:handicap battle-status)
-              :allyteam (:ally battle-status)
-              ;:rgbcolor nil TODO
-              :side (:side battle-status)
+          (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
+            [(str "ai" (:id battle-status))
+             {:name bot-name
+              :shortname ai-name
+              :version ai-version
+              :host (-> battle :users (get owner) :battle-status :id)
+              :isfromdemo 0 ; TODO
+              :team (:ally battle-status)
               :options {}}]) ; TODO
           (:bots battle))
         (map
@@ -80,4 +83,4 @@
 (defn script-txt
   "Given data for a battle, return contents of a script.txt file for Spring."
   ([script-data]
-   (apply str (map script-txt-inner (sort-by first script-data)))))
+   (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))

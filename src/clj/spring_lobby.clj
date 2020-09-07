@@ -22,25 +22,17 @@
 
 (def default-state
   {:username "skynet9001"
-   :password "1234dogs"})
+   :password "1234dogs"
+   :map-name "Dworld Acidic"
+   :mod-name "Balanced Annihilation V9.79.4"
+   :title "deth"
+   :engine-version "103.0"})
 
 (defonce *state
   (atom default-state))
 
-#_
-(pprint @*state)
 
 (defmulti event-handler :event/type)
-
-
-(defn battle-opts []
-  {:mod-hash -1706632985
-   :engine-version "103.0"
-   ;:engine-version "104.0.1-1510-g89bb8e3 maintenance"
-   :map-name "Dworld Acidic"
-   :title "deth"
-   :mod-name "Balanced Annihilation V9.79.4"
-   :map-hash -1611391257})
 
 
 (SevenZip/initSevenZipFromPlatformJAR)
@@ -281,7 +273,8 @@
   (swap! *state dissoc :battle :battles :chanenls :client :client-deferred :my-channels :users))
 
 (defmethod event-handler ::disconnect [_e]
-  (client/disconnect (:client @*state))
+  (when-let [client (:client @*state)]
+    (client/disconnect client))
   (update-disconnected))
 
 (defmethod event-handler ::connect [_e]
@@ -302,7 +295,7 @@
               (update-disconnected))))))))
 
 
-(defn client-buttons [{:keys [client client-deferred username password]}]
+(defn client-buttons [{:keys [client client-deferred username password login-error]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -322,7 +315,10 @@
       {:fx/type :password-field
        :text password
        :disable (boolean (or client client-deferred))
-       :on-action {:event/type ::password-change}}])})
+       :on-action {:event/type ::password-change}}]
+     (when login-error
+       [{:fx/type :label
+         :text (str login-error)}]))})
 
 (defmethod event-handler ::username-change [e]
   (swap! *state assoc :username (:fx/event e)))
@@ -331,8 +327,20 @@
   (swap! *state assoc :password (:fx/event e)))
 
 
+(defn host-battle []
+  (let [{:keys [client] :as state} @*state]
+    (client/open-battle client
+      (assoc
+        (select-keys state [:battle-password :title :engine-version :mod-name :map-name])
+        :mod-hash -1
+        :map-hash -1))))
+
 (defmethod event-handler ::host-battle [_e]
-  (client/open-battle (:client @*state) (battle-opts)))
+  (host-battle))
+
+(defmethod event-handler ::battle-password-action [_e]
+  (host-battle))
+
 
 (defmethod event-handler ::leave-battle [_e]
   (client/send-message (:client @*state) "LEAVEBATTLE"))
@@ -345,34 +353,65 @@
              (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
                (str " " battle-password)))))))
 
-(defn battles-buttons [{:keys [battle battles battle-password client selected-battle]}]
+(defn battles-buttons
+  [{:keys [battle battles battle-password client selected-battle title engine-version mod-name map-name]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
-   (concat
+   (or
      (if battle
        [{:fx/type :button
          :text "Leave Battle"
          :on-action {:event/type ::leave-battle}}]
        (when client
          (concat
-           [{:fx/type :button
-             :text "Host Battle"
-             :on-action {:event/type ::host-battle}}]
            (when selected-battle
              (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))] ; TODO
-               (conj
-                 [{:fx/type :button
-                   :text "Join Battle"
-                   :disable (boolean (and needs-password (string/blank? battle-password)))
-                   :on-action {:event/type ::join-battle}}
-                  (when needs-password
-                    {:fx/type :text-field
-                     :text (str battle-password)
-                     :on-text-changed {:event/type ::battle-password-change}})])))))))})
+               [{:fx/type :button
+                 :text "Join Battle"
+                 :disable (boolean (and needs-password (string/blank? battle-password)))
+                 :on-action {:event/type ::join-battle}}]))
+           [{:fx/type :text-field
+             :text (str battle-password)
+             :prompt-text "Battle Password"
+             :on-action {:event/type ::battle-password-action}
+             :on-text-changed {:event/type ::battle-password-change}}
+            {:fx/type :button
+             :text "Host Battle"
+             :on-action {:event/type ::host-battle}}
+            {:fx/type :text-field
+             :text (str title)
+             :prompt-text "Battle Title"
+             :on-action {:event/type ::host-battle}
+             :on-text-changed {:event/type ::title-change}}
+            {:fx/type :choice-box
+             :value (str engine-version)
+             :items ["103.0" "104.0"] ; TODO
+             :on-value-changed {:event/type ::version-change}}
+            {:fx/type :choice-box
+             :value (str mod-name)
+             :items ["Balanced Annihilation V9.79.4" "Balanced Annihilation V10.24"] ; TODO
+             :on-value-changed {:event/type ::mod-change}}
+            {:fx/type :choice-box
+             :value (str map-name)
+             :items ["Dworld Acidic" "Dworld Duo"] ; TODO
+             :on-value-changed {:event/type ::map-change}}])))
+     [])})
 
 (defmethod event-handler ::battle-password-change [e]
   (swap! *state assoc :battle-password (:fx/event e)))
+
+(defmethod event-handler ::title [e]
+  (swap! *state assoc :title (:fx/event e)))
+
+(defmethod event-handler ::version-change [e]
+  (swap! *state assoc :engine-version (:fx/event e)))
+
+(defmethod event-handler ::mod-change [e]
+  (swap! *state assoc :mod-name (:fx/event e)))
+
+(defmethod event-handler ::map-change [e]
+  (swap! *state assoc :map-name (:fx/event e)))
 
 
 ; doesn't work from WSL
@@ -389,7 +428,7 @@
         message (str "ADDBOT kekbot" bot-num " " bot-status " " bot-color " " bot-name "|" bot-version)]
     (client/send-message (:client @*state) message)))
 
-(defmethod event-handler ::start-battle [_e]
+(defn start-game []
   (let [{:keys [battle battles users username]} @*state
         battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))
         battle (merge (get battles (:battle-id battle)) battle)
@@ -430,6 +469,9 @@
       (catch Exception e
         (warn e)))
     (client/send-message (:client @*state) "MYSTATUS 1")))
+
+(defmethod event-handler ::start-battle [_e]
+  (start-game))
 
 
 (defn battle-table [{:keys [battle battles users username]}]
@@ -517,7 +559,7 @@
          [{:fx/type :h-box
            :alignment :top-left
            :children
-           [(let [{:keys [host-username]} battle
+           [(let [{:keys [host-username]} (get battles (:battle-id battle))
                   host-user (get users host-username)
                   am-host (= username host-username)]
               {:fx/type fx.ext.node/with-tooltip-props
@@ -525,7 +567,7 @@
                {:tooltip
                 {:fx/type :tooltip
                  :text (if am-host
-                         "Host Battle"
+                         "You are the host"
                          (str "Waiting for host " host-username))}}
                :desc
                {:fx/type :button
@@ -542,7 +584,7 @@
 
 
 (defn root-view
-  [{{:keys [client client-deferred users battles battle battle-password selected-battle username password]} :state}]
+  [{{:keys [client client-deferred users battles battle battle-password selected-battle username password login-error title engine-version mod-name map-name]} :state}]
   {:fx/type :stage
    :showing true
    :title "Alt Spring Lobby"
@@ -556,7 +598,8 @@
                               :client client
                               :client-deferred client-deferred
                               :username username
-                              :password password}
+                              :password password
+                              :login-error login-error}
                              {:fx/type user-table
                               :users users}
                              {:fx/type battles-table
@@ -567,7 +610,11 @@
                               :battle-password battle-password
                               :battles battles
                               :client client
-                              :selected-battle selected-battle}
+                              :selected-battle selected-battle
+                              :title title
+                              :engine-version engine-version
+                              :mod-name mod-name
+                              :map-name map-name}
                              {:fx/type battle-table
                               :battles battles
                               :battle battle

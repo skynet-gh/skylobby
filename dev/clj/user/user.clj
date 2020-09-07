@@ -1,6 +1,8 @@
 (ns user
   (:require
     [cljfx.api :as fx]
+    [clojure.datafy :refer [datafy]]
+    [clojure.pprint :refer [pprint]]
     [clojure.tools.namespace.repl :refer [refresh set-refresh-dirs]]
     [pjstadig.humane-test-output]
     [repl]
