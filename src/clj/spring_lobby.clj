@@ -1,5 +1,6 @@
 (ns spring-lobby
   (:require
+    [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.core.async :as async]
     [clojure.java.io :as io]
@@ -181,7 +182,7 @@
       :cell-value-factory identity
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-type i))})}}
+       :describe (fn [i] {:text (str (select-keys i [:battle-type :battle-passworded]))})}}
      {:fx/type :table-column
       :text "Country"
       :cell-value-factory identity
@@ -301,7 +302,7 @@
               (update-disconnected))))))))
 
 
-(defn client-buttons [{:keys [client client-deferred]}]
+(defn client-buttons [{:keys [client client-deferred username password]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -313,7 +314,22 @@
                  "Connecting..."
                  "Connect"))
        :disable (boolean (and (not client) client-deferred))
-       :on-action {:event/type (if client ::disconnect ::connect)}}])})
+       :on-action {:event/type (if client ::disconnect ::connect)}}
+      {:fx/type :text-field
+       :text username
+       :disable (boolean (or client client-deferred))
+       :on-action {:event/type ::username-change}}
+      {:fx/type :password-field
+       :text password
+       :disable (boolean (or client client-deferred))
+       :on-action {:event/type ::password-change}}])})
+
+(defmethod event-handler ::username-change [e]
+  (swap! *state assoc :username (:fx/event e)))
+
+(defmethod event-handler ::password-change [e]
+  (swap! *state assoc :password (:fx/event e)))
+
 
 (defmethod event-handler ::host-battle [_e]
   (client/open-battle (:client @*state) (battle-opts)))
@@ -322,10 +338,14 @@
   (client/send-message (:client @*state) "LEAVEBATTLE"))
 
 (defmethod event-handler ::join-battle [_e]
-  (when-let [selected (-> *state deref :selected-battle)]
-    (client/send-message (:client @*state) (str "JOINBATTLE " selected))))
+  (let [{:keys [battles battle-password selected-battle]} @*state]
+    (when selected-battle
+      (client/send-message (:client @*state)
+        (str "JOINBATTLE " selected-battle
+             (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
+               (str " " battle-password)))))))
 
-(defn battles-buttons [{:keys [battle client selected-battle]}]
+(defn battles-buttons [{:keys [battle battles battle-password client selected-battle]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -340,9 +360,20 @@
              :text "Host Battle"
              :on-action {:event/type ::host-battle}}]
            (when selected-battle
-             [{:fx/type :button
-               :text "Join Battle"
-               :on-action {:event/type ::join-battle}}])))))})
+             (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))] ; TODO
+               (conj
+                 [{:fx/type :button
+                   :text "Join Battle"
+                   :disable (boolean (and needs-password (string/blank? battle-password)))
+                   :on-action {:event/type ::join-battle}}
+                  (when needs-password
+                    {:fx/type :text-field
+                     :text (str battle-password)
+                     :on-text-changed {:event/type ::battle-password-change}})])))))))})
+
+(defmethod event-handler ::battle-password-change [e]
+  (swap! *state assoc :battle-password (:fx/event e)))
+
 
 ; doesn't work from WSL
 (defn spring-env []
@@ -401,12 +432,12 @@
     (client/send-message (:client @*state) "MYSTATUS 1")))
 
 
-(defn battle-table [{:keys [battle users]}]
+(defn battle-table [{:keys [battle battles users username]}]
   (let [items (concat
-                (mapv 
+                (mapv
                   (fn [[k v]] (assoc v :username k :user (get users k)))
                   (:users battle))
-                (mapv 
+                (mapv
                   (fn [[k v]] (assoc v :username (str k "(" (:owner v) ")")))
                   (:bots battle)))]
     {:fx/type :v-box
@@ -486,15 +517,32 @@
          [{:fx/type :h-box
            :alignment :top-left
            :children
+           [(let [{:keys [host-username]} battle
+                  host-user (get users host-username)
+                  am-host (= username host-username)]
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :text (if am-host
+                         "Host Battle"
+                         (str "Waiting for host " host-username))}}
+               :desc
+               {:fx/type :button
+                :text (str (if am-host "Start" "Join") " Game")
+                :disable (boolean (and (not am-host)
+                                       (not (-> host-user :client-status :ingame))))
+                :on-action {:event/type ::start-battle}}})]}
+          {:fx/type :h-box
+           :alignment :top-left
+           :children
            [{:fx/type :button
-             :text "Start Battle"
-             :on-action {:event/type ::start-battle}}
-            {:fx/type :button
              :text "Add Bot"
              :on-action {:event/type ::add-bot}}]}]))}))
 
 
-(defn root-view [{{:keys [client client-deferred users battles battle selected-battle]} :state}]
+(defn root-view
+  [{{:keys [client client-deferred users battles battle battle-password selected-battle username password]} :state}]
   {:fx/type :stage
    :showing true
    :title "Alt Spring Lobby"
@@ -506,7 +554,9 @@
                   :children [{:fx/type menu-view}
                              {:fx/type client-buttons
                               :client client
-                              :client-deferred client-deferred}
+                              :client-deferred client-deferred
+                              :username username
+                              :password password}
                              {:fx/type user-table
                               :users users}
                              {:fx/type battles-table
@@ -514,9 +564,12 @@
                               :users users}
                              {:fx/type battles-buttons
                               :battle battle
+                              :battle-password battle-password
+                              :battles battles
                               :client client
                               :selected-battle selected-battle}
                              {:fx/type battle-table
                               :battles battles
                               :battle battle
-                              :users users}]}}})
+                              :users users
+                              :username username}]}}})

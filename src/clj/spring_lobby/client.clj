@@ -222,7 +222,7 @@
     (swap! state
       (fn [state]
         (let [initial-status {}
-              state (assoc-in state[:battles battle-id :users username] initial-status)]
+              state (assoc-in state [:battles battle-id :users username] initial-status)]
           (if (= battle-id (-> state :battle :battle-id))
             (assoc-in state [:battle :users username] initial-status)
             state))))))
@@ -235,9 +235,11 @@
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
-        (-> state
-            (update-in [:battle :users] dissoc username)
-            (update-in [:battles battle-id :users] dissoc username))))))
+        (update-in
+          (if (= username (:username state))
+            (dissoc state :battle)
+            (update-in state [:battle :users] dissoc username))
+          [:battles battle-id :users] dissoc username)))))
 
 (defmethod handle "REQUESTBATTLESTATUS" [c _state _m]
   (send-message c "MYBATTLESTATUS 0 0")) ; TODO real status
