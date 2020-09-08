@@ -5,6 +5,7 @@
     [clojure.core.async :as async]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [com.evocomputing.colors :as colors]
     [spring-lobby.client :as client]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :refer [debug info trace warn]])
@@ -508,11 +509,34 @@
            {:fx/cell-type :table-cell
             :describe (fn [i] {:text (str (:ingame (:client-status (:user i))))})}}
           {:fx/type :table-column
+           :text "Spectator"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :check-box
+                :selected (not (:mode (:battle-status i)))
+                :on-selected-changed {:event/type ::battle-spectate-change
+                                      :id i}
+                :disable (not= (:username i) username)}})}}
+          {:fx/type :table-column
            :text "Faction"
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:side (:battle-status i)))})}}
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :choice-box
+                :value (str (:side (:battle-status i)))
+                :on-value-changed {:event/type ::battle-side-change
+                                   :id i}
+                :items ["0" "1"]
+                :disable (not= (:username i) username)}})}}
           {:fx/type :table-column
            :text "Rank"
            :cell-value-factory identity
@@ -530,7 +554,15 @@
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:team-color i))})}}
+            :describe
+            (fn [{:keys [team-color] :as i}]
+              {:text ""
+               :graphic
+               {:fx/type :color-picker
+                :value (format "#%03x" (if team-color (Integer/parseInt team-color) 0))
+                :on-value-changed {:event/type ::battle-color-change
+                                   :id i}
+                :disable (not= (:username i) username)}})}}
           {:fx/type :table-column
            :text "Nickname"
            :cell-value-factory identity
@@ -581,6 +613,36 @@
            [{:fx/type :button
              :text "Add Bot"
              :on-action {:event/type ::add-bot}}]}]))}))
+
+(defmethod event-handler ::battle-spectate-change
+  [{:keys [id] :fx/keys [event]}]
+  (client/send-message (:client @*state)
+    (str "MYBATTLESTATUS "
+         (client/encode-battle-status
+           (assoc (:battle-status id) :mode (not event)))
+         " " (:team-color id))))
+
+(defmethod event-handler ::battle-side-change
+  [{:keys [id] :fx/keys [event]}]
+  (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
+    (client/send-message (:client @*state)
+      (str "MYBATTLESTATUS "
+           (client/encode-battle-status
+             (assoc (:battle-status id) :side side))
+           " " (:team-color id)))))
+
+(defmethod event-handler ::battle-color-change
+  [{:keys [id] :fx/keys [event]}]
+  (let [color-int (colors/rgba-int
+                    (colors/create-color
+                      {:r (Math/round (* 255 (.getRed event)))
+                       :g (Math/round (* 255 (.getGreen event)))
+                       :b (Math/round (* 255 (.getBlue event)))
+                       :a 0}))]
+    (client/send-message (:client @*state)
+      (str "MYBATTLESTATUS "
+           (client/encode-battle-status (:battle-status id))
+           " " color-int))))
 
 
 (defn root-view

@@ -63,6 +63,16 @@
         ByteBuffer))
     :prefix :pad :suffix))
 
+(defn encode-battle-status [battle-status]
+  (str
+    (.getInt
+      (gio/to-byte-buffer
+        (gio/encode battle-status-protocol
+          (assoc battle-status
+                 :prefix 0
+                 :pad 0
+                 :suffix 0))))))
+
 
 ; https://stackoverflow.com/a/39188819/984393
 (defn base64-encode [bs]
@@ -96,8 +106,9 @@
 
 
 (defn send-message [c m]
-  (info ">" (str "'" m "'"))
-  @(s/put! c (str m "\n")))
+  (when c
+    (info ">" (str "'" m "'"))
+    @(s/put! c (str m "\n"))))
 
 (defmulti handle
   (fn [_client _state m]
@@ -146,7 +157,7 @@
 
 (defmethod handle "REMOVEBOT" [_c state m]
   (let [[_all botname] (re-find #"\w+ (\w+)" m)]
-    (swap! state update :bots dissoc botname)))
+    (swap! state update-in [:battle :bots] dissoc botname)))
 
 
 (defn parse-battleopened [m]
@@ -177,13 +188,14 @@
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
 
 (defmethod handle "UPDATEBATTLEINFO" [_c state m]
-  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)
-        battle {:battle-id battle-id
-                :battle-spectators battle-spectators
-                :battle-locked battle-locked
-                :battle-maphash battle-maphash
-                :battle-map battle-map}]
-    (swap! state update-in [:battles battle-id] merge battle)))
+  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
+    (swap! state update-in [:battles battle-id]
+           assoc
+           :battle-id battle-id
+           :battle-spectators battle-spectators
+           :battle-locked battle-locked
+           :battle-maphash battle-maphash
+           :battle-map battle-map)))
 
 (defmethod handle "BATTLECLOSED" [_c state m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
@@ -246,8 +258,10 @@
 
 (defmethod handle "CLIENTBATTLESTATUS" [_c state m]
   (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
-    (swap! state update-in [:battle :users username] merge {:battle-status (decode-battle-status battle-status)
-                                                            :team-color team-color})))
+    (swap! state update-in [:battle :users username]
+           assoc
+           :battle-status (decode-battle-status battle-status)
+           :team-color team-color)))
 
 (defn ping-loop [c]
   (async/thread
