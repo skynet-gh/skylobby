@@ -482,7 +482,10 @@
                   (:users battle))
                 (mapv
                   (fn [[k v]] (assoc v :username (str k "(" (:owner v) ")")))
-                  (:bots battle)))]
+                  (:bots battle)))
+        {:keys [host-username]} (get battles (:battle-id battle))
+        host-user (get users host-username)
+        am-host (= username host-username)]
     {:fx/type :v-box
      :alignment :top-left
      :children
@@ -521,7 +524,9 @@
                 :selected (not (:mode (:battle-status i)))
                 :on-selected-changed {:event/type ::battle-spectate-change
                                       :id i}
-                :disable (not= (:username i) username)}})}}
+                :disable (not (or am-host
+                                  (= (:username i) username)
+                                  (= (:owner i) username)))}})}}
           {:fx/type :table-column
            :text "Faction"
            :cell-value-factory identity
@@ -591,22 +596,19 @@
          [{:fx/type :h-box
            :alignment :top-left
            :children
-           [(let [{:keys [host-username]} (get battles (:battle-id battle))
-                  host-user (get users host-username)
-                  am-host (= username host-username)]
-              {:fx/type fx.ext.node/with-tooltip-props
-               :props
-               {:tooltip
-                {:fx/type :tooltip
-                 :text (if am-host
-                         "You are the host"
-                         (str "Waiting for host " host-username))}}
-               :desc
-               {:fx/type :button
-                :text (str (if am-host "Start" "Join") " Game")
-                :disable (boolean (and (not am-host)
-                                       (not (-> host-user :client-status :ingame))))
-                :on-action {:event/type ::start-battle}}})]}
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :text (if am-host
+                       "You are the host"
+                       (str "Waiting for host " host-username))}}
+             :desc
+             {:fx/type :button
+              :text (str (if am-host "Start" "Join") " Game")
+              :disable (boolean (and (not am-host)
+                                     (not (-> host-user :client-status :ingame))))
+              :on-action {:event/type ::start-battle}}}]}
           {:fx/type :h-box
            :alignment :top-left
            :children
