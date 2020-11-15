@@ -1,30 +1,32 @@
 {:paths ["src/clj" "lib/lua-parser/src/main/antlr3/nl/bigo/luaparser"]
  :deps
- {aleph {:mvn/version "0.4.6"}
-  byte-streams {:mvn/version "0.2.4"}
-  clj-antlr {:mvn/version "0.2.6"}
-  cljfx {:mvn/version "1.7.8"}
+ {aleph/aleph {:mvn/version "0.4.6"}
+  byte-streams/byte-streams {:mvn/version "0.2.4"}
+  clj-antlr/clj-antlr {:mvn/version "0.2.7"}
+  cljfx/cljfx {:mvn/version "1.7.10"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
-  com.taoensso/timbre {:mvn/version "4.10.0"}
-  digest {:mvn/version "1.4.9"}
-  gloss {:mvn/version "0.2.6"}
+  com.taoensso/timbre {:mvn/version "5.1.0"}
+  digest/digest {:mvn/version "1.4.9"}
+  gloss/gloss {:mvn/version "0.2.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+  org.clojure/clojure {:mvn/version "1.10.2-alpha4"}
   org.clojure/core.async {:mvn/version "1.3.610"}
-  org.openjfx/javafx-controls {:mvn/version "14.0.2.1"}
+  org.openjfx/javafx-controls {:mvn/version "15.0.1"}
   smee/binary {:mvn/version "0.5.5"}}
  :aliases
  {:nrepl
-  {:extra-paths ["dev/clj/repl" "dev/clj/user" "dev/clj/test" "test/clj"]
+  {:extra-paths ["dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.25.2"}
+   {cider/cider-nrepl {:mvn/version "0.25.4"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
-    nrepl {:mvn/version "0.7.0"}
+    hawk/hawk {:mvn/version "0.2.11"}
+    net.cgrand/parsley {:mvn/version "0.9.3"}
+    nrepl/nrepl {:mvn/version "0.8.3"}
     org.clojure/tools.namespace {:mvn/version "1.0.0"}
-    pjstadig/humane-test-output {:mvn/version "0.10.0"}}
-   :main-opts ["--main" "nrepl.cmdline"
-               "--middleware" "[cider.nrepl/cider-middleware,cider.nrepl/wrap-clojuredocs,cider.nrepl/wrap-classpath,cider.nrepl/wrap-complete,cider.nrepl/wrap-debug,cider.nrepl/wrap-format,cider.nrepl/wrap-info,cider.nrepl/wrap-inspect,cider.nrepl/wrap-macroexpand,cider.nrepl/wrap-ns,cider.nrepl/wrap-spec,cider.nrepl/wrap-profile,cider.nrepl/wrap-resource,cider.nrepl/wrap-refresh,cider.nrepl/wrap-stacktrace,cider.nrepl/wrap-test,cider.nrepl/wrap-trace,cider.nrepl/wrap-out,cider.nrepl/wrap-undef,cider.nrepl/wrap-version]"
-               "--interactive"]}
+    pjstadig/humane-test-output {:mvn/version "0.10.0"}
+    reply/reply {:mvn/version "0.4.4"}}
+   :main-opts ["--main" "repl"]}
   :test
   {:extra-paths ["dev/clj/test" "test/clj"]
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
