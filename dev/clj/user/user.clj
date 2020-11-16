@@ -6,8 +6,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.tools.namespace.repl :refer [disable-unload! disable-reload! refresh]]
     [hawk.core :as hawk]
-    [pjstadig.humane-test-output]
-    [spring-lobby]))
+    [pjstadig.humane-test-output]))
 
 
 (disable-unload!)
@@ -29,46 +28,55 @@
 
 
 (defn mount []
-  (println "mounting")
-  (let [r (fx/create-renderer
-            :middleware (fx/wrap-map-desc (fn [state]
-                                            {:fx/type spring-lobby/root-view
-                                             :state state}))
-            :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
-    (fx/mount-renderer spring-lobby/*state r)
+  (require 'spring-lobby)
+  (let [view (var-get (find-var 'spring-lobby/root-view))
+        event-handler (var-get (find-var 'spring-lobby/event-handler))
+        r (fx/create-renderer
+            :middleware (fx/wrap-map-desc
+                          (fn [state]
+                            {:fx/type view
+                             :state state}))
+            :opts {:fx.opt/map-event-handler event-handler})
+        state (var-get (find-var 'spring-lobby/*state))]
+    (fx/mount-renderer state r)
     (alter-var-root #'renderer (constantly r))))
 
 (defn unmount []
   (println "looking to unmount")
   (when renderer
     (println "unmounting")
-    (fx/unmount-renderer spring-lobby/*state renderer)))
+    (fx/unmount-renderer (var-get (find-var 'spring-lobby/*state)) renderer)))
 
 
 (defn load-and-mount []
   (try
     (println "loading")
-    (reset! spring-lobby/*state @state)
+    (reset! (var-get (find-var 'spring-lobby/*state)) @state)
     (mount)
     (catch Exception e
       (println e))
     (finally
       (reset! refreshing false))))
 
+(def old-refresh refresh)
+
 (defn unmount-store-refresh-load-mount []
   (println "storing")
-  (reset! state @spring-lobby/*state)
+  (reset! state @(var-get (find-var 'spring-lobby/*state)))
   (unmount)
   (println "refreshing")
   (future
     (try
       (binding [*ns* *ns*]
-        (let [res (refresh :after 'user/load-and-mount)]
+        (let [res (old-refresh :after 'user/load-and-mount)]
           (println res)))
       (catch Exception e
         (println e))
       (finally
         (reset! refreshing false)))))
+
+; replace for editor integration
+(alter-var-root #'clojure.tools.namespace.repl/refresh (constantly unmount-store-refresh-load-mount))
 
 
 (defn refresh-on-file-change [context event]
@@ -89,4 +97,6 @@
 
 ; doesn't work
 ;(refresh :after 'user/mount)
+
+;(require 'spring-lobby)
 (mount)

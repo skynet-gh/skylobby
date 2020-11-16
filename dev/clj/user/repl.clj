@@ -23,7 +23,7 @@
 
 
 (def middleware
-  ['cider.nrepl/cider-middleware
+  [;'cider.nrepl/cider-middleware
    'cider.nrepl/wrap-clojuredocs
    'cider.nrepl/wrap-classpath
    'cider.nrepl/wrap-complete
@@ -36,7 +36,7 @@
    'cider.nrepl/wrap-spec
    'cider.nrepl/wrap-profile
    'cider.nrepl/wrap-resource
-   'cider.nrepl/wrap-refresh
+   ;'cider.nrepl/wrap-refresh TODO re-render
    'cider.nrepl/wrap-stacktrace
    'cider.nrepl/wrap-test
    'cider.nrepl/wrap-trace
