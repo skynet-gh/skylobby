@@ -51,7 +51,15 @@
 (defn load-and-mount []
   (try
     (println "loading")
-    (reset! (var-get (find-var 'spring-lobby/*state)) @state)
+    (let [saved-state @state
+          state-atom (var-get (find-var 'spring-lobby/*state))]
+      (reset! state-atom saved-state)
+      (when-let [client (:client saved-state)]
+        (require 'spring-lobby.client)
+        (let [print-loop-fn (var-get (find-var 'spring-lobby.client/print-loop))
+              ping-loop-fn (var-get (find-var 'spring-lobby.client/ping-loop))]
+          (print-loop-fn state-atom client)
+          (ping-loop-fn state-atom client))))
     (mount)
     (catch Exception e
       (println e))
@@ -62,7 +70,12 @@
 
 (defn unmount-store-refresh-load-mount []
   (println "storing")
-  (reset! state @(var-get (find-var 'spring-lobby/*state)))
+  (let [old-state @(var-get (find-var 'spring-lobby/*state))]
+    (reset! state old-state)
+    (when-let [f (:ping-loop old-state)]
+      (future-cancel f))
+    (when-let [f (:print-loop old-state)]
+      (future-cancel f)))
   (unmount)
   (println "refreshing")
   (future

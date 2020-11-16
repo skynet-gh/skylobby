@@ -263,27 +263,35 @@
            :battle-status (decode-battle-status battle-status)
            :team-color team-color)))
 
-(defn ping-loop [c]
-  (async/thread
-    (info "ping loop thread started")
-    (loop []
-      (async/<!! (async/timeout 30000))
-      (if (send-message c "PING")
-        (recur)
-        (info "ping loop ended")))))
+(defn ping-loop [state-atom c]
+  (swap! state-atom
+    assoc
+    :ping-loop
+    (future
+      (info "ping loop thread started")
+      (loop []
+        (async/<!! (async/timeout 30000))
+        (when (send-message c "PING")
+          (when-not (Thread/interrupted)
+            (recur))))
+      (info "ping loop ended"))))
 
-(defn print-loop [c state]
-  (async/thread
-    (info "print loop thread started")
-    (loop []
-      (if-let [d (s/take! c)]
-        (if-let [m @d]
-          (do
-            (info "<" (str "'" m "'"))
-            (handle c state m)
-            (recur))
-          (info "print loop ended"))
-        (info "print loop ended")))))
+(defn print-loop [state-atom c]
+  (swap! state-atom
+    assoc
+    :print-loop
+    (future
+      (info "print loop thread started")
+      (loop []
+        (when-let [d (s/take! c)]
+          (if-let [m @d]
+            (do
+              (info "<" (str "'" m "'"))
+              (handle c state-atom m)
+              (when-not (Thread/interrupted)
+                (recur)))
+            (info "print loop ended"))))
+      (info "print loop ended"))))
 
 (defn exit [c]
   (send-message c "EXIT"))
@@ -303,10 +311,10 @@
   ([state-atom]
    (connect state-atom (client)))
   ([state-atom client]
-   (let [{:keys [username password]} @state-atom]
-     (print-loop client state-atom)
+   (let [{:keys [username password]} @state-atom] ; TODO transfer these loops to new state atom
+     (print-loop state-atom client)
      (login client default-address username password)
-     (ping-loop client))))
+     (ping-loop state-atom client))))
 
 (defn disconnect [c]
   (info "disconnecting")
