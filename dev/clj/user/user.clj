@@ -16,6 +16,7 @@
 
 (def state (atom nil))
 (def ^:dynamic renderer nil)
+(def refreshing (atom false))
 
 
 (pjstadig.humane-test-output/activate!)
@@ -50,7 +51,9 @@
     (reset! spring-lobby/*state @state)
     (mount)
     (catch Exception e
-      (println e))))
+      (println e))
+    (finally
+      (reset! refreshing false))))
 
 (defn unmount-store-refresh-load-mount []
   (println "storing")
@@ -59,16 +62,24 @@
   (println "refreshing")
   (future
     (try
-      (refresh :after 'user/load-and-mount)
+      (binding [*ns* *ns*]
+        (let [res (refresh :after 'user/load-and-mount)]
+          (println res)))
       (catch Exception e
-        (println e)))))
+        (println e))
+      (finally
+        (reset! refreshing false)))))
 
 
 (defn refresh-on-file-change [context event]
   (when-let [file (:file event)]
     (let [f (io/file file)]
       (when (and (.exists f) (not (.isDirectory f)))
-        (unmount-store-refresh-load-mount))))
+        (if @refreshing
+          (println "Already refreshing, duplicate file event")
+          (do
+            (reset! refreshing true)
+            (unmount-store-refresh-load-mount))))))
   context)
 
 
