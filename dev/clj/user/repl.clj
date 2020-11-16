@@ -4,7 +4,22 @@
     [clojure.string :as string]
     [io.aviso.repl]
     [nrepl.cmdline]
-    [reply.main]))
+    [reply.main]
+    [taoensso.timbre :as timbre]
+    [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
+
+
+(def ^:private log-file "repl.log")
+
+(defn log-to-file []
+  (println "Setting up log to" log-file)
+  (timbre/merge-config!
+    {:appenders
+     {:println {:enabled? false}
+      :rotor (rotor/rotor-appender
+               {:path log-file
+                :max-size 100000000
+                :backlog 1})}}))
 
 
 (def middleware
@@ -30,6 +45,7 @@
    'cider.nrepl/wrap-version])
 
 (defn -main [& _args]
+  (log-to-file)
   (future
     (nrepl.cmdline/-main
       "--middleware"

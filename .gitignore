@@ -2,3 +2,4 @@
 /.cpcache/
 /.nrepl-port
 /trace.edn
+/repl.log
