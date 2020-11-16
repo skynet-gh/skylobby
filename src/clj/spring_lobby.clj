@@ -10,12 +10,15 @@
     [spring-lobby.spring :as spring]
     [taoensso.timbre :refer [debug info trace warn]])
   (:import
+    (java.awt.image BufferedImage)
     (java.io RandomAccessFile)
     (java.nio ByteBuffer)
     (java.util.zip CRC32 ZipFile)
     (javax.imageio ImageIO)
+    (manifold.stream SplicedStream)
     (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
-    (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)))
+    (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
+    (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)))
 
 
 (set! *warn-on-reflection* true)
@@ -50,35 +53,34 @@
 (defn map-files []
   (->> (io/file (str (spring-root) "/maps"))
        file-seq
-       (filter #(.isFile %))
-       (filter #(string/ends-with? (.getName %) ".sd7"))))
+       (filter #(.isFile ^java.io.File %))
+       (filter #(string/ends-with? (.getName ^java.io.File %) ".sd7"))))
 
 (defn map-files-zip []
   (->> (io/file (str (spring-root) "/maps"))
        file-seq
-       (filter #(.isFile %))
-       (filter #(string/ends-with? (.getName %) ".sdz"))))
+       (filter #(.isFile ^java.io.File %))
+       (filter #(string/ends-with? (.getName ^java.io.File %) ".sdz"))))
 
 
-(defn open-zip [from]
+(defn open-zip [^java.io.File from]
   (let [zf (ZipFile. from)
         entries (enumeration-seq (.entries zf))]
-    (doseq [entry entries]
+    (doseq [^java.util.zip.ZipEntry entry entries]
       (println (.getName entry) (.getCrc entry))
       (let [entry-name (.getName entry)
-            crc (.getCrc entry)
-            crc-long (.getValue crc)
+            crc-long (.getCrc entry)
             dir (.isDirectory entry)]
         (when (re-find #"(?i)mini" entry-name)
           (println (.getName from) entry-name))))))
 
 ; https://github.com/spring/spring/blob/master/rts/System/FileSystem/ArchiveScanner.cpp#L782-L858
 (defn spring-crc [named-crcs]
-  (let [res (CRC32.)
+  (let [^CRC32 res (CRC32.)
         sorted (sort-by :crc-name named-crcs)]
-    (doseq [{:keys [crc-name crc-long]} sorted]
+    (doseq [{:keys [^String crc-name crc-long]} sorted]
       (.update res (.getBytes crc-name))
-      (.update res (.array (.putLong (ByteBuffer/allocate 4))))) ; TODO fix array overflow
+      (.update res (.array (.putLong (ByteBuffer/allocate 4) crc-long)))) ; TODO fix array overflow
     (.getValue res))) ; TODO 4711 if 0
 
 #_
@@ -92,12 +94,13 @@
   (open-zip map-file))
 
 
-(defn open-7z [from]
+(defn open-7z [^java.io.File from]
   (with-open [raf (RandomAccessFile. from "r")
               rafis (RandomAccessFileInStream. raf)
-              archive (SevenZip/openInArchive nil rafis)]
+              archive (SevenZip/openInArchive nil rafis)
+              simple (.getSimpleInterface archive)]
     (trace from "has" (.getNumberOfItems archive) "items")
-    (doseq [item (.getArchiveItems (.getSimpleInterface archive))]
+    (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
       (let [path (.getPath item)
             crc (.getCRC item)
             crc-long (Integer/toUnsignedString crc)
@@ -115,8 +118,8 @@
                             (trace "got" (count data) "bytes")
                             (.write baos data 0 (count data))
                             (count data))))
-                  image (with-open [is (io/input-stream (.toByteArray baos))]
-                          (ImageIO/read is))]
+                  ^BufferedImage image (with-open [is (io/input-stream (.toByteArray baos))]
+                                         (ImageIO/read is))]
               (info "Extract result" res)
               (info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
 
@@ -282,7 +285,7 @@
   (let [client-deferred (client/client)] ; TODO host port
     (swap! *state assoc :client-deferred client-deferred)
     (async/thread
-      (let [client @client-deferred]
+      (let [^SplicedStream client @client-deferred]
         (client/connect *state client) ; TODO username password
         (swap! *state assoc :client client)
         (loop []
@@ -450,9 +453,11 @@
                      "C:\\Users\\craig\\.alt-spring-lobby\\spring\\script.txt"] ; TODO windows path
             runtime (Runtime/getRuntime)]
         (info "Running '" command "'")
-        (let [process (.exec runtime (into-array String command) nil isolation-dir)]
+        (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+              ^"[Ljava.lang.String;" envp nil
+              process (.exec runtime cmdarray envp isolation-dir)]
           (async/thread
-            (with-open [reader (io/reader (.getInputStream process))]
+            (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
               (loop []
                 (if-let [line (.readLine reader)]
                   (do
@@ -460,7 +465,7 @@
                     (recur))
                   (info "Spring stdout stream closed")))))
           (async/thread
-            (with-open [reader (io/reader (.getErrorStream process))]
+            (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
               (loop []
                 (if-let [line (.readLine reader)]
                   (do
@@ -635,11 +640,12 @@
 
 (defmethod event-handler ::battle-color-change
   [{:keys [id] :fx/keys [event]}]
-  (let [color-int (colors/rgba-int
+  (let [^javafx.scene.paint.Color color event
+        color-int (colors/rgba-int
                     (colors/create-color
-                      {:r (Math/round (* 255 (.getRed event)))
-                       :g (Math/round (* 255 (.getGreen event)))
-                       :b (Math/round (* 255 (.getBlue event)))
+                      {:r (Math/round (* 255 (.getRed color)))
+                       :g (Math/round (* 255 (.getGreen color)))
+                       :b (Math/round (* 255 (.getBlue color)))
                        :a 0}))]
     (client/send-message (:client @*state)
       (str "MYBATTLESTATUS "
