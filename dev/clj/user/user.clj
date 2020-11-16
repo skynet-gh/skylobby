@@ -54,12 +54,10 @@
     (let [saved-state @state
           state-atom (var-get (find-var 'spring-lobby/*state))]
       (reset! state-atom saved-state)
-      (when-let [client (:client saved-state)]
-        (require 'spring-lobby.client)
-        (let [print-loop-fn (var-get (find-var 'spring-lobby.client/print-loop))
-              ping-loop-fn (var-get (find-var 'spring-lobby.client/ping-loop))]
-          (print-loop-fn state-atom client)
-          (ping-loop-fn state-atom client))))
+      (when-let [client-deferred (:client-deferred saved-state)]
+        (require 'spring-lobby)
+        (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
+          (connected-loop-fn state-atom client-deferred))))
     (mount)
     (catch Exception e
       (println e))
@@ -69,24 +67,30 @@
 (def old-refresh refresh)
 
 (defn unmount-store-refresh-load-mount []
-  (println "storing")
-  (let [old-state @(var-get (find-var 'spring-lobby/*state))]
-    (reset! state old-state)
-    (when-let [f (:ping-loop old-state)]
-      (future-cancel f))
-    (when-let [f (:print-loop old-state)]
-      (future-cancel f)))
-  (unmount)
-  (println "refreshing")
-  (future
-    (try
-      (binding [*ns* *ns*]
-        (let [res (old-refresh :after 'user/load-and-mount)]
-          (println res)))
-      (catch Exception e
-        (println e))
-      (finally
-        (reset! refreshing false)))))
+  (require 'spring-lobby)
+  (when (try (var-get (find-var 'spring-lobby/*state))
+             (catch Exception e
+               (println e "Error refreshing")))
+    (println "storing")
+    (let [old-state @(var-get (find-var 'spring-lobby/*state))]
+      (reset! state old-state)
+      (when-let [f (:connected-loop old-state)]
+        (future-cancel f))
+      (when-let [f (:print-loop old-state)]
+        (future-cancel f))
+      (when-let [f (:print-loop old-state)]
+        (future-cancel f)))
+    (unmount)
+    (println "refreshing")
+    (future
+      (try
+        (binding [*ns* *ns*]
+          (let [res (old-refresh :after 'user/load-and-mount)]
+            (println res)))
+        (catch Exception e
+          (println e))
+        (finally
+          (reset! refreshing false))))))
 
 ; replace for editor integration
 (alter-var-root #'clojure.tools.namespace.repl/refresh (constantly unmount-store-refresh-load-mount))

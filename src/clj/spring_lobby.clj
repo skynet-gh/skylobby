@@ -1,14 +1,16 @@
 (ns spring-lobby
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.core.async :as async]
     [clojure.java.io :as io]
+    [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [spring-lobby.client :as client]
     [spring-lobby.spring :as spring]
-    [taoensso.timbre :refer [debug info trace warn]])
+    [taoensso.timbre :refer [debug info trace warn] :as log])
   (:import
     (java.awt.image BufferedImage)
     (java.io RandomAccessFile)
@@ -274,29 +276,45 @@
       :describe (fn [i] {:text (str (:user-agent i))})}}]})
 
 (defn update-disconnected []
-  (swap! *state dissoc :battle :battles :chanenls :client :client-deferred :my-channels :users))
+  (swap! *state dissoc :battle :battles :chanenls :client :client-deferred :my-channels :users)
+  nil)
+
+(defmethod event-handler ::print-state [_e]
+  (pprint *state))
 
 (defmethod event-handler ::disconnect [_e]
   (when-let [client (:client @*state)]
     (client/disconnect client))
   (update-disconnected))
 
+(defn connected-loop [state-atom client-deferred]
+  (swap! state-atom assoc
+         :connected-loop
+         (future
+           (try
+             (let [^SplicedStream client @client-deferred]
+               (when-not ())
+               (client/connect state-atom client) ; TODO username password
+               (swap! state-atom assoc :client client :login-error nil)
+               (loop []
+                 (if (and client (not (.isClosed client)))
+                   (do
+                     (debug "Client is still connected")
+                     (async/<!! (async/timeout 20000))
+                     (recur))
+                   (do
+                     (info "Client was disconnected")
+                     (update-disconnected)))))
+             (catch Exception e
+               (log/error e "Unable to connect")
+               (swap! state-atom assoc :login-error (str (.getMessage e)))
+               (update-disconnected)))
+           nil)))
+
 (defmethod event-handler ::connect [_e]
   (let [client-deferred (client/client)] ; TODO host port
     (swap! *state assoc :client-deferred client-deferred)
-    (async/thread
-      (let [^SplicedStream client @client-deferred]
-        (client/connect *state client) ; TODO username password
-        (swap! *state assoc :client client)
-        (loop []
-          (if (and client (not (.isClosed client)))
-            (do
-              (debug "Client is still connected")
-              (async/<!! (async/timeout 20000))
-              (recur))
-            (do
-              (info "Client was disconnected")
-              (update-disconnected))))))))
+    (connected-loop *state client-deferred)))
 
 
 (defn client-buttons [{:keys [client client-deferred username password login-error]}]
@@ -321,8 +339,20 @@
        :disable (boolean (or client client-deferred))
        :on-action {:event/type ::password-change}}]
      (when login-error
-       [{:fx/type :label
-         :text (str login-error)}]))})
+       [{:fx/type :v-box
+         :alignment :center
+         :children
+         [{:fx/type :label
+           :text (str login-error)
+           :style {:-fx-text-fill "#FF0000"
+                   :-fx-max-width 360}}]}])
+     [{:fx/type :h-box
+       :alignment :top-right
+       :children
+       [{:fx/type :button
+         :text "Print state"
+         :on-action {:event/type ::print-state}
+         :alignment :top-right}]}])})
 
 (defmethod event-handler ::username-change [e]
   (swap! *state assoc :username (:fx/event e)))
@@ -369,7 +399,7 @@
          :on-action {:event/type ::leave-battle}}]
        (when client
          (concat
-           (when selected-battle
+           (when (and selected-battle (-> battles (get selected-battle)))
              (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))] ; TODO
                [{:fx/type :button
                  :text "Join Battle"
@@ -584,19 +614,48 @@
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:id (:battle-status i)))})}}
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :choice-box
+                :value (str (:id (:battle-status i)))
+                :on-value-changed {:event/type ::battle-player-id-change
+                                   :id i}
+                :items (map str (take 16 (iterate inc 0)))
+                :disable (not= (:username i) username)}})}}
           {:fx/type :table-column
            :text "Team ID"
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:ally (:battle-status i)))})}}
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :choice-box
+                :value (str (:ally (:battle-status i)))
+                :on-value-changed {:event/type ::battle-ally-change
+                                   :id i}
+                :items (map str (take 16 (iterate inc 0)))
+                :disable (not= (:username i) username)}})}}
           {:fx/type :table-column
            :text "Bonus"
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:handicap (:battle-status i)) "%")})}}]}]
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :text-field
+                :disable (not am-host)
+                :text-formatter
+                {:fx/type :text-formatter
+                 :value-converter :integer
+                 :value (int (or (:handicap (:battle-status i)) 0))
+                 :on-value-changed {:event/type ::battle-handicap-change
+                                    :id i}}}})}}]}]
        (when battle
          [{:fx/type :h-box
            :alignment :top-left
@@ -638,6 +697,35 @@
              (assoc (:battle-status id) :side side))
            " " (:team-color id)))))
 
+(defmethod event-handler ::battle-player-id-change
+  [{:keys [id] :fx/keys [event]}]
+  (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
+    (client/send-message (:client @*state)
+      (str "MYBATTLESTATUS "
+           (client/encode-battle-status
+             (assoc (:battle-status id) :id player-id))
+           " " (:team-color id)))))
+
+(defmethod event-handler ::battle-ally-change
+  [{:keys [id] :fx/keys [event]}]
+  (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
+    (client/send-message (:client @*state)
+      (str "MYBATTLESTATUS "
+           (client/encode-battle-status
+             (assoc (:battle-status id) :ally ally))
+           " " (:team-color id)))))
+
+(defmethod event-handler ::battle-handicap-change
+  [{:keys [id] :fx/keys [event]}]
+  (when-let [handicap (max 0
+                        (min 100
+                          event))]
+    (client/send-message (:client @*state)
+      (str "HANDICAP "
+           (:username id)
+           " "
+           handicap))))
+
 (defmethod event-handler ::battle-color-change
   [{:keys [id] :fx/keys [event]}]
   (let [^javafx.scene.paint.Color color event
@@ -654,39 +742,53 @@
 
 
 (defn root-view
-  [{{:keys [client client-deferred users battles battle battle-password selected-battle username password login-error title engine-version mod-name map-name]} :state}]
-  {:fx/type :stage
-   :showing true
-   :title "Alt Spring Lobby"
-   :width 900
-   :height 700
-   :scene {:fx/type :scene
-           :root {:fx/type :v-box
-                  :alignment :top-left
-                  :children [{:fx/type menu-view}
-                             {:fx/type client-buttons
-                              :client client
-                              :client-deferred client-deferred
-                              :username username
-                              :password password
-                              :login-error login-error}
-                             {:fx/type user-table
-                              :users users}
-                             {:fx/type battles-table
-                              :battles battles
-                              :users users}
-                             {:fx/type battles-buttons
-                              :battle battle
-                              :battle-password battle-password
-                              :battles battles
-                              :client client
-                              :selected-battle selected-battle
-                              :title title
-                              :engine-version engine-version
-                              :mod-name mod-name
-                              :map-name map-name}
-                             {:fx/type battle-table
-                              :battles battles
-                              :battle battle
-                              :users users
-                              :username username}]}}})
+  [{{:keys [client client-deferred users battles battle battle-password selected-battle username
+            password login-error title engine-version mod-name map-name last-failed-message]} :state}]
+  {:fx/type fx/ext-on-instance-lifecycle
+   :on-created (fn [node]
+                 (println "on-created")
+                 (.requestFocus node))
+   :on-advanced (fn [_] (println "on-advanced"))
+   :on-deleted (fn [_] (println "on-deleted"))
+   :desc
+   {:fx/type :stage
+    :showing true
+    :title "Alt Spring Lobby"
+    :width 900
+    :height 700
+    :scene {:fx/type :scene
+            :root {:fx/type :v-box
+                   :alignment :top-left
+                   :children [{:fx/type menu-view}
+                              {:fx/type client-buttons
+                               :client client
+                               :client-deferred client-deferred
+                               :username username
+                               :password password
+                               :login-error login-error}
+                              {:fx/type user-table
+                               :users users}
+                              {:fx/type battles-table
+                               :battles battles
+                               :users users}
+                              {:fx/type battles-buttons
+                               :battle battle
+                               :battle-password battle-password
+                               :battles battles
+                               :client client
+                               :selected-battle selected-battle
+                               :title title
+                               :engine-version engine-version
+                               :mod-name mod-name
+                               :map-name map-name}
+                              {:fx/type battle-table
+                               :battles battles
+                               :battle battle
+                               :users users
+                               :username username}
+                              {:fx/type :v-box
+                               :alignment :center-left
+                               :children
+                               [{:fx/type :label
+                                 :text (str last-failed-message)
+                                 :style {:-fx-text-fill "#FF0000"}}]}]}}}})

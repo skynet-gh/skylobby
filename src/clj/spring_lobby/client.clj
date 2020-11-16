@@ -22,6 +22,15 @@
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
+(def default-battle-status
+  {:ready false
+   :ally 0
+   :handicap 0
+   :mode 0
+   :sync 0
+   :id 0
+   :side 0})
+
 (def protocol
   (gloss/compile-frame
     (gloss/delimited-frame
@@ -68,10 +77,11 @@
     (.getInt
       (gio/to-byte-buffer
         (gio/encode battle-status-protocol
-          (assoc battle-status
-                 :prefix 0
-                 :pad 0
-                 :suffix 0))))))
+          (assoc
+            (merge default-battle-status battle-status)
+            :prefix 0
+            :pad 0
+            :suffix 0))))))
 
 
 ; https://stackoverflow.com/a/39188819/984393
@@ -118,6 +128,12 @@
 
 (defmethod handle :default [_client _state m]
   (trace "no handler for message" (str "'" m "'")))
+
+(defmethod handle "FAILED" [_client state m]
+  (swap! state assoc :last-failed-message m))
+
+(defmethod handle "JOINBATTLEFAILED" [_client state m]
+  (swap! state assoc :last-failed-message m))
 
 (defn parse-adduser [m]
   (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
@@ -284,13 +300,11 @@
       (info "print loop thread started")
       (loop []
         (when-let [d (s/take! c)]
-          (if-let [m @d]
-            (do
-              (info "<" (str "'" m "'"))
-              (handle c state-atom m)
-              (when-not (Thread/interrupted)
-                (recur)))
-            (info "print loop ended"))))
+          (when-let [m @d]
+            (info "<" (str "'" m "'"))
+            (handle c state-atom m)
+            (when-not (Thread/interrupted)
+              (recur)))))
       (info "print loop ended"))))
 
 (defn exit [c]
