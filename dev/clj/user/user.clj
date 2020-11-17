@@ -42,15 +42,12 @@
     (alter-var-root #'renderer (constantly r))))
 
 (defn unmount []
-  (println "looking to unmount")
   (when renderer
-    (println "unmounting")
     (fx/unmount-renderer (var-get (find-var 'spring-lobby/*state)) renderer)))
 
 
 (defn load-and-mount []
   (try
-    (println "loading")
     (let [saved-state @state
           state-atom (var-get (find-var 'spring-lobby/*state))]
       (reset! state-atom saved-state)
@@ -67,29 +64,25 @@
 (def old-refresh refresh)
 
 (defn unmount-store-refresh-load-mount []
-  (require 'spring-lobby)
-  (when (try (var-get (find-var 'spring-lobby/*state))
-             (catch Exception e
-               (println e "Error refreshing")))
-    (println "storing")
-    (let [old-state @(var-get (find-var 'spring-lobby/*state))]
-      (reset! state old-state)
-      (when-let [f (:connected-loop old-state)]
-        (future-cancel f))
-      (when-let [f (:print-loop old-state)]
-        (future-cancel f))
-      (when-let [f (:print-loop old-state)]
-        (future-cancel f)))
-    (unmount)
-    (println "refreshing")
-    (future
-      (try
+  (try
+    (require 'spring-lobby)
+    (when (try (var-get (find-var 'spring-lobby/*state))
+               (catch Exception e
+                 (println e "Error refreshing")))
+      (println "storing")
+      (let [old-state @(var-get (find-var 'spring-lobby/*state))]
+        (reset! state old-state)
+        (when-let [f (:connected-loop old-state)]
+          (future-cancel f))
+        (when-let [f (:print-loop old-state)]
+          (future-cancel f))
+        (when-let [f (:print-loop old-state)]
+          (future-cancel f)))
+      (unmount))
+    (finally
+      (future
         (binding [*ns* *ns*]
-          (let [res (old-refresh :after 'user/load-and-mount)]
-            (println res)))
-        (catch Exception e
-          (println e))
-        (finally
+          (println (old-refresh :after 'user/load-and-mount))
           (reset! refreshing false))))))
 
 ; replace for editor integration
@@ -102,9 +95,11 @@
       (when (and (.exists f) (not (.isDirectory f)))
         (if @refreshing
           (println "Already refreshing, duplicate file event")
-          (do
+          (try
             (reset! refreshing true)
-            (unmount-store-refresh-load-mount))))))
+            (unmount-store-refresh-load-mount)
+            (catch Exception e
+              (println e)))))))
   context)
 
 
