@@ -220,6 +220,7 @@
         (let [map-info (parse-map-info (slurp (.getInputStream zf map-info-entry)))]
           {::source (.getName map-info-entry)
            :map-name (:name map-info)
+           :map-version (:version map-info)
            :map-data map-info})
         (when-let [map-data-entry
                    (->> entry-seq
@@ -259,6 +260,7 @@
       (let [map-info (parse-map-info (slurp-7z-item map-info-item))]
         {::source (.getPath map-info-item)
          :map-name (:name map-info)
+         :map-version (:version map-info)
          :map-data map-info})
       (if-let [map-data-item
                (->> (.getArchiveItems simple)
@@ -307,8 +309,8 @@
              (filter #(.isDirectory %))
              (map
                (fn [version-dir]
-                 {:ai-name (.getName ai-dir)
-                  :ai-version (.getName version-dir)}))))
+                 {:bot-name (.getName ai-dir)
+                  :bot-version (.getName version-dir)}))))
       ai-dirs)))
 
 #_

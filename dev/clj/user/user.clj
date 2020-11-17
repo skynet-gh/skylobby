@@ -13,7 +13,7 @@
 (disable-reload!)
 
 
-(def state (atom nil))
+(def ^:dynamic state nil)
 (def ^:dynamic renderer nil)
 (def refreshing (atom false))
 
@@ -37,24 +37,26 @@
                             {:fx/type view
                              :state state}))
             :opts {:fx.opt/map-event-handler event-handler})
-        state (var-get (find-var 'spring-lobby/*state))]
-    (fx/mount-renderer state r)
+        state-atom (var-get (find-var 'spring-lobby/*state))]
+    (alter-var-root #'state (constantly state-atom))
+    (fx/mount-renderer state-atom r)
     (alter-var-root #'renderer (constantly r))))
 
 (defn unmount []
   (when renderer
-    (fx/unmount-renderer (var-get (find-var 'spring-lobby/*state)) renderer)))
+    (try
+      (fx/unmount-renderer (var-get (find-var 'spring-lobby/*state)) renderer)
+      (catch Exception e
+        (println "Error unmounting: " (.getMessage e))))))
 
 
 (defn load-and-mount []
   (try
-    (let [saved-state @state
-          state-atom (var-get (find-var 'spring-lobby/*state))]
-      (reset! state-atom saved-state)
-      (when-let [client-deferred (:client-deferred saved-state)]
-        (require 'spring-lobby)
-        (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
-          (connected-loop-fn state-atom client-deferred))))
+    (require 'spring-lobby)
+    (alter-var-root (find-var 'spring-lobby/*state) (constantly state))
+    (when-let [client-deferred (:client-deferred @state)]
+      (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
+        (connected-loop-fn state client-deferred)))
     (mount)
     (catch Exception e
       (println e))
@@ -65,20 +67,15 @@
 
 (defn unmount-store-refresh-load-mount []
   (try
-    (require 'spring-lobby)
-    (when (try (var-get (find-var 'spring-lobby/*state))
-               (catch Exception e
-                 (println e "Error refreshing")))
-      (println "storing")
-      (let [old-state @(var-get (find-var 'spring-lobby/*state))]
-        (reset! state old-state)
-        (when-let [f (:connected-loop old-state)]
-          (future-cancel f))
-        (when-let [f (:print-loop old-state)]
-          (future-cancel f))
-        (when-let [f (:print-loop old-state)]
-          (future-cancel f)))
-      (unmount))
+    (println "cancelling futures")
+    (let [old-state @state]
+      (when-let [f (:connected-loop old-state)]
+        (future-cancel f))
+      (when-let [f (:print-loop old-state)]
+        (future-cancel f))
+      (when-let [f (:ping-loop old-state)]
+        (future-cancel f)))
+    (unmount)
     (finally
       (future
         (binding [*ns* *ns*]

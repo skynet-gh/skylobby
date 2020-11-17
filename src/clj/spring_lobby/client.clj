@@ -8,7 +8,7 @@
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
-    [taoensso.timbre :refer [info trace warn]])
+    [taoensso.timbre :as log])
   (:import
     (java.nio ByteBuffer)
     (java.security MessageDigest)
@@ -117,7 +117,7 @@
 
 (defn send-message [c m]
   (when c
-    (info ">" (str "'" m "'"))
+    (log/info ">" (str "'" m "'"))
     @(s/put! c (str m "\n"))))
 
 (defmulti handle
@@ -126,14 +126,35 @@
         (string/split #"\s")
         first)))
 
-(defmethod handle :default [_client _state m]
-  (trace "no handler for message" (str "'" m "'")))
+(defmethod handle :default [_client state m]
+  (log/trace "no handler for message" (str "'" m "'"))
+  (swap! state assoc :last-failed-message m))
+
+(defmethod handle "PONG" [_client state _m]
+  (swap! state assoc :last-pong (System/currentTimeMillis)))
+
+(defmethod handle "SETSCRIPTTAGS" [_client state m]
+  (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)]
+    (swap! state assoc :script-tags script-tags-raw))) ; TODO parse
+
+(defmethod handle "TASSERVER" [_client state m]
+  (swap! state assoc :tas-server m))
+
+(defmethod handle "ACCEPTED" [_client state _m]
+  (swap! state assoc :accepted true))
+
+(defmethod handle "MOTD" [_client _state m]
+  (log/trace "motd" m))
+
+(defmethod handle "LOGININFOEND" [_client _state _m]
+  (log/trace "end of login info"))
 
 (defmethod handle "FAILED" [_client state m]
   (swap! state assoc :last-failed-message m))
 
 (defmethod handle "JOINBATTLEFAILED" [_client state m]
   (swap! state assoc :last-failed-message m))
+
 
 (defn parse-adduser [m]
   (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
@@ -172,8 +193,14 @@
             state))))))
 
 (defmethod handle "REMOVEBOT" [_c state m]
-  (let [[_all botname] (re-find #"\w+ (\w+)" m)]
-    (swap! state update-in [:battle :bots] dissoc botname)))
+  (if-let [[_all battle-id botname] (re-find #"\w+ (\w+) (\w+)" m)]
+    (swap! state
+      (fn [state]
+        (-> state
+            (update-in [:battles battle-id :bots] dissoc botname)
+            (update-in [:battle :bots] dissoc botname))))
+    (let [[_all botname] (re-find #"\w+ (\w+)" m)]
+      (swap! state update-in [:battle :bots] dissoc botname))))
 
 
 (defn parse-battleopened [m]
@@ -198,7 +225,7 @@
                   :battle-modname battle-modname
                   :channel-name channel-name}]
       (swap! state assoc-in [:battles battle-id] battle))
-    (warn "Unable to parse BATTLEOPENED")))
+    (log/warn "Unable to parse BATTLEOPENED")))
 
 (defn parse-updatebattleinfo [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
@@ -279,33 +306,41 @@
            :battle-status (decode-battle-status battle-status)
            :team-color team-color)))
 
+(defmethod handle "UPDATEBOT" [_c state m]
+  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
+    (swap! state update-in [:battle :bots username]
+           assoc
+           :battle-status (decode-battle-status battle-status)
+           :team-color team-color)))
+
+
 (defn ping-loop [state-atom c]
   (swap! state-atom
     assoc
     :ping-loop
     (future
-      (info "ping loop thread started")
+      (log/info "ping loop thread started")
       (loop []
         (async/<!! (async/timeout 30000))
         (when (send-message c "PING")
           (when-not (Thread/interrupted)
             (recur))))
-      (info "ping loop ended"))))
+      (log/info "ping loop ended"))))
 
 (defn print-loop [state-atom c]
   (swap! state-atom
     assoc
     :print-loop
     (future
-      (info "print loop thread started")
+      (log/info "print loop thread started")
       (loop []
         (when-let [d (s/take! c)]
           (when-let [m @d]
-            (info "<" (str "'" m "'"))
+            (log/info "<" (str "'" m "'"))
             (handle c state-atom m)
             (when-not (Thread/interrupted)
               (recur)))))
-      (info "print loop ended"))))
+      (log/info "print loop ended"))))
 
 (defn exit [c]
   (send-message c "EXIT"))
@@ -331,13 +366,13 @@
      (ping-loop state-atom client))))
 
 (defn disconnect [c]
-  (info "disconnecting")
+  (log/info "disconnecting")
   (exit c)
   (.close c)
-  (info "connection closed?" (.isClosed c)))
+  (log/info "connection closed?" (.isClosed c)))
 
 (defmethod handle "DENIED" [client state m]
-  (info (str "Login denied: '" m "'"))
+  (log/info (str "Login denied: '" m "'"))
   (disconnect client)
   (swap! state
     (fn [state]

@@ -1,4 +1,4 @@
-{:paths ["src/clj" "lib/lua-parser/src/main/antlr3/nl/bigo/luaparser"]
+{:paths ["src/clj" "resources" "lib/lua-parser/src/main/antlr3/nl/bigo/luaparser"]
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
   byte-streams/byte-streams {:mvn/version "0.2.4"}
@@ -12,8 +12,11 @@
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.clojure/clojure {:mvn/version "1.10.2-alpha4"}
   org.clojure/core.async {:mvn/version "1.3.610"}
+  org.kordamp.ikonli/ikonli-javafx {:mvn/version "11.5.0"}
+  org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "11.5.0"}
   org.openjfx/javafx-controls {:mvn/version "15.0.1"}
-  smee/binary {:mvn/version "0.5.5"}}
+  smee/binary {:mvn/version "0.5.5"}
+  toml/toml {:mvn/version "0.1.3"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj/user" "test/clj"]
@@ -26,6 +29,7 @@
     org.clojure/tools.namespace {:mvn/version "1.0.0"}
     pjstadig/humane-test-output {:mvn/version "0.10.0"}
     reply/reply {:mvn/version "0.4.4"}}
+   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "repl"]}
   :test
   {:extra-paths ["dev/clj/test" "test/clj"]
