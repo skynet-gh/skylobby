@@ -9,18 +9,11 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [spring-lobby.client :as client]
+    [spring-lobby.fs :as fs]
     [spring-lobby.spring :as spring]
-    [taoensso.timbre :refer [debug info trace warn] :as log])
+    [taoensso.timbre :as log])
   (:import
-    (java.awt.image BufferedImage)
-    (java.io RandomAccessFile)
-    (java.nio ByteBuffer)
-    (java.util.zip CRC32 ZipFile)
-    (javax.imageio ImageIO)
-    (manifold.stream SplicedStream)
-    (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
-    (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
-    (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)))
+    (manifold.stream SplicedStream)))
 
 
 (set! *warn-on-reflection* true)
@@ -39,99 +32,6 @@
 
 
 (defmulti event-handler :event/type)
-
-
-(SevenZip/initSevenZipFromPlatformJAR)
-
-(defn spring-root
-  "Returns the root directory for Spring"
-  []
-  (if (string/starts-with? (System/getProperty "os.name") "Windows")
-    (io/file (System/getProperty "user.home") "Documents" "My Games" "Spring")
-    (do
-      (io/file (System/getProperty "user.home") "spring") ; TODO make sure
-      (str "/mnt/c/Users/" (System/getProperty "user.name") "/Documents/My Games/Spring")))) ; TODO remove
-
-(defn map-files []
-  (->> (io/file (str (spring-root) "/maps"))
-       file-seq
-       (filter #(.isFile ^java.io.File %))
-       (filter #(string/ends-with? (.getName ^java.io.File %) ".sd7"))))
-
-(defn map-files-zip []
-  (->> (io/file (str (spring-root) "/maps"))
-       file-seq
-       (filter #(.isFile ^java.io.File %))
-       (filter #(string/ends-with? (.getName ^java.io.File %) ".sdz"))))
-
-
-(defn open-zip [^java.io.File from]
-  (let [zf (ZipFile. from)
-        entries (enumeration-seq (.entries zf))]
-    (doseq [^java.util.zip.ZipEntry entry entries]
-      (println (.getName entry) (.getCrc entry))
-      (let [entry-name (.getName entry)
-            crc-long (.getCrc entry)
-            dir (.isDirectory entry)]
-        (when (re-find #"(?i)mini" entry-name)
-          (println (.getName from) entry-name))))))
-
-; https://github.com/spring/spring/blob/master/rts/System/FileSystem/ArchiveScanner.cpp#L782-L858
-(defn spring-crc [named-crcs]
-  (let [^CRC32 res (CRC32.)
-        sorted (sort-by :crc-name named-crcs)]
-    (doseq [{:keys [^String crc-name crc-long]} sorted]
-      (.update res (.getBytes crc-name))
-      (.update res (.array (.putLong (ByteBuffer/allocate 4) crc-long)))) ; TODO fix array overflow
-    (.getValue res))) ; TODO 4711 if 0
-
-#_
-(let [zip-files (map-files-zip)]
-  zip-files)
-#_
-(open-zip
-  (first (map-files-zip)))
-#_
-(doseq [map-file (map-files-zip)]
-  (open-zip map-file))
-
-
-(defn open-7z [^java.io.File from]
-  (with-open [raf (RandomAccessFile. from "r")
-              rafis (RandomAccessFileInStream. raf)
-              archive (SevenZip/openInArchive nil rafis)
-              simple (.getSimpleInterface archive)]
-    (trace from "has" (.getNumberOfItems archive) "items")
-    (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
-      (let [path (.getPath item)
-            crc (.getCRC item)
-            crc-long (Integer/toUnsignedString crc)
-            dir (.isFolder item)
-            from-path (.getPath (io/file from))
-            to (str (subs from-path 0 (.lastIndexOf from-path ".")) ".png")]
-        (when (string/includes? (string/lower-case path) "mini")
-          (info path))
-        (when (re-find #"(?i)mini\.png" path)
-          (info "Extracting" path "to" to)
-          (with-open [baos (java.io.ByteArrayOutputStream.)]
-            (let [res (.extractSlow item
-                        (reify ISequentialOutStream
-                          (write [this data]
-                            (trace "got" (count data) "bytes")
-                            (.write baos data 0 (count data))
-                            (count data))))
-                  ^BufferedImage image (with-open [is (io/input-stream (.toByteArray baos))]
-                                         (ImageIO/read is))]
-              (info "Extract result" res)
-              (info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
-
-
-#_
-(doseq [map-file (map-files)]
-  (open-7z map-file))
-
-#_
-(defn extract-7z [from])
 
 
 (defn menu-view [_opts]
@@ -293,17 +193,16 @@
          (future
            (try
              (let [^SplicedStream client @client-deferred]
-               (when-not ())
                (client/connect state-atom client) ; TODO username password
                (swap! state-atom assoc :client client :login-error nil)
                (loop []
                  (if (and client (not (.isClosed client)))
                    (do
-                     (debug "Client is still connected")
+                     (log/debug "Client is still connected")
                      (async/<!! (async/timeout 20000))
                      (recur))
                    (do
-                     (info "Client was disconnected")
+                     (log/info "Client was disconnected")
                      (update-disconnected)))))
              (catch Exception e
                (log/error e "Unable to connect")
@@ -388,7 +287,7 @@
                (str " " battle-password)))))))
 
 (defn battles-buttons
-  [{:keys [battle battles battle-password client selected-battle title engine-version mod-name map-name]}]
+  [{:keys [battle battles battle-password client selected-battle title engine-version mod-name map-name maps-cached]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -420,16 +319,24 @@
              :on-text-changed {:event/type ::title-change}}
             {:fx/type :choice-box
              :value (str engine-version)
-             :items ["103.0" "104.0"] ; TODO
+             :items (fs/engines)
              :on-value-changed {:event/type ::version-change}}
             {:fx/type :choice-box
              :value (str mod-name)
-             :items ["Balanced Annihilation V9.79.4" "Balanced Annihilation V10.24"] ; TODO
-             :on-value-changed {:event/type ::mod-change}}
-            {:fx/type :choice-box
-             :value (str map-name)
-             :items ["Dworld Acidic" "Dworld Duo"] ; TODO
-             :on-value-changed {:event/type ::map-change}}])))
+             :items (->> (fs/games)
+                         (map :modinfo)
+                         (map (fn [modinfo] (str (:name modinfo) " " (:version modinfo)))))
+             :on-value-changed {:event/type ::mod-change}}]
+           (if maps-cached
+             [{:fx/type :choice-box
+               :value (str map-name)
+               :items (map :map-name maps-cached)
+               :on-value-changed {:event/type ::map-change}}]
+             [{:fx/type :v-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :text "Loading maps..."}]}]))))
      [])})
 
 (defmethod event-handler ::battle-password-change [e]
@@ -448,11 +355,6 @@
   (swap! *state assoc :map-name (:fx/event e)))
 
 
-; doesn't work from WSL
-(defn spring-env []
-  (into-array String ["SPRING_WRITEDIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\write"
-                      "SPRING_DATADIR=C:\\Users\\craig\\.alt-spring-lobby\\spring\\data"]))
-
 (defmethod event-handler ::add-bot [_e]
   (let [bot-num 1
         bot-name "KAIK"
@@ -469,20 +371,17 @@
         {:keys [battle-version]} battle
         script (spring/script-data battle {:myplayername username})
         script-txt (spring/script-txt script)
-        engine-file (io/file (spring-root) "engine" battle-version "spring.exe")
-        ;script-file (io/file (spring-root) "script.txt")
-        ;homedir (io/file (System/getProperty "user.home"))
-        ;script-file (io/file homedir "script.txt")
-        script-file (io/file "/mnt/c/Users/craig/.alt-spring-lobby/spring/script.txt") ; TODO remove
-        isolation-dir (io/file "/mnt/c/Users/craig/.alt-spring-lobby/spring/engine" battle-version)] ; TODO remove
-        ;homedir (io/file "C:\\Users\\craig\\.alt-spring-lobby\\spring") ; TODO remove
+        engine-file (io/file (fs/spring-root) "engine" battle-version "spring.exe")
+        username (System/getProperty "user.name")
+        script-file (io/file "/mnt/c/Users" username ".alt-spring-lobby/spring/script.txt") ; TODO remove
+        isolation-dir (io/file "/mnt/c/Users" username ".alt-spring-lobby/spring/engine" battle-version)] ; TODO remove
     (try
       (spit script-file script-txt)
       (let [command [(.getAbsolutePath engine-file)
-                     "--isolation-dir" (str "C:\\Users\\craig\\.alt-spring-lobby\\spring\\engine\\" battle-version) ; TODO windows path
-                     "C:\\Users\\craig\\.alt-spring-lobby\\spring\\script.txt"] ; TODO windows path
+                     "--isolation-dir" (str "C:\\Users\\" username "\\.alt-spring-lobby\\spring\\engine\\" battle-version) ; TODO windows path
+                     (str "C:\\Users\\" username "\\.alt-spring-lobby\\spring\\script.txt")] ; TODO windows path
             runtime (Runtime/getRuntime)]
-        (info "Running '" command "'")
+        (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp nil
               process (.exec runtime cmdarray envp isolation-dir)]
@@ -491,19 +390,19 @@
               (loop []
                 (if-let [line (.readLine reader)]
                   (do
-                    (info "(spring out)" line)
+                    (log/info "(spring out)" line)
                     (recur))
-                  (info "Spring stdout stream closed")))))
+                  (log/info "Spring stdout stream closed")))))
           (async/thread
             (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
               (loop []
                 (if-let [line (.readLine reader)]
                   (do
-                    (info "(spring err)" line)
+                    (log/info "(spring err)" line)
                     (recur))
-                  (info "Spring stderr stream closed")))))))
+                  (log/info "Spring stderr stream closed")))))))
       (catch Exception e
-        (warn e)))
+        (log/warn e)))
     (client/send-message (:client @*state) "MYSTATUS 1")))
 
 (defmethod event-handler ::start-battle [_e]
@@ -743,18 +642,22 @@
 
 (defn root-view
   [{{:keys [client client-deferred users battles battle battle-password selected-battle username
-            password login-error title engine-version mod-name map-name last-failed-message]} :state}]
+            password login-error title engine-version mod-name map-name last-failed-message maps-cached]} :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [node]
-                 (println "on-created")
+                 (log/debug "on-created")
+                 (future
+                   (swap! *state assoc :maps-cached (doall (fs/maps))))
                  (.requestFocus node))
-   :on-advanced (fn [_] (println "on-advanced"))
-   :on-deleted (fn [_] (println "on-deleted"))
+   :on-advanced (fn [_]
+                  (log/debug "on-advanced"))
+   :on-deleted (fn [_]
+                 (log/debug "on-deleted"))
    :desc
    {:fx/type :stage
     :showing true
     :title "Alt Spring Lobby"
-    :width 900
+    :width 1400
     :height 700
     :scene {:fx/type :scene
             :root {:fx/type :v-box
@@ -780,7 +683,8 @@
                                :title title
                                :engine-version engine-version
                                :mod-name mod-name
-                               :map-name map-name}
+                               :map-name map-name
+                               :maps-cached maps-cached}
                               {:fx/type battle-table
                                :battles battles
                                :battle battle

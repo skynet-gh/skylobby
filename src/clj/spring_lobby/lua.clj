@@ -9,7 +9,7 @@
 
 
 (defn parse [s]
-  (lua-parser s))
+  (@lua-parser s))
 
 #_
 (parse (slurp "mapinfo.lua"))
