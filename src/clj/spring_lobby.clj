@@ -95,7 +95,7 @@
       {:fx/cell-type :table-cell
        :describe (fn [i] {:text (str (:country (get users (:host-username i))))})}}
      {:fx/type :table-column
-      :text " "
+      :text "?"
       :cell-value-factory identity
       :cell-factory
       {:fx/cell-type :table-cell
@@ -177,7 +177,7 @@
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [_i] {:text ""})}}
+      :describe (fn [i] {:text (str (:rank (:client-status i)))})}}
     {:fx/type :table-column
      :text "Username"
      :cell-value-factory identity
@@ -303,6 +303,30 @@
              (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
                (str " " battle-password)))))))
 
+(defn map-list
+  [{:keys [disable map-name maps-cached on-value-changed]}]
+  (if maps-cached
+    {:fx/type :h-box
+     :children
+     [{:fx/type :choice-box
+       :value (str map-name)
+       :items (map
+                (fn [{:keys [map-name map-version]}]
+                  (str map-name (when map-version (str " " map-version))))
+                maps-cached)
+       :disable (boolean disable)
+       :on-value-changed on-value-changed}
+      {:fx/type :button
+       :on-action {:event/type ::reload-maps}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-refresh:16:white"}}]}
+    {:fx/type :v-box
+     :alignment :center-left
+     :children
+     [{:fx/type :label
+       :text "Loading maps..."}]}))
+
 (defn battles-buttons
   [{:keys [battle battles battle-password client selected-battle title engine-version mod-name map-name maps-cached]}]
   {:fx/type :h-box
@@ -334,32 +358,20 @@
          :on-action {:event/type ::host-battle}
          :on-text-changed {:event/type ::title-change}}])
      (when (not battle)
-       (concat
-         [{:fx/type :choice-box
-           :value (str engine-version)
-           :items (fs/engines)
-           :on-value-changed {:event/type ::version-change}}
-          {:fx/type :choice-box
-           :value (str mod-name)
-           :items (->> (fs/games)
-                       (map :modinfo)
-                       (map (fn [modinfo] (str (:name modinfo) " " (:version modinfo)))))
-           :on-value-changed {:event/type ::mod-change}}]
-         (if maps-cached
-           [{:fx/type :choice-box
-             :value (str map-name)
-             :items (map :map-name maps-cached)
-             :on-value-changed {:event/type ::map-change}}
-            {:fx/type :button
-             :on-action {:event/type ::reload-maps}
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-refresh:16:white"}}]
-           [{:fx/type :v-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text "Loading maps..."}]}]))))})
+       [{:fx/type :choice-box
+         :value (str engine-version)
+         :items (fs/engines)
+         :on-value-changed {:event/type ::version-change}}
+        {:fx/type :choice-box
+         :value (str mod-name)
+         :items (->> (fs/games)
+                     (map :modinfo)
+                     (map (fn [modinfo] (str (:name modinfo) " " (:version modinfo)))))
+         :on-value-changed {:event/type ::mod-change}}
+        {:fx/type map-list
+         :map-name map-name
+         :maps-cached maps-cached
+         :on-value-changed {:event/type ::map-change}}]))})
 
 
 (defmethod event-handler ::battle-password-change [e]
@@ -457,71 +469,102 @@
   (start-game))
 
 
+
+
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
            engine-version]}]
-  {:fx/type :v-box
+  {:fx/type :h-box
    :children
-   [{:fx/type :h-box
-     :alignment :top-left
-     :children
-     (concat
-       [{:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :text (if am-host
-                   "You are the host"
-                   (str "Waiting for host " host-username))}}
-         :desc
-         {:fx/type :button
-          :text (str (if am-host "Start" "Join") " Game")
-          :disable (boolean (and (not am-host)
-                                 (not (-> host-user :client-status :ingame))))
-          :on-action {:event/type ::start-battle}}}]
-       (if maps-cached
-         [{:fx/type :choice-box
-           :value (str battle-map)
-           :items (map :map-name maps-cached)
+   (concat
+     [{:fx/type :v-box
+       :children
+       [{:fx/type :h-box
+         :alignment :top-left
+         :children
+         [{:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :text (if am-host
+                     "You are the host"
+                     (str "Waiting for host " host-username))}}
+           :desc
+           {:fx/type :button
+            :text (str (if am-host "Start" "Join") " Game")
+            :disable (boolean (and (not am-host)
+                                   (not (-> host-user :client-status :ingame))))
+            :on-action {:event/type ::start-battle}}}
+          {:fx/type map-list
            :disable (not am-host)
-           :on-value-changed {:event/type ::battle-map-change}}
-          {:fx/type :button
-           :on-action {:event/type ::reload-maps}
-           :graphic
-           {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-refresh:16:white"}}]
-         [{:fx/type :v-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "Loading maps..."}]}]))}
-    {:fx/type :h-box
-     :alignment :top-left
-     :children
-     [{:fx/type :button
-       :text "Add Bot"
-       :disable (or (string/blank? bot-username)
-                    (string/blank? bot-name)
-                    (string/blank? bot-version))
-       :on-action {:event/type ::add-bot
-                   :bot-username bot-username
-                   :bot-name bot-name
-                   :bot-version bot-version}}
-      {:fx/type :text-field
-       :text (str bot-username)
-       :on-text-changed {:event/type ::change-bot-username}}
-      {:fx/type :choice-box
-       :value (str bot-name)
-       :on-value-changed {:event/type ::change-bot-name
-                          :engine-version engine-version}
-       :items (map :bot-name (fs/bots engine-version))}
-      {:fx/type :choice-box
-       :value (str bot-version)
-       :on-value-changed {:event/type ::change-bot-version}
-       :items (map :bot-version
-                   (or (get (group-by :bot-name (fs/bots engine-version))
-                            bot-name)
-                       []))}]}]})
+           :map-name battle-map
+           :maps-cached maps-cached
+           :on-value-changed {:event/type ::battle-map-change}}]}
+        {:fx/type :h-box
+         :alignment :top-left
+         :children
+         [{:fx/type :button
+           :text "Add Bot"
+           :disable (or (string/blank? bot-username)
+                        (string/blank? bot-name)
+                        (string/blank? bot-version))
+           :on-action {:event/type ::add-bot
+                       :bot-username bot-username
+                       :bot-name bot-name
+                       :bot-version bot-version}}
+          {:fx/type :text-field
+           :text (str bot-username)
+           :on-text-changed {:event/type ::change-bot-username}}
+          {:fx/type :choice-box
+           :value (str bot-name)
+           :on-value-changed {:event/type ::change-bot-name
+                              :engine-version engine-version}
+           :items (map :bot-name (fs/bots engine-version))}
+          {:fx/type :choice-box
+           :value (str bot-version)
+           :on-value-changed {:event/type ::change-bot-version}
+           :items (map :bot-version
+                       (or (get (group-by :bot-name (fs/bots engine-version))
+                                bot-name)
+                           []))}]}]}
+      {:fx/type :pane
+       :h-box/hgrow :always}]
+    (let [image-file (io/file (fs/map-minimap battle-map))]
+      (when (.exists image-file)
+        [{:fx/type :image-view
+          :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
+                        (when (.exists image-file)
+                          (io/input-stream image-file)))}
+          :fit-width 200
+          :fit-height 200}])))})
+
+
+(defn fix-color
+  "Returns the rgb int color represention for the given Spring bgr int color."
+  [spring-color-int]
+  (let [[r g b _a] (:rgba (colors/create-color spring-color-int))
+        reversed (colors/create-color
+                   {:r b
+                    :g g
+                    :b r})
+        spring-int (colors/rgb-int reversed)]
+    spring-int))
+
+(defn spring-color
+  "Returns the spring bgr int color format from a javafx color."
+  [^javafx.scene.paint.Color color]
+  (colors/rgba-int
+    (colors/create-color
+      {:r (Math/round (* 255 (.getBlue color)))  ; switch blue to red
+       :g (Math/round (* 255 (.getGreen color)))
+       :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
+       :a 0})))
+
+#_
+(colors/create-color
+  (colors/rgb-int-to-components 0))
+#_
+(colors/create-color 0)
 
 
 (defn battle-table
@@ -531,7 +574,10 @@
                   (fn [[k v]] (assoc v :username k :user (get users k)))
                   (:users battle))
                 (mapv
-                  (fn [[k v]] (assoc v :username (str k " (" (:owner v) ")")))
+                  (fn [[k v]]
+                    (assoc v
+                           :username k
+                           :user {:client-status {:bot true}}))
                   (:bots battle)))
         {:keys [host-username battle-map]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -554,7 +600,12 @@
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (select-keys (:client-status (:user i)) [:bot :access]))})}}
+            :describe
+            (fn [i]
+              {:text (str (merge
+                            (select-keys (:client-status (:user i)) [:bot])
+                            (select-keys (:battle-status i) [:ready])
+                            {:host (= (:username i) host-username)}))})}}
           {:fx/type :table-column
            :text "Ingame"
            :cell-value-factory identity
@@ -573,8 +624,10 @@
                {:fx/type :check-box
                 :selected (not (:mode (:battle-status i)))
                 :on-selected-changed {:event/type ::battle-spectate-change
+                                      :is-me (= (:username i) username)
+                                      :is-bot (-> i :user :client-status :bot)
                                       :id i}
-                :disable (not (or am-host
+                :disable (not (or (and am-host (:mode (:battle-status i)))
                                   (= (:username i) username)
                                   (= (:owner i) username)))}})}}
           {:fx/type :table-column
@@ -589,6 +642,8 @@
                {:fx/type :choice-box
                 :value (str (:side (:battle-status i)))
                 :on-value-changed {:event/type ::battle-side-change
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
                                    :id i}
                 :items ["0" "1"]
                 :disable (not= (:username i) username)}})}}
@@ -614,16 +669,22 @@
               {:text ""
                :graphic
                {:fx/type :color-picker
-                :value (format "#%03x" (if team-color (Integer/parseInt team-color) 0))
+                :value (format "#%03x" (fix-color (if team-color (Integer/parseInt team-color) 0)))
                 :on-value-changed {:event/type ::battle-color-change
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
                                    :id i}
-                :disable (not= (:username i) username)}})}}
+                :disable (not (or am-host
+                                  (= (:username i) username)
+                                  (= (:owner i) username)))}})}}
           {:fx/type :table-column
            :text "Nickname"
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:username i))})}}
+            :describe
+            (fn [{:keys [username owner]}]
+              {:text (str username (when owner (str " (" owner ")")))})}}
           {:fx/type :table-column
            :text "Player ID"
            :cell-value-factory identity
@@ -636,9 +697,13 @@
                {:fx/type :choice-box
                 :value (str (:id (:battle-status i)))
                 :on-value-changed {:event/type ::battle-player-id-change
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
                                    :id i}
                 :items (map str (take 16 (iterate inc 0)))
-                :disable (not= (:username i) username)}})}}
+                :disable (not (or am-host
+                                  (= (:username i) username)
+                                  (= (:owner i) username)))}})}}
           {:fx/type :table-column
            :text "Team ID"
            :cell-value-factory identity
@@ -651,9 +716,14 @@
                {:fx/type :choice-box
                 :value (str (:ally (:battle-status i)))
                 :on-value-changed {:event/type ::battle-ally-change
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
+                                   :bot (-> i :user :client-status :bot)
                                    :id i}
                 :items (map str (take 16 (iterate inc 0)))
-                :disable (not= (:username i) username)}})}}
+                :disable (not (or am-host
+                                  (= (:username i) username)
+                                  (= (:owner i) username)))}})}}
           {:fx/type :table-column
            :text "Bonus"
            :cell-value-factory identity
@@ -674,45 +744,60 @@
        (when battle
          [(merge
             {:fx/type battle-buttons
+             :am-host am-host
              :battle-map battle-map
              :host-user host-user}
-            (select-keys state [:am-host :host-username :maps-cached
+            (select-keys state [:host-username :maps-cached
                                 :bot-username :bot-name :bot-version :engine-version]))]))}))
 
 
 
-(defn my-battle-status [state battle-status team-color]
-  (let [{:keys [client battle]} state]
-    (when (and client battle)
-      (log/debug battle-status team-color)
+(defn update-battle-status
+  "Sends a message to update battle status for yourself or a bot of yours."
+  [{:keys [client battle]} {:keys [is-bot id]} battle-status team-color]
+  (when (and client battle)
+    (let [prefix (if is-bot
+                   (str "UPDATEBOT " (:username id))
+                   "MYBATTLESTATUS")]
+      (log/trace battle-status team-color)
       (client/send-message client
-        (str "MYBATTLESTATUS "
+        (str prefix
+             " "
              (client/encode-battle-status battle-status)
              " "
              team-color)))))
 
 
 (defmethod event-handler ::battle-spectate-change
-  [{:keys [id] :fx/keys [event]}]
-  (my-battle-status @*state
-    (assoc (:battle-status id) :mode (not event))
-    (:team-color id)))
+  [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
+  (if (or is-me is-bot)
+    (update-battle-status @*state data
+      (assoc (:battle-status id) :mode (not event))
+      (:team-color id))
+    (client/send-message (:client @*state)
+      (str "FORCESPECTATORMODE " (:username id)))))
 
 (defmethod event-handler ::battle-side-change
-  [{:keys [id] :fx/keys [event]}]
+  [{:keys [id] :fx/keys [event] :as data}]
   (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
-    (my-battle-status @*state (assoc (:battle-status id) :side side) (:team-color id))))
+    (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id))))
 
 (defmethod event-handler ::battle-player-id-change
-  [{:keys [id] :fx/keys [event]}]
+  [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
   (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
-    (my-battle-status @*state (assoc (:battle-status id) :id player-id) (:team-color id))))
+    (if (or is-me is-bot)
+      (update-battle-status @*state data (assoc (:battle-status id) :id player-id) (:team-color id))
+      (client/send-message (:client @*state)
+        (str "FORCETEAMNO " (:username id) " " player-id)))))
 
 (defmethod event-handler ::battle-ally-change
-  [{:keys [id] :fx/keys [event]}]
+  [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
   (log/debug (:battle-status id) event)
   (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
-    (my-battle-status @*state (assoc (:battle-status id) :ally ally) (:team-color id))))
+    (if (or is-me is-bot)
+      (update-battle-status @*state data (assoc (:battle-status id) :ally ally) (:team-color id))
+      (client/send-message (:client @*state)
+        (str "FORCEALLYNO " (:username id) " " ally)))))
 
 (defmethod event-handler ::battle-handicap-change
   [{:keys [id] :fx/keys [event]}]
@@ -726,16 +811,13 @@
            handicap))))
 
 (defmethod event-handler ::battle-color-change
-  [{:keys [id] :fx/keys [event]}]
+  [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
   (log/debug (:battle-status id) event)
-  (let [^javafx.scene.paint.Color color event
-        color-int (colors/rgba-int
-                    (colors/create-color
-                      {:r (Math/round (* 255 (.getRed color)))
-                       :g (Math/round (* 255 (.getGreen color)))
-                       :b (Math/round (* 255 (.getBlue color)))
-                       :a 0}))]
-    (my-battle-status @*state (:battle-status id) color-int)))
+  (let [color-int (spring-color event)]
+    (if (or is-me is-bot)
+      (update-battle-status @*state data (:battle-status id) color-int)
+      (client/send-message (:client @*state)
+        (str "FORCETEAMCOLOR " (:username id) " " color-int)))))
 
 
 (defn root-view
@@ -757,7 +839,7 @@
     :showing true
     :title "Alt Spring Lobby"
     :width 1400
-    :height 700
+    :height 900
     :scene {:fx/type :scene
             :stylesheets [(str (io/resource "dark-theme2.css"))]
             :root {:fx/type :v-box

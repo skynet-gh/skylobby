@@ -317,3 +317,7 @@
 (bots "103.0")
 #_
 (bots "104.0.1-1510-g89bb8e3 maintenance")
+
+
+(defn map-minimap [map-name]
+  (str "/mnt/c/Users/" (System/getProperty "user.name") "/AppData/Roaming/springlobby/cache/" map-name ".minimap.png"))
