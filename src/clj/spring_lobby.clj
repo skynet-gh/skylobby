@@ -398,6 +398,12 @@
         m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
     (client/send-message (:client @*state) m)))
 
+(defmethod event-handler ::kick-battle
+  [{:keys [is-bot username]}]
+  (when-let [client (:client @*state)]
+    (if is-bot
+      (client/send-message client (str "REMOVEBOT " username))
+      (client/send-message client (str "KICKFROMBATTLE " username)))))
 
 
 (defmethod event-handler ::add-bot [{:keys [bot-username bot-name bot-version]}]
@@ -590,6 +596,26 @@
          :items items
          :columns
          [{:fx/type :table-column
+           :text "Nickname"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [{:keys [owner] :as id}]
+              (merge
+                {:text (str (:username id) (when owner (str " (" owner ")")))}
+                (when (and (not= username (:username id))
+                           (or am-host
+                               (= owner username)))
+                  {:graphic
+                   {:fx/type :button
+                    :on-action {:event/type ::kick-battle
+                                :username (:username id)
+                                :is-bot (-> id :user :client-status :bot)}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-account-remove:16:white"}}})))}}
+          {:fx/type :table-column
            :text "Country"
            :cell-value-factory identity
            :cell-factory
@@ -677,14 +703,6 @@
                 :disable (not (or am-host
                                   (= (:username i) username)
                                   (= (:owner i) username)))}})}}
-          {:fx/type :table-column
-           :text "Nickname"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [{:keys [username owner]}]
-              {:text (str username (when owner (str " (" owner ")")))})}}
           {:fx/type :table-column
            :text "Player ID"
            :cell-value-factory identity
@@ -792,7 +810,6 @@
 
 (defmethod event-handler ::battle-ally-change
   [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
-  (log/debug (:battle-status id) event)
   (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
     (if (or is-me is-bot)
       (update-battle-status @*state data (assoc (:battle-status id) :ally ally) (:team-color id))
