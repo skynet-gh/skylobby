@@ -15,7 +15,8 @@
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
-    (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)))
+    (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
+    (org.apache.commons.io FilenameUtils)))
 
 
 (SevenZip/initSevenZipFromPlatformJAR)
@@ -203,35 +204,36 @@
       (string/split #"\.")
       first))
 
+(defn map-name [path]
+  (FilenameUtils/getBaseName path))
+
 (defn read-zip-map [file]
   (with-open [zf (new ZipFile file)]
     (let [entry-seq (->> (.entries zf)
                          enumeration-seq)]
       (merge
-        (when-let [map-entry
+        (when-let [smf-entry
                    (->> entry-seq
                         (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName %)))
                         first)]
-          ; TODO extract only what's needed
-          {:smf-header (smf/decode-map-header (.getInputStream zf map-entry))})
-        (if-let [map-info-entry
-                 (->> entry-seq
-                      (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName %)))
-                      first)]
-          (let [map-info (parse-map-info (slurp (.getInputStream zf map-info-entry)))]
-            {::source (.getName map-info-entry)
-             :map-name (:name map-info)
-             :map-version (:version map-info)
-             :map-data map-info})
-          (when-let [map-data-entry
-                     (->> entry-seq
-                          (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName %)))
-                          first)]
-            {::source (.getName map-data-entry)
-             :map-name (before-dot (.getName map-data-entry))
-             :map-data
-             (when-let [map-data (slurp (.getInputStream zf map-data-entry))]
-               (parse-map-data map-data))}))))))
+          (let [smf-path (.getName smf-entry)]
+            {:map-name (map-name smf-path)
+             ; TODO extract only what's needed
+             :smf {::source smf-path
+                   :header (smf/decode-map-header (.getInputStream zf smf-entry))}}))
+        (when-let [mapinfo-entry
+                   (->> entry-seq
+                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName %)))
+                        first)]
+          (let [mapinfo (lua/read-mapinfo (slurp (.getInputStream zf mapinfo-entry)))]
+            {:mapinfo (assoc mapinfo ::source (.getName mapinfo-entry))}))
+        (when-let [smd-entry
+                   (->> entry-seq
+                        (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName %)))
+                        first)]
+          (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
+                      (parse-map-data map-data))]
+            {:smd (assoc smd ::source (.getName smd-entry))}))))))
 
 #_
 (read-zip-map (io/file (spring-root) "maps" "bilateral.sdz"))
@@ -264,31 +266,29 @@
               archive (SevenZip/openInArchive nil rafis)
               simple (.getSimpleInterface archive)]
     (merge
-      (when-let [map-item (->> (.getArchiveItems simple)
+      (when-let [smf-item (->> (.getArchiveItems simple)
                                (filter (comp #(string/ends-with? % ".smf")
                                              string/lower-case
                                              #(.getPath %)))
                                first)]
-        ; TODO extract only what's needed
-        {:smf-header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes map-item)))})
-      (if-let [map-info-item (->> (.getArchiveItems simple)
-                                  (filter (comp #{"mapinfo.lua"}
-                                                string/lower-case
-                                                #(.getPath %)))
-                                  first)]
-        (let [map-info (parse-map-info (slurp-7z-item map-info-item))]
-          {::source (.getPath map-info-item)
-           :map-name (:name map-info)
-           :map-version (:version map-info)
-           :map-data map-info})
-        (when-let [map-data-item
-                   (->> (.getArchiveItems simple)
-                        (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath %)))
-                        first)]
-          (let [path (.getPath map-data-item)]
-            {::source path
-             :map-name (before-dot path)
-             :map-data (parse-map-data (slurp-7z-item map-data-item))}))))))
+        (let [smf-path (.getPath smf-item)]
+          {:map-name (map-name smf-path)
+           ; TODO extract only what's needed
+           :smf {::source smf-path
+                 :header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes smf-item)))}}))
+      (when-let [mapinfo-item (->> (.getArchiveItems simple)
+                                   (filter (comp #{"mapinfo.lua"}
+                                                 string/lower-case
+                                                 #(.getPath %)))
+                                   first)]
+        (let [mapinfo (lua/read-mapinfo (slurp-7z-item mapinfo-item))]
+          {:mapinfo (assoc mapinfo ::source (.getPath mapinfo-item))}))
+      (when-let [smd-item
+                 (->> (.getArchiveItems simple)
+                      (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath %)))
+                      first)]
+        (let [smd (parse-map-data (slurp-7z-item smd-item))]
+          {:smd (assoc smd ::source (.getPath smd-item))})))))
 
 #_
 (read-7z-map (io/file (spring-root) "maps" "altored_divide_bar_remake_1.3.sd7"))

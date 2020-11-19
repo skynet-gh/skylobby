@@ -307,11 +307,15 @@
            :team-color team-color)))
 
 (defmethod handle "UPDATEBOT" [_c state m]
-  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
-    (swap! state update-in [:battle :bots username]
-           assoc
-           :battle-status (decode-battle-status battle-status)
-           :team-color team-color)))
+  (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+)" m)
+        bot-data {:battle-status (decode-battle-status battle-status)
+                  :team-color team-color}]
+    (swap! state
+      (fn [state]
+        (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
+          (if (= battle-id (-> state :battle :battle-id))
+            (update-in state [:battle :bots username] merge bot-data)
+            state))))))
 
 
 (defn ping-loop [state-atom c]

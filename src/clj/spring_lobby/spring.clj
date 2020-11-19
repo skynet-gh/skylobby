@@ -41,12 +41,12 @@
               :countrycode (:country user)}])
           (:users battle))
         (map
-          (fn [[_player {:keys [battle-status]}]]
+          (fn [[_player {:keys [battle-status team-color]}]]
             [(str "team" (:ally battle-status))
              {:teamleader (:id battle-status)
               :handicap (:handicap battle-status)
               :allyteam (:ally battle-status)
-              :rgbcolor (format-color (:team-color battle-status))
+              :rgbcolor (format-color team-color)
               :side (:side battle-status)}])
           (map
             (comp first second)
