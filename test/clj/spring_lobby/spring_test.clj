@@ -38,6 +38,7 @@
 
 (deftest parse-script
   (is (= expected-script-data
+         (spring/parse-script expected-script-txt)
          (spring/parse-script expected-script-txt))))
 
 

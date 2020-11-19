@@ -49,7 +49,8 @@
 
 (defn decode-map-header
   [input-stream]
-  (b/decode map-header input-stream))
+  (into (sorted-map)
+    (b/decode map-header input-stream)))
 
 (defn decode-map
   [input-stream]

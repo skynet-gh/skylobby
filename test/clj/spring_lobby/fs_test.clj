@@ -5,7 +5,7 @@
     [spring-lobby.fs :as fs]))
 
 
-(declare mock-parsed-lua mock-map-data)
+(declare mock-parsed-lua mock-map-data-txt)
 
 
 (deftest parse-modinfo
@@ -21,18 +21,22 @@
 
 (deftest spring-config-line
   (is (= "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"
-         (fs/spring-config-line (string/split-lines mock-map-data) "Description="))))
+         (fs/spring-config-line (string/split-lines mock-map-data-txt) "Description="))))
 
 (deftest parse-map-data
-  (is (= {:description "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"
-          :gravity "120"
-          :max-metal "1.23"
-          :tidal-strength "13"
-          :extractor-radius "85"
-          :map-hardness "100"
-          :auto-show-metal "1"
-          :detailtex "detailtexblurred.bmp"}
-         (fs/parse-map-data mock-map-data))))
+  (is (= {:map
+          {:description "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"
+           :gravity 120
+           :maxmetal 1.23
+           :tidalstrength 13
+           :extractorradius 85
+           :maphardness 100
+           :autoshowmetal 1
+           :detailtex "detailtexblurred.bmp"
+           :smf
+           {:maxheight 532
+            :minheight -200}}}
+         (fs/parse-map-data mock-map-data-txt))))
 
 
 (def mock-parsed-lua
@@ -68,7 +72,7 @@
     "<EOF>"]])
 
 
-(def mock-map-data
+(def mock-map-data-txt
   "[MAP]
 {
   Description=Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP;
@@ -84,4 +88,4 @@
 minheight = -200;
 maxheight = 532;
 }
-")
+}")
