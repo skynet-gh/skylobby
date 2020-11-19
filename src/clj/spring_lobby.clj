@@ -14,6 +14,7 @@
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
+    (javafx.scene.paint Color)
     (manifold.stream SplicedStream)))
 
 
@@ -482,81 +483,107 @@
 
 
 
+(def start-pos-r 10.0)
+(def map-multiplier 8.0)
+
 
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
            engine-version]}]
-  {:fx/type :h-box
-   :children
-   (concat
-     [{:fx/type :v-box
-       :children
-       [{:fx/type :h-box
-         :alignment :top-left
+  (let [map-details (->> maps-cached
+                         (filter (comp #{battle-map} :map-name))
+                         first)
+        {:keys [map-width map-height]} (:smf-header map-details)
+        image-width 256
+        image-height 256]
+    {:fx/type :h-box
+     :children
+     (concat
+       [{:fx/type :v-box
          :children
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :text (if am-host
-                     "You are the host"
-                     (str "Waiting for host " host-username))}}
-           :desc
-           {:fx/type :button
-            :text (str (if am-host "Start" "Join") " Game")
-            :disable (boolean (and (not am-host)
-                                   (not (-> host-user :client-status :ingame))))
-            :on-action {:event/type ::start-battle}}}
-          {:fx/type map-list
-           :disable (not am-host)
-           :map-name battle-map
-           :maps-cached maps-cached
-           :on-value-changed {:event/type ::battle-map-change}}]}
-        {:fx/type :h-box
-         :alignment :top-left
-         :children
-         [{:fx/type :button
-           :text "Add Bot"
-           :disable (or (string/blank? bot-username)
-                        (string/blank? bot-name)
-                        (string/blank? bot-version))
-           :on-action {:event/type ::add-bot
-                       :bot-username bot-username
-                       :bot-name bot-name
-                       :bot-version bot-version}}
-          {:fx/type :text-field
-           :text (str bot-username)
-           :on-text-changed {:event/type ::change-bot-username}}
-          {:fx/type :choice-box
-           :value (str bot-name)
-           :on-value-changed {:event/type ::change-bot-name
-                              :engine-version engine-version}
-           :items (map :bot-name (fs/bots engine-version))}
-          {:fx/type :choice-box
-           :value (str bot-version)
-           :on-value-changed {:event/type ::change-bot-version}
-           :items (map :bot-version
-                       (or (get (group-by :bot-name (fs/bots engine-version))
-                                bot-name)
-                           []))}]}]}
-      {:fx/type :pane
-       :h-box/hgrow :always}
-      {:fx/type :text-area
-       :editable false
-       :text (with-out-str
-               (->> maps-cached
-                    (filter (comp #{battle-map} :map-name))
-                    first
-                    pprint))
-       :style {:-fx-font-family "monospace"}}]
-    (let [image-file (io/file (fs/map-minimap battle-map))]
-      (when (.exists image-file)
-        [{:fx/type :image-view
-          :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
-                        (when (.exists image-file)
-                          (io/input-stream image-file)))}
-          :fit-width 200
-          :fit-height 200}])))})
+         [{:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :text (if am-host
+                       "You are the host"
+                       (str "Waiting for host " host-username))}}
+             :desc
+             {:fx/type :button
+              :text (str (if am-host "Start" "Join") " Game")
+              :disable (boolean (and (not am-host)
+                                     (not (-> host-user :client-status :ingame))))
+              :on-action {:event/type ::start-battle}}}
+            {:fx/type map-list
+             :disable (not am-host)
+             :map-name battle-map
+             :maps-cached maps-cached
+             :on-value-changed {:event/type ::battle-map-change}}]}
+          {:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type :button
+             :text "Add Bot"
+             :disable (or (string/blank? bot-username)
+                          (string/blank? bot-name)
+                          (string/blank? bot-version))
+             :on-action {:event/type ::add-bot
+                         :bot-username bot-username
+                         :bot-name bot-name
+                         :bot-version bot-version}}
+            {:fx/type :text-field
+             :text (str bot-username)
+             :on-text-changed {:event/type ::change-bot-username}}
+            {:fx/type :choice-box
+             :value (str bot-name)
+             :on-value-changed {:event/type ::change-bot-name
+                                :engine-version engine-version}
+             :items (map :bot-name (fs/bots engine-version))}
+            {:fx/type :choice-box
+             :value (str bot-version)
+             :on-value-changed {:event/type ::change-bot-version}
+             :items (map :bot-version
+                         (or (get (group-by :bot-name (fs/bots engine-version))
+                                  bot-name)
+                             []))}]}]}
+        {:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :text-area
+         :editable false
+         :text (with-out-str (pprint map-details))
+         :style {:-fx-font-family "monospace"}}]
+      (let [image-file (io/file (fs/map-minimap battle-map))]
+        (when (.exists image-file)
+          [{:fx/type :stack-pane
+            :children
+            (concat
+              [{:fx/type :image-view
+                :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
+                              (when (.exists image-file)
+                                (io/input-stream image-file)))}
+                :fit-width image-width
+                :fit-height image-height}
+               {:fx/type :canvas
+                :width image-width
+                :height image-height
+                :draw
+                (fn [canvas]
+                  (let [gc (.getGraphicsContext2D canvas)
+                        starting-points
+                        (->> map-details
+                             :map-data
+                             :map
+                             (filter (comp #(string/starts-with? % "team") name first))
+                             (map second))]
+                    (.clearRect gc 0 0 image-width image-height)
+                    (.setFill gc Color/RED)
+                    (doseq [{:keys [startposx startposz]} starting-points]
+                      (let [x (- (* (/ startposx (* map-multiplier map-width)) image-width) (/ start-pos-r 2))
+                            y (- (* (/ startposz (* map-multiplier map-height)) image-height) (/ start-pos-r 2))]
+                        (.fillOval gc x y start-pos-r start-pos-r)))))}])}])))}))
 
 
 (defn fix-color
