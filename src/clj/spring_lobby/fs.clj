@@ -4,6 +4,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [spring-lobby.lua :as lua]
+    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
     (java.awt.image BufferedImage)
@@ -178,6 +179,8 @@
     2))
 
 (defn parse-map-data [map-data]
+  (spring/parse-script map-data)
+  #_
   (let [lines (string/split-lines map-data)]
     {:description (spring-config-line lines "Description=")
      :gravity (spring-config-line lines "Gravity=")

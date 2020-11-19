@@ -4,10 +4,12 @@
   byte-streams/byte-streams {:mvn/version "0.2.4"}
   clj-antlr/clj-antlr {:mvn/version "0.2.7"}
   cljfx/cljfx {:mvn/version "1.7.10"}
+  clojail/clojail {:mvn/version "1.0.6"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.taoensso/timbre {:mvn/version "5.1.0"}
   digest/digest {:mvn/version "1.4.9"}
   gloss/gloss {:mvn/version "0.2.6"}
+  instaparse/instaparse {:mvn/version "1.4.10"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.clojure/clojure {:mvn/version "1.10.2-alpha4"}

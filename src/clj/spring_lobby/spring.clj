@@ -1,8 +1,12 @@
 (ns spring-lobby.spring
   "Interface to run Spring."
   (:require
+    [clojail.core :as clojail]
+    [clojure.edn :as edn]
+    [clojure.string :as string]
     [clojure.walk]
-    [com.evocomputing.colors :as colors]))
+    [com.evocomputing.colors :as colors]
+    [instaparse.core :as instaparse]))
 
 
 (defn format-color [team-color]
@@ -84,3 +88,64 @@
   "Given data for a battle, return contents of a script.txt file for Spring."
   ([script-data]
    (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))
+
+
+(def whitespace
+  (instaparse/parser
+    "whitespace = #'[\\s\\n]+'"))
+
+
+(def script-grammar
+  (instaparse/parser
+    "config = block*
+     block = tag <'{'> ( block | field | <comment> )* <'}'>
+     tag = <'['> #'\\w+' <']'>
+     field = <#'\\s+'?> #'\\w+' <#'\\s+'?> <'='> <#'\\s*'> #'[^;]*' <';'> <comment?>
+     comment = '//' #'[^\\n]*' '\n'"
+    :auto-whitespace whitespace))
+
+#_
+(whitespace "\n \n\n  \t")
+
+
+(declare parse-fields-or-blocks)
+
+(defn parse-number
+  [v]
+  (try
+    (if-let [e (edn/read-string v)] ; TODO clean
+       (if (number? e)
+         e
+         v)
+       v)
+    (catch Exception _e
+      v)))
+
+(defn parse-field-or-block [field-or-block]
+  (let [kind (first field-or-block)]
+    (case kind
+      :field
+      (let [[_kind k v] field-or-block]
+        [(keyword (string/lower-case k))
+         (parse-number v)])
+      :block
+      (let [[_block [_tag tag]] field-or-block
+            block (nthrest field-or-block 2)]
+        [(keyword (string/lower-case tag))
+         (parse-fields-or-blocks block)]))))
+
+(defn parse-fields-or-blocks
+  [fields-or-blocks]
+  (into (sorted-map)
+    (map parse-field-or-block fields-or-blocks)))
+
+(defn postprocess [script-parsed-raw]
+  (let [blocks (rest script-parsed-raw)]
+    (parse-fields-or-blocks blocks)))
+
+(defn parse-script
+  "Returns the parsed data representation of a spring config."
+  [script-txt]
+  (clojail/thunk-timeout
+    #(postprocess (script-grammar script-txt))
+    1000))

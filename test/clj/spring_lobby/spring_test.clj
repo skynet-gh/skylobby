@@ -36,6 +36,11 @@
           (pprint diff))))))
 
 
+(deftest parse-script
+  (is (= expected-script-data
+         (spring/parse-script expected-script-txt))))
+
+
 (def battle
   {:battle-modhash -1706632985
    :battle-version "104.0.1-1510-g89bb8e3 maintenance"
