@@ -87,7 +87,10 @@
       :cell-value-factory identity
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (select-keys i [:battle-type :battle-passworded]))})}}
+       :describe
+       (fn [i]
+         {:text (str (select-keys i [:battle-type :battle-passworded]))
+          :style {:-fx-font-family "monospace"}})}}
      {:fx/type :table-column
       :text "Country"
       :cell-value-factory identity
@@ -165,7 +168,10 @@
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:client-status i))})}}
+      :describe
+      (fn [i]
+        {:text (str (select-keys (:client-status i) [:bot :access :away :ingame]))
+         :style {:-fx-font-family "monospace"}})}}
     {:fx/type :table-column
      :text "Country"
      :cell-value-factory identity
@@ -534,7 +540,15 @@
                                 bot-name)
                            []))}]}]}
       {:fx/type :pane
-       :h-box/hgrow :always}]
+       :h-box/hgrow :always}
+      {:fx/type :text-area
+       :editable false
+       :text (with-out-str
+               (->> maps-cached
+                    (filter (comp #{battle-map} :map-name))
+                    first
+                    pprint))
+       :style {:-fx-font-family "monospace"}}]
     (let [image-file (io/file (fs/map-minimap battle-map))]
       (when (.exists image-file)
         [{:fx/type :image-view
@@ -631,7 +645,8 @@
               {:text (str (merge
                             (select-keys (:client-status (:user i)) [:bot])
                             (select-keys (:battle-status i) [:ready])
-                            {:host (= (:username i) host-username)}))})}}
+                            {:host (= (:username i) host-username)}))
+               :style {:-fx-font-family "monospace"}})}}
           {:fx/type :table-column
            :text "Ingame"
            :cell-value-factory identity
