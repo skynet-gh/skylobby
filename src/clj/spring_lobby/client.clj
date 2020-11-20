@@ -28,7 +28,7 @@
    :ally 0
    :handicap 0
    :mode 0
-   :sync 0
+   :sync 1
    :id 0
    :side 0})
 

@@ -4,6 +4,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.core.async :as async]
+    [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
@@ -81,7 +82,9 @@
            :on-selected-item-changed {:event/type ::select-battle}}
    :desc
    {:fx/type :table-view
+    :column-resize-policy :constrained ; TODO auto resize
     :items (vec (vals battles))
+    :style {:-fx-max-height "240px"}
     :columns
     [{:fx/type :table-column
       :text "Battle Name"
@@ -171,6 +174,7 @@
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (vec (vals users))
+   :style {:-fx-max-height "240px"}
    :columns
    [{:fx/type :table-column
      :text "Username"
@@ -463,8 +467,20 @@
   []
   (long (rand (* 255 255 255))))
 
-(defmethod event-handler ::add-bot [{:keys [bot-username bot-name bot-version]}]
-  (let [bot-status (client/encode-battle-status
+(defn available-name [existing-names desired-name]
+  (if-not (contains? (set existing-names) desired-name)
+    desired-name
+    (recur
+      existing-names
+      (if-let [[_ prefix n suffix] (re-find #"(.*)(\d+)(.*)" desired-name)]
+        (let [nn (inc (edn/read-string n))]
+          (str prefix nn suffix))
+        (str desired-name 0)))))
+
+(defmethod event-handler ::add-bot [{:keys [battle bot-username bot-name bot-version]}]
+  (let [existing-bots (keys (:bots battle))
+        bot-username (available-name existing-bots bot-username)
+        bot-status (client/encode-battle-status
                      (assoc client/default-battle-status
                             :ready true
                             :mode 1
@@ -620,6 +636,7 @@
                         (string/blank? bot-name)
                         (string/blank? bot-version))
            :on-action {:event/type ::add-bot
+                       :battle battle
                        :bot-username bot-username
                        :bot-name bot-name
                        :bot-version bot-version}}
@@ -715,40 +732,63 @@
            :text " Ready"}]}]}
       {:fx/type :pane
        :h-box/hgrow :always}
-      {:fx/type :text-area
-       :editable false
-       :text (with-out-str (pprint (:scripttags battle)))
-       :style {:-fx-font-family "monospace"}}
-      {:fx/type :text-area
-       :editable false
-       :text (str (string/replace (script-txt) #"\t" "  "))
-       :style {:-fx-font-family "monospace"}}
-      {:fx/type :text-area
-       :editable false
-       :text (with-out-str (pprint map-details))
-       :style {:-fx-font-family "monospace"}}]
+      {:fx/type :v-box
+       :alignment :top-left
+       :children
+       [{:fx/type :label
+         :text "scripttags"}
+        {:fx/type :text-area
+         :editable false
+         :text (with-out-str (pprint (:scripttags battle)))
+         :style {:-fx-font-family "monospace"}
+         :v-box/vgrow :always}]}
+      {:fx/type :v-box
+       :alignment :top-left
+       :children
+       [{:fx/type :label
+         :text "script.txt preview"}
+        {:fx/type :text-area
+         :editable false
+         :text (str (string/replace (script-txt) #"\t" "  "))
+         :style {:-fx-font-family "monospace"}
+         :v-box/vgrow :always}]}
+      {:fx/type :v-box
+       :alignment :top-left
+       :children
+       [{:fx/type :label
+         :text "Map Details"}
+        {:fx/type :text-area
+         :editable false
+         :text (with-out-str (pprint map-details))
+         :style {:-fx-font-family "monospace"}
+         :v-box/vgrow :always}]}]
     (let [image-file (io/file (fs/map-minimap battle-map))]
       (when (.exists image-file)
-        [{:fx/type :stack-pane
+        [{:fx/type :v-box
+          :alignment :top-left
           :children
-          (concat
-            [{:fx/type :image-view
-              :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
-                            (when (.exists image-file)
-                              (io/input-stream image-file)))}
-              :fit-width minimap-width
-              :fit-height minimap-height}
-             {:fx/type :canvas
-              :width minimap-width
-              :height minimap-height
-              :draw
-              (fn [canvas]
-                (let [gc (.getGraphicsContext2D canvas)
-                      starting-points (minimap-starting-points map-details)]
-                  (.clearRect gc 0 0 minimap-width minimap-height)
-                  (.setFill gc Color/RED)
-                  (doseq [{:keys [x y]} starting-points]
-                    (.fillOval gc x y start-pos-r start-pos-r))))}])}])))})
+          [{:fx/type :label
+            :text "Minimap"}
+           {:fx/type :stack-pane
+            :children
+            (concat
+              [{:fx/type :image-view
+                :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
+                              (when (.exists image-file)
+                                (io/input-stream image-file)))}
+                :fit-width minimap-width
+                :fit-height minimap-height}
+               {:fx/type :canvas
+                :width minimap-width
+                :height minimap-height
+                :draw
+                (fn [canvas]
+                  (let [gc (.getGraphicsContext2D canvas)
+                        starting-points (minimap-starting-points map-details)]
+                    (.clearRect gc 0 0 minimap-width minimap-height)
+                    (.setFill gc Color/RED)
+                    (doseq [{:keys [x y]} starting-points]
+                      (.fillOval gc x y start-pos-r start-pos-r))))}])}]}])))})
 
 
 (defn battle-players-and-bots
@@ -761,7 +801,7 @@
     (mapv
       (fn [[k v]]
         (assoc v
-               :username k
+               :bot-name k
                :user {:client-status {:bot true}}))
       (:bots battle))))
 
@@ -806,7 +846,7 @@
     (update-battle-status @*state (assoc opts :id id) (merge (:battle-status id) status-changes) (:team-color id))
     (doseq [[k v] status-changes]
       (let [msg (case k
-                  :team "FORCETEAMNO"
+                  :id "FORCETEAMNO"
                   :ally "FORCEALLYNO")]
         (client/send-message (:client @*state) (str msg " " (:username id) " " v))))))
 
@@ -906,6 +946,7 @@
      :children
      (concat
        [{:fx/type :table-view
+         :column-resize-policy :constrained ; TODO auto resize
          :items (battle-players-and-bots state)
          :columns
          [{:fx/type :table-column
@@ -914,9 +955,11 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [{:keys [owner] :as id}]
+            (fn [{:keys [bot-name owner] :as id}]
               (merge
-                {:text (str (:username id) (when owner (str " (" owner ")")))}
+                {:text (if bot-name
+                         (str bot-name (when owner (str " (" owner ")")))
+                         (str (:username id)))}
                 (when (and (not= username (:username id))
                            (or am-host
                                (= owner username)))
