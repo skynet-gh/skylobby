@@ -1,6 +1,7 @@
 (ns tests
   (:require
     [com.jakemccrary.test-refresh :refer [monitor-project]]
+    hashp.core
     [pjstadig.humane-test-output]))
 
 

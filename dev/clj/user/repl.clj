@@ -2,6 +2,7 @@
   (:require
     [cider.nrepl]
     [clojure.string :as string]
+    hashp.core
     [io.aviso.repl]
     [nrepl.cmdline]
     [reply.main]
