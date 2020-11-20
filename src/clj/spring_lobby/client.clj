@@ -8,6 +8,7 @@
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
+    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
     (java.nio ByteBuffer)
@@ -134,8 +135,9 @@
   (swap! state assoc :last-pong (System/currentTimeMillis)))
 
 (defmethod handle "SETSCRIPTTAGS" [_client state m]
-  (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)]
-    (swap! state assoc :script-tags script-tags-raw))) ; TODO parse
+  (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)
+        parsed (spring/parse-scripttags script-tags-raw)]
+    (swap! state update-in [:battle :scripttags] spring/deep-merge parsed)))
 
 (defmethod handle "TASSERVER" [_client state m]
   (swap! state assoc :tas-server m))
@@ -270,7 +272,8 @@
   (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]
     (swap! state assoc :battle {:battle-id battle-id
                                 :hash-code hash-code
-                                :channel-name channel-name})))
+                                :channel-name channel-name
+                                :scripttags spring/default-scripttags})))
 
 (defmethod handle "JOINEDBATTLE" [_c state m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
@@ -308,8 +311,10 @@
 
 (defmethod handle "UPDATEBOT" [_c state m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+)" m)
-        bot-data {:battle-status (decode-battle-status battle-status)
+        decoded-status (decode-battle-status battle-status)
+        bot-data {:battle-status decoded-status
                   :team-color team-color}]
+    (log/debug username (pr-str decoded-status) team-color)
     (swap! state
       (fn [state]
         (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
@@ -341,7 +346,10 @@
         (when-let [d (s/take! c)]
           (when-let [m @d]
             (log/info "<" (str "'" m "'"))
-            (handle c state-atom m)
+            (try
+              (handle c state-atom m)
+              (catch Exception e
+                (log/error e "Error handling message")))
             (when-not (Thread/interrupted)
               (recur)))))
       (log/info "print loop ended"))))

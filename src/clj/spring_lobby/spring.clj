@@ -3,71 +3,127 @@
   (:require
     [clojail.core :as clojail]
     [clojure.edn :as edn]
+    [clojure.set]
     [clojure.string :as string]
     [clojure.walk]
     [com.evocomputing.colors :as colors]
     [instaparse.core :as instaparse]))
 
 
+(def startpostypes
+  {0 "Fixed"
+   1 "Random"
+   2 "Choose in game"
+   3 "Choose before game"})
+
+(def startpostypes-by-name
+  (clojure.set/map-invert startpostypes))
+
+(def default-modoptions
+  {:relayhoststartpostype 1
+   :disablemapdamage 0
+   :fixedallies 1
+   :maxunits 500
+   :starttime 0
+   :deathmode "com"
+   :scoremode "disabled"
+   :pathfinder "normal"})
+
+(def default-scripttags ; TODO read these from lua in map, mod/game, and engine
+  {:game
+   {:startpostype 1
+    :modoptions default-modoptions}})
+
+
+; https://stackoverflow.com/a/17328219/984393
+(defn deep-merge [& ms]
+  (apply
+    merge-with
+    (fn [x y]
+      (cond (map? y) (deep-merge x y)
+            (vector? y) (concat x y)
+            :else y))
+    ms))
+
+(defn parse-scripttags [raw-scripttags]
+  (->> (string/split raw-scripttags #"\t")
+       (remove string/blank?)
+       (map
+         (fn [raw-scripttag]
+           (let [[_all ks v] (re-find #"([^\s]+)=(.*)" raw-scripttag)
+                 kws (map keyword (string/split ks #"/"))]
+             (assoc-in {} kws v))))
+       (apply deep-merge)))
+
+
+(defn unit-rgb
+  [i]
+  (/ i 255.0))
+
 (defn format-color [team-color]
   (when-let [decimal-color (or (when (number? team-color) team-color)
                                (try (Integer/parseInt team-color)
                                     (catch Exception _ nil)))]
     (let [[r g b _a] (:rgba (colors/create-color decimal-color))]
-      (str r " " g " " b))))
+      (str (unit-rgb r) " " (unit-rgb g) " " (unit-rgb b)))))
 
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   ([battle]
    (script-data battle nil))
   ([battle opts]
-   {:game
-    (into
-      {:gametype (:battle-modname battle)
-       :mapname (:battle-map battle)
-       :hostip (:battle-ip battle)
-       :hostport (:battle-port battle)
-       :ishost 1 ; TODO
-       :numplayers 1 ; TODO
-       :startpostype 2 ; TODO
-       :numusers (count (concat (:users battle) (:bots battle)))} ; TODO
-      (concat
-        (map
-          (fn [[player {:keys [battle-status user]}]]
-            [(str "player" (:id battle-status))
-             {:name player
-              :team (:ally battle-status)
-              :isfromdemo 0 ; TODO
-              :countrycode (:country user)}])
-          (:users battle))
-        (map
-          (fn [[_player {:keys [battle-status team-color]}]]
-            [(str "team" (:ally battle-status))
-             {:teamleader (:id battle-status)
-              :handicap (:handicap battle-status)
-              :allyteam (:ally battle-status)
-              :rgbcolor (format-color team-color)
-              :side (:side battle-status)}])
-          (map
-            (comp first second)
-            (group-by (comp :ally :battle-status second)
-              (merge (:users battle) (:bots battle))))) ; TODO group-by :team ?
-        (map
-          (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
-            [(str "ai" (:id battle-status))
-             {:name bot-name
-              :shortname ai-name
-              :version ai-version
-              :host (-> battle :users (get owner) :battle-status :id)
-              :isfromdemo 0 ; TODO
-              :team (:ally battle-status)
-              :options {}}]) ; TODO
-          (:bots battle))
-        (map
-          (fn [ally]
-            [(str "allyteam" ally) {}])
-          (set (map (comp :ally :battle-status second) (mapcat battle [:users :bots]))))
-        opts))}))
+   (let [is-host true] ; TODO
+     (deep-merge
+       (:scripttags battle)
+       {:game
+        (into
+          {:gametype (:battle-modname battle)
+           :mapname (:battle-map battle)
+           :hostip (when-not is-host (:battle-ip battle))
+           :hostport (:battle-port battle)
+           :ishost (if is-host 1 0)}
+          (concat
+            (map
+              (fn [[player {:keys [battle-status user]}]]
+                [(str "player" (:id battle-status))
+                 {:name player
+                  :team (:id battle-status)
+                  :isfromdemo 0 ; TODO
+                  :spectator (if (:mode battle-status) 0 1)
+                  :countrycode (:country user)}])
+              (:users battle))
+            (map
+              (fn [[_player {:keys [battle-status team-color owner]}]]
+                [(str "team" (:id battle-status))
+                 {:teamleader (if owner
+                                (-> battle :users (get owner) :battle-status :id)
+                                (:id battle-status))
+                  :handicap (:handicap battle-status)
+                  :allyteam (:ally battle-status)
+                  :rgbcolor (format-color team-color)
+                  :side (if (= 1 (:side battle-status))
+                          "CORE"
+                          "ARM")}])
+              (map
+                (comp first second)
+                (group-by (comp :id :battle-status second)
+                  (merge (:users battle) (:bots battle))))) ; TODO group-by :team ?
+            (map
+              (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
+                [(str "ai" (:id battle-status))
+                 {:name bot-name
+                  :shortname ai-name
+                  :version ai-version
+                  :host (-> battle :users (get owner) :battle-status :id)
+                  :isfromdemo 0 ; TODO
+                  :team (:id battle-status)
+                  :options {}}]) ; TODO
+              (:bots battle))
+            (map
+              (fn [ally]
+                [(str "allyteam" ally) {:numallies 0}])
+              (set (map (comp :ally :battle-status second) (mapcat battle [:users :bots]))))
+            opts))}))))
 
 (defn script-txt-inner
   ([kv]
