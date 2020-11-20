@@ -7,7 +7,8 @@
     [clojure.string :as string]
     [clojure.walk]
     [com.evocomputing.colors :as colors]
-    [instaparse.core :as instaparse]))
+    [instaparse.core :as instaparse]
+    [taoensso.timbre :as log]))
 
 
 (def startpostypes
@@ -146,22 +147,19 @@
    (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))
 
 
-(def whitespace
-  (instaparse/parser
-    "whitespace = #'[\\s\\n]+'"))
-
-
 (def script-grammar
   (instaparse/parser
     "config = block*
-     block = tag <'{'> ( block | field | <comment> )* <'}'>
-     tag = <'['> #'\\w+' <']'>
-     field = <#'\\s+'?> #'\\w+' <#'\\s+'?> <'='> <#'\\s*'> #'[^;]*' <';'> <comment?>
-     comment = '//' #'[^\\n]*' '\n'"
-    :auto-whitespace whitespace))
-
-#_
-(whitespace "\n \n\n  \t")
+     block = <comment*>
+             tag <comment*>
+             <'{'>
+               ( block | field | <comment> )*
+             <'}'>
+             <comment*>
+     tag = <'['> #'[\\w\\s]+' <']'>
+     field = <#'\\s+'?> #'\\w+' <#'\\s+'?> <'='> <#'\\s*'> #'[^;]*' <';'> <#'.*'>?
+     comment = '//' #'.*'"
+    :auto-whitespace :standard))
 
 
 (declare parse-fields-or-blocks)
@@ -199,9 +197,21 @@
   (let [blocks (rest script-parsed-raw)]
     (parse-fields-or-blocks blocks)))
 
+
+; https://stackoverflow.com/a/62915361/984393
+(defn remove-nonprintable [s]
+  (string/replace s #"[\p{C}&&^(\S)]" ""))
+
+
 (defn parse-script
   "Returns the parsed data representation of a spring config."
   [script-txt]
   (clojail/thunk-timeout
-    #(postprocess (script-grammar script-txt))
-    1000))
+    #(let [cleaned (remove-nonprintable script-txt)
+           parsed (instaparse/parse script-grammar cleaned)]
+       (if (instaparse/failure? parsed)
+         (do
+           (log/debug parsed)
+           (throw (ex-info "Failed to parse" {:pr-script-txt (pr-str cleaned)})))
+         (postprocess parsed)))
+    2000))

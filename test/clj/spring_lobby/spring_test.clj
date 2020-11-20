@@ -51,7 +51,9 @@
 (deftest script-data
   (testing "no players"
     (is (= expected-script-data
-           (spring/script-data battle))))
+           (assoc-in
+             (spring/script-data battle)
+             [:game :hostip] nil))))
   (testing "player and bot"
     (is (= expected-script-data-players
            (spring/script-data battle-players)))))
@@ -173,13 +175,10 @@
   "[game]
 {
 \tgametype = Balanced Annihilation V9.79.4;
-\thostip = 127.0.0.1;
+\thostip = ;
 \thostport = 8452;
 \tishost = 1;
 \tmapname = Dworld Acidic;
-\tnumplayers = 1;
-\tnumusers = 0;
-\tstartpostype = 2;
 }
 
 ")
