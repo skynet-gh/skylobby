@@ -48,10 +48,6 @@ end
             (let [kk (keyword (.toString k))
                   vs (cond
                        (.istable v) (table-to-map v)
-                       (.isnumber v)
-                       (if (.islong v)
-                         (.tolong v)
-                         (.todouble v))
                        :else
                        (.toString v))]
               (assoc m kk vs))

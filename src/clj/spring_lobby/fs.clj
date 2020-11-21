@@ -212,7 +212,11 @@
   (try
     (let [mapinfo (lua/read-mapinfo s)]
       {:mapinfo (assoc mapinfo ::source path)
-       :map-name (str (:name mapinfo) (when-let [version (:version mapinfo)] (str " " version)))})
+       :map-name (string/trim
+                   (str (:name mapinfo)
+                        (when-let [version (:version mapinfo)]
+                          (when-not (string/ends-with? (:name mapinfo) (string/trim version))
+                            (str " " version)))))})
     (catch Exception e
       (log/error e "Failed to parse mapinfo.lua from" (.getName file)))))
 

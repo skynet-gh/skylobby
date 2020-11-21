@@ -579,9 +579,17 @@
 (def minimap-height 256)
 
 
-(defn minimap-starting-points [map-details]
+(defn minimap-starting-points
+  [map-details]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-        teams (or (-> map-details :mapinfo :teams)
+        teams (or (->> map-details :mapinfo :teams
+                       (map
+                         (fn [[k v]]
+                           [k
+                            (-> v
+                                (update-in [:startpos :x] edn/read-string)
+                                (update-in [:startpos :z] edn/read-string))]))
+                       seq)
                   (->> map-details
                        :smd
                        :map
@@ -590,14 +598,17 @@
                          (fn [[k {:keys [startposx startposz]}]]
                            [k {:startpos {:x startposx :z startposz}}]))
                        (into {})))]
-    (map
-      (fn [[_team {:keys [startpos]}]]
-        (let [{:keys [x z]} startpos]
-          {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
-                 (/ start-pos-r 2))
-           :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
-                 (/ start-pos-r 2))}))
-      teams)))
+    (->> teams
+         (map
+           (fn [[_team {:keys [startpos]}]]
+             (when-let [{:keys [x z]} startpos]
+               (if (and (number? x) (number? z))
+                 {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
+                        (/ start-pos-r 2))
+                  :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
+                        (/ start-pos-r 2))}
+                 (log/warn "Bad starting pos" startpos)))))
+         (filter some?))))
 
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
