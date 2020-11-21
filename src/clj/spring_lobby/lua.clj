@@ -16,6 +16,21 @@
 #_
 (parse (slurp "mapinfo.lua"))
 
+(def mocks
+  "VFS = {}
+
+function VFS.DirList(dir, fileType)
+    return {}
+end
+
+function getfenv()
+    local t = {}
+    t[\"mapinfo\"] = {}
+    return t
+end
+
+")
+
 
 (defn table-to-map
   "Returns a map from the given lua table, with keys converted to keywowrds and inner table values
@@ -32,9 +47,11 @@
           (recur
             (let [kk (keyword (.toString k))
                   vs (cond
-                       (.islong v) (.tolong v)
-                       (.isdouble v) (.todouble v)
                        (.istable v) (table-to-map v)
+                       (.isnumber v)
+                       (if (.islong v)
+                         (.tolong v)
+                         (.todouble v))
                        :else
                        (.toString v))]
               (assoc m kk vs))
@@ -44,6 +61,6 @@
   "Returns a map repsenting mapinfo from the given string representation of mapinfo.lua."
   [s]
   (let [globals (JsePlatform/standardGlobals)
-        lua-chunk (.load globals s)
+        lua-chunk (.load globals (str mocks s))
         res (.call lua-chunk)]
     (table-to-map res)))

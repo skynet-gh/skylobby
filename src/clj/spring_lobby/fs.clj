@@ -3,6 +3,7 @@
     [byte-streams]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [com.climate.claypoole :as cp]
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.lua :as lua]
     [spring-lobby.spring :as spring]
@@ -207,6 +208,14 @@
 (defn map-name [path]
   (FilenameUtils/getBaseName path))
 
+(defn parse-mapinfo [file s path]
+  (try
+    (let [mapinfo (lua/read-mapinfo s)]
+      {:mapinfo (assoc mapinfo ::source path)
+       :map-name (str (:name mapinfo) (when-let [version (:version mapinfo)] (str " " version)))})
+    (catch Exception e
+      (log/error e "Failed to parse mapinfo.lua from" (.getName file)))))
+
 (defn read-zip-map [file]
   (with-open [zf (new ZipFile file)]
     (let [entry-seq (->> (.entries zf)
@@ -225,8 +234,7 @@
                    (->> entry-seq
                         (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName %)))
                         first)]
-          (let [mapinfo (lua/read-mapinfo (slurp (.getInputStream zf mapinfo-entry)))]
-            {:mapinfo (assoc mapinfo ::source (.getName mapinfo-entry))}))
+          (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
         (when-let [smd-entry
                    (->> entry-seq
                         (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName %)))
@@ -281,8 +289,7 @@
                                                  string/lower-case
                                                  #(.getPath %)))
                                    first)]
-        (let [mapinfo (lua/read-mapinfo (slurp-7z-item mapinfo-item))]
-          {:mapinfo (assoc mapinfo ::source (.getPath mapinfo-item))}))
+        (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
       (when-let [smd-item
                  (->> (.getArchiveItems simple)
                       (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath %)))
@@ -295,27 +302,33 @@
 #_
 (read-7z-map (io/file (spring-root) "maps" "beach2_v1.sd7"))
 
+
+(defn read-map-data [file]
+  (let [filename (.getName file)]
+    (log/info "Loading map" filename)
+    (try
+      (merge
+        {:filename filename}
+        (cond
+          (string/ends-with? filename ".sdz")
+          (read-zip-map file)
+          (string/ends-with? filename ".sd7")
+          (read-7z-map file)
+          :else
+          nil))
+      (catch Exception e
+        (log/warn e "Error reading map data for" filename)))))
+
 (defn maps []
-  (->> (.listFiles (io/file (spring-root) "maps"))
-       seq
-       (filter #(.isFile %))
-       (map
-         (fn [file]
-           (let [filename (.getName file)]
-             (log/info "Loading map" filename)
-             (try
-               (merge
-                 {:filename filename}
-                 (cond
-                   (string/ends-with? filename ".sdz")
-                   (read-zip-map file)
-                   (string/ends-with? filename ".sd7")
-                   (read-7z-map file)
-                   :else
-                   nil))
-               (catch Exception e
-                 (log/warn e "Error reading map data for" filename))))))
-       (filter some?)))
+  (let [before (System/currentTimeMillis)
+        m (->> (.listFiles (io/file (spring-root) "maps"))
+               seq
+               (filter #(.isFile %))
+               (cp/pmap 8 read-map-data)
+               (filter some?)
+               doall)]
+    (log/info "Maps loaded in" (- (System/currentTimeMillis) before) "ms")
+    m))
 
 (defn bots [engine]
   (let [ai-dirs
