@@ -17,8 +17,10 @@
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
+    (javafx.application Platform)
     (javafx.scene.paint Color)
-    (manifold.stream SplicedStream)))
+    (manifold.stream SplicedStream))
+  (:gen-class))
 
 
 (set! *warn-on-reflection* true)
@@ -1295,6 +1297,15 @@
     :title "Alt Spring Lobby"
     :width 2000
     :height 1200
+    :on-close-request (fn [e]
+                        (log/debug e)
+                        (loop []
+                          (let [client (:client @*state)]
+                            (if (and client (.isConnected client))
+                              (do
+                                (client/disconnect client)
+                                (recur))
+                              (System/exit 0)))))
     :scene {:fx/type :scene
             :stylesheets [(str (io/resource "dark-theme2.css"))]
             :root {:fx/type :v-box
@@ -1338,3 +1349,14 @@
                                [{:fx/type :label
                                  :text (str last-failed-message)
                                  :style {:-fx-text-fill "#FF0000"}}]}]}}}})
+
+
+(defn -main [& _args]
+  (Platform/setImplicitExit true)
+  (let [r (fx/create-renderer
+            :middleware (fx/wrap-map-desc
+                          (fn [state]
+                            {:fx/type root-view
+                             :state state}))
+            :opts {:fx.opt/map-event-handler event-handler})]
+    (fx/mount-renderer *state r)))

@@ -41,4 +41,12 @@
   {:extra-paths ["dev/clj/test" "test/clj"]
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
                 pjstadig/humane-test-output {:mvn/version "0.10.0"}}
-   :main-opts ["-m" "tests"]}}}
+   :main-opts ["-m" "tests"]}
+  :uberjar
+  {:extra-deps
+   {seancorfield/depstar {:mvn/version "1.1.136"}}
+   :exec-fn hf.depstar.uberjar/run
+   :exec-args {:jar "alt-spring-lobby.jar"
+               :aot true
+               :main-class spring-lobby}
+   :jvm-opts ["-Dcljfx.skip-javafx-initialization=true"]}}}

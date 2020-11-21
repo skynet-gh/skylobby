@@ -1,5 +1,6 @@
 *.orig
 /.cpcache/
 /.nrepl-port
-/trace.edn
+/*.jar
 /repl.log
+/trace.edn

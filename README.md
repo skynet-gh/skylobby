@@ -6,6 +6,22 @@ A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com
 ## Build
 
 
+To build an executable jar file, run
+
+```bash
+clj -Xuberjar
+```
+
+And then run it with
+
+```bash
+java -jar alt-spring-lobby.jar
+```
+
+
+## Development
+
+
 For now, you will need the [Clojure CLI tools](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools). Once you have those you can run
 
 ```bash
