@@ -17,6 +17,11 @@
    2 "Choose in game"
    3 "Choose before game"})
 
+(def sides
+  {0 "ARM"
+   1 "CORE"})
+
+
 (def startpostypes-by-name
   (clojure.set/map-invert startpostypes))
 
@@ -102,9 +107,7 @@
                   :handicap (:handicap battle-status)
                   :allyteam (:ally battle-status)
                   :rgbcolor (format-color team-color)
-                  :side (if (= 1 (:side battle-status))
-                          "CORE"
-                          "ARM")}])
+                  :side (get sides (:side battle-status))}])
               (map
                 (comp first second)
                 (group-by (comp :id :battle-status second)

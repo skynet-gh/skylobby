@@ -1,8 +1,10 @@
 (ns spring-lobby
   (:require
     [cljfx.api :as fx]
+    [cljfx.component :as fx.component]
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
+    [cljfx.lifecycle :as fx.lifecycle]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
@@ -456,10 +458,10 @@
     (client/send-message (:client @*state) m)))
 
 (defmethod event-handler ::kick-battle
-  [{:keys [is-bot username]}]
+  [{:keys [bot-name username]}]
   (when-let [client (:client @*state)]
-    (if is-bot
-      (client/send-message client (str "REMOVEBOT " username))
+    (if bot-name
+      (client/send-message client (str "REMOVEBOT " bot-name))
       (client/send-message client (str "KICKFROMBATTLE " username)))))
 
 
@@ -933,6 +935,33 @@
 (colors/create-color 0)
 
 
+(defn nickname [{:keys [bot-name owner username]}]
+  (if bot-name
+    (str bot-name (when owner (str " (" owner ")")))
+    (str username)))
+
+
+; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
+(def ext-recreate-on-key-changed
+  "Extension lifecycle that recreates its component when lifecycle's key is changed
+
+  Supported keys:
+  - `:key` (required) - a value that determines if returned component should be recreated
+  - `:desc` (required) - a component description with additional lifecycle semantics"
+  (reify fx.lifecycle/Lifecycle
+    (create [_ {:keys [key desc]} opts]
+      (with-meta {:key key
+                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
+                 {`fx.component/instance #(-> % :child fx.component/instance)}))
+    (advance [this component {:keys [key desc] :as this-desc} opts]
+      (if (= (:key component) key)
+        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
+        (do (fx.lifecycle/delete this component opts)
+            (fx.lifecycle/create this this-desc opts))))
+    (delete [_ component opts]
+      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
+
 (defn battle-table
   [{:keys [battle battles users username maps-cached] :as state}]
   (let [{:keys [host-username battle-map]} (get battles (:battle-id battle))
@@ -955,19 +984,18 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [{:keys [bot-name owner] :as id}]
+            (fn [{:keys [owner] :as id}]
               (merge
-                {:text (if bot-name
-                         (str bot-name (when owner (str " (" owner ")")))
-                         (str (:username id)))}
+                {:text (nickname id)}
                 (when (and (not= username (:username id))
                            (or am-host
                                (= owner username)))
                   {:graphic
                    {:fx/type :button
-                    :on-action {:event/type ::kick-battle
-                                :username (:username id)
-                                :is-bot (-> id :user :client-status :bot)}
+                    :on-action
+                    (merge
+                      {:event/type ::kick-battle}
+                      (select-keys id [:username :bot-name]))
                     :graphic
                     {:fx/type font-icon/lifecycle
                      :icon-literal "mdi-account-remove:16:white"}}})))}}
@@ -1024,15 +1052,18 @@
             (fn [i]
               {:text ""
                :graphic
-               {:fx/type :check-box
-                :selected (not (:mode (:battle-status i)))
-                :on-selected-changed {:event/type ::battle-spectate-change
-                                      :is-me (= (:username i) username)
-                                      :is-bot (-> i :user :client-status :bot)
-                                      :id i}
-                :disable (not (or (and am-host (:mode (:battle-status i)))
-                                  (= (:username i) username)
-                                  (= (:owner i) username)))}})}}
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :check-box
+                 :selected (not (:mode (:battle-status i)))
+                 :on-selected-changed {:event/type ::battle-spectate-change
+                                       :is-me (= (:username i) username)
+                                       :is-bot (-> i :user :client-status :bot)
+                                       :id i}
+                 :disable (not (or (and am-host (:mode (:battle-status i)))
+                                   (= (:username i) username)
+                                   (= (:owner i) username)))}}})}}
           {:fx/type :table-column
            :text "Faction"
            :cell-value-factory identity
@@ -1042,16 +1073,19 @@
             (fn [i]
               {:text ""
                :graphic
-               {:fx/type :choice-box
-                :value (str (:side (:battle-status i)))
-                :on-value-changed {:event/type ::battle-side-change
-                                   :is-me (= (:username i) username)
-                                   :is-bot (-> i :user :client-status :bot)
-                                   :id i}
-                :items ["0" "1"]
-                :disable (not (or am-host
-                                  (= (:username i) username)
-                                  (= (:owner i) username)))}})}}
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :choice-box
+                 :value (->> i :battle-status :side (get spring/sides) str)
+                 :on-action {:event/type ::battle-side-action
+                             :is-me (= (:username i) username)
+                             :is-bot (-> i :user :client-status :bot)
+                             :id i}
+                 :items (vals spring/sides)
+                 :disable (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username)))}}})}}
           {:fx/type :table-column
            :text "Rank"
            :cell-value-factory identity
@@ -1073,15 +1107,18 @@
             (fn [{:keys [team-color] :as i}]
               {:text ""
                :graphic
-               {:fx/type :color-picker
-                :value (format "#%06x" (fix-color (if team-color (Integer/parseInt team-color) 0)))
-                :on-action {:event/type ::battle-color-action
-                            :is-me (= (:username i) username)
-                            :is-bot (-> i :user :client-status :bot)
-                            :id i}
-                :disable (not (or am-host
-                                  (= (:username i) username)
-                                  (= (:owner i) username)))}})}}
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :color-picker
+                 :value (format "#%06x" (fix-color (if team-color (Integer/parseInt team-color) 0)))
+                 :on-action {:event/type ::battle-color-action
+                             :is-me (= (:username i) username)
+                             :is-bot (-> i :user :client-status :bot)
+                             :id i}
+                 :disable (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username)))}}})}}
           {:fx/type :table-column
            :text "Team"
            :cell-value-factory identity
@@ -1091,16 +1128,19 @@
             (fn [i]
               {:text ""
                :graphic
-               {:fx/type :choice-box
-                :value (str (:id (:battle-status i)))
-                :on-value-changed {:event/type ::battle-team-change
-                                   :is-me (= (:username i) username)
-                                   :is-bot (-> i :user :client-status :bot)
-                                   :id i}
-                :items (map str (take 16 (iterate inc 0)))
-                :disable (not (or am-host
-                                  (= (:username i) username)
-                                  (= (:owner i) username)))}})}}
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :choice-box
+                 :value (str (:id (:battle-status i)))
+                 :on-action {:event/type ::battle-team-action
+                             :is-me (= (:username i) username)
+                             :is-bot (-> i :user :client-status :bot)
+                             :id i}
+                 :items (map str (take 16 (iterate inc 0)))
+                 :disable (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username)))}}})}}
           {:fx/type :table-column
            :text "Ally"
            :cell-value-factory identity
@@ -1110,17 +1150,20 @@
             (fn [i]
               {:text ""
                :graphic
-               {:fx/type :choice-box
-                :value (str (:ally (:battle-status i)))
-                :on-value-changed {:event/type ::battle-ally-change
-                                   :is-me (= (:username i) username)
-                                   :is-bot (-> i :user :client-status :bot)
-                                   :bot (-> i :user :client-status :bot)
-                                   :id i}
-                :items (map str (take 16 (iterate inc 0)))
-                :disable (not (or am-host
-                                  (= (:username i) username)
-                                  (= (:owner i) username)))}})}}
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :choice-box
+                 :value (str (:ally (:battle-status i)))
+                 :on-action {:event/type ::battle-ally-action
+                             :is-me (= (:username i) username)
+                             :is-bot (-> i :user :client-status :bot)
+                             :bot (-> i :user :client-status :bot)
+                             :id i}
+                 :items (map str (take 16 (iterate inc 0)))
+                 :disable (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username)))}}})}}
           {:fx/type :table-column
            :text "Bonus"
            :cell-value-factory identity
@@ -1130,14 +1173,17 @@
             (fn [i]
               {:text ""
                :graphic
-               {:fx/type :text-field
-                :disable (not am-host)
-                :text-formatter
-                {:fx/type :text-formatter
-                 :value-converter :integer
-                 :value (int (or (:handicap (:battle-status i)) 0))
-                 :on-value-changed {:event/type ::battle-handicap-change
-                                    :id i}}}})}}]}] ; TODO update bot
+               {:fx/type ext-recreate-on-key-changed
+                :key (nickname i)
+                :desc
+                {:fx/type :text-field
+                 :disable (not am-host)
+                 :text-formatter
+                 {:fx/type :text-formatter
+                  :value-converter :integer
+                  :value (int (or (:handicap (:battle-status i)) 0))
+                  :on-value-changed {:event/type ::battle-handicap-change
+                                     :id i}}}}})}}]}] ; TODO update bot
        (when battle
          [(merge
             {:fx/type battle-buttons
@@ -1169,23 +1215,39 @@
     (client/send-message (:client @*state)
       (str "FORCESPECTATORMODE " (:username id)))))
 
-(defmethod event-handler ::battle-side-change
+(defmethod event-handler ::battle-side-action
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
-    (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id))))
+  (let [v (.getValue (.getSource event))]
+    (when-let [side (try (Integer/parseInt v) (catch Exception _e))]
+      (if (not= side (-> id :battle-status :side))
+        (do
+          (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
+          (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
+        (log/debug "No change for side")))))
 
-(defmethod event-handler ::battle-team-change
+(defmethod event-handler ::battle-team-action
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
-    (update-team id data player-id)))
+  (let [v (.getValue (.getSource event))]
+    (when-let [player-id (try (Integer/parseInt v) (catch Exception _e))]
+      (if (not= player-id (-> id :battle-status :id))
+        (do
+          (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
+          (update-team id data player-id))
+        (log/debug "No change for team")))))
 
-(defmethod event-handler ::battle-ally-change
+(defmethod event-handler ::battle-ally-action
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
-    (update-ally id data ally)))
+  (let [v (.getValue (.getSource event))]
+    (when-let [ally (try (Integer/parseInt v) (catch Exception _e))]
+      (if (not= ally (-> id :battle-status :ally))
+        (do
+          (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
+          (update-ally id data ally))
+        (log/debug "No change for ally")))))
 
 (defmethod event-handler ::battle-handicap-change
-  [{:keys [id] :fx/keys [event]}]
+  [{:keys [id] :fx/keys [event] :as e}]
+  (log/debug (:event/type e))
   (when-let [handicap (max 0
                         (min 100
                           event))]
