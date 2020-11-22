@@ -54,6 +54,8 @@
   (try
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly state))
+    (let [watch-fn (var-get (find-var 'spring-lobby/watch-config-state))]
+      (watch-fn))
     (when-let [client-deferred (:client-deferred @state)]
       (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
         (connected-loop-fn state client-deferred)))

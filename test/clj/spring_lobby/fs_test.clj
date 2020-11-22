@@ -1,11 +1,90 @@
 (ns spring-lobby.fs-test
   (:require
     [clojure.string :as string]
-    [clojure.test :refer [deftest is]]
+    [clojure.test :refer [deftest is testing]]
     [spring-lobby.fs :as fs]))
 
 
 (declare mock-parsed-lua mock-map-data-txt)
+
+
+(deftest spring-root
+  (testing "Windows Subsystem for Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version "blahblah Microsoft"
+                                 :user-name "me"})]
+      (is (= (str "/mnt/c/Users/me/Documents/My Games/Spring")
+             (.getAbsolutePath
+               (fs/spring-root))))))
+  (testing "Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version ""
+                                 :user-home "/home/me2"})]
+      (is (= (str "/home/me2/spring")
+             (.getAbsolutePath
+               (fs/spring-root))))))
+  (testing "Windows"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "somethingWindowssomething"
+                                 :os-version "10.0"
+                                 :user-home "/C:/Users/me3"})]
+      (is (= (str "/C:/Users/me3/Documents/My Games/Spring")
+             (.getAbsolutePath
+               (fs/spring-root)))))))
+
+(deftest springlobby-root
+  (testing "Windows Subsystem for Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version "blahblah Microsoft"
+                                 :user-name "me"})]
+      (is (= (str "/mnt/c/Users/me/AppData/Roaming/springlobby")
+             (.getAbsolutePath
+               (fs/springlobby-root))))))
+  (testing "Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version ""
+                                 :user-home "/home/me2"})]
+      (is (= (str "/home/me2/.springlobby")
+             (.getAbsolutePath
+               (fs/springlobby-root))))))
+  (testing "Windows"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "somethingWindowssomething"
+                                 :os-version "10.0"
+                                 :user-home "/C:/Users/me3"})]
+      (is (= (str "/C:/Users/me3/AppData/Roaming/springlobby")
+             (.getAbsolutePath
+               (fs/springlobby-root)))))))
+
+(deftest app-root
+  (testing "Windows Subsystem for Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version "blahblah Microsoft"
+                                 :user-name "me"})]
+      (is (= (str "/mnt/c/Users/me/.alt-spring-lobby")
+             (.getAbsolutePath
+               (fs/app-root))))))
+  (testing "Linux"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "Linux"
+                                 :os-version ""
+                                 :user-home "/home/me2"})]
+      (is (= (str "/home/me2/.alt-spring-lobby")
+             (.getAbsolutePath
+               (fs/app-root))))))
+  (testing "Windows"
+    (with-redefs [fs/sys-data (constantly
+                                {:os-name "somethingWindowssomething"
+                                 :os-version "10.0"
+                                 :user-home "/C:/Users/me3"})]
+      (is (= (str "/C:/Users/me3/.alt-spring-lobby")
+             (.getAbsolutePath
+               (fs/app-root)))))))
 
 
 (deftest parse-modinfo

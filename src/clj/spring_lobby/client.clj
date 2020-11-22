@@ -3,6 +3,7 @@
     [aleph.tcp :as tcp]
     [byte-streams]
     [clojure.core.async :as async]
+    [clojure.edn :as edn]
     [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
@@ -18,8 +19,15 @@
 
 (def agent-string "alt-spring-lobby-0.1")
 
-(def default-address "192.168.1.6")
+
 (def default-port 8200)
+
+
+(defn parse-host-port [server-url]
+  (if-let [[_all host port] (re-find #"(.+):(\d+)$" server-url)]
+    [host (edn/read-string port)]
+    [server-url default-port]))
+
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
@@ -27,7 +35,7 @@
   {:ready false
    :ally 0
    :handicap 0
-   :mode 0
+   :mode 1
    :sync 1
    :id 0
    :side 0})
@@ -42,11 +50,28 @@
 
 (def client-status-protocol
   (gloss/compile-frame
-    (gloss/bit-map :prefix 1 :bot 1 :access 1 :rank 3 :away 1 :ingame 1)))
+    (gloss/bit-map
+      :prefix 1
+      :bot 1
+      :access 1
+      :rank 3
+      :away 1
+      :ingame 1)))
 
 (def battle-status-protocol
   (gloss/compile-frame
-    (gloss/bit-map :prefix 6 :side 2 :sync 2 :pad 4 :handicap 7 :mode 1 :ally 4 :id 4 :ready 1 :suffix 1)))
+    (gloss/bit-map
+      :prefix 6
+      :side 2
+      :sync 2
+      :pad 4
+      :handicap 7
+      :mode 1
+      :ally 4
+      :id 4
+      :ready 1
+      :suffix 1)))
+
 
 (def default-client-status "0")
 
@@ -108,8 +133,8 @@
       (gio/decode-stream s protocol))))
 
 (defn client
-  ([]
-   (client default-address default-port))
+  ([server-url]
+   (apply client (parse-host-port server-url)))
   ([host port]
    (d/chain (tcp/client {:host host
                          :port port})
@@ -370,11 +395,11 @@
 
 (defn connect
   ([state-atom]
-   (connect state-atom (client)))
+   (connect state-atom (client (:server-url @state-atom))))
   ([state-atom client]
-   (let [{:keys [username password]} @state-atom] ; TODO transfer these loops to new state atom
+   (let [{:keys [username password]} @state-atom]
      (print-loop state-atom client)
-     (login client default-address username password)
+     (login client "*" username password)
      (ping-loop state-atom client))))
 
 (defn disconnect [c]

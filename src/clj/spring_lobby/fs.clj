@@ -22,14 +22,98 @@
 
 (SevenZip/initSevenZipFromPlatformJAR)
 
+
+(def config-filename "config.edn")
+
+
+(defn os-name []
+  (System/getProperty "os.name"))
+
+(defn os-version []
+  (System/getProperty "os.version"))
+
+(defn user-home []
+  (System/getProperty "user.home"))
+
+(defn user-name []
+  (System/getProperty "user.name"))
+
+(defn sys-data []
+  {:os-name (os-name)
+   :os-version (os-version)
+   :user-home (user-home)
+   :user-name (user-name)})
+
+
+(defn wsl?
+  "Returns true if this system appears to be the Windows Subsystem for Linux."
+  []
+  (let [{:keys [os-name os-version]} (sys-data)]
+    (and
+      (string/includes? os-name "Linux")
+      (string/includes? os-version "Microsoft")))) ; WSL
+
+
+(defn wslpath
+  "Returns the host path if in WSL, otherwise returns the original path."
+  [^java.io.File f]
+  (if (wsl?)
+    (let [path (.getAbsolutePath f)
+          command ["wslpath" "-w" path]
+          ^"[Ljava.lang.String;" cmdarray (into-array String command)
+          runtime (Runtime/getRuntime)
+          process (.exec runtime cmdarray)]
+      (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
+      (let [windows-path (string/trim (slurp (.getInputStream process)))]
+        (log/info "Converted path" path "to" windows-path)
+        windows-path))
+    (.getAbsolutePath f)))
+
+
 (defn spring-root
   "Returns the root directory for Spring"
   []
-  (if (string/starts-with? (System/getProperty "os.name") "Windows")
-    (io/file (System/getProperty "user.home") "Documents" "My Games" "Spring")
-    (do
-      (io/file (System/getProperty "user.home") "spring") ; TODO make sure
-      (str "/mnt/c/Users/" (System/getProperty "user.name") "/Documents/My Games/Spring"))))
+  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+    (cond
+      (string/includes? os-name "Linux")
+      (if (string/includes? os-version "Microsoft") ; WSL
+        (io/file "/mnt" "c" "Users" user-name "Documents" "My Games" "Spring")
+        (io/file user-home "spring"))
+      (string/includes? os-name "Windows")
+      (io/file user-home "Documents" "My Games" "Spring")
+      :else
+      (throw (ex-info "Unable to determine Spring root for this system"
+                      {:sys-data sys-data})))))
+
+(defn springlobby-root
+  "Returns the root directory for Spring"
+  []
+  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+    (cond
+      (string/includes? os-name "Linux")
+      (if (string/includes? os-version "Microsoft") ; WSL
+        (io/file "/mnt" "c" "Users" user-name "AppData" "Roaming" "springlobby")
+        (io/file user-home ".springlobby"))
+      (string/includes? os-name "Windows")
+      (io/file user-home "AppData" "Roaming" "springlobby")
+      :else
+      (throw (ex-info "Unable to determine Spring root for this system"
+                      {:sys-data sys-data})))))
+
+(defn app-root
+  "Returns the root directory for this application"
+  []
+  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+    (cond
+      (string/includes? os-name "Linux")
+      (if (string/includes? os-version "Microsoft") ; WSL
+        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby")
+        (io/file user-home ".alt-spring-lobby"))
+      (string/includes? os-name "Windows")
+      (io/file user-home ".alt-spring-lobby")
+      :else
+      (throw (ex-info "Unable to determine app root for this system"
+                      {:sys-data sys-data})))))
 
 (defn map-files []
   (->> (io/file (str (spring-root) "/maps"))
@@ -328,7 +412,7 @@
         m (->> (.listFiles (io/file (spring-root) "maps"))
                seq
                (filter #(.isFile %))
-               (cp/pmap 8 read-map-data)
+               (cp/pmap 2 read-map-data)
                (filter some?)
                doall)]
     (log/info "Maps loaded in" (- (System/currentTimeMillis) before) "ms")

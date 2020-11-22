@@ -9,6 +9,7 @@
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
+    [clojure.set]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [spring-lobby.client :as client]
@@ -17,6 +18,7 @@
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
+    (java.nio.file CopyOption StandardCopyOption)
     (javafx.application Platform)
     (javafx.scene.paint Color)
     (manifold.stream SplicedStream))
@@ -26,16 +28,36 @@
 (set! *warn-on-reflection* true)
 
 
-(def default-state
-  {:username "skynet9001"
-   :password "1234dogs"
-   :map-name "Dworld Acidic"
-   :mod-name "Balanced Annihilation V9.79.4"
-   :title "deth"
-   :engine-version "103.0"})
+(def initial-state
+  (or
+    (try
+      (-> (fs/app-root) (io/file fs/config-filename) slurp edn/read-string)
+      (catch Exception e
+        (log/warn e "Exception loading initial state")))
+    {}))
+
 
 (def ^:dynamic *state
-  (atom default-state))
+  (atom initial-state))
+
+
+(def config-keys
+  [:username :password :server-url :engine-version :mod-name :map-name
+   :battle-title :battle-password
+   :bot-username :bot-name :bot-version])
+
+
+(defn watch-config-state []
+  (add-watch
+    *state
+    :config
+    (fn [_k _ref old-state new-state]
+      (let [old-config (select-keys old-state config-keys)
+            new-config (select-keys new-state config-keys)]
+        (when (not= old-config new-config)
+          (log/debug "Updating config file")
+          (spit (io/file (fs/app-root) fs/config-filename)
+                (with-out-str (pprint new-config))))))))
 
 
 (defmulti event-handler :event/type)
@@ -46,36 +68,6 @@
     (swap! *state assoc :maps-cached nil)
     (swap! *state assoc :maps-cached (doall (fs/maps)))))
 
-
-(defn menu-view [_opts]
-  {:fx/type :menu-bar
-   :menus
-   [{:fx/type :menu
-     :text "Server"
-     :items [{:fx/type :menu-item
-              :text "Connect"}
-             {:fx/type :menu-item
-              :text "Disconnect"}
-             {:fx/type :menu-item
-              :text "Pick Server"}]}
-    {:fx/type :menu
-     :text "Edit"
-     :items [{:fx/type :menu-item
-              :text "menu2 item1"}
-             {:fx/type :menu-item
-              :text "menu2 item2"}]}
-    {:fx/type :menu
-     :text "Tools"
-     :items [{:fx/type :menu-item
-              :text "menu3 item1"}
-             {:fx/type :menu-item
-              :text "menu3 item2"}]}
-    {:fx/type :menu
-     :text "Help"
-     :items [{:fx/type :menu-item
-              :text "menu4 item1"}
-             {:fx/type :menu-item
-              :text "menu4 item2"}]}]})
 
 (defmethod event-handler ::select-battle [e]
   (swap! *state assoc :selected-battle (-> e :fx/event :battle-id)))
@@ -258,7 +250,7 @@
          (future
            (try
              (let [^SplicedStream client @client-deferred]
-               (client/connect state-atom client) ; TODO username password
+               (client/connect state-atom client)
                (swap! state-atom assoc :client client :login-error nil)
                (loop []
                  (if (and client (not (.isClosed client)))
@@ -278,12 +270,14 @@
            nil)))
 
 (defmethod event-handler ::connect [_e]
-  (let [client-deferred (client/client)] ; TODO host port
+  (let [server-url (:server-url @*state)
+        client-deferred (client/client server-url)]
     (swap! *state assoc :client-deferred client-deferred)
     (connected-loop *state client-deferred)))
 
 
-(defn client-buttons [{:keys [client client-deferred username password login-error]}]
+(defn client-buttons
+  [{:keys [client client-deferred username password login-error server-url]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -298,11 +292,11 @@
     {:fx/type :text-field
      :text username
      :disable (boolean (or client client-deferred))
-     :on-action {:event/type ::username-change}}
+     :on-text-changed {:event/type ::username-change}}
     {:fx/type :password-field
      :text password
      :disable (boolean (or client client-deferred))
-     :on-action {:event/type ::password-change}}
+     :on-text-changed {:event/type ::password-change}}
     {:fx/type :v-box
      :h-box/hgrow :always
      :alignment :center
@@ -311,25 +305,34 @@
        :text (str login-error)
        :style {:-fx-text-fill "#FF0000"
                :-fx-max-width "360px"}}]}
-    {:fx/type :button
-     :text "Print state"
-     :on-action {:event/type ::print-state}
-     :alignment :top-right}]})
+    {:fx/type :text-field
+     :text server-url
+     :disable (boolean (or client client-deferred))
+     :on-text-changed {:event/type ::server-url-change}}]})
 
-(defmethod event-handler ::username-change [e]
-  (swap! *state assoc :username (:fx/event e)))
 
-(defmethod event-handler ::password-change [e]
-  (swap! *state assoc :password (:fx/event e)))
+(defmethod event-handler ::username-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :username event))
+
+(defmethod event-handler ::password-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :password event))
+
+(defmethod event-handler ::server-url-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :server-url event))
 
 
 (defn host-battle []
   (let [{:keys [client] :as state} @*state]
     (client/open-battle client
-      (assoc
-        (select-keys state [:battle-password :title :engine-version :mod-name :map-name])
-        :mod-hash -1
-        :map-hash -1))))
+      (-> state
+          (clojure.set/rename-keys {:battle-title :title})
+          (select-keys [:battle-password :title :engine-version
+                        :mod-name :map-name])
+          (assoc :mod-hash -1
+                :map-hash -1)))))
 
 (defmethod event-handler ::host-battle [_e]
   (host-battle))
@@ -388,7 +391,8 @@
        :text "Loading maps..."}]}))
 
 (defn battles-buttons
-  [{:keys [battle battles battle-password client selected-battle title engine-version mod-name map-name maps-cached]}]
+  [{:keys [battle battles battle-password client selected-battle
+           battle-title engine-version mod-name map-name maps-cached]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -413,10 +417,10 @@
          :text "Host Battle"
          :on-action {:event/type ::host-battle}}
         {:fx/type :text-field
-         :text (str title)
+         :text (str battle-title)
          :prompt-text "Battle Title"
          :on-action {:event/type ::host-battle}
-         :on-text-changed {:event/type ::title-change}}])
+         :on-text-changed {:event/type ::battle-title-change}}])
      (when (not battle)
        [{:fx/type :choice-box
          :value (str engine-version)
@@ -434,17 +438,21 @@
          :on-value-changed {:event/type ::map-change}}]))})
 
 
-(defmethod event-handler ::battle-password-change [e]
-  (swap! *state assoc :battle-password (:fx/event e)))
+(defmethod event-handler ::battle-password-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :battle-password event))
 
-(defmethod event-handler ::title [e]
-  (swap! *state assoc :title (:fx/event e)))
+(defmethod event-handler ::battle-title-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :battle-title event))
 
-(defmethod event-handler ::version-change [e]
-  (swap! *state assoc :engine-version (:fx/event e)))
+(defmethod event-handler ::version-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :engine-version event))
 
-(defmethod event-handler ::mod-change [e]
-  (swap! *state assoc :mod-name (:fx/event e)))
+(defmethod event-handler ::mod-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :mod-name event))
 
 (defmethod event-handler ::map-change
   [{:fx/keys [event] :keys [map-name]}]
@@ -452,6 +460,7 @@
 
 (defmethod event-handler ::battle-map-change
   [{:fx/keys [event] :keys [map-name]}]
+  (swap! *state assoc :map-name (or map-name event))
   (let [spectator-count 0 ; TODO
         locked 0
         map-hash -1 ; TODO
@@ -520,27 +529,56 @@
         script-txt (spring/script-txt script)]
     script-txt))
 
+
+(defn copy-map [map-filename engine-version]
+  (if (and map-filename engine-version)
+    (let [source (io/file (fs/spring-root) "maps" map-filename)
+          dest (io/file (fs/app-root) "spring" "engine" engine-version "maps" map-filename)
+          ^java.nio.file.Path source-path (.toPath source)
+          ^java.nio.file.Path dest-path (.toPath dest)
+          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
+                                                   [StandardCopyOption/COPY_ATTRIBUTES
+                                                    StandardCopyOption/REPLACE_EXISTING])]
+      (if (.exists source)
+        (java.nio.file.Files/copy source-path dest-path options)
+        (log/warn "No map file to copy from" (.getAbsolutePath source)
+                  "to" (.getAbsolutePath dest))))
+    (throw
+      (ex-info "Missing map or engine to copy to isolation dir"
+               {:map-filename map-filename
+                :engine-version engine-version}))))
+
+
+#_
+(copy-map "incandescence_1.5.sd7" "103.0")
+
+
 (defn start-game []
   (try
     (log/info "Starting game")
-    (let [state @*state
-          battle-version (-> state
-                             :battles
-                             (get (-> state :battle :battle-id))
-                             :battle-version)
+    (let [{:keys [maps-cached] :as state} @*state
+          battle (-> state
+                     :battles
+                     (get (-> state :battle :battle-id)))
+          {:keys [battle-map battle-version]} battle
+          map-filename (->> maps-cached
+                            (filter (comp #{battle-map} :map-name))
+                            first
+                            :filename)
+          _ (copy-map map-filename battle-version)
           script-txt (script-txt)
           username (System/getProperty "user.name")
           engine-file (io/file (fs/spring-root) "engine" battle-version "spring.exe")
           _ (log/info "Engine executable" engine-file)
-          ;script-file (io/file (fs/spring-root) "script.txt")
-          ;script-file (io/file homedir "script.txt")
-          script-file (io/file "/mnt/c/Users" username ".alt-spring-lobby/spring/script.txt") ; TODO remove
-          isolation-dir (io/file "/mnt/c/Users" username ".alt-spring-lobby/spring/engine" battle-version)] ; TODO remove
+          script-file (io/file (fs/app-root) "spring" "script.txt")
+          isolation-dir (io/file (fs/app-root) "spring" "engine" battle-version)
+          script-file-param (fs/wslpath script-file)
+          isolation-dir-param (fs/wslpath isolation-dir)]
       (spit script-file script-txt)
       (log/info "Wrote script to" script-file)
       (let [command [(.getAbsolutePath engine-file)
-                     "--isolation-dir" (str "C:\\Users\\" username "\\.alt-spring-lobby\\spring\\engine\\" battle-version) ; TODO windows path
-                     (str "C:\\Users\\" username "\\.alt-spring-lobby\\spring\\script.txt")] ; TODO windows path
+                     "--isolation-dir" isolation-dir-param
+                     script-file-param]
             runtime (Runtime/getRuntime)]
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
@@ -797,7 +835,7 @@
                 :width minimap-width
                 :height minimap-height
                 :draw
-                (fn [canvas]
+                (fn [^javafx.scene.canvas.Canvas canvas]
                   (let [gc (.getGraphicsContext2D canvas)
                         starting-points (minimap-starting-points map-details)]
                     (.clearRect gc 0 0 minimap-width minimap-height)
@@ -1091,10 +1129,10 @@
                 :desc
                 {:fx/type :choice-box
                  :value (->> i :battle-status :side (get spring/sides) str)
-                 :on-action {:event/type ::battle-side-action
-                             :is-me (= (:username i) username)
-                             :is-bot (-> i :user :client-status :bot)
-                             :id i}
+                 :on-value-changed {:event/type ::battle-side-changed
+                                    :is-me (= (:username i) username)
+                                    :is-bot (-> i :user :client-status :bot)
+                                    :id i}
                  :items (vals spring/sides)
                  :disable (not (or am-host
                                    (= (:username i) username)
@@ -1146,10 +1184,10 @@
                 :desc
                 {:fx/type :choice-box
                  :value (str (:id (:battle-status i)))
-                 :on-action {:event/type ::battle-team-action
-                             :is-me (= (:username i) username)
-                             :is-bot (-> i :user :client-status :bot)
-                             :id i}
+                 :on-value-changed {:event/type ::battle-team-changed
+                                    :is-me (= (:username i) username)
+                                    :is-bot (-> i :user :client-status :bot)
+                                    :id i}
                  :items (map str (take 16 (iterate inc 0)))
                  :disable (not (or am-host
                                    (= (:username i) username)
@@ -1168,11 +1206,11 @@
                 :desc
                 {:fx/type :choice-box
                  :value (str (:ally (:battle-status i)))
-                 :on-action {:event/type ::battle-ally-action
-                             :is-me (= (:username i) username)
-                             :is-bot (-> i :user :client-status :bot)
-                             :bot (-> i :user :client-status :bot)
-                             :id i}
+                 :on-value-changed {:event/type ::battle-ally-changed
+                                    :is-me (= (:username i) username)
+                                    :is-bot (-> i :user :client-status :bot)
+                                    :bot (-> i :user :client-status :bot)
+                                    :id i}
                  :items (map str (take 16 (iterate inc 0)))
                  :disable (not (or am-host
                                    (= (:username i) username)
@@ -1228,35 +1266,32 @@
     (client/send-message (:client @*state)
       (str "FORCESPECTATORMODE " (:username id)))))
 
-(defmethod event-handler ::battle-side-action
+(defmethod event-handler ::battle-side-changed
   [{:keys [id] :fx/keys [event] :as data}]
-  (let [v (.getValue (.getSource event))]
-    (when-let [side (try (Integer/parseInt v) (catch Exception _e))]
-      (if (not= side (-> id :battle-status :side))
-        (do
-          (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
-          (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
-        (log/debug "No change for side")))))
+  (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
+    (if (not= side (-> id :battle-status :side))
+      (do
+        (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
+        (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
+      (log/debug "No change for side"))))
 
 (defmethod event-handler ::battle-team-action
   [{:keys [id] :fx/keys [event] :as data}]
-  (let [v (.getValue (.getSource event))]
-    (when-let [player-id (try (Integer/parseInt v) (catch Exception _e))]
-      (if (not= player-id (-> id :battle-status :id))
-        (do
-          (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
-          (update-team id data player-id))
-        (log/debug "No change for team")))))
+  (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
+    (if (not= player-id (-> id :battle-status :id))
+      (do
+        (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
+        (update-team id data player-id))
+      (log/debug "No change for team"))))
 
-(defmethod event-handler ::battle-ally-action
+(defmethod event-handler ::battle-ally-changed
   [{:keys [id] :fx/keys [event] :as data}]
-  (let [v (.getValue (.getSource event))]
-    (when-let [ally (try (Integer/parseInt v) (catch Exception _e))]
-      (if (not= ally (-> id :battle-status :ally))
-        (do
-          (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
-          (update-ally id data ally))
-        (log/debug "No change for ally")))))
+  (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
+    (if (not= ally (-> id :battle-status :ally))
+      (do
+        (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
+        (update-ally id data ally))
+      (log/debug "No change for ally"))))
 
 (defmethod event-handler ::battle-handicap-change
   [{:keys [id] :fx/keys [event] :as e}]
@@ -1271,7 +1306,7 @@
            handicap))))
 
 (defmethod event-handler ::battle-color-action
-  [{:keys [id] :fx/keys [event] :as opts}]
+  [{:keys [id] :fx/keys [^javafx.event.Event event] :as opts}]
   (let [javafx-color (.getValue (.getSource event))
         color-int (spring-color javafx-color)]
     (update-color id opts color-int)))
@@ -1279,8 +1314,9 @@
 
 (defn root-view
   [{{:keys [client client-deferred users battles battle battle-password selected-battle username
-            password login-error title engine-version mod-name map-name last-failed-message maps-cached
-            bot-username bot-name bot-version]} :state}]
+            password login-error battle-title engine-version mod-name map-name last-failed-message maps-cached
+            bot-username bot-name bot-version
+            server-url]} :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [_node]
                  (log/debug "on-created")
@@ -1310,13 +1346,13 @@
             :stylesheets [(str (io/resource "dark-theme2.css"))]
             :root {:fx/type :v-box
                    :alignment :top-left
-                   :children [{:fx/type menu-view}
-                              {:fx/type client-buttons
+                   :children [{:fx/type client-buttons
                                :client client
                                :client-deferred client-deferred
                                :username username
                                :password password
-                               :login-error login-error}
+                               :login-error login-error
+                               :server-url server-url}
                               {:fx/type user-table
                                :users users}
                               {:fx/type battles-table
@@ -1328,7 +1364,7 @@
                                :battles battles
                                :client client
                                :selected-battle selected-battle
-                               :title title
+                               :battle-title battle-title
                                :engine-version engine-version
                                :mod-name mod-name
                                :map-name map-name
@@ -1353,6 +1389,7 @@
 
 (defn -main [& _args]
   (Platform/setImplicitExit true)
+  (watch-config-state)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
                           (fn [state]
