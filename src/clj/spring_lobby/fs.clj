@@ -70,6 +70,14 @@
     (.getAbsolutePath f)))
 
 
+(defn spring-executable []
+  (let [{:keys [os-name]} (sys-data)]
+    (if (or (string/includes? os-name "Windows")
+            (wsl?))
+      "spring.exe"
+      "spring")))
+
+
 (defn spring-root
   "Returns the root directory for Spring"
   []
