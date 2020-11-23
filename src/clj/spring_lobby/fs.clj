@@ -78,7 +78,10 @@
       (string/includes? os-name "Linux")
       (if (string/includes? os-version "Microsoft") ; WSL
         (io/file "/mnt" "c" "Users" user-name "Documents" "My Games" "Spring")
-        (io/file user-home "spring"))
+        (let [linux-home (io/file user-home ".spring")]
+          (if (.exists linux-home)
+            linux-home
+            (io/file user-home "snap" "springlobby-nsg" "common" ".spring"))))
       (string/includes? os-name "Windows")
       (io/file user-home "Documents" "My Games" "Spring")
       :else
@@ -93,7 +96,10 @@
       (string/includes? os-name "Linux")
       (if (string/includes? os-version "Microsoft") ; WSL
         (io/file "/mnt" "c" "Users" user-name "AppData" "Roaming" "springlobby")
-        (io/file user-home ".springlobby"))
+        (let [linux-home (io/file user-home ".springlobby")]
+          (if (.exists linux-home)
+            linux-home
+            (io/file user-home "snap" "springlobby-nsg" "common" ".springlobby"))))
       (string/includes? os-name "Windows")
       (io/file user-home "AppData" "Roaming" "springlobby")
       :else
