@@ -9,6 +9,7 @@
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.taoensso/timbre {:mvn/version "5.1.0"}
   commons-io/commons-io {:mvn/version "2.8.0"}
+  crouton/crouton {:mvn/version "0.1.2"}
   digest/digest {:mvn/version "1.4.9"}
   gloss/gloss {:mvn/version "0.2.6"}
   hashp/hashp {:mvn/version "0.2.0"}
