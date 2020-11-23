@@ -403,7 +403,7 @@
                    (filter some?)
                    doall)]
     (log/info "Maps loaded in" (- (System/currentTimeMillis) before) "ms")
-    m))
+    (or m [])))
 
 (defn bots [engine]
   (let [ai-dirs

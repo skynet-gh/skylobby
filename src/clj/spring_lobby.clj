@@ -57,8 +57,11 @@
             new-config (select-keys new-state config-keys)]
         (when (not= old-config new-config)
           (log/debug "Updating config file")
-          (spit (io/file (fs/app-root) fs/config-filename)
-                (with-out-str (pprint new-config))))))))
+          (let [app-root (io/file (fs/app-root))
+                config-file (io/file app-root fs/config-filename)]
+            (when-not (.exists app-root)
+              (.mkdirs app-root))
+            (spit config-file (with-out-str (pprint new-config)))))))))
 
 
 (defmulti event-handler :event/type)
