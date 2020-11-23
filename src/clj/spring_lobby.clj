@@ -558,6 +558,31 @@
     script-txt))
 
 
+(defn copy-engine [engine-version]
+  (if engine-version
+    (let [source (io/file (fs/spring-root) "engine" engine-version)
+          dest (io/file (fs/app-root) "spring" "engine" engine-version)
+          ^java.nio.file.Path source-path (.toPath source)
+          ^java.nio.file.Path dest-path (.toPath dest)
+          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
+                                                   [StandardCopyOption/COPY_ATTRIBUTES
+                                                    StandardCopyOption/REPLACE_EXISTING])]
+      (if (.exists source)
+        (if (.exists dest)
+          (log/info "Skipping copy of existing engine folder" (.getAbsolutePath dest) "from "
+                    (.getAbsolutePath source))
+          (do
+            (.mkdirs dest)
+            (java.nio.file.Files/copy source-path dest-path options)))
+        (log/warn "No map file to copy from" (.getAbsolutePath source)
+                  "to" (.getAbsolutePath dest))))
+    (throw
+      (ex-info "Missing map or engine to copy to isolation dir"
+               {:engine-version engine-version}))))
+
+#_
+(copy-engine "103.0")
+
 (defn copy-map [map-filename engine-version]
   (if (and map-filename engine-version)
     (let [source (io/file (fs/spring-root) "maps" map-filename)
@@ -568,7 +593,9 @@
                                                    [StandardCopyOption/COPY_ATTRIBUTES
                                                     StandardCopyOption/REPLACE_EXISTING])]
       (if (.exists source)
-        (java.nio.file.Files/copy source-path dest-path options)
+        (do
+          (.mkdirs dest)
+          (java.nio.file.Files/copy source-path dest-path options))
         (log/warn "No map file to copy from" (.getAbsolutePath source)
                   "to" (.getAbsolutePath dest))))
     (throw
@@ -589,6 +616,7 @@
                      :battles
                      (get (-> state :battle :battle-id)))
           {:keys [battle-map battle-version]} battle
+          _ (copy-engine battle-version)
           map-filename (->> maps-cached
                             (filter (comp #{battle-map} :map-name))
                             first
