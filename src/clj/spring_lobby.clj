@@ -1304,7 +1304,7 @@
         (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
       (log/debug "No change for side"))))
 
-(defmethod event-handler ::battle-team-action
+(defmethod event-handler ::battle-team-changed
   [{:keys [id] :fx/keys [event] :as data}]
   (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
     (if (not= player-id (-> id :battle-status :id))
