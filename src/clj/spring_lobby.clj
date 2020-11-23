@@ -32,7 +32,9 @@
 (def initial-state
   (or
     (try
-      (-> (fs/app-root) (io/file fs/config-filename) slurp edn/read-string)
+      (let [config-file (io/file (fs/app-root) fs/config-filename)]
+        (when (.exists config-file)
+          (-> config-file slurp edn/read-string)))
       (catch Exception e
         (log/warn e "Exception loading initial state")))
     {}))
@@ -363,37 +365,39 @@
       {:fx/type :h-box
        :alignment :center-left
        :children
-       [{:fx/type :label
-         :text " Map: "}
-        {:fx/type :choice-box
-         :value (str map-name)
-         :items map-names
-         :disable (boolean disable)
-         :on-value-changed on-value-changed}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Random map"}}
-         :desc
-         {:fx/type :button
-          :on-action (assoc on-value-changed :map-name (rand-nth map-names))
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Reload maps"}}
-         :desc
-         {:fx/type :button
-          :on-action {:event/type ::reload-maps}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal "mdi-refresh:16:white"}}}]})
+       (concat
+         [{:fx/type :label
+           :text " Map: "}
+          {:fx/type :choice-box
+           :value (str map-name)
+           :items map-names
+           :disable (boolean disable)
+           :on-value-changed on-value-changed}]
+         (when (seq map-names)
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Random map"}}
+             :desc
+             {:fx/type :button
+              :on-action (assoc on-value-changed :map-name (rand-nth map-names))
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+         [{:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Reload maps"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::reload-maps}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-refresh:16:white"}}}])})
     {:fx/type :v-box
      :alignment :center-left
      :children
