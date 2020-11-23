@@ -29,6 +29,7 @@
   {:extra-paths ["dev/clj/user" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.25.4"}
+    clj-commons/pomegranate {:mvn/version "1.2.0"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
@@ -44,10 +45,7 @@
                 pjstadig/humane-test-output {:mvn/version "0.10.0"}}
    :main-opts ["-m" "tests"]}
   :uberjar
-  {:extra-deps
+  {:extra-paths ["dev/clj/uberjar"]
+   :extra-deps
    {seancorfield/depstar {:mvn/version "1.1.136"}}
-   :exec-fn hf.depstar.uberjar/run
-   :exec-args {:jar "alt-spring-lobby.jar"
-               :aot true
-               :main-class spring-lobby}
-   :jvm-opts ["-Dcljfx.skip-javafx-initialization=true"]}}}
+   :main-opts ["-m" "uberjar"]}}}

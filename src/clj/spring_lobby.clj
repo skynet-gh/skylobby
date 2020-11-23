@@ -1314,9 +1314,10 @@
 
 (defn root-view
   [{{:keys [client client-deferred users battles battle battle-password selected-battle username
-            password login-error battle-title engine-version mod-name map-name last-failed-message maps-cached
+            password login-error battle-title engine-version mod-name map-name last-failed-message
+            maps-cached
             bot-username bot-name bot-version
-            server-url]} :state}]
+            server-url standalone]} :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [_node]
                  (log/debug "on-created")
@@ -1335,13 +1336,14 @@
     :height 1200
     :on-close-request (fn [e]
                         (log/debug e)
-                        (loop []
-                          (let [client (:client @*state)]
-                            (if (and client (.isConnected client))
-                              (do
-                                (client/disconnect client)
-                                (recur))
-                              (System/exit 0)))))
+                        (when standalone
+                          (loop []
+                            (let [client (:client @*state)]
+                              (if (and client (not (.isClosed client)))
+                                (do
+                                  (client/disconnect client)
+                                  (recur))
+                                (System/exit 0))))))
     :scene {:fx/type :scene
             :stylesheets [(str (io/resource "dark-theme2.css"))]
             :root {:fx/type :v-box
@@ -1389,6 +1391,7 @@
 
 (defn -main [& _args]
   (Platform/setImplicitExit true)
+  (swap! *state assoc :standalone true)
   (watch-config-state)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
