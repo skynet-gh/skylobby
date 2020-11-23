@@ -2,6 +2,8 @@
 
 A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com/spring/uberserver).
 
+You will need the [Clojure CLI tools](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools).
+
 
 ## Build
 
@@ -9,7 +11,7 @@ A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com
 To build an executable jar file, run
 
 ```bash
-clj -M:uberjar
+clojure -M:uberjar
 ```
 
 And then run it with
@@ -21,8 +23,7 @@ java -jar alt-spring-lobby.jar
 
 ## Development
 
-
-For now, you will need the [Clojure CLI tools](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools). Once you have those you can run
+You will also need `rlwrap`. Run
 
 ```bash
 clj -M:nrepl
