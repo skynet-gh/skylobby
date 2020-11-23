@@ -1,8 +1,7 @@
-{:paths ["src/clj" "resources" "lib/lua-parser/src/main/antlr3/nl/bigo/luaparser"]
+{:paths ["src/clj" "resources"]
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
   byte-streams/byte-streams {:mvn/version "0.2.4"}
-  clj-antlr/clj-antlr {:mvn/version "0.2.7"}
   cljfx/cljfx {:mvn/version "1.7.10"}
   clojail/clojail {:mvn/version "1.0.6"}
   com.climate/claypoole {:mvn/version "1.1.4"}
@@ -23,7 +22,8 @@
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-controls {:mvn/version "15.0.1"}
   smee/binary {:mvn/version "0.5.5"}
-  toml/toml {:mvn/version "0.1.3"}}
+  toml/toml {:mvn/version "0.1.3"}
+  version-clj/version-clj {:mvn/version "0.1.2"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj/user" "test/clj"]

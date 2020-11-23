@@ -16,7 +16,8 @@
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring :as spring]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [version-clj.core :as version])
   (:import
     (java.nio.file CopyOption StandardCopyOption)
     (javafx.application Platform)
@@ -291,10 +292,12 @@
      :on-action {:event/type (if client ::disconnect ::connect)}}
     {:fx/type :text-field
      :text username
+     :prompt-text "Username"
      :disable (boolean (or client client-deferred))
      :on-text-changed {:event/type ::username-change}}
     {:fx/type :password-field
      :text password
+     :prompt-text "Password"
      :disable (boolean (or client client-deferred))
      :on-text-changed {:event/type ::password-change}}
     {:fx/type :v-box
@@ -307,6 +310,7 @@
                :-fx-max-width "360px"}}]}
     {:fx/type :text-field
      :text server-url
+     :prompt-text "server:port"
      :disable (boolean (or client client-deferred))
      :on-text-changed {:event/type ::server-url-change}}]})
 
@@ -354,8 +358,11 @@
   (if maps-cached
     (let [map-names (mapv :map-name maps-cached)]
       {:fx/type :h-box
+       :alignment :center-left
        :children
-       [{:fx/type :choice-box
+       [{:fx/type :label
+         :text " Map: "}
+        {:fx/type :choice-box
          :value (str map-name)
          :items map-names
          :disable (boolean disable)
@@ -422,16 +429,30 @@
          :on-action {:event/type ::host-battle}
          :on-text-changed {:event/type ::battle-title-change}}])
      (when (not battle)
-       [{:fx/type :choice-box
-         :value (str engine-version)
-         :items (fs/engines)
-         :on-value-changed {:event/type ::version-change}}
-        {:fx/type :choice-box
-         :value (str mod-name)
-         :items (->> (fs/games)
-                     (map :modinfo)
-                     (map (fn [modinfo] (str (:name modinfo) " " (:version modinfo)))))
-         :on-value-changed {:event/type ::mod-change}}
+       [{:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :text " Engine: "}
+          {:fx/type :choice-box
+           :value (str engine-version)
+           :items (fs/engines)
+           :on-value-changed {:event/type ::version-change}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center-left
+           :text " Game: "}
+          {:fx/type :choice-box
+           :value (str mod-name)
+           :items (->> (fs/games)
+                       (map :modinfo)
+                       (sort-by :version version/version-compare)
+                       (map
+                         (fn [modinfo]
+                           (str (:name modinfo) " " (:version modinfo)))))
+           :on-value-changed {:event/type ::mod-change}}]}
         {:fx/type map-list
          :map-name map-name
          :maps-cached maps-cached
@@ -694,6 +715,7 @@
                        :bot-name bot-name
                        :bot-version bot-version}}
           {:fx/type :text-field
+           :prompt-text "Bot Name"
            :text (str bot-username)
            :on-text-changed {:event/type ::change-bot-username}}
           {:fx/type :choice-box

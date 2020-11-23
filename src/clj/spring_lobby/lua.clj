@@ -1,20 +1,8 @@
 (ns spring-lobby.lua
-  (:require
-    [clj-antlr.core :as antlr])
   (:import
     (org.luaj.vm2 LuaValue)
     (org.luaj.vm2.lib.jse JsePlatform)))
 
-
-(def lua-parser
-  (future (antlr/parser "lib/grammars-v4/lua/Lua.g4")))
-
-
-(defn parse [s]
-  (@lua-parser s))
-
-#_
-(parse (slurp "mapinfo.lua"))
 
 (def mocks
   "VFS = {}
@@ -55,6 +43,14 @@ end
 
 (defn read-mapinfo
   "Returns a map repsenting mapinfo from the given string representation of mapinfo.lua."
+  [s]
+  (let [globals (JsePlatform/standardGlobals)
+        lua-chunk (.load globals (str mocks s))
+        res (.call lua-chunk)]
+    (table-to-map res)))
+
+(defn read-modinfo
+  "Returns a map repsenting modinfo from the given string representation of modinfo.lua."
   [s]
   (let [globals (JsePlatform/standardGlobals)
         lua-chunk (.load globals (str mocks s))

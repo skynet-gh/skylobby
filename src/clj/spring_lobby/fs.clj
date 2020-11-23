@@ -241,9 +241,9 @@
                                  (filter (comp #{"modinfo.lua"} string/lower-case #(.getName %)))
                                  first)]
                         (when-let [modinfo (slurp (.getInputStream zf modinfo-entry))]
-                          (lua/parse modinfo))))]
+                          (lua/read-modinfo modinfo))))]
         {:filename (.getName file)
-         :modinfo (parse-modinfo modinfo)}))
+         :modinfo modinfo}))
     (->> (.listFiles (io/file (spring-root) "games"))
          seq
          (filter #(.isFile %)))))
@@ -267,19 +267,6 @@
 
 (defn parse-map-data [map-data]
   (spring/parse-script map-data))
-
-(defn parse-map-info
-  [map-info]
-  (let [fieldlist
-        (-> (lua/parse map-info)
-            second
-            second
-            last
-            second
-            second
-            (nth 2)
-            rest)]
-    (parse-fieldlist fieldlist)))
 
 (defn before-dot
   [path]
@@ -409,12 +396,12 @@
 
 (defn maps []
   (let [before (System/currentTimeMillis)
-        m (->> (.listFiles (io/file (spring-root) "maps"))
-               seq
-               (filter #(.isFile %))
-               (cp/pmap 2 read-map-data)
-               (filter some?)
-               doall)]
+        m (some->> (.listFiles (io/file (spring-root) "maps"))
+                   seq
+                   (filter #(.isFile %))
+                   (cp/pmap 2 read-map-data)
+                   (filter some?)
+                   doall)]
     (log/info "Maps loaded in" (- (System/currentTimeMillis) before) "ms")
     m))
 
