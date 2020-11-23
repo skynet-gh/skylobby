@@ -13,6 +13,7 @@
   gloss/gloss {:mvn/version "0.2.6"}
   hashp/hashp {:mvn/version "0.2.0"}
   instaparse/instaparse {:mvn/version "1.4.10"}
+  me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.clojure/clojure {:mvn/version "1.10.2-alpha4"}

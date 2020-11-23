@@ -12,6 +12,7 @@
     [clojure.set]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
+    [me.raynes.fs :as raynes-fs]
     [spring-lobby.client :as client]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -22,7 +23,8 @@
     (java.nio.file CopyOption StandardCopyOption)
     (javafx.application Platform)
     (javafx.scene.paint Color)
-    (manifold.stream SplicedStream))
+    (manifold.stream SplicedStream)
+    (org.apache.commons.io FileUtils))
   (:gen-class))
 
 
@@ -561,19 +563,12 @@
 (defn copy-engine [engine-version]
   (if engine-version
     (let [source (io/file (fs/spring-root) "engine" engine-version)
-          dest (io/file (fs/app-root) "spring" "engine" engine-version)
-          ^java.nio.file.Path source-path (.toPath source)
-          ^java.nio.file.Path dest-path (.toPath dest)
-          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                   [StandardCopyOption/COPY_ATTRIBUTES
-                                                    StandardCopyOption/REPLACE_EXISTING])]
+          dest (io/file (fs/app-root) "spring" "engine" engine-version)]
       (if (.exists source)
-        (if (.exists dest)
-          (log/info "Skipping copy of existing engine folder" (.getAbsolutePath dest) "from "
-                    (.getAbsolutePath source))
-          (do
-            (.mkdirs dest)
-            (java.nio.file.Files/copy source-path dest-path options)))
+        (do
+          (FileUtils/forceMkdir dest)
+          (log/info "Copying" source "to" dest)
+          (FileUtils/copyDirectory source dest))
         (log/warn "No map file to copy from" (.getAbsolutePath source)
                   "to" (.getAbsolutePath dest))))
     (throw
