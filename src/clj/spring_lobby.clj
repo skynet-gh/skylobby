@@ -583,6 +583,30 @@
 #_
 (copy-engine "103.0")
 
+(defn copy-mod [mod-filename engine-version]
+  (if (and mod-filename engine-version)
+    (let [source (io/file (fs/spring-root) "games" mod-filename)
+          dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)
+          ^java.nio.file.Path source-path (.toPath source)
+          ^java.nio.file.Path dest-path (.toPath dest)
+          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
+                                                   [StandardCopyOption/COPY_ATTRIBUTES
+                                                    StandardCopyOption/REPLACE_EXISTING])]
+      (if (.exists source)
+        (do
+          (.mkdirs dest)
+          (java.nio.file.Files/copy source-path dest-path options))
+        (log/warn "No mod file to copy from" (.getAbsolutePath source)
+                  "to" (.getAbsolutePath dest))))
+    (throw
+      (ex-info "Missing mod or engine to copy to isolation dir"
+               {:mod-filename mod-filename
+                :engine-version engine-version}))))
+
+#_
+(copy-mod "Balanced Annihilation V11.0.2")
+
+
 (defn copy-map [map-filename engine-version]
   (if (and map-filename engine-version)
     (let [source (io/file (fs/spring-root) "maps" map-filename)
@@ -615,18 +639,23 @@
           battle (-> state
                      :battles
                      (get (-> state :battle :battle-id)))
-          {:keys [battle-map battle-version]} battle
+          {:keys [battle-map battle-version battle-modname]} battle
           _ (copy-engine battle-version)
+          mod-filename (->> (fs/games)
+                            (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
+                            first
+                            :filename)
+          _ (copy-mod mod-filename battle-version)
           map-filename (->> maps-cached
                             (filter (comp #{battle-map} :map-name))
                             first
                             :filename)
           _ (copy-map map-filename battle-version)
           script-txt (script-txt)
-          engine-file (io/file (fs/spring-root) "engine" battle-version (fs/spring-executable))
+          isolation-dir (io/file (fs/app-root) "spring" "engine" battle-version)
+          engine-file (io/file isolation-dir (fs/spring-executable))
           _ (log/info "Engine executable" engine-file)
           script-file (io/file (fs/app-root) "spring" "script.txt")
-          isolation-dir (io/file (fs/app-root) "spring" "engine" battle-version)
           script-file-param (fs/wslpath script-file)
           isolation-dir-param (fs/wslpath isolation-dir)]
       (spit script-file script-txt)
