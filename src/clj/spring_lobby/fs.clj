@@ -70,12 +70,16 @@
     (.getAbsolutePath f)))
 
 
-(defn spring-executable []
+(defn executable [common-name]
   (let [{:keys [os-name]} (sys-data)]
-    (if (or (string/includes? os-name "Windows")
-            (wsl?))
-      "spring.exe"
-      "spring")))
+    (str
+      common-name
+      (when (or (string/includes? os-name "Windows")
+                (wsl?))
+        ".exe"))))
+
+(defn spring-executable []
+  (executable "spring"))
 
 
 (defn spring-root
@@ -209,6 +213,7 @@
 
 
 (defn engines []
+  (log/debug "Loading engine versions")
   (->> (.listFiles (io/file (spring-root) "engine"))
        seq
        (filter #(.isDirectory %))

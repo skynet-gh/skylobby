@@ -4,7 +4,8 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
-    [spring-lobby.fs :as fs])
+    [spring-lobby.fs :as fs]
+    [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
 
@@ -47,9 +48,11 @@
      :items (b/decode (b/repeated sdp-line) gz)}))
 
 (defn sdp-files []
+  (log/debug "Loading sdp file names")
   (let [packages-root (io/file (fs/spring-root) "packages")]
-    (if (.exists packages-root)
-      (.listFiles packages-root)
+    (or
+      (when (.exists packages-root)
+        (seq (.listFiles packages-root)))
       [])))
 
 (defn slurp-from-pool [md5]
@@ -71,6 +74,74 @@
 
 (defn rapid-inner [sdp-file inner-filename]
   (inner (decode-sdp sdp-file) inner-filename))
+
+(defn sdp-hash [sdp-file]
+  (-> (.getName sdp-file)
+      (string/split #"\.")
+      first))
+
+
+(def repos-url "http://repos.springrts.com/repos.gz")
+
+
+(defn repos []
+  (log/debug "Loading rapid repo names")
+  (->> (.listFiles (io/file (fs/spring-root) "rapid" "repos.springrts.com"))
+       seq
+       (filter #(.isDirectory %))
+       (map #(.getName %))))
+
+#_
+(repos)
+
+(defn rapid-versions [f]
+  (with-open [is (io/input-stream f)
+              gz (GZIPInputStream. is)]
+    (->> gz
+         slurp
+         (string/split-lines)
+         (map
+           (fn [line]
+             (let [[id commit detail version] (string/split line #",")]
+               {:id id
+                :hash commit
+                :detail detail
+                :version version}))))))
+
+
+(defn package-versions []
+  (-> (fs/spring-root)
+      (io/file "rapid" "packages.springrts.com" "versions.gz")
+      (rapid-versions)))
+
+(def package-by-hash
+  (->> (package-versions)
+       (map (juxt :hash identity))
+       (into {})))
+
+#_
+(take 10 package-by-hash)
+
+
+(defn versions [repo]
+  (log/debug "Loading rapid versions for repo" repo)
+  (-> (fs/spring-root)
+      (io/file "rapid" "repos.springrts.com" repo "versions.gz")
+      (rapid-versions)))
+
+#_
+(take 10 (versions "ba"))
+
+(def all-versions
+  (mapcat versions (repos)))
+
+(def versions-by-hash
+  (->> all-versions
+       (map (juxt :hash identity))
+       (into {})))
+
+#_
+(take 10 (ba-versions))
 
 #_
 (let [sdps (sdp-files)

@@ -12,10 +12,10 @@
     [clojure.set]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
-    [me.raynes.fs :as raynes-fs]
     [spring-lobby.client :as client]
-    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
+    [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [version-clj.core :as version])
@@ -247,6 +247,9 @@
 (defmethod event-handler ::print-state [_e]
   (pprint *state))
 
+(defmethod event-handler ::show-rapid-downloader [_e]
+  (swap! *state assoc :show-rapid-downloader true))
+
 (defmethod event-handler ::disconnect [_e]
   (when-let [client (:client @*state)]
     (client/disconnect client))
@@ -438,7 +441,8 @@
          :on-action {:event/type ::host-battle}
          :on-text-changed {:event/type ::battle-title-change}}])
      (when (not battle)
-       [{:fx/type :h-box
+       [
+        {:fx/type :h-box
          :alignment :center-left
          :children
          [{:fx/type :label
@@ -461,7 +465,19 @@
                        (map
                          (fn [modinfo]
                            (str (:name modinfo) " " (:version modinfo)))))
-           :on-value-changed {:event/type ::mod-change}}]}
+           :on-value-changed {:event/type ::mod-change}}
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Browse and download more with Rapid"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::show-rapid-downloader}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal (str "mdi-magnify:16:white")}}}]}
         {:fx/type map-list
          :map-name map-name
          :maps-cached maps-cached
@@ -1391,82 +1407,272 @@
         color-int (spring-color javafx-color)]
     (update-color id opts color-int)))
 
+(defmethod event-handler ::rapid-repo-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :rapid-repo event)
+  (future
+    (let [versions (->> (rapid/versions event)
+                        (sort-by :version version/version-compare)
+                        reverse
+                        doall)]
+      (swap! *state assoc :rapid-versions-cached versions))))
+
+(defmethod event-handler ::rapid-download
+  [{:keys [engine-version rapid-id]}]
+  (swap! *state assoc-in [:rapid-download rapid-id] {:running true
+                                                     :message "Preparing to run pr-downloader"})
+  (future
+    (let [pr-downloader-file (io/file (fs/spring-root) "engine" engine-version (fs/executable "pr-downloader"))
+          command [(.getAbsolutePath pr-downloader-file)
+                   "--filesystem-writepath" (fs/wslpath (fs/spring-root))
+                   "--rapid-download" rapid-id]
+          runtime (Runtime/getRuntime)]
+      (log/info "Running '" command "'")
+      (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+            ^"[Ljava.lang.String;" envp nil
+            process (.exec runtime cmdarray envp (fs/spring-root))]
+        (future
+          (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+            (loop []
+              (if-let [line (.readLine reader)]
+                (do
+                  (swap! *state assoc-in [:rapid-download rapid-id :message] line)
+                  (log/info "(pr-downloader" rapid-id "out)" line)
+                  (recur))
+                (log/info "pr-downloader" rapid-id "stdout stream closed")))))
+        (future
+          (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+            (loop []
+              (if-let [line (.readLine reader)]
+                (do
+                  (swap! *state assoc-in [:rapid-download rapid-id :message] line)
+                  (log/info "(pr-downloader" rapid-id "err)" line)
+                  (recur))
+                (log/info "pr-downloader" rapid-id "stderr stream closed")))))
+        (.waitFor process)
+        (swap! *state assoc-in [:rapid-download rapid-id :running] false)
+        (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files)))))))
+
 
 (defn root-view
   [{{:keys [client client-deferred users battles battle battle-password selected-battle username
             password login-error battle-title engine-version mod-name map-name last-failed-message
             maps-cached
             bot-username bot-name bot-version
-            server-url standalone]} :state}]
+            server-url standalone
+            rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines-cached
+            rapid-versions-cached
+            show-rapid-downloader]} :state}]
   {:fx/type fx/ext-on-instance-lifecycle
-   :on-created (fn [_node]
-                 (log/debug "on-created")
+   :on-created (fn [& args]
+                 (log/debug "on-created" args)
                  (when-not (:maps-cached @*state)
                    (future
-                     (swap! *state assoc :maps-cached (doall (fs/maps))))))
-   :on-advanced (fn [_]
-                  (log/debug "on-advanced"))
-   :on-deleted (fn [_]
-                 (log/debug "on-deleted"))
+                     (swap! *state assoc :maps-cached (doall (fs/maps)))))
+                 (future
+                   (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files))))
+                 (future
+                   (swap! *state assoc :rapid-repos-cached (doall (rapid/repos))))
+                 (future
+                   (swap! *state assoc :engines-cached (doall (fs/engines))))
+                 (future
+                   (when-let [rapid-repo (:rapid-repo @*state)]
+                     (let [versions (->> (rapid/versions rapid-repo)
+                                         (sort-by :version version/version-compare)
+                                         reverse
+                                         doall)]
+                       (swap! *state assoc :rapid-versions-cached versions)))))
+   :on-advanced (fn [& args]
+                  (log/debug "on-advanced" args))
+   :on-deleted (fn [& args]
+                 (log/debug "on-deleted" args))
    :desc
-   {:fx/type :stage
-    :showing true
-    :title "Alt Spring Lobby"
-    :width 2000
-    :height 1200
-    :on-close-request (fn [e]
-                        (log/debug e)
-                        (when standalone
-                          (loop []
-                            (let [client (:client @*state)]
-                              (if (and client (not (.isClosed client)))
-                                (do
-                                  (client/disconnect client)
-                                  (recur))
-                                (System/exit 0))))))
-    :scene {:fx/type :scene
-            :stylesheets [(str (io/resource "dark-theme2.css"))]
-            :root {:fx/type :v-box
-                   :alignment :top-left
-                   :children [{:fx/type client-buttons
-                               :client client
-                               :client-deferred client-deferred
-                               :username username
-                               :password password
-                               :login-error login-error
-                               :server-url server-url}
-                              {:fx/type user-table
-                               :users users}
-                              {:fx/type battles-table
-                               :battles battles
-                               :users users}
-                              {:fx/type battles-buttons
-                               :battle battle
-                               :battle-password battle-password
-                               :battles battles
-                               :client client
-                               :selected-battle selected-battle
-                               :battle-title battle-title
-                               :engine-version engine-version
-                               :mod-name mod-name
-                               :map-name map-name
-                               :maps-cached maps-cached}
-                              {:fx/type battle-table
-                               :battles battles
-                               :battle battle
-                               :users users
-                               :username username
-                               :engine-version engine-version
-                               :bot-username bot-username
-                               :bot-name bot-name
-                               :bot-version bot-version
-                               :maps-cached maps-cached}
-                              {:fx/type :v-box
-                               :alignment :center-left
-                               :children
-                               [{:fx/type :label
-                                 :text (str last-failed-message)
-                                 :style {:-fx-text-fill "#FF0000"}}]}]}}}})
+   {:fx/type fx/ext-many
+    :desc
+    (concat
+      [{:fx/type :stage
+        :showing true
+        :title "Alt Spring Lobby"
+        :width 2000
+        :height 1200
+        :on-close-request (fn [e]
+                            (log/debug e)
+                            (when standalone
+                              (loop []
+                                (let [client (:client @*state)]
+                                  (if (and client (not (.isClosed client)))
+                                    (do
+                                      (client/disconnect client)
+                                      (recur))
+                                    (System/exit 0))))))
+        :scene {:fx/type :scene
+                :stylesheets [(str (io/resource "dark-theme2.css"))]
+                :root {:fx/type :v-box
+                       :alignment :top-left
+                       :children [{:fx/type client-buttons
+                                   :client client
+                                   :client-deferred client-deferred
+                                   :username username
+                                   :password password
+                                   :login-error login-error
+                                   :server-url server-url}
+                                  {:fx/type user-table
+                                   :users users}
+                                  {:fx/type battles-table
+                                   :battles battles
+                                   :users users}
+                                  {:fx/type battles-buttons
+                                   :battle battle
+                                   :battle-password battle-password
+                                   :battles battles
+                                   :client client
+                                   :selected-battle selected-battle
+                                   :battle-title battle-title
+                                   :engine-version engine-version
+                                   :mod-name mod-name
+                                   :map-name map-name
+                                   :maps-cached maps-cached}
+                                  {:fx/type battle-table
+                                   :battles battles
+                                   :battle battle
+                                   :users users
+                                   :username username
+                                   :engine-version engine-version
+                                   :bot-username bot-username
+                                   :bot-name bot-name
+                                   :bot-version bot-version
+                                   :maps-cached maps-cached}
+                                  {:fx/type :v-box
+                                   :alignment :center-left
+                                   :children
+                                   [{:fx/type :label
+                                     :text (str last-failed-message)
+                                     :style {:-fx-text-fill "#FF0000"}}]}]}}}]
+      (when show-rapid-downloader
+        (let [sdp-files (or sdp-files-cached [])
+              sdp-hashes (set (map rapid/sdp-hash sdp-files))]
+          [{:fx/type :stage
+            :always-on-top true
+            :showing show-rapid-downloader
+            :title "alt-spring-lobby Rapid Downloader"
+            :on-close-request (fn [& args]
+                                (log/debug args)
+                                (swap! *state assoc :show-rapid-downloader false))
+            :width 1600
+            :height 800
+            :scene
+            {:fx/type :scene
+             :stylesheets [(str (io/resource "dark-theme2.css"))]
+             :root
+             {:fx/type :v-box
+              :children
+              [{:fx/type :h-box
+                :alignment :center-left
+                :children
+                [{:fx/type :label
+                  :text " Repo: "}
+                 {:fx/type :choice-box
+                  :value (str rapid-repo)
+                  :items (or rapid-repos-cached [])
+                  :on-value-changed {:event/type ::rapid-repo-change}}
+                 {:fx/type :label
+                  :text " Engine for pr-downloader: "}
+                 {:fx/type :choice-box
+                  :value (str engine-version)
+                  :items (or engines-cached [])
+                  :on-value-changed {:event/type ::version-change}}]}
+               {:fx/type :table-view
+                :column-resize-policy :constrained ; TODO auto resize
+                :items (or rapid-versions-cached [])
+                :columns
+                [{:fx/type :table-column
+                  :text "ID"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:id i))})}}
+                 {:fx/type :table-column
+                  :text "Hash"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:hash i))})}}
+                 {:fx/type :table-column
+                  :text "Version"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:version i))})}}
+                 {:fx/type :table-column
+                  :text "Download"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     (let [download (get rapid-download (:id i))]
+                       (merge
+                         {:text (str (:message download))}
+                         (cond
+                           (sdp-hashes (:hash i))
+                           {:graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-check:16:white"}}
+                           (:running download)
+                           nil
+                           :else
+                           {:graphic
+                            {:fx/type :button
+                             :on-action {:event/type ::rapid-download
+                                         :rapid-id (:id i)
+                                         :engine-version engine-version}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-download:16:white"}}}))))}}]}
+               {:fx/type :label
+                :text " Packages"}
+               {:fx/type :table-view
+                :column-resize-policy :constrained ; TODO auto resize
+                :items sdp-files
+                :columns
+                [{:fx/type :table-column
+                  :text "Filename"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (.getName i))})}}
+                 {:fx/type :table-column
+                  :text "ID"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (->> i
+                                 rapid/sdp-hash
+                                 (get rapid/versions-by-hash)
+                                 :id
+                                 str)})}}
+                 {:fx/type :table-column
+                  :text "Version"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (->> i
+                                 rapid/sdp-hash
+                                 (get rapid/versions-by-hash)
+                                 :version
+                                 str)})}}]}]}}}])))}})
 
 
 (defn -main [& _args]
