@@ -5,3 +5,10 @@
 /pom.xml
 /repl.log
 /trace.edn
+
+# Calva stuff probably
+/.calva/
+/.classpath
+/.project
+/.settings/
+/target/
