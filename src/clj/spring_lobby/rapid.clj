@@ -115,9 +115,14 @@
       (rapid-versions)))
 
 (def package-by-hash
-  (->> (package-versions)
-       (map (juxt :hash identity))
-       (into {})))
+  (or
+    (try
+      (->> (package-versions)
+           (map (juxt :hash identity))
+           (into {}))
+      (catch Exception e
+        (log/error e "Error loading Rapid package versions")))
+    {}))
 
 #_
 (take 10 package-by-hash)

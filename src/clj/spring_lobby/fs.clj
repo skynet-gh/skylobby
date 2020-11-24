@@ -90,10 +90,10 @@
       (string/includes? os-name "Linux")
       (if (string/includes? os-version "Microsoft") ; WSL
         (io/file "/mnt" "c" "Users" user-name "Documents" "My Games" "Spring")
-        (let [linux-home (io/file user-home ".spring")]
-          (if (.exists linux-home)
-            linux-home
-            (io/file user-home "snap" "springlobby-nsg" "common" ".spring"))))
+        (let [snap-dir (io/file user-home "snap" "springlobby-nsg" "common" ".spring")]
+          (if (.exists snap-dir)
+            snap-dir
+            (io/file user-home ".spring"))))
       (string/includes? os-name "Windows")
       (io/file user-home "Documents" "My Games" "Spring")
       :else
