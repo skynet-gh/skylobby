@@ -1,5 +1,6 @@
 (ns spring-lobby
   (:require
+    [clj-http.client :as clj-http]
     [cljfx.api :as fx]
     [cljfx.component :as fx.component]
     [cljfx.ext.node :as fx.ext.node]
@@ -12,9 +13,11 @@
     [clojure.set]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
+    [crouton.html :as html]
     [spring-lobby.client :as client]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.http :as http]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
@@ -24,7 +27,8 @@
     (javafx.application Platform)
     (javafx.scene.paint Color)
     (manifold.stream SplicedStream)
-    (org.apache.commons.io FileUtils))
+    (org.apache.commons.io FileUtils)
+    (org.apache.commons.io.input CountingInputStream))
   (:gen-class))
 
 
@@ -250,6 +254,9 @@
 (defmethod event-handler ::show-rapid-downloader [_e]
   (swap! *state assoc :show-rapid-downloader true))
 
+(defmethod event-handler ::show-http-downloader [_e]
+  (swap! *state assoc :show-http-downloader true))
+
 (defmethod event-handler ::disconnect [_e]
   (when-let [client (:client @*state)]
     (client/disconnect client))
@@ -450,7 +457,19 @@
           {:fx/type :choice-box
            :value (str engine-version)
            :items (fs/engines)
-           :on-value-changed {:event/type ::version-change}}]}
+           :on-value-changed {:event/type ::version-change}}
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Browse and download engines with http"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::show-http-downloader}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal (str "mdi-magnify:16:white")}}}]}
         {:fx/type :h-box
          :alignment :center-left
          :children
@@ -1453,6 +1472,112 @@
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
         (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files)))))))
 
+(defmethod event-handler ::engine-branch-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :engine-branch event)
+  (future
+    (log/debug "Getting engine versions for branch" event)
+    (let [versions (->> (http/springrts-buildbot-files [event])
+                        (sort-by :filename version/version-compare)
+                        reverse
+                        doall)]
+      (log/debug "Got engine versions" (pr-str versions))
+      (swap! *state assoc :engine-versions-cached versions))))
+
+(defmethod event-handler ::maps-index-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :maps-index-url event)
+  (future
+    (log/debug "Getting maps from" event)
+    (let [map-files (->> (http/files (html/parse event))
+                         (sort-by :filename)
+                         doall)]
+      (log/debug "Got maps" (pr-str map-files))
+      (swap! *state assoc :map-files-cache map-files))))
+
+
+; https://github.com/dakrone/clj-http/pull/220/files
+(defn print-progress-bar
+  "Render a simple progress bar given the progress and total. If the total is zero
+   the progress will run as indeterminated."
+  ([progress total] (print-progress-bar progress total {}))
+  ([progress total {:keys [bar-width]
+                    :or   {bar-width 50}}]
+   (if (pos? total)
+     (let [pct (/ progress total)
+           render-bar (fn []
+                        (let [bars (Math/floor (* pct bar-width))
+                              pad (- bar-width bars)]
+                          (str (clojure.string/join (repeat bars "="))
+                               (clojure.string/join (repeat pad " ")))))]
+       (print (str "[" (render-bar) "] "
+                   (int (* pct 100)) "% "
+                   progress "/" total)))
+     (let [render-bar (fn [] (clojure.string/join (repeat bar-width "-")))]
+       (print (str "[" (render-bar) "] "
+                   progress "/?"))))))
+
+(defn insert-at
+  "Addes value into a vector at an specific index."
+  [v idx val]
+  (-> (subvec v 0 idx)
+      (conj val)
+      (into (subvec v idx))))
+
+(defn insert-after
+  "Finds an item into a vector and adds val just after it.
+   If needle is not found, the input vector will be returned."
+  [v needle val]
+  (let [index (.indexOf v needle)]
+    (if (neg? index)
+      v
+      (insert-at v (inc index) val))))
+
+(defn wrap-downloaded-bytes-counter
+  "Middleware that provides an CountingInputStream wrapping the stream output"
+  [client]
+  (fn [req]
+    (let [resp (client req)
+          counter (CountingInputStream. (:body resp))]
+      (merge resp {:body                     counter
+                   :downloaded-bytes-counter counter}))))
+
+
+(defmethod event-handler ::http-download
+  [{:keys [dest url]}]
+  (swap! *state assoc-in [:http-download url] {:running true
+                                               :message "Preparing to download..."})
+  (log/info "Request to download" url "to" dest)
+  (future
+    (try
+      (clj-http/with-middleware
+        (-> clj-http/default-middleware
+            (insert-after clj-http/wrap-url wrap-downloaded-bytes-counter)
+            (conj clj-http/wrap-lower-case-headers))
+        (let [request (clj-http/get url {:as :stream})
+              length (Integer. (get-in request [:headers "content-length"] 0))
+              buffer-size (* 1024 10)]
+          (with-open [input (:body request)
+                      output (io/output-stream dest)]
+            (let [buffer (make-array Byte/TYPE buffer-size)
+                  counter (:downloaded-bytes-counter request)]
+              (loop []
+                (let [size (.read input buffer)]
+                  (when (pos? size)
+                    (.write output buffer 0 size)
+                    (when counter
+                      (let [msg (with-out-str
+                                  (print-progress-bar
+                                    (.getByteCount counter)
+                                    length))]
+                        (swap! *state assoc-in [:http-download url :message] msg)))
+                    (recur))))))))
+      (catch Exception e
+        (log/error e "Error downloading" url "to" dest))
+      (finally
+        (swap! *state assoc-in [:http-download url :running] false)
+        (log/info "Finished downloading" url "to" dest)))))
+
 
 (defn root-view
   [{{:keys [client client-deferred users battles battle battle-password selected-battle username
@@ -1462,7 +1587,11 @@
             server-url standalone
             rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines-cached
             rapid-versions-cached
-            show-rapid-downloader]} :state}]
+            show-rapid-downloader
+            engine-branch engine-versions-cached http-download
+            maps-index-url map-files-cache
+            show-http-downloader]}
+    :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [& args]
                  (log/debug "on-created" args)
@@ -1672,7 +1801,168 @@
                                  rapid/sdp-hash
                                  (get rapid/versions-by-hash)
                                  :version
-                                 str)})}}]}]}}}])))}})
+                                 str)})}}]}]}}}]))
+      (when show-http-downloader
+        (let [engine-branches ["master" "maintenance" "develop"]] ; TODO
+          [{:fx/type :stage
+            :always-on-top true
+            :showing show-http-downloader
+            :title "alt-spring-lobby HTTP Downloader"
+            :on-close-request (fn [& args]
+                                (log/debug args)
+                                (swap! *state assoc :show-http-downloader false))
+            :width 1600
+            :height 800
+            :scene
+            {:fx/type :scene
+             :stylesheets [(str (io/resource "dark-theme2.css"))]
+             :root
+             {:fx/type :v-box
+              :children
+              [{:fx/type :h-box
+                :alignment :center-left
+                :children
+                [{:fx/type :label
+                  :text " Engine branch: "}
+                 {:fx/type :choice-box
+                  :value (str engine-branch)
+                  :items (or engine-branches [])
+                  :on-value-changed {:event/type ::engine-branch-change}}]}
+               {:fx/type :table-view
+                :column-resize-policy :constrained ; TODO auto resize
+                :items (or engine-versions-cached [])
+                :columns
+                [{:fx/type :table-column
+                  :text "Filename"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:filename i))})}}
+                 {:fx/type :table-column
+                  :text "URL"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:url i))})}}
+                 {:fx/type :table-column
+                  :text "Date"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:date i))})}}
+                 {:fx/type :table-column
+                  :text "Size"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:size i))})}}
+                 {:fx/type :table-column
+                  :text "Download"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     (let [download (get http-download (:id i))]
+                       (merge
+                         {:text (str (:message download))}
+                         (cond
+                           false ; TODO check if already downloaded
+                           {:graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-check:16:white"}}
+                           (:running download)
+                           nil
+                           :else
+                           {:graphic
+                            {:fx/type :button
+                             :on-action {:event/type ::http-download
+                                         :url i}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-download:16:white"}}}))))}}]}
+               {:fx/type :h-box
+                :alignment :center-left
+                :children
+                [{:fx/type :label
+                  :text " Maps index URL: "}
+                 {:fx/type :choice-box
+                  :value (str maps-index-url)
+                  :items [http/springfiles-maps-url
+                          (str http/springfightclub-root "/maps")]
+                  :on-value-changed {:event/type ::maps-index-change}}]}
+               {:fx/type :table-view
+                :column-resize-policy :constrained ; TODO auto resize
+                :items (or map-files-cache [])
+                :columns
+                [{:fx/type :table-column
+                  :text "Filename"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:filename i))})}}
+                 {:fx/type :table-column
+                  :text "URL"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:url i))})}}
+                 {:fx/type :table-column
+                  :text "Date"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:date i))})}}
+                 {:fx/type :table-column
+                  :text "Size"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (str (:size i))})}}
+                 {:fx/type :table-column
+                  :text "Download"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     (let [url (str maps-index-url "/" (:url i))
+                           download (get http-download url)
+                           dest (io/file (fs/spring-root) "maps" (:filename i))]
+                       (merge
+                         {:text (str (:message download))}
+                         (cond
+                           (.exists dest)
+                           {:graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-check:16:white"}}
+                           (:running download)
+                           nil
+                           :else
+                           {:graphic
+                            {:fx/type :button
+                             :on-action {:event/type ::http-download
+                                         :url url
+                                         :dest dest}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-download:16:white"}}}))))}}]}]}}}])))}})
 
 
 (defn -main [& _args]

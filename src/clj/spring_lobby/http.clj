@@ -1,16 +1,18 @@
 (ns spring-lobby.http
   (:require
-    [crouton.html :as html]))
+    [clojure.string :as string]
+    [crouton.html :as html]
+    [taoensso.timbre :as log]))
 
 
 (def springrts-buildbot-root
-  "https://springrts.com/dl/buildbot/default/")
+  "https://springrts.com/dl/buildbot/default")
 
-(def springfiles-maps
-  "http://api.springfiles.com/files/maps/")
+(def springfiles-maps-url
+  "http://api.springfiles.com/files/maps")
 
 (def springfightclub-root
-  "https://www.springfightclub.com/data/")
+  "https://www.springfightclub.com/data")
 
 
 (defn- by-tag [element tag]
@@ -41,18 +43,81 @@
          (map (comp :href :attrs)))))
 
 
-(def parsed-springrts-buildbot-root
-  (html/parse springrts-buildbot-root))
+(defn files [parsed]
+  (let [rows (-> parsed
+                 (in-tags [:body :table :tbody])
+                 :content)
+        files (->> rows
+                   (filter (comp #{:tr} :tag))
+                   (map
+                     (fn [{:keys [content]}]
+                       (let [[_image link-td date-td size-td _description] content
+                             link (-> link-td :content first)]
+                         {:filename (-> link :content first)
+                          :url (-> link :attrs :href)
+                          :date (-> date-td :content first)
+                          :size (-> size-td :content first)})))
+                   (filter :filename))]
+    (-> files
+        (nthrest 2))))
 
-(def parsed-springfiles-maps
-  (html/parse springfiles-maps))
 
-(def parsed-springfightclub-root
-  (html/parse springfightclub-root))
+(defn parsed-springrts-buildbot
+  ([]
+   (parsed-springrts-buildbot nil))
+  ([path]
+   (let [url (string/join
+               "/"
+               (concat
+                 [springrts-buildbot-root]
+                 path))]
+     (log/info "Getting html table from" url)
+     (html/parse url))))
 
+(defn parsed-springfiles-maps []
+  (html/parse springfiles-maps-url))
+
+(defn parsed-springfightclub
+  ([]
+   (parsed-springfightclub  nil))
+  ([path]
+   (let [url (string/join
+               "/"
+               (concat
+                 [springfightclub-root]
+                 path))]
+     (log/info "Getting html table from" url)
+     (html/parse url))))
+
+
+(defn springrts-buildbot-links
+  ([]
+   (springrts-buildbot-links nil))
+  ([path]
+   (let [parsed (parsed-springrts-buildbot path)]
+     (links parsed))))
+
+(defn springrts-buildbot-files
+  ([]
+   (springrts-buildbot-files nil))
+  ([path]
+   (let [parsed (parsed-springrts-buildbot path)]
+     (files parsed))))
+
+(defn springfiles-maps
+  [path]
+  (files (parsed-springrts-buildbot path)))
+
+(defn springfightclub-files
+  ([]
+   (springfightclub-files nil))
+  ([path]
+   (let [parsed (parsed-springfightclub path)]
+     (files parsed))))
 
 #_
-(links parsed-springrts-buildbot-root)
+(links
+  (parsed-springrts-buildbot ["master"]))
 #_
 (links parsed-springfiles-maps)
 #_
