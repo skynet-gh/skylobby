@@ -1833,7 +1833,7 @@
                 :items (or engine-versions-cached [])
                 :columns
                 [{:fx/type :table-column
-                  :text "Filename"
+                  :text "Link"
                   :cell-value-factory identity
                   :cell-factory
                   {:fx/cell-type :table-cell
@@ -1841,13 +1841,15 @@
                    (fn [i]
                      {:text (str (:filename i))})}}
                  {:fx/type :table-column
-                  :text "URL"
+                  :text "Archive URL"
                   :cell-value-factory identity
                   :cell-factory
                   {:fx/cell-type :table-cell
                    :describe
                    (fn [i]
-                     {:text (str (:url i))})}}
+                     (let [[_all version] (re-find #"(.*)/" (:url i))
+                           engine-path (http/engine-path engine-branch version)]
+                       {:text (str engine-path)}))}}
                  {:fx/type :table-column
                   :text "Date"
                   :cell-value-factory identity
@@ -1871,11 +1873,15 @@
                   {:fx/cell-type :table-cell
                    :describe
                    (fn [i]
-                     (let [download (get http-download (:id i))]
+                     (let [[_all version] (re-find #"(.*)/" (:url i))
+                           archive-path (http/engine-path engine-branch version)
+                           url (str http/springrts-buildbot-root "/" engine-branch "/" archive-path)
+                           download (get http-download url)
+                           dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))]
                        (merge
                          {:text (str (:message download))}
                          (cond
-                           false ; TODO check if already downloaded
+                           (.exists dest)
                            {:graphic
                             {:fx/type font-icon/lifecycle
                              :icon-literal "mdi-check:16:white"}}
@@ -1885,7 +1891,8 @@
                            {:graphic
                             {:fx/type :button
                              :on-action {:event/type ::http-download
-                                         :url i}
+                                         :url url
+                                         :dest dest}
                              :graphic
                              {:fx/type font-icon/lifecycle
                               :icon-literal "mdi-download:16:white"}}}))))}}]}

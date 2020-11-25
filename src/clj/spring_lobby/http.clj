@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     [crouton.html :as html]
+    [spring-lobby.fs :as fs]
     [taoensso.timbre :as log]))
 
 
@@ -114,6 +115,38 @@
   ([path]
    (let [parsed (parsed-springfightclub path)]
      (files parsed))))
+
+
+(defn engine-archive
+  ([branch version]
+   (let [{:keys [os-name]} (fs/sys-data)
+         platform (if (and (string/includes? os-name "Linux")
+                           (not (fs/wsl?)))
+                    "linux64"
+                    "win32")]
+     (engine-archive branch version platform)))
+  ([branch version platform]
+   (str "spring_"
+        (when (not= "master" branch) (str "{" branch "}"))
+        version "_" platform "-minimal-portable.7z")))
+
+(defn engine-path
+  "Returns the path to the Spring archive to download for this system."
+  [branch version]
+  (let [{:keys [os-name]} (fs/sys-data)
+        platform (if (and (string/includes? os-name "Linux")
+                          (not (fs/wsl?)))
+                   "linux64"
+                   "win32")]
+    (str version "/" platform "/" (engine-archive branch version platform))))
+
+
+#_
+(engine-path "103.0/")
+#_
+(let [engine-links (-> spring-lobby/*state deref :engine-versions-cached)
+      first-link (first engine-links)]
+  first-link)
 
 #_
 (links
