@@ -111,7 +111,9 @@
               (map
                 (comp first second)
                 (group-by (comp :id :battle-status second)
-                  (merge (:users battle) (:bots battle))))) ; TODO group-by :team ?
+                  (filter
+                    (comp :mode :battle-status second)
+                    (merge (:users battle) (:bots battle)))))) ; TODO group-by :team ?
             (map
               (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
                 [(str "ai" (:id battle-status))
@@ -126,7 +128,12 @@
             (map
               (fn [ally]
                 [(str "allyteam" ally) {:numallies 0}])
-              (set (map (comp :ally :battle-status second) (mapcat battle [:users :bots]))))
+              (set
+                (map
+                  (comp :ally :battle-status second)
+                  (filter
+                    (comp :mode :battle-status second)
+                    (mapcat battle [:users :bots])))))
             opts))}))))
 
 (defn script-txt-inner
