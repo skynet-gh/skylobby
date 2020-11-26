@@ -70,6 +70,16 @@
     (.getAbsolutePath f)))
 
 
+(defn envp
+  "Returns environment variables to pass to spring for this system."
+  []
+  (if (string/includes? (os-name) "Linux")
+    (into-array
+      ^String
+      ["LD_LIBRARY_PATH=/var/lib/snapd/lib/gl:/var/lib/snapd/lib/gl32:/var/lib/snapd/void:/snap/springlobby-nsg/416/lib/x86_64-linux-gnu:/snap/springlobby-nsg/416/usr/lib/x86_64-linux-gnu:/snap/springlobby-nsg/416/usr/lib/x86_64-linux-gnu/pulseaudio::/snap/springlobby-nsg/416/lib:/snap/springlobby-nsg/416/usr/lib:/snap/springlobby-nsg/416/lib/x86_64-linux-gnu:/snap/springlobby-nsg/416/usr/lib/x86_64-linux-gnu:/snap/springlobby-nsg/416/usr/lib/x86_64-linux-gnu/dri:/var/lib/snapd/lib/gl:/snap/springlobby-nsg/416/usr/lib/x86_64-linux-gnu/pulseaudio"])
+    nil))
+
+
 (defn executable [common-name]
   (let [{:keys [os-name]} (sys-data)]
     (str

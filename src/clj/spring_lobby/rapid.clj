@@ -5,6 +5,7 @@
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
+    [spring-lobby.lua :as lua]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
@@ -153,9 +154,8 @@
       one (->> sdps
                (filter #(string/starts-with? (.getName %) "e9"))
                first)
-      decoded (decode-sdp one)]
-  (println (::source decoded))
-  (rapid-inner one "modinfo.lua")
+      modinfo-file (rapid-inner one "modinfo.lua")]
+  (lua/read-modinfo (:contents modinfo-file))
   #_
   (->> (decode-sdp one)
        :items

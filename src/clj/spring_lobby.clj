@@ -18,6 +18,7 @@
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.http :as http]
+    [spring-lobby.lua :as lua]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
@@ -258,8 +259,15 @@
   (swap! *state assoc :show-http-downloader true))
 
 (defmethod event-handler ::disconnect [_e]
-  (when-let [client (:client @*state)]
-    (client/disconnect client))
+  (let [state @*state]
+    (when-let [client (:client state)]
+      (when-let [f (:connected-loop state)]
+        (future-cancel f))
+      (when-let [f (:print-loop state)]
+        (future-cancel f))
+      (when-let [f (:ping-loop state)]
+        (future-cancel f))
+      (client/disconnect client)))
   (update-disconnected))
 
 (defn connected-loop [state-atom client-deferred]
@@ -418,7 +426,7 @@
 
 (defn battles-buttons
   [{:keys [battle battles battle-password client selected-battle
-           battle-title engine-version mod-name map-name maps-cached]}]
+           battle-title engine-version mod-name map-name maps-cached engines-cached mods-cached]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -448,15 +456,14 @@
          :on-action {:event/type ::host-battle}
          :on-text-changed {:event/type ::battle-title-change}}])
      (when (not battle)
-       [
-        {:fx/type :h-box
+       [{:fx/type :h-box
          :alignment :center-left
          :children
          [{:fx/type :label
            :text " Engine: "}
           {:fx/type :choice-box
            :value (str engine-version)
-           :items (fs/engines)
+           :items engines-cached
            :on-value-changed {:event/type ::version-change}}
           {:fx/type fx.ext.node/with-tooltip-props
            :props
@@ -476,15 +483,18 @@
          [{:fx/type :label
            :alignment :center-left
            :text " Game: "}
-          {:fx/type :choice-box
-           :value (str mod-name)
-           :items (->> (fs/games)
-                       (map :modinfo)
-                       (sort-by :version version/version-compare)
-                       (map
-                         (fn [modinfo]
-                           (str (:name modinfo) " " (:version modinfo)))))
-           :on-value-changed {:event/type ::mod-change}}
+          (if (seq mods-cached)
+            {:fx/type :choice-box
+             :value (str mod-name)
+             :items (->> mods-cached
+                        (map :modinfo)
+                        (sort-by :version version/version-compare)
+                        (map (fn [modinfo]
+                               (str (:name modinfo) " " (:version modinfo)))))
+             :on-value-changed {:event/type ::mod-change}}
+            {:fx/type :label
+             :alignment :center-left
+             :text " Loading games... "})
           {:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -665,13 +675,13 @@
 (defn start-game []
   (try
     (log/info "Starting game")
-    (let [{:keys [maps-cached] :as state} @*state
+    (let [{:keys [maps-cached mods-cached] :as state} @*state
           battle (-> state
                      :battles
                      (get (-> state :battle :battle-id)))
           {:keys [battle-map battle-version battle-modname]} battle
           _ (copy-engine battle-version)
-          mod-filename (->> (fs/games)
+          mod-filename (->> mods-cached
                             (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
                             first
                             :filename)
@@ -696,7 +706,7 @@
             runtime (Runtime/getRuntime)]
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-              ^"[Ljava.lang.String;" envp nil
+              ^"[Ljava.lang.String;" envp (fs/envp)
               process (.exec runtime cmdarray envp isolation-dir)]
           (client/send-message (:client @*state) "MYSTATUS 1") ; TODO full status
           (async/thread
@@ -1590,7 +1600,8 @@
             show-rapid-downloader
             engine-branch engine-versions-cached http-download
             maps-index-url map-files-cache
-            show-http-downloader]}
+            show-http-downloader
+            mods-cached]}
     :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [& args]
@@ -1610,7 +1621,21 @@
                                          (sort-by :version version/version-compare)
                                          reverse
                                          doall)]
-                       (swap! *state assoc :rapid-versions-cached versions)))))
+                       (swap! *state assoc :rapid-versions-cached versions))))
+                 (future
+                   (let [rapid-mods
+                         (some->> sdp-files-cached
+                                  (map (fn [f]
+                                         {::source :rapid
+                                          :filename (.getAbsolutePath f)
+                                          :modinfo
+                                          (when-let [inner (rapid/rapid-inner f "modinfo.lua")]
+                                            (let [contents (:contents inner)]
+                                              (when-not (string/blank? contents)
+                                                (lua/read-modinfo contents))))}))
+                                  (filter :modinfo))
+                         mods (doall (concat rapid-mods (fs/games)))]
+                     (swap! *state assoc :mods-cached mods))))
    :on-advanced (fn [& args]
                   (log/debug "on-advanced" args))
    :on-deleted (fn [& args]
@@ -1660,7 +1685,10 @@
                                    :engine-version engine-version
                                    :mod-name mod-name
                                    :map-name map-name
-                                   :maps-cached maps-cached}
+                                   :maps-cached maps-cached
+                                   :sdp-files-cached sdp-files-cached
+                                   :engines-cached engines-cached
+                                   :mods-cached mods-cached}
                                   {:fx/type battle-table
                                    :battles battles
                                    :battle battle
