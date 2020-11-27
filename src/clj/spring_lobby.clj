@@ -54,7 +54,8 @@
 (def config-keys
   [:username :password :server-url :engine-version :mod-name :map-name
    :battle-title :battle-password
-   :bot-username :bot-name :bot-version])
+   :bot-username :bot-name :bot-version
+   :engine-branch :maps-index-url])
 
 
 (defn watch-config-state []
@@ -80,6 +81,37 @@
   (future
     (swap! *state assoc :maps-cached nil)
     (swap! *state assoc :maps-cached (doall (fs/maps)))))
+
+
+(defn cache-mods []
+  (future
+    (try
+      (let [sdp-files (doall (rapid/sdp-files))
+            try-inner-lua (fn [f filename]
+                            (try
+                              (when-let [inner (rapid/rapid-inner f filename)]
+                                (let [contents (:contents inner)]
+                                  (when-not (string/blank? contents)
+                                    (lua/read-modinfo contents))))
+                              (catch Exception e
+                                (log/warn e "Error reading" filename "in" f))))
+            rapid-mods
+            (some->> sdp-files
+                     (map (fn [f]
+                            {::fs/source :rapid
+                             :filename (.getAbsolutePath f)
+                             :modinfo (try-inner-lua f "modinfo.lua")
+                             :modoptions (try-inner-lua f "modoptions.lua")
+                             :engineoptions (try-inner-lua f "engineoptions.lua")
+                             :luaai (try-inner-lua f "luaai.lua")}))
+                     (filter :modinfo))
+            mods (doall (concat rapid-mods (fs/games)))]
+        (swap! *state assoc :mods-cached mods))
+      (catch Exception e
+        (log/error e "Error loading mods")))))
+
+(defmethod event-handler ::reload-mods [_e]
+  (cache-mods))
 
 
 (defmethod event-handler ::select-battle [e]
@@ -392,7 +424,19 @@
            :value (str map-name)
            :items map-names
            :disable (boolean disable)
-           :on-value-changed on-value-changed}]
+           :on-value-changed on-value-changed}
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Browse and download maps with http"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::show-http-downloader}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal (str "mdi-magnify:16:white")}}}]
          (when (seq map-names)
            [{:fx/type fx.ext.node/with-tooltip-props
              :props
@@ -463,7 +507,7 @@
            :text " Engine: "}
           {:fx/type :choice-box
            :value (str engine-version)
-           :items engines-cached
+           :items (or engines-cached [])
            :on-value-changed {:event/type ::version-change}}
           {:fx/type fx.ext.node/with-tooltip-props
            :props
@@ -483,18 +527,15 @@
          [{:fx/type :label
            :alignment :center-left
            :text " Game: "}
-          (if (seq mods-cached)
-            {:fx/type :choice-box
-             :value (str mod-name)
-             :items (->> mods-cached
-                        (map :modinfo)
-                        (sort-by :version version/version-compare)
-                        (map (fn [modinfo]
-                               (str (:name modinfo) " " (:version modinfo)))))
-             :on-value-changed {:event/type ::mod-change}}
-            {:fx/type :label
-             :alignment :center-left
-             :text " Loading games... "})
+          {:fx/type :choice-box
+           :value (str mod-name)
+           :items (or (some->> mods-cached
+                               (map :modinfo)
+                               (sort-by :version version/version-compare)
+                               (map (fn [modinfo]
+                                      (str (:name modinfo) " " (:version modinfo)))))
+                      [])
+           :on-value-changed {:event/type ::mod-change}}
           {:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -506,7 +547,19 @@
             :on-action {:event/type ::show-rapid-downloader}
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-magnify:16:white")}}}]}
+             :icon-literal (str "mdi-magnify:16:white")}}}
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Reload games"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::reload-mods}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-refresh:16:white"}}}]}
         {:fx/type map-list
          :map-name map-name
          :maps-cached maps-cached
@@ -623,25 +676,49 @@
 #_
 (copy-engine "103.0")
 
-(defn copy-mod [mod-filename engine-version]
-  (if (and mod-filename engine-version)
-    (let [source (io/file (fs/spring-root) "games" mod-filename)
-          dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)
-          ^java.nio.file.Path source-path (.toPath source)
-          ^java.nio.file.Path dest-path (.toPath dest)
-          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                   [StandardCopyOption/COPY_ATTRIBUTES
-                                                    StandardCopyOption/REPLACE_EXISTING])]
-      (if (.exists source)
-        (do
-          (.mkdirs dest)
-          (java.nio.file.Files/copy source-path dest-path options))
-        (log/warn "No mod file to copy from" (.getAbsolutePath source)
-                  "to" (.getAbsolutePath dest))))
-    (throw
-      (ex-info "Missing mod or engine to copy to isolation dir"
-               {:mod-filename mod-filename
-                :engine-version engine-version}))))
+(defn copy-mod [mod-detail engine-version]
+  (log/info "Mod detail:" (pr-str mod-detail))
+  (let [mod-filename (:filename mod-detail)]
+    (cond
+      (not (and mod-filename engine-version))
+      (throw
+        (ex-info "Missing mod or engine to copy to isolation dir"
+                 {:mod-filename mod-filename
+                  :engine-version engine-version}))
+      (= :rapid (::fs/source mod-detail))
+      (let [sdp-decoded (rapid/decode-sdp (io/file mod-filename))
+            source (io/file mod-filename)
+            dest (io/file (fs/app-root) "spring" "engine" engine-version "packages" (.getName source))
+            ^java.nio.file.Path source-path (.toPath source)
+            ^java.nio.file.Path dest-path (.toPath dest)
+            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
+                                                     [StandardCopyOption/COPY_ATTRIBUTES
+                                                      StandardCopyOption/REPLACE_EXISTING])]
+        (.mkdirs dest)
+        (java.nio.file.Files/copy source-path dest-path options)
+        (doseq [item (:items sdp-decoded)]
+          (let [md5 (:md5 item)
+                pool-source (rapid/file-in-pool md5)
+                pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)
+                ^java.nio.file.Path pool-source-path (.toPath pool-source)
+                ^java.nio.file.Path pool-dest-path (.toPath pool-dest)]
+            (log/info "Copying" pool-source-path "to" pool-dest-path)
+            (.mkdirs pool-dest)
+            (java.nio.file.Files/copy pool-source-path pool-dest-path options))))
+      (= :archive (::fs/source mod-detail))
+      (let [source (io/file (fs/spring-root) "games" mod-filename)
+            dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)
+            ^java.nio.file.Path source-path (.toPath source)
+            ^java.nio.file.Path dest-path (.toPath dest)
+            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
+                                                     [StandardCopyOption/COPY_ATTRIBUTES
+                                                      StandardCopyOption/REPLACE_EXISTING])]
+        (if (.exists source)
+          (do
+            (.mkdirs dest)
+            (java.nio.file.Files/copy source-path dest-path options))
+          (log/warn "No mod file to copy from" (.getAbsolutePath source)
+                    "to" (.getAbsolutePath dest)))))))
 
 #_
 (copy-mod "Balanced Annihilation V11.0.2")
@@ -681,11 +758,10 @@
                      (get (-> state :battle :battle-id)))
           {:keys [battle-map battle-version battle-modname]} battle
           _ (copy-engine battle-version)
-          mod-filename (->> mods-cached
-                            (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
-                            first
-                            :filename)
-          _ (copy-mod mod-filename battle-version)
+          mod-detail (some->> mods-cached
+                              (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
+                              first)
+          _ (copy-mod mod-detail battle-version)
           map-filename (->> maps-cached
                             (filter (comp #{battle-map} :map-name))
                             first
@@ -1622,20 +1698,7 @@
                                          reverse
                                          doall)]
                        (swap! *state assoc :rapid-versions-cached versions))))
-                 (future
-                   (let [rapid-mods
-                         (some->> sdp-files-cached
-                                  (map (fn [f]
-                                         {::source :rapid
-                                          :filename (.getAbsolutePath f)
-                                          :modinfo
-                                          (when-let [inner (rapid/rapid-inner f "modinfo.lua")]
-                                            (let [contents (:contents inner)]
-                                              (when-not (string/blank? contents)
-                                                (lua/read-modinfo contents))))}))
-                                  (filter :modinfo))
-                         mods (doall (concat rapid-mods (fs/games)))]
-                     (swap! *state assoc :mods-cached mods))))
+                 (cache-mods))
    :on-advanced (fn [& args]
                   (log/debug "on-advanced" args))
    :on-deleted (fn [& args]
@@ -1858,7 +1921,8 @@
                   :on-value-changed {:event/type ::engine-branch-change}}]}
                {:fx/type :table-view
                 :column-resize-policy :constrained ; TODO auto resize
-                :items (or engine-versions-cached [])
+                :items (or (filter :url engine-versions-cached)
+                           [])
                 :columns
                 [{:fx/type :table-column
                   :text "Link"

@@ -71,7 +71,7 @@
                                (try (Integer/parseInt team-color)
                                     (catch Exception _ nil)))]
     (let [[r g b _a] (:rgba (colors/create-color decimal-color))]
-      (str (unit-rgb r) " " (unit-rgb g) " " (unit-rgb b)))))
+      (str (unit-rgb b) " " (unit-rgb g) " " (unit-rgb r))))) ; Spring lobby uses bgr
 
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."

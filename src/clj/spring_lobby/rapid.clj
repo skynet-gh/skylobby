@@ -5,7 +5,6 @@
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
-    [spring-lobby.lua :as lua]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
@@ -32,11 +31,9 @@
       :filename-length :ubyte)
     (fn [{:keys [filename-length]}]
       (b/ordered-map
-        ;:filename (b/blob :length filename-length)
         :filename (b/string "ISO-8859-1" :length filename-length)
         :md5 md5-codec
-        ;:md5 (b/string "UTF-8" :length 16)
-        :crc32 :uint-le ; (b/string "ISO-8859-1" :length 4)
+        :crc32 :uint-le
         :file-size :uint-le))
     (constantly nil) ; TODO writing SDP files
     :keep-header? false))
@@ -56,10 +53,16 @@
         (seq (.listFiles packages-root)))
       [])))
 
+(defn file-in-pool
+  ([md5]
+   (file-in-pool (fs/spring-root) md5))
+  ([spring-root md5]
+   (let [pool-dir (subs md5 0 2)
+         pool-file (str (subs md5 2) ".gz")]
+     (io/file spring-root "pool" pool-dir pool-file))))
+
 (defn slurp-from-pool [md5]
-  (let [pool-dir (subs md5 0 2)
-        pool-file (str (subs md5 2) ".gz")
-        f (io/file (fs/spring-root) "pool" pool-dir pool-file)]
+  (let [f (file-in-pool md5)]
     (with-open [is (io/input-stream f)
                 gz (GZIPInputStream. is)]
       (slurp gz))))
@@ -70,6 +73,10 @@
                               (filter (comp #{inner-filename} :filename))
                               first)]
     (assoc inner-details :contents (slurp-from-pool (:md5 inner-details)))
+    (log/warn "No such inner rapid file"
+              (pr-str {:package (::source decoded-sdp)
+                       :inner-filename inner-filename}))
+    #_
     (throw (ex-info "No such inner rapid file" {:package (::source decode-sdp)
                                                 :inner-filename inner-filename}))))
 
@@ -153,30 +160,11 @@
 (let [sdps (sdp-files)
       one (->> sdps
                (filter #(string/starts-with? (.getName %) "e9"))
-               first)
-      modinfo-file (rapid-inner one "modinfo.lua")]
-  (lua/read-modinfo (:contents modinfo-file))
+               first)]
+  (-> spring-lobby/*state deref keys)
   #_
   (->> (decode-sdp one)
        :items
-       (filter (comp #(string/starts-with? % "mod") :filename))
-       #_
-       (fn [{:keys [body]}]
-         (let [{:keys [md5]} body]
-           {:raw md5
-            :hex (format "%16x" (java.math.BigInteger. 1 md5))})))
-       ;:md5
-       ;detect)
-  #_
-  (b/decode sdp-line (io/input-stream one))
-  #_
-  (->> (io/input-stream one)
-       (b/decode :ubyte)
-       #_(b/decode sdp-line))
-  #_
-  (->> sdps
-       (map
-         (fn [f]
-           [(.getName f)
-            (decode-sdp (io/input-stream f))]))
-       (into {})))
+       (take 10)
+       (map (comp file-in-pool :md5))
+       first))

@@ -87,16 +87,6 @@
                (fs/app-root)))))))
 
 
-(deftest parse-modinfo
-  (is (= {:name "Balanced Annihilation"
-          :description "Balanced Annihilation"
-          :shortname "BA"
-          :version "V9.79.4"
-          :mutator "Official"
-          :game "Total Annihilation"
-          :shortGame "TA"
-          :modtype 1}
-         (fs/parse-modinfo mock-parsed-lua))))
 
 (deftest spring-config-line
   (is (= "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"

@@ -20,7 +20,11 @@
     (org.apache.commons.io FilenameUtils)))
 
 
-(SevenZip/initSevenZipFromPlatformJAR)
+(def o (Object.))
+
+(future
+  (locking o
+    (SevenZip/initSevenZipFromPlatformJAR)))
 
 
 (def config-filename "config.edn")
@@ -229,50 +233,32 @@
        (filter #(.isDirectory %))
        (map #(.getName %))))
 
-(defn parse-fieldlist
-  [fieldlist]
-  (->> fieldlist
-       (filter (comp #{:field} first))
-       (map
-         (fn [[_f field _eq exp]]
-           (let [[_exp [field-type value]] exp
-                 parsed (case field-type
-                          :number (try (Long/parseLong value)
-                                       (catch Exception _e
-                                         (try (Double/parseDouble value)
-                                              (catch Exception _e
-                                                nil))))
-                          :string (or (second (re-find #"'(.*)'" value))
-                                      (second (re-find #"\"(.*)\"" value))
-                                      value)
-                          nil)] ; TODO
-             [(keyword field) parsed])))
-       (into {})))
 
-(defn parse-modinfo [modinfo]
-  (let [fieldlist (-> modinfo
-                      second
-                      second
-                      last
-                      last
-                      last
-                      (nth 2)
-                      rest)]
-    (parse-fieldlist fieldlist)))
+(defn slurp-zip-entry [zip-file entries entry-filename-lowercase]
+  (when-let [entry
+             (->> entries
+                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName %)))
+                  first)]
+    (slurp (.getInputStream zip-file entry))))
+
 
 (defn games []
   (map
     (fn [file]
-      (let [modinfo (with-open [zf (new ZipFile file)]
-                      (let [entries (enumeration-seq (.entries zf))
-                            modinfo-entry
-                            (->> entries
-                                 (filter (comp #{"modinfo.lua"} string/lower-case #(.getName %)))
-                                 first)]
-                        (when-let [modinfo (slurp (.getInputStream zf modinfo-entry))]
-                          (lua/read-modinfo modinfo))))]
-        {:filename (.getName file)
-         :modinfo modinfo}))
+      (with-open [zf (new ZipFile file)]
+        (let [entries (enumeration-seq (.entries zf))
+              try-entry-lua (fn [filename]
+                              (try
+                                (when-let [slurped (slurp-zip-entry zf entries filename)]
+                                  (lua/read-modinfo slurped))
+                                (catch Exception e
+                                  (log/warn e "Error loading" filename "from" file))))]
+          {:filename (.getName file)
+           :modinfo (try-entry-lua "modinfo.lua")
+           :modoptions (try-entry-lua "modoptions.lua")
+           :engineoptions (try-entry-lua "engineoptions.lua")
+           :luaai (try-entry-lua "luaai.lua")
+           ::source :archive})))
     (->> (.listFiles (io/file (spring-root) "games"))
          seq
          (filter #(.isFile %)))))
