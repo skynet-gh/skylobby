@@ -524,42 +524,46 @@
         {:fx/type :h-box
          :alignment :center-left
          :children
-         [{:fx/type :label
-           :alignment :center-left
-           :text " Game: "}
-          {:fx/type :choice-box
-           :value (str mod-name)
-           :items (or (some->> mods-cached
-                               (map :modinfo)
-                               (sort-by :version version/version-compare)
-                               (map (fn [modinfo]
-                                      (str (:name modinfo) " " (:version modinfo)))))
-                      [])
-           :on-value-changed {:event/type ::mod-change}}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Browse and download more with Rapid"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::show-rapid-downloader}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-magnify:16:white")}}}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Reload games"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::reload-mods}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh:16:white"}}}]}
+         (concat
+           (if (seq mods-cached)
+             [{:fx/type :label
+               :alignment :center-left
+               :text " Game: "}
+              {:fx/type :choice-box
+               :value (str mod-name)
+               :items (or (some->> mods-cached
+                                   (map :modinfo)
+                                   (sort-by :version version/version-compare)
+                                   (map (fn [modinfo]
+                                          (str (:name modinfo) " " (:version modinfo)))))
+                          [])
+               :on-value-changed {:event/type ::mod-change}}]
+             [{:fx/type :label
+               :text "Loading games..."}])
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Browse and download more with Rapid"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::show-rapid-downloader}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal (str "mdi-magnify:16:white")}}}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Reload games"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::reload-mods}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-refresh:16:white"}}}])}
         {:fx/type map-list
          :map-name map-name
          :maps-cached maps-cached
@@ -850,199 +854,282 @@
                  (log/warn "Bad starting pos" startpos)))))
          (filter some?))))
 
+; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
+(def ext-recreate-on-key-changed
+  "Extension lifecycle that recreates its component when lifecycle's key is changed
+
+  Supported keys:
+  - `:key` (required) - a value that determines if returned component should be recreated
+  - `:desc` (required) - a component description with additional lifecycle semantics"
+  (reify fx.lifecycle/Lifecycle
+    (create [_ {:keys [key desc]} opts]
+      (with-meta {:key key
+                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
+                 {`fx.component/instance #(-> % :child fx.component/instance)}))
+    (advance [this component {:keys [key desc] :as this-desc} opts]
+      (if (= (:key component) key)
+        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
+        (do (fx.lifecycle/delete this component opts)
+            (fx.lifecycle/create this this-desc opts))))
+    (delete [_ component opts]
+      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
-           engine-version map-details battle username users]}]
-  {:fx/type :h-box
-   :children
-   (concat
-     [{:fx/type :v-box
-       :children
-       [{:fx/type :h-box
+           engine-version map-details battle battles username users mods-cached]}]
+  (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
+        mod-details (some->> mods-cached
+                             (filter (comp #{battle-modname}
+                                           (fn [modinfo]
+                                             (str (:name modinfo) " " (:version modinfo)))
+                                           :modinfo))
+                             first)]
+    {:fx/type :h-box
+     :children
+     (concat
+       [{:fx/type :v-box
+         :children
+         [{:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text (if am-host
+                       "You are the host"
+                       (str "Waiting for host " host-username))}}
+             :desc
+             {:fx/type :button
+              :text (str (if am-host "Start" "Join") " Game")
+              :disable (boolean (and (not am-host)
+                                     (not (-> host-user :client-status :ingame))))
+              :on-action {:event/type ::start-battle}}}
+            {:fx/type map-list
+             :disable (not am-host)
+             :map-name battle-map
+             :maps-cached maps-cached
+             :on-value-changed {:event/type ::battle-map-change}}]}
+          {:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type :button
+             :text "Add Bot"
+             :disable (or (string/blank? bot-username)
+                          (string/blank? bot-name)
+                          (string/blank? bot-version))
+             :on-action {:event/type ::add-bot
+                         :battle battle
+                         :bot-username bot-username
+                         :bot-name bot-name
+                         :bot-version bot-version}}
+            {:fx/type :text-field
+             :prompt-text "Bot Name"
+             :text (str bot-username)
+             :on-text-changed {:event/type ::change-bot-username}}
+            {:fx/type :choice-box
+             :value (str bot-name)
+             :on-value-changed {:event/type ::change-bot-name
+                                :engine-version engine-version}
+             :items (map :bot-name (fs/bots engine-version))}
+            {:fx/type :choice-box
+             :value (str bot-version)
+             :on-value-changed {:event/type ::change-bot-version}
+             :items (map :bot-version
+                         (or (get (group-by :bot-name (fs/bots engine-version))
+                                  bot-name)
+                             []))}]}
+          {:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :button
+             :text "Randomize Colors"
+             :on-action {:event/type ::battle-randomize-colors
+                         :battle battle
+                         :users users
+                         :username username}}]}
+          {:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :button
+             :text "FFA"
+             :on-action {:event/type ::battle-teams-ffa
+                         :battle battle
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "2 teams"
+             :on-action {:event/type ::battle-teams-2
+                         :battle battle
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "3 teams"
+             :on-action {:event/type ::battle-teams-3
+                         :battle battle
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "4 teams"
+             :on-action {:event/type ::battle-teams-4
+                         :battle battle
+                         :users users
+                         :username username}}]}
+          {:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :alignment :center-left
+             :text "Start Positions: "}
+            {:fx/type :choice-box
+             :value (->> battle
+                         :scripttags
+                         :game
+                         :startpostype
+                         (or 1)
+                         (get spring/startpostypes)
+                         str)
+             :items (map str (vals spring/startpostypes))
+             :disable (not am-host)
+             :on-value-changed {:event/type ::battle-startpostype-change}}]}
+          {:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :style {:-fx-font-size 24}
+           :children
+           [(let [{:keys [battle-status] :as me} (-> battle :users (get username))]
+              {:fx/type :check-box
+               :selected (-> battle-status :ready boolean)
+               :style {:-fx-padding "10px"}
+               :on-selected-changed (merge me
+                                      {:event/type ::battle-ready-change
+                                       :username username})})
+            {:fx/type :label
+             :alignment :center-left
+             :text " Ready"}]}]}
+        {:fx/type :pane
+         :h-box/hgrow :always}
+        #_
+        {:fx/type :v-box
          :alignment :top-left
-         :children
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text (if am-host
-                     "You are the host"
-                     (str "Waiting for host " host-username))}}
-           :desc
-           {:fx/type :button
-            :text (str (if am-host "Start" "Join") " Game")
-            :disable (boolean (and (not am-host)
-                                   (not (-> host-user :client-status :ingame))))
-            :on-action {:event/type ::start-battle}}}
-          {:fx/type map-list
-           :disable (not am-host)
-           :map-name battle-map
-           :maps-cached maps-cached
-           :on-value-changed {:event/type ::battle-map-change}}]}
-        {:fx/type :h-box
-         :alignment :top-left
-         :children
-         [{:fx/type :button
-           :text "Add Bot"
-           :disable (or (string/blank? bot-username)
-                        (string/blank? bot-name)
-                        (string/blank? bot-version))
-           :on-action {:event/type ::add-bot
-                       :battle battle
-                       :bot-username bot-username
-                       :bot-name bot-name
-                       :bot-version bot-version}}
-          {:fx/type :text-field
-           :prompt-text "Bot Name"
-           :text (str bot-username)
-           :on-text-changed {:event/type ::change-bot-username}}
-          {:fx/type :choice-box
-           :value (str bot-name)
-           :on-value-changed {:event/type ::change-bot-name
-                              :engine-version engine-version}
-           :items (map :bot-name (fs/bots engine-version))}
-          {:fx/type :choice-box
-           :value (str bot-version)
-           :on-value-changed {:event/type ::change-bot-version}
-           :items (map :bot-version
-                       (or (get (group-by :bot-name (fs/bots engine-version))
-                                bot-name)
-                           []))}]}
-        {:fx/type :pane
-         :v-box/vgrow :always}
-        {:fx/type :h-box
-         :alignment :center-left
-         :children
-         [{:fx/type :button
-           :text "Randomize Colors"
-           :on-action {:event/type ::battle-randomize-colors
-                       :battle battle
-                       :users users
-                       :username username}}]}
-        {:fx/type :pane
-         :v-box/vgrow :always}
-        {:fx/type :h-box
-         :alignment :center-left
-         :children
-         [{:fx/type :button
-           :text "FFA"
-           :on-action {:event/type ::battle-teams-ffa
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "2 teams"
-           :on-action {:event/type ::battle-teams-2
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "3 teams"
-           :on-action {:event/type ::battle-teams-3
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "4 teams"
-           :on-action {:event/type ::battle-teams-4
-                       :battle battle
-                       :users users
-                       :username username}}]}
-        {:fx/type :pane
-         :v-box/vgrow :always}
-        {:fx/type :h-box
-         :alignment :center-left
          :children
          [{:fx/type :label
-           :alignment :center-left
-           :text "Start Positions: "}
-          {:fx/type :choice-box
-           :value (->> battle
-                       :scripttags
-                       :game
-                       :startpostype
-                       (or 1)
-                       (get spring/startpostypes)
-                       str)
-           :items (map str (vals spring/startpostypes))
-           :disable (not am-host)
-           :on-value-changed {:event/type ::battle-startpostype-change}}]}
-        {:fx/type :pane
-         :v-box/vgrow :always}
-        {:fx/type :h-box
-         :alignment :center-left
-         :style {:-fx-font-size 24}
+           :text "mod details"}
+          {:fx/type :text-area
+           :editable false
+           :text (with-out-str (pprint mod-details))
+           :style {:-fx-font-family "monospace"}
+           :v-box/vgrow :always}]}
+        {:fx/type :table-view
+         :h-box/hgrow :always
+         :column-resize-policy :constrained
+         :items (or (some->> mod-details
+                             :modoptions
+                             (map second))
+                    [])
+         :columns
+         [{:fx/type :table-column
+           :text "Key"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text (str (:key i))})}}
+          {:fx/type :table-column
+           :text "Type"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text (str (:type i))})}}
+          {:fx/type :table-column
+           :text "Value"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              (if (= "bool" (:type i))
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type :check-box
+                   :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                                           (:def i))))
+                   :on-selected-changed {:event/type ::modoption-change
+                                         :modoption-key (:key i)}
+                   :disable (not am-host)}}}
+                {:text (str (:def i))}))}}]}
+        {:fx/type :v-box
+         :alignment :top-left
          :children
-         [(let [{:keys [battle-status] :as me} (-> battle :users (get username))]
-            {:fx/type :check-box
-             :selected (-> battle-status :ready boolean)
-             :style {:-fx-padding "10px"}
-             :on-selected-changed (merge me
-                                    {:event/type ::battle-ready-change
-                                     :username username})})
-          {:fx/type :label
-           :alignment :center-left
-           :text " Ready"}]}]}
-      {:fx/type :pane
-       :h-box/hgrow :always}
-      {:fx/type :v-box
-       :alignment :top-left
-       :children
-       [{:fx/type :label
-         :text "scripttags"}
-        {:fx/type :text-area
-         :editable false
-         :text (with-out-str (pprint (:scripttags battle)))
-         :style {:-fx-font-family "monospace"}
-         :v-box/vgrow :always}]}
-      {:fx/type :v-box
-       :alignment :top-left
-       :children
-       [{:fx/type :label
-         :text "script.txt preview"}
-        {:fx/type :text-area
-         :editable false
-         :text (str (string/replace (script-txt) #"\t" "  "))
-         :style {:-fx-font-family "monospace"}
-         :v-box/vgrow :always}]}
-      {:fx/type :v-box
-       :alignment :top-left
-       :children
-       [{:fx/type :label
-         :text "Map Details"}
-        {:fx/type :text-area
-         :editable false
-         :text (with-out-str (pprint map-details))
-         :style {:-fx-font-family "monospace"}
-         :v-box/vgrow :always}]}]
-    (let [image-file (io/file (fs/map-minimap battle-map))]
-      (when (.exists image-file)
-        [{:fx/type :v-box
-          :alignment :top-left
-          :children
-          [{:fx/type :label
-            :text "Minimap"}
-           {:fx/type :stack-pane
+         [{:fx/type :label
+           :text "scripttags"}
+          {:fx/type :text-area
+           :editable false
+           :text (with-out-str (pprint (:scripttags battle)))
+           :style {:-fx-font-family "monospace"}
+           :v-box/vgrow :always}]}
+        {:fx/type :v-box
+         :alignment :top-left
+         :children
+         [{:fx/type :label
+           :text "script.txt preview"}
+          {:fx/type :text-area
+           :editable false
+           :text (str (string/replace (script-txt) #"\t" "  "))
+           :style {:-fx-font-family "monospace"}
+           :v-box/vgrow :always}]}
+        #_
+        {:fx/type :v-box
+         :alignment :top-left
+         :children
+         [{:fx/type :label
+           :text "Map Details"}
+          {:fx/type :text-area
+           :editable false
+           :text (with-out-str (pprint map-details))
+           :style {:-fx-font-family "monospace"}
+           :v-box/vgrow :always}]}]
+      (let [image-file (io/file (fs/map-minimap battle-map))]
+        (when (.exists image-file)
+          [{:fx/type :v-box
+            :alignment :top-left
             :children
-            (concat
-              [{:fx/type :image-view
-                :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
-                              (when (.exists image-file)
-                                (io/input-stream image-file)))}
-                :fit-width minimap-width
-                :fit-height minimap-height}
-               {:fx/type :canvas
-                :width minimap-width
-                :height minimap-height
-                :draw
-                (fn [^javafx.scene.canvas.Canvas canvas]
-                  (let [gc (.getGraphicsContext2D canvas)
-                        starting-points (minimap-starting-points map-details)]
-                    (.clearRect gc 0 0 minimap-width minimap-height)
-                    (.setFill gc Color/RED)
-                    (doseq [{:keys [x y]} starting-points]
-                      (.fillOval gc x y start-pos-r start-pos-r))))}])}]}])))})
+            [{:fx/type :label
+              :text "Minimap"}
+             {:fx/type :stack-pane
+              :children
+              (concat
+                [{:fx/type :image-view
+                  :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
+                                (when (.exists image-file)
+                                  (io/input-stream image-file)))}
+                  :fit-width minimap-width
+                  :fit-height minimap-height}
+                 {:fx/type :canvas
+                  :width minimap-width
+                  :height minimap-height
+                  :draw
+                  (fn [^javafx.scene.canvas.Canvas canvas]
+                    (let [gc (.getGraphicsContext2D canvas)
+                          starting-points (minimap-starting-points map-details)]
+                      (.clearRect gc 0 0 minimap-width minimap-height)
+                      (.setFill gc Color/RED)
+                      (doseq [{:keys [x y]} starting-points]
+                        (.fillOval gc x y start-pos-r start-pos-r))))}])}]}])))}))
 
 
 (defn battle-players-and-bots
@@ -1191,27 +1278,6 @@
   (if bot-name
     (str bot-name (when owner (str " (" owner ")")))
     (str username)))
-
-
-; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
-(def ext-recreate-on-key-changed
-  "Extension lifecycle that recreates its component when lifecycle's key is changed
-
-  Supported keys:
-  - `:key` (required) - a value that determines if returned component should be recreated
-  - `:desc` (required) - a component description with additional lifecycle semantics"
-  (reify fx.lifecycle/Lifecycle
-    (create [_ {:keys [key desc]} opts]
-      (with-meta {:key key
-                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
-                 {`fx.component/instance #(-> % :child fx.component/instance)}))
-    (advance [this component {:keys [key desc] :as this-desc} opts]
-      (if (= (:key component) key)
-        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
-        (do (fx.lifecycle/delete this component opts)
-            (fx.lifecycle/create this this-desc opts))))
-    (delete [_ component opts]
-      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
 
 (defn battle-table
@@ -1444,7 +1510,8 @@
              :host-user host-user
              :map-details map-details}
             (select-keys state [:battle :username :host-username :maps-cached
-                                :bot-username :bot-name :bot-version :engine-version]))]))}))
+                                :bot-username :bot-name :bot-version :engine-version
+                                :mods-cached :battles]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -1452,6 +1519,13 @@
   (let [startpostype (get spring/startpostypes-by-name event)]
     (swap! *state assoc-in [:battle :scripttags :startpostype] startpostype)
     (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
+
+(defmethod event-handler ::modoption-change
+  [{:keys [modoption-key] :fx/keys [event]}]
+  (let [k (keyword modoption-key)
+        value (str event)]
+    (swap! *state assoc-in [:battle :scripttags :game :modoptions k] (str event))
+    (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" modoption-key "=" value))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status team-color] :as id}]
@@ -1761,7 +1835,8 @@
                                    :bot-username bot-username
                                    :bot-name bot-name
                                    :bot-version bot-version
-                                   :maps-cached maps-cached}
+                                   :maps-cached maps-cached
+                                   :mods-cached mods-cached}
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children

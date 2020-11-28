@@ -25,20 +25,11 @@
 (def startpostypes-by-name
   (clojure.set/map-invert startpostypes))
 
-(def default-modoptions
-  {:relayhoststartpostype 1
-   :disablemapdamage 0
-   :fixedallies 1
-   :maxunits 500
-   :starttime 0
-   :deathmode "com"
-   :scoremode "disabled"
-   :pathfinder "normal"})
 
 (def default-scripttags ; TODO read these from lua in map, mod/game, and engine
   {:game
    {:startpostype 1
-    :modoptions default-modoptions}})
+    :modoptions {}}})
 
 
 ; https://stackoverflow.com/a/17328219/984393
