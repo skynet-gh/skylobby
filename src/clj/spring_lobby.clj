@@ -15,6 +15,7 @@
     [com.evocomputing.colors :as colors]
     [crouton.html :as html]
     [spring-lobby.client :as client]
+    spring-lobby.client.handler
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.http :as http]
@@ -24,11 +25,9 @@
     [taoensso.timbre :as log]
     [version-clj.core :as version])
   (:import
-    (java.nio.file CopyOption StandardCopyOption)
     (javafx.application Platform)
     (javafx.scene.paint Color)
     (manifold.stream SplicedStream)
-    (org.apache.commons.io FileUtils)
     (org.apache.commons.io.input CountingInputStream))
   (:gen-class))
 
@@ -251,10 +250,7 @@
             {:text ""
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account:16"}}
-            #_
-            {:text (str status)
-             :style {:-fx-font-family "monospace"}})))}}
+              :icon-literal "mdi-account:16"}})))}}
     {:fx/type :table-column
      :text "Country"
      :cell-value-factory identity
@@ -653,168 +649,8 @@
   (swap! *state assoc :bot-version event))
 
 
-(defn script-txt []
-  (let [{:keys [battle battles users username]} @*state
-        battle (update battle :users #(into {} (map (fn [[k v]] [k (assoc v :username k :user (get users k))]) %)))
-        battle (merge (get battles (:battle-id battle)) battle)
-        script (spring/script-data battle {:myplayername username})
-        script-txt (spring/script-txt script)]
-    script-txt))
-
-
-(defn copy-engine [engine-version]
-  (if engine-version
-    (let [source (io/file (fs/spring-root) "engine" engine-version)
-          dest (io/file (fs/app-root) "spring" "engine" engine-version)]
-      (if (.exists source)
-        (do
-          (FileUtils/forceMkdir dest)
-          (log/info "Copying" source "to" dest)
-          (FileUtils/copyDirectory source dest))
-        (log/warn "No map file to copy from" (.getAbsolutePath source)
-                  "to" (.getAbsolutePath dest))))
-    (throw
-      (ex-info "Missing map or engine to copy to isolation dir"
-               {:engine-version engine-version}))))
-
-#_
-(copy-engine "103.0")
-
-(defn copy-mod [mod-detail engine-version]
-  (log/info "Mod detail:" (pr-str mod-detail))
-  (let [mod-filename (:filename mod-detail)]
-    (cond
-      (not (and mod-filename engine-version))
-      (throw
-        (ex-info "Missing mod or engine to copy to isolation dir"
-                 {:mod-filename mod-filename
-                  :engine-version engine-version}))
-      (= :rapid (::fs/source mod-detail))
-      (let [sdp-decoded (rapid/decode-sdp (io/file mod-filename))
-            source (io/file mod-filename)
-            dest (io/file (fs/app-root) "spring" "engine" engine-version "packages" (.getName source))
-            ^java.nio.file.Path source-path (.toPath source)
-            ^java.nio.file.Path dest-path (.toPath dest)
-            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                     [StandardCopyOption/COPY_ATTRIBUTES
-                                                      StandardCopyOption/REPLACE_EXISTING])]
-        (.mkdirs dest)
-        (java.nio.file.Files/copy source-path dest-path options)
-        (doseq [item (:items sdp-decoded)]
-          (let [md5 (:md5 item)
-                pool-source (rapid/file-in-pool md5)
-                pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)
-                ^java.nio.file.Path pool-source-path (.toPath pool-source)
-                ^java.nio.file.Path pool-dest-path (.toPath pool-dest)]
-            (log/info "Copying" pool-source-path "to" pool-dest-path)
-            (.mkdirs pool-dest)
-            (java.nio.file.Files/copy pool-source-path pool-dest-path options))))
-      (= :archive (::fs/source mod-detail))
-      (let [source (io/file (fs/spring-root) "games" mod-filename)
-            dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)
-            ^java.nio.file.Path source-path (.toPath source)
-            ^java.nio.file.Path dest-path (.toPath dest)
-            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                     [StandardCopyOption/COPY_ATTRIBUTES
-                                                      StandardCopyOption/REPLACE_EXISTING])]
-        (if (.exists source)
-          (do
-            (.mkdirs dest)
-            (java.nio.file.Files/copy source-path dest-path options))
-          (log/warn "No mod file to copy from" (.getAbsolutePath source)
-                    "to" (.getAbsolutePath dest)))))))
-
-#_
-(copy-mod "Balanced Annihilation V11.0.2")
-
-
-(defn copy-map [map-filename engine-version]
-  (if (and map-filename engine-version)
-    (let [source (io/file (fs/spring-root) "maps" map-filename)
-          dest (io/file (fs/app-root) "spring" "engine" engine-version "maps" map-filename)
-          ^java.nio.file.Path source-path (.toPath source)
-          ^java.nio.file.Path dest-path (.toPath dest)
-          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                   [StandardCopyOption/COPY_ATTRIBUTES
-                                                    StandardCopyOption/REPLACE_EXISTING])]
-      (if (.exists source)
-        (do
-          (.mkdirs dest)
-          (java.nio.file.Files/copy source-path dest-path options))
-        (log/warn "No map file to copy from" (.getAbsolutePath source)
-                  "to" (.getAbsolutePath dest))))
-    (throw
-      (ex-info "Missing map or engine to copy to isolation dir"
-               {:map-filename map-filename
-                :engine-version engine-version}))))
-
-
-#_
-(copy-map "incandescence_1.5.sd7" "103.0")
-
-
-(defn start-game []
-  (try
-    (log/info "Starting game")
-    (let [{:keys [maps-cached mods-cached] :as state} @*state
-          battle (-> state
-                     :battles
-                     (get (-> state :battle :battle-id)))
-          {:keys [battle-map battle-version battle-modname]} battle
-          _ (copy-engine battle-version)
-          mod-detail (some->> mods-cached
-                              (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
-                              first)
-          _ (copy-mod mod-detail battle-version)
-          map-filename (->> maps-cached
-                            (filter (comp #{battle-map} :map-name))
-                            first
-                            :filename)
-          _ (copy-map map-filename battle-version)
-          script-txt (script-txt)
-          isolation-dir (io/file (fs/app-root) "spring" "engine" battle-version)
-          engine-file (io/file isolation-dir (fs/spring-executable))
-          _ (log/info "Engine executable" engine-file)
-          script-file (io/file (fs/app-root) "spring" "script.txt")
-          script-file-param (fs/wslpath script-file)
-          isolation-dir-param (fs/wslpath isolation-dir)]
-      (spit script-file script-txt)
-      (log/info "Wrote script to" script-file)
-      (let [command [(.getAbsolutePath engine-file)
-                     "--isolation-dir" isolation-dir-param
-                     script-file-param]
-            runtime (Runtime/getRuntime)]
-        (log/info "Running '" command "'")
-        (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-              ^"[Ljava.lang.String;" envp (fs/envp)
-              process (.exec runtime cmdarray envp isolation-dir)]
-          (client/send-message (:client @*state) "MYSTATUS 1") ; TODO full status
-          (async/thread
-            (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (do
-                    (log/info "(spring out)" line)
-                    (recur))
-                  (log/info "Spring stdout stream closed")))))
-          (async/thread
-            (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (do
-                    (log/info "(spring err)" line)
-                    (recur))
-                  (log/info "Spring stderr stream closed")))))
-          (future
-            (.waitFor process)
-            (client/send-message (:client @*state) "MYSTATUS 0"))))) ; TODO full status
-    (catch Exception e
-      (log/error e "Error starting game")
-      (client/send-message (:client @*state) "MYSTATUS 0")))) ; TODO full status
-
 (defmethod event-handler ::start-battle [_e]
-  (start-game))
-
+  (spring/start-game @*state))
 
 
 (def start-pos-r 10.0)
@@ -1017,17 +853,6 @@
              :text " Ready"}]}]}
         {:fx/type :pane
          :h-box/hgrow :always}
-        #_
-        {:fx/type :v-box
-         :alignment :top-left
-         :children
-         [{:fx/type :label
-           :text "mod details"}
-          {:fx/type :text-area
-           :editable false
-           :text (with-out-str (pprint mod-details))
-           :style {:-fx-font-family "monospace"}
-           :v-box/vgrow :always}]}
         {:fx/type :table-view
          :h-box/hgrow :always
          :column-resize-policy :constrained
@@ -1089,18 +914,7 @@
            :text "script.txt preview"}
           {:fx/type :text-area
            :editable false
-           :text (str (string/replace (script-txt) #"\t" "  "))
-           :style {:-fx-font-family "monospace"}
-           :v-box/vgrow :always}]}
-        #_
-        {:fx/type :v-box
-         :alignment :top-left
-         :children
-         [{:fx/type :label
-           :text "Map Details"}
-          {:fx/type :text-area
-           :editable false
-           :text (with-out-str (pprint map-details))
+           :text (str (string/replace (spring/battle-script-txt @*state) #"\t" "  "))
            :style {:-fx-font-family "monospace"}
            :v-box/vgrow :always}]}]
       (let [image-file (io/file (fs/map-minimap battle-map))]
@@ -1266,12 +1080,6 @@
        :g (Math/round (* 255 (.getGreen color)))
        :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
        :a 0})))
-
-#_
-(colors/create-color
-  (colors/rgb-int-to-components 0))
-#_
-(colors/create-color 0)
 
 
 (defn nickname [{:keys [bot-name owner username]}]

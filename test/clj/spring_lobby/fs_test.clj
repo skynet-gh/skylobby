@@ -22,7 +22,7 @@
                                 {:os-name "Linux"
                                  :os-version ""
                                  :user-home "/home/me2"})]
-      (is (= (str "/home/me2/spring")
+      (is (= (str "/home/me2/.spring")
              (.getAbsolutePath
                (fs/spring-root))))))
   (testing "Windows"
@@ -48,7 +48,7 @@
                                 {:os-name "Linux"
                                  :os-version ""
                                  :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.springlobby")
+      (is (= (str "/home/me2/snap/springlobby-nsg/common/.springlobby")
              (.getAbsolutePath
                (fs/springlobby-root))))))
   (testing "Windows"
@@ -91,22 +91,6 @@
 (deftest spring-config-line
   (is (= "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"
          (fs/spring-config-line (string/split-lines mock-map-data-txt) "Description="))))
-
-(deftest parse-map-data
-  (is (= {:map
-          {:description "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"
-           :gravity 120
-           :maxmetal 1.23
-           :tidalstrength 13
-           :extractorradius 85
-           :maphardness 100
-           :autoshowmetal 1
-           :detailtex "detailtexblurred.bmp"
-           :smf
-           {:maxheight 532
-            :minheight -200}}}
-         (fs/parse-map-data mock-map-data-txt))))
-
 
 (def mock-parsed-lua
   [:chunk

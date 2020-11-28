@@ -9,7 +9,8 @@
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
-    [spring-lobby.spring :as spring]
+    [spring-lobby.spring.script :as spring-script]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.nio ByteBuffer)
@@ -28,6 +29,11 @@
     [host (edn/read-string port)]
     [server-url default-port]))
 
+
+(def default-scripttags ; TODO read these from lua in map, mod/game, and engine
+  {:game
+   {:startpostype 1
+    :modoptions {}}})
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
@@ -161,8 +167,8 @@
 
 (defmethod handle "SETSCRIPTTAGS" [_client state m]
   (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)
-        parsed (spring/parse-scripttags script-tags-raw)]
-    (swap! state update-in [:battle :scripttags] spring/deep-merge parsed)))
+        parsed (spring-script/parse-scripttags script-tags-raw)]
+    (swap! state update-in [:battle :scripttags] u/deep-merge parsed)))
 
 (defmethod handle "TASSERVER" [_client state m]
   (swap! state assoc :tas-server m))
@@ -278,10 +284,6 @@
             (dissoc state :battle)
             state))))))
 
-(defmethod handle "CLIENTSTATUS" [_c state m]
-  (let [[_all username client-status] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state assoc-in [:users username :client-status] (decode-client-status client-status))))
-
 (defmethod handle "JOIN" [_c state m]
   (let [[_all channel-name] (re-find #"\w+ (\w+)" m)]
     (swap! state assoc-in [:my-channels channel-name] {})))
@@ -298,7 +300,7 @@
     (swap! state assoc :battle {:battle-id battle-id
                                 :hash-code hash-code
                                 :channel-name channel-name
-                                :scripttags spring/default-scripttags})))
+                                :scripttags default-scripttags})))
 
 (defmethod handle "JOINEDBATTLE" [_c state m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]

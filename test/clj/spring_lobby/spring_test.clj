@@ -1,51 +1,12 @@
 (ns spring-lobby.spring-test
   (:require
     [clojure.data]
-    [clojure.pprint :refer [pprint]]
-    [clojure.string :as string]
     [clojure.test :refer [deftest is testing]]
     [spring-lobby.spring :as spring]))
 
 
 (declare battle battle-players expected-script-data expected-script-data-players
          expected-script-txt expected-script-txt-players)
-
-
-(deftest parse-scripttags
-  (is (= nil
-         (spring/parse-scripttags "")))
-  (is (= {:game
-          {:modoptions
-           {:test "true"}}}
-         (spring/parse-scripttags "game/modoptions/test=true")))
-  (is (= {:game
-          {:mapoptions
-           {:fog "0"
-            :inv "0"
-            :extractorradius "100"
-            :metal "normal"
-            :tidal "normal"
-            :timeofday "day"
-            :weather "clear"
-            :wind "normal"},
-           :modoptions
-           {:disablemapdamage "0"
-            :fixedallies "1"
-            :mo_heatmap "1"
-            :mo_preventcombomb "0"
-            :critters "1"
-            :mo_coop "0"
-            :mo_no_close_spawns "1"
-            :mo_ffa "0"
-            :captureradius "500"
-            :anon_ffa "0"
-            :allow_buzz "0"
-            :shareddynamicalliancevictory "0"
-            :capturebonus "0.5"
-            :mo_enemycomcount "1"
-            :mo_newbie_placer "0"
-            :capturetime "30"}}}
-         (spring/parse-scripttags "game/mapoptions/fog=0\tgame/mapoptions/inv=0\tgame/mapoptions/extractorradius=100\tgame/mapoptions/metal=normal\tgame/mapoptions/tidal=normal\tgame/mapoptions/timeofday=day\tgame/mapoptions/weather=clear\tgame/mapoptions/wind=normal\tgame/modoptions/allow_buzz=0\tgame/modoptions/anon_ffa=0\tgame/modoptions/critters=1\tgame/modoptions/disablemapdamage=0\tgame/modoptions/fixedallies=1\tgame/modoptions/mo_coop=0\tgame/modoptions/mo_enemycomcount=1\tgame/modoptions/mo_ffa=0\tgame/modoptions/mo_heatmap=1\tgame/modoptions/mo_newbie_placer=0\tgame/modoptions/mo_no_close_spawns=1\tgame/modoptions/mo_preventcombomb=0\tgame/modoptions/shareddynamicalliancevictory=0\tgame/modoptions/capturebonus=0.5\tgame/modoptions/captureradius=500\tgame/modoptions/capturetime=30"))))
 
 
 (deftest script-data
@@ -100,7 +61,7 @@
     :mapname "Dworld Acidic"
     :hostport 8452
     :hostip nil
-    :ishost 1}})
+    :ishost 0}})
 
 (def battle-players
   {:battle-modhash -1
@@ -118,6 +79,7 @@
       :ally 0
       :team-color 0
       :handicap 0
+      :mode 1
       :side 0}
      :team-color 0}}
    :bots
@@ -131,6 +93,7 @@
       :ally 1
       :team-color 1
       :handicap 1
+      :mode 1
       :side 1}}}})
 
 (def expected-script-data-players
@@ -139,7 +102,7 @@
     :mapname "Dworld Duo"
     :hostport 8452
     :hostip nil
-    :ishost 1
+    :ishost 0
     "team0"
     {:teamleader 0
      :handicap 0
@@ -150,7 +113,7 @@
     {:teamleader 0
      :handicap 1
      :allyteam 1
-     :rgbcolor "0.0 0.0 0.00392156862745098"
+     :rgbcolor "0.00392156862745098 0.0 0.0"
      :side "CORE"},
     "allyteam1" {:numallies 0}
     "allyteam0" {:numallies 0}
@@ -167,7 +130,7 @@
      :team 0,
      :isfromdemo 0,
      :countrycode nil
-     :spectator 1}}})
+     :spectator 0}}})
 
 
 
