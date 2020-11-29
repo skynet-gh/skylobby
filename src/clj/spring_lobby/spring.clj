@@ -2,6 +2,7 @@
   "Interface to run Spring."
   (:require
     [clojure.core.async :as async]
+    [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.set]
     [clojure.walk]
@@ -31,8 +32,15 @@
   (clojure.set/map-invert startpostypes))
 
 
-; https://stackoverflow.com/a/17328219/984393
-
+(defn startpostype-name [startpostype]
+  (when startpostype
+    (let [startpostype (int
+                         (or
+                           (if (string? startpostype)
+                             (edn/read-string startpostype)
+                             startpostype)
+                           0))]
+      (get startpostypes startpostype))))
 
 
 (defn unit-rgb
@@ -72,7 +80,7 @@
             (:users battle))
           (map
             (fn [[_player {:keys [battle-status team-color owner]}]]
-              [(str "team" (:id battle-status))
+              [(keyword (str "team" (:id battle-status)))
                {:teamleader (if owner
                               (-> battle :users (get owner) :battle-status :id)
                               (:id battle-status))
@@ -88,7 +96,7 @@
                   (merge (:users battle) (:bots battle)))))) ; TODO group-by :team ?
           (map
             (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
-              [(str "ai" (:id battle-status))
+              [(keyword (str "ai" (:id battle-status)))
                {:name bot-name
                 :shortname ai-name
                 :version ai-version
@@ -99,7 +107,7 @@
             (:bots battle))
           (map
             (fn [ally]
-              [(str "allyteam" ally) {:numallies 0}])
+              [(keyword (str "allyteam" ally)) {:numallies 0}])
             (set
               (map
                 (comp :ally :battle-status second)

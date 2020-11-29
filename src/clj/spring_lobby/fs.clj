@@ -179,15 +179,6 @@
       (.update res (.array (.putLong (ByteBuffer/allocate 4) crc-long)))) ; TODO fix array overflow
     (.getValue res))) ; TODO 4711 if 0
 
-#_
-(let [zip-files (map-files-zip)]
-  zip-files)
-#_
-(open-zip
-  (first (map-files-zip)))
-#_
-(doseq [map-file (map-files-zip)]
-  (open-zip map-file))
 
 (defn open-7z [^java.io.File from]
   (with-open [raf (new RandomAccessFile from "r")
@@ -217,13 +208,6 @@
                                          (ImageIO/read is))]
               (log/info "Extract result" res)
               (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
-
-#_
-(doseq [map-file (map-files)]
-  (open-7z map-file))
-
-#_
-(defn extract-7z [from])
 
 
 (defn engines []
@@ -330,10 +314,6 @@
                       (spring-script/parse-script map-data))]
             {:smd (assoc smd ::source (.getName smd-entry))}))))))
 
-#_
-(read-zip-map (io/file (spring-root) "maps" "bilateral.sdz"))
-#_
-(read-zip-map (io/file (spring-root) "maps" "deltasiegedry_revolution_v2.5.sdz"))
 
 (defn slurp-7z-item [item]
   (with-open [baos (java.io.ByteArrayOutputStream.)]
@@ -384,11 +364,6 @@
         (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
           {:smd (assoc smd ::source (.getPath smd-item))})))))
 
-#_
-(read-7z-map (io/file (spring-root) "maps" "altored_divide_bar_remake_1.3.sd7"))
-#_
-(read-7z-map (io/file (spring-root) "maps" "beach2_v1.sd7"))
-
 
 (defn read-map-data [file]
   (let [filename (.getName file)]
@@ -432,11 +407,6 @@
                   :bot-version (.getName version-dir)}))))
       ai-dirs)))
 
-#_
-(bots "103.0")
-#_
-(bots "104.0.1-1510-g89bb8e3 maintenance")
-
 
 (defn map-minimap [map-name]
-  (str "/mnt/c/Users/" (System/getProperty "user.name") "/AppData/Roaming/springlobby/cache/" map-name ".minimap.png"))
+  (io/file (springlobby-root) "cache" (str map-name ".minimap.png")))

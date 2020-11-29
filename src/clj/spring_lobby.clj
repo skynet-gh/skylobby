@@ -23,6 +23,7 @@
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [version-clj.core :as version])
   (:import
@@ -412,7 +413,7 @@
           (assoc :mod-hash -1
                  :map-hash -1)))
     (when (seq scripttags)
-      (client/send-message client (str "SETSCRIPTTAGS " (spring-script/flatten-scripttags scripttags))))))
+      (client/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
 
 (defmethod event-handler ::host-battle [_e]
   (host-battle))
@@ -637,7 +638,7 @@
     (recur
       existing-names
       (if-let [[_ prefix n suffix] (re-find #"(.*)(\d+)(.*)" desired-name)]
-        (let [nn (inc (edn/read-string n))]
+        (let [nn (inc (u/to-number n))]
           (str prefix nn suffix))
         (str desired-name 0)))))
 
@@ -678,20 +679,20 @@
 
 (def start-pos-r 10.0)
 (def map-multiplier 8.0)
-(def minimap-width 256)
-(def minimap-height 256)
+
+(def minimap-size 384)
 
 
 (defn minimap-starting-points
-  [map-details]
+  [map-details scripttags minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         teams (or (->> map-details :mapinfo :teams
                        (map
                          (fn [[k v]]
                            [k
                             (-> v
-                                (update-in [:startpos :x] edn/read-string)
-                                (update-in [:startpos :z] edn/read-string))]))
+                                (update-in [:startpos :x] u/to-number)
+                                (update-in [:startpos :z] u/to-number))]))
                        seq)
                   (->> map-details
                        :smd
@@ -703,13 +704,19 @@
                        (into {})))]
     (->> teams
          (map
-           (fn [[_team {:keys [startpos]}]]
+           (fn [[team-kw {:keys [startpos]}]]
              (when-let [{:keys [x z]} startpos]
                (if (and (number? x) (number? z))
-                 {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
-                        (/ start-pos-r 2))
-                  :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
-                        (/ start-pos-r 2))}
+                 (let [[_all team] (re-find #"team(\d+)" (name team-kw))
+                       scriptx (some-> scripttags :game team-kw :startposx u/to-number)
+                       scriptz (some-> scripttags :game team-kw :startposz u/to-number)
+                       x (or scriptx x)
+                       z (or scriptz z)]
+                   {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
+                          (/ start-pos-r 2))
+                    :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
+                          (/ start-pos-r 2))
+                    :team team})
                  (log/warn "Bad starting pos" startpos)))))
          (filter some?))))
 
@@ -733,16 +740,86 @@
     (delete [_ component opts]
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
+
+(defmethod event-handler ::minimap-mouse-pressed
+  [{:fx/keys [event] :keys [starting-points startpostype]}]
+  (when (= "Choose before game" startpostype)
+    (let [ex (.getX event)
+          ey (.getY event)]
+      (when-let [target (some
+                          (fn [{:keys [x y] :as target}]
+                            (when (and
+                                    (< x ex (+ x (* 2 start-pos-r)))
+                                    (< y ey (+ y (* 2 start-pos-r))))
+                              target))
+                          starting-points)]
+        (swap! *state assoc :drag-team {:team (:team target)
+                                        :x (- ex start-pos-r)
+                                        :y (- ey start-pos-r)})))))
+
+
+(defmethod event-handler ::minimap-mouse-dragged
+  [{:fx/keys [event]}]
+  (swap! *state
+         (fn [state]
+           (if (:drag-team state)
+             (update state :drag-team assoc
+                     :x (- (.getX event) start-pos-r)
+                     :y (- (.getY event) start-pos-r))
+             state))))
+
+(defmethod event-handler ::minimap-mouse-released
+  [{:keys [minimap-width minimap-height map-details]}]
+  (let [{:keys [team x y]} (-> *state deref :drag-team)
+        {:keys [map-width map-height]} (-> map-details :smf :header)
+        x (* (/ x minimap-width) map-width map-multiplier)
+        z (* (/ y minimap-height) map-height map-multiplier)
+        scripttags {:game
+                    {(keyword (str "team" team))
+                     {:startposx x
+                      :startposz z}}}]
+    (log/debug scripttags)
+    (swap! *state update :scripttags u/deep-merge scripttags)
+    (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
+    (client/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+  (swap! *state dissoc :drag-team))
+
+
+(defn minimap-dimensions [map-smf-header]
+  (let [{:keys [map-width map-height]} map-smf-header]
+    (when (and map-width)
+      (let [ratio-x (/ minimap-size map-width)
+            ratio-y (/ minimap-size map-height)
+            min-ratio (min ratio-x ratio-y)
+            normal-x (/ ratio-x min-ratio)
+            normal-y (/ ratio-y min-ratio)
+            invert-x (/ min-ratio ratio-x)
+            invert-y (/ min-ratio ratio-y)
+            convert-x (if (< ratio-y ratio-x) invert-x normal-x)
+            convert-y (if (< ratio-x ratio-y) invert-y normal-y)
+            minimap-width (* minimap-size convert-x)
+            minimap-height (* minimap-size convert-y)]
+        {:minimap-width minimap-width
+         :minimap-height minimap-height}))))
+
+
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
-           engine-version map-details battle battles username users mods-cached]}]
+           engine-version map-details battle battles username users mods-cached drag-team]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (some->> mods-cached
                              (filter (comp #{battle-modname}
                                            (fn [modinfo]
                                              (str (:name modinfo) " " (:version modinfo)))
                                            :modinfo))
-                             first)]
+                             first)
+        scripttags (:scripttags battle)
+        startpostype (->> scripttags
+                          :game
+                          :startpostype
+                          spring/startpostype-name)
+        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (-> map-details :smf :header))
+        starting-points (minimap-starting-points map-details scripttags minimap-width minimap-height)]
     {:fx/type :h-box
      :children
      (concat
@@ -848,13 +925,7 @@
              :alignment :center-left
              :text "Start Positions: "}
             {:fx/type :choice-box
-             :value (->> battle
-                         :scripttags
-                         :game
-                         :startpostype
-                         (or 1)
-                         (get spring/startpostypes)
-                         str)
+             :value startpostype
              :items (map str (vals spring/startpostypes))
              :disable (not am-host)
              :on-value-changed {:event/type ::battle-startpostype-change}}]}
@@ -876,122 +947,128 @@
              :text " Ready"}]}]}
         {:fx/type :pane
          :h-box/hgrow :always}
-        {:fx/type :table-view
+        {:fx/type :v-box
+         :alignment :top-left
          :h-box/hgrow :always
-         :column-resize-policy :constrained
-         :items (or (some->> mod-details
-                             :modoptions
-                             (map second)
-                             (filter :key)
-                             (map #(update % :key (comp keyword string/lower-case)))
-                             (sort-by :key)
-                             (remove (comp #{"section"} :type)))
-                    [])
-         :columns
-         [{:fx/type :table-column
-           :text "Key"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text ""
-               :graphic
-               {:fx/type fx.ext.node/with-tooltip-props
-                :props
-                {:tooltip
-                 {:fx/type :tooltip
-                  :show-delay [10 :ms]
-                  :text (str (:name i) "\n\n" (:desc i))}}
-                :desc
-                (merge
-                  {:fx/type :label
-                   :text (str (name (:key i)))}
-                  (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
-                    (when (and (not= (:def i) v)
-                               (not= (:def i)
-                                     (edn/read-string v)))
-                      {:style {:-fx-font-weight :bold}})))}})}}
-          #_
-          {:fx/type :table-column
-           :text "Type"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text (str (:type i))})}}
-          {:fx/type :table-column
-           :text "Value"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              (case (:type i)
-                "bool"
+         :children
+         [{:fx/type :label
+           :text "modoptions"}
+          {:fx/type :table-view
+           :column-resize-policy :constrained
+           :items (or (some->> mod-details
+                               :modoptions
+                               (map second)
+                               (filter :key)
+                               (map #(update % :key (comp keyword string/lower-case)))
+                               (sort-by :key)
+                               (remove (comp #{"section"} :type)))
+                      [])
+           :columns
+           [{:fx/type :table-column
+             :text "Key"
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
                 {:text ""
                  :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
+                 {:fx/type fx.ext.node/with-tooltip-props
+                  :props
+                  {:tooltip
+                   {:fx/type :tooltip
+                    :show-delay [10 :ms]
+                    :text (str (:name i) "\n\n" (:desc i))}}
                   :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :check-box
-                    :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                                            (:def i))))
-                    :on-selected-changed {:event/type ::modoption-change
-                                          :modoption-key (:key i)}
-                    :disable (not am-host)}}}}
-                "number"
-                {:text ""
-                 :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
-                  :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :text-field
-                    :disable (not am-host)
-                    :text-formatter
-                    {:fx/type :text-formatter
-                     :value-converter :number
-                     :value (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                                 (:def i)))
-                     :on-value-changed {:event/type ::modoption-change
-                                        :modoption-key (:key i)}}}}}}
-                "list"
-                {:text ""
-                 :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
-                  :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :choice-box
-                    :disable (not am-host)
-                    :value (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                                (:def i)))
-                    :on-value-changed {:event/type ::modoption-change
-                                       :modoption-key (:key i)}
-                    :items (or (map (comp :key second) (:items i))
-                               [])}}}}
-                {:text (str (:def i))}))}}]}
+                  (merge
+                    {:fx/type :label
+                     :text (str (name (:key i)))}
+                    (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
+                      (when (and (not= (:def i) v)
+                                 (not= (u/to-number (:def i))
+                                       (u/to-number v)))
+                        {:style {:-fx-font-weight :bold}})))}})}}
+            #_
+            {:fx/type :table-column
+             :text "Type"
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
+                {:text (str (:type i))})}}
+            {:fx/type :table-column
+             :text "Value"
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
+                (case (:type i)
+                  "bool"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :check-box
+                      :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                                              (:def i))))
+                      :on-selected-changed {:event/type ::modoption-change
+                                            :modoption-key (:key i)}
+                      :disable (not am-host)}}}}
+                  "number"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :text-field
+                      :disable (not am-host)
+                      :text-formatter
+                      {:fx/type :text-formatter
+                       :value-converter :number
+                       :value (u/to-number (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                               (:def i)))
+                       :on-value-changed {:event/type ::modoption-change
+                                          :modoption-key (:key i)}}}}}}
+                  "list"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :choice-box
+                      :disable (not am-host)
+                      :value (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                 (:def i))
+                      :on-value-changed {:event/type ::modoption-change
+                                         :modoption-key (:key i)}
+                      :items (or (map (comp :key second) (:items i))
+                                 [])}}}}
+                  {:text (str (:def i))}))}}]}]}
+        #_
         {:fx/type :v-box
          :alignment :top-left
          :children
@@ -1011,6 +1088,20 @@
            :editable false
            :text (str (string/replace (spring/battle-script-txt @*state) #"\t" "  "))
            :style {:-fx-font-family "monospace"}
+           :v-box/vgrow :always}]}
+        {:fx/type :v-box
+         :alignment :top-left
+         :children
+         [{:fx/type :label
+           :text "map details"}
+          {:fx/type :text-area
+           :editable false
+           :text (with-out-str
+                   (pprint
+                     (->> maps-cached
+                          (filter (comp #{battle-map} :map-name))
+                          first)))
+           :style {:-fx-font-family "monospace"}
            :v-box/vgrow :always}]}]
       (let [image-file (io/file (fs/map-minimap battle-map))]
         (when (.exists image-file)
@@ -1027,18 +1118,53 @@
                                 (when (.exists image-file)
                                   (io/input-stream image-file)))}
                   :fit-width minimap-width
-                  :fit-height minimap-height}
-                 {:fx/type :canvas
-                  :width minimap-width
-                  :height minimap-height
-                  :draw
-                  (fn [^javafx.scene.canvas.Canvas canvas]
-                    (let [gc (.getGraphicsContext2D canvas)
-                          starting-points (minimap-starting-points map-details)]
-                      (.clearRect gc 0 0 minimap-width minimap-height)
-                      (.setFill gc Color/RED)
-                      (doseq [{:keys [x y]} starting-points]
-                        (.fillOval gc x y start-pos-r start-pos-r))))}])}]}])))}))
+                  :fit-height minimap-height
+                  :preserve-ratio true}
+                 (merge
+                   (when am-host
+                     {:on-mouse-pressed {:event/type ::minimap-mouse-pressed
+                                         :startpostype startpostype
+                                         :starting-points starting-points}
+                      :on-mouse-dragged {:event/type ::minimap-mouse-dragged
+                                         :startpostype startpostype
+                                         :starting-points starting-points}
+                      :on-mouse-released {:event/type ::minimap-mouse-released
+                                          :startpostype startpostype
+                                          :map-details map-details
+                                          :minimap-width minimap-width
+                                          :minimap-height minimap-height}})
+                   {:fx/type :canvas
+                    :width minimap-width
+                    :height minimap-height
+                    :draw
+                    (fn [^javafx.scene.canvas.Canvas canvas]
+                      (let [gc (.getGraphicsContext2D canvas)]
+                        (.clearRect gc 0 0 minimap-width minimap-height)
+                        (.setFill gc Color/RED)
+                        (doseq [{:keys [x y team]} starting-points]
+                          (let [drag (when (and drag-team
+                                                (= team (:team drag-team)))
+                                       drag-team)
+                                x (or (:x drag) x)
+                                y (or (:y drag) y)
+                                xc (+ x (/ start-pos-r 2.0))
+                                yc (+ y (/ start-pos-r 0.75))]
+                            (cond
+                              (#{"Fixed" "Choose before game"} startpostype)
+                              (do
+                                (.beginPath gc)
+                                (.rect gc x y
+                                       (* 2 start-pos-r)
+                                       (* 2 start-pos-r))
+                                (.setFill gc Color/WHITE)
+                                (.fill gc)
+                                (.setStroke gc Color/RED)
+                                (.stroke gc)
+                                (.closePath gc)
+                                (.setFill gc Color/RED)
+                                (.fillText gc team xc yc))
+                              :else
+                              (.fillOval gc x y start-pos-r start-pos-r))))))})])}]}])))}))
 
 
 (defn battle-players-and-bots
@@ -1414,14 +1540,14 @@
              :map-details map-details}
             (select-keys state [:battle :username :host-username :maps-cached
                                 :bot-username :bot-name :bot-version :engine-version
-                                :mods-cached :battles]))]))}))
+                                :mods-cached :battles :drag-team]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event]}]
   (let [startpostype (get spring/startpostypes-by-name event)]
-    (swap! *state assoc-in [:scripttags :startpostype] startpostype)
-    (swap! *state assoc-in [:battle :scripttags :startpostype] startpostype)
+    (swap! *state assoc-in [:scripttags :game :startpostype] startpostype)
+    (swap! *state assoc-in [:battle :scripttags :game :startpostype] startpostype)
     (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
 (defmethod event-handler ::modoption-change
@@ -1657,7 +1783,7 @@
             engine-branch engine-versions-cached http-download
             maps-index-url map-files-cache
             show-http-downloader
-            mods-cached]}
+            mods-cached drag-team]}
     :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [& args]
@@ -1742,7 +1868,8 @@
                                    :bot-name bot-name
                                    :bot-version bot-version
                                    :maps-cached maps-cached
-                                   :mods-cached mods-cached}
+                                   :mods-cached mods-cached
+                                   :drag-team drag-team}
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children
