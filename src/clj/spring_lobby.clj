@@ -742,7 +742,7 @@
 
 
 (defmethod event-handler ::minimap-mouse-pressed
-  [{:fx/keys [event] :keys [starting-points startpostype]}]
+  [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [starting-points startpostype]}]
   (when (= "Choose before game" startpostype)
     (let [ex (.getX event)
           ey (.getY event)]
@@ -759,7 +759,7 @@
 
 
 (defmethod event-handler ::minimap-mouse-dragged
-  [{:fx/keys [event]}]
+  [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
   (swap! *state
          (fn [state]
            (if (:drag-team state)
@@ -770,18 +770,18 @@
 
 (defmethod event-handler ::minimap-mouse-released
   [{:keys [minimap-width minimap-height map-details]}]
-  (let [{:keys [team x y]} (-> *state deref :drag-team)
-        {:keys [map-width map-height]} (-> map-details :smf :header)
-        x (* (/ x minimap-width) map-width map-multiplier)
-        z (* (/ y minimap-height) map-height map-multiplier)
-        scripttags {:game
-                    {(keyword (str "team" team))
-                     {:startposx x
-                      :startposz z}}}]
-    (log/debug scripttags)
-    (swap! *state update :scripttags u/deep-merge scripttags)
-    (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
-    (client/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+  (when-let [{:keys [team x y]} (-> *state deref :drag-team)]
+    (let [{:keys [map-width map-height]} (-> map-details :smf :header)
+          x (* (/ x minimap-width) map-width map-multiplier)
+          z (* (/ y minimap-height) map-height map-multiplier)
+          scripttags {:game
+                      {(keyword (str "team" team))
+                       {:startposx x
+                        :startposz z}}}]
+      (log/debug scripttags)
+      (swap! *state update :scripttags u/deep-merge scripttags)
+      (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
+      (client/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
   (swap! *state dissoc :drag-team))
 
 

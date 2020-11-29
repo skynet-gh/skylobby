@@ -103,21 +103,21 @@
     :hostport 8452
     :hostip nil
     :ishost 0
-    "team0"
+    :team0
     {:teamleader 0
      :handicap 0
      :allyteam 0
      :rgbcolor "0.0 0.0 0.0"
      :side "ARM"}
-    "team1"
+    :team1
     {:teamleader 0
      :handicap 1
      :allyteam 1
      :rgbcolor "0.00392156862745098 0.0 0.0"
      :side "CORE"},
-    "allyteam1" {:numallies 0}
-    "allyteam0" {:numallies 0}
-    "ai1"
+    :allyteam1 {:numallies 0}
+    :allyteam0 {:numallies 0}
+    :ai1
     {:name "kekbot1"
      :shortname "KAIK"
      :version "0.13"
@@ -125,7 +125,7 @@
      :team 1,
      :isfromdemo 0
      :options {}},
-    "player0"
+    :player0
     {:name "skynet9001",
      :team 0,
      :isfromdemo 0,
