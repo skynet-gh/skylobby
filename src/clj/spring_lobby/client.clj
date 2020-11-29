@@ -418,17 +418,3 @@
       (-> state
           (dissoc :client :client-deferred)
           (assoc :login-error m)))))
-
-(defn open-battle [c {:keys [battle-type nat-type battle-password host-port max-players mod-hash rank map-hash
-                             engine engine-version map-name title mod-name]
-                      :or {battle-type 0
-                           nat-type 0
-                           battle-password "*"
-                           host-port 8452
-                           max-players 8
-                           rank 0
-                           engine "Spring"}}]
-  (send-message c
-    (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
-         " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
-         "\t" mod-name)))

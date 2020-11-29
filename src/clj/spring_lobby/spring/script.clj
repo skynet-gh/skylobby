@@ -8,6 +8,26 @@
     [taoensso.timbre :as log]))
 
 
+(defn flatten-scripttags
+  ([scripttags]
+   (flatten-scripttags nil scripttags))
+  ([prefix scripttags]
+   (mapcat
+     (fn [[k v]]
+       (let [prefix (if prefix
+                      (str prefix "/" (name k))
+                      (name k))]
+         (if (map? v)
+           (flatten-scripttags prefix v)
+           [(str prefix "=" v)])))
+     scripttags)))
+
+(defn format-scripttags [scripttags-data]
+  (string/join
+    "\t"
+    (flatten-scripttags scripttags-data)))
+
+
 (defn parse-scripttags [raw-scripttags]
   (->> (string/split raw-scripttags #"\t")
        (remove string/blank?)

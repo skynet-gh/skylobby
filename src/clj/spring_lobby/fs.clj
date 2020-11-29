@@ -98,7 +98,7 @@
 
 (defn spring-root
   "Returns the root directory for Spring"
-  []
+  ^java.io.File []
   (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")

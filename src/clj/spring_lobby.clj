@@ -22,6 +22,7 @@
     [spring-lobby.lua :as lua]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
+    [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log]
     [version-clj.core :as version])
   (:import
@@ -54,7 +55,11 @@
   [:username :password :server-url :engine-version :mod-name :map-name
    :battle-title :battle-password
    :bot-username :bot-name :bot-version
-   :engine-branch :maps-index-url])
+   :engine-branch :maps-index-url :scripttags])
+
+
+(defn config [state]
+  (select-keys state config-keys))
 
 
 (defn watch-config-state []
@@ -62,8 +67,8 @@
     *state
     :config
     (fn [_k _ref old-state new-state]
-      (let [old-config (select-keys old-state config-keys)
-            new-config (select-keys new-state config-keys)]
+      (let [old-config (config old-state)
+            new-config (config new-state)]
         (when (not= old-config new-config)
           (log/debug "Updating config file")
           (let [app-root (io/file (fs/app-root))
@@ -96,7 +101,7 @@
                                 (log/warn e "Error reading" filename "in" f))))
             rapid-mods
             (some->> sdp-files
-                     (map (fn [f]
+                     (map (fn [^java.io.File f]
                             {::fs/source :rapid
                              :filename (.getAbsolutePath f)
                              :modinfo (try-inner-lua f "modinfo.lua")
@@ -381,15 +386,33 @@
   (swap! *state assoc :server-url event))
 
 
+
+(defn open-battle
+  [client {:keys [battle-type nat-type battle-password host-port max-players mod-hash rank map-hash
+                  engine engine-version map-name title mod-name]
+           :or {battle-type 0
+                nat-type 0
+                battle-password "*"
+                host-port 8452
+                max-players 8
+                rank 0
+                engine "Spring"}}]
+  (client/send-message client
+    (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
+         " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
+         "\t" mod-name)))
+
 (defn host-battle []
-  (let [{:keys [client] :as state} @*state]
-    (client/open-battle client
+  (let [{:keys [client scripttags] :as state} @*state]
+    (open-battle client
       (-> state
           (clojure.set/rename-keys {:battle-title :title})
           (select-keys [:battle-password :title :engine-version
                         :mod-name :map-name])
           (assoc :mod-hash -1
-                :map-hash -1)))))
+                 :map-hash -1)))
+    (when (seq scripttags)
+      (client/send-message client (str "SETSCRIPTTAGS " (spring-script/flatten-scripttags scripttags))))))
 
 (defmethod event-handler ::host-battle [_e]
   (host-battle))
@@ -858,7 +881,11 @@
          :column-resize-policy :constrained
          :items (or (some->> mod-details
                              :modoptions
-                             (map second))
+                             (map second)
+                             (filter :key)
+                             (map #(update % :key (comp keyword string/lower-case)))
+                             (sort-by :key)
+                             (remove (comp #{"section"} :type)))
                     [])
          :columns
          [{:fx/type :table-column
@@ -868,7 +895,24 @@
            {:fx/cell-type :table-cell
             :describe
             (fn [i]
-              {:text (str (:key i))})}}
+              {:text ""
+               :graphic
+               {:fx/type fx.ext.node/with-tooltip-props
+                :props
+                {:tooltip
+                 {:fx/type :tooltip
+                  :show-delay [10 :ms]
+                  :text (str (:name i) "\n\n" (:desc i))}}
+                :desc
+                (merge
+                  {:fx/type :label
+                   :text (str (name (:key i)))}
+                  (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
+                    (when (and (not= (:def i) v)
+                               (not= (:def i)
+                                     (edn/read-string v)))
+                      {:style {:-fx-font-weight :bold}})))}})}}
+          #_
           {:fx/type :table-column
            :text "Type"
            :cell-value-factory identity
@@ -884,18 +928,69 @@
            {:fx/cell-type :table-cell
             :describe
             (fn [i]
-              (if (= "bool" (:type i))
+              (case (:type i)
+                "bool"
                 {:text ""
                  :graphic
                  {:fx/type ext-recreate-on-key-changed
                   :key (str (:key i))
                   :desc
-                  {:fx/type :check-box
-                   :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                                           (:def i))))
-                   :on-selected-changed {:event/type ::modoption-change
-                                         :modoption-key (:key i)}
-                   :disable (not am-host)}}}
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :check-box
+                    :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                                            (:def i))))
+                    :on-selected-changed {:event/type ::modoption-change
+                                          :modoption-key (:key i)}
+                    :disable (not am-host)}}}}
+                "number"
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :text-field
+                    :disable (not am-host)
+                    :text-formatter
+                    {:fx/type :text-formatter
+                     :value-converter :number
+                     :value (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                                 (:def i)))
+                     :on-value-changed {:event/type ::modoption-change
+                                        :modoption-key (:key i)}}}}}}
+                "list"
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :choice-box
+                    :disable (not am-host)
+                    :value (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
+                                                (:def i)))
+                    :on-value-changed {:event/type ::modoption-change
+                                       :modoption-key (:key i)}
+                    :items (or (map (comp :key second) (:items i))
+                               [])}}}}
                 {:text (str (:def i))}))}}]}
         {:fx/type :v-box
          :alignment :top-left
@@ -1325,15 +1420,16 @@
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event]}]
   (let [startpostype (get spring/startpostypes-by-name event)]
+    (swap! *state assoc-in [:scripttags :startpostype] startpostype)
     (swap! *state assoc-in [:battle :scripttags :startpostype] startpostype)
     (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
-  (let [k (keyword modoption-key)
-        value (str event)]
-    (swap! *state assoc-in [:battle :scripttags :game :modoptions k] (str event))
-    (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" modoption-key "=" value))))
+  (let [value (str event)]
+    (swap! *state assoc-in [:scripttags :game :modoptions modoption-key] (str event))
+    (swap! *state assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event))
+    (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status team-color] :as id}]
@@ -1390,7 +1486,8 @@
 
 (defmethod event-handler ::battle-color-action
   [{:keys [id] :fx/keys [^javafx.event.Event event] :as opts}]
-  (let [javafx-color (.getValue (.getSource event))
+  (let [^javafx.scene.control.ComboBoxBase source (.getSource event)
+        javafx-color (.getValue source)
         color-int (spring-color javafx-color)]
     (update-color id opts color-int)))
 
@@ -1417,7 +1514,7 @@
       (log/info "Running '" command "'")
       (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
             ^"[Ljava.lang.String;" envp nil
-            process (.exec runtime cmdarray envp (fs/spring-root))]
+            ^java.lang.Process process (.exec runtime cmdarray envp (fs/spring-root))]
         (future
           (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
             (loop []
@@ -1487,19 +1584,19 @@
 
 (defn insert-at
   "Addes value into a vector at an specific index."
-  [v idx val]
+  [v idx value]
   (-> (subvec v 0 idx)
-      (conj val)
+      (conj value)
       (into (subvec v idx))))
 
 (defn insert-after
   "Finds an item into a vector and adds val just after it.
    If needle is not found, the input vector will be returned."
-  [v needle val]
+  [^clojure.lang.APersistentVector v needle value]
   (let [index (.indexOf v needle)]
     (if (neg? index)
       v
-      (insert-at v (inc index) val))))
+      (insert-at v (inc index) value))))
 
 (defn wrap-downloaded-bytes-counter
   "Middleware that provides an CountingInputStream wrapping the stream output"
@@ -1523,12 +1620,13 @@
             (insert-after clj-http/wrap-url wrap-downloaded-bytes-counter)
             (conj clj-http/wrap-lower-case-headers))
         (let [request (clj-http/get url {:as :stream})
-              length (Integer. (get-in request [:headers "content-length"] 0))
+              ^int content-length (get-in request [:headers "content-length"] 0)
+              length (Integer/valueOf content-length)
               buffer-size (* 1024 10)]
-          (with-open [input (:body request)
+          (with-open [^java.io.InputStream input (:body request)
                       output (io/output-stream dest)]
             (let [buffer (make-array Byte/TYPE buffer-size)
-                  counter (:downloaded-bytes-counter request)]
+                  ^CountingInputStream counter (:downloaded-bytes-counter request)]
               (loop []
                 (let [size (.read input buffer)]
                   (when (pos? size)
@@ -1598,7 +1696,7 @@
                             (log/debug e)
                             (when standalone
                               (loop []
-                                (let [client (:client @*state)]
+                                (let [^SplicedStream client (:client @*state)]
                                   (if (and client (not (.isClosed client)))
                                     (do
                                       (client/disconnect client)
@@ -1750,7 +1848,7 @@
                   :cell-factory
                   {:fx/cell-type :table-cell
                    :describe
-                   (fn [i]
+                   (fn [^java.io.File i]
                      {:text (str (.getName i))})}}
                  {:fx/type :table-column
                   :text "ID"
