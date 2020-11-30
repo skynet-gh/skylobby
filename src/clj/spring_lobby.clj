@@ -684,8 +684,9 @@
 
 
 (defn minimap-starting-points
-  [map-details scripttags minimap-width minimap-height]
+  [battle-details map-details scripttags minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
+        battle-team-keys (spring/team-keys (spring/teams battle-details))
         teams (or (->> map-details :mapinfo :teams
                        (map
                          (fn [[k v]]
@@ -701,23 +702,26 @@
                        (map
                          (fn [[k {:keys [startposx startposz]}]]
                            [k {:startpos {:x startposx :z startposz}}]))
-                       (into {})))]
+                       (into {})))
+        missing-teams (clojure.set/difference (set battle-team-keys) (set (map first teams)))
+        midx (quot (* map-multiplier map-width) 2)
+        midz (quot (* map-multiplier map-height) 2)
+        teams (concat teams (map (fn [team] [team {}]) missing-teams))]
     (->> teams
          (map
            (fn [[team-kw {:keys [startpos]}]]
-             (when-let [{:keys [x z]} startpos]
-               (if (and (number? x) (number? z))
-                 (let [[_all team] (re-find #"team(\d+)" (name team-kw))
-                       scriptx (some-> scripttags :game team-kw :startposx u/to-number)
-                       scriptz (some-> scripttags :game team-kw :startposz u/to-number)
-                       x (or scriptx x)
-                       z (or scriptz z)]
-                   {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
-                          (/ start-pos-r 2))
-                    :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
-                          (/ start-pos-r 2))
-                    :team team})
-                 (log/warn "Bad starting pos" startpos)))))
+             (let [{:keys [x z]} startpos
+                   [_all team] (re-find #"team(\d+)" (name team-kw))
+                   scriptx (some-> scripttags :game team-kw :startposx u/to-number)
+                   scriptz (some-> scripttags :game team-kw :startposz u/to-number)
+                   x (or scriptx x midx)
+                   z (or scriptz z midz)]
+               (when (and (number? x) (number? z))
+                 {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
+                        (/ start-pos-r 2))
+                  :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
+                        (/ start-pos-r 2))
+                  :team team}))))
          (filter some?))))
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
@@ -819,7 +823,8 @@
                           :startpostype
                           spring/startpostype-name)
         {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (-> map-details :smf :header))
-        starting-points (minimap-starting-points map-details scripttags minimap-width minimap-height)]
+        battle-details (spring/battle-details {:battle battle :battles battles :users users})
+        starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)]
     {:fx/type :h-box
      :children
      (concat

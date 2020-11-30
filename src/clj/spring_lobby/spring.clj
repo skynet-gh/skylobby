@@ -58,24 +58,30 @@
 (defn team-name [battle-status]
   (keyword (str "team" (:id battle-status))))
 
+(defn teams [battle]
+  (map
+    (comp first second)
+    (group-by (comp :id :battle-status second)
+      (filter
+        (comp :mode :battle-status second)
+        (merge (:users battle) (:bots battle))))))
+
+(defn team-keys [teams]
+  (set (map (comp team-name :battle-status second) teams)))
+
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   ([battle]
    (script-data battle nil))
   ([battle {:keys [is-host] :as opts}]
-   (let [teams (map
-                 (comp first second)
-                 (group-by (comp :id :battle-status second)
-                   (filter
-                     (comp :mode :battle-status second)
-                     (merge (:users battle) (:bots battle)))))
+   (let [teams (teams battle)
          ally-teams (set
                       (map
                         (comp :ally :battle-status second)
                         (filter
                           (comp :mode :battle-status second)
                           (mapcat battle [:users :bots]))))
-         team-keys (set (map (comp team-name :battle-status second) teams))]
+         team-keys (team-keys teams)]
      (u/deep-merge
        (update
          (:scripttags battle)
@@ -154,13 +160,16 @@
    (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))
 
 
-(defn battle-script-txt [{:keys [battle battles users username]}]
+(defn battle-details [{:keys [battle battles users]}]
   (let [battle (update battle :users
                        #(into {}
                           (map (fn [[k v]]
                                  [k (assoc v :username k :user (get users k))])
-                               %)))
-        battle (merge (get battles (:battle-id battle)) battle)
+                               %)))]
+    (merge (get battles (:battle-id battle)) battle)))
+
+(defn battle-script-txt [{:keys [username] :as state}]
+  (let [battle (battle-details state)
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}})]
