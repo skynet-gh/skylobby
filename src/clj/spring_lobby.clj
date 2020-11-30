@@ -921,14 +921,19 @@
           {:fx/type :h-box
            :alignment :center-left
            :children
-           [{:fx/type :label
-             :alignment :center-left
-             :text "Start Positions: "}
-            {:fx/type :choice-box
-             :value startpostype
-             :items (map str (vals spring/startpostypes))
-             :disable (not am-host)
-             :on-value-changed {:event/type ::battle-startpostype-change}}]}
+           (concat
+             [{:fx/type :label
+               :alignment :center-left
+               :text "Start Positions: "}
+              {:fx/type :choice-box
+               :value startpostype
+               :items (map str (vals spring/startpostypes))
+               :disable (not am-host)
+               :on-value-changed {:event/type ::battle-startpostype-change}}]
+             (when (= "Choose before game" startpostype)
+               [{:fx/type :button
+                 :text "Reset"
+                 :on-action {:event/type ::reset-start-positions}}]))}
           {:fx/type :pane
            :v-box/vgrow :always}
           {:fx/type :h-box
@@ -1550,6 +1555,20 @@
     (swap! *state assoc-in [:battle :scripttags :game :startpostype] startpostype)
     (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
+(defmethod event-handler ::reset-start-positions
+  [_e]
+  (let [team-ids (take 16 (iterate inc 0))
+        scripttag-keys (mapcat
+                         (fn [i]
+                           [(str "game/team" i "/startposx")
+                            (str "game/team" i "/startposz")])
+                         team-ids)]
+    (doseq [i team-ids]
+      (let [team (keyword (str "team" i))]
+        (swap! *state update-in [:scripttags :game team] dissoc :startposx :startposz)
+        (swap! *state update-in [:battle :scripttags :game team] dissoc :startposx :startposz)))
+    (client/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join scripttag-keys)))))
+
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
   (let [value (str event)]
@@ -1797,14 +1816,16 @@
                    (swap! *state assoc :rapid-repos-cached (doall (rapid/repos))))
                  (future
                    (swap! *state assoc :engines-cached (doall (fs/engines))))
-                 (future
-                   (when-let [rapid-repo (:rapid-repo @*state)]
-                     (let [versions (->> (rapid/versions rapid-repo)
-                                         (sort-by :version version/version-compare)
-                                         reverse
-                                         doall)]
-                       (swap! *state assoc :rapid-versions-cached versions))))
-                 (cache-mods))
+                 (when-not (:rapid-versions-cached @*state)
+                   (future
+                     (when-let [rapid-repo (:rapid-repo @*state)]
+                       (let [versions (->> (rapid/versions rapid-repo)
+                                           (sort-by :version version/version-compare)
+                                           reverse
+                                           doall)]
+                         (swap! *state assoc :rapid-versions-cached versions)))))
+                 (when-not (:mods-cached @*state)
+                   (cache-mods)))
    :on-advanced (fn [& args]
                   (log/debug "on-advanced" args))
    :on-deleted (fn [& args]
