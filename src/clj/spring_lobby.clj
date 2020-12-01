@@ -1572,7 +1572,7 @@
       (let [team (keyword (str "team" i))]
         (swap! *state update-in [:scripttags :game team] dissoc :startposx :startposz)
         (swap! *state update-in [:battle :scripttags :game team] dissoc :startposx :startposz)))
-    (client/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join scripttag-keys)))))
+    (client/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]

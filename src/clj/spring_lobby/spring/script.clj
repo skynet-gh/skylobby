@@ -17,8 +17,13 @@
        (let [prefix (if prefix
                       (str prefix "/" (name k))
                       (name k))]
-         (if (map? v)
+         (cond
+           (or (and (seqable? v) (not (seq v)))
+               (string/blank? (str v)))
+           []
+           (map? v)
            (flatten-scripttags prefix v)
+           :else
            [(str prefix "=" v)])))
      scripttags)))
 
