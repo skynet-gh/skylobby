@@ -37,19 +37,32 @@
 (set! *warn-on-reflection* true)
 
 
-(def initial-state
-  (or
-    (try
-      (let [config-file (io/file (fs/app-root) fs/config-filename)]
-        (when (.exists config-file)
-          (-> config-file slurp edn/read-string)))
-      (catch Exception e
-        (log/warn e "Exception loading initial state")))
-    {}))
+(defn load-config []
+  (try
+    (let [config-file (io/file (fs/app-root) fs/config-filename)]
+      (when (.exists config-file)
+        (-> config-file slurp edn/read-string)))
+    (catch Exception e
+      (log/warn e "Exception loading config"))))
+
+(defn load-maps []
+  (try
+    (let [maps-file (io/file (fs/app-root) fs/maps-filename)]
+      (when (.exists maps-file)
+        (-> maps-file slurp edn/read-string)))
+    (catch Exception e
+      (log/warn e "Exception loading maps"))))
+
+
+(defn initial-state []
+  (merge
+    {}
+    (load-config)
+    (load-maps)))
 
 
 (def ^:dynamic *state
-  (atom initial-state))
+  (atom (initial-state)))
 
 
 (def config-keys
@@ -58,10 +71,8 @@
    :bot-username :bot-name :bot-version
    :engine-branch :maps-index-url :scripttags])
 
-
 (defn config [state]
   (select-keys state config-keys))
-
 
 (defn watch-config-state []
   (add-watch
@@ -78,14 +89,76 @@
               (.mkdirs app-root))
             (spit config-file (with-out-str (pprint new-config)))))))))
 
+(defn maps [state]
+  (select-keys state [:maps]))
+
+(defn watch-maps-state []
+  (add-watch
+    *state
+    :config
+    (fn [_k _ref old-state new-state]
+      (let [old-maps (maps old-state)
+            new-maps (maps new-state)]
+        (when (not= old-maps new-maps)
+          (log/debug "Updating maps file")
+          (let [app-root (io/file (fs/app-root))
+                maps-file (io/file app-root fs/maps-filename)]
+            (when-not (.exists app-root)
+              (.mkdirs app-root))
+            (spit maps-file (with-out-str (pprint new-maps)))))))))
+
+(def maps-cache-root
+  (io/file (fs/app-root) "maps-cache"))
+
+(defn map-cache-file [map-name]
+  (io/file maps-cache-root (str map-name ".edn")))
+
+(defn safe-read-map-cache [map-name]
+  (log/info "Reading map cache for" (str "'" map-name "'"))
+  (try
+    (edn/read-string (slurp (map-cache-file map-name)))
+    (catch Exception e
+      (log/warn e "Error loading map cache for" (str "'" map-name "'")))))
+
+(defn reconcile-maps
+  "Reads map details and caches for maps missing from :maps in state."
+  [state-atom]
+  (let [before (u/curr-millis)
+        map-files (fs/map-files)
+        known-filenames (->> state-atom deref :maps (map :filename) set)
+        todo (remove (comp known-filenames #(.getName %)) map-files)]
+    (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
+    (when-not (.exists maps-cache-root)
+      (.mkdirs maps-cache-root))
+    (doseq [map-file todo]
+      (log/info "Reading" map-file)
+      (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)
+            map-cache-file (map-cache-file (:map-name map-data))]
+        (if map-name
+          (do
+            (log/info "Caching" map-file "to" map-cache-file)
+            (spit map-cache-file (with-out-str (pprint map-data)))
+            (swap! state-atom update :maps
+                   (fn [maps]
+                     (set (conj maps (select-keys map-data [:filename :map-name]))))))
+          (log/warn "No map name found for" map-file))))
+    (log/debug "Removing maps with no name")
+    (swap! state-atom update :maps (fn [maps] (set (filter :map-name maps))))
+    {:todo-count (count todo)}))
+
+
+#_
+(reconcile-maps *state)
+#_
+(->> *state deref :maps (remove :map-name))
+
 
 (defmulti event-handler :event/type)
 
 
 (defmethod event-handler ::reload-maps [_e]
   (future
-    (swap! *state assoc :maps-cached nil)
-    (swap! *state assoc :maps-cached (doall (fs/maps)))))
+    (reconcile-maps *state)))
 
 
 (defn cache-mods []
@@ -430,67 +503,87 @@
              (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
                (str " " battle-password)))))))
 
+(defmethod event-handler ::maps-key-typed [{:fx/keys [^javafx.scene.input.KeyEvent event]}]
+  (swap! *state update :map-input-prefix (fn [x] (str x (.getCharacter event))))
+  (log/info (-> *state deref :map-input-prefix)))
+
+(defmethod event-handler ::maps-hidden [_e]
+  (swap! *state dissoc :map-input-prefix))
+
+
 (defn map-list
-  [{:keys [disable map-name maps-cached on-value-changed]}]
-  (if maps-cached
-    (let [map-names (mapv :map-name maps-cached)]
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       (concat
-         [{:fx/type :label
-           :text " Map: "}
-          {:fx/type :choice-box
-           :value (str map-name)
-           :items map-names
-           :disable (boolean disable)
-           :on-value-changed on-value-changed}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Browse and download maps with http"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::show-http-downloader}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-magnify:16:white")}}}]
-         (when (seq map-names)
-           [{:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
-               :text "Random map"}}
-             :desc
-             {:fx/type :button
-              :on-action (assoc on-value-changed :map-name (rand-nth map-names))
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+  [{:keys [disable map-name maps on-value-changed]}]
+  (cond
+    (not maps)
+    {:fx/type :v-box
+     :alignment :center-left
+     :children
+     [{:fx/type :label
+       :text "Loading maps..."}]}
+    (not (seq maps))
+    {:fx/type :v-box
+     :alignment :center-left
+     :children
+     [{:fx/type :label
+       :text "No maps"}]}
+    :else
+    {:fx/type :h-box
+     :alignment :center-left
+     :children
+     (concat
+       [{:fx/type :label
+         :text " Map: "}
+        {:fx/type :choice-box
+         :value (str map-name)
+         :items (->> maps
+                     (map :map-name)
+                     sort)
+         :disable (boolean disable)
+         :on-value-changed on-value-changed
+         :on-key-typed {:event/type ::maps-key-typed}
+         :on-hidden {:event/type ::maps-hidden}}
+        {:fx/type fx.ext.node/with-tooltip-props
+         :props
+         {:tooltip
+          {:fx/type :tooltip
+           :show-delay [10 :ms]
+           :text "Browse and download maps with http"}}
+         :desc
+         {:fx/type :button
+          :on-action {:event/type ::show-http-downloader}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal (str "mdi-download:16:white")}}}]
+       (when (seq maps)
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
             {:fx/type :tooltip
              :show-delay [10 :ms]
-             :text "Reload maps"}}
+             :text "Random map"}}
            :desc
            {:fx/type :button
-            :on-action {:event/type ::reload-maps}
+            :on-action (assoc on-value-changed :map-name (:map-name (rand-nth (seq maps))))
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh:16:white"}}}])})
-    {:fx/type :v-box
-     :alignment :center-left
-     :children
-     [{:fx/type :label
-       :text "Loading maps..."}]}))
+             :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+       [{:fx/type fx.ext.node/with-tooltip-props
+         :props
+         {:tooltip
+          {:fx/type :tooltip
+           :show-delay [10 :ms]
+           :text "Reload maps"}}
+         :desc
+         {:fx/type :button
+          :on-action {:event/type ::reload-maps}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal "mdi-refresh:16:white"}}}])}))
 
 (defn battles-buttons
   [{:keys [battle battles battle-password client selected-battle
-           battle-title engine-version mod-name map-name maps-cached engines-cached mods-cached]}]
+           battle-title engine-version mod-name map-name maps engines-cached
+           mods-cached map-input-prefix]}]
   {:fx/type :h-box
    :alignment :top-left
    :children
@@ -540,7 +633,7 @@
             :on-action {:event/type ::show-http-downloader}
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-magnify:16:white")}}}]}
+             :icon-literal (str "mdi-download:16:white")}}}]}
         {:fx/type :h-box
          :alignment :center-left
          :children
@@ -571,7 +664,7 @@
               :on-action {:event/type ::show-rapid-downloader}
               :graphic
               {:fx/type font-icon/lifecycle
-               :icon-literal (str "mdi-magnify:16:white")}}}
+               :icon-literal (str "mdi-download:16:white")}}}
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
@@ -586,7 +679,8 @@
                :icon-literal "mdi-refresh:16:white"}}}])}
         {:fx/type map-list
          :map-name map-name
-         :maps-cached maps-cached
+         :maps maps
+         :map-input-prefix map-input-prefix
          :on-value-changed {:event/type ::map-change}}]))})
 
 
@@ -608,16 +702,21 @@
 
 (defmethod event-handler ::map-change
   [{:fx/keys [event] :keys [map-name]}]
-  (swap! *state assoc :map-name (or map-name event)))
+  (let [map-name (or map-name event)]
+    (swap! *state assoc
+           :map-name map-name
+           :map-details (safe-read-map-cache map-name))))
 
 (defmethod event-handler ::battle-map-change
   [{:fx/keys [event] :keys [map-name]}]
-  (swap! *state assoc :map-name (or map-name event))
   (let [spectator-count 0 ; TODO
         locked 0
         map-hash -1 ; TODO
         map-name (or map-name event)
         m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
+    (swap! *state assoc
+           :map-name map-name
+           :map-details (safe-read-map-cache map-name))
     (client/send-message (:client @*state) m)))
 
 (defmethod event-handler ::kick-battle
@@ -704,25 +803,29 @@
                            [k {:startpos {:x startposx :z startposz}}]))
                        (into {})))
         missing-teams (clojure.set/difference (set battle-team-keys) (set (map first teams)))
-        midx (quot (* map-multiplier map-width) 2)
-        midz (quot (* map-multiplier map-height) 2)
+        midx (if map-width (quot (* map-multiplier map-width) 2) 0)
+        midz (if map-height (quot (* map-multiplier map-height) 2) 0)
         teams (concat teams (map (fn [team] [team {}]) missing-teams))]
-    (->> teams
-         (map
-           (fn [[team-kw {:keys [startpos]}]]
-             (let [{:keys [x z]} startpos
-                   [_all team] (re-find #"team(\d+)" (name team-kw))
-                   scriptx (some-> scripttags :game team-kw :startposx u/to-number)
-                   scriptz (some-> scripttags :game team-kw :startposz u/to-number)
-                   x (or scriptx x midx)
-                   z (or scriptz z midz)]
-               (when (and (number? x) (number? z))
-                 {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
-                        (/ start-pos-r 2))
-                  :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
-                        (/ start-pos-r 2))
-                  :team team}))))
-         (filter some?))))
+    (when (and (number? map-width)
+               (number? map-height)
+               (number? minimap-width)
+               (number? minimap-height))
+      (->> teams
+           (map
+             (fn [[team-kw {:keys [startpos]}]]
+               (let [{:keys [x z]} startpos
+                     [_all team] (re-find #"(\d+)" (name team-kw))
+                     scriptx (some-> scripttags :game team-kw :startposx u/to-number)
+                     scriptz (some-> scripttags :game team-kw :startposz u/to-number)
+                     x (or scriptx x midx)
+                     z (or scriptz z midz)]
+                 (when (and (number? x) (number? z))
+                   {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
+                          (/ start-pos-r 2))
+                    :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
+                          (/ start-pos-r 2))
+                    :team team}))))
+           (filter some?)))))
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
 (def ext-recreate-on-key-changed
@@ -808,8 +911,9 @@
 
 
 (defn battle-buttons
-  [{:keys [am-host host-user host-username maps-cached battle-map bot-username bot-name bot-version
-           engine-version map-details battle battles username users mods-cached drag-team]}]
+  [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version
+           engine-version map-details battle battles username users mods-cached drag-team
+           map-input-prefix]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (some->> mods-cached
                              (filter (comp #{battle-modname}
@@ -830,28 +934,14 @@
      (concat
        [{:fx/type :v-box
          :children
-         [{:fx/type :h-box
-           :alignment :top-left
-           :children
-           [{:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
-               :text (if am-host
-                       "You are the host"
-                       (str "Waiting for host " host-username))}}
-             :desc
-             {:fx/type :button
-              :text (str (if am-host "Start" "Join") " Game")
-              :disable (boolean (and (not am-host)
-                                     (not (-> host-user :client-status :ingame))))
-              :on-action {:event/type ::start-battle}}}
-            {:fx/type map-list
-             :disable (not am-host)
-             :map-name battle-map
-             :maps-cached maps-cached
-             :on-value-changed {:event/type ::battle-map-change}}]}
+         [{:fx/type map-list
+           :disable (not am-host)
+           :map-name battle-map
+           :maps maps
+           :map-input-prefix map-input-prefix
+           :on-value-changed {:event/type ::battle-map-change}}
+          {:fx/type :pane
+           :v-box/vgrow :always}
           {:fx/type :h-box
            :alignment :top-left
            :children
@@ -954,7 +1044,23 @@
                                        :username username})})
             {:fx/type :label
              :alignment :center-left
-             :text " Ready"}]}]}
+             :text " Ready"}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text (if am-host
+                       "You are the host"
+                       (str "Waiting for host " host-username))}}
+             :desc
+             {:fx/type :button
+              :text (str (if am-host "Start" "Join") " Game")
+              :disable (boolean (and (not am-host)
+                                     (not (-> host-user :client-status :ingame))))
+              :on-action {:event/type ::start-battle}}}]}]}
         {:fx/type :pane
          :h-box/hgrow :always}
         {:fx/type :v-box
@@ -1078,17 +1184,6 @@
                       :items (or (map (comp :key second) (:items i))
                                  [])}}}}
                   {:text (str (:def i))}))}}]}]}
-        #_
-        {:fx/type :v-box
-         :alignment :top-left
-         :children
-         [{:fx/type :label
-           :text "scripttags"}
-          {:fx/type :text-area
-           :editable false
-           :text (with-out-str (pprint (:scripttags battle)))
-           :style {:-fx-font-family "monospace"}
-           :v-box/vgrow :always}]}
         {:fx/type :v-box
          :alignment :top-left
          :children
@@ -1099,6 +1194,7 @@
            :text (str (string/replace (spring/battle-script-txt @*state) #"\t" "  "))
            :style {:-fx-font-family "monospace"}
            :v-box/vgrow :always}]}
+        #_
         {:fx/type :v-box
          :alignment :top-left
          :children
@@ -1107,10 +1203,7 @@
           {:fx/type :text-area
            :editable false
            :text (with-out-str
-                   (pprint
-                     (->> maps-cached
-                          (filter (comp #{battle-map} :map-name))
-                          first)))
+                   (pprint map-details))
            :style {:-fx-font-family "monospace"}
            :v-box/vgrow :always}]}]
       (let [image-file (io/file (fs/map-minimap battle-map))]
@@ -1320,13 +1413,10 @@
 
 
 (defn battle-table
-  [{:keys [battle battles users username maps-cached] :as state}]
+  [{:keys [battle battles map-details users username] :as state}]
   (let [{:keys [host-username battle-map]} (get battles (:battle-id battle))
         host-user (get users host-username)
-        am-host (= username host-username)
-        map-details (->> maps-cached
-                         (filter (comp #{battle-map} :map-name))
-                         first)]
+        am-host (= username host-username)]
     {:fx/type :v-box
      :alignment :top-left
      :children
@@ -1548,9 +1638,9 @@
              :battle-map battle-map
              :host-user host-user
              :map-details map-details}
-            (select-keys state [:battle :username :host-username :maps-cached
+            (select-keys state [:battle :username :host-username :maps
                                 :bot-username :bot-name :bot-version :engine-version
-                                :mods-cached :battles :drag-team]))]))}))
+                                :mods-cached :battles :drag-team :map-input-prefix]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -1796,25 +1886,21 @@
 
 
 (defn root-view
-  [{{:keys [client client-deferred users battles battle battle-password selected-battle username
-            password login-error battle-title engine-version mod-name map-name last-failed-message
-            maps-cached
-            bot-username bot-name bot-version
-            server-url standalone
+  [{{:keys [users battles
+            engine-version last-failed-message
+            standalone
             rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines-cached
             rapid-versions-cached
             show-rapid-downloader
             engine-branch engine-versions-cached http-download
             maps-index-url map-files-cache
-            show-http-downloader
-            mods-cached drag-team]}
+            show-http-downloader]
+     :as state}
     :state}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [& args]
                  (log/debug "on-created" args)
-                 (when-not (:maps-cached @*state)
-                   (future
-                     (swap! *state assoc :maps-cached (doall (fs/maps)))))
+                 (future (reconcile-maps *state))
                  (future
                    (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files))))
                  (future
@@ -1842,8 +1928,8 @@
       [{:fx/type :stage
         :showing true
         :title "Alt Spring Lobby"
-        :width 2000
-        :height 1200
+        :width 1800
+        :height 1000
         :on-close-request (fn [e]
                             (log/debug e)
                             (when standalone
@@ -1858,44 +1944,29 @@
                 :stylesheets [(str (io/resource "dark-theme2.css"))]
                 :root {:fx/type :v-box
                        :alignment :top-left
-                       :children [{:fx/type client-buttons
-                                   :client client
-                                   :client-deferred client-deferred
-                                   :username username
-                                   :password password
-                                   :login-error login-error
-                                   :server-url server-url}
+                       :children [(merge
+                                    {:fx/type client-buttons}
+                                    (select-keys state
+                                      [:client :client-deferred :username :password :login-error
+                                       :server-url]))
                                   {:fx/type user-table
                                    :users users}
                                   {:fx/type battles-table
                                    :battles battles
                                    :users users}
-                                  {:fx/type battles-buttons
-                                   :battle battle
-                                   :battle-password battle-password
-                                   :battles battles
-                                   :client client
-                                   :selected-battle selected-battle
-                                   :battle-title battle-title
-                                   :engine-version engine-version
-                                   :mod-name mod-name
-                                   :map-name map-name
-                                   :maps-cached maps-cached
-                                   :sdp-files-cached sdp-files-cached
-                                   :engines-cached engines-cached
-                                   :mods-cached mods-cached}
-                                  {:fx/type battle-table
-                                   :battles battles
-                                   :battle battle
-                                   :users users
-                                   :username username
-                                   :engine-version engine-version
-                                   :bot-username bot-username
-                                   :bot-name bot-name
-                                   :bot-version bot-version
-                                   :maps-cached maps-cached
-                                   :mods-cached mods-cached
-                                   :drag-team drag-team}
+                                  (merge
+                                    {:fx/type battles-buttons}
+                                    (select-keys state
+                                      [:battle :battle-password :battles :client :selected-battle
+                                       :battle-title :engine-version :mod-name :map-name
+                                       :maps :map-input-prefix :sdp-files-cached
+                                       :engines-cached :mods-cached]))
+                                  (merge
+                                    {:fx/type battle-table}
+                                    (select-keys state
+                                      [:battles :battle :users :username :engine-version
+                                       :bot-username :bot-name :bot-version :maps
+                                       :map-input-prefix :mods-cached :drag-team :map-details]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children
@@ -2202,6 +2273,7 @@
   (Platform/setImplicitExit true)
   (swap! *state assoc :standalone true)
   (watch-config-state)
+  (watch-maps-state)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
                           (fn [state]

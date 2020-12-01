@@ -23,3 +23,9 @@
     (edn/read-string string-or-number)
     :else
     nil))
+
+
+(defn curr-millis
+  "Returns (System/currentTimeMillis)."
+  []
+  (System/currentTimeMillis))

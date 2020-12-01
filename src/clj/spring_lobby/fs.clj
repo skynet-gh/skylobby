@@ -7,6 +7,7 @@
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.lua :as lua]
     [spring-lobby.spring.script :as spring-script]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.awt.image BufferedImage)
@@ -28,6 +29,7 @@
 
 
 (def config-filename "config.edn")
+(def maps-filename "maps.edn")
 
 
 (defn os-name []
@@ -147,17 +149,24 @@
       (throw (ex-info "Unable to determine app root for this system"
                       {:sys-data sys-data})))))
 
-(defn map-files []
-  (->> (io/file (str (spring-root) "/maps"))
+(defn map-files-7z []
+  (->> (io/file (spring-root) "maps")
        file-seq
        (filter #(.isFile ^java.io.File %))
        (filter #(string/ends-with? (.getName ^java.io.File %) ".sd7"))))
 
 (defn map-files-zip []
-  (->> (io/file (str (spring-root) "/maps"))
+  (->> (io/file (spring-root) "maps")
        file-seq
        (filter #(.isFile ^java.io.File %))
        (filter #(string/ends-with? (.getName ^java.io.File %) ".sdz"))))
+
+(defn map-files []
+  (->> (io/file (spring-root) "maps")
+       file-seq
+       (filter #(.isFile ^java.io.File %))
+       (filter #(or (string/ends-with? (.getName ^java.io.File %) ".sd7")
+                    (string/ends-with? (.getName ^java.io.File %) ".sdz")))))
 
 (defn open-zip [^java.io.File from]
   (let [zf (new ZipFile from)
@@ -382,14 +391,12 @@
         (log/warn e "Error reading map data for" filename)))))
 
 (defn maps []
-  (let [before (System/currentTimeMillis)
-        m (some->> (.listFiles (io/file (spring-root) "maps"))
-                   seq
-                   (filter #(.isFile %))
+  (let [before (u/curr-millis)
+        m (some->> (map-files)
                    (cp/pmap 2 read-map-data)
                    (filter some?)
                    doall)]
-    (log/info "Maps loaded in" (- (System/currentTimeMillis) before) "ms")
+    (log/info "Maps loaded in" (- (u/curr-millis) before) "ms")
     (or m [])))
 
 (defn bots [engine]
