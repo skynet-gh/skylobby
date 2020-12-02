@@ -3,6 +3,9 @@
     [clojure.edn :as edn]))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://stackoverflow.com/a/17328219/984393
 (defn deep-merge [& ms]
   (apply

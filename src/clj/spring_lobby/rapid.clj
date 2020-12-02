@@ -5,9 +5,13 @@
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
+    [spring-lobby.lua :as lua]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
+
+
+(set! *warn-on-reflection* true)
 
 
 ; https://springrts.com/wiki/Rapid
@@ -168,3 +172,25 @@
        (take 10)
        (map (comp file-in-pool :md5))
        first))
+
+
+(defn mods []
+  (let [sdp-files (doall (sdp-files))
+        try-inner-lua (fn [f filename]
+                        (try
+                          (when-let [inner (rapid-inner f filename)]
+                            (let [contents (:contents inner)]
+                              (when-not (string/blank? contents)
+                                (lua/read-modinfo contents))))
+                          (catch Exception e
+                            (log/warn e "Error reading" filename "in" f))))]
+    (some->> sdp-files
+             (map (fn [^java.io.File f]
+                    {::fs/source :rapid
+                     :filename (.getName f)
+                     :absolute-path (.getAbsolutePath f)
+                     :modinfo (try-inner-lua f "modinfo.lua")
+                     :modoptions (try-inner-lua f "modoptions.lua")
+                     :engineoptions (try-inner-lua f "engineoptions.lua")
+                     :luaai (try-inner-lua f "luaai.lua")}))
+             (filter :modinfo))))

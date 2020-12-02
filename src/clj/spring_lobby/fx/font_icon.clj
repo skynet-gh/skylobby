@@ -6,6 +6,9 @@
     (org.kordamp.ikonli.javafx FontIcon)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def props
   (composite/props FontIcon
     :icon-literal [:setter lifecycle/scalar]))

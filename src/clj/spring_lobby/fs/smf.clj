@@ -3,6 +3,8 @@
     [org.clojars.smee.binary.core :as b]))
 
 
+(set! *warn-on-reflection* true)
+
 
 (def header-length 80)
 

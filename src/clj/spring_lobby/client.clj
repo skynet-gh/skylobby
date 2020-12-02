@@ -18,6 +18,9 @@
     (java.util Base64)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def agent-string "alt-spring-lobby-0.1")
 
 

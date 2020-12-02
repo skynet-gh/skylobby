@@ -8,6 +8,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn flatten-scripttags
   ([scripttags]
    (flatten-scripttags nil scripttags))
@@ -33,13 +36,16 @@
     (flatten-scripttags scripttags-data)))
 
 
+(defn parse-scripttag-key [scripttag-key]
+  (map keyword (string/split scripttag-key #"/")))
+
 (defn parse-scripttags [raw-scripttags]
   (->> (string/split raw-scripttags #"\t")
        (remove string/blank?)
        (map
          (fn [raw-scripttag]
            (let [[_all ks v] (re-find #"([^\s]+)=(.*)" raw-scripttag)
-                 kws (map keyword (string/split ks #"/"))]
+                 kws (parse-scripttag-key ks)]
              (assoc-in {} kws v))))
        (apply u/deep-merge)))
 

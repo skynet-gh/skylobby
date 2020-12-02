@@ -4,6 +4,9 @@
     (org.luaj.vm2.lib.jse JsePlatform)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def mocks
   "VFS = {}
 

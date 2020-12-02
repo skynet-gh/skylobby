@@ -87,6 +87,16 @@
                (fs/app-root)))))))
 
 
+(deftest sync-version-to-engine-version
+  (is (= "103.0"
+         (fs/sync-version-to-engine-version "103")))
+  (is (= "104.0"
+         (fs/sync-version-to-engine-version "104")))
+  (is (= "104.0.1-1553-gd3c0012 maintenance"
+         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance")))
+  (is (= "104.0.1-1553-gd3c0012 maintenance"
+         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance"))))
+
 
 (deftest spring-config-line
   (is (= "Dworld V1, for 16 players free for all. Roads are fast, expand to win! Made by [teh]Beherith (mysterme[at]gmail.com) concept by TP"

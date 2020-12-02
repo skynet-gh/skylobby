@@ -6,6 +6,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def springrts-buildbot-root
   "https://springrts.com/dl/buildbot/default")
 

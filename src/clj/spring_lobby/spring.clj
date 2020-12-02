@@ -18,6 +18,9 @@
     (org.apache.commons.io FileUtils)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def startpostypes
   {0 "Fixed"
    1 "Random"
@@ -175,9 +178,15 @@
                   :game {:myplayername username}})]
     (script-txt script)))
 
-(defn copy-engine [engine-version]
+(defn engine-dir-filename [engines engine-version]
+  (some->> engines
+           (filter (comp #{engine-version} :engine-version))
+           first
+           :engine-dir-filename))
+
+(defn copy-engine [engines engine-version]
   (if engine-version
-    (let [source (io/file (fs/spring-root) "engine" engine-version)
+    (let [source (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
           dest (io/file (fs/app-root) "spring" "engine" engine-version)]
       (if (.exists source)
         (do
@@ -254,19 +263,19 @@
                {:map-filename map-filename
                 :engine-version engine-version}))))
 
-(defn start-game [{:keys [client maps-cached mods-cached] :as state}]
+(defn start-game [{:keys [client engines maps mods] :as state}]
   (try
     (log/info "Starting game")
     (let [battle (-> state
                      :battles
                      (get (-> state :battle :battle-id)))
           {:keys [battle-map battle-version battle-modname]} battle
-          _ (copy-engine battle-version)
-          mod-detail (some->> mods-cached
+          _ (copy-engine engines battle-version)
+          mod-detail (some->> mods
                               (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
                               first)
           _ (copy-mod mod-detail battle-version)
-          map-filename (->> maps-cached
+          map-filename (->> maps
                             (filter (comp #{battle-map} :map-name))
                             first
                             :filename)

@@ -21,6 +21,9 @@
     (org.apache.commons.io FilenameUtils)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def o (Object.))
 
 (future
@@ -219,12 +222,39 @@
               (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
 
 
-(defn engines []
-  (log/debug "Loading engine versions")
+(defn sync-version-to-engine-version
+  "Returns the Spring engine version from a sync version. For some reason, engine '103.0' has sync
+  version '103' whereas for engine 104.0.1-1553-gd3c0012 maintenance the sync version is the same,
+  '104.0.1-1553-gd3c0012 maintenance'."
+  [sync-version]
+  (if (= sync-version (string/replace sync-version #"[^\d]" ""))
+    (str sync-version ".0")
+    sync-version))
+
+
+(defn sync-version [engine-dir]
+  (let [engine-exe (io/file engine-dir (spring-executable))
+        command [(.getAbsolutePath engine-exe) "--sync-version"]
+        ^"[Ljava.lang.String;" cmdarray (into-array String command)
+        runtime (Runtime/getRuntime)
+        process (.exec runtime cmdarray)]
+    (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
+    (let [sync-version (string/trim (slurp (.getInputStream process)))]
+      (log/info "Discovered sync-version of" engine-exe "is" (str "'" sync-version "'"))
+      sync-version)))
+
+
+(defn engine-dirs []
   (->> (.listFiles (io/file (spring-root) "engine"))
        seq
-       (filter #(.isDirectory %))
-       (map #(.getName %))))
+       (filter #(.isDirectory %))))
+
+(defn engine-data [engine-dir]
+  (let [sync-version (sync-version engine-dir)]
+    {:engine-dir-absolute-path (.getAbsolutePath engine-dir)
+     :engine-dir-filename (.getName engine-dir)
+     :sync-version sync-version
+     :engine-version (sync-version-to-engine-version sync-version)}))
 
 
 (defn slurp-zip-entry [zip-file entries entry-filename-lowercase]
@@ -235,7 +265,7 @@
     (slurp (.getInputStream zip-file entry))))
 
 
-(defn games []
+(defn mods []
   (map
     (fn [file]
       (with-open [zf (new ZipFile file)]
@@ -247,6 +277,7 @@
                                 (catch Exception e
                                   (log/warn e "Error loading" filename "from" file))))]
           {:filename (.getName file)
+           :absolute-path (.getAbsolutePath file)
            :modinfo (try-entry-lua "modinfo.lua")
            :modoptions (try-entry-lua "modoptions.lua")
            :engineoptions (try-entry-lua "engineoptions.lua")

@@ -39,6 +39,8 @@
             :opts {:fx.opt/map-event-handler event-handler})
         state-atom (var-get (find-var 'spring-lobby/*state))]
     (alter-var-root #'state (constantly state-atom))
+    (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))]
+      (watch-fn state-atom))
     (fx/mount-renderer state-atom r)
     (alter-var-root #'renderer (constantly r))))
 
@@ -54,10 +56,6 @@
   (try
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly state))
-    (let [watch-fn (var-get (find-var 'spring-lobby/watch-config-state))]
-      (watch-fn))
-    (let [watch-fn (var-get (find-var 'spring-lobby/watch-maps-state))]
-      (watch-fn))
     (when-let [client-deferred (:client-deferred @state)]
       (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
         (connected-loop-fn state client-deferred)))
@@ -71,7 +69,6 @@
 
 (defn unmount-store-refresh-load-mount []
   (try
-    (println "cancelling futures")
     (let [old-state @state]
       (when-let [f (:connected-loop old-state)]
         (future-cancel f))
