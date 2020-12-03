@@ -7,7 +7,8 @@
     [nrepl.cmdline]
     [reply.main]
     [taoensso.timbre :as timbre]
-    [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
+    [taoensso.timbre.appenders.3rd-party.rotor :as rotor]
+    user))
 
 
 (def ^:private log-file "repl.log")
@@ -53,6 +54,7 @@
       (str "[" (string/join "," middleware) "]")
       ;"--interactive"
       "--color"))
+  (user/init)
   (loop []
     (when
       (try

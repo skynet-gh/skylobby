@@ -83,9 +83,6 @@
           (println (old-refresh :after 'user/load-and-mount))
           (reset! refreshing false))))))
 
-; replace for editor integration
-(alter-var-root #'clojure.tools.namespace.repl/refresh (constantly unmount-store-refresh-load-mount))
-
 
 (defn refresh-on-file-change [context event]
   (when-let [file (:file event)]
@@ -101,12 +98,7 @@
   context)
 
 
-(hawk/watch! [{:paths ["src/clj"]
-               :handler refresh-on-file-change}])
-
-
-; doesn't work
-;(refresh :after 'user/mount)
-
-;(require 'spring-lobby)
-(mount)
+(defn init []
+  (hawk/watch! [{:paths ["src/clj"]
+                 :handler refresh-on-file-change}])
+  (mount))

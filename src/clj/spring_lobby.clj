@@ -1960,7 +1960,7 @@
   [{{:keys [users battles
             engine-version last-failed-message
             standalone
-            rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines
+            rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines rapid-versions-by-hash
             rapid-versions-cached
             show-rapid-downloader
             engine-branch engine-versions-cached http-download
@@ -1993,20 +1993,25 @@
                        (log/error e "Error loading SDP files"))))
                  (future
                    (try
-                     (swap! *state assoc :rapid-repos-cached (doall (rapid/repos)))
+                     (let [rapid-repos (doall (rapid/repos))]
+                       (swap! *state assoc :rapid-repos-cached rapid-repos)
+                       (swap! *state assoc :rapid-versions-by-hash
+                              (->> rapid-repos
+                                   (mapcat rapid/versions)
+                                   (map (juxt :hash identity))
+                                   (into {}))))
                      (catch Exception e
-                       (log/error e "Error loading rapid repos"))))
-                 (when-not (:rapid-versions-cached @*state)
-                   (future
-                     (try
-                       (when-let [rapid-repo (:rapid-repo @*state)]
-                         (let [versions (->> (rapid/versions rapid-repo)
-                                             (sort-by :version version/version-compare)
-                                             reverse
-                                             doall)]
-                           (swap! *state assoc :rapid-versions-cached versions)))
-                       (catch Exception e
-                         (log/error e "Error loading rapid versions"))))))
+                       (log/error e "Error loading rapid versions by hash"))))
+                 (future
+                   (try
+                     (when-let [rapid-repo (:rapid-repo @*state)]
+                       (let [versions (->> (rapid/versions rapid-repo)
+                                           (sort-by :version version/version-compare)
+                                           reverse
+                                           doall)]
+                         (swap! *state assoc :rapid-versions-cached versions)))
+                     (catch Exception e
+                       (log/error e "Error loading rapid versions")))))
    :on-advanced (fn [& args]
                   (log/trace "on-advanced" args))
    :on-deleted (fn [& args]
@@ -2176,7 +2181,7 @@
                    (fn [i]
                      {:text (->> i
                                  rapid/sdp-hash
-                                 (get rapid/versions-by-hash)
+                                 (get rapid-versions-by-hash)
                                  :id
                                  str)})}}
                  {:fx/type :table-column
@@ -2188,7 +2193,7 @@
                    (fn [i]
                      {:text (->> i
                                  rapid/sdp-hash
-                                 (get rapid/versions-by-hash)
+                                 (get rapid-versions-by-hash)
                                  :version
                                  str)})}}]}]}}}]))
       (when show-http-downloader

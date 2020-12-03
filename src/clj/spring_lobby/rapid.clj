@@ -79,10 +79,7 @@
     (assoc inner-details :contents (slurp-from-pool (:md5 inner-details)))
     (log/warn "No such inner rapid file"
               (pr-str {:package (::source decoded-sdp)
-                       :inner-filename inner-filename}))
-    #_
-    (throw (ex-info "No such inner rapid file" {:package (::source decode-sdp)
-                                                :inner-filename inner-filename}))))
+                       :inner-filename inner-filename}))))
 
 (defn rapid-inner [sdp-file inner-filename]
   (inner (decode-sdp sdp-file) inner-filename))
@@ -102,9 +99,6 @@
        seq
        (filter #(.isDirectory %))
        (map #(.getName %))))
-
-#_
-(repos)
 
 (defn rapid-versions [f]
   (with-open [is (io/input-stream f)
@@ -136,42 +130,12 @@
         (log/error e "Error loading Rapid package versions")))
     {}))
 
-#_
-(take 10 package-by-hash)
-
 
 (defn versions [repo]
   (log/debug "Loading rapid versions for repo" repo)
   (-> (fs/spring-root)
       (io/file "rapid" "repos.springrts.com" repo "versions.gz")
       (rapid-versions)))
-
-#_
-(take 10 (versions "ba"))
-
-(def all-versions
-  (mapcat versions (repos)))
-
-(def versions-by-hash
-  (->> all-versions
-       (map (juxt :hash identity))
-       (into {})))
-
-#_
-(take 10 (ba-versions))
-
-#_
-(let [sdps (sdp-files)
-      one (->> sdps
-               (filter #(string/starts-with? (.getName %) "e9"))
-               first)]
-  (-> spring-lobby/*state deref keys)
-  #_
-  (->> (decode-sdp one)
-       :items
-       (take 10)
-       (map (comp file-in-pool :md5))
-       first))
 
 
 (defn mods []
