@@ -840,6 +840,12 @@
 (def minimap-size 384)
 
 
+(defn normalize-team
+  "Returns :team1 from either :team1 or :1."
+  [team-kw]
+  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
+    (keyword (str "team" team))))
+
 (defn minimap-starting-points
   [battle-details map-details scripttags minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
@@ -860,21 +866,24 @@
                          (fn [[k {:keys [startposx startposz]}]]
                            [k {:startpos {:x startposx :z startposz}}]))
                        (into {})))
-        missing-teams (clojure.set/difference (set battle-team-keys) (set (map first teams)))
+        missing-teams (clojure.set/difference
+                        (set (map normalize-team battle-team-keys))
+                        (set (map (comp normalize-team first) teams)))
         midx (if map-width (quot (* map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* map-multiplier map-height) 2) 0)
-        teams (concat teams (map (fn [team] [team {}]) missing-teams))]
+        all-teams (concat teams (map (fn [team] [team {}]) missing-teams))]
     (when (and (number? map-width)
                (number? map-height)
                (number? minimap-width)
                (number? minimap-height))
-      (->> teams
+      (->> all-teams
            (map
              (fn [[team-kw {:keys [startpos]}]]
                (let [{:keys [x z]} startpos
                      [_all team] (re-find #"(\d+)" (name team-kw))
-                     scriptx (some-> scripttags :game team-kw :startposx u/to-number)
-                     scriptz (some-> scripttags :game team-kw :startposz u/to-number)
+                     normalized (normalize-team team-kw)
+                     scriptx (some-> scripttags :game normalized :startposx u/to-number)
+                     scriptz (some-> scripttags :game normalized :startposz u/to-number)
                      x (or scriptx x midx)
                      z (or scriptz z midz)]
                  (when (and (number? x) (number? z))
@@ -1714,15 +1723,11 @@
 (defmethod event-handler ::reset-start-positions
   [_e]
   (let [team-ids (take 16 (iterate inc 0))
-        scripttag-keys (mapcat
-                         (fn [i]
-                           [(str "game/team" i "/startposx")
-                            (str "game/team" i "/startposz")])
-                         team-ids)]
+        scripttag-keys (map (fn [i] (str "game/team" i)) team-ids)]
     (doseq [i team-ids]
       (let [team (keyword (str "team" i))]
-        (swap! *state update-in [:scripttags :game team] dissoc :startposx :startposz)
-        (swap! *state update-in [:battle :scripttags :game team] dissoc :startposx :startposz)))
+        (swap! *state update-in [:scripttags :game] dissoc team)
+        (swap! *state update-in [:battle :scripttags :game] dissoc team)))
     (client/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
 (defmethod event-handler ::modoption-change
