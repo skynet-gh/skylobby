@@ -15,7 +15,8 @@
   (:import
     (java.nio ByteBuffer)
     (java.security MessageDigest)
-    (java.util Base64)))
+    (java.util Base64)
+    (manifold.stream SplicedStream)))
 
 
 (set! *warn-on-reflection* true)
@@ -110,6 +111,7 @@
 (defn encode-battle-status [battle-status]
   (str
     (.getInt
+      ^ByteBuffer
       (gio/to-byte-buffer
         (gio/encode battle-status-protocol
           (assoc
@@ -124,7 +126,7 @@
   (.encodeToString (Base64/getEncoder) bs))
 
 ; https://gist.github.com/jizhang/4325757
-(defn md5-bytes [s]
+(defn md5-bytes [^String s]
   (let [algorithm (MessageDigest/getInstance "MD5")]
     (.digest algorithm (.getBytes s))))
 
@@ -407,7 +409,7 @@
      (login client "*" username password)
      (ping-loop state-atom client))))
 
-(defn disconnect [c]
+(defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
   (exit c)
   (.close c)

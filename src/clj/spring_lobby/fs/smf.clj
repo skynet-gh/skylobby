@@ -71,10 +71,10 @@
       (java.nio.ByteBuffer/allocate (quot Integer/SIZE Byte/SIZE))
       (int i))))
 
-(defn concat-bytes [& bs]
+(defn concat-bytes [& byte-arrays]
   (with-open [baos (java.io.ByteArrayOutputStream.)]
-    (doseq [b bs]
-      (.write baos b))
+    (doseq [^bytes ba byte-arrays]
+      (.write baos ba))
     (.toByteArray baos)))
 
 ; https://github.com/AledLLEvans/BALobby/blob/master/spring.lua#L8-L36

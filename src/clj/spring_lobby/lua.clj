@@ -26,7 +26,7 @@ end
 (defn table-to-map
   "Returns a map from the given lua table, with keys converted to keywowrds and inner table values
   converted to maps as well."
-  [lv]
+  [^LuaValue lv]
   (let [table (.checktable lv)]
     (loop [m {}
            prevk LuaValue/NIL]

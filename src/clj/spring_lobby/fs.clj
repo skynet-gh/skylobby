@@ -13,7 +13,7 @@
     (java.awt.image BufferedImage)
     (java.io RandomAccessFile)
     (java.nio ByteBuffer)
-    (java.util.zip CRC32 ZipFile)
+    (java.util.zip CRC32 ZipEntry ZipFile)
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
@@ -247,9 +247,9 @@
 (defn engine-dirs []
   (->> (.listFiles (io/file (spring-root) "engine"))
        seq
-       (filter #(.isDirectory %))))
+       (filter #(.isDirectory ^java.io.File %))))
 
-(defn engine-data [engine-dir]
+(defn engine-data [^java.io.File engine-dir]
   (let [sync-version (sync-version engine-dir)]
     {:engine-dir-absolute-path (.getAbsolutePath engine-dir)
      :engine-dir-filename (.getName engine-dir)
@@ -257,10 +257,10 @@
      :engine-version (sync-version-to-engine-version sync-version)}))
 
 
-(defn slurp-zip-entry [zip-file entries entry-filename-lowercase]
+(defn slurp-zip-entry [^ZipFile zip-file entries entry-filename-lowercase]
   (when-let [entry
              (->> entries
-                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName %)))
+                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName ^java.io.File %)))
                   first)]
     (slurp (.getInputStream zip-file entry))))
 
@@ -268,9 +268,9 @@
 (defn mod-files []
   (->> (.listFiles (io/file (spring-root) "games"))
        seq
-       (filter #(.isFile %))))
+       (filter #(.isFile ^java.io.File %))))
 
-(defn read-mod-file [file]
+(defn read-mod-file [^java.io.File file]
   (with-open [zf (new ZipFile file)]
     (let [entries (enumeration-seq (.entries zf))
           try-entry-lua (fn [filename]
@@ -295,9 +295,9 @@
 (defn map-names []
   (->> (.listFiles (io/file (spring-root) "maps"))
        seq
-       (filter #(.isFile %))
+       (filter #(.isFile ^java.io.File %))
        (map
-         (fn [file]
+         (fn [^java.io.File file]
            (let [filename (.getName file)]
              (first (string/split filename #"\.")))))))
 
@@ -320,7 +320,7 @@
 (defn map-name [path]
   (FilenameUtils/getBaseName path))
 
-(defn parse-mapinfo [file s path]
+(defn parse-mapinfo [^java.io.File file s path]
   (try
     (let [mapinfo (lua/read-mapinfo s)]
       {:mapinfo (assoc mapinfo ::source path)
@@ -332,35 +332,35 @@
     (catch Exception e
       (log/error e "Failed to parse mapinfo.lua from" (.getName file)))))
 
-(defn read-zip-map [file]
+(defn read-zip-map [^java.io.File file]
   (with-open [zf (new ZipFile file)]
     (let [entry-seq (->> (.entries zf)
                          enumeration-seq)]
       (merge
-        (when-let [smf-entry
+        (when-let [^ZipEntry smf-entry
                    (->> entry-seq
-                        (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName %)))
+                        (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^java.io.File %)))
                         first)]
           (let [smf-path (.getName smf-entry)]
             {:map-name (map-name smf-path)
              ; TODO extract only what's needed
              :smf {::source smf-path
                    :header (smf/decode-map-header (.getInputStream zf smf-entry))}}))
-        (when-let [mapinfo-entry
+        (when-let [^ZipEntry mapinfo-entry
                    (->> entry-seq
-                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName %)))
+                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^java.io.File %)))
                         first)]
           (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
-        (when-let [smd-entry
+        (when-let [^ZipEntry smd-entry
                    (->> entry-seq
-                        (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName %)))
+                        (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName ^ZipEntry %)))
                         first)]
           (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
                       (spring-script/parse-script map-data))]
             {:smd (assoc smd ::source (.getName smd-entry))}))))))
 
 
-(defn slurp-7z-item [item]
+(defn slurp-7z-item [^ISimpleInArchiveItem item]
   (with-open [baos (java.io.ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
@@ -370,7 +370,7 @@
                 (count data))))
       (byte-streams/convert (.toByteArray baos) String))))
 
-(defn slurp-7z-item-bytes [item]
+(defn slurp-7z-item-bytes [^ISimpleInArchiveItem item]
   (with-open [baos (java.io.ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
@@ -380,37 +380,39 @@
                 (count data))))
       (.toByteArray baos))))
 
-(defn read-7z-map [file]
+(defn read-7z-map [^java.io.File file]
   (with-open [raf (new RandomAccessFile file "r")
               rafis (new RandomAccessFileInStream raf)
               archive (SevenZip/openInArchive nil rafis)
               simple (.getSimpleInterface archive)]
     (merge
-      (when-let [smf-item (->> (.getArchiveItems simple)
-                               (filter (comp #(string/ends-with? % ".smf")
-                                             string/lower-case
-                                             #(.getPath %)))
-                               first)]
+      (when-let [^ISimpleInArchiveItem smf-item
+                 (->> (.getArchiveItems simple)
+                      (filter (comp #(string/ends-with? % ".smf")
+                                    string/lower-case
+                                    #(.getPath ^ISimpleInArchiveItem %)))
+                      first)]
         (let [smf-path (.getPath smf-item)]
           {:map-name (map-name smf-path)
            ; TODO extract only what's needed
            :smf {::source smf-path
                  :header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes smf-item)))}}))
-      (when-let [mapinfo-item (->> (.getArchiveItems simple)
-                                   (filter (comp #{"mapinfo.lua"}
-                                                 string/lower-case
-                                                 #(.getPath %)))
-                                   first)]
-        (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
-      (when-let [smd-item
+      (when-let [^ISimpleInArchiveItem mapinfo-item
                  (->> (.getArchiveItems simple)
-                      (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath %)))
+                      (filter (comp #{"mapinfo.lua"}
+                                    string/lower-case
+                                    #(.getPath ^ISimpleInArchiveItem %)))
+                      first)]
+        (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
+      (when-let [^ISimpleInArchiveItem smd-item
+                 (->> (.getArchiveItems simple)
+                      (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath ^ISimpleInArchiveItem %)))
                       first)]
         (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
           {:smd (assoc smd ::source (.getPath smd-item))})))))
 
 
-(defn read-map-data [file]
+(defn read-map-data [^java.io.File file]
   (let [filename (.getName file)]
     (log/info "Loading map" filename)
     (try
@@ -439,13 +441,13 @@
   (let [ai-dirs
         (->> (.listFiles (io/file (spring-root) "engine" engine "AI" "Skirmish"))
              seq
-             (filter #(.isDirectory %)))]
+             (filter #(.isDirectory ^java.io.File %)))]
     (mapcat
-      (fn [ai-dir]
+      (fn [^java.io.File ai-dir]
         (->> (.listFiles ai-dir)
-             (filter #(.isDirectory %))
+             (filter #(.isDirectory ^java.io.File %))
              (map
-               (fn [version-dir]
+               (fn [^java.io.File version-dir]
                  {:bot-name (.getName ai-dir)
                   :bot-version (.getName version-dir)}))))
       ai-dirs)))

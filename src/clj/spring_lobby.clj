@@ -118,8 +118,8 @@
   (let [before (u/curr-millis)
         engine-dirs (fs/engine-dirs)
         known-absolute-paths (->> state-atom deref :engines (map :engine-dir-absolute-path) set)
-        to-add (remove (comp known-absolute-paths #(.getAbsolutePath %)) engine-dirs)
-        absolute-path-set (set (map #(.getAbsolutePath %) engine-dirs))
+        to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
+        absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
         to-remove (set (remove absolute-path-set known-absolute-paths))]
     (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
     (doseq [engine-dir to-add]
@@ -148,8 +148,8 @@
         mod-archives (fs/mod-files)
         sdp-files (rapid/sdp-files)
         _ (log/info "Found" (count mod-archives) "archives and" (count sdp-files) "rapid archives to scan for mods")
-        to-add-archive (remove (comp known-archive-paths #(.getAbsolutePath %)) mod-archives)
-        to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath %)) sdp-files)
+        to-add-archive (remove (comp known-archive-paths #(.getAbsolutePath ^java.io.File %)) mod-archives)
+        to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath ^java.io.File %)) sdp-files)
         add-mod-fn (fn [mod-data]
                      (swap! state-atom update :mods
                            (fn [mods]
@@ -169,7 +169,7 @@
 (rapid/read-sdp-mod (io/file "/mnt/c/Users/craig/Documents/My Games/Spring/packages/ea6419652961687d4c31a3b13987e9a5.sdp"))
 
 
-(def maps-cache-root
+(def ^java.io.File maps-cache-root
   (io/file (fs/app-root) "maps-cache"))
 
 (defn map-cache-file [map-name]
@@ -188,7 +188,7 @@
   (let [before (u/curr-millis)
         map-files (fs/map-files)
         known-filenames (->> state-atom deref :maps (map :filename) set)
-        todo (remove (comp known-filenames #(.getName %)) map-files)]
+        todo (remove (comp known-filenames #(.getName ^java.io.File %)) map-files)]
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (when-not (.exists maps-cache-root)
       (.mkdirs maps-cache-root))

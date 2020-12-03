@@ -21,7 +21,7 @@
   (b/compile-codec
     (b/blob :length 16)
     ;(b/repeated :ubyte :length 16)
-    (fn [md5-string]
+    (fn [^String md5-string]
       (.toByteArray
         (java.math.BigInteger. md5-string 16))) ; TODO verify
     (fn [md5-bytes]
@@ -43,7 +43,7 @@
     :keep-header? false))
 
 
-(defn decode-sdp [f]
+(defn decode-sdp [^java.io.File f]
   (with-open [is (io/input-stream f)
               gz (GZIPInputStream. is)]
     {::source (.getAbsolutePath f)
@@ -84,7 +84,7 @@
 (defn rapid-inner [sdp-file inner-filename]
   (inner (decode-sdp sdp-file) inner-filename))
 
-(defn sdp-hash [sdp-file]
+(defn sdp-hash [^java.io.File sdp-file]
   (-> (.getName sdp-file)
       (string/split #"\.")
       first))
@@ -97,8 +97,8 @@
   (log/debug "Loading rapid repo names")
   (->> (.listFiles (io/file (fs/spring-root) "rapid" "repos.springrts.com"))
        seq
-       (filter #(.isDirectory %))
-       (map #(.getName %))))
+       (filter #(.isDirectory ^java.io.File %))
+       (map #(.getName ^java.io.File %))))
 
 (defn rapid-versions [f]
   (with-open [is (io/input-stream f)

@@ -221,8 +221,8 @@
         (java.nio.file.Files/copy source-path dest-path options)
         (doseq [item (:items sdp-decoded)]
           (let [md5 (:md5 item)
-                pool-source (rapid/file-in-pool md5)
-                pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)
+                ^java.io.File pool-source (rapid/file-in-pool md5)
+                ^java.io.File pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)
                 ^java.nio.file.Path pool-source-path (.toPath pool-source)
                 ^java.nio.file.Path pool-dest-path (.toPath pool-dest)]
             (log/info "Copying" pool-source-path "to" pool-dest-path)
