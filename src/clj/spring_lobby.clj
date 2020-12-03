@@ -36,6 +36,10 @@
 (set! *warn-on-reflection* true)
 
 
+(def stylesheets
+  [(str (io/resource "dark.css"))])
+
+
 (defn slurp-app-edn
   "Returns data loaded from a .edn file in this application's root directory."
   [edn-filename]
@@ -272,11 +276,11 @@
              {:text ""
               :graphic
               {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-lock:16"}}
+               :icon-literal "mdi-lock:16:white"}}
              {:text ""
               :graphic
               {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-lock-open:16"}})))}}
+               :icon-literal "mdi-lock-open:16:white"}})))}}
      {:fx/type :table-column
       :text "Country"
       :cell-value-factory identity
@@ -357,22 +361,22 @@
             {:text ""
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-robot:16"}}
+              :icon-literal "mdi-robot:16:white"}}
             (:away status)
             {:text ""
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-sleep:16"}}
+              :icon-literal "mdi-sleep:16:white"}}
             (:access status)
             {:text ""
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account-key:16"}}
+              :icon-literal "mdi-account-key:16:white"}}
             :else
             {:text ""
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account:16"}})))}}
+              :icon-literal "mdi-account:16:white"}})))}}
     {:fx/type :table-column
      :text "Country"
      :cell-value-factory identity
@@ -1538,22 +1542,22 @@
                   {:text ""
                    :graphic
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-robot:16"}}
+                    :icon-literal "mdi-robot:16:white"}}
                   (:ready status)
                   {:text ""
                    :graphic
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account-check:16"}}
+                    :icon-literal "mdi-account-check:16:white"}}
                   (:host status)
                   {:text ""
                    :graphic
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account-key:16"}}
+                    :icon-literal "mdi-account-key:16:white"}}
                   :else
                   {:text ""
                    :graphic
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account:16"}})))}}
+                    :icon-literal "mdi-account:16:white"}})))}}
           {:fx/type :table-column
            :text "Ingame"
            :cell-value-factory identity
@@ -2038,7 +2042,7 @@
                                       (recur))
                                     (System/exit 0))))))
         :scene {:fx/type :scene
-                :stylesheets [(str (io/resource "dark-theme2.css"))]
+                :stylesheets stylesheets
                 :root {:fx/type :v-box
                        :alignment :top-left
                        :children [(merge
@@ -2084,7 +2088,7 @@
             :height 800
             :scene
             {:fx/type :scene
-             :stylesheets [(str (io/resource "dark-theme2.css"))]
+             :stylesheets stylesheets
              :root
              {:fx/type :v-box
               :children
@@ -2211,7 +2215,7 @@
             :height 800
             :scene
             {:fx/type :scene
-             :stylesheets [(str (io/resource "dark-theme2.css"))]
+             :stylesheets stylesheets
              :root
              {:fx/type :v-box
               :children
