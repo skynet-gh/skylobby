@@ -265,27 +265,32 @@
     (slurp (.getInputStream zip-file entry))))
 
 
+(defn mod-files []
+  (->> (.listFiles (io/file (spring-root) "games"))
+       seq
+       (filter #(.isFile %))))
+
+(defn read-mod-file [file]
+  (with-open [zf (new ZipFile file)]
+    (let [entries (enumeration-seq (.entries zf))
+          try-entry-lua (fn [filename]
+                          (try
+                            (when-let [slurped (slurp-zip-entry zf entries filename)]
+                              (lua/read-modinfo slurped))
+                            (catch Exception e
+                              (log/warn e "Error loading" filename "from" file))))]
+      {:filename (.getName file)
+       :absolute-path (.getAbsolutePath file)
+       :modinfo (try-entry-lua "modinfo.lua")
+       :modoptions (try-entry-lua "modoptions.lua")
+       :engineoptions (try-entry-lua "engineoptions.lua")
+       :luaai (try-entry-lua "luaai.lua")
+       ::source :archive})))
+
 (defn mods []
-  (map
-    (fn [file]
-      (with-open [zf (new ZipFile file)]
-        (let [entries (enumeration-seq (.entries zf))
-              try-entry-lua (fn [filename]
-                              (try
-                                (when-let [slurped (slurp-zip-entry zf entries filename)]
-                                  (lua/read-modinfo slurped))
-                                (catch Exception e
-                                  (log/warn e "Error loading" filename "from" file))))]
-          {:filename (.getName file)
-           :absolute-path (.getAbsolutePath file)
-           :modinfo (try-entry-lua "modinfo.lua")
-           :modoptions (try-entry-lua "modoptions.lua")
-           :engineoptions (try-entry-lua "engineoptions.lua")
-           :luaai (try-entry-lua "luaai.lua")
-           ::source :archive})))
-    (->> (.listFiles (io/file (spring-root) "games"))
-         seq
-         (filter #(.isFile %)))))
+  (->> (mod-files)
+       (map read-mod-file)
+       doall))
 
 (defn map-names []
   (->> (.listFiles (io/file (spring-root) "maps"))

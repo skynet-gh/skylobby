@@ -141,32 +141,32 @@
   "Reads mod details and updates missing mods in :mods in state."
   [state-atom]
   (let [before (u/curr-millis)
-        mods (doall (concat (rapid/mods) (fs/mods)))
-        ; TODO load only files and compare
-        _known-absolute-paths (->> state-atom deref :mods (map :absolute-path) set)]
-        ;to-add (remove (comp known-absolute-paths #(.getAbsolutePath %)) mod-files)
-        ;to-remove (set (filter (comp known-absolute-paths #(.getAbsolutePath %)) mod-files))]
-    (log/info "Found" (count mods) "mods in" (- (u/curr-millis) before) "ms")
-    (swap! *state assoc :mods mods)
-    #_
-    (doseq [engine-dir to-add]
-      (log/info "Detecting engine data for" engine-dir)
-      (let [engine-data (fs/engine-data engine-dir)]
-        (swap! state-atom update :engines
-               (fn [engines]
-                 (set (conj maps engine-data))))))
-    #_
-    (log/debug "Removing" (count to-remove) "engines")
-    #_
-    (swap! state-atom update :engines
-           (fn [engines]
-             (set (remove
-                    (comp to-remove :engine-dir-absolute-path)
-                    engines))))
-    #_
-    {:to-add-count (count to-add)
-     :to-remove-count (count to-remove)}
-    nil))
+        mods (->> state-atom deref :mods)
+        {:keys [rapid archive]} (group-by ::fs/source mods)
+        known-archive-paths (set (map :absolute-path archive))
+        known-rapid-paths (set (map :absolute-path rapid))
+        mod-archives (fs/mod-files)
+        sdp-files (rapid/sdp-files)
+        _ (log/info "Found" (count mod-archives) "archives and" (count sdp-files) "rapid archives to scan for mods")
+        to-add-archive (remove (comp known-archive-paths #(.getAbsolutePath %)) mod-archives)
+        to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath %)) sdp-files)
+        add-mod-fn (fn [mod-data]
+                     (swap! state-atom update :mods
+                           (fn [mods]
+                             (set (conj mods mod-data)))))]
+    (log/info "Found" (count to-add-archive) "mod archives and" (count to-add-rapid)
+              "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
+    (doseq [archive-file to-add-archive]
+      (log/info "Reading mod from" archive-file)
+      (add-mod-fn (fs/read-mod-file archive-file)))
+    (doseq [sdp-file to-add-rapid]
+      (log/info "Reading mod from" sdp-file)
+      (add-mod-fn (rapid/read-sdp-mod sdp-file)))
+    {:to-add-archive-count (count to-add-archive)
+     :to-add-rapid-count (count to-add-rapid)}))
+
+#_
+(rapid/read-sdp-mod (io/file "/mnt/c/Users/craig/Documents/My Games/Spring/packages/ea6419652961687d4c31a3b13987e9a5.sdp"))
 
 
 (def maps-cache-root
@@ -207,12 +207,6 @@
     (log/debug "Removing maps with no name")
     (swap! state-atom update :maps (fn [maps] (set (filter :map-name maps))))
     {:todo-count (count todo)}))
-
-
-#_
-(reconcile-maps *state)
-#_
-(->> *state deref :maps (remove :map-name))
 
 
 (defmulti event-handler :event/type)
@@ -702,18 +696,18 @@
          :alignment :center-left
          :children
          (concat
-           (if (seq mods)
+           (if mods
              [{:fx/type :label
                :alignment :center-left
                :text " Game: "}
               {:fx/type :choice-box
                :value (str mod-name)
-               :items (or (some->> mods
-                                   (map :modinfo)
-                                   (map (fn [modinfo]
-                                          (str (:name modinfo) " " (:version modinfo))))
-                                   (sort version/version-compare))
-                          [])
+               :items (->> mods
+                           (filter :modinfo)
+                           (map :modinfo)
+                           (map (fn [modinfo]
+                                  (str (:name modinfo) " " (:version modinfo))))
+                           (sort version/version-compare))
                :on-value-changed {:event/type ::mod-change}}]
              [{:fx/type :label
                :text "Loading games..."}])
@@ -1164,7 +1158,8 @@
                   :desc
                   (merge
                     {:fx/type :label
-                     :text (str (name (:key i)))}
+                     :text (or (some-> i :key name str)
+                               "")}
                     (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
                       (when (and (not= (:def i) v)
                                  (not= (u/to-number (:def i))
@@ -1984,6 +1979,8 @@
                  (future
                    (try
                      (reconcile-maps *state)
+                     (when-let [map-name (:map-name @*state)]
+                       (swap! *state assoc :map-details (safe-read-map-cache map-name)))
                      (catch Exception e
                        (log/error e "Error reconciling maps"))))
                  (future

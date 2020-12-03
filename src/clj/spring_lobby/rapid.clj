@@ -138,23 +138,29 @@
       (rapid-versions)))
 
 
+(defn- try-inner-lua
+  [f filename]
+  (try
+    (when-let [inner (rapid-inner f filename)]
+      (let [contents (:contents inner)]
+        (when-not (string/blank? contents)
+          (lua/read-modinfo contents))))
+    (catch Exception e
+      (log/warn e "Error reading" filename "in" f))))
+
+(defn read-sdp-mod [^java.io.File f]
+  (merge
+    {::fs/source :rapid
+     :filename (.getName f)
+     :absolute-path (.getAbsolutePath f)}
+    (when-let [modinfo (try-inner-lua f "modinfo.lua")] ; TODO don't parse the .sdp over and over
+      {:modinfo modinfo
+       :modoptions (try-inner-lua f "modoptions.lua")
+       :engineoptions (try-inner-lua f "engineoptions.lua")
+       :luaai (try-inner-lua f "luaai.lua")})))
+
 (defn mods []
-  (let [sdp-files (doall (sdp-files))
-        try-inner-lua (fn [f filename]
-                        (try
-                          (when-let [inner (rapid-inner f filename)]
-                            (let [contents (:contents inner)]
-                              (when-not (string/blank? contents)
-                                (lua/read-modinfo contents))))
-                          (catch Exception e
-                            (log/warn e "Error reading" filename "in" f))))]
-    (some->> sdp-files
-             (map (fn [^java.io.File f]
-                    {::fs/source :rapid
-                     :filename (.getName f)
-                     :absolute-path (.getAbsolutePath f)
-                     :modinfo (try-inner-lua f "modinfo.lua")
-                     :modoptions (try-inner-lua f "modoptions.lua")
-                     :engineoptions (try-inner-lua f "engineoptions.lua")
-                     :luaai (try-inner-lua f "luaai.lua")}))
-             (filter :modinfo))))
+  (some->> (sdp-files)
+           (map read-sdp-mod)
+           (filter :modinfo)
+           doall))
