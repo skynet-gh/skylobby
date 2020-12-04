@@ -163,3 +163,13 @@
                   (u/random-color))
         msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
     (message/send-message client msg)))
+
+(defmethod handle "BATTLECLOSED" [_c state m]
+  (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
+    (swap! state
+      (fn [state]
+        (let [curr-battle-id (-> state :battle :battle-id)
+              state (update state :battles dissoc battle-id)]
+          (if (= battle-id curr-battle-id)
+            (dissoc state :battle)
+            state))))))

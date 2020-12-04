@@ -249,17 +249,6 @@
            :battle-maphash battle-maphash
            :battle-map battle-map)))
 
-(defmethod handler/handle "BATTLECLOSED" [_c state m]
-  (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
-    (swap! state
-      (fn [state]
-        (let [battle-name (-> state :battles (get battle-id) :battle-name)
-              curr-battle-name (-> state :battle :battle-name)
-              state (update state :battles dissoc battle-id)]
-          (if (= battle-name curr-battle-name)
-            (dissoc state :battle)
-            state))))))
-
 (defmethod handler/handle "JOIN" [_c state m]
   (let [[_all channel-name] (re-find #"\w+ (\w+)" m)]
     (swap! state assoc-in [:my-channels channel-name] {})))
@@ -338,7 +327,7 @@
             (log/info "<" (str "'" m "'"))
             (try
               (require 'spring-lobby.client.handler) ; is there a better way?
-              ((var-get (find-var 'handler/handle)) c state-atom m)
+              ((var-get (find-var 'spring-lobby.client.handler/handle)) c state-atom m)
               (catch Exception e
                 (log/error e "Error handling message")))
             (when-not (Thread/interrupted)

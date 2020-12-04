@@ -924,20 +924,37 @@
 (def minimap-size 384)
 
 
+(defn fix-color
+  "Returns the rgb int color represention for the given Spring bgr int color."
+  [spring-color]
+  (let [spring-color-int (if spring-color (u/to-number spring-color) 0)
+        [r g b _a] (:rgba (colors/create-color spring-color-int))
+        reversed (colors/create-color
+                   {:r b
+                    :g g
+                    :b r})]
+    (Color/web (format "#%06x" (colors/rgb-int reversed)))))
+
+
 (defn minimap-starting-points
   [battle-details map-details scripttags minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-        battle-team-keys (spring/team-keys (spring/teams battle-details))
-        teams (spring/map-teams map-details)
+        teams (spring/teams battle-details)
+        team-by-key (->> teams
+                         (map second)
+                         (map (juxt (comp spring/team-name :battle-status) identity))
+                         (into {}))
+        battle-team-keys (spring/team-keys teams)
+        map-teams (spring/map-teams map-details)
         missing-teams (clojure.set/difference
                         (set (map spring/normalize-team battle-team-keys))
-                        (set (map (comp spring/normalize-team first) teams)))
+                        (set (map (comp spring/normalize-team first) map-teams)))
         midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
         choose-before-game (= "3" (some-> scripttags :game :startpostype str))
         all-teams (if choose-before-game
-                    (concat teams (map (fn [team] [team {}]) missing-teams))
-                    teams)]
+                    (concat map-teams (map (fn [team] [team {}]) missing-teams))
+                    map-teams)]
     (when (and (number? map-width)
                (number? map-height)
                (number? minimap-width)
@@ -952,14 +969,19 @@
                                (some-> scripttags :game normalized :startposx u/to-number))
                      scriptz (when choose-before-game
                                (some-> scripttags :game normalized :startposz u/to-number))
+                     scripty (when choose-before-game
+                               (some-> scripttags :game normalized :startposy u/to-number))
+                     ; ^ SpringLobby seems to use startposy
                      x (or scriptx x midx)
-                     z (or scriptz z midz)]
+                     z (or scriptz scripty z midz)]
                  (when (and (number? x) (number? z))
                    {:x (- (* (/ x (* spring/map-multiplier map-width)) minimap-width)
                           (/ start-pos-r 2))
                     :y (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
                           (/ start-pos-r 2))
-                    :team team}))))
+                    :team team
+                    :color (or (-> team-by-key team-kw :team-color fix-color)
+                               Color/WHITE)}))))
            (filter some?)))))
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
@@ -1014,11 +1036,12 @@
   [{:keys [minimap-width minimap-height map-details]}]
   (when-let [{:keys [team x y]} (-> *state deref :drag-team)]
     (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-          x (* (/ x minimap-width) map-width spring/map-multiplier)
-          z (* (/ y minimap-height) map-height spring/map-multiplier)
+          x (int (* (/ x minimap-width) map-width spring/map-multiplier))
+          z (int (* (/ y minimap-height) map-height spring/map-multiplier))
           scripttags {:game
                       {(keyword (str "team" team))
                        {:startposx x
+                        :startposy z ; for SpringLobby bug
                         :startposz z}}}]
       (log/debug scripttags)
       (swap! *state update :scripttags u/deep-merge scripttags)
@@ -1380,13 +1403,15 @@
                  (let [gc (.getGraphicsContext2D canvas)]
                    (.clearRect gc 0 0 minimap-width minimap-height)
                    (.setFill gc Color/RED)
-                   (doseq [{:keys [x y team]} starting-points]
+                   (doseq [{:keys [x y team color]} starting-points]
                      (let [drag (when (and drag-team
                                            (= team (:team drag-team)))
                                   drag-team)
                            x (or (:x drag) x)
                            y (or (:y drag) y)
-                           xc (+ x (/ start-pos-r 2.0))
+                           xc (- x (if (= 1 (count team))
+                                     (* start-pos-r -0.6)
+                                     (* start-pos-r -0.2)))
                            yc (+ y (/ start-pos-r 0.75))]
                        (cond
                          (#{"Fixed" "Choose before game"} startpostype)
@@ -1395,12 +1420,14 @@
                            (.rect gc x y
                                   (* 2 start-pos-r)
                                   (* 2 start-pos-r))
-                           (.setFill gc Color/WHITE)
+                           (.setFill gc color)
                            (.fill gc)
-                           (.setStroke gc Color/RED)
+                           (.setStroke gc Color/BLACK)
                            (.stroke gc)
                            (.closePath gc)
-                           (.setFill gc Color/RED)
+                           (.setStroke gc Color/BLACK)
+                           (.strokeText gc team xc yc)
+                           (.setFill gc Color/WHITE)
                            (.fillText gc team xc yc))
                          :else
                          (.fillOval gc x y start-pos-r start-pos-r))))))})])}]}]}))
@@ -1519,17 +1546,6 @@
   [e]
   (n-teams e 4))
 
-
-(defn fix-color
-  "Returns the rgb int color represention for the given Spring bgr int color."
-  [spring-color-int]
-  (let [[r g b _a] (:rgba (colors/create-color spring-color-int))
-        reversed (colors/create-color
-                   {:r b
-                    :g g
-                    :b r})
-        spring-int (colors/rgb-int reversed)]
-    spring-int))
 
 (defn spring-color
   "Returns the spring bgr int color format from a javafx color."
@@ -1694,7 +1710,7 @@
                 :key (nickname i)
                 :desc
                 {:fx/type :color-picker
-                 :value (format "#%06x" (fix-color (if team-color (Integer/parseInt team-color) 0)))
+                 :value (fix-color team-color)
                  :on-action {:event/type ::battle-color-action
                              :is-me (= (:username i) username)
                              :is-bot (-> i :user :client-status :bot)
