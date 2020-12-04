@@ -32,3 +32,8 @@
   "Returns (System/currentTimeMillis)."
   []
   (System/currentTimeMillis))
+
+
+(defn random-color
+  []
+  (long (rand (* 255 255 255))))

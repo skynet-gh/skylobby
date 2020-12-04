@@ -8,7 +8,7 @@
     [clojure.string :as string]
     [clojure.walk]
     [com.evocomputing.colors :as colors]
-    [spring-lobby.client :as client]
+    [spring-lobby.client.message :as client]
     [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.util :as u]

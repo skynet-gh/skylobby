@@ -14,8 +14,9 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [crouton.html :as html]
+    [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
-    spring-lobby.client.handler
+    [spring-lobby.client.message :as message]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.http :as http]
@@ -100,7 +101,8 @@
   [:username :password :server-url :engine-version :mod-name :map-name
    :battle-title :battle-password
    :bot-username :bot-name :bot-version
-   :scripttags])
+   :scripttags :preferred-color])
+
 
 (defn select-config [state]
   (select-keys state config-keys))
@@ -123,6 +125,11 @@
 (defn add-watchers
   "Adds all *state watchers."
   [state-atom]
+  (remove-watch state-atom :config)
+  (remove-watch state-atom :maps)
+  (remove-watch state-atom :engines)
+  (remove-watch state-atom :mods)
+  (remove-watch state-atom :download)
   (add-watch-state-to-edn state-atom :config select-config "config.edn")
   (add-watch-state-to-edn state-atom :maps select-maps "maps.edn")
   (add-watch-state-to-edn state-atom :engines select-engines "engines.edn")
@@ -532,7 +539,7 @@
                 max-players 8
                 rank 0
                 engine "Spring"}}]
-  (client/send-message client
+  (message/send-message client
     (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
          " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
          "\t" mod-name)))
@@ -547,19 +554,19 @@
           (assoc :mod-hash -1
                  :map-hash -1)))
     (when (seq scripttags)
-      (client/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
+      (message/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
 
 (defmethod event-handler ::host-battle [_e]
   (host-battle))
 
 
 (defmethod event-handler ::leave-battle [_e]
-  (client/send-message (:client @*state) "LEAVEBATTLE"))
+  (message/send-message (:client @*state) "LEAVEBATTLE"))
 
 (defmethod event-handler ::join-battle [_e]
   (let [{:keys [battles battle-password selected-battle]} @*state]
     (when selected-battle
-      (client/send-message (:client @*state)
+      (message/send-message (:client @*state)
         (str "JOINBATTLE " selected-battle
              (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
                (str " " battle-password)))))))
@@ -855,19 +862,15 @@
     (swap! *state assoc
            :map-name map-name
            :map-details (safe-read-map-cache map-name))
-    (client/send-message (:client @*state) m)))
+    (message/send-message (:client @*state) m)))
 
 (defmethod event-handler ::kick-battle
   [{:keys [bot-name username]}]
   (when-let [client (:client @*state)]
     (if bot-name
-      (client/send-message client (str "REMOVEBOT " bot-name))
-      (client/send-message client (str "KICKFROMBATTLE " username)))))
+      (message/send-message client (str "REMOVEBOT " bot-name))
+      (message/send-message client (str "KICKFROMBATTLE " username)))))
 
-
-(defn random-color
-  []
-  (long (rand (* 255 255 255))))
 
 (defn available-name [existing-names desired-name]
   (if-not (contains? (set existing-names) desired-name)
@@ -887,10 +890,12 @@
                             :ready true
                             :mode 1
                             :sync 1
+                            :id (battle/available-team-id battle)
+                            :ally (battle/available-ally battle)
                             :side (rand-nth [0 1])))
-        bot-color (random-color)
+        bot-color (u/random-color)
         message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-    (client/send-message (:client @*state) message)))
+    (message/send-message (:client @*state) message)))
 
 (defmethod event-handler ::change-bot-username
   [{:fx/keys [event]}]
@@ -1013,7 +1018,7 @@
       (log/debug scripttags)
       (swap! *state update :scripttags u/deep-merge scripttags)
       (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
-      (client/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
+      (message/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
   (swap! *state dissoc :drag-team))
 
 
@@ -1424,7 +1429,7 @@
                    (str "UPDATEBOT " player-name) ; TODO normalize
                    "MYBATTLESTATUS")]
       (log/debug player-name (pr-str battle-status) team-color)
-      (client/send-message client
+      (message/send-message client
         (str prefix
              " "
              (client/encode-battle-status battle-status)
@@ -1434,19 +1439,19 @@
 (defn update-color [id {:keys [is-me is-bot] :as opts} color-int]
   (if (or is-me is-bot)
     (update-battle-status @*state (assoc opts :id id) (:battle-status id) color-int)
-    (client/send-message (:client @*state)
+    (message/send-message (:client @*state)
       (str "FORCETEAMCOLOR " (:username id) " " color-int))))
 
 (defn update-team [id {:keys [is-me is-bot] :as opts} player-id]
   (if (or is-me is-bot)
     (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
-    (client/send-message (:client @*state)
+    (message/send-message (:client @*state)
       (str "FORCETEAMNO " (:username id) " " player-id))))
 
 (defn update-ally [id {:keys [is-me is-bot] :as opts} ally]
   (if (or is-me is-bot)
     (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
-    (client/send-message (:client @*state)
+    (message/send-message (:client @*state)
       (str "FORCEALLYNO " (:username id) " " ally))))
 
 (defn apply-battle-status-changes
@@ -1457,7 +1462,7 @@
       (let [msg (case k
                   :id "FORCETEAMNO"
                   :ally "FORCEALLYNO")]
-        (client/send-message (:client @*state) (str msg " " (:username id) " " v))))))
+        (message/send-message (:client @*state) (str msg " " (:username id) " " v))))))
 
 
 (defmethod event-handler ::battle-randomize-colors
@@ -1466,7 +1471,7 @@
     (doseq [id players-and-bots]
       (let [is-bot (boolean (:bot-name id))
             is-me (= (:username e) (:username id))]
-        (update-color id {:is-me is-me :is-bot is-bot} (random-color))))))
+        (update-color id {:is-me is-me :is-bot is-bot} (u/random-color))))))
 
 (defmethod event-handler ::battle-teams-ffa
   [e]
@@ -1778,7 +1783,7 @@
   (let [startpostype (get spring/startpostypes-by-name event)]
     (swap! *state assoc-in [:scripttags :game :startpostype] startpostype)
     (swap! *state assoc-in [:battle :scripttags :game :startpostype] startpostype)
-    (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
+    (message/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
 (defmethod event-handler ::reset-start-positions
   [_e]
@@ -1788,14 +1793,14 @@
       (let [team (keyword (str "team" i))]
         (swap! *state update-in [:scripttags :game] dissoc team)
         (swap! *state update-in [:battle :scripttags :game] dissoc team)))
-    (client/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
+    (message/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
   (let [value (str event)]
     (swap! *state assoc-in [:scripttags :game :modoptions modoption-key] (str event))
     (swap! *state assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event))
-    (client/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
+    (message/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status team-color] :as id}]
@@ -1808,7 +1813,7 @@
     (update-battle-status @*state data
       (assoc (:battle-status id) :mode (not event))
       (:team-color id))
-    (client/send-message (:client @*state)
+    (message/send-message (:client @*state)
       (str "FORCESPECTATORMODE " (:username id)))))
 
 (defmethod event-handler ::battle-side-changed
@@ -1844,17 +1849,19 @@
   (when-let [handicap (max 0
                         (min 100
                           event))]
-    (client/send-message (:client @*state)
+    (message/send-message (:client @*state)
       (str "HANDICAP "
            (:username id)
            " "
            handicap))))
 
 (defmethod event-handler ::battle-color-action
-  [{:keys [id] :fx/keys [^javafx.event.Event event] :as opts}]
+  [{:keys [id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
   (let [^javafx.scene.control.ComboBoxBase source (.getSource event)
         javafx-color (.getValue source)
         color-int (spring-color javafx-color)]
+    (when is-me
+      (swap! *state assoc :preferred-color color-int))
     (update-color id opts color-int)))
 
 (defmethod event-handler ::rapid-repo-change

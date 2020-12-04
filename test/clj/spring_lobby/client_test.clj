@@ -67,10 +67,6 @@
           "ChanServ"]
          (rest (client/parse-adduser "ADDUSER ChanServ US None ChanServ")))))
 
-(deftest parse-addbot
-  (is (= ["12" "kekbot1" "skynet9001" "0" "0" "KAIK|0.13"]
-         (rest (client/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13")))))
-
 (deftest parse-battleopened
   (is (= ["1"
           "0"
@@ -99,8 +95,3 @@
           "Archers_Valley_v6"]
          (rest
            (client/parse-updatebattleinfo "UPDATEBATTLEINFO 1 0 0 1465550451 Archers_Valley_v6")))))
-
-(deftest parse-joinbattle
-  (is (= ["32" "-1706632985" "__battle__1"]
-         (rest
-           (client/parse-joinbattle "JOINBATTLE 32 -1706632985 __battle__1")))))

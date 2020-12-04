@@ -13,92 +13,91 @@
 (disable-reload!)
 
 
-(def ^:dynamic state nil)
-(def ^:dynamic renderer nil)
-(def refreshing (atom false))
-
-
 (pjstadig.humane-test-output/activate!)
 
 
-; https://github.com/cljfx/cljfx/blob/master/examples/e27_selection_models.clj#L20
+; application state, copy this to spring-lobby nses on refresh
+
+(def *state (atom nil))
+
+; prevent duplicate refreshes
+
+(def refreshing (atom false))
 
 
-; store things through ns refreshes
+; renderer var, create in init
+
+(def ^:dynamic renderer nil)
 
 
-(defn mount []
-  (require 'spring-lobby)
-  (let [view (var-get (find-var 'spring-lobby/root-view))
-        event-handler (var-get (find-var 'spring-lobby/event-handler))
-        r (fx/create-renderer
-            :middleware (fx/wrap-map-desc
-                          (fn [state]
-                            {:fx/type view
-                             :state state}))
-            :opts {:fx.opt/map-event-handler event-handler})
-        state-atom (var-get (find-var 'spring-lobby/*state))]
-    (alter-var-root #'state (constantly state-atom))
-    (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))]
-      (watch-fn state-atom))
-    (fx/mount-renderer state-atom r)
-    (alter-var-root #'renderer (constantly r))))
-
-(defn unmount []
-  (when renderer
-    (try
-      (fx/unmount-renderer (var-get (find-var 'spring-lobby/*state)) renderer)
-      (catch Exception e
-        (println "Error unmounting: " (.getMessage e))))))
-
-
-(defn load-and-mount []
+(defn rerender []
   (try
+    (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
-    (alter-var-root (find-var 'spring-lobby/*state) (constantly state))
-    (when-let [client-deferred (:client-deferred @state)]
-      (let [connected-loop-fn (var-get (find-var 'spring-lobby/connected-loop))]
-        (connected-loop-fn state client-deferred)))
-    (mount)
+    (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
+    (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))]
+      (watch-fn *state))
+    (if renderer
+      (do
+        (println "Re-rendering")
+        (renderer))
+      (println "No renderer"))
     (catch Exception e
-      (println e))
-    (finally
-      (reset! refreshing false))))
+      (println e))))
 
-(def old-refresh refresh)
-
-(defn unmount-store-refresh-load-mount []
-  (try
-    (let [old-state @state]
-      (when-let [f (:connected-loop old-state)]
-        (future-cancel f))
-      (when-let [f (:print-loop old-state)]
-        (future-cancel f))
-      (when-let [f (:ping-loop old-state)]
-        (future-cancel f)))
-    (unmount)
-    (finally
-      (future
-        (binding [*ns* *ns*]
-          (println (old-refresh :after 'user/load-and-mount))
-          (reset! refreshing false))))))
-
+(defn refresh-rerender []
+  (println "Refreshing")
+  (future
+    (try
+      (binding [*ns* *ns*]
+        (println (refresh :after 'user/rerender)))
+      (catch Exception e
+        (println e))
+      (finally
+        (reset! refreshing false)))))
 
 (defn refresh-on-file-change [context event]
   (when-let [file (:file event)]
     (let [f (io/file file)]
       (when (and (.exists f) (not (.isDirectory f)))
         (if @refreshing
-          (println "Already refreshing, duplicate file event")
+          (println "Duplicate file event, skipping refresh")
           (try
             (reset! refreshing true)
-            (unmount-store-refresh-load-mount)
+            (refresh-rerender)
             (catch Exception e
               (println e)))))))
   context)
 
 
+(defn view [state]
+  (require 'spring-lobby)
+  (let [actual-view (var-get (find-var 'spring-lobby/root-view))]
+    (actual-view state)))
+
+(defn event-handler [e]
+  (require 'spring-lobby)
+  (let [actual-handler (var-get (find-var 'spring-lobby/event-handler))]
+    (actual-handler e)))
+
+
 (defn init []
-  (hawk/watch! [{:paths ["src/clj"]
-                 :handler refresh-on-file-change}])
-  (mount))
+  (try
+    [datafy pprint]
+    (hawk/watch! [{:paths ["src/clj"]
+                   :handler refresh-on-file-change}])
+    (require 'spring-lobby)
+    (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
+    ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
+    (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))
+          r (fx/create-renderer
+              :middleware (fx/wrap-map-desc
+                            (fn [state]
+                              {:fx/type view
+                               :state state}))
+              :opts {:fx.opt/map-event-handler event-handler})]
+      (watch-fn *state)
+      (alter-var-root #'renderer (constantly r)))
+    (fx/mount-renderer *state renderer)
+    (catch Exception e
+      (println e))))

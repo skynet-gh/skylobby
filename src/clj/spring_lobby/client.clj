@@ -4,11 +4,12 @@
     [byte-streams]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
-    [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
+    [spring-lobby.client.handler :as handler]
+    [spring-lobby.client.message :as message]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
@@ -152,52 +153,41 @@
      #(wrap-duplex-stream protocol %))))
 
 
-(defn send-message [c m]
-  (when c
-    (log/info ">" (str "'" m "'"))
-    @(s/put! c (str m "\n"))))
-
-(defmulti handle
-  (fn [_client _state m]
-    (-> m
-        (string/split #"\s")
-        first)))
-
-(defmethod handle :default [_client state m]
+(defmethod handler/handle :default [_client state m]
   (log/trace "no handler for message" (str "'" m "'"))
   (swap! state assoc :last-failed-message m))
 
-(defmethod handle "PONG" [_client state _m]
+(defmethod handler/handle "PONG" [_client state _m]
   (swap! state assoc :last-pong (System/currentTimeMillis)))
 
-(defmethod handle "SETSCRIPTTAGS" [_client state m]
+(defmethod handler/handle "SETSCRIPTTAGS" [_client state m]
   (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)
         parsed (spring-script/parse-scripttags script-tags-raw)]
     (swap! state update-in [:battle :scripttags] u/deep-merge parsed)))
 
-(defmethod handle "TASSERVER" [_client state m]
+(defmethod handler/handle "TASSERVER" [_client state m]
   (swap! state assoc :tas-server m))
 
-(defmethod handle "ACCEPTED" [_client state _m]
+(defmethod handler/handle "ACCEPTED" [_client state _m]
   (swap! state assoc :accepted true))
 
-(defmethod handle "MOTD" [_client _state m]
+(defmethod handler/handle "MOTD" [_client _state m]
   (log/trace "motd" m))
 
-(defmethod handle "LOGININFOEND" [_client _state _m]
+(defmethod handler/handle "LOGININFOEND" [_client _state _m]
   (log/trace "end of login info"))
 
-(defmethod handle "FAILED" [_client state m]
+(defmethod handler/handle "FAILED" [_client state m]
   (swap! state assoc :last-failed-message m))
 
-(defmethod handle "JOINBATTLEFAILED" [_client state m]
+(defmethod handler/handle "JOINBATTLEFAILED" [_client state m]
   (swap! state assoc :last-failed-message m))
 
 
 (defn parse-adduser [m]
   (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
 
-(defmethod handle "ADDUSER" [_c state m]
+(defmethod handler/handle "ADDUSER" [_c state m]
   (let [[_all username country user-id user-agent] (parse-adduser m)
         user {:username username
               :country country
@@ -206,31 +196,12 @@
               :client-status (decode-client-status default-client-status)}]
     (swap! state assoc-in [:users username] user)))
 
-(defmethod handle "REMOVEUSER" [_c state m]
+(defmethod handler/handle "REMOVEUSER" [_c state m]
   (let [[_all username] (re-find #"\w+ (\w+)" m)]
     (swap! state update :users dissoc username)))
 
 
-(defn parse-addbot [m]
-  (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+) ([^\s]+)" m))
-
-(defmethod handle "ADDBOT" [_c state m]
-  (let [[_all battle-id bot-name owner battle-status team-color ai] (parse-addbot m)
-        [_all ai-name ai-version] (when ai (re-find #"([^\s]+)\|([^\s]+)" ai))
-        bot {:bot-name bot-name
-             :owner owner
-             :battle-status (decode-battle-status battle-status)
-             :team-color team-color
-             :ai-name ai-name
-             :ai-version ai-version}]
-    (swap! state
-      (fn [state]
-        (let [state (assoc-in state [:battles battle-id :bots bot-name] bot)]
-          (if (= battle-id (-> state :battle :battle-id))
-            (assoc-in state [:battle :bots bot-name] bot)
-            state))))))
-
-(defmethod handle "REMOVEBOT" [_c state m]
+(defmethod handler/handle "REMOVEBOT" [_c state m]
   (if-let [[_all battle-id botname] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
@@ -244,7 +215,7 @@
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
 
-(defmethod handle "BATTLEOPENED" [_c state m]
+(defmethod handler/handle "BATTLEOPENED" [_c state m]
   (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname channel-name] (parse-battleopened m)]
     (let [battle {:battle-id battle-id
                   :battle-type battle-type
@@ -268,7 +239,7 @@
 (defn parse-updatebattleinfo [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
 
-(defmethod handle "UPDATEBATTLEINFO" [_c state m]
+(defmethod handler/handle "UPDATEBATTLEINFO" [_c state m]
   (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
     (swap! state update-in [:battles battle-id]
            assoc
@@ -278,7 +249,7 @@
            :battle-maphash battle-maphash
            :battle-map battle-map)))
 
-(defmethod handle "BATTLECLOSED" [_c state m]
+(defmethod handler/handle "BATTLECLOSED" [_c state m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
     (swap! state
       (fn [state]
@@ -289,25 +260,15 @@
             (dissoc state :battle)
             state))))))
 
-(defmethod handle "JOIN" [_c state m]
+(defmethod handler/handle "JOIN" [_c state m]
   (let [[_all channel-name] (re-find #"\w+ (\w+)" m)]
     (swap! state assoc-in [:my-channels channel-name] {})))
 
-(defmethod handle "JOINED" [_c state m]
+(defmethod handler/handle "JOINED" [_c state m]
   (let [[_all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state assoc-in [:channels channel-name :users username] {})))
 
-(defn parse-joinbattle [m]
-  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)" m))
-
-(defmethod handle "JOINBATTLE" [_c state m]
-  (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]
-    (swap! state assoc :battle {:battle-id battle-id
-                                :hash-code hash-code
-                                :channel-name channel-name
-                                :scripttags default-scripttags})))
-
-(defmethod handle "JOINEDBATTLE" [_c state m]
+(defmethod handler/handle "JOINEDBATTLE" [_c state m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
@@ -317,11 +278,11 @@
             (assoc-in state [:battle :users username] initial-status)
             state))))))
 
-(defmethod handle "LEFT" [_c state m]
+(defmethod handler/handle "LEFT" [_c state m]
   (let [[_all _channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state update-in [:channels :users] dissoc username)))
 
-(defmethod handle "LEFTBATTLE" [_c state m]
+(defmethod handler/handle "LEFTBATTLE" [_c state m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state
       (fn [state]
@@ -331,17 +292,14 @@
             (update-in state [:battle :users] dissoc username))
           [:battles battle-id :users] dissoc username)))))
 
-(defmethod handle "REQUESTBATTLESTATUS" [c _state _m]
-  (send-message c "MYBATTLESTATUS 0 0")) ; TODO real status
-
-(defmethod handle "CLIENTBATTLESTATUS" [_c state m]
+(defmethod handler/handle "CLIENTBATTLESTATUS" [_c state m]
   (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
     (swap! state update-in [:battle :users username]
            assoc
            :battle-status (decode-battle-status battle-status)
            :team-color team-color)))
 
-(defmethod handle "UPDATEBOT" [_c state m]
+(defmethod handler/handle "UPDATEBOT" [_c state m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+)" m)
         decoded-status (decode-battle-status battle-status)
         bot-data {:battle-status decoded-status
@@ -363,7 +321,7 @@
       (log/info "ping loop thread started")
       (loop []
         (async/<!! (async/timeout 30000))
-        (when (send-message c "PING")
+        (when (message/send-message c "PING")
           (when-not (Thread/interrupted)
             (recur))))
       (log/info "ping loop ended"))))
@@ -379,15 +337,13 @@
           (when-let [m @d]
             (log/info "<" (str "'" m "'"))
             (try
-              (handle c state-atom m)
+              (require 'spring-lobby.client.handler) ; is there a better way?
+              ((var-get (find-var 'handler/handle)) c state-atom m)
               (catch Exception e
                 (log/error e "Error handling message")))
             (when-not (Thread/interrupted)
               (recur)))))
       (log/info "print loop ended"))))
-
-(defn exit [c]
-  (send-message c "EXIT"))
 
 (defn login
   [client local-addr username password]
@@ -397,7 +353,7 @@
         compat-flags "sp u"
         msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
                  " " agent-string "\t" user-id " " git-ref "\t" compat-flags)]
-    (send-message client msg)))
+    (message/send-message client msg)))
 
 
 (defn connect
@@ -411,11 +367,11 @@
 
 (defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
-  (exit c)
+  (message/send-message c "EXIT")
   (.close c)
   (log/info "connection closed?" (.isClosed c)))
 
-(defmethod handle "DENIED" [client state m]
+(defmethod handler/handle "DENIED" [client state m]
   (log/info (str "Login denied: '" m "'"))
   (disconnect client)
   (swap! state
