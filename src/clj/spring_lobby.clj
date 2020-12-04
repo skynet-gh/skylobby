@@ -1232,9 +1232,7 @@
                    :text (or (some-> i :key name str)
                              "")}
                   (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
-                    (when (and (not= (:def i) v)
-                               (not= (u/to-number (:def i))
-                                     (u/to-number v)))
+                    (when (not (spring-script/tag= i v))
                       {:style {:-fx-font-weight :bold}})))}})}}
           #_
           {:fx/type :table-column
@@ -1252,70 +1250,68 @@
            {:fx/cell-type :table-cell
             :describe
             (fn [i]
-              (case (:type i)
-                "bool"
-                {:text ""
-                 :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
-                  :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :check-box
-                    :selected (boolean (edn/read-string (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                                            (:def i))))
-                    :on-selected-changed {:event/type ::modoption-change
-                                          :modoption-key (:key i)}
-                    :disable (not am-host)}}}}
-                "number"
-                {:text ""
-                 :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
-                  :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :text-field
-                    :disable (not am-host)
-                    :text-formatter
-                    {:fx/type :text-formatter
-                     :value-converter :number
-                     :value (u/to-number (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                                             (:def i)))
-                     :on-value-changed {:event/type ::modoption-change
-                                        :modoption-key (:key i)}}}}}}
-                "list"
-                {:text ""
-                 :graphic
-                 {:fx/type ext-recreate-on-key-changed
-                  :key (str (:key i))
-                  :desc
-                  {:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (str (:name i) "\n\n" (:desc i))}}
-                   :desc
-                   {:fx/type :choice-box
-                    :disable (not am-host)
-                    :value (or (-> battle :scripttags :game :modoptions (get (:key i)))
-                               (:def i))
-                    :on-value-changed {:event/type ::modoption-change
-                                       :modoption-key (:key i)}
-                    :items (or (map (comp :key second) (:items i))
-                               [])}}}}
-                {:text (str (:def i))}))}}]}]}
+              (let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
+                (case (:type i)
+                  "bool"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :check-box
+                      :selected (u/to-bool (or v (:def i)))
+                      :on-selected-changed {:event/type ::modoption-change
+                                            :modoption-key (:key i)}
+                      :disable (not am-host)}}}}
+                  "number"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :text-field
+                      :disable (not am-host)
+                      :text-formatter
+                      {:fx/type :text-formatter
+                       :value-converter :number
+                       :value (u/to-number (or v (:def i)))
+                       :on-value-changed {:event/type ::modoption-change
+                                          :modoption-key (:key i)}}}}}}
+                  "list"
+                  {:text ""
+                   :graphic
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str (:key i))
+                    :desc
+                    {:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text (str (:name i) "\n\n" (:desc i))}}
+                     :desc
+                     {:fx/type :choice-box
+                      :disable (not am-host)
+                      :value (or v (:def i))
+                      :on-value-changed {:event/type ::modoption-change
+                                         :modoption-key (:key i)}
+                      :items (or (map (comp :key second) (:items i))
+                                 [])}}}}
+                  {:text (str (:def i))})))}}]}]}
       {:fx/type :v-box
        :alignment :top-left
        :children

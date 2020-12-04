@@ -27,6 +27,14 @@
     :else
     nil))
 
+(defn to-bool [v]
+  (cond
+    (boolean? v) v
+    (number? v) (not (zero? v))
+    (string? v) (recur (to-number v))
+    :else
+    (boolean v)))
+
 
 (defn curr-millis
   "Returns (System/currentTimeMillis)."

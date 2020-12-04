@@ -5,6 +5,13 @@
     [spring-lobby.spring.script :as spring-script]))
 
 
+(deftest tag=
+  (is (true? (spring-script/tag= {:def "true" :type "bool"} "1")))
+  (is (false? (spring-script/tag= {:def "true" :type "bool"} "0")))
+  (is (true? (spring-script/tag= {:def "false" :type "bool"} "0")))
+  (is (false? (spring-script/tag= {:def "false" :type "bool"} "1"))))
+
+
 (deftest flatten-scripttags
   (is (= []
          (spring-script/flatten-scripttags nil)

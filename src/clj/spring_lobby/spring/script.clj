@@ -11,6 +11,17 @@
 (set! *warn-on-reflection* true)
 
 
+(defn tag=
+  ([definition value1]
+   (tag= definition value1 (:def definition)))
+  ([definition value1 value2]
+   (case (:type definition)
+     "number" (= (u/to-number value1) (u/to-number value2))
+     "bool" (= (u/to-bool value1) (u/to-bool value2))
+     ; else
+     (= value1 value2))))
+
+
 (defn flatten-scripttags
   ([scripttags]
    (flatten-scripttags nil scripttags))
