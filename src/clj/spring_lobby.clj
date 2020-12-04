@@ -934,7 +934,10 @@
                         (set (map (comp spring/normalize-team first) teams)))
         midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
-        all-teams (concat teams (map (fn [team] [team {}]) missing-teams))]
+        choose-before-game (= "3" (some-> scripttags :game :startpostype str))
+        all-teams (if choose-before-game
+                    (concat teams (map (fn [team] [team {}]) missing-teams))
+                    teams)]
     (when (and (number? map-width)
                (number? map-height)
                (number? minimap-width)
@@ -945,8 +948,10 @@
                (let [{:keys [x z]} startpos
                      [_all team] (re-find #"(\d+)" (name team-kw))
                      normalized (spring/normalize-team team-kw)
-                     scriptx (some-> scripttags :game normalized :startposx u/to-number)
-                     scriptz (some-> scripttags :game normalized :startposz u/to-number)
+                     scriptx (when choose-before-game
+                               (some-> scripttags :game normalized :startposx u/to-number))
+                     scriptz (when choose-before-game
+                               (some-> scripttags :game normalized :startposz u/to-number))
                      x (or scriptx x midx)
                      z (or scriptz z midz)]
                  (when (and (number? x) (number? z))
