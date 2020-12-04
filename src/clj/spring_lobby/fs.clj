@@ -438,10 +438,10 @@
     (or m [])))
 
 (defn bots [engine]
-  (let [ai-dirs
-        (->> (.listFiles (io/file (spring-root) "engine" engine "AI" "Skirmish"))
-             seq
-             (filter #(.isDirectory ^java.io.File %)))]
+  (let [ai-skirmish-dir (io/file (spring-root) "engine" engine "AI" "Skirmish")
+        ai-dirs (some->> (.listFiles ai-skirmish-dir)
+                         seq
+                         (filter #(.isDirectory ^java.io.File %)))]
     (mapcat
       (fn [^java.io.File ai-dir]
         (->> (.listFiles ai-dir)
