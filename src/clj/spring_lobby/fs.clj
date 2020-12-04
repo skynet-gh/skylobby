@@ -472,19 +472,28 @@
     (or m [])))
 
 (defn bots [engine]
-  (let [ai-skirmish-dir (io/file (spring-root) "engine" engine "AI" "Skirmish")
-        ai-dirs (some->> (.listFiles ai-skirmish-dir)
-                         seq
-                         (filter #(.isDirectory ^java.io.File %)))]
-    (mapcat
-      (fn [^java.io.File ai-dir]
-        (->> (.listFiles ai-dir)
-             (filter #(.isDirectory ^java.io.File %))
-             (map
-               (fn [^java.io.File version-dir]
-                 {:bot-name (.getName ai-dir)
-                  :bot-version (.getName version-dir)}))))
-      ai-dirs)))
+  (or
+    (try
+      (when engine
+        (let [ai-skirmish-dir (io/file (spring-root) "engine" engine "AI" "Skirmish")
+              ai-dirs (some->> (.listFiles ai-skirmish-dir)
+                               seq
+                               (filter #(.isDirectory ^java.io.File %)))]
+          (mapcat
+            (fn [^java.io.File ai-dir]
+              (->> (.listFiles ai-dir)
+                   (filter #(.isDirectory ^java.io.File %))
+                   (map
+                     (fn [^java.io.File version-dir]
+                       {:bot-name (.getName ai-dir)
+                        :bot-version (.getName version-dir)}))))
+            ai-dirs)))
+      (catch Exception e
+        (log/error e "Error loading bots")))
+    []))
+
+#_
+(bots nil)
 
 
 (defn map-minimap [map-name]
