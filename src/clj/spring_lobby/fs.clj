@@ -11,7 +11,7 @@
     [taoensso.timbre :as log])
   (:import
     (java.awt.image BufferedImage)
-    (java.io RandomAccessFile)
+    (java.io FileOutputStream RandomAccessFile)
     (java.nio ByteBuffer)
     (java.util.zip CRC32 ZipEntry ZipFile)
     (javax.imageio ImageIO)
@@ -221,6 +221,40 @@
               (log/info "Extract result" res)
               (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
 
+(defn extract-7z [^java.io.File f]
+  (let [fname (.getName f)
+        dir (if (string/includes? fname ".")
+              (subs fname 0 (.lastIndexOf fname "."))
+              fname)]
+    (with-open [raf (new RandomAccessFile f "r")
+                rafis (new RandomAccessFileInStream raf)
+                archive (SevenZip/openInArchive nil rafis)
+                simple (.getSimpleInterface archive)]
+      (log/trace archive "has" (.getNumberOfItems archive) "items")
+      (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
+        (let [path (.getPath item)
+              to (io/file (.getParentFile f) dir path)]
+          (try
+            (when-not (.isFolder item)
+              (when-not (.exists to)
+                (let [parent (.getParentFile to)]
+                  (.mkdirs parent))
+                (log/info "Extracting" path "to" to)
+                (with-open [fos (FileOutputStream. to)]
+                  (let [res (.extractSlow item
+                              (reify ISequentialOutStream
+                                (write [this data]
+                                  (.write fos data 0 (count data))
+                                  (count data))))]
+                    (log/info "Extract result for" to res)))))
+            (catch Exception e
+              (log/warn e "Error extracting"))))))
+    (log/info "Finished extracting" f "to" dir)))
+
+
+#_
+(extract-7z (io/file (spring-root) "engine" "spring_103.0_win32-minimal-portable.7z"))
+
 
 (defn sync-version-to-engine-version
   "Returns the Spring engine version from a sync version. For some reason, engine '103.0' has sync
@@ -260,7 +294,7 @@
 (defn slurp-zip-entry [^ZipFile zip-file entries entry-filename-lowercase]
   (when-let [entry
              (->> entries
-                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName ^java.io.File %)))
+                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName ^ZipEntry %)))
                   first)]
     (slurp (.getInputStream zip-file entry))))
 

@@ -2050,6 +2050,19 @@
         (log/info "Finished downloading" url "to" dest)))))
 
 
+(defmethod event-handler ::extract-7z
+  [{:keys [file]}]
+  (future
+    (try
+      (swap! *state assoc-in [:extracting file] true)
+      (fs/extract-7z file)
+      (reconcile-engines *state)
+      (catch Exception e
+        (log/error e "Error extracting 7z" file))
+      (finally
+        (swap! *state assoc-in [:extracting file] false)))))
+
+
 (defn root-view
   [{{:keys [users battles
             engine-version last-failed-message
@@ -2059,7 +2072,7 @@
             show-rapid-downloader
             engine-branch engine-versions-cached http-download
             maps-index-url map-files-cache
-            show-http-downloader
+            show-http-downloader extracting
             mods-index-url mod-files-cache]
      :as state}
     :state}]
@@ -2370,15 +2383,29 @@
                            archive-path (http/engine-path engine-branch version)
                            url (str http/springrts-buildbot-root "/" engine-branch "/" archive-path)
                            download (get http-download url)
-                           dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))]
+                           dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))
+                           engine-version (str version (when (not= "master" engine-branch) (str " " engine-branch)))]
                        (merge
                          {:text (str (:message download))
                           :style {:-fx-font-family "monospace"}}
                          (cond
                            (.exists dest)
                            {:graphic
-                            {:fx/type font-icon/lifecycle
-                             :icon-literal "mdi-check:16:white"}}
+                            (if (some #{engine-version} (map :engine-version engines))
+                              {:fx/type font-icon/lifecycle
+                               :icon-literal "mdi-check:16:white"}
+                              {:fx/type :button
+                               :disable (boolean (get extracting dest))
+                               :on-action {:event/type ::extract-7z
+                                           :file dest}
+                               :tooltip {:fx/type :tooltip
+                                         :show-delay [10 :ms]
+                                         :text (if (get extracting dest)
+                                                 "Extracting..."
+                                                 (str "Extract " version))}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-package-variant:16:white"}})}
                            (:running download)
                            nil
                            :else
@@ -2524,7 +2551,8 @@
                            download (get http-download url)
                            dest (io/file (fs/spring-root) "maps" (:filename i))]
                        (merge
-                         {:text (str (:message download))}
+                         {:text (str (:message download))
+                          :style {:-fx-font-family "monospace"}}
                          (cond
                            (.exists dest)
                            {:graphic
