@@ -31,6 +31,9 @@
   {0 "ARM"
    1 "CORE"})
 
+(def map-multiplier
+  "Multiplier from positions in map file into positions that Spring uses."
+  8.0)
 
 (def startpostypes-by-name
   (clojure.set/map-invert startpostypes))
@@ -72,11 +75,37 @@
 (defn team-keys [teams]
   (set (map (comp team-name :battle-status second) teams)))
 
+(defn normalize-team
+  "Returns :team1 from either :team1 or :1."
+  [team-kw]
+  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
+    (keyword (str "team" team))))
+
+(defn map-teams [map-details]
+  (or (->> map-details :mapinfo :teams
+           (map
+             (fn [[k v]]
+               [(normalize-team k)
+                (-> v
+                    (update-in [:startpos :x] u/to-number)
+                    (update-in [:startpos :z] u/to-number))]))
+           seq)
+      (->> map-details
+           :smd
+           :map
+           (filter (comp #(string/starts-with? % "team") name first))
+           (map
+             (fn [[k {:keys [startposx startposz]}]]
+               [(normalize-team k)
+                {:startpos {:x startposx :z startposz}}]))
+           (into {}))
+      []))
+
 (defn script-data
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   ([battle]
    (script-data battle nil))
-  ([battle {:keys [is-host] :as opts}]
+  ([battle {:keys [is-host map-details] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
                       (map
@@ -84,18 +113,29 @@
                         (filter
                           (comp :mode :battle-status second)
                           (mapcat battle [:users :bots]))))
-         team-keys (team-keys teams)]
+         team-keys (team-keys teams)
+         existing-team? (fn [[k _v]]
+                          (if (string/starts-with? (name k) "team")
+                            (contains? team-keys k)
+                            true))
+         default-map-teams {:game
+                            (->> (map-teams map-details)
+                                 (map
+                                   (fn [[k {:keys [startpos]}]]
+                                     [(normalize-team k)
+                                      {:startposx (:x startpos)
+                                       :startposz (:z startpos)}]))
+                                 (filter existing-team?)
+                                 (into {}))}]
      (u/deep-merge
+       (when (= "3" (-> battle :scripttags :game :startpostype str))
+         default-map-teams)
        (update
          (:scripttags battle)
          :game
          (fn [game]
            (->> game
-                (filter
-                  (fn [[k _v]]
-                    (if (string/starts-with? (name k) "team")
-                      (contains? team-keys k)
-                      true)))
+                (filter existing-team?)
                 (into {}))))
        {:game
         (into
@@ -171,11 +211,12 @@
                                %)))]
     (merge (get battles (:battle-id battle)) battle)))
 
-(defn battle-script-txt [{:keys [username] :as state}]
+(defn battle-script-txt [{:keys [username map-details] :as state}]
   (let [battle (battle-details state)
         script (script-data battle
                  {:is-host (= username (:host-username battle))
-                  :game {:myplayername username}})]
+                  :game {:myplayername username}
+                  :map-details map-details})]
     (script-txt script)))
 
 (defn engine-dir-filename [engines engine-version]

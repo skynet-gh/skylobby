@@ -915,42 +915,20 @@
 
 
 (def start-pos-r 10.0)
-(def map-multiplier 8.0)
 
 (def minimap-size 384)
 
-
-(defn normalize-team
-  "Returns :team1 from either :team1 or :1."
-  [team-kw]
-  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
-    (keyword (str "team" team))))
 
 (defn minimap-starting-points
   [battle-details map-details scripttags minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         battle-team-keys (spring/team-keys (spring/teams battle-details))
-        teams (or (->> map-details :mapinfo :teams
-                       (map
-                         (fn [[k v]]
-                           [k
-                            (-> v
-                                (update-in [:startpos :x] u/to-number)
-                                (update-in [:startpos :z] u/to-number))]))
-                       seq)
-                  (->> map-details
-                       :smd
-                       :map
-                       (filter (comp #(string/starts-with? % "team") name first))
-                       (map
-                         (fn [[k {:keys [startposx startposz]}]]
-                           [k {:startpos {:x startposx :z startposz}}]))
-                       (into {})))
+        teams (spring/map-teams map-details)
         missing-teams (clojure.set/difference
-                        (set (map normalize-team battle-team-keys))
-                        (set (map (comp normalize-team first) teams)))
-        midx (if map-width (quot (* map-multiplier map-width) 2) 0)
-        midz (if map-height (quot (* map-multiplier map-height) 2) 0)
+                        (set (map spring/normalize-team battle-team-keys))
+                        (set (map (comp spring/normalize-team first) teams)))
+        midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
+        midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
         all-teams (concat teams (map (fn [team] [team {}]) missing-teams))]
     (when (and (number? map-width)
                (number? map-height)
@@ -961,15 +939,15 @@
              (fn [[team-kw {:keys [startpos]}]]
                (let [{:keys [x z]} startpos
                      [_all team] (re-find #"(\d+)" (name team-kw))
-                     normalized (normalize-team team-kw)
+                     normalized (spring/normalize-team team-kw)
                      scriptx (some-> scripttags :game normalized :startposx u/to-number)
                      scriptz (some-> scripttags :game normalized :startposz u/to-number)
                      x (or scriptx x midx)
                      z (or scriptz z midz)]
                  (when (and (number? x) (number? z))
-                   {:x (- (* (/ x (* map-multiplier map-width)) minimap-width)
+                   {:x (- (* (/ x (* spring/map-multiplier map-width)) minimap-width)
                           (/ start-pos-r 2))
-                    :y (- (* (/ z (* map-multiplier map-height)) minimap-height)
+                    :y (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
                           (/ start-pos-r 2))
                     :team team}))))
            (filter some?)))))
@@ -1026,8 +1004,8 @@
   [{:keys [minimap-width minimap-height map-details]}]
   (when-let [{:keys [team x y]} (-> *state deref :drag-team)]
     (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-          x (* (/ x minimap-width) map-width map-multiplier)
-          z (* (/ y minimap-height) map-height map-multiplier)
+          x (* (/ x minimap-width) map-width spring/map-multiplier)
+          z (* (/ y minimap-height) map-height spring/map-multiplier)
           scripttags {:game
                       {(keyword (str "team" team))
                        {:startposx x
