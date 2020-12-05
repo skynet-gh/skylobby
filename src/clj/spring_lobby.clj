@@ -1088,7 +1088,8 @@
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
         engine-dir-filename (spring/engine-dir-filename engines engine-version)
-        bots (fs/bots engine-dir-filename)]
+        bots (fs/bots engine-dir-filename)
+        image-file (io/file (fs/map-minimap battle-map))]
     {:fx/type :h-box
      :children
      [{:fx/type :v-box
@@ -1375,14 +1376,13 @@
           :-fx-max-height minimap-size}
          :children
          (concat
-           [{:fx/type :image-view
-             :image {:is (let [image-file (io/file (fs/map-minimap battle-map))]
-                           (when (.exists image-file)
-                             (io/input-stream image-file)))}
-             :fit-width minimap-width
-             :fit-height minimap-height
-             :preserve-ratio true}
-            (merge
+           (when (.exists image-file)
+             [{:fx/type :image-view
+               :image {:is (io/input-stream image-file)}
+               :fit-width minimap-width
+               :fit-height minimap-height
+               :preserve-ratio true}])
+           [(merge
               (when am-host
                 {:on-mouse-pressed {:event/type ::minimap-mouse-pressed
                                     :startpostype startpostype

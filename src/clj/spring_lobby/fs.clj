@@ -492,9 +492,6 @@
         (log/error e "Error loading bots")))
     []))
 
-#_
-(bots nil)
-
 
 (defn map-minimap [map-name]
   (io/file (springlobby-root) "cache" (str map-name ".minimap.png")))
