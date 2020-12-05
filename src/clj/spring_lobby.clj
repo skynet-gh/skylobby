@@ -1090,12 +1090,7 @@
            engine-version map-details battle battles username users mods drag-team
            map-input-prefix]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
-        mod-details (some->> mods
-                             (filter (comp #{battle-modname}
-                                           (fn [modinfo]
-                                             (str (:name modinfo) " " (:version modinfo)))
-                                           :modinfo))
-                             first)
+        mod-details (spring/mod-details mods battle-modname)
         scripttags (:scripttags battle)
         startpostype (->> scripttags
                           :game

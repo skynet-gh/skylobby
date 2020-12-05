@@ -3,7 +3,7 @@
 /.nrepl-port
 /*.jar
 /pom.xml
-/repl.log
+/repl.log*
 /trace.edn
 
 # Calva stuff probably

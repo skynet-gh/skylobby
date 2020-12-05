@@ -105,7 +105,7 @@
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   ([battle]
    (script-data battle nil))
-  ([battle {:keys [is-host map-details] :as opts}]
+  ([battle {:keys [is-host map-details mod-details] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
                       (map
@@ -134,9 +134,18 @@
          (:scripttags battle)
          :game
          (fn [game]
-           (->> game
-                (filter existing-team?)
-                (into {}))))
+           (let [all-modoptions (->> mod-details
+                                     :modoptions
+                                     (map (comp :key second))
+                                     (map (comp keyword string/lower-case))
+                                     set)]
+             (->> (update game :modoptions
+                          (fn [modoptions]
+                            (->> modoptions
+                                 (filter (comp all-modoptions first))
+                                 (into {}))))
+                  (filter existing-team?)
+                  (into {})))))
        {:game
         (into
           {:gametype (:battle-modname battle)
@@ -211,12 +220,23 @@
                                %)))]
     (merge (get battles (:battle-id battle)) battle)))
 
-(defn battle-script-txt [{:keys [username map-details] :as state}]
+; TODO find a better place for this
+(defn mod-details [mods mod-name]
+  (some->> mods
+           (filter (comp #{mod-name}
+                         (fn [modinfo]
+                           (str (:name modinfo) " " (:version modinfo)))
+                         :modinfo))
+           first))
+
+(defn battle-script-txt [{:keys [username map-details mods] :as state}]
   (let [battle (battle-details state)
+        mod-details (mod-details mods (:battle-modname battle))
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}
-                  :map-details map-details})]
+                  :map-details map-details
+                  :mod-details mod-details})]
     (script-txt script)))
 
 (defn engine-dir-filename [engines engine-version]
