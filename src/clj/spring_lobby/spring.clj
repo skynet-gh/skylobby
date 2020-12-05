@@ -242,7 +242,8 @@
 
 (defn copy-mod [mod-detail engine-version]
   (log/info "Mod detail:" (pr-str mod-detail))
-  (let [mod-filename (:filename mod-detail)]
+  (let [mod-filename (:filename mod-detail)
+        absolute-path (:absolute-path mod-detail)]
     (cond
       (not (and mod-filename engine-version))
       (throw
@@ -250,8 +251,8 @@
                  {:mod-filename mod-filename
                   :engine-version engine-version}))
       (= :rapid (::fs/source mod-detail))
-      (let [sdp-decoded (rapid/decode-sdp (io/file mod-filename))
-            source (io/file mod-filename)
+      (let [sdp-decoded (rapid/decode-sdp (io/file absolute-path))
+            source (io/file absolute-path)
             dest (io/file (fs/app-root) "spring" "engine" engine-version "packages" (.getName source))
             ^java.nio.file.Path source-path (.toPath source)
             ^java.nio.file.Path dest-path (.toPath dest)
