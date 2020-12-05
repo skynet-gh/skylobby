@@ -100,16 +100,18 @@
         (string/split #"\s")
         first)))
 
-(defmethod handle "CLIENTSTATUS" [_c state m]
+(defmethod handle "CLIENTSTATUS" [_c state-atom m]
   (let [[_all username client-status] (re-find #"\w+ (\w+) (\w+)" m)
-        decoded-status (decode-client-status client-status)
-        state-data @state]
-    (swap! state assoc-in [:users username :client-status] decoded-status)
-    (when (and (:battle state)
-               (= (:host-username (:battle state)) username)
-               (:ingame decoded-status))
-      (log/info "Starting game to join host")
-      (spring/start-game state-data))))
+        decoded-status (decode-client-status client-status)]
+    (swap! state-atom assoc-in [:users username :client-status] decoded-status)
+    (let [{:keys [battle battles] :as state} @state-atom
+          battle-detail (-> battles (get (:battle-id battle)))]
+      (when (and battle
+                 (= (:host-username battle-detail)
+                    username)
+                 (:ingame decoded-status))
+        (log/info "Starting game to join host")
+        (spring/start-game state)))))
 
 (defmethod handle "REMOVESCRIPTTAGS" [_c state m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
