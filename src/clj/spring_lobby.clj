@@ -145,7 +145,10 @@
         known-absolute-paths (->> state-atom deref :engines (map :engine-dir-absolute-path) set)
         to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
         absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
-        to-remove (set (remove absolute-path-set known-absolute-paths))]
+        missing-files (set (remove (comp #(.exists %) io/file) known-absolute-paths))
+        to-remove (set
+                    (concat missing-files
+                            (remove absolute-path-set known-absolute-paths)))]
     (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
     (doseq [engine-dir to-add]
       (log/info "Detecting engine data for" engine-dir)
@@ -178,7 +181,9 @@
         add-mod-fn (fn [mod-data]
                      (swap! state-atom update :mods
                            (fn [mods]
-                             (set (conj mods mod-data)))))]
+                             (set (conj mods mod-data)))))
+        missing-files (set (remove (comp #(.exists %) io/file)
+                                   (concat known-archive-paths known-rapid-paths)))]
     (log/info "Found" (count to-add-archive) "mod archives and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
     (doseq [archive-file to-add-archive]
@@ -187,6 +192,10 @@
     (doseq [sdp-file to-add-rapid]
       (log/info "Reading mod from" sdp-file)
       (add-mod-fn (rapid/read-sdp-mod sdp-file)))
+    (log/info "Removing" (count missing-files) "mods because their files don't exist")
+    (swap! state-atom update :mods
+           (fn [mods]
+             (set (remove (comp missing-files :absolute-path) mods))))
     {:to-add-archive-count (count to-add-archive)
      :to-add-rapid-count (count to-add-rapid)}))
 
@@ -213,7 +222,10 @@
   (let [before (u/curr-millis)
         map-files (fs/map-files)
         known-filenames (->> state-atom deref :maps (map :filename) set)
-        todo (remove (comp known-filenames #(.getName ^java.io.File %)) map-files)]
+        todo (remove (comp known-filenames #(.getName ^java.io.File %)) map-files)
+        missing-filenames (->> known-filenames
+                               (remove (comp #(.exists %) fs/map-file))
+                               set)]
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (when-not (.exists maps-cache-root)
       (.mkdirs maps-cache-root))
@@ -229,8 +241,13 @@
                    (fn [maps]
                      (set (conj maps (select-keys map-data [:filename :map-name]))))))
           (log/warn "No map name found for" map-file))))
-    (log/debug "Removing maps with no name")
-    (swap! state-atom update :maps (fn [maps] (set (filter :map-name maps))))
+    (log/debug "Removing maps with no name, and" (count missing-filenames) "maps with missing files")
+    (swap! state-atom update :maps
+           (fn [maps]
+             (->> maps
+                  (filter :map-name)
+                  (remove (comp missing-filenames :filename))
+                  set)))
     {:todo-count (count todo)}))
 
 
@@ -2184,7 +2201,6 @@
         (let [sdp-files (or sdp-files-cached [])
               sdp-hashes (set (map rapid/sdp-hash sdp-files))]
           [{:fx/type :stage
-            :always-on-top true
             :showing show-rapid-downloader
             :title "alt-spring-lobby Rapid Downloader"
             :on-close-request (fn [& args]
@@ -2312,7 +2328,6 @@
       (when show-http-downloader
         (let [engine-branches ["master" "maintenance" "develop"]] ; TODO
           [{:fx/type :stage
-            :always-on-top true
             :showing show-http-downloader
             :title "alt-spring-lobby HTTP Downloader"
             :on-close-request (fn [& args]

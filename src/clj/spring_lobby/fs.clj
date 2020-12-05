@@ -335,6 +335,9 @@
            (let [filename (.getName file)]
              (first (string/split filename #"\.")))))))
 
+(defn map-file [map-filename]
+  (io/file (spring-root) "maps" map-filename))
+
 (defn spring-config-line [lines field]
   (nth
     (some->> lines
