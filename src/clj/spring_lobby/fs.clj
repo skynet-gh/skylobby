@@ -376,16 +376,19 @@
       (merge
         (when-let [^ZipEntry smf-entry
                    (->> entry-seq
-                        (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^java.io.File %)))
+                        (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^ZipEntry %)))
                         first)]
-          (let [smf-path (.getName smf-entry)]
+          (let [smf-path (.getName smf-entry)
+                {:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))]
             {:map-name (map-name smf-path)
              ; TODO extract only what's needed
              :smf {::source smf-path
-                   :header (smf/decode-map-header (.getInputStream zf smf-entry))}}))
+                   :header header
+                   :minimap-bytes (when-let [minimap (:minimap body)]
+                                    (smf/decompress-minimap minimap))}}))
         (when-let [^ZipEntry mapinfo-entry
                    (->> entry-seq
-                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^java.io.File %)))
+                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^ZipEntry %)))
                         first)]
           (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
         (when-let [^ZipEntry smd-entry
@@ -429,11 +432,14 @@
                                     string/lower-case
                                     #(.getPath ^ISimpleInArchiveItem %)))
                       first)]
-        (let [smf-path (.getPath smf-item)]
+        (let [smf-path (.getPath smf-item)
+              {:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))]
           {:map-name (map-name smf-path)
            ; TODO extract only what's needed
            :smf {::source smf-path
-                 :header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes smf-item)))}}))
+                 :header header
+                 :minimap-bytes (when-let [minimap (:minimap body)]
+                                  (smf/decompress-minimap minimap))}}))
       (when-let [^ISimpleInArchiveItem mapinfo-item
                  (->> (.getArchiveItems simple)
                       (filter (comp #{"mapinfo.lua"}

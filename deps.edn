@@ -12,6 +12,7 @@
   crouton/crouton {:mvn/version "0.1.2"}
   digest/digest {:mvn/version "1.4.9"}
   gloss/gloss {:mvn/version "0.2.6"}
+  gr.zdimensions/jsquish {:local/root "lib/jsquish.jar"}
   hashp/hashp {:mvn/version "0.2.0"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   me.raynes/fs {:mvn/version "1.4.6"}
@@ -23,6 +24,7 @@
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.0.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-controls {:mvn/version "15.0.1"}
+  org.openjfx/javafx-swing {:mvn/version "15.0.1"}
   smee/binary {:mvn/version "0.5.5"}
   toml/toml {:mvn/version "0.1.3"}
   version-clj/version-clj {:mvn/version "0.1.2"}}

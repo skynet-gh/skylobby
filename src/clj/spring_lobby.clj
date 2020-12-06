@@ -28,6 +28,7 @@
     [version-clj.core :as version])
   (:import
     (javafx.application Platform)
+    (javafx.embed.swing SwingFXUtils)
     (javafx.scene.input KeyCode)
     (javafx.scene.paint Color)
     (manifold.stream SplicedStream)
@@ -145,7 +146,7 @@
         known-absolute-paths (->> state-atom deref :engines (map :engine-dir-absolute-path) set)
         to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
         absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
-        missing-files (set (remove (comp #(.exists %) io/file) known-absolute-paths))
+        missing-files (set (remove (comp #(.exists ^java.io.File %) io/file) known-absolute-paths))
         to-remove (set
                     (concat missing-files
                             (remove absolute-path-set known-absolute-paths)))]
@@ -182,7 +183,7 @@
                      (swap! state-atom update :mods
                            (fn [mods]
                              (set (conj mods mod-data)))))
-        missing-files (set (remove (comp #(.exists %) io/file)
+        missing-files (set (remove (comp #(.exists ^java.io.File %) io/file)
                                    (concat known-archive-paths known-rapid-paths)))]
     (log/info "Found" (count to-add-archive) "mod archives and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
@@ -212,7 +213,10 @@
 (defn safe-read-map-cache [map-name]
   (log/info "Reading map cache for" (str "'" map-name "'"))
   (try
-    (edn/read-string (slurp (map-cache-file map-name)))
+    (let [map-details (->> *state deref :maps
+                           (filter (comp #{map-name} :map-name))
+                           first)]
+      (fs/read-map-data (fs/map-file (:filename map-details))))
     (catch Exception e
       (log/warn e "Error loading map cache for" (str "'" map-name "'")))))
 
@@ -224,7 +228,7 @@
         known-filenames (->> state-atom deref :maps (map :filename) set)
         todo (remove (comp known-filenames #(.getName ^java.io.File %)) map-files)
         missing-filenames (->> known-filenames
-                               (remove (comp #(.exists %) fs/map-file))
+                               (remove (comp #(.exists ^java.io.File %) fs/map-file))
                                set)]
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (when-not (.exists maps-cache-root)
@@ -1101,7 +1105,8 @@
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
         engine-dir-filename (spring/engine-dir-filename engines engine-version)
         bots (fs/bots engine-dir-filename)
-        image-file (io/file (fs/map-minimap battle-map))]
+        ;image-file (io/file (fs/map-minimap battle-map))]
+        minimap-image (-> map-details :smf :minimap-bytes)]
     {:fx/type :h-box
      :children
      [{:fx/type :v-box
@@ -1388,9 +1393,10 @@
           :-fx-max-height minimap-size}
          :children
          (concat
-           (when (.exists image-file)
+           (when minimap-image ;(.exists image-file)
              [{:fx/type :image-view
-               :image {:is (io/input-stream image-file)}
+               :image (SwingFXUtils/toFXImage minimap-image nil)
+               ;^ {:is (io/input-stream image-file)}
                :fit-width minimap-width
                :fit-height minimap-height
                :preserve-ratio true}])
