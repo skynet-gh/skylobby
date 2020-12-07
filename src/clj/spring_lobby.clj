@@ -14,6 +14,7 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [crouton.html :as html]
+    [me.raynes.fs :as raynes-fs]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.message :as message]
@@ -199,9 +200,6 @@
              (set (remove (comp missing-files :absolute-path) mods))))
     {:to-add-archive-count (count to-add-archive)
      :to-add-rapid-count (count to-add-rapid)}))
-
-#_
-(rapid/read-sdp-mod (io/file "/mnt/c/Users/craig/Documents/My Games/Spring/packages/ea6419652961687d4c31a3b13987e9a5.sdp"))
 
 
 (def ^java.io.File maps-cache-root
@@ -799,8 +797,7 @@
                   filtered-mods (->> mods
                                      (filter :modinfo)
                                      (map :modinfo)
-                                     (map (fn [modinfo]
-                                            (str (:name modinfo) " " (:version modinfo))))
+                                     (map spring/mod-name)
                                      (filter #(string/includes? (string/lower-case %) filter-lc))
                                      (sort version/version-compare))]
               {:fx/type :combo-box
@@ -937,7 +934,11 @@
 
 
 (defmethod event-handler ::start-battle [_e]
-  (spring/start-game @*state))
+  (future
+    (try
+      (spring/start-game @*state)
+      (catch Exception e
+        (log/error e "Error starting battle")))))
 
 
 (def start-pos-r 10.0)
@@ -1089,10 +1090,136 @@
          :minimap-height minimap-height}))))
 
 
+(def ok-green "#008000")
+(def warn-yellow "#FFD700")
+(def error-red "#DD0000")
+(def severity-styles
+  {0 {:-fx-base ok-green
+      :-fx-background ok-green
+      :-fx-background-color ok-green}
+   1 {:-fx-base warn-yellow
+      :-fx-background warn-yellow
+      :-fx-background-color warn-yellow}
+   2 {:-fx-base error-red
+      :-fx-background error-red
+      :-fx-background-color error-red}})
+
+(defn resource-sync-pane
+  [{:keys [resource issues]}]
+  (let [worst-severity (reduce
+                         (fn [worst {:keys [severity]}]
+                           (max worst severity))
+                         0
+                         issues)]
+    {:fx/type :v-box
+     :style (merge
+              (get severity-styles worst-severity)
+              {:-fx-background-radius 3
+               :-fx-border-color "#666666"
+               :-fx-border-radius 3
+               :-fx-border-style "solid"
+               :-fx-border-width 1})
+     :children
+     (concat
+       [{:fx/type :label
+         :v-box/margin 4
+         :text (str resource
+                    (if (zero? worst-severity) " is synced" " issues:"))
+         :style {:-fx-font-size 16}}]
+       (map
+         (fn [{:keys [text action severity in-progress]}]
+           (let [style (merge
+                         {:-fx-max-width Integer/MAX_VALUE}
+                         (get severity-styles severity))]
+             (if (zero? severity)
+               {:fx/type :label
+                :v-box/margin 2
+                :text (str resource " is " text)
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-check:16:white"}}
+               {:fx/type :v-box
+                :style style
+                :children
+                [{:fx/type :button
+                  :v-box/margin 8
+                  :text (str text " " resource)
+                  :disable (boolean in-progress)
+                  :on-action action}]})))
+         issues))}))
+
+
+(defmethod event-handler ::copy-map
+  [{:keys [map-filename engine-version]}]
+  (log/info "Copying map" map-filename "to" engine-version)
+  (swap! *state assoc-in [:copying map-filename] {:status true})
+  (future
+    (try
+      (spring/copy-map map-filename engine-version)
+      (catch Exception e
+        (log/error e "Error copying map" map-filename "to isolation dir for" engine-version))
+      (finally
+        (swap! *state assoc-in [:copying map-filename] {:status false})))))
+
+(defmethod event-handler ::copy-mod
+  [{:keys [mod-details engine-version]}]
+  (let [mod-filename (:filename mod-details)]
+    (log/info "Copying mod" mod-filename "to" engine-version)
+    (swap! *state assoc-in [:copying mod-filename] {:status true})
+    (future
+      (try
+        (spring/copy-mod mod-details engine-version)
+        (catch Exception e
+          (log/error e "Error copying mod" mod-filename "to isolation dir for" engine-version))
+        (finally
+          (swap! *state assoc-in [:copying mod-filename] {:status false}))))))
+
+(defmethod event-handler ::archive-mod
+  [{:keys [mod-details engine-version]}]
+  (let [mod-filename (:filename mod-details)]
+    (log/info "Archiving mod" mod-filename "to" engine-version)
+    (swap! *state assoc-in [:archiving mod-filename] {:status true})
+    (future
+      (try
+        (spring/archive-mod mod-details engine-version)
+        (catch Exception e
+          (log/error e "Error archiving mod" mod-filename "to isolation dir for" engine-version)
+          (raynes-fs/delete
+            (spring/mod-isolation-archive-file mod-details engine-version)))
+        (finally
+          (swap! *state assoc-in [:archiving mod-filename] {:status false}))))))
+
+(defmethod event-handler ::copy-engine
+  [{:keys [engines engine-version]}]
+  (log/info "Copying engine" engine-version "to isolation dir")
+  (swap! *state assoc-in [:copying engine-version] {:status true})
+  (future
+    (try
+      (spring/copy-engine engines engine-version)
+      (catch Exception e
+        (log/error e "Error copying engine" engine-version "to isolation dir"))
+      (finally
+        (swap! *state assoc-in [:copying engine-version] {:status false})))))
+
+(defmethod event-handler ::clean-engine
+  [{:keys [engine-version]}]
+  (let [isolation-dir (spring/engine-isolation-file engine-version)]
+    (log/info "Cleaning engine" engine-version "isolation dir")
+    (swap! *state assoc-in [:cleaning engine-version] {:status true})
+    (future
+      (try
+        (raynes-fs/delete-dir (io/file isolation-dir "packages"))
+        (raynes-fs/delete-dir (io/file isolation-dir "pool"))
+        (catch Exception e
+          (log/error e "Error cleaning engine" engine-version "isolation dir"))
+        (finally
+          (swap! *state assoc-in [:cleaning engine-version] {:status false}))))))
+
+
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version engines
            engine-version map-details battle battles username users mods drag-team
-           map-input-prefix]}]
+           map-input-prefix copying archiving cleaning]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (spring/mod-details mods battle-modname)
         scripttags (:scripttags battle)
@@ -1190,22 +1317,6 @@
                        :username username}}]}
         {:fx/type :pane
          :v-box/vgrow :always}
-        {:fx/type :h-box
-         :alignment :center-left
-         :children
-         (concat
-           [{:fx/type :label
-             :alignment :center-left
-             :text "Start Positions: "}
-            {:fx/type :choice-box
-             :value startpostype
-             :items (map str (vals spring/startpostypes))
-             :disable (not am-host)
-             :on-value-changed {:event/type ::battle-startpostype-change}}]
-           (when (= "Choose before game" startpostype)
-             [{:fx/type :button
-               :text "Reset"
-               :on-action {:event/type ::reset-start-positions}}]))}
         {:fx/type :pane
          :v-box/vgrow :always}
         {:fx/type :h-box
@@ -1229,17 +1340,96 @@
            {:tooltip
             {:fx/type :tooltip
              :show-delay [10 :ms]
+             :style {:-fx-font-size 12}
              :text (if am-host
-                     "You are the host"
+                     "You are the host, start battle for everyone"
                      (str "Waiting for host " host-username))}}
            :desc
-           {:fx/type :button
-            :text (str (if am-host "Start" "Join") " Game")
-            :disable (boolean (and (not am-host)
-                                   (not (-> host-user :client-status :ingame))))
-            :on-action {:event/type ::start-battle}}}]}]}
-      {:fx/type :pane
-       :h-box/hgrow :always}
+           (let [iam-ingame (-> users (get username) :client-status :ingame)]
+             {:fx/type :button
+              :text (if iam-ingame
+                      "Game started"
+                      (str (if am-host "Start" "Join") " Game"))
+              :disable (boolean (or (and (not am-host)
+                                         (not (-> host-user :client-status :ingame)))
+                                    iam-ingame))
+              :on-action {:event/type ::start-battle}})}]}]}
+      {:fx/type :v-box
+       :alignment :bottom-center
+       :h-box/hgrow :always
+       :fill-width true
+       :children
+       [{:fx/type resource-sync-pane
+         :v-box/margin 8
+         :resource "map"
+         :issues
+         (concat
+           [{:severity (if map-details 0 2)
+             :text "download"
+             :action {:event/type ::download-map
+                      :map-name battle-map}}]
+           (let [map-filename (:filename map-details)]
+             (when-let [map-isolation-file (spring/map-isolation-file map-filename engine-version)]
+               [{:severity (if (.exists map-isolation-file)
+                             0 1)
+                 :text "copy"
+                 :in-progress (-> copying (get map-filename) :status)
+                 :action {:event/type ::copy-map
+                          :map-filename map-filename
+                          :engine-version engine-version}}])))}
+        {:fx/type resource-sync-pane
+         :v-box/margin 8
+         :resource "game"
+         :issues
+         (concat
+           [{:severity (if mod-details 0 2)
+             :text "download"
+             :action {:event/type ::download-mod
+                      :mod-name battle-modname}}]
+           (if-let [mod-isolation-archive-file (spring/mod-isolation-archive-file
+                                                 mod-details engine-version)]
+             [{:severity (if (.exists mod-isolation-archive-file)
+                           0 1)
+               :text "archive"
+               :in-progress (-> archiving (get (:filename mod-details)) :status)
+               :action {:event/type ::archive-mod
+                        :mod-details mod-details
+                        :engine-version engine-version}}]
+             (when-let [mod-isolation-file (spring/mod-isolation-file
+                                             mod-details engine-version)]
+               [{:severity (if (.exists mod-isolation-file)
+                             0 1)
+                 :text "copy"
+                 :in-progress (-> copying (get (:mod-filename mod-details)) :status)
+                 :action {:event/type ::copy-mod
+                          :mod-details mod-details
+                          :engine-version engine-version}}])))}
+        {:fx/type resource-sync-pane
+         :v-box/margin 8
+         :resource "engine"
+         :issues
+         (concat
+           [{:severity (if engine-dir-filename 0 2)
+             :text "download"
+             :action {:event/type ::download-engine
+                      :engine-version engine-version}}]
+           (when-let [engine-isolation-file (spring/engine-isolation-file engine-version)]
+             [{:severity (if (.exists engine-isolation-file)
+                           0 1)
+               :text "copy"
+               :in-progress (-> copying (get engine-version) :status)
+               :action {:event/type ::copy-engine
+                        :engines engines
+                        :engine-version engine-version}}
+              (let [packages-dir (io/file engine-isolation-file "packages")
+                    pool-dir (io/file engine-isolation-file "pool")]
+                {:severity (if (or (.exists packages-dir)
+                                   (.exists pool-dir))
+                             1 0)
+                 :text "clean"
+                 :in-progress (-> cleaning (get engine-version) :status)
+                 :action {:event/type ::clean-engine
+                          :engine-version engine-version}})]))}]}
       {:fx/type :v-box
        :alignment :top-left
        :h-box/hgrow :always
@@ -1280,15 +1470,6 @@
                   (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
                     (when (not (spring-script/tag= i v))
                       {:style {:-fx-font-weight :bold}})))}})}}
-          #_
-          {:fx/type :table-column
-           :text "Type"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text (str (:type i))})}}
           {:fx/type :table-column
            :text "Value"
            :cell-value-factory identity
@@ -1368,18 +1549,6 @@
          :text (str (string/replace (spring/battle-script-txt @*state) #"\t" "  "))
          :style {:-fx-font-family "monospace"}
          :v-box/vgrow :always}]}
-      #_
-      {:fx/type :v-box
-       :alignment :top-left
-       :children
-       [{:fx/type :label
-         :text "map details"}
-        {:fx/type :text-area
-         :editable false
-         :text (with-out-str
-                 (pprint map-details))
-         :style {:-fx-font-family "monospace"}
-         :v-box/vgrow :always}]}
       {:fx/type :v-box
        :alignment :top-left
        :children
@@ -1394,12 +1563,16 @@
          :children
          (concat
            (when minimap-image ;(.exists image-file)
-             [{:fx/type :image-view
-               :image (SwingFXUtils/toFXImage minimap-image nil)
-               ;^ {:is (io/input-stream image-file)}
-               :fit-width minimap-width
-               :fit-height minimap-height
-               :preserve-ratio true}])
+             (let [scaled (.getScaledInstance minimap-image minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
+                   _ (.getWidth scaled)
+                   _ (.getHeight scaled)
+                   bi (.getBufferedImage scaled)
+                   image (SwingFXUtils/toFXImage bi nil)]
+               [{:fx/type :image-view
+                 :image image
+                 :fit-width minimap-width
+                 :fit-height minimap-height
+                 :preserve-ratio true}]))
            [(merge
               (when am-host
                 {:on-mouse-pressed {:event/type ::minimap-mouse-pressed
@@ -1448,7 +1621,30 @@
                            (.setFill gc Color/WHITE)
                            (.fillText gc team xc yc))
                          :else
-                         (.fillOval gc x y start-pos-r start-pos-r))))))})])}]}]}))
+                         (.fillOval gc x y start-pos-r start-pos-r))))))})])}
+        {:fx/type :label
+         :text (str " Size: "
+                    (when-let [{:keys [map-width map-height]} (-> map-details :smf :header)]
+                      (str
+                        (when map-width (quot map-width 64))
+                        " x "
+                        (when map-height (quot map-height 64)))))}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         (concat
+           [{:fx/type :label
+             :alignment :center-left
+             :text " Start Positions: "}
+            {:fx/type :choice-box
+             :value startpostype
+             :items (map str (vals spring/startpostypes))
+             :disable (not am-host)
+             :on-value-changed {:event/type ::battle-startpostype-change}}]
+           (when (= "Choose before game" startpostype)
+             [{:fx/type :button
+               :text "Reset"
+               :on-action {:event/type ::reset-start-positions}}]))}]}]}))
 
 
 (defn battle-players-and-bots
@@ -1810,7 +2006,8 @@
              :map-details map-details}
             (select-keys state [:battle :username :host-username :maps :engines
                                 :bot-username :bot-name :bot-version :engine-version
-                                :mods :battles :drag-team :map-input-prefix]))]))}))
+                                :mods :battles :drag-team :map-input-prefix :copying
+                                :archiving :cleaning :users]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2191,7 +2388,8 @@
                                     (select-keys state
                                       [:battles :battle :users :username :engine-version
                                        :bot-username :bot-name :bot-version :maps :engines
-                                       :map-input-prefix :mods :drag-team :map-details]))
+                                       :map-input-prefix :mods :drag-team :map-details
+                                       :copying :archiving :cleaning]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children

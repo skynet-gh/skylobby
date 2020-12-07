@@ -106,12 +106,18 @@
     (swap! state-atom assoc-in [:users username :client-status] decoded-status)
     (let [{:keys [battle battles] :as state} @state-atom
           battle-detail (-> battles (get (:battle-id battle)))]
-      (when (and battle
-                 (= (:host-username battle-detail)
-                    username)
-                 (:ingame decoded-status))
-        (log/info "Starting game to join host")
-        (spring/start-game state)))))
+      (cond
+        (= username (:username state))
+        (log/info "Ignoring own game start")
+        (and battle
+             (= (:host-username battle-detail)
+                username)
+             (:ingame decoded-status))
+        (do
+          (log/info "Starting game to join host")
+          (spring/start-game state))
+        :else
+        (log/debug "No game to join")))))
 
 (defmethod handle "REMOVESCRIPTTAGS" [_c state m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
