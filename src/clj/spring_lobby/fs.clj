@@ -27,8 +27,11 @@
 (def o (Object.))
 
 (future
-  (locking o
-    (SevenZip/initSevenZipFromPlatformJAR)))
+  (try
+    (locking o
+      (SevenZip/initSevenZipFromPlatformJAR))
+    (catch Exception e
+      (log/error e))))
 
 
 (def config-filename "config.edn")

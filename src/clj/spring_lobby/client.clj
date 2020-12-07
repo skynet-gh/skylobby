@@ -282,10 +282,12 @@
           [:battles battle-id :users] dissoc username)))))
 
 (defmethod handler/handle "CLIENTBATTLESTATUS" [_c state m]
-  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)]
+  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)
+        decoded (decode-battle-status battle-status)]
+    (log/debug "Updating status of" username "to" decoded "with color" team-color)
     (swap! state update-in [:battle :users username]
            assoc
-           :battle-status (decode-battle-status battle-status)
+           :battle-status decoded
            :team-color team-color)))
 
 (defmethod handler/handle "UPDATEBOT" [_c state m]
@@ -307,32 +309,39 @@
     assoc
     :ping-loop
     (future
-      (log/info "ping loop thread started")
-      (loop []
-        (async/<!! (async/timeout 30000))
-        (when (message/send-message c "PING")
-          (when-not (Thread/interrupted)
-            (recur))))
-      (log/info "ping loop ended"))))
+      (try
+        (log/info "ping loop thread started")
+        (loop []
+          (async/<!! (async/timeout 30000))
+          (when (message/send-message c "PING")
+            (when-not (Thread/interrupted)
+              (recur))))
+        (log/info "ping loop ended")
+        (catch Exception e
+          (log/error e "Error in ping loop"))))))
+
 
 (defn print-loop [state-atom c]
   (swap! state-atom
     assoc
     :print-loop
     (future
-      (log/info "print loop thread started")
-      (loop []
-        (when-let [d (s/take! c)]
-          (when-let [m @d]
-            (log/info "<" (str "'" m "'"))
-            (try
-              (require 'spring-lobby.client.handler) ; is there a better way?
-              ((var-get (find-var 'spring-lobby.client.handler/handle)) c state-atom m)
-              (catch Exception e
-                (log/error e "Error handling message")))
-            (when-not (Thread/interrupted)
-              (recur)))))
-      (log/info "print loop ended"))))
+      (try
+        (log/info "print loop thread started")
+        (loop []
+          (when-let [d (s/take! c)]
+            (when-let [m @d]
+              (log/info "<" (str "'" m "'"))
+              (try
+                (require 'spring-lobby.client.handler) ; is there a better way?
+                ((var-get (find-var 'spring-lobby.client.handler/handle)) c state-atom m)
+                (catch Exception e
+                  (log/error e "Error handling message")))
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (log/info "print loop ended")
+        (catch Exception e
+          (log/error e "Error in print loop"))))))
 
 (defn login
   [client local-addr username password]

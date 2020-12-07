@@ -92,11 +92,14 @@
   (add-watch state-atom
     watcher-kw
     (fn [_k _ref old-state new-state]
-      (let [old-data (filter-fn old-state)
-            new-data (filter-fn new-state)]
-        (when (not= old-data new-data)
-          (log/debug "Updating" output-filename)
-          (spit-app-edn new-data output-filename))))))
+      (try
+        (let [old-data (filter-fn old-state)
+              new-data (filter-fn new-state)]
+          (when (not= old-data new-data)
+            (log/debug "Updating" output-filename)
+            (spit-app-edn new-data output-filename)))
+        (catch Exception e
+          (log/error e "Error in" watcher-kw "state watcher"))))))
 
 
 (def config-keys
@@ -124,6 +127,16 @@
      :engine-branch :maps-index-url]))
 
 
+(defn safe-read-map-cache [map-name]
+  (log/info "Reading map cache for" (str "'" map-name "'"))
+  (try
+    (let [map-details (->> *state deref :maps
+                           (filter (comp #{map-name} :map-name))
+                           first)]
+      (fs/read-map-data (fs/map-file (:filename map-details))))
+    (catch Exception e
+      (log/warn e "Error loading map cache for" (str "'" map-name "'")))))
+
 (defn add-watchers
   "Adds all *state watchers."
   [state-atom]
@@ -132,11 +145,23 @@
   (remove-watch state-atom :engines)
   (remove-watch state-atom :mods)
   (remove-watch state-atom :download)
+  (remove-watch state-atom :battle-map-details)
   (add-watch-state-to-edn state-atom :config select-config "config.edn")
   (add-watch-state-to-edn state-atom :maps select-maps "maps.edn")
   (add-watch-state-to-edn state-atom :engines select-engines "engines.edn")
   (add-watch-state-to-edn state-atom :mods select-mods "mods.edn")
-  (add-watch-state-to-edn state-atom :download select-mods "download.edn"))
+  (add-watch-state-to-edn state-atom :download select-download "download.edn")
+  (add-watch state-atom :battle-map-details
+    (fn [_k _ref old-state new-state]
+      (try
+        (let [battle-id (-> new-state :battle :battle-id)
+              old-battle-map (-> old-state :battles (get battle-id) :battle-map)
+              new-battle-map (-> new-state :battles (get battle-id) :battle-map)]
+          (when (not= old-battle-map new-battle-map)
+            (swap! *state assoc
+                   :battle-map-details (safe-read-map-cache new-battle-map))))
+        (catch Exception e
+          (log/error e "Error in :battle-map-details state watcher"))))))
 
 
 (defn reconcile-engines
@@ -207,16 +232,6 @@
 
 (defn map-cache-file [map-name]
   (io/file maps-cache-root (str map-name ".edn")))
-
-(defn safe-read-map-cache [map-name]
-  (log/info "Reading map cache for" (str "'" map-name "'"))
-  (try
-    (let [map-details (->> *state deref :maps
-                           (filter (comp #{map-name} :map-name))
-                           first)]
-      (fs/read-map-data (fs/map-file (:filename map-details))))
-    (catch Exception e
-      (log/warn e "Error loading map cache for" (str "'" map-name "'")))))
 
 (defn reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
@@ -674,6 +689,7 @@
              :text "Random map"}}
            :desc
            {:fx/type :button
+            :disable disable
             :on-action (fn [& _]
                          (event-handler
                            (let [random-map-name (:map-name (rand-nth (seq maps)))]
@@ -719,7 +735,7 @@
          :text "Leave Battle"
          :on-action {:event/type ::leave-battle}}])
      (when (and (not battle) selected-battle (-> battles (get selected-battle)))
-       (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))] ; TODO
+       (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
          [{:fx/type :button
            :text "Join Battle"
            :disable (boolean (and needs-password (string/blank? battle-password)))
@@ -840,6 +856,7 @@
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])}
       {:fx/type map-list
+       :disable (boolean battle)
        :map-name map-name
        :maps maps
        :map-input-prefix map-input-prefix
@@ -878,8 +895,7 @@
         map-name (or map-name event)
         m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
     (swap! *state assoc
-           :map-name map-name
-           :map-details (safe-read-map-cache map-name))
+           :battle-map-details (safe-read-map-cache map-name))
     (message/send-message (:client @*state) m)))
 
 (defmethod event-handler ::kick-battle
@@ -1218,7 +1234,7 @@
 
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version engines
-           engine-version map-details battle battles username users mods drag-team
+           engine-version battle-map-details battle battles username users mods drag-team
            map-input-prefix copying archiving cleaning]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (spring/mod-details mods battle-modname)
@@ -1227,13 +1243,19 @@
                           :game
                           :startpostype
                           spring/startpostype-name)
-        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (-> map-details :smf :header))
+        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (-> battle-map-details :smf :header))
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
-        starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
+        starting-points (minimap-starting-points battle-details battle-map-details scripttags minimap-width minimap-height)
         engine-dir-filename (spring/engine-dir-filename engines engine-version)
         bots (fs/bots engine-dir-filename)
         ;image-file (io/file (fs/map-minimap battle-map))]
-        minimap-image (-> map-details :smf :minimap-bytes)]
+        minimap-image (-> battle-map-details :smf :minimap-bytes)
+        bots (concat bots
+                     (->> mod-details :luaai
+                          (map second)
+                          (map (fn [ai]
+                                 {:bot-name (:name ai)
+                                  :bot-version "<game>"}))))]
     {:fx/type :h-box
      :children
      [{:fx/type :v-box
@@ -1280,41 +1302,45 @@
         {:fx/type :h-box
          :alignment :center-left
          :children
-         [{:fx/type :button
-           :text "Randomize Colors"
-           :on-action {:event/type ::battle-randomize-colors
-                       :battle battle
-                       :users users
-                       :username username}}]}
+         (concat
+           (when am-host
+             [{:fx/type :button
+               :text "Randomize Colors"
+               :on-action {:event/type ::battle-randomize-colors
+                           :battle battle
+                           :users users
+                           :username username}}]))}
         {:fx/type :pane
          :v-box/vgrow :always}
         {:fx/type :h-box
          :alignment :center-left
          :children
-         [{:fx/type :button
-           :text "FFA"
-           :on-action {:event/type ::battle-teams-ffa
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "2 teams"
-           :on-action {:event/type ::battle-teams-2
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "3 teams"
-           :on-action {:event/type ::battle-teams-3
-                       :battle battle
-                       :users users
-                       :username username}}
-          {:fx/type :button
-           :text "4 teams"
-           :on-action {:event/type ::battle-teams-4
-                       :battle battle
-                       :users users
-                       :username username}}]}
+         (concat
+           (when am-host
+             [{:fx/type :button
+               :text "FFA"
+               :on-action {:event/type ::battle-teams-ffa
+                           :battle battle
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "2 teams"
+               :on-action {:event/type ::battle-teams-2
+                           :battle battle
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "3 teams"
+               :on-action {:event/type ::battle-teams-3
+                           :battle battle
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "4 teams"
+               :on-action {:event/type ::battle-teams-4
+                           :battle battle
+                           :users users
+                           :username username}}]))}
         {:fx/type :pane
          :v-box/vgrow :always}
         {:fx/type :pane
@@ -1364,16 +1390,18 @@
          :resource "map"
          :issues
          (concat
-           [{:severity (if map-details 0 2)
+           [{:severity (if battle-map-details 0 2)
              :text "download"
              :action {:event/type ::download-map
                       :map-name battle-map}}]
-           (let [map-filename (:filename map-details)]
+           (let [map-filename (:filename battle-map-details)
+                 in-progress (-> copying (get map-filename) :status)]
              (when-let [map-isolation-file (spring/map-isolation-file map-filename engine-version)]
-               [{:severity (if (.exists map-isolation-file)
+               [{:severity (if (and (.exists map-isolation-file)
+                                    (not in-progress))
                              0 1)
                  :text "copy"
-                 :in-progress (-> copying (get map-filename) :status)
+                 :in-progress in-progress
                  :action {:event/type ::copy-map
                           :map-filename map-filename
                           :engine-version engine-version}}])))}
@@ -1388,22 +1416,26 @@
                       :mod-name battle-modname}}]
            (if-let [mod-isolation-archive-file (spring/mod-isolation-archive-file
                                                  mod-details engine-version)]
-             [{:severity (if (.exists mod-isolation-archive-file)
-                           0 1)
-               :text "archive"
-               :in-progress (-> archiving (get (:filename mod-details)) :status)
-               :action {:event/type ::archive-mod
-                        :mod-details mod-details
-                        :engine-version engine-version}}]
+             (let [in-progress (-> archiving (get (:filename mod-details)) :status)]
+               [{:severity (if (and (.exists mod-isolation-archive-file)
+                                    (not in-progress))
+                             0 1)
+                 :text "archive"
+                 :in-progress in-progress
+                 :action {:event/type ::archive-mod
+                          :mod-details mod-details
+                          :engine-version engine-version}}])
              (when-let [mod-isolation-file (spring/mod-isolation-file
                                              mod-details engine-version)]
-               [{:severity (if (.exists mod-isolation-file)
-                             0 1)
-                 :text "copy"
-                 :in-progress (-> copying (get (:mod-filename mod-details)) :status)
-                 :action {:event/type ::copy-mod
-                          :mod-details mod-details
-                          :engine-version engine-version}}])))}
+               (let [in-progress (-> copying (get (:mod-filename mod-details)) :status)]
+                 [{:severity (if (and (.exists mod-isolation-file)
+                                      (not in-progress))
+                               0 1)
+                   :text "copy"
+                   :in-progress in-progress
+                   :action {:event/type ::copy-mod
+                            :mod-details mod-details
+                            :engine-version engine-version}}]))))}
         {:fx/type resource-sync-pane
          :v-box/margin 8
          :resource "engine"
@@ -1414,20 +1446,24 @@
              :action {:event/type ::download-engine
                       :engine-version engine-version}}]
            (when-let [engine-isolation-file (spring/engine-isolation-file engine-version)]
-             [{:severity (if (.exists engine-isolation-file)
-                           0 1)
-               :text "copy"
-               :in-progress (-> copying (get engine-version) :status)
-               :action {:event/type ::copy-engine
-                        :engines engines
-                        :engine-version engine-version}}
+             [(let [in-progress (-> copying (get engine-version) :status)]
+                {:severity (if (and (.exists engine-isolation-file)
+                                    (not in-progress))
+                             0 1)
+                 :text "copy"
+                 :in-progress in-progress
+                 :action {:event/type ::copy-engine
+                          :engines engines
+                          :engine-version engine-version}})
               (let [packages-dir (io/file engine-isolation-file "packages")
-                    pool-dir (io/file engine-isolation-file "pool")]
-                {:severity (if (or (.exists packages-dir)
-                                   (.exists pool-dir))
+                    pool-dir (io/file engine-isolation-file "pool")
+                    in-progress (-> cleaning (get engine-version) :status)]
+                {:severity (if (and (or (.exists packages-dir)
+                                        (.exists pool-dir))
+                                    (not in-progress))
                              1 0)
                  :text "clean"
-                 :in-progress (-> cleaning (get engine-version) :status)
+                 :in-progress in-progress
                  :action {:event/type ::clean-engine
                           :engine-version engine-version}})]))}]}
       {:fx/type :v-box
@@ -1562,8 +1598,10 @@
           :-fx-max-height minimap-size}
          :children
          (concat
-           (when minimap-image ;(.exists image-file)
-             (let [scaled (.getScaledInstance minimap-image minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
+           (when minimap-image
+             (let [^sun.awt.image.ToolkitImage scaled
+                   (.getScaledInstance ^java.awt.Image minimap-image
+                     minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
                    _ (.getWidth scaled)
                    _ (.getHeight scaled)
                    bi (.getBufferedImage scaled)
@@ -1583,7 +1621,7 @@
                                     :starting-points starting-points}
                  :on-mouse-released {:event/type ::minimap-mouse-released
                                      :startpostype startpostype
-                                     :map-details map-details
+                                     :map-details battle-map-details
                                      :minimap-width minimap-width
                                      :minimap-height minimap-height}})
               {:fx/type :canvas
@@ -1624,7 +1662,7 @@
                          (.fillOval gc x y start-pos-r start-pos-r))))))})])}
         {:fx/type :label
          :text (str " Size: "
-                    (when-let [{:keys [map-width map-height]} (-> map-details :smf :header)]
+                    (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                       (str
                         (when map-width (quot map-width 64))
                         " x "
@@ -1644,6 +1682,7 @@
            (when (= "Choose before game" startpostype)
              [{:fx/type :button
                :text "Reset"
+               :disable (not am-host)
                :on-action {:event/type ::reset-start-positions}}]))}]}]}))
 
 
@@ -1696,6 +1735,12 @@
     (message/send-message (:client @*state)
       (str "FORCEALLYNO " (:username id) " " ally))))
 
+(defn update-handicap [id {:keys [is-bot] :as opts} handicap]
+  (if is-bot
+    (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
+    (message/send-message (:client @*state)
+      (str "HANDICAP " (:username id) " " handicap))))
+
 (defn apply-battle-status-changes
   [id {:keys [is-me is-bot] :as opts} status-changes]
   (if (or is-me is-bot)
@@ -1703,7 +1748,8 @@
     (doseq [[k v] status-changes]
       (let [msg (case k
                   :id "FORCETEAMNO"
-                  :ally "FORCEALLYNO")]
+                  :ally "FORCEALLYNO"
+                  :handicap "HANDICAP")]
         (message/send-message (:client @*state) (str msg " " (:username id) " " v))))))
 
 
@@ -1779,7 +1825,7 @@
 
 
 (defn battle-table
-  [{:keys [battle battles map-details users username] :as state}]
+  [{:keys [battle battles users username] :as state}]
   (let [{:keys [host-username battle-map]} (get battles (:battle-id battle))
         host-user (get users host-username)
         am-host (= username host-username)]
@@ -1971,7 +2017,6 @@
                  :on-value-changed {:event/type ::battle-ally-changed
                                     :is-me (= (:username i) username)
                                     :is-bot (-> i :user :client-status :bot)
-                                    :bot (-> i :user :client-status :bot)
                                     :id i}
                  :items (map str (take 16 (iterate inc 0)))
                  :disable (not (or am-host
@@ -1996,18 +2041,19 @@
                   :value-converter :integer
                   :value (int (or (:handicap (:battle-status i)) 0))
                   :on-value-changed {:event/type ::battle-handicap-change
-                                     :id i}}}}})}}]}] ; TODO update bot
+                                     :is-bot (-> i :user :client-status :bot)
+                                     :id i}}}}})}}]}]
        (when battle
          [(merge
             {:fx/type battle-buttons
              :am-host am-host
              :battle-map battle-map
-             :host-user host-user
-             :map-details map-details}
+             :host-user host-user}
             (select-keys state [:battle :username :host-username :maps :engines
                                 :bot-username :bot-name :bot-version :engine-version
                                 :mods :battles :drag-team :map-input-prefix :copying
-                                :archiving :cleaning :users]))]))}))
+                                :archiving :cleaning :users
+                                :battle-map-details]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2076,16 +2122,15 @@
       (log/debug "No change for ally"))))
 
 (defmethod event-handler ::battle-handicap-change
-  [{:keys [id] :fx/keys [event] :as e}]
-  (log/debug (:event/type e))
+  [{:keys [id] :fx/keys [event] :as data}]
   (when-let [handicap (max 0
                         (min 100
                           event))]
-    (message/send-message (:client @*state)
-      (str "HANDICAP "
-           (:username id)
-           " "
-           handicap))))
+    (if (not= handicap (-> id :battle-status :handicap))
+      (do
+        (log/info "Updating handicap for" id "from" (-> id :battle-status :ally) "to" handicap)
+        (update-handicap id data handicap))
+      (log/debug "No change for handicap"))))
 
 (defmethod event-handler ::battle-color-action
   [{:keys [id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
@@ -2151,35 +2196,44 @@
   [{:fx/keys [event]}]
   (swap! *state assoc :engine-branch event)
   (future
-    (log/debug "Getting engine versions for branch" event)
-    (let [versions (->> (http/springrts-buildbot-files [event])
-                        (sort-by :filename version/version-compare)
-                        reverse
-                        doall)]
-      (log/debug "Got engine versions" (pr-str versions))
-      (swap! *state assoc :engine-versions-cached versions))))
+    (try
+      (log/debug "Getting engine versions for branch" event)
+      (let [versions (->> (http/springrts-buildbot-files [event])
+                          (sort-by :filename version/version-compare)
+                          reverse
+                          doall)]
+        (log/debug "Got engine versions" (pr-str versions))
+        (swap! *state assoc :engine-versions-cached versions))
+      (catch Exception e
+        (log/error e)))))
 
 (defmethod event-handler ::maps-index-change
   [{:fx/keys [event]}]
   (swap! *state assoc :maps-index-url event)
   (future
-    (log/debug "Getting maps from" event)
-    (let [map-files (->> (http/files (html/parse event))
-                         (sort-by :filename)
-                         doall)]
-      (log/debug "Got maps" (pr-str map-files))
-      (swap! *state assoc :map-files-cache map-files))))
+    (try
+      (log/debug "Getting maps from" event)
+      (let [map-files (->> (http/files (html/parse event))
+                           (sort-by :filename)
+                           doall)]
+        (log/debug "Got maps" (pr-str map-files))
+        (swap! *state assoc :map-files-cache map-files))
+      (catch Exception e
+        (log/error e)))))
 
 (defmethod event-handler ::mods-index-change
   [{:fx/keys [event]}]
   (swap! *state assoc :mods-index-url event)
   (future
-    (log/debug "Getting mods from" event)
-    (let [mod-files (->> (http/files (html/parse event))
-                         (sort-by :filename)
-                         doall)]
-      (log/debug "Got mods" (pr-str mod-files))
-      (swap! *state assoc :mod-files-cache mod-files))))
+    (try
+      (log/debug "Getting mods from" event)
+      (let [mod-files (->> (http/files (html/parse event))
+                           (sort-by :filename)
+                           doall)]
+        (log/debug "Got mods" (pr-str mod-files))
+        (swap! *state assoc :mod-files-cache mod-files))
+      (catch Exception e
+        (log/error e)))))
 
 
 
@@ -2309,8 +2363,6 @@
                  (future
                    (try
                      (reconcile-maps *state)
-                     (when-let [map-name (:map-name @*state)]
-                       (swap! *state assoc :map-details (safe-read-map-cache map-name)))
                      (catch Exception e
                        (log/error e "Error reconciling maps"))))
                  (future
@@ -2388,8 +2440,8 @@
                                     (select-keys state
                                       [:battles :battle :users :username :engine-version
                                        :bot-username :bot-name :bot-version :maps :engines
-                                       :map-input-prefix :mods :drag-team :map-details
-                                       :copying :archiving :cleaning]))
+                                       :map-input-prefix :mods :drag-team
+                                       :copying :archiving :cleaning :battle-map-details]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children
@@ -2569,9 +2621,11 @@
                   {:fx/cell-type :table-cell
                    :describe
                    (fn [i]
-                     (let [[_all version] (re-find #"(.*)/" (:url i))
-                           engine-path (http/engine-path engine-branch version)]
-                       {:text (str engine-path)}))}}
+                     (if-let [url (:url i)]
+                       (let [[_all version] (re-find #"(.*)/" url)
+                             engine-path (http/engine-path engine-branch version)]
+                         {:text (str engine-path)})
+                       {:text "-"}))}}
                  {:fx/type :table-column
                   :text "Date"
                   :cell-value-factory identity
@@ -2595,44 +2649,47 @@
                   {:fx/cell-type :table-cell
                    :describe
                    (fn [i]
-                     (let [[_all version] (re-find #"(.*)/" (:url i))
-                           archive-path (http/engine-path engine-branch version)
-                           url (str http/springrts-buildbot-root "/" engine-branch "/" archive-path)
-                           download (get http-download url)
-                           dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))
-                           engine-version (str version (when (not= "master" engine-branch) (str " " engine-branch)))]
-                       (merge
-                         {:text (str (:message download))
-                          :style {:-fx-font-family "monospace"}}
-                         (cond
-                           (.exists dest)
-                           {:graphic
-                            (if (some #{engine-version} (map :engine-version engines))
-                              {:fx/type font-icon/lifecycle
-                               :icon-literal "mdi-check:16:white"}
+                     (if-let [url (:url i)]
+                       (let [[_all version] (re-find #"(.*)/" url)
+                             archive-path (http/engine-path engine-branch version)
+                             url (str http/springrts-buildbot-root "/" engine-branch "/" archive-path)
+                             download (get http-download url)
+                             dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))
+                             engine-version (str version (when (not= "master" engine-branch) (str " " engine-branch)))]
+                         (merge
+                           {:text (str (:message download))
+                            :style {:-fx-font-family "monospace"}}
+                           (cond
+                             (.exists dest)
+                             {:graphic
+                              (if (some #{engine-version} (map :engine-version engines))
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-check:16:white"}
+                                {:fx/type :button
+                                 :disable (boolean (or (:running download)
+                                                       (get extracting dest)))
+                                 :on-action {:event/type ::extract-7z
+                                             :file dest}
+                                 :tooltip {:fx/type :tooltip
+                                           :show-delay [10 :ms]
+                                           :text (if (get extracting dest)
+                                                   "Extracting..."
+                                                   (str "Extract " version))}
+                                 :graphic
+                                 {:fx/type font-icon/lifecycle
+                                  :icon-literal "mdi-package-variant:16:white"}})}
+                             (:running download)
+                             nil
+                             :else
+                             {:graphic
                               {:fx/type :button
-                               :disable (boolean (get extracting dest))
-                               :on-action {:event/type ::extract-7z
-                                           :file dest}
-                               :tooltip {:fx/type :tooltip
-                                         :show-delay [10 :ms]
-                                         :text (if (get extracting dest)
-                                                 "Extracting..."
-                                                 (str "Extract " version))}
+                               :on-action {:event/type ::http-download
+                                           :url url
+                                           :dest dest}
                                :graphic
                                {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-package-variant:16:white"}})}
-                           (:running download)
-                           nil
-                           :else
-                           {:graphic
-                            {:fx/type :button
-                             :on-action {:event/type ::http-download
-                                         :url url
-                                         :dest dest}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-download:16:white"}}}))))}}]}
+                                :icon-literal "mdi-download:16:white"}}})))
+                       {:text "-"}))}}]}
                {:fx/type :h-box
                 :alignment :center-left
                 :children

@@ -172,12 +172,12 @@
         msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
     (message/send-message client msg)))
 
-(defmethod handle "BATTLECLOSED" [_c state m]
+(defmethod handle "BATTLECLOSED" [_c state-atom m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
-    (swap! state
+    (swap! state-atom
       (fn [state]
         (let [curr-battle-id (-> state :battle :battle-id)
-              state (update state :battles dissoc battle-id)]
+              next-state (update state :battles dissoc battle-id)]
           (if (= battle-id curr-battle-id)
-            (dissoc state :battle)
-            state))))))
+            (dissoc next-state :battle)
+            next-state))))))
