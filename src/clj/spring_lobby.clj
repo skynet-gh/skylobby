@@ -2193,47 +2193,50 @@
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)))))
 
 (defmethod event-handler ::engine-branch-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :engine-branch event)
-  (future
-    (try
-      (log/debug "Getting engine versions for branch" event)
-      (let [versions (->> (http/springrts-buildbot-files [event])
-                          (sort-by :filename version/version-compare)
-                          reverse
-                          doall)]
-        (log/debug "Got engine versions" (pr-str versions))
-        (swap! *state assoc :engine-versions-cached versions))
-      (catch Exception e
-        (log/error e)))))
+  [{:keys [engine-branch] :fx/keys [event]}]
+  (let [engine-branch (or engine-branch event)]
+    (swap! *state assoc :engine-branch engine-branch)
+    (future
+      (try
+        (log/debug "Getting engine versions for branch" engine-branch)
+        (let [versions (->> (http/springrts-buildbot-files [engine-branch])
+                            (sort-by :filename version/version-compare)
+                            reverse
+                            doall)]
+          (log/debug "Got engine versions" (pr-str versions))
+          (swap! *state assoc :engine-versions-cached versions))
+        (catch Exception e
+          (log/error e))))))
 
 (defmethod event-handler ::maps-index-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :maps-index-url event)
-  (future
-    (try
-      (log/debug "Getting maps from" event)
-      (let [map-files (->> (http/files (html/parse event))
-                           (sort-by :filename)
-                           doall)]
-        (log/debug "Got maps" (pr-str map-files))
-        (swap! *state assoc :map-files-cache map-files))
-      (catch Exception e
-        (log/error e)))))
+  [{:keys [maps-index-url] :fx/keys [event]}]
+  (let [maps-index-url (or maps-index-url event)]
+    (swap! *state assoc :maps-index-url maps-index-url)
+    (future
+      (try
+        (log/debug "Getting maps from" maps-index-url)
+        (let [map-files (->> (http/files (html/parse maps-index-url))
+                             (sort-by :filename)
+                             doall)]
+          (log/debug "Got maps" (pr-str map-files))
+          (swap! *state assoc :map-files-cache map-files))
+        (catch Exception e
+          (log/error e))))))
 
 (defmethod event-handler ::mods-index-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :mods-index-url event)
-  (future
-    (try
-      (log/debug "Getting mods from" event)
-      (let [mod-files (->> (http/files (html/parse event))
-                           (sort-by :filename)
-                           doall)]
-        (log/debug "Got mods" (pr-str mod-files))
-        (swap! *state assoc :mod-files-cache mod-files))
-      (catch Exception e
-        (log/error e)))))
+  [{:keys [mods-index-url] :fx/keys [event]}]
+  (let [mods-index-url (or mods-index-url event)]
+    (swap! *state assoc :mods-index-url mods-index-url)
+    (future
+      (try
+        (log/debug "Getting mods from" mods-index-url)
+        (let [mod-files (->> (http/files (html/parse mods-index-url))
+                             (sort-by :filename)
+                             doall)]
+          (log/debug "Got mods" (pr-str mod-files))
+          (swap! *state assoc :mod-files-cache mod-files))
+        (catch Exception e
+          (log/error e))))))
 
 
 
@@ -2600,7 +2603,13 @@
                  {:fx/type :choice-box
                   :value (str engine-branch)
                   :items (or engine-branches [])
-                  :on-value-changed {:event/type ::engine-branch-change}}]}
+                  :on-value-changed {:event/type ::engine-branch-change}}
+                 {:fx/type :button
+                  :on-action {:event/type ::engine-branch-change
+                              :engine-branch engine-branch}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-refresh:16:white"}}]}
                {:fx/type :table-view
                 :column-resize-policy :constrained ; TODO auto resize
                 :items (or (filter :url engine-versions-cached)
@@ -2698,7 +2707,13 @@
                  {:fx/type :choice-box
                   :value (str mods-index-url)
                   :items [http/springfightclub-root]
-                  :on-value-changed {:event/type ::mods-index-change}}]}
+                  :on-value-changed {:event/type ::mods-index-change}}
+                 {:fx/type :button
+                  :on-action {:event/type ::mods-index-change
+                              :mods-index-url mods-index-url}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-refresh:16:white"}}]}
                {:fx/type :table-view
                 :column-resize-policy :constrained ; TODO auto resize
                 :items (or mod-files-cache
@@ -2776,7 +2791,13 @@
                   :value (str maps-index-url)
                   :items [http/springfiles-maps-url
                           (str http/springfightclub-root "/maps")]
-                  :on-value-changed {:event/type ::maps-index-change}}]}
+                  :on-value-changed {:event/type ::maps-index-change}}
+                 {:fx/type :button
+                  :on-action {:event/type ::maps-index-change
+                              :maps-index-url maps-index-url}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-refresh:16:white"}}]}
                {:fx/type :table-view
                 :column-resize-policy :constrained ; TODO auto resize
                 :items (or map-files-cache [])
