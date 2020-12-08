@@ -382,13 +382,19 @@
                         (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^ZipEntry %)))
                         first)]
           (let [smf-path (.getName smf-entry)
-                {:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))]
+                {:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))
+                {:keys [map-width map-height]} header]
             {:map-name (map-name smf-path)
              ; TODO extract only what's needed
-             :smf {::source smf-path
-                   :header header
-                   :minimap-bytes (when-let [minimap (:minimap body)]
-                                    (smf/decompress-minimap minimap))}}))
+             :smf (merge
+                    {::source smf-path
+                     :header header}
+                    (when-let [minimap (:minimap body)]
+                      {:minimap-bytes minimap
+                       :minimap-image (smf/decompress-minimap minimap)})
+                    (when-let [metalmap (:metalmap body)]
+                      {:metalmap-bytes metalmap
+                       :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))}))
         (when-let [^ZipEntry mapinfo-entry
                    (->> entry-seq
                         (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^ZipEntry %)))
@@ -436,13 +442,19 @@
                                     #(.getPath ^ISimpleInArchiveItem %)))
                       first)]
         (let [smf-path (.getPath smf-item)
-              {:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))]
+              {:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))
+              {:keys [map-width map-height]} header]
           {:map-name (map-name smf-path)
            ; TODO extract only what's needed
-           :smf {::source smf-path
-                 :header header
-                 :minimap-bytes (when-let [minimap (:minimap body)]
-                                  (smf/decompress-minimap minimap))}}))
+           :smf (merge
+                  {::source smf-path
+                   :header header}
+                  (when-let [minimap (:minimap body)]
+                    {:minimap-bytes minimap
+                     :minimap-image (smf/decompress-minimap minimap)})
+                  (when-let [metalmap (:metalmap body)]
+                    {:metalmap-bytes metalmap
+                     :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))}))
       (when-let [^ISimpleInArchiveItem mapinfo-item
                  (->> (.getArchiveItems simple)
                       (filter (comp #{"mapinfo.lua"}

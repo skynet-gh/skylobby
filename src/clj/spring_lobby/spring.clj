@@ -231,13 +231,13 @@
                          :modinfo))
            first))
 
-(defn battle-script-txt [{:keys [username map-details mods] :as state}]
+(defn battle-script-txt [{:keys [username battle-map-details mods] :as state}]
   (let [battle (battle-details state)
         mod-details (mod-details mods (:battle-modname battle))
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}
-                  :map-details map-details
+                  :map-details battle-map-details
                   :mod-details mod-details})]
     (script-txt script)))
 

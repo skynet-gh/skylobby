@@ -871,6 +871,10 @@
   [{:fx/keys [event]}]
   (swap! *state assoc :battle-title event))
 
+(defmethod event-handler ::minimap-type-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :minimap-type event))
+
 (defmethod event-handler ::version-change
   [{:fx/keys [event]}]
   (swap! *state assoc :engine-version event))
@@ -1232,10 +1236,34 @@
           (swap! *state assoc-in [:cleaning engine-version] {:status false}))))))
 
 
+(def minimap-types
+  ["minimap" "metalmap"])
+
+(defmethod event-handler ::minimap-scroll
+  [_e]
+  (swap! *state
+         (fn [{:keys [minimap-type] :as state}]
+           (assoc state :minimap-type
+                  (get minimap-types
+                       (mod
+                         (inc (.indexOf minimap-types minimap-type))
+                         (count minimap-types)))))))
+
+
+
+(defn scale-minimap-image [minimap-width minimap-height minimap-image]
+  (when minimap-image
+    (let [^sun.awt.image.ToolkitImage scaled
+          (.getScaledInstance ^java.awt.Image minimap-image
+            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
+          _ (.getWidth scaled)
+          _ (.getHeight scaled)]
+      (.getBufferedImage scaled))))
+
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version engines
            engine-version battle-map-details battle battles username users mods drag-team
-           map-input-prefix copying archiving cleaning]}]
+           map-input-prefix copying archiving cleaning minimap-type]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (spring/mod-details mods battle-modname)
         scripttags (:scripttags battle)
@@ -1243,13 +1271,16 @@
                           :game
                           :startpostype
                           spring/startpostype-name)
-        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (-> battle-map-details :smf :header))
+        {:keys [smf]} battle-map-details
+        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         starting-points (minimap-starting-points battle-details battle-map-details scripttags minimap-width minimap-height)
         engine-dir-filename (spring/engine-dir-filename engines engine-version)
         bots (fs/bots engine-dir-filename)
-        ;image-file (io/file (fs/map-minimap battle-map))]
-        minimap-image (-> battle-map-details :smf :minimap-bytes)
+        minimap-image (case minimap-type
+                        "metalmap" (:metalmap-image smf)
+                        ; else
+                        (scale-minimap-image minimap-width minimap-height (:minimap-image smf)))
         bots (concat bots
                      (->> mod-details :luaai
                           (map second)
@@ -1588,9 +1619,12 @@
       {:fx/type :v-box
        :alignment :top-left
        :children
-       [{:fx/type :label
-         :text "Minimap"}
+       [{:fx/type :combo-box
+         :value minimap-type
+         :items minimap-types
+         :on-value-changed {:event/type ::minimap-type-change}}
         {:fx/type :stack-pane
+         :on-scroll {:event/type ::minimap-scroll}
          :style
          {:-fx-min-width minimap-size
           :-fx-max-width minimap-size
@@ -1599,13 +1633,7 @@
          :children
          (concat
            (when minimap-image
-             (let [^sun.awt.image.ToolkitImage scaled
-                   (.getScaledInstance ^java.awt.Image minimap-image
-                     minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
-                   _ (.getWidth scaled)
-                   _ (.getHeight scaled)
-                   bi (.getBufferedImage scaled)
-                   image (SwingFXUtils/toFXImage bi nil)]
+             (let [image (SwingFXUtils/toFXImage minimap-image nil)]
                [{:fx/type :image-view
                  :image image
                  :fit-width minimap-width
@@ -1629,7 +1657,9 @@
                :height minimap-height
                :draw
                (fn [^javafx.scene.canvas.Canvas canvas]
-                 (let [gc (.getGraphicsContext2D canvas)]
+                 (let [gc (.getGraphicsContext2D canvas)
+                       border-color (if (= "minimap" minimap-type)
+                                      Color/BLACK Color/WHITE)]
                    (.clearRect gc 0 0 minimap-width minimap-height)
                    (.setFill gc Color/RED)
                    (doseq [{:keys [x y team color]} starting-points]
@@ -1651,7 +1681,7 @@
                                   (* 2 start-pos-r))
                            (.setFill gc color)
                            (.fill gc)
-                           (.setStroke gc Color/BLACK)
+                           (.setStroke gc border-color)
                            (.stroke gc)
                            (.closePath gc)
                            (.setStroke gc Color/BLACK)
@@ -2053,7 +2083,7 @@
                                 :bot-username :bot-name :bot-version :engine-version
                                 :mods :battles :drag-team :map-input-prefix :copying
                                 :archiving :cleaning :users
-                                :battle-map-details]))]))}))
+                                :battle-map-details :minimap-type]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2444,7 +2474,8 @@
                                       [:battles :battle :users :username :engine-version
                                        :bot-username :bot-name :bot-version :maps :engines
                                        :map-input-prefix :mods :drag-team
-                                       :copying :archiving :cleaning :battle-map-details]))
+                                       :copying :archiving :cleaning :battle-map-details
+                                       :minimap-type]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children

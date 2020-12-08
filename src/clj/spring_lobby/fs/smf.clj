@@ -43,11 +43,27 @@
 (def map-protocol
   (b/header
     map-header
-    (fn [{:keys [minimap-offset]}]
-      (b/ordered-map
-        :prefix (b/blob :length (- minimap-offset header-length))
-        :minimap (b/blob :length minimap-length) ; TODO other pieces
-        :rest (b/blob)))
+    (fn [{:keys [map-width map-height minimap-offset metalmap-offset]}]
+      (let [metalmap-length (* (quot map-width 2) (quot map-height 2))]
+        (if (< minimap-offset metalmap-offset)
+          (let [before-minimap (- minimap-offset header-length)
+                pad-length (- metalmap-offset
+                              (+ minimap-length minimap-offset))]
+            (b/ordered-map
+              :prefix (b/blob :length before-minimap)
+              :minimap (b/blob :length minimap-length)
+              :pad (b/blob :length pad-length)
+              :metalmap (b/blob :length metalmap-length)
+              :rest (b/blob)))
+          (let [before-metalmap (- metalmap-offset header-length)
+                pad-length (- minimap-offset
+                              (+ metalmap-length metalmap-offset))]
+            (b/ordered-map
+              :prefix (b/blob :length before-metalmap)
+              :metalmap (b/blob :length metalmap-length)
+              :pad (b/blob :length pad-length)
+              :minimap (b/blob :length minimap-length)
+              :rest (b/blob))))))
     (constantly nil) ; TODO writing maps
     :keep-header? true))
 
@@ -117,3 +133,16 @@
       0 0 minimap-size minimap-size
       rgba)
     bi))
+
+(defn metalmap-image [map-width map-height metalmap-bytes]
+  (when (and (number? map-width)
+             (number? map-height)
+             metalmap-bytes)
+    (let [width (quot map-width 2)
+          height (quot map-height 2)
+          bi (BufferedImage. width height BufferedImage/TYPE_BYTE_GRAY)]
+      (.setDataElements
+        (.getRaster bi)
+        0 0 width height
+        metalmap-bytes)
+      bi)))
