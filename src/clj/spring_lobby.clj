@@ -124,7 +124,7 @@
 (defn select-download [state]
   (select-keys state
     [:engine-versions-cache :map-files-cache
-     :engine-branch :maps-index-url]))
+     :engine-branch :maps-index-url :rapid-repo :mods-index-url]))
 
 
 (defn safe-read-map-cache [map-name]
@@ -197,25 +197,26 @@
   [state-atom]
   (let [before (u/curr-millis)
         mods (->> state-atom deref :mods)
-        {:keys [rapid archive]} (group-by ::fs/source mods)
-        known-archive-paths (set (map :absolute-path archive))
+        {:keys [rapid archive directory]} (group-by ::fs/source mods)
+        known-file-paths (set (map :absolute-path (concat archive directory)))
         known-rapid-paths (set (map :absolute-path rapid))
-        mod-archives (fs/mod-files)
+        mod-files (fs/mod-files)
         sdp-files (rapid/sdp-files)
-        _ (log/info "Found" (count mod-archives) "archives and" (count sdp-files) "rapid archives to scan for mods")
-        to-add-archive (remove (comp known-archive-paths #(.getAbsolutePath ^java.io.File %)) mod-archives)
+        _ (log/info "Found" (count mod-files) "files and"
+                    (count sdp-files) "rapid archives to scan for mods")
+        to-add-file (remove (comp known-file-paths #(.getAbsolutePath ^java.io.File %)) mod-files)
         to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath ^java.io.File %)) sdp-files)
         add-mod-fn (fn [mod-data]
                      (swap! state-atom update :mods
                            (fn [mods]
                              (set (conj mods mod-data)))))
         missing-files (set (remove (comp #(.exists ^java.io.File %) io/file)
-                                   (concat known-archive-paths known-rapid-paths)))]
-    (log/info "Found" (count to-add-archive) "mod archives and" (count to-add-rapid)
+                                   (concat known-file-paths known-rapid-paths)))]
+    (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-    (doseq [archive-file to-add-archive]
-      (log/info "Reading mod from" archive-file)
-      (add-mod-fn (fs/read-mod-file archive-file)))
+    (doseq [file to-add-file]
+      (log/info "Reading mod from" file)
+      (add-mod-fn (fs/read-mod-file file)))
     (doseq [sdp-file to-add-rapid]
       (log/info "Reading mod from" sdp-file)
       (add-mod-fn (rapid/read-sdp-mod sdp-file)))
@@ -223,7 +224,7 @@
     (swap! state-atom update :mods
            (fn [mods]
              (set (remove (comp missing-files :absolute-path) mods))))
-    {:to-add-archive-count (count to-add-archive)
+    {:to-add-file-count (count to-add-file)
      :to-add-rapid-count (count to-add-rapid)}))
 
 
@@ -1286,7 +1287,13 @@
                           (map second)
                           (map (fn [ai]
                                  {:bot-name (:name ai)
-                                  :bot-version "<game>"}))))]
+                                  :bot-version "<game>"}))))
+        bot-names (map :bot-name bots)
+        bot-versions (map :bot-version
+                          (get (group-by :bot-name bots)
+                               bot-name))
+        bot-name (some #{bot-name} bot-names)
+        bot-version (some #{bot-version} bot-versions)]
     {:fx/type :h-box
      :children
      [{:fx/type :v-box
@@ -1317,17 +1324,16 @@
            :text (str bot-username)
            :on-text-changed {:event/type ::change-bot-username}}
           {:fx/type :choice-box
-           :value (str bot-name)
+           :value bot-name
+           :disable (empty? bot-names)
            :on-value-changed {:event/type ::change-bot-name
                               :bots bots}
-           :items (map :bot-name bots)}
+           :items bot-names}
           {:fx/type :choice-box
-           :value (str bot-version)
+           :value bot-version
+           :disable (string/blank? bot-name)
            :on-value-changed {:event/type ::change-bot-version}
-           :items (map :bot-version
-                       (or (get (group-by :bot-name bots)
-                                bot-name)
-                           []))}]}
+           :items (or bot-versions [])}]}
         {:fx/type :pane
          :v-box/vgrow :always}
         {:fx/type :h-box
@@ -2173,13 +2179,16 @@
 
 (defmethod event-handler ::rapid-repo-change
   [{:fx/keys [event]}]
-  (swap! *state assoc :rapid-repo event)
   (future
-    (let [versions (->> (rapid/versions event)
-                        (sort-by :version version/version-compare)
-                        reverse
-                        doall)]
-      (swap! *state assoc :rapid-versions-cached versions))))
+    (try
+      (swap! *state assoc :rapid-repo event)
+      (let [versions (->> (rapid/versions event)
+                          (sort-by :version version/version-compare)
+                          reverse
+                          doall)]
+        (swap! *state assoc :rapid-versions-cached versions))
+      (catch Exception e
+        (log/error e)))))
 
 (defmethod event-handler ::rapid-download
   [{:keys [engine-dir-filename rapid-id]}]

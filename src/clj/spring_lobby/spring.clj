@@ -150,7 +150,8 @@
                   (into {})))))
        {:game
         (into
-          {:gametype (:battle-modname battle)
+          {:gametype (let [modinfo (:modinfo mod-details)]
+                       (str (:name modinfo) " " (:version modinfo)))
            :mapname (:battle-map battle)
            :hostip (when-not is-host (:battle-ip battle))
            :hostport (:battle-port battle)
@@ -222,13 +223,16 @@
                                %)))]
     (merge (get battles (:battle-id battle)) battle)))
 
+(defn mod-name [{:keys [git-commit-id modinfo]}]
+  (str (:name modinfo) " "
+       (or (when git-commit-id
+             (subs git-commit-id 0 7))
+           (:version modinfo))))
+
 ; TODO find a better place for this
-(defn mod-details [mods mod-name]
+(defn mod-details [mods filter-mod-name]
   (some->> mods
-           (filter (comp #{mod-name}
-                         (fn [modinfo]
-                           (str (:name modinfo) " " (:version modinfo)))
-                         :modinfo))
+           (filter (comp #{filter-mod-name} mod-name))
            first))
 
 (defn battle-script-txt [{:keys [username battle-map-details mods] :as state}]
@@ -268,23 +272,21 @@
 
 (defn mod-isolation-file ^java.io.File
   [{::fs/keys [source] :keys [filename]} engine-version]
-  (case source
-    :rapid
-    (io/file (fs/app-root) "spring" "engine" engine-version "packages" filename)
-    :archive
-    (io/file (fs/app-root) "spring" "engine" engine-version "games" filename)))
+  (when filename
+    (case source
+      :rapid
+      (io/file (fs/app-root) "spring" "engine" engine-version "packages" filename)
+      ; else
+      (io/file (fs/app-root) "spring" "engine" engine-version "games" filename))))
 
-
-(defn mod-name [modinfo]
-  (str (:name modinfo) " " (:version modinfo)))
 
 (defn mod-isolation-archive-file ^java.io.File
-  [{::fs/keys [source] :keys [modinfo] :as mod-details} engine-version]
-  (case source
-    :rapid
-    (let [filename (str (mod-name modinfo) ".sdz")]
+  [{::fs/keys [source] :as mod-details} engine-version]
+  (cond
+    (#{:rapid :directory} source)
+    (let [filename (str (mod-name mod-details) ".sdz")]
       (io/file (fs/app-root) "spring" "engine" engine-version "games" filename))
-    ; else
+    :else
     (mod-isolation-file mod-details engine-version)))
 
 (defn copy-mod [mod-details engine-version]
@@ -331,6 +333,11 @@
           (log/warn "No mod file to copy from" (.getAbsolutePath source)
                     "to" (.getAbsolutePath dest)))))))
 
+(defn hidden-directory? [path-str]
+  (or (re-find #"^\." path-str)
+      (re-find #"/\." path-str)
+      (re-find #"\\\." path-str)))
+
 (defn archive-mod [mod-details engine-version]
   (let [mod-filename (:filename mod-details)
         absolute-path (:absolute-path mod-details)]
@@ -353,7 +360,30 @@
               (log/debug "Adding zip entry for" filename)
               (.putNextEntry zos ze)
               (.write zos content-bytes 0 (count content-bytes))
-              (.closeEntry zos)))))
+              (.closeEntry zos))))
+        (log/info "Finished creating" dest))
+      (= :directory (::fs/source mod-details))
+      (let [source-dir (io/file absolute-path)
+            source-path (.toPath source-dir)
+            parent (io/file (fs/app-root) "spring" "engine" engine-version "games")
+            ^java.io.File dest (mod-isolation-archive-file mod-details engine-version)]
+        (.mkdirs parent)
+        (with-open [fos (FileOutputStream. dest)
+                    zos (ZipOutputStream. fos)]
+          (doseq [subfile (->> source-dir
+                               file-seq
+                               (filter #(.isFile %)))]
+            (let [file-bytes (rapid/slurp-bytes subfile)
+                  path (.toPath subfile)
+                  relative-path (str (.relativize source-path path))]
+              (if-not (hidden-directory? relative-path)
+                (let [ze (ZipEntry. ^String relative-path)]
+                  (log/debug "Adding zip entry for" relative-path)
+                  (.putNextEntry zos ze)
+                  (.write zos file-bytes 0 (count file-bytes))
+                  (.closeEntry zos))
+                (log/info "Skipping hidden directory" relative-path)))))
+        (log/info "Finished creating" dest))
       :else
       (log/info "Nothing to do, mod is already an archive: " (:filename mod-details)))))
 
@@ -392,7 +422,7 @@
           {:keys [battle-map battle-version battle-modname]} battle
           _ (copy-engine engines battle-version)
           mod-details (some->> mods
-                               (filter (comp #{battle-modname} (fn [modinfo] (str (:name modinfo) " " (:version modinfo))) :modinfo))
+                               (filter (comp #{battle-modname} mod-name))
                                first)
           mod-isolation-archive (mod-isolation-archive-file mod-details battle-version)
           _ (if (and mod-isolation-archive (.exists mod-isolation-archive))

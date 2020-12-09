@@ -5,6 +5,7 @@
     [clojure.string :as string]
     [com.climate.claypoole :as cp]
     [spring-lobby.fs.smf :as smf]
+    [spring-lobby.git :as git]
     [spring-lobby.lua :as lua]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
@@ -303,11 +304,9 @@
 
 
 (defn mod-files []
-  (->> (.listFiles (io/file (spring-root) "games"))
-       seq
-       (filter #(.isFile ^java.io.File %))))
+  (seq (.listFiles (io/file (spring-root) "games"))))
 
-(defn read-mod-file [^java.io.File file]
+(defn read-mod-zip-file [^java.io.File file]
   (with-open [zf (new ZipFile file)]
     (let [entries (enumeration-seq (.entries zf))
           try-entry-lua (fn [filename]
@@ -323,6 +322,34 @@
        :engineoptions (try-entry-lua "engineoptions.lua")
        :luaai (try-entry-lua "luaai.lua")
        ::source :archive})))
+
+(defn read-mod-directory [^java.io.File file]
+  (let [try-file-lua (fn [filename]
+                       (try
+                         (when-let [slurped (slurp (io/file file filename))]
+                           (lua/read-modinfo slurped))
+                         (catch Exception e
+                           (log/warn e "Error loading" filename "from" file))))]
+    {:filename (.getName file)
+     :absolute-path (.getAbsolutePath file)
+     :modinfo (try-file-lua "modinfo.lua")
+     :modoptions (try-file-lua "modoptions.lua")
+     :engineoptions (try-file-lua "engineoptions.lua")
+     :luaai (try-file-lua "luaai.lua")
+     :git-commit-id (try
+                      (git/latest-id file)
+                      (catch Exception e
+                        (log/error e "Error loading git commit id")))
+     ::source :directory}))
+
+(defn read-mod-file [^java.io.File file]
+  (cond
+    (.isDirectory file)
+    (read-mod-directory file)
+    (string/ends-with? (.getName file) ".sdz")
+    (read-mod-zip-file file)
+    :else
+    (log/warn "Uknown mod file type" file)))
 
 (defn mods []
   (->> (mod-files)
