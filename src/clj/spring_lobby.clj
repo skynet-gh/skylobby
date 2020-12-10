@@ -20,6 +20,7 @@
     [spring-lobby.client.message :as message]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.git :as git]
     [spring-lobby.http :as http]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
@@ -813,7 +814,6 @@
             (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
                   filtered-mods (->> mods
                                      (filter :modinfo)
-                                     (map :modinfo)
                                      (map spring/mod-name)
                                      (filter #(string/includes? (string/lower-case %) filter-lc))
                                      (sort version/version-compare))]
@@ -1254,6 +1254,33 @@
                          (inc (.indexOf minimap-types minimap-type))
                          (count minimap-types)))))))
 
+(defn git-clone-mod [repo-url]
+  (swap! *state assoc-in [:git-clone repo-url :status] true)
+  (future
+    (try
+      (let [[_all dir] (re-find #"/([^/]+)\.git" repo-url)]
+        (git/clone-repo repo-url (io/file (fs/spring-root) "games" dir)
+                        {:on-begin-task (fn [title total-work]
+                                          (let [m (str title " " total-work)]
+                                            (swap! *state assoc-in [:git-clone repo-url :message] m)))}))
+      (reconcile-mods *state)
+      (catch Exception e
+        (log/error e "Error cloning git repo" repo-url))
+      (finally
+        (swap! *state assoc-in [:git-clone repo-url :status] false)))))
+
+(defmethod event-handler ::download-mod
+  [{:keys [engine-dir-filename git-url mod-name rapid-id]}]
+  (cond
+    git-url (git-clone-mod git-url)
+    ; TODO lots of complex logic for where to get each BA version...
+    rapid-id
+    (event-handler {:fx/type ::rapid-download
+                    :engine-dir-filename engine-dir-filename
+                    :rapid-id rapid-id})
+    :else
+    (log/warn "No known method to download mod" (str "'" mod-name "'"))))
+
 (defmethod event-handler ::download-map
   [{:keys [map-name]}]
   (let [url (http/map-url map-name)
@@ -1282,7 +1309,8 @@
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version engines
            battle-map-details battle battles username users mods drag-team extracting
-           map-input-prefix copying archiving cleaning minimap-type http-download]}]
+           map-input-prefix copying archiving cleaning minimap-type http-download
+           rapid-download rapid-data-by-version git-clone]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (spring/mod-details mods battle-modname)
         scripttags (:scripttags battle)
@@ -1473,10 +1501,22 @@
          :resource (str "game (" battle-modname ")")
          :issues
          (concat
-           [{:severity (if mod-details 0 2)
-             :text "download"
-             :action {:event/type ::download-mod
-                      :mod-name battle-modname}}]
+           (let [git-url (cond
+                           (string/starts-with? battle-modname "Beyond All Reason")
+                           git/bar-repo-url
+                           (string/starts-with? battle-modname "Balanced Annihilation")
+                           git/ba-repo-url)
+                 rapid-id (:id (get rapid-data-by-version battle-modname))
+                 in-progress (or (-> rapid-download (get rapid-id) :status)
+                                 (-> git-clone (get git-url) :status))]
+             [{:severity (if mod-details 0 2)
+               :text "download"
+               :in-progress in-progress
+               :action {:event/type ::download-mod
+                        :mod-name battle-modname
+                        :rapid-id rapid-id
+                        :git-url git-url
+                        :engine-dir-filename (spring/engine-dir-filename engines engine-version)}}])
            (if-let [mod-isolation-archive-file (spring/mod-isolation-archive-file
                                                  mod-details engine-version)]
              (let [in-progress (-> archiving (get (:filename mod-details)) :status)]
@@ -2129,7 +2169,8 @@
                                 :bot-username :bot-name :bot-version :engine-version
                                 :mods :battles :drag-team :map-input-prefix :copying
                                 :archiving :cleaning :users :http-download :extracting
-                                :battle-map-details :minimap-type]))]))}))
+                                :battle-map-details :minimap-type
+                                :rapid-data-by-version :rapid-download :git-clone]))]))}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2462,6 +2503,11 @@
                               (->> rapid-repos
                                    (mapcat rapid/versions)
                                    (map (juxt :hash identity))
+                                   (into {})))
+                       (swap! *state assoc :rapid-data-by-version
+                              (->> rapid-repos
+                                   (mapcat rapid/versions)
+                                   (map (juxt :version identity))
                                    (into {}))))
                      (catch Exception e
                        (log/error e "Error loading rapid versions by hash"))))
@@ -2526,7 +2572,8 @@
                                        :bot-username :bot-name :bot-version :maps :engines
                                        :map-input-prefix :mods :drag-team
                                        :copying :archiving :cleaning :battle-map-details
-                                       :minimap-type :http-download :extracting]))
+                                       :minimap-type :http-download :extracting
+                                       :rapid-data-by-version :rapid-download :git-clone]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children
