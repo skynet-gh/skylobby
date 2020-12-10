@@ -1,6 +1,8 @@
 (ns spring-lobby.spring-test
   (:require
     [clojure.data]
+    [clojure.pprint :refer [pprint]]
+    [clojure.string :as string]
     [clojure.test :refer [deftest is testing]]
     [spring-lobby.spring :as spring]))
 
@@ -20,11 +22,9 @@
            (spring/script-data battle-players)))))
 
 (deftest script-test
-  #_
   (is (= expected-script-txt
          (spring/script-txt
            (sort-by first expected-script-data))))
-  #_
   (testing "with players"
     (let [expected expected-script-txt-players
           actual (spring/script-txt
@@ -36,13 +36,6 @@
         (let [diff (clojure.data/diff (string/split-lines expected) (string/split-lines actual))]
           (println "diff:")
           (pprint diff))))))
-
-
-(deftest parse-script
-  #_
-  (is (= expected-script-data
-         (spring/parse-script expected-script-txt)
-         (spring/parse-script expected-script-txt))))
 
 
 (def battle
@@ -61,7 +54,8 @@
     :mapname "Dworld Acidic"
     :hostport 8452
     :hostip nil
-    :ishost 0}})
+    :ishost 0
+    :modoptions {}}})
 
 (def battle-players
   {:battle-modhash -1
@@ -103,6 +97,7 @@
     :hostport 8452
     :hostip nil
     :ishost 0
+    :modoptions {}
     :team0
     {:teamleader 0
      :handicap 0
@@ -132,16 +127,18 @@
      :countrycode nil
      :spectator 0}}})
 
-
-
 (def expected-script-txt
   "[game]
 {
 \tgametype = Balanced Annihilation V9.79.4;
 \thostip = ;
 \thostport = 8452;
-\tishost = 1;
+\tishost = 0;
 \tmapname = Dworld Acidic;
+\t[modoptions]
+\t{
+\t}
+
 }
 
 ")
@@ -165,34 +162,38 @@
 
 \t[allyteam0]
 \t{
+\t\tnumallies = 0;
 \t}
 
 \t[allyteam1]
 \t{
+\t\tnumallies = 0;
 \t}
 
 \tgametype = Balanced Annihilation V10.24;
-\thostip = 192.168.1.6;
+\thostip = ;
 \thostport = 8452;
-\tishost = 1;
+\tishost = 0;
 \tmapname = Dworld Duo;
-\tnumplayers = 1;
-\tnumusers = 2;
+\t[modoptions]
+\t{
+\t}
+
 \t[player0]
 \t{
 \t\tcountrycode = ;
 \t\tisfromdemo = 0;
 \t\tname = skynet9001;
+\t\tspectator = 0;
 \t\tteam = 0;
 \t}
 
-\tstartpostype = 2;
 \t[team0]
 \t{
 \t\tallyteam = 0;
 \t\thandicap = 0;
-\t\trgbcolor = 0 0 0;
-\t\tside = 0;
+\t\trgbcolor = 0.0 0.0 0.0;
+\t\tside = ARM;
 \t\tteamleader = 0;
 \t}
 
@@ -200,9 +201,9 @@
 \t{
 \t\tallyteam = 1;
 \t\thandicap = 1;
-\t\trgbcolor = 0 0 1;
-\t\tside = 1;
-\t\tteamleader = 1;
+\t\trgbcolor = 0.00392156862745098 0.0 0.0;
+\t\tside = CORE;
+\t\tteamleader = 0;
 \t}
 
 }

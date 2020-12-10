@@ -225,35 +225,43 @@
               (log/info "Extract result" res)
               (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
 
-(defn extract-7z [^java.io.File f]
-  (let [fname (.getName f)
-        dir (if (string/includes? fname ".")
-              (subs fname 0 (.lastIndexOf fname "."))
-              fname)]
-    (with-open [raf (new RandomAccessFile f "r")
-                rafis (new RandomAccessFileInStream raf)
-                archive (SevenZip/openInArchive nil rafis)
-                simple (.getSimpleInterface archive)]
-      (log/trace archive "has" (.getNumberOfItems archive) "items")
-      (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
-        (let [path (.getPath item)
-              to (io/file (.getParentFile f) dir path)]
-          (try
-            (when-not (.isFolder item)
-              (when-not (.exists to)
-                (let [parent (.getParentFile to)]
-                  (.mkdirs parent))
-                (log/info "Extracting" path "to" to)
-                (with-open [fos (FileOutputStream. to)]
-                  (let [res (.extractSlow item
-                              (reify ISequentialOutStream
-                                (write [this data]
-                                  (.write fos data 0 (count data))
-                                  (count data))))]
-                    (log/info "Extract result for" to res)))))
-            (catch Exception e
-              (log/warn e "Error extracting"))))))
-    (log/info "Finished extracting" f "to" dir)))
+(defn extract-7z
+  ([^java.io.File f]
+   (let [fname (.getName f)
+         dir (if (string/includes? fname ".")
+               (subs fname 0 (.lastIndexOf fname "."))
+               fname)
+         dest (io/file (.getParentFile f) dir)]
+     (extract-7z f dest)))
+  ([^java.io.File f ^java.io.File dest]
+   (let [fname (.getName f)
+         dir (if (string/includes? fname ".")
+               (subs fname 0 (.lastIndexOf fname "."))
+               fname)]
+     (with-open [raf (new RandomAccessFile f "r")
+                 rafis (new RandomAccessFileInStream raf)
+                 archive (SevenZip/openInArchive nil rafis)
+                 simple (.getSimpleInterface archive)]
+       (log/trace archive "has" (.getNumberOfItems archive) "items")
+       (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
+         (let [path (.getPath item)
+               to (io/file dest path)]
+           (try
+             (when-not (.isFolder item)
+               (when-not (.exists to)
+                 (let [parent (.getParentFile to)]
+                   (.mkdirs parent))
+                 (log/info "Extracting" path "to" to)
+                 (with-open [fos (FileOutputStream. to)]
+                   (let [res (.extractSlow item
+                               (reify ISequentialOutStream
+                                 (write [this data]
+                                   (.write fos data 0 (count data))
+                                   (count data))))]
+                     (log/info "Extract result for" to res)))))
+             (catch Exception e
+               (log/warn e "Error extracting"))))))
+     (log/info "Finished extracting" f "to" dir))))
 
 
 #_
@@ -272,6 +280,7 @@
 
 (defn sync-version [engine-dir]
   (let [engine-exe (io/file engine-dir (spring-executable))
+        _ (.setExecutable engine-exe true)
         command [(.getAbsolutePath engine-exe) "--sync-version"]
         ^"[Ljava.lang.String;" cmdarray (into-array String command)
         runtime (Runtime/getRuntime)

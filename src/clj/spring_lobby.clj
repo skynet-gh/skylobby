@@ -1237,6 +1237,10 @@
           (swap! *state assoc-in [:cleaning engine-version] {:status false}))))))
 
 
+(defn engine-dest [engine-version]
+  (io/file (fs/spring-root) "engine" (http/engine-archive engine-version)))
+
+
 (def minimap-types
   ["minimap" "metalmap"])
 
@@ -1263,8 +1267,8 @@
 
 (defn battle-buttons
   [{:keys [am-host host-user host-username maps battle-map bot-username bot-name bot-version engines
-           engine-version battle-map-details battle battles username users mods drag-team
-           map-input-prefix copying archiving cleaning minimap-type]}]
+           battle-map-details battle battles username users mods drag-team extracting
+           map-input-prefix copying archiving cleaning minimap-type http-download]}]
   (let [battle-modname (:battle-modname (get battles (:battle-id battle)))
         mod-details (spring/mod-details mods battle-modname)
         scripttags (:scripttags battle)
@@ -1276,7 +1280,9 @@
         {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         starting-points (minimap-starting-points battle-details battle-map-details scripttags minimap-width minimap-height)
+        engine-version (:battle-version battle-details)
         engine-dir-filename (spring/engine-dir-filename engines engine-version)
+        engine-archive-file (engine-dest engine-version)
         bots (fs/bots engine-dir-filename)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
@@ -1424,7 +1430,7 @@
        :children
        [{:fx/type resource-sync-pane
          :v-box/margin 8
-         :resource "map"
+         :resource (str "map (" battle-map ")")
          :issues
          (concat
            [{:severity (if battle-map-details 0 2)
@@ -1444,7 +1450,7 @@
                           :engine-version engine-version}}])))}
         {:fx/type resource-sync-pane
          :v-box/margin 8
-         :resource "game"
+         :resource (str "game (" battle-modname ")")
          :issues
          (concat
            [{:severity (if mod-details 0 2)
@@ -1475,34 +1481,48 @@
                             :engine-version engine-version}}]))))}
         {:fx/type resource-sync-pane
          :v-box/margin 8
-         :resource "engine"
+         :resource (str "engine (" engine-version ")")
          :issues
          (concat
-           [{:severity (if engine-dir-filename 0 2)
-             :text "download"
-             :action {:event/type ::download-engine
-                      :engine-version engine-version}}]
-           (when-let [engine-isolation-file (spring/engine-isolation-file engine-version)]
-             [(let [in-progress (-> copying (get engine-version) :status)]
-                {:severity (if (and (.exists engine-isolation-file)
-                                    (not in-progress))
-                             0 1)
-                 :text "copy"
-                 :in-progress in-progress
-                 :action {:event/type ::copy-engine
-                          :engines engines
-                          :engine-version engine-version}})
-              (let [packages-dir (io/file engine-isolation-file "packages")
-                    pool-dir (io/file engine-isolation-file "pool")
-                    in-progress (-> cleaning (get engine-version) :status)]
-                {:severity (if (and (or (.exists packages-dir)
-                                        (.exists pool-dir))
-                                    (not in-progress))
-                             1 0)
-                 :text "clean"
-                 :in-progress in-progress
-                 :action {:event/type ::clean-engine
-                          :engine-version engine-version}})]))}]}
+           (let [url (http/engine-url engine-version)
+                 download (get http-download url)
+                 in-progress (:running download)
+                 text (or (when in-progress (:message download))
+                          "download")]
+             [{:severity (if (.exists engine-archive-file) 0 2)
+               :text text
+               :in-progress in-progress
+               :action {:event/type ::http-download
+                        :url url
+                        :dest engine-archive-file}}])
+           (when (.exists engine-archive-file)
+             [{:severity (if engine-dir-filename 0 2)
+               :text "extract"
+               :in-progress (get extracting engine-archive-file)
+               :action {:event/type ::extract-7z
+                        :file engine-archive-file}}])
+           (when engine-dir-filename
+             (when-let [engine-isolation-file (spring/engine-isolation-file engine-version)]
+               [(let [in-progress (-> copying (get engine-version) :status)]
+                  {:severity (if (and (.exists engine-isolation-file)
+                                      (not in-progress))
+                               0 1)
+                   :text "copy"
+                   :in-progress in-progress
+                   :action {:event/type ::copy-engine
+                            :engines engines
+                            :engine-version engine-version}})
+                (let [packages-dir (io/file engine-isolation-file "packages")
+                      pool-dir (io/file engine-isolation-file "pool")
+                      in-progress (-> cleaning (get engine-version) :status)]
+                  {:severity (if (and (or (.exists packages-dir)
+                                          (.exists pool-dir))
+                                      (not in-progress))
+                               1 0)
+                   :text "clean"
+                   :in-progress in-progress
+                   :action {:event/type ::clean-engine
+                            :engine-version engine-version}})])))}]}
       {:fx/type :v-box
        :alignment :top-left
        :h-box/hgrow :always
@@ -1854,9 +1874,9 @@
        :a 0})))
 
 
-(defn nickname [{:keys [bot-name owner username]}]
+(defn nickname [{:keys [ai-name bot-name owner username]}]
   (if bot-name
-    (str bot-name (when owner (str " (" owner ")")))
+    (str bot-name " (" ai-name ", " owner ")")
     (str username)))
 
 
@@ -2088,7 +2108,7 @@
             (select-keys state [:battle :username :host-username :maps :engines
                                 :bot-username :bot-name :bot-version :engine-version
                                 :mods :battles :drag-team :map-input-prefix :copying
-                                :archiving :cleaning :users
+                                :archiving :cleaning :users :http-download :extracting
                                 :battle-map-details :minimap-type]))]))}))
 
 
@@ -2364,11 +2384,13 @@
 
 
 (defmethod event-handler ::extract-7z
-  [{:keys [file]}]
+  [{:keys [file dest]}]
   (future
     (try
       (swap! *state assoc-in [:extracting file] true)
-      (fs/extract-7z file)
+      (if dest
+        (fs/extract-7z file dest)
+        (fs/extract-7z file))
       (reconcile-engines *state)
       (catch Exception e
         (log/error e "Error extracting 7z" file))
@@ -2484,7 +2506,7 @@
                                        :bot-username :bot-name :bot-version :maps :engines
                                        :map-input-prefix :mods :drag-team
                                        :copying :archiving :cleaning :battle-map-details
-                                       :minimap-type]))
+                                       :minimap-type :http-download :extracting]))
                                   {:fx/type :v-box
                                    :alignment :center-left
                                    :children
@@ -2620,7 +2642,7 @@
                                  :version
                                  str)})}}]}]}}}]))
       (when show-http-downloader
-        (let [engine-branches ["master" "maintenance" "develop"]] ; TODO
+        (let [engine-branches http/engine-branches]
           [{:fx/type :stage
             :showing show-http-downloader
             :title "alt-spring-lobby HTTP Downloader"
@@ -2700,11 +2722,12 @@
                    (fn [i]
                      (if-let [url (:url i)]
                        (let [[_all version] (re-find #"(.*)/" url)
-                             archive-path (http/engine-path engine-branch version)
-                             url (str http/springrts-buildbot-root "/" engine-branch "/" archive-path)
+                             url (http/engine-url version)
                              download (get http-download url)
-                             dest (io/file (fs/spring-root) "engine" (http/engine-archive engine-branch version))
-                             engine-version (str version (when (not= "master" engine-branch) (str " " engine-branch)))]
+                             dest (engine-dest version)
+                             engine-version (str version
+                                              (when (not= http/default-engine-branch engine-branch)
+                                                (str " " engine-branch)))]
                          (merge
                            {:text (str (:message download))
                             :style {:-fx-font-family "monospace"}}

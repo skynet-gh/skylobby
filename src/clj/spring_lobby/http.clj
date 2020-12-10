@@ -8,6 +8,9 @@
 
 (set! *warn-on-reflection* true)
 
+(def default-engine-branch "master")
+(def engine-branches
+  ["master" "maintenance" "develop"])  ; TODO maybe auto detect these
 
 (def springrts-buildbot-root
   "https://springrts.com/dl/buildbot/default")
@@ -120,7 +123,20 @@
      (files parsed))))
 
 
+(defn detect-engine-branch
+  [engine-version]
+  (or
+    (some
+      (fn [engine-branch]
+        (when
+          (string/includes? engine-version engine-branch)
+          engine-branch))
+      engine-branches)
+    default-engine-branch))
+
 (defn engine-archive
+  ([version]
+   (engine-archive (detect-engine-branch version) version))
   ([branch version]
    (let [{:keys [os-name]} (fs/sys-data)
          platform (if (and (string/includes? os-name "Linux")
@@ -129,32 +145,34 @@
                     "win32")]
      (engine-archive branch version platform)))
   ([branch version platform]
-   (str "spring_"
-        (when (not= "master" branch) (str "{" branch "}"))
-        version "_" platform "-minimal-portable.7z")))
+   (let [mp "minimal-portable"
+         suffix (cond
+                  (string/starts-with? platform "linux")
+                  (str mp "-" platform "-static")
+                  (string/starts-with? platform "win")
+                  (str platform "-" mp))]
+     (str "spring_"
+          (when (not= "master" branch) (str "{" branch "}"))
+          (first (string/split version #"\s"))
+          "_" suffix ".7z"))))
 
 (defn engine-path
   "Returns the path to the Spring archive to download for this system."
-  [branch version]
-  (let [{:keys [os-name]} (fs/sys-data)
-        platform (if (and (string/includes? os-name "Linux")
-                          (not (fs/wsl?)))
-                   "linux64"
-                   "win32")]
-    (str version "/" platform "/" (engine-archive branch version platform))))
+  ([version]
+   (engine-path (detect-engine-branch version) version))
+  ([branch version]
+   (let [{:keys [os-name]} (fs/sys-data)
+         platform (if (and (string/includes? os-name "Linux")
+                           (not (fs/wsl?)))
+                    "linux64"
+                    "win32")]
+     (str (first (string/split version #"\s"))
+          "/" platform "/" (engine-archive branch version platform)))))
 
 
-#_
-(engine-path "103.0/")
-#_
-(let [engine-links (-> spring-lobby/*state deref :engine-versions-cached)
-      first-link (first engine-links)]
-  first-link)
-
-#_
-(links
-  (parsed-springrts-buildbot ["master"]))
-#_
-(links parsed-springfiles-maps)
-#_
-(links parsed-springfightclub-root)
+(defn engine-url
+  "Returns the url for the archive for the given engine version."
+  [engine-version]
+  (let [engine-branch (detect-engine-branch engine-version)
+        archive-path (engine-path engine-branch engine-version)]
+    (str springrts-buildbot-root "/" engine-branch "/" archive-path)))

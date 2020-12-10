@@ -54,4 +54,8 @@
   {:extra-paths ["dev/clj/uberjar"]
    :extra-deps
    {seancorfield/depstar {:mvn/version "1.1.136"}}
-   :main-opts ["-m" "uberjar"]}}}
+   :main-opts ["-m" "uberjar"]}
+  :kaocha
+  {:extra-paths ["test/clj"]
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}
+   :main-opts ["-m" "kaocha.runner" "--watch"]}}}

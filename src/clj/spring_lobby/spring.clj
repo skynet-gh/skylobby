@@ -150,8 +150,9 @@
                   (into {})))))
        {:game
         (into
-          {:gametype (let [modinfo (:modinfo mod-details)]
-                       (str (:name modinfo) " " (:version modinfo)))
+          {:gametype (if-let [modinfo (:modinfo mod-details)]
+                       (str (:name modinfo) " " (:version modinfo))
+                       (:battle-modname battle))
            :mapname (:battle-map battle)
            :hostip (when-not is-host (:battle-ip battle))
            :hostport (:battle-port battle)
