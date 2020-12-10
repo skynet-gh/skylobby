@@ -158,7 +158,8 @@
         (let [battle-id (-> new-state :battle :battle-id)
               old-battle-map (-> old-state :battles (get battle-id) :battle-map)
               new-battle-map (-> new-state :battles (get battle-id) :battle-map)]
-          (when (not= old-battle-map new-battle-map)
+          (when (or (not (:battle-map-details new-state))
+                    (not= old-battle-map new-battle-map))
             (swap! *state assoc
                    :battle-map-details (safe-read-map-cache new-battle-map))))
         (catch Exception e

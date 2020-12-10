@@ -421,7 +421,10 @@
                      :battles
                      (get (-> state :battle :battle-id)))
           {:keys [battle-map battle-version battle-modname]} battle
-          _ (copy-engine engines battle-version)
+          engine-dir (engine-isolation-file battle-version)
+          _ (if (and engine-dir (.exists engine-dir))
+              (log/info "Engine dir" engine-dir "already exists")
+              (copy-engine engines battle-version))
           mod-details (some->> mods
                                (filter (comp #{battle-modname} mod-name))
                                first)
