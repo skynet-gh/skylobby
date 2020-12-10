@@ -176,3 +176,7 @@
   (let [engine-branch (detect-engine-branch engine-version)
         archive-path (engine-path engine-branch engine-version)]
     (str springrts-buildbot-root "/" engine-branch "/" archive-path)))
+
+
+(defn map-url [map-name]
+  (str springfiles-maps-url "/" (fs/map-filename map-name)))

@@ -27,3 +27,7 @@
   (is (= "https://springrts.com/dl/buildbot/default/develop/104.0.1-2141-gfb2f9d5/win32/spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z"
          (with-redefs [fs/sys-data (constantly {:os-name "Windows"})]
            (http/engine-url "104.0.1-2141-gfb2f9d5 develop")))))
+
+(deftest map-url
+  (is (= "http://api.springfiles.com/files/maps/pentos_v1.sd7"
+         (http/map-url "Pentos_V1"))))

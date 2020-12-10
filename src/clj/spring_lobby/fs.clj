@@ -374,6 +374,11 @@
            (let [filename (.getName file)]
              (first (string/split filename #"\.")))))))
 
+(defn map-filename [map-name]
+  (str
+    (string/lower-case (string/replace map-name #"\s" "_"))
+    ".sd7"))
+
 (defn map-file [map-filename]
   (io/file (spring-root) "maps" map-filename))
 

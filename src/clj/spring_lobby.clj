@@ -1254,6 +1254,20 @@
                          (inc (.indexOf minimap-types minimap-type))
                          (count minimap-types)))))))
 
+(defmethod event-handler ::download-map
+  [{:keys [map-name]}]
+  (let [url (http/map-url map-name)
+        dest (fs/map-file (fs/map-filename map-name))
+        http-future (event-handler {:event/type ::http-download
+                                    :dest dest
+                                    :url url})]
+    (future
+      (try
+        @http-future
+        (reconcile-maps *state)
+        (swap! *state assoc :battle-map-details (safe-read-map-cache map-name))
+        (catch Exception e
+          (log/error e "Error downloading map"))))))
 
 
 (defn scale-minimap-image [minimap-width minimap-height minimap-image]
@@ -1433,10 +1447,16 @@
          :resource (str "map (" battle-map ")")
          :issues
          (concat
-           [{:severity (if battle-map-details 0 2)
-             :text "download"
-             :action {:event/type ::download-map
-                      :map-name battle-map}}]
+           (let [url (http/map-url battle-map)
+                 download (get http-download url)
+                 in-progress (:running download)
+                 text (or (when in-progress (:message download))
+                          "download")]
+             [{:severity (if battle-map-details 0 2)
+               :text text
+               :in-progress in-progress
+               :action {:event/type ::download-map
+                        :map-name battle-map}}])
            (let [map-filename (:filename battle-map-details)
                  in-progress (-> copying (get map-filename) :status)]
              (when-let [map-isolation-file (spring/map-isolation-file map-filename engine-version)]
