@@ -125,14 +125,15 @@
 
 (defn detect-engine-branch
   [engine-version]
-  (or
-    (some
-      (fn [engine-branch]
-        (when
-          (string/includes? engine-version engine-branch)
-          engine-branch))
-      engine-branches)
-    default-engine-branch))
+  (when engine-version
+    (or
+      (some
+        (fn [engine-branch]
+          (when
+            (string/includes? engine-version engine-branch)
+            engine-branch))
+        engine-branches)
+      default-engine-branch)))
 
 (defn engine-archive
   ([version]
@@ -145,29 +146,31 @@
                     "win32")]
      (engine-archive branch version platform)))
   ([branch version platform]
-   (let [mp "minimal-portable"
-         suffix (cond
-                  (string/starts-with? platform "linux")
-                  (str mp "-" platform "-static")
-                  (string/starts-with? platform "win")
-                  (str platform "-" mp))]
-     (str "spring_"
-          (when (not= "master" branch) (str "{" branch "}"))
-          (first (string/split version #"\s"))
-          "_" suffix ".7z"))))
+   (when version
+     (let [mp "minimal-portable"
+           suffix (cond
+                    (string/starts-with? platform "linux")
+                    (str mp "-" platform "-static")
+                    (string/starts-with? platform "win")
+                    (str platform "-" mp))]
+       (str "spring_"
+            (when (not= "master" branch) (str "{" branch "}"))
+            (first (string/split version #"\s"))
+            "_" suffix ".7z")))))
 
 (defn engine-path
   "Returns the path to the Spring archive to download for this system."
   ([version]
    (engine-path (detect-engine-branch version) version))
   ([branch version]
-   (let [{:keys [os-name]} (fs/sys-data)
-         platform (if (and (string/includes? os-name "Linux")
-                           (not (fs/wsl?)))
-                    "linux64"
-                    "win32")]
-     (str (first (string/split version #"\s"))
-          "/" platform "/" (engine-archive branch version platform)))))
+   (when version
+     (let [{:keys [os-name]} (fs/sys-data)
+           platform (if (and (string/includes? os-name "Linux")
+                             (not (fs/wsl?)))
+                      "linux64"
+                      "win32")]
+       (str (first (string/split version #"\s"))
+            "/" platform "/" (engine-archive branch version platform))))))
 
 
 (defn engine-url

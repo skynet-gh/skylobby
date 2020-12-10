@@ -1239,7 +1239,8 @@
 
 
 (defn engine-dest [engine-version]
-  (io/file (fs/spring-root) "engine" (http/engine-archive engine-version)))
+  (when engine-version
+    (io/file (fs/spring-root) "engine" (http/engine-archive engine-version))))
 
 
 (def minimap-types
@@ -2498,7 +2499,7 @@
                        (log/error e "Error loading SDP files"))))
                  (future
                    (try
-                     (let [rapid-repos (doall (rapid/repos))]
+                     (let [rapid-repos (sort (rapid/repos))]
                        (swap! *state assoc :rapid-repos-cached rapid-repos)
                        (swap! *state assoc :rapid-versions-by-hash
                               (->> rapid-repos
@@ -2800,6 +2801,8 @@
                            {:text (str (:message download))
                             :style {:-fx-font-family "monospace"}}
                            (cond
+                             (not dest)
+                             nil
                              (.exists dest)
                              {:graphic
                               (if (some #{engine-version} (map :engine-version engines))
