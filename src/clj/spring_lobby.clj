@@ -165,12 +165,13 @@
         (let [battle-id (-> new-state :battle :battle-id)
               old-battle-map (-> old-state :battles (get battle-id) :battle-map)
               new-battle-map (-> new-state :battles (get battle-id) :battle-map)]
-          (when (or (not (:battle-map-details new-state))
-                    (not= old-battle-map new-battle-map))
+          (when (and new-battle-map
+                     (or (not (:battle-map-details new-state))
+                      (not= old-battle-map new-battle-map)))
             (log/debug "Updating battle map details for" new-battle-map
                        "was" old-battle-map)
-            (swap! *state assoc
-                   :battle-map-details (safe-read-map-cache new-battle-map))))
+            (when-let [map-details (safe-read-map-cache new-battle-map)]
+              (swap! *state assoc :battle-map-details map-details))))
         (catch Exception e
           (log/error e "Error in :battle-map-details state watcher"))))))
 
