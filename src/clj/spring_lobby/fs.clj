@@ -11,11 +11,11 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.awt.image BufferedImage)
+    ;(java.awt.image BufferedImage)
     (java.io FileOutputStream RandomAccessFile)
     (java.nio ByteBuffer)
     (java.util.zip CRC32 ZipEntry ZipFile)
-    (javax.imageio ImageIO)
+    ;(javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
     (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
@@ -107,6 +107,24 @@
   (executable "spring"))
 
 
+(defn bar-root
+  "Returns the root directory for BAR"
+  ^java.io.File []
+  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+    (cond
+      (string/includes? os-name "Linux")
+      (if (string/includes? os-version "Microsoft") ; WSL
+        (io/file "/mnt" "c" "Users" user-name "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
+        (let [snap-dir (io/file user-home "snap" "springlobby-nsg" "common" ".spring")]
+          (if (.exists snap-dir)
+            snap-dir
+            (io/file user-home ".spring"))))
+      (string/includes? os-name "Windows")
+      (io/file user-home "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
+      :else
+      (throw (ex-info "Unable to determine Spring root for this system"
+                      {:sys-data sys-data})))))
+
 (defn spring-root
   "Returns the root directory for Spring"
   ^java.io.File []
@@ -177,6 +195,7 @@
        (filter #(or (string/ends-with? (.getName ^java.io.File %) ".sd7")
                     (string/ends-with? (.getName ^java.io.File %) ".sdz")))))
 
+#_
 (defn open-zip [^java.io.File from]
   (let [zf (new ZipFile from)
         entries (enumeration-seq (.entries zf))]
@@ -198,6 +217,7 @@
     (.getValue res))) ; TODO 4711 if 0
 
 
+#_
 (defn open-7z [^java.io.File from]
   (with-open [raf (new RandomAccessFile from "r")
               rafis (new RandomAccessFileInStream raf)
@@ -317,55 +337,63 @@
 (defn mod-files []
   (seq (.listFiles (io/file (spring-root) "games"))))
 
-(defn read-mod-zip-file [^java.io.File file]
-  (with-open [zf (new ZipFile file)]
-    (let [entries (enumeration-seq (.entries zf))
-          try-entry-lua (fn [filename]
-                          (try
-                            (when-let [slurped (slurp-zip-entry zf entries filename)]
-                              (lua/read-modinfo slurped))
-                            (catch Exception e
-                              (log/warn e "Error loading" filename "from" file))))]
-      {:filename (.getName file)
-       :absolute-path (.getAbsolutePath file)
-       :modinfo (try-entry-lua "modinfo.lua")
-       :modoptions (try-entry-lua "modoptions.lua")
-       :engineoptions (try-entry-lua "engineoptions.lua")
-       :luaai (try-entry-lua "luaai.lua")
-       ::source :archive})))
+(defn read-mod-zip-file
+  ([^java.io.File file]
+   (read-mod-zip-file file nil))
+  ([^java.io.File file {:keys [modinfo-only]}]
+   (with-open [zf (new ZipFile file)]
+     (let [entries (enumeration-seq (.entries zf))
+           try-entry-lua (fn [filename]
+                           (try
+                             (when-let [slurped (slurp-zip-entry zf entries filename)]
+                               (lua/read-modinfo slurped))
+                             (catch Exception e
+                               (log/warn e "Error loading" filename "from" file))))]
+       (merge
+         {:filename (.getName file)
+          :absolute-path (.getAbsolutePath file)
+          :modinfo (try-entry-lua "modinfo.lua")
+          ::source :archive}
+         (when-not modinfo-only
+           {:modoptions (try-entry-lua "modoptions.lua")
+            :engineoptions (try-entry-lua "engineoptions.lua")
+            :luaai (try-entry-lua "luaai.lua")}))))))
 
-(defn read-mod-directory [^java.io.File file]
-  (let [try-file-lua (fn [filename]
-                       (try
-                         (when-let [slurped (slurp (io/file file filename))]
-                           (lua/read-modinfo slurped))
+(defn read-mod-directory
+  ([^java.io.File file]
+   (read-mod-directory file nil))
+  ([^java.io.File file {:keys [modinfo-only]}]
+   (let [try-file-lua (fn [filename]
+                        (try
+                          (when-let [slurped (slurp (io/file file filename))]
+                            (lua/read-modinfo slurped))
+                          (catch Exception e
+                            (log/warn e "Error loading" filename "from" file))))]
+     (merge
+       {:filename (.getName file)
+        :absolute-path (.getAbsolutePath file)
+        :modinfo (try-file-lua "modinfo.lua")
+        :git-commit-id (try
+                         (git/latest-id file)
                          (catch Exception e
-                           (log/warn e "Error loading" filename "from" file))))]
-    {:filename (.getName file)
-     :absolute-path (.getAbsolutePath file)
-     :modinfo (try-file-lua "modinfo.lua")
-     :modoptions (try-file-lua "modoptions.lua")
-     :engineoptions (try-file-lua "engineoptions.lua")
-     :luaai (try-file-lua "luaai.lua")
-     :git-commit-id (try
-                      (git/latest-id file)
-                      (catch Exception e
-                        (log/error e "Error loading git commit id")))
-     ::source :directory}))
+                           (log/error e "Error loading git commit id")))
+        ::source :directory}
+       (when-not modinfo-only
+         {:modoptions (try-file-lua "modoptions.lua")
+          :engineoptions (try-file-lua "engineoptions.lua")
+          :luaai (try-file-lua "luaai.lua")})))))
 
-(defn read-mod-file [^java.io.File file]
-  (cond
-    (.isDirectory file)
-    (read-mod-directory file)
-    (string/ends-with? (.getName file) ".sdz")
-    (read-mod-zip-file file)
-    :else
-    (log/warn "Uknown mod file type" file)))
-
-(defn mods []
-  (->> (mod-files)
-       (map read-mod-file)
-       doall))
+(defn read-mod-file
+  ([^java.io.File file]
+   (read-mod-file file nil))
+  ([^java.io.File file opts]
+   (cond
+     (.isDirectory file)
+     (read-mod-directory file opts)
+     (string/ends-with? (.getName file) ".sdz")
+     (read-mod-zip-file file opts)
+     :else
+     (log/warn "Unknown mod file type" file))))
 
 (defn map-names []
   (->> (.listFiles (io/file (spring-root) "maps"))
@@ -377,12 +405,14 @@
              (first (string/split filename #"\.")))))))
 
 (defn map-filename [map-name]
-  (str
-    (string/lower-case (string/replace map-name #"\s" "_"))
-    ".sd7"))
+  (when map-name
+    (str
+      (string/lower-case (string/replace map-name #"\s" "_"))
+      ".sd7")))
 
 (defn map-file [map-filename]
-  (io/file (spring-root) "maps" map-filename))
+  (when map-filename
+    (io/file (spring-root) "maps" map-filename)))
 
 (defn spring-config-line [lines field]
   (nth
@@ -415,41 +445,56 @@
     (catch Exception e
       (log/error e "Failed to parse mapinfo.lua from" (.getName file)))))
 
-(defn read-zip-map [^java.io.File file]
-  (with-open [zf (new ZipFile file)]
-    (let [entry-seq (->> (.entries zf)
-                         enumeration-seq)]
-      (merge
-        (when-let [^ZipEntry smf-entry
-                   (->> entry-seq
-                        (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^ZipEntry %)))
-                        first)]
-          (let [smf-path (.getName smf-entry)
-                {:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))
-                {:keys [map-width map-height]} header]
-            {:map-name (map-name smf-path)
-             ; TODO extract only what's needed
-             :smf (merge
-                    {::source smf-path
-                     :header header}
-                    (when-let [minimap (:minimap body)]
-                      {:minimap-bytes minimap
-                       :minimap-image (smf/decompress-minimap minimap)})
-                    (when-let [metalmap (:metalmap body)]
-                      {:metalmap-bytes metalmap
-                       :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))}))
-        (when-let [^ZipEntry mapinfo-entry
-                   (->> entry-seq
-                        (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^ZipEntry %)))
-                        first)]
-          (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
-        (when-let [^ZipEntry smd-entry
-                   (->> entry-seq
-                        (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName ^ZipEntry %)))
-                        first)]
-          (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
-                      (spring-script/parse-script map-data))]
-            {:smd (assoc smd ::source (.getName smd-entry))}))))))
+(defn read-zip-smf
+  ([zf ^ZipEntry smf-entry]
+   (read-zip-smf zf smf-entry nil))
+  ([zf ^ZipEntry smf-entry {:keys [header-only]}]
+   (let [smf-path (.getName smf-entry)]
+     (if header-only
+       (let [header (smf/decode-map-header (.getInputStream zf smf-entry))]
+         {:map-name (map-name smf-path)
+          :smf (merge
+                 {::source smf-path
+                  :header header})})
+       (let [{:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))
+             {:keys [map-width map-height]} header]
+         {:map-name (map-name smf-path)
+          ; TODO extract only what's needed
+          :smf (merge
+                 {::source smf-path
+                  :header header}
+                 (when-let [minimap (:minimap body)]
+                   {:minimap-bytes minimap
+                    :minimap-image (smf/decompress-minimap minimap)})
+                 (when-let [metalmap (:metalmap body)]
+                   {:metalmap-bytes metalmap
+                    :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
+
+(defn read-zip-map
+  ([^java.io.File file]
+   (read-zip-map file nil))
+  ([^java.io.File file opts]
+   (with-open [zf (new ZipFile file)]
+     (let [entry-seq (->> (.entries zf)
+                          enumeration-seq)]
+       (merge
+         (when-let [^ZipEntry smf-entry
+                    (->> entry-seq
+                         (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (read-zip-smf zf smf-entry opts))
+         (when-let [^ZipEntry mapinfo-entry
+                    (->> entry-seq
+                         (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
+         (when-let [^ZipEntry smd-entry
+                    (->> entry-seq
+                         (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
+                       (spring-script/parse-script map-data))]
+             {:smd (assoc smd ::source (.getName smd-entry))})))))))
 
 
 (defn slurp-7z-item [^ISimpleInArchiveItem item]
@@ -472,62 +517,80 @@
                 (count data))))
       (.toByteArray baos))))
 
-(defn read-7z-map [^java.io.File file]
-  (with-open [raf (new RandomAccessFile file "r")
-              rafis (new RandomAccessFileInStream raf)
-              archive (SevenZip/openInArchive nil rafis)
-              simple (.getSimpleInterface archive)]
-    (merge
-      (when-let [^ISimpleInArchiveItem smf-item
-                 (->> (.getArchiveItems simple)
-                      (filter (comp #(string/ends-with? % ".smf")
-                                    string/lower-case
-                                    #(.getPath ^ISimpleInArchiveItem %)))
-                      first)]
-        (let [smf-path (.getPath smf-item)
-              {:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))
-              {:keys [map-width map-height]} header]
-          {:map-name (map-name smf-path)
-           ; TODO extract only what's needed
-           :smf (merge
-                  {::source smf-path
-                   :header header}
-                  (when-let [minimap (:minimap body)]
-                    {:minimap-bytes minimap
-                     :minimap-image (smf/decompress-minimap minimap)})
-                  (when-let [metalmap (:metalmap body)]
-                    {:metalmap-bytes metalmap
-                     :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))}))
-      (when-let [^ISimpleInArchiveItem mapinfo-item
-                 (->> (.getArchiveItems simple)
-                      (filter (comp #{"mapinfo.lua"}
-                                    string/lower-case
-                                    #(.getPath ^ISimpleInArchiveItem %)))
-                      first)]
-        (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
-      (when-let [^ISimpleInArchiveItem smd-item
-                 (->> (.getArchiveItems simple)
-                      (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath ^ISimpleInArchiveItem %)))
-                      first)]
-        (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
-          {:smd (assoc smd ::source (.getPath smd-item))})))))
+(defn read-7z-smf
+  ([^ISimpleInArchiveItem smf-item]
+   (read-7z-smf smf-item nil))
+  ([^ISimpleInArchiveItem smf-item {:keys [header-only]}]
+   (let [smf-path (.getPath smf-item)]
+     (if header-only
+       (let [header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes smf-item)))]
+         {:map-name (map-name smf-path)
+          :smf (merge
+                 {::source smf-path
+                  :header header})})
+       (let [{:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))
+             {:keys [map-width map-height]} header]
+         {:map-name (map-name smf-path)
+          ; TODO extract only what's needed
+          :smf (merge
+                 {::source smf-path
+                  :header header}
+                 (when-let [minimap (:minimap body)]
+                   {:minimap-bytes minimap
+                    :minimap-image (smf/decompress-minimap minimap)})
+                 (when-let [metalmap (:metalmap body)]
+                   {:metalmap-bytes metalmap
+                    :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
+
+(defn read-7z-map
+  ([^java.io.File file]
+   (read-7z-map file nil))
+  ([^java.io.File file opts]
+   (with-open [raf (new RandomAccessFile file "r")
+               rafis (new RandomAccessFileInStream raf)
+               archive (SevenZip/openInArchive nil rafis)
+               simple (.getSimpleInterface archive)]
+     (merge
+       (when-let [^ISimpleInArchiveItem smf-item
+                  (->> (.getArchiveItems simple)
+                       (filter (comp #(string/ends-with? % ".smf")
+                                     string/lower-case
+                                     #(.getPath ^ISimpleInArchiveItem %)))
+                       first)]
+         (read-7z-smf smf-item opts))
+       (when-let [^ISimpleInArchiveItem mapinfo-item
+                  (->> (.getArchiveItems simple)
+                       (filter (comp #{"mapinfo.lua"}
+                                     string/lower-case
+                                     #(.getPath ^ISimpleInArchiveItem %)))
+                       first)]
+         (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
+       (when-let [^ISimpleInArchiveItem smd-item
+                  (->> (.getArchiveItems simple)
+                       (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath ^ISimpleInArchiveItem %)))
+                       first)]
+         (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
+           {:smd (assoc smd ::source (.getPath smd-item))}))))))
 
 
-(defn read-map-data [^java.io.File file]
-  (let [filename (.getName file)]
-    (log/info "Loading map" filename)
-    (try
-      (merge
-        {:filename filename}
-        (cond
-          (string/ends-with? filename ".sdz")
-          (read-zip-map file)
-          (string/ends-with? filename ".sd7")
-          (read-7z-map file)
-          :else
-          nil))
-      (catch Exception e
-        (log/warn e "Error reading map data for" filename)))))
+(defn read-map-data
+  ([^java.io.File file]
+   (read-map-data file nil))
+  ([^java.io.File file opts]
+   (let [filename (.getName file)]
+     (log/info "Loading map" filename)
+     (try
+       (merge
+         {:filename filename}
+         (cond
+           (string/ends-with? filename ".sdz")
+           (read-zip-map file opts)
+           (string/ends-with? filename ".sd7")
+           (read-7z-map file opts)
+           :else
+           nil))
+       (catch Exception e
+         (log/warn e "Error reading map data for" filename))))))
 
 (defn maps []
   (let [before (u/curr-millis)
@@ -562,3 +625,20 @@
 
 (defn map-minimap [map-name]
   (io/file (springlobby-root) "cache" (str map-name ".minimap.png")))
+
+
+; https://stackoverflow.com/a/25267111/984393
+(defn descendant?
+  "Returns true if f is a possible descendant of dir."
+  [dir f]
+  (string/starts-with?
+    (.getCanonicalPath f)
+    (.getCanonicalPath dir)))
+
+(defn child?
+  "Returns true if f is a possible descendant of dir."
+  [dir f]
+  (and dir f
+       (= (.getCanonicalPath dir)
+          (when-let [parent (.getParentFile dir)]
+            (.getCanonicalPath parent)))))

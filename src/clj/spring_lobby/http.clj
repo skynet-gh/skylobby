@@ -176,10 +176,12 @@
 (defn engine-url
   "Returns the url for the archive for the given engine version."
   [engine-version]
-  (let [engine-branch (detect-engine-branch engine-version)
-        archive-path (engine-path engine-branch engine-version)]
-    (str springrts-buildbot-root "/" engine-branch "/" archive-path)))
+  (when engine-version
+    (let [engine-branch (detect-engine-branch engine-version)
+          archive-path (engine-path engine-branch engine-version)]
+      (str springrts-buildbot-root "/" engine-branch "/" archive-path))))
 
 
 (defn map-url [map-name]
-  (str springfiles-maps-url "/" (fs/map-filename map-name)))
+  (when map-name
+    (str springfiles-maps-url "/" (fs/map-filename map-name))))

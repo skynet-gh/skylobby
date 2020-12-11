@@ -17,7 +17,7 @@
 
 
 (defn latest-id [^java.io.File f]
-  (let [repo (git/load-repo f)]
+  (with-open [repo (git/load-repo f)]
     (->> (git/git-log repo :max-count 1)
          first
          :id

@@ -33,6 +33,10 @@
   {0 "ARM"
    1 "CORE"})
 
+(def sides
+  {0 "Armada"
+   1 "Cortex"})
+
 (def map-multiplier
   "Multiplier from positions in map file into positions that Spring uses."
   8.0)
@@ -246,17 +250,16 @@
 ; TODO find a better place for this
 (defn mod-details [mods filter-mod-name]
   (some->> mods
-           (filter (comp #{filter-mod-name} mod-name))
+           (filter (comp #{filter-mod-name} :mod-name))
            first))
 
-(defn battle-script-txt [{:keys [username battle-map-details mods] :as state}]
+(defn battle-script-txt [{:keys [username battle-map-details battle-mod-details] :as state}]
   (let [battle (battle-details state)
-        mod-details (mod-details mods (:battle-modname battle))
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}
                   :map-details battle-map-details
-                  :mod-details mod-details})]
+                  :mod-details battle-mod-details})]
     (script-txt script)))
 
 (defn engine-dir-filename [engines engine-version]
@@ -293,21 +296,32 @@
                                                    StandardCopyOption/REPLACE_EXISTING]}}]
    (let [^java.nio.file.Path source-path (.toPath source)
          ^java.nio.file.Path dest-path (.toPath dest)
-         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)]
-     (.mkdirs dest)
+         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)
+         dest-parent (.getParentFile dest)]
+     (when (and dest-parent (not (.exists dest-parent)))
+       (.mkdirs dest-parent))
      (java.nio.file.Files/copy source-path dest-path options))))
+
+(defn copy-missing [source-dir dest-dir]
+  (let [source-path (.toPath source-dir)]
+    (doseq [source (file-seq source-dir)]
+      (let [dest (io/file dest-dir (str (.relativize source-path (.toPath source))))]
+        (cond
+          (not (.isFile source)) (log/warn "Not a file" source)
+          (.exists dest) (log/trace "Skipping copy of" source "since it exists at" dest)
+          :else
+          (try
+            (log/info "Copying" source "to" dest)
+            (java-nio-copy source dest {:copy-options [StandardCopyOption/COPY_ATTRIBUTES]})
+            (catch Exception e
+              (log/warn e "Unable to copy file" source "to" dest
+                        {:exists (.exists dest)}))))))))
 
 (defn copy-engine-missing [engines engine-version]
   (if engine-version
     (let [source-dir (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
-          source-path (.toPath source-dir)
           dest-dir (engine-isolation-file engine-version)]
-      (doseq [source (file-seq source-dir)]
-        (if (.isFile source)
-          (let [dest (io/file dest-dir (str (.relativize source-path (.toPath source))))]
-            (log/info "Copying" source "to" dest)
-            (java-nio-copy source dest))
-          (log/warn "Not a file" source))))
+      (copy-missing source-dir dest-dir))
     (throw
       (ex-info "Missing engine to copy to isolation dir"
                {:engine-version engine-version}))))
@@ -323,13 +337,13 @@
 
 
 (defn mod-isolation-archive-file ^java.io.File
-  [{::fs/keys [source] :as mod-details} engine-version]
+  [{::fs/keys [source] :keys [mod-name]} engine-version]
   (cond
-    (#{:rapid :directory} source)
-    (let [filename (str (mod-name mod-details) ".sdz")]
+    (#{:rapid} source)
+    (let [filename (str mod-name ".sdz")]
       (io/file (fs/app-root) "spring" "engine" engine-version "games" filename))
     :else
-    (mod-isolation-file mod-details engine-version)))
+    (log/info "No archive for mod type" source "for" mod-name)))
 
 (defn copy-mod [mod-details engine-version]
   (let [mod-filename (:filename mod-details)
@@ -340,6 +354,12 @@
         (ex-info "Missing mod or engine to copy to isolation dir"
                  {:mod-filename mod-filename
                   :engine-version engine-version}))
+      (= :directory (::fs/source mod-details))
+      (let [source (io/file absolute-path)
+            dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)]
+        (if (.exists source)
+          (copy-missing source dest)
+          (log/warn "No mod file to copy from" source "to" dest)))
       (= :rapid (::fs/source mod-details))
       (let [sdp-decoded (rapid/decode-sdp (io/file absolute-path))
             source (io/file absolute-path)
@@ -408,7 +428,7 @@
                   (.putNextEntry zos ze)
                   (.write zos file-bytes 0 (count file-bytes))
                   (.closeEntry zos))
-                (log/info "Skipping hidden directory" relative-path)))))
+                (log/trace "Skipping hidden directory" relative-path)))))
         (log/info "Finished creating" dest))
       :else
       (log/info "Nothing to do, mod is already an archive: " (:filename mod-details)))))
@@ -453,7 +473,7 @@
                 (copy-engine-missing engines battle-version))
               (copy-engine engines battle-version))
           mod-details (some->> mods
-                               (filter (comp #{battle-modname} mod-name))
+                               (filter (comp #{battle-modname} :mod-name))
                                first)
           mod-isolation-archive (mod-isolation-archive-file mod-details battle-version)
           _ (if (and mod-isolation-archive (.exists mod-isolation-archive))
