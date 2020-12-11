@@ -103,10 +103,16 @@
            (into {}))
       []))
 
-(defn script-data
+(defn script-data-client
+  [battle {:keys [game]}]
+  {:game
+   {:hostip (:battle-ip battle)
+    :hostport (:battle-port battle)
+    :ishost 0
+    :myplayername (:myplayername game)}})
+
+(defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
-  ([battle]
-   (script-data battle nil))
   ([battle {:keys [is-host map-details mod-details] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
@@ -195,6 +201,13 @@
               ally-teams)
             (:game opts)))}))))
 
+(defn script-data
+  "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
+  [battle {:keys [is-host] :as opts}]
+  (if is-host
+    (script-data-host battle opts)
+    (script-data-client battle opts)))
+
 (defn script-txt-inner
   ([kv]
    (script-txt-inner "" kv))
@@ -271,6 +284,34 @@
       (ex-info "Missing engine to copy to isolation dir"
                {:engine-version engine-version}))))
 
+(defn java-nio-copy
+  ([^java.io.File source ^java.io.File dest]
+   (java-nio-copy source dest nil))
+  ([^java.io.File source ^java.io.File dest {:keys [copy-options]
+                                             :or {copy-options
+                                                  [StandardCopyOption/COPY_ATTRIBUTES
+                                                   StandardCopyOption/REPLACE_EXISTING]}}]
+   (let [^java.nio.file.Path source-path (.toPath source)
+         ^java.nio.file.Path dest-path (.toPath dest)
+         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)]
+     (.mkdirs dest)
+     (java.nio.file.Files/copy source-path dest-path options))))
+
+(defn copy-engine-missing [engines engine-version]
+  (if engine-version
+    (let [source-dir (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
+          source-path (.toPath source-dir)
+          dest-dir (engine-isolation-file engine-version)]
+      (doseq [source (file-seq source-dir)]
+        (if (.isFile source)
+          (let [dest (io/file dest-dir (str (.relativize source-path (.toPath source))))]
+            (log/info "Copying" source "to" dest)
+            (java-nio-copy source dest))
+          (log/warn "Not a file" source))))
+    (throw
+      (ex-info "Missing engine to copy to isolation dir"
+               {:engine-version engine-version}))))
+
 (defn mod-isolation-file ^java.io.File
   [{::fs/keys [source] :keys [filename]} engine-version]
   (when filename
@@ -302,35 +343,19 @@
       (= :rapid (::fs/source mod-details))
       (let [sdp-decoded (rapid/decode-sdp (io/file absolute-path))
             source (io/file absolute-path)
-            dest (io/file (fs/app-root) "spring" "engine" engine-version "packages" mod-filename)
-            ^java.nio.file.Path source-path (.toPath source)
-            ^java.nio.file.Path dest-path (.toPath dest)
-            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                     [StandardCopyOption/COPY_ATTRIBUTES
-                                                      StandardCopyOption/REPLACE_EXISTING])]
-        (.mkdirs dest)
-        (java.nio.file.Files/copy source-path dest-path options)
+            dest (io/file (fs/app-root) "spring" "engine" engine-version "packages" mod-filename)]
+        (java-nio-copy source dest)
         (doseq [item (:items sdp-decoded)]
           (let [md5 (:md5 item)
                 ^java.io.File pool-source (rapid/file-in-pool md5)
-                ^java.io.File pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)
-                ^java.nio.file.Path pool-source-path (.toPath pool-source)
-                ^java.nio.file.Path pool-dest-path (.toPath pool-dest)]
-            (log/info "Copying" pool-source-path "to" pool-dest-path)
-            (.mkdirs pool-dest)
-            (java.nio.file.Files/copy pool-source-path pool-dest-path options))))
+                ^java.io.File pool-dest (rapid/file-in-pool (io/file (fs/app-root) "spring" "engine" engine-version) md5)]
+            (log/info "Copying" pool-source "to" pool-dest)
+            (java-nio-copy pool-source pool-dest))))
       (= :archive (::fs/source mod-details))
       (let [source (io/file (fs/spring-root) "games" mod-filename)
-            dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)
-            ^java.nio.file.Path source-path (.toPath source)
-            ^java.nio.file.Path dest-path (.toPath dest)
-            ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                     [StandardCopyOption/COPY_ATTRIBUTES
-                                                      StandardCopyOption/REPLACE_EXISTING])]
+            dest (io/file (fs/app-root) "spring" "engine" engine-version "games" mod-filename)]
         (if (.exists source)
-          (do
-            (.mkdirs dest)
-            (java.nio.file.Files/copy source-path dest-path options))
+          (java-nio-copy source dest)
           (log/warn "No mod file to copy from" (.getAbsolutePath source)
                     "to" (.getAbsolutePath dest)))))))
 
@@ -423,7 +448,9 @@
           {:keys [battle-map battle-version battle-modname]} battle
           engine-dir (engine-isolation-file battle-version)
           _ (if (and engine-dir (.exists engine-dir))
-              (log/info "Engine dir" engine-dir "already exists")
+              (do
+                (log/info "Engine dir" engine-dir "already exists")
+                (copy-engine-missing engines battle-version))
               (copy-engine engines battle-version))
           mod-details (some->> mods
                                (filter (comp #{battle-modname} mod-name))
