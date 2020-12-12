@@ -49,21 +49,24 @@
     {::source (.getAbsolutePath f)
      :items (b/decode (b/repeated sdp-line) gz)}))
 
-(defn sdp-files []
-  (log/debug "Loading sdp file names")
-  (let [packages-root (io/file (fs/spring-root) "packages")]
-    (or
-      (when (.exists packages-root)
-        (seq (.listFiles packages-root)))
-      [])))
+(defn sdp-files
+  ([]
+   (sdp-files (fs/isolation-dir)))
+  ([root]
+   (log/debug "Loading sdp file names from" root)
+   (let [packages-root (io/file root "packages")]
+     (or
+       (when (.exists packages-root)
+         (seq (.listFiles packages-root)))
+       []))))
 
 (defn file-in-pool
   ([md5]
-   (file-in-pool (fs/spring-root) md5))
-  ([spring-root md5]
+   (file-in-pool (fs/isolation-dir) md5))
+  ([root md5]
    (let [pool-dir (subs md5 0 2)
          pool-file (str (subs md5 2) ".gz")]
-     (io/file spring-root "pool" pool-dir pool-file))))
+     (io/file root "pool" pool-dir pool-file))))
 
 (defn slurp-from-pool [md5]
   (let [f (file-in-pool md5)]
@@ -109,12 +112,15 @@
 (def repos-url "http://repos.springrts.com/repos.gz")
 
 
-(defn repos []
-  (log/debug "Loading rapid repo names")
-  (->> (.listFiles (io/file (fs/spring-root) "rapid" "repos.springrts.com"))
-       seq
-       (filter #(.isDirectory ^java.io.File %))
-       (map #(.getName ^java.io.File %))))
+(defn repos
+  ([]
+   (repos (fs/isolation-dir)))
+  ([root]
+   (log/debug "Loading rapid repo names")
+   (->> (.listFiles (io/file root "rapid" "repos.springrts.com"))
+        seq
+        (filter #(.isDirectory ^java.io.File %))
+        (map #(.getName ^java.io.File %)))))
 
 (defn rapid-versions [f]
   (with-open [is (io/input-stream f)
@@ -131,10 +137,13 @@
                 :version version}))))))
 
 
-(defn package-versions []
-  (-> (fs/spring-root)
-      (io/file "rapid" "packages.springrts.com" "versions.gz")
-      (rapid-versions)))
+(defn package-versions
+  ([]
+   (package-versions (fs/isolation-dir)))
+  ([root]
+   (-> root
+       (io/file "rapid" "packages.springrts.com" "versions.gz")
+       (rapid-versions))))
 
 (def package-by-hash
   (or

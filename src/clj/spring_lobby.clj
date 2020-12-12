@@ -280,10 +280,15 @@
   [state-atom]
   (let [before (u/curr-millis)
         engine-dirs (fs/engine-dirs)
-        known-absolute-paths (->> state-atom deref :engines (map :engine-dir-absolute-path) set)
+        known-absolute-paths (->> state-atom deref :engines (map :absolute-path) (filter some?) set)
         to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
         absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
-        missing-files (set (remove (comp #(.exists ^java.io.File %) io/file) known-absolute-paths))
+        missing-files (set
+                        (concat
+                          (->> known-absolute-paths
+                               (remove (comp #(.exists ^java.io.File %) io/file)))
+                          (->> known-absolute-paths
+                               (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))
         to-remove (set
                     (concat missing-files
                             (remove absolute-path-set known-absolute-paths)))]
@@ -298,7 +303,7 @@
     (swap! state-atom update :engines
            (fn [engines]
              (set (remove
-                    (comp to-remove :engine-dir-absolute-path)
+                    (comp to-remove :absolute-path)
                     engines))))
     {:to-add-count (count to-add)
      :to-remove-count (count to-remove)}))
@@ -337,8 +342,13 @@
                     (count sdp-files) "rapid archives to scan for mods")
         to-add-file (remove (comp known-file-paths #(.getAbsolutePath ^java.io.File %)) mod-files)
         to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath ^java.io.File %)) sdp-files)
-        missing-files (set (remove (comp #(.exists ^java.io.File %) io/file)
-                                   (concat known-file-paths known-rapid-paths)))]
+        all-paths (filter some? (concat known-file-paths known-rapid-paths))
+        missing-files (set
+                        (concat
+                          (->> all-paths
+                               (remove (comp #(.exists ^java.io.File %) io/file)))
+                          (->> all-paths
+                               (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))]
     (when-not (.exists mods-cache-root)
       (.mkdirs mods-cache-root))
     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
@@ -1317,7 +1327,7 @@
       :-fx-background-color error-red}})
 
 (defn resource-sync-pane
-  [{:keys [resource issues]}]
+  [{:keys [resource issues delete-action]}]
   (let [worst-severity (reduce
                          (fn [worst {:keys [severity]}]
                            (max worst severity))
@@ -1333,11 +1343,23 @@
                :-fx-border-width 1})
      :children
      (concat
-       [{:fx/type :label
-         :v-box/margin 4
-         :text (str resource
-                    (if (zero? worst-severity) " is synced" " issues:"))
-         :style {:-fx-font-size 16}}]
+       [{:fx/type :h-box
+         :children
+         [{:fx/type :label
+           :h-box/margin 4
+           :text (str resource
+                      (if (zero? worst-severity) " is synced" " issues:"))
+           :style {:-fx-font-size 16}}
+          {:fx/type :button
+           :on-action delete-action
+           :h-box/margin 4
+           :style
+           {:-fx-base "black"
+            :-fx-background "black"
+            :-fx-background-color "black"}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-delete:16:white"}}]}]
        (map
          (fn [{:keys [text action severity in-progress]}]
            (let [font-style {:-fx-font-size 12}]
@@ -1432,6 +1454,10 @@
 (defn engine-dest [engine-version]
   (when engine-version
     (io/file (fs/spring-root) "engine" (http/engine-archive engine-version))))
+
+(defn engine-download-file [engine-version]
+  (when engine-version
+    (io/file (fs/download-dir) "engine" (http/engine-archive engine-version))))
 
 
 (def minimap-types
@@ -1619,6 +1645,30 @@
 (defmethod event-handler ::battle-teams-4
   [e]
   (n-teams e 4))
+
+(defmethod event-handler ::battle-teams-humans-vs-bots
+  [{:keys [battle users username]}]
+  (let [players (mapv
+                  (fn [[k v]] (assoc v :username k :user (get users k)))
+                  (:users battle))
+        bots (mapv
+               (fn [[k v]]
+                 (assoc v
+                        :bot-name k
+                        :user {:client-status {:bot true}}))
+               (:bots battle))]
+    (doall
+      (map-indexed
+        (fn [i player]
+          (let [is-me (= username (:username player))]
+            (apply-battle-status-changes player {:is-me is-me :is-bot false} {:id i :ally 0})))
+        players))
+    (doall
+      (map-indexed
+        (fn [b bot]
+          (let [i (+ (count players) b)]
+            (apply-battle-status-changes bot {:is-me false :is-bot true} {:id i :ally 1})))
+        bots))))
 
 
 (defn spring-color
@@ -1854,6 +1904,22 @@
 (defmethod event-handler ::isolation-type-change [{:fx/keys [event]}]
   (log/info event))
 
+(defmethod event-handler ::delete-map [{:fx/keys [event]}]
+  (log/info event))
+
+(defmethod event-handler ::delete-mod [{:fx/keys [event]}]
+  (log/info event))
+
+(defmethod event-handler ::delete-engine
+  [{:keys [engines engine-version]}]
+  (if-let [engine-dir (some->> engines
+                               (filter (comp #{engine-version} :engine-version))
+                               first
+                               :absolute-path
+                               io/file)]
+    (raynes-fs/delete-dir engine-dir)
+    (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
+
 
 (defn battle-view
   [{:keys [archiving battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
@@ -1950,9 +2016,26 @@
              :v-box/vgrow :always}
             {:fx/type :h-box
              :children
+             [{:fx/type :button
+               :style (merge
+                        (get severity-styles 2)
+                        {:-fx-font-size 24})
+               :h-box/margin 16
+               :tooltip
+               {:fx/type :tooltip
+                :show-delay [10 :ms]
+                :style {:-fx-font-size 16}
+                :text "Nuke data directory"}
+               :on-action {:event/type ::nuke-data-dir}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-nuke:16:white"}}]}
+            {:fx/type :h-box
+             :children
              [{:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "map" ;battle-map ; (str "map (" battle-map ")")
+               :delete-action {:event/type ::delete-map}
                :issues
                (concat
                  (let [url (http/map-url battle-map)
@@ -1979,6 +2062,7 @@
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "game" ;battle-modname ; (str "game (" battle-modname ")")
+               :delete-action {:event/type ::delete-mod}
                :issues
                (concat
                  (let [git-url (cond
@@ -2022,21 +2106,24 @@
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "engine" ; engine-version ; (str "engine (" engine-version ")")
+               :delete-action {:event/type ::delete-engine
+                               :engines engines
+                               :engine-version engine-version}
                :issues
                (concat
                  (let [url (http/engine-url engine-version)
                        download (get http-download url)
                        in-progress (:running download)
                        text (or (when in-progress (:message download))
-                                "download")]
-                   [{:severity (if (or engine-dir-filename
-                                       (.exists engine-archive-file))
-                                 0 2)
+                                "download")
+                       download-file (engine-download-file engine-version)]
+                   [{:severity (if (.exists download-file)
+                                 0 1)
                      :text text
                      :in-progress in-progress
                      :action {:event/type ::http-download
                               :url url
-                              :dest engine-archive-file}}])
+                              :dest download-file}}])
                  (when (.exists engine-archive-file)
                    [{:severity (if engine-dir-filename 0 2)
                      :text "extract"
@@ -2360,6 +2447,12 @@
               {:fx/type :button
                :text "4 teams"
                :on-action {:event/type ::battle-teams-4
+                           :battle battle
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "Humans vs bots"
+               :on-action {:event/type ::battle-teams-humans-vs-bots
                            :battle battle
                            :users users
                            :username username}}]))}]}]}))

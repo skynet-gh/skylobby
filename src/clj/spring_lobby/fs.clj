@@ -188,12 +188,23 @@
        (filter #(.isFile ^java.io.File %))
        (filter #(string/ends-with? (.getName ^java.io.File %) ".sdz"))))
 
-(defn map-files []
-  (->> (io/file (spring-root) "maps")
-       file-seq
-       (filter #(.isFile ^java.io.File %))
-       (filter #(or (string/ends-with? (.getName ^java.io.File %) ".sd7")
-                    (string/ends-with? (.getName ^java.io.File %) ".sdz")))))
+(defn download-dir ^java.io.File
+  []
+  (io/file (app-root) "download"))
+
+(defn isolation-dir ^java.io.File
+  []
+  (io/file (app-root) "spring"))
+
+(defn map-files
+  ([]
+   (map-files (isolation-dir)))
+  ([root]
+   (->> (io/file root "maps")
+        file-seq
+        (filter #(.isFile ^java.io.File %))
+        (filter #(or (string/ends-with? (.getName ^java.io.File %) ".sd7")
+                     (string/ends-with? (.getName ^java.io.File %) ".sdz"))))))
 
 #_
 (defn open-zip [^java.io.File from]
@@ -313,14 +324,17 @@
       sync-version)))
 
 
-(defn engine-dirs []
-  (->> (.listFiles (io/file (spring-root) "engine"))
-       seq
-       (filter #(.isDirectory ^java.io.File %))))
+(defn engine-dirs
+  ([]
+   (engine-dirs (isolation-dir)))
+  ([root]
+   (->> (.listFiles (io/file root "engine"))
+        seq
+        (filter #(.isDirectory ^java.io.File %)))))
 
 (defn engine-data [^java.io.File engine-dir]
   (let [sync-version (sync-version engine-dir)]
-    {:engine-dir-absolute-path (.getAbsolutePath engine-dir)
+    {:absolute-path (.getAbsolutePath engine-dir)
      :engine-dir-filename (.getName engine-dir)
      :sync-version sync-version
      :engine-version (sync-version-to-engine-version sync-version)}))
@@ -334,8 +348,11 @@
     (slurp (.getInputStream zip-file entry))))
 
 
-(defn mod-files []
-  (seq (.listFiles (io/file (spring-root) "games"))))
+(defn mod-files
+  ([]
+   (mod-files (isolation-dir)))
+  ([root]
+   (seq (.listFiles (io/file root "games")))))
 
 (defn read-mod-zip-file
   ([^java.io.File file]
