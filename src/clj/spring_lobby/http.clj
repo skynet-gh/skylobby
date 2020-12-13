@@ -1,6 +1,10 @@
 (ns spring-lobby.http
   (:require
+    [clj-http.client :as http]
+    [clojure.core.memoize :as mem]
+    [clojure.java.io :as io]
     [clojure.string :as string]
+    [clojure.xml :as xml]
     [crouton.html :as html]
     [spring-lobby.fs :as fs]
     [taoensso.timbre :as log]))
@@ -20,6 +24,9 @@
 
 (def springfightclub-root
   "https://www.springfightclub.com/data")
+
+(def springlauncher-root
+  "https://content.spring-launcher.com")
 
 
 (defn- by-tag [element tag]
@@ -173,8 +180,8 @@
             "/" platform "/" (engine-archive branch version platform))))))
 
 
-(defn engine-url
-  "Returns the url for the archive for the given engine version."
+(defn springrts-engine-url
+  "Returns the url for the archive for the given engine version on springrts."
   [engine-version]
   (when engine-version
     (let [engine-branch (detect-engine-branch engine-version)
@@ -185,3 +192,43 @@
 (defn map-url [map-name]
   (when map-name
     (str springfiles-maps-url "/" (fs/map-filename map-name))))
+
+
+(defn get-springlauncher-root
+  "Returns parsed XML string body from springlauncher root."
+  []
+  (log/info "GET" springlauncher-root)
+  (->> (clj-http.client/get springlauncher-root {:as :stream})
+       :body
+       xml/parse
+       :content
+       (filter (comp #{:Contents} :tag))
+       (mapcat
+         (fn [{:keys [content]}]
+           (->> content
+                (filter (comp #{:Key} :tag))
+                first
+                :content)))))
+
+
+(def springlauncher-links
+  (mem/ttl (partial get-springlauncher-root) :ttl/threshold 3600000))
+
+(defn springlauncher-engine-url [engine-version]
+  (let [engine-archive (engine-archive engine-version)]
+    (->> (springlauncher-links)
+         (filter (comp #(clojure.string/starts-with? % "engines/")))
+         (remove #{"engines/"})
+         (filter (comp #(clojure.string/ends-with? % engine-archive)))
+         first
+         (str springlauncher-root "/"))))
+
+(defn engine-url
+  "Returns the url for the archive for the given engine version."
+  [engine-version]
+  (or (springlauncher-engine-url engine-version)
+      (springrts-engine-url engine-version)))
+
+(defn engine-download-file [engine-version]
+  (when engine-version
+    (io/file (fs/download-dir) "engine" (engine-archive engine-version))))

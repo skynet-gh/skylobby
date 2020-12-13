@@ -294,7 +294,7 @@
                      (log/info "Extract result for" to res)))))
              (catch Exception e
                (log/warn e "Error extracting"))))))
-     (log/info "Finished extracting" f "to" dir))))
+     (log/info "Finished extracting" f "to" dest))))
 
 
 #_
@@ -618,26 +618,27 @@
     (log/info "Maps loaded in" (- (u/curr-millis) before) "ms")
     (or m [])))
 
-(defn bots [engine]
-  (or
-    (try
-      (when engine
-        (let [ai-skirmish-dir (io/file (spring-root) "engine" engine "AI" "Skirmish")
-              ai-dirs (some->> (.listFiles ai-skirmish-dir)
-                               seq
-                               (filter #(.isDirectory ^java.io.File %)))]
-          (mapcat
-            (fn [^java.io.File ai-dir]
-              (->> (.listFiles ai-dir)
-                   (filter #(.isDirectory ^java.io.File %))
-                   (map
-                     (fn [^java.io.File version-dir]
-                       {:bot-name (.getName ai-dir)
-                        :bot-version (.getName version-dir)}))))
-            ai-dirs)))
-      (catch Exception e
-        (log/error e "Error loading bots")))
-    []))
+(defn bots
+  ([engine-absolute-path]
+   (or
+     (try
+       (when engine-absolute-path
+         (let [ai-skirmish-dir (io/file engine-absolute-path "AI" "Skirmish")
+               ai-dirs (some->> (.listFiles ai-skirmish-dir)
+                                seq
+                                (filter #(.isDirectory ^java.io.File %)))]
+           (mapcat
+             (fn [^java.io.File ai-dir]
+               (->> (.listFiles ai-dir)
+                    (filter #(.isDirectory ^java.io.File %))
+                    (map
+                      (fn [^java.io.File version-dir]
+                        {:bot-name (.getName ai-dir)
+                         :bot-version (.getName version-dir)}))))
+             ai-dirs)))
+       (catch Exception e
+         (log/error e "Error loading bots")))
+     [])))
 
 
 (defn map-minimap [map-name]

@@ -277,36 +277,38 @@
 
 (defn reconcile-engines
   "Reads engine details and updates missing engines in :engines in state."
-  [state-atom]
-  (let [before (u/curr-millis)
-        engine-dirs (fs/engine-dirs)
-        known-absolute-paths (->> state-atom deref :engines (map :absolute-path) (filter some?) set)
-        to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
-        absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
-        missing-files (set
-                        (concat
-                          (->> known-absolute-paths
-                               (remove (comp #(.exists ^java.io.File %) io/file)))
-                          (->> known-absolute-paths
-                               (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))
-        to-remove (set
-                    (concat missing-files
-                            (remove absolute-path-set known-absolute-paths)))]
-    (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
-    (doseq [engine-dir to-add]
-      (log/info "Detecting engine data for" engine-dir)
-      (let [engine-data (fs/engine-data engine-dir)]
-        (swap! state-atom update :engines
-               (fn [engines]
-                 (set (conj engines engine-data))))))
-    (log/debug "Removing" (count to-remove) "engines")
-    (swap! state-atom update :engines
-           (fn [engines]
-             (set (remove
-                    (comp to-remove :absolute-path)
-                    engines))))
-    {:to-add-count (count to-add)
-     :to-remove-count (count to-remove)}))
+  ([]
+   (reconcile-engines *state))
+  ([state-atom]
+   (let [before (u/curr-millis)
+         engine-dirs (fs/engine-dirs)
+         known-absolute-paths (->> state-atom deref :engines (map :absolute-path) (filter some?) set)
+         to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
+         absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
+         missing-files (set
+                         (concat
+                           (->> known-absolute-paths
+                                (remove (comp #(.exists ^java.io.File %) io/file)))
+                           (->> known-absolute-paths
+                                (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))
+         to-remove (set
+                     (concat missing-files
+                             (remove absolute-path-set known-absolute-paths)))]
+     (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
+     (doseq [engine-dir to-add]
+       (log/info "Detecting engine data for" engine-dir)
+       (let [engine-data (fs/engine-data engine-dir)]
+         (swap! state-atom update :engines
+                (fn [engines]
+                  (set (conj engines engine-data))))))
+     (log/debug "Removing" (count to-remove) "engines")
+     (swap! state-atom update :engines
+            (fn [engines]
+              (set (remove
+                     (comp to-remove :absolute-path)
+                     engines))))
+     {:to-add-count (count to-add)
+      :to-remove-count (count to-remove)})))
 
 (defn remove-bad-mods [state-atom]
   (swap! state-atom update :mods
@@ -1455,6 +1457,7 @@
   (when engine-version
     (io/file (fs/spring-root) "engine" (http/engine-archive engine-version))))
 
+#_
 (defn engine-download-file [engine-version]
   (when engine-version
     (io/file (fs/download-dir) "engine" (http/engine-archive engine-version))))
@@ -1917,13 +1920,15 @@
                                first
                                :absolute-path
                                io/file)]
-    (raynes-fs/delete-dir engine-dir)
+    (do
+      (log/info "Deleting engine dir" engine-dir)
+      (raynes-fs/delete-dir engine-dir)
+      (reconcile-engines *state))
     (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
 
 
 (defn battle-view
   [{:keys [archiving battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           cleaning
            copying drag-team engines extracting git-clone http-download isolation-type map-input-prefix maps
            minimap-type rapid-data-by-version rapid-download users username] :as state}]
   (let [{:keys [host-username battle-map]} (get battles (:battle-id battle))
@@ -1941,9 +1946,13 @@
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         starting-points (minimap-starting-points battle-details battle-map-details scripttags minimap-width minimap-height)
         engine-version (:battle-version battle-details)
-        engine-dir-filename (spring/engine-dir-filename engines engine-version)
-        engine-archive-file (engine-dest engine-version)
-        bots (fs/bots engine-dir-filename)
+        engine-details (spring/engine-details engines engine-version)
+        engine-absolute-path (:absolute-path engine-details)
+        engine-dir-file (when engine-absolute-path (io/file engine-absolute-path))
+        ;engine-dir-filename (spring/engine-dir-filename engines engine-version)
+        ;engine-archive-file (engine-dest engine-version)
+        engine-download-file (http/engine-download-file engine-version)
+        bots (fs/bots engine-absolute-path)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
                         ; else
@@ -2029,7 +2038,7 @@
                :on-action {:event/type ::nuke-data-dir}
                :graphic
                {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-nuke:16:white"}}]}
+                :icon-literal "mdi-nuke:32:white"}}]}
             {:fx/type :h-box
              :children
              [{:fx/type resource-sync-pane
@@ -2116,7 +2125,7 @@
                        in-progress (:running download)
                        text (or (when in-progress (:message download))
                                 "download")
-                       download-file (engine-download-file engine-version)]
+                       download-file engine-download-file]
                    [{:severity (if (.exists download-file)
                                  0 1)
                      :text text
@@ -2124,12 +2133,15 @@
                      :action {:event/type ::http-download
                               :url url
                               :dest download-file}}])
-                 (when (.exists engine-archive-file)
-                   [{:severity (if engine-dir-filename 0 2)
+                 (when (.exists engine-download-file)
+                   [{:severity (if (and engine-dir-file (.exists engine-dir-file))
+                                 0 2)
                      :text "extract"
-                     :in-progress (get extracting engine-archive-file)
+                     :in-progress (get extracting engine-download-file)
                      :action {:event/type ::extract-7z
-                              :file engine-archive-file}}])
+                              :file engine-download-file
+                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}])
+                 #_
                  (when engine-dir-filename
                    (when-let [engine-isolation-file (spring/engine-isolation-file engine-version)]
                      [(let [in-progress (-> copying (get engine-version) :status)]
@@ -2701,6 +2713,8 @@
   (log/info "Request to download" url "to" dest)
   (future
     (try
+      (let [parent (.getParentFile dest)]
+        (.mkdirs parent))
       (clj-http/with-middleware
         (-> clj-http/default-middleware
             (insert-after clj-http/wrap-url wrap-downloaded-bytes-counter)
@@ -2733,6 +2747,7 @@
 
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
+  #p file #p dest
   (future
     (try
       (swap! *state assoc-in [:extracting file] true)
@@ -2768,38 +2783,39 @@
                    (try
                      (reconcile-engines *state)
                      (catch Exception e
-                       (log/error e "Error reconciling engines"))))
-                 (future
+                       (log/error e "Error reconciling engines")))
                    (try
                      (reconcile-mods *state)
                      (catch Exception e
-                       (log/error e "Error reconciling mods"))))
-                 (future
+                       (log/error e "Error reconciling mods")))
                    (try
                      (reconcile-maps *state)
                      (catch Exception e
                        (log/error e "Error reconciling maps"))))
-                 (future
-                   (try
-                     (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files)))
-                     (catch Exception e
-                       (log/error e "Error loading SDP files"))))
-                 (future
-                   (try
-                     (let [rapid-repos (sort (rapid/repos))]
-                       (swap! *state assoc :rapid-repos-cached rapid-repos)
-                       (swap! *state assoc :rapid-versions-by-hash
-                              (->> rapid-repos
-                                   (mapcat rapid/versions)
-                                   (map (juxt :hash identity))
-                                   (into {})))
-                       (swap! *state assoc :rapid-data-by-version
-                              (->> rapid-repos
-                                   (mapcat rapid/versions)
-                                   (map (juxt :version identity))
-                                   (into {}))))
-                     (catch Exception e
-                       (log/error e "Error loading rapid versions by hash"))))
+                 (swap! *state assoc :sdp-files-cached
+                   (delay
+                     (try
+                       (doall (rapid/sdp-files))
+                       (catch Exception e
+                         (log/error e "Error loading SDP files")))))
+                 (swap! *state assoc :rapid-cache
+                   (delay
+                     (try
+                       (let [rapid-repos (sort (rapid/repos))]
+                         {:rapid-repos-cached rapid-repos
+                          :rapid-versions-by-hash
+                          (->> rapid-repos
+                               (mapcat rapid/versions)
+                               (map (juxt :hash identity))
+                               (into {}))
+                          :rapid-data-by-version
+                          (->> rapid-repos
+                               (mapcat rapid/versions)
+                               (map (juxt :version identity))
+                               (into {}))})
+                       (catch Exception e
+                         (log/error e "Error loading rapid versions by hash")))))
+                 #_
                  (future
                    (try
                      (when-let [rapid-repo (:rapid-repo @*state)]

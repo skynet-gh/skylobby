@@ -265,11 +265,13 @@
                   :mod-details battle-mod-details})]
     (script-txt script)))
 
-(defn engine-dir-filename [engines engine-version]
+(defn engine-details [engines engine-version]
   (some->> engines
            (filter (comp #{engine-version} :engine-version))
-           first
-           :engine-dir-filename))
+           first))
+
+(defn engine-dir-filename [engines engine-version]
+  (:engine-dir-filename (engine-details engines engine-version)))
 
 (defn engine-isolation-file ^java.io.File
   [engine-version]
