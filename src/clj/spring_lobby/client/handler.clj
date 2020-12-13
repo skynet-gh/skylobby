@@ -102,22 +102,23 @@
 
 (defmethod handle "CLIENTSTATUS" [_c state-atom m]
   (let [[_all username client-status] (re-find #"\w+ (\w+) (\w+)" m)
-        decoded-status (decode-client-status client-status)]
-    (swap! state-atom assoc-in [:users username :client-status] decoded-status)
-    (let [{:keys [battle battles] :as state} @state-atom
-          battle-detail (-> battles (get (:battle-id battle)))]
-      (cond
-        (= username (:username state))
-        (log/info "Ignoring own game start")
-        (and battle
-             (= (:host-username battle-detail)
-                username)
-             (:ingame decoded-status))
-        (do
-          (log/info "Starting game to join host")
-          (spring/start-game state))
-        :else
-        (log/debug "No game to join")))))
+        decoded-status (decode-client-status client-status)
+        {:keys [battle battles] :as prev-state} @state-atom
+        _ (swap! state-atom assoc-in [:users username :client-status] decoded-status)
+        prev-status (-> prev-state :users (get username) :client-status)
+        my-status (-> prev-state :users (get (:username prev-state)) :client-status)
+        battle-detail (-> battles (get (:battle-id battle)))]
+    (cond
+      (not (:ingame decoded-status)) (log/info "Not a game start")
+      (not= (:ingame prev-status) (:ingame decoded-status)) (log/info "Not a game status change")
+      (= username (:username prev-state)) (log/info "Ignoring own game start")
+      (:ingame my-status) (log/info "Already in game")
+      (not battle) (log/debug "Not in a battle")
+      (not= (:host-username battle-detail) username) (log/info "Not the host game start")
+      :else
+      (do
+        (log/info "Starting game to join host" username)
+        (spring/start-game prev-state)))))
 
 (defmethod handle "REMOVESCRIPTTAGS" [_c state m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
