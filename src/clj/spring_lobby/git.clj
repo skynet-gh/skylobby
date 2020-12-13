@@ -50,13 +50,10 @@
                (pr-str (latest-id repo)))
      repo)))
 
+(defn fetch [^java.io.File f]
+  (with-open [repo (git/load-repo f)]
+    (git/git-fetch repo)))
+
 (defn reset-hard [^java.io.File f commit-id]
   (with-open [repo (git/load-repo f)]
     (git/git-reset repo :mode :hard :ref commit-id)))
-
-#_
-(clone-game (first known-mod-repos))
-#_
-(clone-game (second known-mod-repos))
-#_
-(latest-id (io/file (fs/spring-root) "games" "Beyond-All-Reason"))

@@ -192,7 +192,9 @@
   []
   (io/file (app-root) "download"))
 
-(defn isolation-dir ^java.io.File
+(defn isolation-dir
+  "Returns the isolation dir for spring in this app, usually $HOME/.alt-spring-lobby/spring"
+  ^java.io.File
   []
   (io/file (app-root) "spring"))
 
@@ -427,9 +429,12 @@
       (string/lower-case (string/replace map-name #"\s" "_"))
       ".sd7")))
 
-(defn map-file [map-filename]
-  (when map-filename
-    (io/file (spring-root) "maps" map-filename)))
+(defn map-file
+  ([map-filename]
+   (map-file (isolation-dir) map-filename))
+  ([root map-filename]
+   (when map-filename
+     (io/file root "maps" map-filename))))
 
 (defn spring-config-line [lines field]
   (nth
@@ -658,5 +663,5 @@
   [dir f]
   (and dir f
        (= (.getCanonicalPath dir)
-          (when-let [parent (.getParentFile dir)]
+          (when-let [parent (.getParentFile f)]
             (.getCanonicalPath parent)))))

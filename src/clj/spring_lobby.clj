@@ -1,5 +1,6 @@
 (ns spring-lobby
   (:require
+    [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.api :as fx]
     [cljfx.component :as fx.component]
@@ -15,7 +16,9 @@
     [com.evocomputing.colors :as colors]
     [crouton.html :as html]
     [hawk.core :as hawk]
+    java-time
     [me.raynes.fs :as raynes-fs]
+    [shams.priority-queue :as pq]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.message :as message]
@@ -71,17 +74,21 @@
 
 
 (defn initial-tasks []
+  (pq/priority-queue (constantly 1) :variant :set))
+
+(defn initial-file-events []
   (clojure.lang.PersistentQueue/EMPTY))
 
 
 (defn initial-state []
   (merge
-    {:tasks (initial-tasks)}
     (slurp-app-edn "config.edn")
     (slurp-app-edn "maps.edn")
     (slurp-app-edn "engines.edn")
     (slurp-app-edn "mods.edn")
-    (slurp-app-edn "download.edn")))
+    (slurp-app-edn "download.edn")
+    {:file-events (initial-file-events)
+     :tasks (initial-tasks)}))
 
 
 (def ^:dynamic *state
@@ -162,25 +169,42 @@
   ([f]
    (read-mod-data f nil))
   ([f opts]
-   (if (string/ends-with? (.getName f) ".sdp")
-     (rapid/read-sdp-mod f opts)
-     (fs/read-mod-file f opts))))
+   (let [mod-data
+         (if (string/ends-with? (.getName f) ".sdp")
+           (rapid/read-sdp-mod f opts)
+           (fs/read-mod-file f opts))
+         mod-name (spring/mod-name mod-data)]
+     (assoc mod-data :mod-name mod-name))))
 
 (defn update-mod [state-atom file]
-  (let [mod-data (read-mod-data file {:modinfo-only true})
-        mod-name (spring/mod-name mod-data)
+  (let [mod-data (read-mod-data file {:modinfo-only false})
+        mod-name (:mod-name mod-data)
         cache-file (mod-cache-file mod-name)
-        mod-data (assoc mod-data :mod-name mod-name)
         mod-details (select-keys mod-data [:filename :absolute-path :mod-name ::fs/source
                                            :git-commit-id])]
     (log/info "Caching" mod-name "to" cache-file)
     (spit cache-file (with-out-str (pprint mod-data)))
+    (let [state @state-atom
+          battle-id (-> state :battle :battle-id)
+          battle-modname (-> state :battles (get battle-id) :battle-modname)
+          battle-mod-details (:battle-mod-details state)]
+      (when (or (= (:absolute-path mod-data) (:absolute-path battle-mod-details))
+                (= (:mod-name mod-details) battle-modname)) ; can this ever happen?
+        (log/info "Updating battle mod details")
+        (swap! state-atom assoc :battle-mod-details mod-data))) ; TODO avoid dupe swap
     (swap! state-atom update :mods
            (fn [mods]
              (-> (remove (comp #{(:absolute-path mod-details)} :absolute-path) mods)
                  (conj mod-details)
                  set)))
     mod-data))
+
+
+(defn mod-name-sans-git [mod-name]
+  (when mod-name
+    (when-let [[_all mod-prefix _git] (re-find #"(.+)\s([0-9a-f]+)$" mod-name)]
+      mod-prefix
+      mod-name)))
 
 
 (defn add-watchers
@@ -193,6 +217,7 @@
   (remove-watch state-atom :download)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
+  (remove-watch state-atom :fix-missing-resource)
   (add-watch-state-to-edn state-atom :config select-config "config.edn")
   (add-watch-state-to-edn state-atom :maps select-maps "maps.edn")
   (add-watch-state-to-edn state-atom :engines select-engines "engines.edn")
@@ -206,7 +231,10 @@
               old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
               new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)]
           (when (or (not= old-battle-id new-battle-id)
-                    (not= old-battle-map new-battle-map))
+                    (not= old-battle-map new-battle-map)
+                    (and new-battle-map
+                         (not (:battle-map-details new-state))
+                         (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
             (log/debug "Updating battle map details for" new-battle-map
                        "was" old-battle-map)
             (let [map-details (safe-read-map-cache new-battle-map)]
@@ -219,60 +247,241 @@
         (let [old-battle-id (-> old-state :battle :battle-id)
               new-battle-id (-> new-state :battle :battle-id)
               old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
-              new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)]
+              new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
+              new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
+              mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
+              filter-fn (comp mod-name-set mod-name-sans-git :mod-name)]
           (when (or (not= old-battle-id new-battle-id)
-                    (not= old-battle-mod new-battle-mod))
-            (log/debug "Updating battle mod details for" new-battle-mod
-                       "was" old-battle-mod)
+                    (not= old-battle-mod new-battle-mod)
+                    (and new-battle-mod
+                         (not (:battle-mod-details new-state))
+                         (->> new-state :mods
+                              (filter filter-fn)
+                              first)))
+            (log/debug "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
             (when-let [mod-details (some->> new-state
                                             :mods
-                                            (filter (comp #{new-battle-mod} :mod-name))
+                                            (filter filter-fn)
                                             first
                                             :absolute-path
                                             io/file
                                             read-mod-data)]
               (swap! *state assoc :battle-mod-details mod-details))))
         (catch Exception e
+          (log/error e "Error in :battle-map-details state watcher")))))
+  (add-watch state-atom :fix-missing-resource
+    (fn [_k _ref _old-state new-state]
+      (try
+        (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
+              engine-fix (when engine-version
+                           (when-not (->> engines
+                                          (filter (comp #{engine-version} :engine-version))
+                                          first)
+                             (-> engines first :engine-version)))
+              mod-fix (when mod-name
+                        (when-not (->> mods
+                                       (filter (comp #{mod-name} :mod-name))
+                                       first)
+                          (-> mods first :mod-name)))
+              map-fix (when map-name
+                        (when-not (->> maps
+                                       (filter (comp #{map-name} :map-name))
+                                       first)
+                          (-> maps first :map-name)))]
+          (when (or engine-fix mod-fix map-fix)
+            (swap! state-atom
+                   (fn [state]
+                     (cond-> state
+                       engine-fix (assoc :engine-version engine-fix)
+                       mod-fix (assoc :mod-name mod-fix)
+                       map-fix (assoc :map-name map-fix))))))
+        (catch Exception e
           (log/error e "Error in :battle-map-details state watcher"))))))
 
-(defn add-hawk [state-atom]
+(defn add-hawk! [state-atom]
+  (log/info "Adding hawk file watcher")
   (hawk/watch!
-    [{:paths [(io/file (fs/app-root) "spring")
+    [{:paths [(fs/download-dir)
+              (fs/isolation-dir)
               (fs/spring-root)]
       :handler (fn [ctx e]
-                 (log/info "Hawk event:" e)
-                 (swap! state-atom update :tasks conj {::task-type ::file-event
-                                                       :file-event e})
-                 ctx)}]))
+                 (try
+                   (log/trace "Hawk event:" e)
+                   (swap! state-atom update :file-events conj e)
+                   (catch Exception e
+                     (log/error e "Error in hawk handler"))
+                   (finally
+                     ctx)))}]))
 
 
 (defmulti task-handler ::task-type)
 
-(defmethod task-handler ::file-event
-  [{:keys [file-event]}]
-  (let [{:keys [file]} file-event]
-    (cond
-      ; check if possible mod
-      (or (fs/child? (io/file (fs/spring-root) "games") file)
-          (and (fs/child? (io/file (fs/spring-root) "packages") file)
-               (string/ends-with? (.getName file) ".sdp")))
-      (update-mod *state file)
-      :else
-      (log/warn "Nothing to do for" file-event))))
+(defmethod task-handler ::update-mod
+  [{:keys [file]}]
+  (update-mod *state file))
 
 (defmethod task-handler :default [task]
-  (log/warn "Unknown task type" task))
+  (when task
+    (log/warn "Unknown task type" task)))
 
 
 ; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
 (defn handle-task! [state-atom]
-  (let [[before _after] (swap-vals! state-atom update :tasks pop)
-        task (-> before :tasks peek)]
+  (let [[before _after] (swap-vals! state-atom update :tasks
+                                    (fn [tasks]
+                                      (if-not (empty? tasks)
+                                        (pop tasks)
+                                        tasks)))
+        tasks (:tasks before)
+        task (when-not (empty? tasks)
+               (peek tasks))]
     (task-handler task)
     task))
 
+(defn tasks-chimer-fn [state-atom]
+  (log/info "Starting tasks chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/instant)
+            (java-time/duration 1 :seconds))
+          (fn [_chimestamp]
+            (handle-task! state-atom))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error handling task")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn handle-all-tasks! [state-atom]
   (while (handle-task! state-atom)))
+
+
+(defn add-task! [state-atom task]
+  (if task
+    (do
+      (log/info "Adding task" (pr-str task))
+      (swap! state-atom update :tasks conj task))
+    (log/warn "Attempt to add nil task" task)))
+
+
+(defn file-event-task [file-event]
+  (let [{:keys [file]} file-event
+        ;root (io/file (fs/spring-root) "games") ; TODO check spring and BAR dirs...
+        ;root (io/file (fs/bar-root) "games") ; TODO check spring and BAR dirs...
+        root (fs/isolation-dir)
+        games (io/file root "games")
+        maps (io/file root "maps")]
+    (when file
+      (cond
+        (not file)
+        (log/info "nil file")
+        ; update possible mod file
+        (or (fs/child? games file)
+            (and (fs/child? (io/file root "packages") file)
+                 (string/ends-with? (.getName file) ".sdp")))
+        {::task-type ::update-mod
+         :file file}
+        ; or mod in directory / git format
+        (fs/descendant? games file)
+        (loop [parent file] ; find directory in games
+          (when parent
+            (if (fs/child? games parent)
+              {::task-type ::update-mod
+               :file parent}
+              (recur (.getParentFile parent)))))
+        (fs/descendant? maps file)
+        (loop [parent file] ; find file in maps
+          (when parent
+            (if (fs/child? maps parent)
+              {::task-type ::update-map
+               :file parent}
+              (recur (.getParentFile parent)))))
+        :else
+        (log/warn "Nothing to do for" file-event)))))
+
+(defn handle-file-event [state-atom file-event]
+  (let [{:keys [file]} file-event
+        ;root (io/file (fs/spring-root) "games") ; TODO check spring and BAR dirs...
+        ;root (io/file (fs/bar-root) "games") ; TODO check spring and BAR dirs...
+        root (fs/isolation-dir)
+        games (io/file root "games")
+        maps (io/file root "maps")]
+    (when file
+      (cond
+        (not file)
+        (log/info "nil file")
+        ; update possible mod file
+        (or (fs/child? games file)
+            (and (fs/child? (io/file root "packages") file)
+                 (string/ends-with? (.getName file) ".sdp")))
+        (add-task! state-atom {::task-type ::update-mod
+                               :file file})
+        ; or mod in directory / git format
+        (fs/descendant? games file)
+        (loop [parent file] ; find directory in games
+          (when parent
+            (if (fs/child? games parent)
+              (add-task! state-atom {::task-type ::update-mod
+                                     :file parent})
+              (recur (.getParentFile parent)))))
+        (fs/descendant? maps file)
+        (loop [parent file] ; find file in maps
+          (when parent
+            (if (fs/child? maps parent)
+              (add-task! state-atom {::task-type ::update-map
+                                     :file parent})
+              (recur (.getParentFile parent)))))
+        :else
+        (log/warn "Nothing to do for" file-event)))
+    file-event))
+
+
+(defn handle-file-event! [state-atom]
+  (let [[before _after] (swap-vals! state-atom update :file-events pop)
+        file-event (-> before :file-events peek)]
+    (handle-file-event state-atom file-event)))
+
+; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
+(defn pop-file-event! [state-atom]
+  (let [[before _after] (swap-vals! state-atom update :file-events pop)]
+    (-> before :file-events peek)))
+
+(defn handle-all-file-events! [state-atom]
+  (let [events (loop [all []]
+                 (if-let [event (pop-file-event! state-atom)]
+                   (recur (conj all event))
+                   all))
+        tasks (set (filter some? (map file-event-task events)))]
+    (when (seq events)
+      (log/info "From" (count events) "file events got" (count tasks) "tasks"))
+    (doseq [task tasks] ; TODO all at once?
+      (add-task! state-atom task))))
+
+(defn file-events-chimer-fn [state-atom]
+  (log/info "Starting file events chimer")
+  (let [hawk-atom (atom (add-hawk! state-atom))
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/instant)
+            (java-time/duration 1 :seconds))
+          (fn [_chimestamp]
+            (let [hawk @hawk-atom]
+              (when-not (.isAlive (:thread hawk))
+                (log/warn "Hawk watcher died, starting a new one")
+                (hawk/stop! hawk)
+                (reset! hawk-atom (add-hawk! state-atom))))
+            (handle-all-file-events! state-atom))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error handling file event")
+             true)})]
+    (fn []
+      (let [hawk @hawk-atom]
+        (when hawk
+          (hawk/stop! hawk)))
+      (.close chimer))))
 
 
 (defn reconcile-engines
@@ -408,6 +617,11 @@
                   (remove (comp missing-filenames :filename))
                   set)))
     {:todo-count (count todo)}))
+
+
+(defmethod task-handler ::update-map
+  [{:keys [file]}]
+  (reconcile-maps *state))
 
 
 (defmulti event-handler :event/type)
@@ -787,24 +1001,13 @@
 
 (defn map-list
   [{:keys [disable map-name maps on-value-changed map-input-prefix]}]
-  (cond
-    (not maps)
-    {:fx/type :v-box
-     :alignment :center-left
-     :children
-     [{:fx/type :label
-       :text "Loading maps..."}]}
-    (not (seq maps))
-    {:fx/type :v-box
-     :alignment :center-left
-     :children
-     [{:fx/type :label
-       :text "No maps"}]}
-    :else
-    {:fx/type :h-box
-     :alignment :center-left
-     :children
-     (concat
+  {:fx/type :h-box
+   :alignment :center-left
+   :children
+   (concat
+     (if (empty? maps)
+       [{:fx/type :label
+         :text "No maps "}]
        [(let [filter-lc (if map-input-prefix (string/lower-case map-input-prefix) "")
               filtered-maps
               (->> maps
@@ -833,48 +1036,48 @@
            :on-hidden {:event/type ::maps-hidden}
            :tooltip {:fx/type :tooltip
                      :show-delay [10 :ms]
-                     :text (or map-input-prefix "Choose map")}})
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Browse and download maps with http"}}
-         :desc
-         {:fx/type :button
-          :on-action {:event/type ::show-http-downloader}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-download:16:white")}}}]
-       (when (seq maps)
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Random map"}}
-           :desc
-           {:fx/type :button
-            :disable disable
-            :on-action (fn [& _]
-                         (event-handler
-                           (let [random-map-name (:map-name (rand-nth (seq maps)))]
-                             (assoc on-value-changed :map-name random-map-name))))
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+                     :text (or map-input-prefix "Choose map")}})])
+     [{:fx/type fx.ext.node/with-tooltip-props
+       :props
+       {:tooltip
+        {:fx/type :tooltip
+         :show-delay [10 :ms]
+         :text "Browse and download maps with http"}}
+       :desc
+       {:fx/type :button
+        :on-action {:event/type ::show-http-downloader}
+        :graphic
+        {:fx/type font-icon/lifecycle
+         :icon-literal (str "mdi-download:16:white")}}}]
+     (when (seq maps)
        [{:fx/type fx.ext.node/with-tooltip-props
          :props
          {:tooltip
           {:fx/type :tooltip
            :show-delay [10 :ms]
-           :text "Reload maps"}}
+           :text "Random map"}}
          :desc
          {:fx/type :button
-          :on-action {:event/type ::reload-maps}
+          :disable disable
+          :on-action (fn [& _]
+                       (event-handler
+                         (let [random-map-name (:map-name (rand-nth (seq maps)))]
+                           (assoc on-value-changed :map-name random-map-name))))
           :graphic
           {:fx/type font-icon/lifecycle
-           :icon-literal "mdi-refresh:16:white"}}}])}))
+           :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}]
+      [{:fx/type fx.ext.node/with-tooltip-props
+        :props
+        {:tooltip
+         {:fx/type :tooltip
+          :show-delay [10 :ms]
+          :text "Reload maps"}}
+        :desc
+        {:fx/type :button
+         :on-action {:event/type ::reload-maps}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-refresh:16:white"}}}]))})
 
 (defmethod event-handler ::engines-key-pressed [{:fx/keys [event]}]
   (swap! *state update :engine-filter (update-filter-fn event)))
@@ -902,65 +1105,71 @@
      [{:fx/type :h-box
        :alignment :center-left
        :children
-       [{:fx/type :label
-         :text " Engine: "}
-        (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
-              filtered-engines (->> engines
-                                    (map :engine-version)
-                                    (filter #(string/includes? (string/lower-case %) filter-lc))
-                                    sort)]
-          {:fx/type :combo-box
-           :value (str engine-version)
-           :items filtered-engines
-           :disable (boolean battle)
-           :on-value-changed {:event/type ::version-change}
-           :cell-factory
-           {:fx/cell-type :list-cell
-            :describe (fn [engine] {:text (str engine)})}
-           :on-key-pressed {:event/type ::engines-key-pressed}
-           :on-hidden {:event/type ::engines-hidden}
-           :tooltip {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (or engine-filter "Choose engine")}})
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Browse and download engines with http"}}
-         :desc
-         {:fx/type :button
-          :on-action {:event/type ::show-http-downloader}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-download:16:white")}}}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Reload engines"}}
-         :desc
-         {:fx/type :button
-          :on-action {:event/type ::reload-engines}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal "mdi-refresh:16:white"}}}]}
+       (concat
+         [{:fx/type :label
+           :text " Engine: "}]
+         (if (empty? engines)
+           [{:fx/type :label
+             :text "No engines "}]
+           (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
+                 filtered-engines (->> engines
+                                       (map :engine-version)
+                                       (filter #(string/includes? (string/lower-case %) filter-lc))
+                                       sort)]
+             [{:fx/type :combo-box
+               :value (str engine-version)
+               :items filtered-engines
+               :disable (boolean battle)
+               :on-value-changed {:event/type ::version-change}
+               :cell-factory
+               {:fx/cell-type :list-cell
+                :describe (fn [engine] {:text (str engine)})}
+               :on-key-pressed {:event/type ::engines-key-pressed}
+               :on-hidden {:event/type ::engines-hidden}
+               :tooltip {:fx/type :tooltip
+                         :show-delay [10 :ms]
+                         :text (or engine-filter "Choose engine")}}]))
+         [{:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Browse and download engines with http"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::show-http-downloader}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal (str "mdi-download:16:white")}}}
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type :tooltip
+             :show-delay [10 :ms]
+             :text "Reload engines"}}
+           :desc
+           {:fx/type :button
+            :on-action {:event/type ::reload-engines}
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-refresh:16:white"}}}])}
       {:fx/type :h-box
        :alignment :center-left
        :children
        (concat
-         (if mods
+         [{:fx/type :label
+           :alignment :center-left
+           :text " Game: "}]
+         (if (empty? mods)
            [{:fx/type :label
-             :alignment :center-left
-             :text " Game: "}
-            (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
-                  filtered-mods (->> mods
-                                     (map :mod-name)
-                                     (filter string?)
-                                     (filter #(string/includes? (string/lower-case %) filter-lc))
-                                     (sort version/version-compare))]
-              {:fx/type :combo-box
+             :text "No games "}]
+           (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
+                 filtered-mods (->> mods
+                                    (map :mod-name)
+                                    (filter string?)
+                                    (filter #(string/includes? (string/lower-case %) filter-lc))
+                                    (sort version/version-compare))]
+             [{:fx/type :combo-box
                :value (str mod-name)
                :items filtered-mods
                :disable (boolean battle)
@@ -972,9 +1181,7 @@
                :on-hidden {:event/type ::mods-hidden}
                :tooltip {:fx/type :tooltip
                          :show-delay [10 :ms]
-                         :text (or mod-filter "Choose game")}})]
-           [{:fx/type :label
-             :text "Loading games..."}])
+                         :text (or mod-filter "Choose game")}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -1400,6 +1607,21 @@
       (finally
         (swap! *state assoc-in [:copying map-filename] {:status false})))))
 
+(defmethod event-handler ::import-map
+  [{:keys [source dest]}]
+  (when source
+    (let [filename (.getName source)
+          dest (or dest (fs/map-file filename))]
+      (log/info "Importing map" filename "from" source "to" dest)
+      (swap! *state assoc-in [:copying filename] {:status true})
+      (future
+        (try
+          (spring/java-nio-copy source dest)
+          (catch Exception e
+            (log/error e "Error importing map" filename "from" source "to" dest))
+          (finally
+            (swap! *state assoc-in [:copying filename] {:status false})))))))
+
 (defmethod event-handler ::copy-mod
   [{:keys [mod-details engine-version]}]
   (let [mod-filename (:filename mod-details)]
@@ -1414,17 +1636,19 @@
           (swap! *state assoc-in [:copying mod-filename] {:status false}))))))
 
 (defmethod event-handler ::git-mod
-  [{:keys [mod-details]}]
-  (let [{:keys [absolute-path git-commit-id]} mod-details]
-    (when (and absolute-path git-commit-id)
-      (log/info "Checking out mod" absolute-path "to" git-commit-id)
+  [{:keys [battle-modname mod-details]}]
+  (let [{:keys [absolute-path]} mod-details
+        short-battle-commit-id (last (clojure.string/split battle-modname #"\s"))]
+    (when (and absolute-path short-battle-commit-id)
+      (log/info "Checking out mod" absolute-path "to" short-battle-commit-id)
       (swap! *state assoc-in [:gitting absolute-path] {:status true})
       (future
         (try
-          (git/reset-hard (io/file absolute-path) git-commit-id)
+          (git/fetch (io/file absolute-path))
+          (git/reset-hard (io/file absolute-path) short-battle-commit-id)
           (reconcile-mods *state)
           (catch Exception e
-            (log/error e "Error during git reset" absolute-path "to" git-commit-id))
+            (log/error e "Error during git reset" absolute-path "to" short-battle-commit-id))
           (finally
             (swap! *state assoc-in [:gitting absolute-path] {:status false})))))))
 
@@ -1456,16 +1680,18 @@
         (swap! *state assoc-in [:copying engine-version] {:status false})))))
 
 (defmethod event-handler ::clean-engine
-  [{:keys [engine-version]}]
-  (let [isolation-dir (spring/engine-isolation-file engine-version)]
-    (log/info "Cleaning engine" engine-version "isolation dir")
+  [{:keys [engines engine-version]}]
+  (let [engine-details (spring/engine-details engines engine-version)
+        absolute-path (:absolute-path engine-details)
+        engine-dir (io/file absolute-path)]
+    (log/info "Cleaning engine" engine-version "at" engine-dir)
     (swap! *state assoc-in [:cleaning engine-version] {:status true})
     (future
       (try
-        (raynes-fs/delete-dir (io/file isolation-dir "packages"))
-        (raynes-fs/delete-dir (io/file isolation-dir "pool"))
+        (raynes-fs/delete-dir (io/file engine-dir "packages"))
+        (raynes-fs/delete-dir (io/file engine-dir "pool"))
         (catch Exception e
-          (log/error e "Error cleaning engine" engine-version "isolation dir"))
+          (log/error e "Error cleaning engine" engine-version "at" engine-dir))
         (finally
           (swap! *state assoc-in [:cleaning engine-version] {:status false}))))))
 
@@ -1498,10 +1724,10 @@
   (future
     (try
       (let [[_all dir] (re-find #"/([^/]+)\.git" repo-url)]
-        (git/clone-repo repo-url (io/file (fs/spring-root) "games" dir)
-                        {:on-begin-task (fn [title total-work]
-                                          (let [m (str title " " total-work)]
-                                            (swap! *state assoc-in [:git-clone repo-url :message] m)))}))
+        (git/clone-repo repo-url (io/file (fs/isolation-dir) "games" dir)
+          {:on-begin-task (fn [title total-work]
+                            (let [m (str title " " total-work)]
+                              (swap! *state assoc-in [:git-clone repo-url :message] m)))}))
       (reconcile-mods *state)
       (catch Exception e
         (log/error e "Error cloning git repo" repo-url))
@@ -1709,7 +1935,7 @@
 
 
 (defn battle-players-table
-  [{:keys [am-host host-username players username]}]
+  [{:keys [am-host battle-modname host-username players username]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (or players [])
@@ -1813,12 +2039,12 @@
           :key (nickname i)
           :desc
           {:fx/type :choice-box
-           :value (->> i :battle-status :side (get spring/sides) str)
+           :value (->> i :battle-status :side (get (spring/sides battle-modname)) str)
            :on-value-changed {:event/type ::battle-side-changed
                               :is-me (= (:username i) username)
                               :is-bot (-> i :user :client-status :bot)
                               :id i}
-           :items (vals spring/sides)
+           :items (vals (spring/sides battle-modname))
            :disable (not (or am-host
                              (= (:username i) username)
                              (= (:owner i) username)))}}})}}
@@ -1943,6 +2169,15 @@
       (reconcile-engines *state))
     (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
 
+(defmethod event-handler ::nuke-data-dir
+  [_e]
+  (future
+    (try
+      (log/info "Nuking data dir!" (fs/isolation-dir))
+      (raynes-fs/delete-dir (fs/isolation-dir))
+      (catch Exception e
+        (log/error e "Error nuking data dir")))))
+
 
 (defn battle-view
   [{:keys [archiving battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
@@ -1996,7 +2231,8 @@
          :am-host am-host
          :host-username host-username
          :players (battle-players-and-bots state)
-         :username username}
+         :username username
+         :battle-modname battle-modname}
         {:fx/type :h-box
          :children
          [{:fx/type :v-box
@@ -2084,7 +2320,18 @@
                        :in-progress in-progress
                        :action {:event/type ::copy-map
                                 :map-filename map-filename
-                                :engine-version engine-version}}])))}
+                                :engine-version engine-version}}]))
+                 (let [map-filename (fs/map-filename battle-map)
+                       in-progress (-> copying (get map-filename) :status)]
+                   (when-let [spring-map-file (fs/map-file (fs/spring-root) map-filename)]
+                     [{:severity (if (and (not battle-map-details)
+                                          (.exists spring-map-file)
+                                          (not in-progress))
+                                   2 0)
+                       :text "import"
+                       :in-progress in-progress
+                       :action {:event/type ::import-map
+                                :source spring-map-file}}])))}
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "game" ;battle-modname ; (str "game (" battle-modname ")")
@@ -2107,8 +2354,9 @@
                               :rapid-id rapid-id
                               :git-url git-url
                               :engine-dir-filename (spring/engine-dir-filename engines engine-version)}}])
-                 (if-let [mod-isolation-archive-file (spring/mod-isolation-archive-file
-                                                       battle-mod-details engine-version)]
+                 #_
+                 (if-let [mod-file (when-let [absolute-path (:absolute-path battle-mod-details)]
+                                     (io/file absolute-path))]
                    (let [in-progress (-> archiving (get (:filename battle-mod-details)) :status)]
                      [{:severity (if (and (.exists mod-isolation-archive-file)
                                           (not in-progress))
@@ -2117,27 +2365,28 @@
                        :in-progress in-progress
                        :action {:event/type ::archive-mod
                                 :mod-details battle-mod-details
+                                :engine-version engine-version}}]))
+                 (when-let [mod-file (when-let [absolute-path (:absolute-path battle-mod-details)]
+                                       (io/file absolute-path))]
+                   (let [in-progress (-> copying (get (:filename battle-mod-details)) :status)]
+                     [{:severity (if (and (.exists mod-file)
+                                          (not in-progress))
+                                   0 1)
+                       :text "copy"
+                       :in-progress in-progress
+                       :action {:event/type ::copy-mod
+                                :mod-details battle-mod-details
                                 :engine-version engine-version}}])
-                   (when-let [mod-isolation-file (spring/mod-isolation-file
-                                                   battle-mod-details engine-version)]
-                     (let [in-progress (-> copying (get (:filename battle-mod-details)) :status)]
-                       [{:severity (if (and (.exists mod-isolation-file)
-                                            (not in-progress))
-                                     0 1)
-                         :text "copy"
-                         :in-progress in-progress
-                         :action {:event/type ::copy-mod
-                                  :mod-details battle-mod-details
-                                  :engine-version engine-version}}])
-                     (when (and (.exists mod-isolation-file)
-                                (= :directory (::fs/source battle-mod-details)))
-                       [{:severity (if (= (git/latest-id mod-isolation-file)
-                                          (:git-commit-id battle-mod-details))
-                                     0 1)
-                         :text "git"
-                         :in-progress false
-                         :action {:event/type ::git-mod
-                                  :mod-details battle-mod-details}}]))))}
+                   (when (and (= :directory
+                                 (::fs/source battle-mod-details)))
+                     [{:severity (if (= battle-modname
+                                        (:mod-name battle-mod-details))
+                                   0 1)
+                       :text "git"
+                       :in-progress false
+                       :action {:event/type ::git-mod
+                                :mod-details battle-mod-details
+                                :battle-modname battle-modname}}])))}
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "engine" ; engine-version ; (str "engine (" engine-version ")")
@@ -2189,7 +2438,8 @@
                          :text "clean"
                          :in-progress in-progress
                          :action {:event/type ::clean-engine
-                                  :engine-version engine-version}})])))}]}
+                                  :engine-version engine-version
+                                  :engines engines}})])))}]}
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
@@ -2489,7 +2739,7 @@
                            :users users
                            :username username}}
               {:fx/type :button
-               :text "Humans vs bots"
+               :text "Humans vs Bots"
                :on-action {:event/type ::battle-teams-humans-vs-bots
                            :battle battle
                            :users users
@@ -2773,7 +3023,6 @@
 
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
-  #p file #p dest
   (future
     (try
       (swap! *state assoc-in [:extracting file] true)
@@ -2789,7 +3038,7 @@
 
 (defn root-view
   [{{:keys [users battles
-            engine-version last-failed-message tasks
+            engine-version last-failed-message tasks file-events
             standalone
             rapid-repo rapid-download sdp-files-cached rapid-repos-cached engines rapid-versions-by-hash
             rapid-versions-cached
@@ -2934,6 +3183,8 @@
                 :style {:-fx-text-fill "#FF0000"}}
                {:fx/type :pane
                 :h-box/hgrow :always}
+               {:fx/type :label
+                :text (str (count file-events) " file events  ")}
                {:fx/type :label
                 :text (str (count tasks) " tasks")}]}])}}}]
       (when pop-out-battle
@@ -3354,7 +3605,7 @@
                      (if filename
                        (let [url (str maps-index-url "/" url)
                              download (get http-download url)
-                             dest (io/file (fs/spring-root) "maps" filename)]
+                             dest (io/file (fs/download-dir) "maps" filename)]
                          (merge
                            {:text (str (:message download))
                             :style {:-fx-font-family "monospace"}}
@@ -3381,6 +3632,9 @@
   (Platform/setImplicitExit true)
   (swap! *state assoc :standalone true)
   (add-watchers *state)
+  ;(add-hawk *state)
+  (tasks-chimer-fn *state)
+  (file-events-chimer-fn *state)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
                           (fn [state]
