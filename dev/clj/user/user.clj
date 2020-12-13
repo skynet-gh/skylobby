@@ -1,5 +1,7 @@
 (ns user
   (:require
+    [cemerick.pomegranate :as pomegranate]
+    [cemerick.pomegranate.aether :refer [maven-central]]
     [cljfx.api :as fx]
     [clojure.datafy :refer [datafy]]
     [clojure.java.io :as io]
@@ -101,3 +103,10 @@
     (fx/mount-renderer *state renderer)
     (catch Exception e
       (println e))))
+
+
+(defn add-dependency [coordinate]
+  (pomegranate/add-dependencies
+    :coordinates `[~coordinate]
+    :repositories (merge maven-central
+                         {"clojars" "https://clojars.org/repo"})))
