@@ -244,10 +244,13 @@
                                %)))]
     (merge (get battles (:battle-id battle)) battle)))
 
+(defn short-git-commit [git-commit-id]
+  (when git-commit-id
+    (subs git-commit-id 0 7)))
+
 (defn mod-name [{:keys [git-commit-id modinfo]}]
   (str (:name modinfo) " "
-       (or (when git-commit-id
-             (subs git-commit-id 0 7))
+       (or (short-git-commit git-commit-id)
            (:version modinfo))))
 
 ; TODO find a better place for this

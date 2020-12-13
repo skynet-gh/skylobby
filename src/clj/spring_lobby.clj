@@ -1347,21 +1347,23 @@
      (concat
        [{:fx/type :h-box
          :children
-         [{:fx/type :label
-           :h-box/margin 4
-           :text (str resource
-                      (if (zero? worst-severity) " is synced" " issues:"))
-           :style {:-fx-font-size 16}}
-          {:fx/type :button
-           :on-action delete-action
-           :h-box/margin 4
-           :style
-           {:-fx-base "black"
-            :-fx-background "black"
-            :-fx-background-color "black"}
-           :graphic
-           {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-delete:16:white"}}]}]
+         (concat
+           [{:fx/type :label
+             :h-box/margin 4
+             :text (str resource
+                        (if (zero? worst-severity) " is synced" " issues:"))
+             :style {:-fx-font-size 16}}]
+           (when delete-action
+             [{:fx/type :button
+               :on-action delete-action
+               :h-box/margin 4
+               :style
+               {:-fx-base "black"
+                :-fx-background "black"
+                :-fx-background-color "black"}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-delete:16:white"}}]))}]
        (map
          (fn [{:keys [text action severity in-progress]}]
            (let [font-style {:-fx-font-size 12}]
@@ -1410,6 +1412,21 @@
           (log/error e "Error copying mod" mod-filename "to isolation dir for" engine-version))
         (finally
           (swap! *state assoc-in [:copying mod-filename] {:status false}))))))
+
+(defmethod event-handler ::git-mod
+  [{:keys [mod-details]}]
+  (let [{:keys [absolute-path git-commit-id]} mod-details]
+    (when (and absolute-path git-commit-id)
+      (log/info "Checking out mod" absolute-path "to" git-commit-id)
+      (swap! *state assoc-in [:gitting absolute-path] {:status true})
+      (future
+        (try
+          (git/reset-hard (io/file absolute-path) git-commit-id)
+          (reconcile-mods *state)
+          (catch Exception e
+            (log/error e "Error during git reset" absolute-path "to" git-commit-id))
+          (finally
+            (swap! *state assoc-in [:gitting absolute-path] {:status false})))))))
 
 (defmethod event-handler ::archive-mod
   [{:keys [mod-details engine-version]}]
@@ -2044,7 +2061,7 @@
              [{:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "map" ;battle-map ; (str "map (" battle-map ")")
-               :delete-action {:event/type ::delete-map}
+               ;:delete-action {:event/type ::delete-map}
                :issues
                (concat
                  (let [url (http/map-url battle-map)
@@ -2071,7 +2088,7 @@
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "game" ;battle-modname ; (str "game (" battle-modname ")")
-               :delete-action {:event/type ::delete-mod}
+               ;:delete-action {:event/type ::delete-mod}
                :issues
                (concat
                  (let [git-url (cond
@@ -2111,7 +2128,16 @@
                          :in-progress in-progress
                          :action {:event/type ::copy-mod
                                   :mod-details battle-mod-details
-                                  :engine-version engine-version}}]))))}
+                                  :engine-version engine-version}}])
+                     (when (and (.exists mod-isolation-file)
+                                (= :directory (::fs/source battle-mod-details)))
+                       [{:severity (if (= (git/latest-id mod-isolation-file)
+                                          (:git-commit-id battle-mod-details))
+                                     0 1)
+                         :text "git"
+                         :in-progress false
+                         :action {:event/type ::git-mod
+                                  :mod-details battle-mod-details}}]))))}
               {:fx/type resource-sync-pane
                :h-box/margin 8
                :resource "engine" ; engine-version ; (str "engine (" engine-version ")")

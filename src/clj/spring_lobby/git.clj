@@ -50,6 +50,10 @@
                (pr-str (latest-id repo)))
      repo)))
 
+(defn reset-hard [^java.io.File f commit-id]
+  (with-open [repo (git/load-repo f)]
+    (git/git-reset repo :mode :hard :ref commit-id)))
+
 #_
 (clone-game (first known-mod-repos))
 #_
