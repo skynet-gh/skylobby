@@ -137,6 +137,9 @@
     (hawk/watch! [{:paths ["src/clj"]
                    :handler refresh-on-file-change}])
     (require 'spring-lobby)
+    (require 'spring-lobby.fs)
+    (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
+      (init-7z-fn))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
     (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))
