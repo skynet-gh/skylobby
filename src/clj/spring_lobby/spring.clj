@@ -258,7 +258,8 @@
 
 (defn mod-name [{:keys [git-commit-id modinfo]}]
   (str (:name modinfo) " "
-       (or (short-git-commit git-commit-id)
+       (or (when git-commit-id
+             (str "git:" (short-git-commit git-commit-id)))
            (:version modinfo))))
 
 ; TODO find a better place for this

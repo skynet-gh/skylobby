@@ -57,6 +57,11 @@
    :user-home (user-home)
    :user-name (user-name)})
 
+(defn windows?
+  ([]
+   (windows? (sys-data)))
+  ([{:keys [os-name]}]
+   (string/includes? os-name "Windows")))
 
 (defn wsl?
   "Returns true if this system appears to be the Windows Subsystem for Linux."
@@ -66,6 +71,8 @@
       (string/includes? os-name "Linux")
       (string/includes? os-version "Microsoft")))) ; WSL
 
+(defn wsl-or-windows? []
+  (or (windows?) (wsl?)))
 
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."
@@ -96,12 +103,10 @@
 
 
 (defn executable [common-name]
-  (let [{:keys [os-name]} (sys-data)]
-    (str
-      common-name
-      (when (or (string/includes? os-name "Windows")
-                (wsl?))
-        ".exe"))))
+  (str
+    common-name
+    (when (wsl-or-windows?)
+      ".exe")))
 
 (defn spring-executable []
   (executable "spring"))
@@ -269,38 +274,30 @@
          dest (io/file (.getParentFile f) dir)]
      (extract-7z f dest)))
   ([^java.io.File f ^java.io.File dest]
-   (let [fname (.getName f)
-         dir (if (string/includes? fname ".")
-               (subs fname 0 (.lastIndexOf fname "."))
-               fname)]
-     (with-open [raf (new RandomAccessFile f "r")
-                 rafis (new RandomAccessFileInStream raf)
-                 archive (SevenZip/openInArchive nil rafis)
-                 simple (.getSimpleInterface archive)]
-       (log/trace archive "has" (.getNumberOfItems archive) "items")
-       (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
-         (let [path (.getPath item)
-               to (io/file dest path)]
-           (try
-             (when-not (.isFolder item)
-               (when-not (.exists to)
-                 (let [parent (.getParentFile to)]
-                   (.mkdirs parent))
-                 (log/info "Extracting" path "to" to)
-                 (with-open [fos (FileOutputStream. to)]
-                   (let [res (.extractSlow item
-                               (reify ISequentialOutStream
-                                 (write [this data]
-                                   (.write fos data 0 (count data))
-                                   (count data))))]
-                     (log/info "Extract result for" to res)))))
-             (catch Exception e
-               (log/warn e "Error extracting"))))))
-     (log/info "Finished extracting" f "to" dest))))
-
-
-#_
-(extract-7z (io/file (spring-root) "engine" "spring_103.0_win32-minimal-portable.7z"))
+   (with-open [raf (new RandomAccessFile f "r")
+               rafis (new RandomAccessFileInStream raf)
+               archive (SevenZip/openInArchive nil rafis)
+               simple (.getSimpleInterface archive)]
+     (log/trace archive "has" (.getNumberOfItems archive) "items")
+     (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
+       (let [path (.getPath item)
+             to (io/file dest path)]
+         (try
+           (when-not (.isFolder item)
+             (when-not (.exists to)
+               (let [parent (.getParentFile to)]
+                 (.mkdirs parent))
+               (log/info "Extracting" path "to" to)
+               (with-open [fos (FileOutputStream. to)]
+                 (let [res (.extractSlow item
+                             (reify ISequentialOutStream
+                               (write [this data]
+                                 (.write fos data 0 (count data))
+                                 (count data))))]
+                   (log/info "Extract result for" to res)))))
+           (catch Exception e
+             (log/warn e "Error extracting"))))))
+   (log/info "Finished extracting" f "to" dest)))
 
 
 (defn sync-version-to-engine-version
