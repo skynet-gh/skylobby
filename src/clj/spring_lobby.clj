@@ -63,13 +63,26 @@
 (def minimap-size 512)
 
 
+; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
+(defn read-file-tag [cs]
+  (io/file cs))
+
+; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
+(def custom-readers
+  {'spring-lobby/java.io.File #'spring-lobby/read-file-tag})
+
+; https://stackoverflow.com/a/23592006/984393
+(defmethod print-method java.io.File [f w]
+  (.write w (str "#spring-lobby/java.io.File \"" (.getAbsolutePath f) "\"")))
+
+
 (defn slurp-app-edn
   "Returns data loaded from a .edn file in this application's root directory."
   [edn-filename]
   (try
     (let [config-file (io/file (fs/app-root) edn-filename)]
       (when (.exists config-file)
-        (-> config-file slurp edn/read-string)))
+        (->> config-file slurp (edn/read-string custom-readers))))
     (catch Exception e
       (log/warn e "Exception loading app edn file" edn-filename))))
 
@@ -88,6 +101,7 @@
     (slurp-app-edn "engines.edn")
     (slurp-app-edn "mods.edn")
     (slurp-app-edn "download.edn")
+    (slurp-app-edn "importables.edn")
     {:file-events (initial-file-events)
      :tasks (initial-tasks)
      :minimap-type "minimap"}))
@@ -354,8 +368,9 @@
     {:watcher :polling
      :sensitivity :low} ;:medium} ;:high} ;:low}
     [{:paths [(fs/download-dir)
-              (fs/isolation-dir)
-              (fs/spring-root)]
+              ;(fs/isolation-dir)
+              ;(fs/spring-root)] ; TODO slow or dangerous
+              (fs/maps-dir)]
       :handler (fn [ctx e]
                  (try
                    (log/trace "Hawk event:" e)
@@ -3335,6 +3350,22 @@
    :resource-type t
    :import-source-name source})
 
+(defn update-importable
+  [{:keys [resource-file resource-type] :as importable}]
+  (log/info "Finding name for importable" importable)
+  (let [resource-name (case resource-type
+                        ::map (:map-name (fs/read-map-data resource-file))
+                        ::mod (:mod-name (read-mod-data resource-file))
+                        ::engine (:engine-version (fs/engine-data resource-file))
+                        ::sdp (:mod-name (read-mod-data resource-file)))]
+    (swap! *state update-in [:importables-by-path (.getAbsolutePath resource-file)]
+           assoc :resource-name resource-name
+           :resource-updated (u/curr-millis))
+    resource-name))
+
+(defmethod task-handler ::update-importable [{:keys [importable]}]
+  (update-importable importable))
+
 (defmethod task-handler ::scan-imports
   [{root :file import-source-name :import-source-name}]
   (log/info "Scanning for possible imports from" root)
@@ -3354,28 +3385,13 @@
                                :engine-dirs (count engine-dirs)
                                :sdp-files (count sdp-files)})
     (swap! *state update :importables-by-path merge importables-by-path)
-    (doseq [{:keys [resource-file resource-type] :as importable} importables]
-      (try
-        (log/info "Finding name for importable" importable)
-        (let [resource-name (case resource-type
-                              ::map (:map-name (fs/read-map-data resource-file))
-                              ::mod (:mod-name (read-mod-data resource-file))
-                              ::engine (:engine-version (fs/engine-data resource-file))
-                              ::sdp (:mod-name (read-mod-data resource-file)))]
-          (swap! *state update-in [:importables-by-path (.getAbsolutePath resource-file)]
-                 assoc :resource-name resource-name
-                 :resource-updated (u/curr-millis))
-          (Thread/sleep 100))
-        (catch Exception e
-          (log/error e "Error reading importable" importable))))))
+    (doseq [importable importables]
+      (add-task! *state {::task-type ::update-importable
+                         :importable importable}))))
 
 (defmethod event-handler ::import-source-change
   [{:fx/keys [event]}]
-  (swap! *state assoc :import-source-name (:import-source-name event))
-  #_
-  (add-task! *state {::task-type ::scan-imports
-                     :file (:file event)
-                     :import-source-name event}))
+  (swap! *state assoc :import-source-name (:import-source-name event)))
 
 (defn import-source-cell
   [{:keys [file import-source-name]}]
