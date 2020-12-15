@@ -285,17 +285,20 @@
 (defn engine-dir-filename [engines engine-version]
   (:engine-dir-filename (engine-details engines engine-version)))
 
+(defn copy-dir ; TODO move to fs
+  [^java.io.File source ^java.io.File dest]
+  (if (.exists source)
+    (do
+      (FileUtils/forceMkdir dest)
+      (log/info "Copying" source "to" dest)
+      (FileUtils/copyDirectory source dest))
+    (log/warn "No source to copy from" (.getAbsolutePath source) "to" (.getAbsolutePath dest))))
+
 (defn copy-engine [engines engine-version]
   (if engine-version
     (let [source (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
           dest (io/file (fs/isolation-dir) "engine" engine-version)]
-      (if (.exists source)
-        (do
-          (FileUtils/forceMkdir dest)
-          (log/info "Copying" source "to" dest)
-          (FileUtils/copyDirectory source dest))
-        (log/warn "No engine to copy from" (.getAbsolutePath source)
-                  "to" (.getAbsolutePath ^java.io.File dest))))
+      (copy-dir source dest))
     (throw
       (ex-info "Missing engine to copy to isolation dir"
                {:engine-version engine-version}))))

@@ -55,7 +55,7 @@
 (def download-window-width 1600)
 (def download-window-height 800)
 
-(def battle-window-width 1600)
+(def battle-window-width 1920)
 (def battle-window-height 800)
 
 (def start-pos-r 10.0)
@@ -73,7 +73,7 @@
 
 ; https://stackoverflow.com/a/23592006/984393
 (defmethod print-method java.io.File [f w]
-  (.write w (str "#spring-lobby/java.io.File \"" (.getAbsolutePath f) "\"")))
+  (.write w (str "#spring-lobby/java.io.File \"" (fs/absolute-path f) "\"")))
 
 
 (defn slurp-app-edn
@@ -82,13 +82,23 @@
   (try
     (let [config-file (io/file (fs/app-root) edn-filename)]
       (when (.exists config-file)
-        (->> config-file slurp (edn/read-string custom-readers))))
+        (->> config-file slurp (edn/read-string {:readers custom-readers}))))
     (catch Exception e
       (log/warn e "Exception loading app edn file" edn-filename))))
 
 
+(def priority-overrides
+  {::update-engine 4
+   ::update-map 4
+   ::update-mod 4})
+
+(defn task-priority [{::keys [task-priority task-type]}]
+  (or task-priority
+      (get priority-overrides task-type)
+      3))
+
 (defn initial-tasks []
-  (pq/priority-queue (constantly 1) :variant :set))
+  (pq/priority-queue task-priority :variant :set))
 
 (defn initial-file-events []
   (clojure.lang.PersistentQueue/EMPTY))
@@ -432,6 +442,37 @@
     (log/warn "Attempt to add nil task" task)))
 
 
+(defn update-file-cache!
+  "Updates the file cache in state for this file. This is so that we don't need to do IO in render,
+  and any updates to file statuses here can now cause UI redraws, which is good."
+  [& fs]
+  (let [statuses (for [f fs]
+                   (let [f (if (string? f)
+                             (io/file f)
+                             f)]
+                     (if f
+                       {:absolute-path (fs/absolute-path f)
+                        :exists (.exists f)
+                        :is-directory (.isDirectory f)}
+                       (log/warn "Attempt to update file cache for nil file"))))
+        status-by-path (->> statuses
+                            (filter some?)
+                            (map (juxt :absolute-path identity))
+                            (into {}))]
+    (swap! *state update :file-cache merge status-by-path)
+    status-by-path))
+
+(defn file-status [file-cache f]
+  (when f
+    (let [path (if (string? f)
+                 f
+                 (fs/absolute-path f))]
+      (get file-cache path))))
+
+(defn file-exists? [file-cache f]
+  (boolean (:exists (file-status file-cache f))))
+
+
 (def import-sources
   [{:import-source-name "Spring"
     :file (fs/spring-root)}
@@ -532,8 +573,8 @@
    (let [before (u/curr-millis)
          engine-dirs (fs/engine-dirs)
          known-absolute-paths (->> state-atom deref :engines (map :absolute-path) (filter some?) set)
-         to-add (remove (comp known-absolute-paths #(.getAbsolutePath ^java.io.File %)) engine-dirs)
-         absolute-path-set (set (map #(.getAbsolutePath ^java.io.File %) engine-dirs))
+         to-add (remove (comp known-absolute-paths fs/absolute-path) engine-dirs)
+         absolute-path-set (set (map fs/absolute-path engine-dirs))
          missing-files (set
                          (concat
                            (->> known-absolute-paths
@@ -543,6 +584,7 @@
          to-remove (set
                      (concat missing-files
                              (remove absolute-path-set known-absolute-paths)))]
+     (apply update-file-cache! known-absolute-paths)
      (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
      (doseq [engine-dir to-add]
        (log/info "Detecting engine data for" engine-dir)
@@ -591,8 +633,8 @@
         sdp-files (rapid/sdp-files)
         _ (log/info "Found" (count mod-files) "files and"
                     (count sdp-files) "rapid archives to scan for mods")
-        to-add-file (remove (comp known-file-paths #(.getAbsolutePath ^java.io.File %)) mod-files)
-        to-add-rapid (remove (comp known-rapid-paths #(.getAbsolutePath ^java.io.File %)) sdp-files)
+        to-add-file (remove (comp known-file-paths fs/absolute-path) mod-files)
+        to-add-rapid (remove (comp known-rapid-paths fs/absolute-path) sdp-files)
         all-paths (filter some? (concat known-file-paths known-rapid-paths))
         missing-files (set
                         (concat
@@ -600,6 +642,7 @@
                                (remove (comp #(.exists ^java.io.File %) io/file)))
                           (->> all-paths
                                (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))]
+    (apply update-file-cache! all-paths)
     (when-not (.exists mods-cache-root)
       (.mkdirs mods-cache-root))
     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
@@ -634,6 +677,7 @@
         missing-filenames (->> known-filenames
                                (remove (comp #(.exists ^java.io.File %) fs/map-file))
                                set)]
+    (apply update-file-cache! map-files)
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (when-not (.exists maps-cache-root)
       (.mkdirs maps-cache-root))
@@ -1815,19 +1859,52 @@
          issues))}))
 
 
+(defn update-copying [f copying]
+  (if f
+    (swap! *state update-in [:copying (fs/absolute-path f)] merge copying)
+    (log/warn "Attempt to update copying for nil file")))
+
+(defmethod event-handler ::add-task [{:keys [task]}]
+  (add-task! *state task))
+
+(defn resource-dest [{:keys [resource-name resource-file resource-type]}]
+  (case resource-type
+    ::engine (io/file (fs/engines-dir) resource-name)
+    ::mod (io/file (fs/mod-file (.getName resource-file))) ; TODO mod format types
+    ::map (io/file (fs/map-file (.getName resource-file))))) ; TODO mod format types
+
+(defmethod task-handler ::import [{:keys [importable]}]
+  (let [{:keys [resource-file]} importable
+        source resource-file
+        dest (resource-dest importable)]
+    (update-copying source {:status true})
+    (update-copying dest {:status true})
+    (try
+      (if (.isDirectory source) ; TODO replace with one fn to do both in fs
+        (spring/copy-dir source dest)
+        (spring/java-nio-copy source dest))
+      (log/info "Finished importing" importable "from" source "to" dest)
+      (catch Exception e
+        (log/error e "Error importing" importable))
+      (finally
+        (update-copying source {:status false})
+        (update-copying dest {:status false})
+        (update-file-cache! source)
+        (update-file-cache! dest))))) ; TODO atomic?
+
 (defmethod event-handler ::copy-file
   [{:keys [source dest] :as e}]
   (if source
     (do
       (log/info "Copying from" source "to" dest)
-      (swap! *state assoc-in [:copying (.getAbsolutePath source)] {:status true})
+      (swap! *state assoc-in [:copying (fs/absolute-path source)] {:status true})
       (future
         (try
           (spring/java-nio-copy source dest) ; TODO move to fs
           (catch Exception e
             (log/error e "Error copying from" source "to" dest))
           (finally
-            (swap! *state assoc-in [:copying (.getAbsolutePath source)] {:status false})))))
+            (swap! *state assoc-in [:copying (fs/absolute-path source)] {:status false})))))
     (log/warn "No source to copy for event" e)))
 
 (defmethod event-handler ::copy-map ; TODO duplicate of ::copy-file ?
@@ -1842,20 +1919,6 @@
       (finally
         (swap! *state assoc-in [:copying map-filename] {:status false})))))
 
-(defmethod event-handler ::import-map ; TODO duplicate of ::copy-file ?
-  [{:keys [source dest]}]
-  (when source
-    (let [filename (.getName source)
-          dest (or dest (fs/map-file filename))]
-      (log/info "Importing map" filename "from" source "to" dest)
-      (swap! *state assoc-in [:copying filename] {:status true})
-      (future
-        (try
-          (spring/java-nio-copy source dest)
-          (catch Exception e
-            (log/error e "Error importing map" filename "from" source "to" dest))
-          (finally
-            (swap! *state assoc-in [:copying filename] {:status false})))))))
 
 (defmethod event-handler ::copy-mod ; TODO duplicate of ::copy-file ?
   [{:keys [mod-details engine-version]}]
@@ -2428,9 +2491,17 @@
      ;(filter (comp #{::map} :resource-type))
      (filter (comp #{"Claymore_v2"} :resource-name)))
 
+(def battle-view-keys
+  [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
+   :bot-username :bot-version :cleaning :copying :drag-team :engine-version
+   :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
+   :isolation-type
+   :map-input-prefix :maps :minimap-type :mods :rapid-data-by-version
+   :rapid-download :username :users])
+
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           copying drag-team engines extracting git-clone gitting http-download importables-by-path
+           copying drag-team engines extracting file-cache git-clone gitting http-download importables-by-path
            isolation-type
            map-input-prefix maps minimap-type rapid-data-by-version rapid-download users username]
     :as state}]
@@ -2579,8 +2650,7 @@
                          :in-progress in-progress
                          :action {:event/type ::download-map
                                   :map-name battle-map}}])
-                     (when (and map-download-file
-                                (.exists map-download-file) ; FIXME IO IN RENDER
+                     (when (and (file-exists? file-cache map-download-file)
                                 (not battle-map-details))
                        (let [in-progress (-> copying (get map-filename) :status)]
                          [{:severity 2
@@ -2594,15 +2664,18 @@
                      (when (and (not battle-map-details)
                                 importable)
                        (when-let [resource-file (:resource-file importable)]
-                         (let [absolute-path (.getAbsolutePath resource-file)]
+                         (let [absolute-path (fs/absolute-path resource-file)]
                            [{:severity 2
                              :text "import"
                              :human-text (str "Import from " (:import-source-name importable))
                              :tooltip (str "Copy map archive from " absolute-path)
                              :in-progress (-> copying (get absolute-path) :status)
-                             :action {:event/type ::copy-file
-                                      :source resource-file
-                                      :dest (fs/map-file (.getName resource-file))}}])))))})
+                             :action
+                             (when-not (file-exists? file-cache (resource-dest importable))
+                               {:event/type ::add-task
+                                :task
+                                {::task-type ::import
+                                 :importable importable}})}])))))})
               (let [absolute-path (:absolute-path battle-mod-details)
                     mod-file (when absolute-path (io/file absolute-path))]
                 {:fx/type resource-sync-pane
@@ -2653,7 +2726,7 @@
                                     :dest (fs/mod-file (.getName resource-file))}}])))
                    (when (and (not battle-mod-details) mod-file)
                      (let [in-progress (-> copying (get (:filename battle-mod-details)) :status)]
-                       [{:severity (if (and (.exists mod-file)
+                       [{:severity (if (and (file-exists? file-cache mod-file)
                                             (not in-progress))
                                      0 1)
                          :text "copy"
@@ -2693,23 +2766,26 @@
                                :file (or engine-dir-file
                                          (fs/engines-dir))}
                :issues
-               (if (and (not (.exists engine-download-file)) ; FIXME IO IN RENDER
-                        (or (not engine-dir-file)
-                            (not (.exists engine-dir-file)))) ; FIXME IO IN RENDER
+               (if (and (not (file-exists? file-cache engine-download-file))
+                        (not (file-exists? file-cache engine-dir-file)))
                  (if-let [importable (some->> importables-by-path
                                               vals
                                               (filter (comp #{::engine} :resource-type))
                                               (filter (comp #{engine-version} :resource-name))
                                               first)]
-                   (let [resource-file (:resource-file importable)]
+                   (let [resource-file (:resource-file importable)
+                         resource-path (fs/absolute-path resource-file)]
                      [{:severity 2
                        :text "import"
                        :human-text (str "Import from" resource-file)
                        :tooltip (str "Copy engine dir from" (:import-source-name importable)
                                      " at " resource-file)
-                       :in-progress (get copying resource-file)
-                       :action {:event/type ::import-engine ; TODO just ::import ?
-                                :importable importable}}])
+                       :in-progress (-> copying (get resource-path) :status)
+                       :action
+                       {:event/type ::add-task
+                        :task
+                        {:event/type ::import
+                         :importable importable}}}])
                    (let [url (http/engine-url engine-version)
                          download (get http-download url)
                          in-progress (:running download)
@@ -2724,9 +2800,8 @@
                        :action {:event/type ::http-download
                                 :url url
                                 :dest download-file}}]))
-                 (let [severity (if (and engine-dir-file
-                                         (.exists engine-dir-file))
-                                  0 2)] ; FIXME IO IN RENDER
+                 (let [severity (if (file-exists? file-cache engine-dir-file)
+                                  0 2)]
                    [{:severity severity
                      :text "extract"
                      :in-progress (get extracting engine-download-file)
@@ -3160,7 +3235,7 @@
   (future
     (try
       (let [pr-downloader-file (io/file (fs/spring-root) "engine" engine-dir-filename (fs/executable "pr-downloader"))
-            command [(.getAbsolutePath pr-downloader-file)
+            command [(fs/absolute-path pr-downloader-file)
                      "--filesystem-writepath" (fs/wslpath (fs/spring-root))
                      "--rapid-download" rapid-id]
             runtime (Runtime/getRuntime)]
@@ -3345,6 +3420,9 @@
         (swap! *state assoc-in [:extracting file] false)))))
 
 
+(def resource-types
+  [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
+
 (defn import-type [t source f]
   {:resource-file f
    :resource-type t
@@ -3358,7 +3436,7 @@
                         ::mod (:mod-name (read-mod-data resource-file))
                         ::engine (:engine-version (fs/engine-data resource-file))
                         ::sdp (:mod-name (read-mod-data resource-file)))]
-    (swap! *state update-in [:importables-by-path (.getAbsolutePath resource-file)]
+    (swap! *state update-in [:importables-by-path (fs/absolute-path resource-file)]
            assoc :resource-name resource-name
            :resource-updated (u/curr-millis))
     resource-name))
@@ -3378,7 +3456,7 @@
                       (map (partial import-type ::mod import-source-name) (concat mod-files sdp-files))
                       (map (partial import-type ::engine import-source-name) engine-dirs))
         importables-by-path (->> importables
-                                 (map (juxt #(.getAbsolutePath (:resource-file %)) identity))
+                                 (map (juxt (comp fs/absolute-path :resource-file) identity))
                                  (into {}))]
     (log/info "Found imports" {:map-files (count map-files)
                                :mod-files (count mod-files)
@@ -3397,10 +3475,30 @@
   [{:keys [file import-source-name]}]
   {:text (str import-source-name
               (when file
-                (str " ( at " (.getAbsolutePath file) " )")))})
+                (str " ( at " (fs/absolute-path file) " )")))})
+
+(defn import-type-cell
+  [import-type]
+  {:text (if import-type
+           (name import-type)
+           " < nil > ")})
+
+(defmethod event-handler ::assoc
+  [{:fx/keys [event] :as e}]
+  (swap! *state assoc (:key e) event))
+
+(defmethod event-handler ::assoc-in
+  [{:fx/keys [event] :keys [path]}]
+  (swap! *state assoc-in path event))
+
+(defmethod event-handler ::dissoc
+  [e]
+  (swap! *state dissoc (:key e)))
+
 
 (defn import-window
-  [{:keys [import-source-name importables-by-path show-importer]}]
+  [{:keys [copying file-cache import-filter import-type import-source-name importables-by-path
+           show-importer]}]
   (let [import-source (->> import-sources
                            (filter (comp #{import-source-name} :import-source-name))
                            first)]
@@ -3426,7 +3524,7 @@
          :children
          (concat
            [{:fx/type :label
-             :text " Import from: "}
+             :text " Filter source: "}
             {:fx/type :combo-box
              :value import-source
              :items import-sources
@@ -3445,6 +3543,19 @@
                {:tooltip
                 {:fx/type :tooltip
                  :show-delay [10 :ms]
+                 :text "Clear source filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :import-source-name}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
                  :text "Open import source directory"}}
                :desc
                {:fx/type :button
@@ -3453,17 +3564,93 @@
                 :graphic
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-folder:16:white"}}}]))}
+        {:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         (concat
+           [{:fx/type :label
+             :text " Filter: "}
+            {:fx/type :text-field
+             :text import-filter
+             :prompt-text "Filter by name or path"
+             :on-text-changed {:event/type ::assoc
+                               :key :import-filter}}]
+           (when import-filter
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Clear filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :import-filter}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}])
+           [{:fx/type :label
+             :text " Filter type: "}
+            {:fx/type :combo-box
+             :value import-type
+             :items resource-types
+             :button-cell import-type-cell
+             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :cell-factory
+             {:fx/cell-type :list-cell
+              :describe import-type-cell}
+             :on-value-changed {:event/type ::assoc
+                                :key :import-type}
+             :tooltip {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text "Choose import type"}}]
+           (when import-type
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Clear type filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :import-type}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}]))}
         {:fx/type :table-view
          :column-resize-policy :constrained ; TODO auto resize
          :v-box/vgrow :always
-         :items (or (vals importables-by-path) [])
+         :items (->> (or (vals importables-by-path) [])
+                     (filter (fn [importable]
+                               (if import-source-name
+                                 (= import-source-name (:import-source-name importable))
+                                 true)))
+                     (filter (fn [{:keys [resource-name]}]
+                               (if import-filter
+                                 (and resource-name
+                                      (string/includes?
+                                        (string/lower-case resource-name)
+                                        (string/lower-case import-filter)))
+                                 true)))
+                     (filter (fn [{:keys [resource-type]}]
+                               (if import-type
+                                 (= import-type resource-type)
+                                 true))))
          :columns
          [{:fx/type :table-column
+           :text "Source"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:import-source-name i))})}}
+          {:fx/type :table-column
            :text "Type"
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:resource-type i))})}}
+            :describe (comp import-type-cell :resource-type)}}
           {:fx/type :table-column
            :text "Name"
            :cell-value-factory identity
@@ -3481,7 +3668,30 @@
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [_i] {:text "TODO Import buttons"})}}]}]}}}))
+            :describe
+            (fn [importable]
+              (let [source-path (some-> importable :resource-file fs/absolute-path)
+                    dest-path (some-> importable resource-dest fs/absolute-path)
+                    disable (boolean
+                              (or (-> copying (get source-path) :status) ; TODO standard fn
+                                  (file-exists? file-cache source-path)
+                                  (-> copying (get dest-path) :status) ; TODO standard fn
+                                  (file-exists? file-cache dest-path)))]
+                {:text ""
+                 :graphic
+                 {:fx/type :button
+                  :disable disable
+                  :tooltip
+                  {:fx/type :tooltip
+                   :show-delay [10 :ms]
+                   :text (str "Copy to " dest-path)}
+                  :on-action {:event/type ::add-task
+                              :task
+                              {::task-type ::import
+                               :importable importable}}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-content-copy:16:white"}}}))}}]}]}}}))
 
 
 (defn rapid-download-window
@@ -3617,7 +3827,7 @@
 
 
 (defn http-download-window
-  [{:keys [engine-branch engine-versions-cached engines extracting http-download map-files-cache
+  [{:keys [engine-branch engine-versions-cached engines extracting file-cache http-download map-files-cache
            maps-index-url mod-files-cache mods-index-url show-http-downloader]}]
   (let [engine-branches http/engine-branches]
     {:fx/type :stage
@@ -3709,9 +3919,7 @@
                     {:text (str (:message download))
                      :style {:-fx-font-family "monospace"}}
                     (cond
-                      (not dest)
-                      nil
-                      (.exists dest)
+                      (file-exists? file-cache dest)
                       {:graphic
                        (if (some #{engine-version} (map :engine-version engines))
                          {:fx/type font-icon/lifecycle
@@ -3729,8 +3937,7 @@
                           :graphic
                           {:fx/type font-icon/lifecycle
                            :icon-literal "mdi-package-variant:16:white"}})}
-                      (:running download)
-                      nil
+                      (:running download) nil
                       :else
                       {:graphic
                        {:fx/type :button
@@ -3807,9 +4014,8 @@
                   {:text (str (:message download))
                    :style {:-fx-font-family "monospace"}}
                   (cond
-                    (or (not (:size i)) (= "-" (string/trim (:size i))))
-                    nil
-                    (.exists dest)
+                    (or (not (:size i)) (= "-" (string/trim (:size i)))) nil
+                    (file-exists? file-cache dest)
                     {:graphic
                      {:fx/type font-icon/lifecycle
                       :icon-literal "mdi-check:16:white"}}
@@ -3891,12 +4097,11 @@
                     {:text (str (:message download))
                      :style {:-fx-font-family "monospace"}}
                     (cond
-                      (.exists dest)
+                      (and (not (:running download))
+                           (file-exists? file-cache dest))
                       {:graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-check:16:white"}}
-                      (:running download)
-                      nil
                       :else
                       {:graphic
                        {:fx/type :button
@@ -4037,13 +4242,7 @@
                 (when (not pop-out-battle)
                   [(merge
                      {:fx/type battle-view}
-                     (select-keys state
-                       [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-                        :bot-username :bot-version :cleaning :copying :drag-team :engine-version
-                        :engines :extracting :git-clone :gitting :http-download :importables-by-path
-                        :isolation-type
-                        :map-input-prefix :maps :minimap-type :mods :rapid-data-by-version
-                        :rapid-download :username :users]))])
+                     (select-keys state battle-view-keys))])
                 [{:fx/type :h-box
                   :alignment :top-left
                   :children
@@ -4072,6 +4271,8 @@
           :on-close-request (fn [& args]
                               (log/debug args)
                               (swap! *state assoc :pop-out-battle false))
+          :x 300
+          :y 300
           :width battle-window-width
           :height battle-window-height
           :scene
@@ -4080,18 +4281,13 @@
            :root
            (merge
              {:fx/type battle-view}
-             (select-keys state
-               [:battles :battle :users :username :engine-version
-                :bot-username :bot-name :bot-version :maps :engines
-                :map-input-prefix :mods :drag-team
-                :copying :archiving :cleaning :battle-map-details
-                :minimap-type :http-download :extracting
-                :rapid-data-by-version :rapid-download :git-clone]))}}])
+             (select-keys state battle-view-keys))}}])
       (when show-importer
         [(merge
            {:fx/type import-window}
            (select-keys state
-             [:import-source-name :importables-by-path :show-importer]))])
+             [:copying :file-cache :import-filter :import-source-name :import-type
+              :importables-by-path :show-importer]))])
       (when show-rapid-downloader
         [(merge
            {:fx/type rapid-download-window}
@@ -4102,7 +4298,7 @@
         [(merge
            {:fx/type http-download-window}
            (select-keys state
-             [:engine-branch :engine-versions-cached :engines :extracting :http-download :map-files-cache
+             [:engine-branch :engine-versions-cached :engines :extracting :file-cache :http-download :map-files-cache
               :maps-index-url :mod-files-cache :mods-index-url :show-http-downloader]))]))}})
 
 

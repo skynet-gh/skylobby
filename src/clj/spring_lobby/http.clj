@@ -219,7 +219,8 @@
     (->> (springlauncher-links)
          (filter (comp #(clojure.string/starts-with? % "engines/")))
          (remove #{"engines/"})
-         (filter (comp #(clojure.string/ends-with? % engine-archive)))
+         (filter (comp #(and % engine-archive
+                             (clojure.string/ends-with? % engine-archive))))
          first
          (str springlauncher-root "/"))))
 

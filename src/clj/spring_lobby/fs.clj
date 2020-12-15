@@ -33,6 +33,11 @@
 (def maps-filename "maps.edn")
 
 
+(defn absolute-path [^java.io.File f]
+  (when f
+    (.getAbsolutePath f)))
+
+
 (defn os-name []
   (System/getProperty "os.name"))
 
