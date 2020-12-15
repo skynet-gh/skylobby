@@ -112,6 +112,7 @@
     (slurp-app-edn "mods.edn")
     (slurp-app-edn "download.edn")
     (slurp-app-edn "importables.edn")
+    (slurp-app-edn "downloadables.edn")
     {:file-events (initial-file-events)
      :tasks (initial-tasks)
      :minimap-type "minimap"}))
@@ -175,6 +176,10 @@
 (defn select-importables [state]
   (select-keys state
     [:importables-by-path]))
+
+(defn select-downloadables [state]
+  (select-keys state
+    [:downloadables-by-url]))
 
 
 (defn safe-read-map-cache [map-name]
@@ -287,6 +292,7 @@
   (remove-watch state-atom :mods)
   (remove-watch state-atom :download)
   (remove-watch state-atom :importables)
+  (remove-watch state-atom :downloadables)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
@@ -296,6 +302,7 @@
   (add-watch-state-to-edn state-atom :mods select-mods "mods.edn")
   (add-watch-state-to-edn state-atom :download select-download "download.edn")
   (add-watch-state-to-edn state-atom :importables select-importables "importables.edn")
+  (add-watch-state-to-edn state-atom :downloadables select-downloadables "downloadables.edn")
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (try
@@ -595,9 +602,10 @@
      (log/debug "Removing" (count to-remove) "engines")
      (swap! state-atom update :engines
             (fn [engines]
-              (set (remove
-                     (comp to-remove :absolute-path)
-                     engines))))
+              (->> engines
+                   (filter :absolute-path)
+                   (remove (comp to-remove :absolute-path))
+                   set)))
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 
@@ -1229,6 +1237,9 @@
 (defmethod event-handler ::show-importer [_e]
   (swap! *state assoc :show-importer true))
 
+(defmethod event-handler ::show-downloader [_e]
+  (swap! *state assoc :show-downloader true))
+
 (defn battles-buttons
   [{:keys [battle battles battle-password battle-title client engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle]
@@ -1254,6 +1265,18 @@
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal (str "mdi-file-import:16:white")}}}
+      {:fx/type fx.ext.node/with-tooltip-props
+       :props
+       {:tooltip
+        {:fx/type :tooltip
+         :show-delay [10 :ms]
+         :text "Download resources from various websites"}}
+       :desc
+       {:fx/type :button
+        :on-action {:event/type ::show-downloader}
+        :graphic
+        {:fx/type font-icon/lifecycle
+         :icon-literal (str "mdi-download:16:white")}}}
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -1867,11 +1890,13 @@
 (defmethod event-handler ::add-task [{:keys [task]}]
   (add-task! *state task))
 
-(defn resource-dest [{:keys [resource-name resource-file resource-type]}]
-  (case resource-type
-    ::engine (io/file (fs/engines-dir) resource-name)
-    ::mod (io/file (fs/mod-file (.getName resource-file))) ; TODO mod format types
-    ::map (io/file (fs/map-file (.getName resource-file))))) ; TODO mod format types
+(defn resource-dest [{:keys [resource-filename resource-name resource-file resource-type]}]
+  (let [filename (or resource-filename
+                     (when resource-file (.getName resource-file)))]
+    (case resource-type
+      ::engine (when resource-name (io/file (fs/engines-dir) resource-name))
+      ::mod (when filename (io/file (fs/mod-file filename))) ; TODO mod format types
+      ::map (when filename (io/file (fs/map-file filename)))))) ; TODO mod format types
 
 (defmethod task-handler ::import [{:keys [importable]}]
   (let [{:keys [resource-file]} importable
@@ -1943,6 +1968,7 @@
         (git/fetch (io/file absolute-path))
         (git/reset-hard (io/file absolute-path) battle-mod-git-ref)
         (reconcile-mods *state)
+        (force-update-battle-mod *state)
         (catch Exception e
           (log/error e "Error during git reset" absolute-path "to" battle-mod-git-ref))
         (finally
@@ -3467,6 +3493,34 @@
       (add-task! *state {::task-type ::update-importable
                          :importable importable}))))
 
+
+#_
+(defn html-resources [{:keys [url download-source-name]}]
+  (let [parsed (html/parse url)
+        links (http/links parsed)]
+    (http/html-downloadables url download-source-name links)))
+
+(def download-sources
+  [{:download-source-name "SpringFiles Maps"
+    :url http/springfiles-maps-url
+    :resources-fn http/html-downloadables}
+   {:download-source-name "SpringFightClub Maps"
+    :url (str http/springfightclub-root "/maps")
+    :resources-fn http/html-downloadables}])
+
+
+(defmethod task-handler ::update-downloadables
+  [{:keys [resources-fn url download-source-name] :as source}]
+  (log/info "Getting resources for possible download from" download-source-name "at" url)
+  (let [downloadables (resources-fn source)
+        downloadables-by-url (->> downloadables
+                                  (map (juxt :download-url identity))
+                                  (into {}))]
+    (log/info "Found downloadables from" download-source-name "at" url
+              (frequencies (map :resource-type downloadables)))
+    (swap! *state update :downloadables-by-url merge downloadables-by-url)))
+
+
 (defmethod event-handler ::import-source-change
   [{:fx/keys [event]}]
   (swap! *state assoc :import-source-name (:import-source-name event)))
@@ -3576,7 +3630,7 @@
              :prompt-text "Filter by name or path"
              :on-text-changed {:event/type ::assoc
                                :key :import-filter}}]
-           (when import-filter
+           (when-not (string/blank? import-filter)
              [{:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
@@ -3627,12 +3681,17 @@
                                (if import-source-name
                                  (= import-source-name (:import-source-name importable))
                                  true)))
-                     (filter (fn [{:keys [resource-name]}]
-                               (if import-filter
-                                 (and resource-name
-                                      (string/includes?
-                                        (string/lower-case resource-name)
-                                        (string/lower-case import-filter)))
+                     (filter (fn [{:keys [resource-file resource-name]}]
+                               (if-not (string/blank? import-filter)
+                                 (let [path (fs/absolute-path resource-file)]
+                                   (or (and path
+                                            (string/includes?
+                                              (string/lower-case path)
+                                              (string/lower-case import-filter)))
+                                       (and resource-name
+                                            (string/includes?
+                                              (string/lower-case resource-name)
+                                              (string/lower-case import-filter)))))
                                  true)))
                      (filter (fn [{:keys [resource-type]}]
                                (if import-type
@@ -3692,6 +3751,219 @@
                   :graphic
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-content-copy:16:white"}}}))}}]}]}}}))
+
+
+(defmethod event-handler ::download-source-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :download-source-name (:download-source-name event)))
+
+(defn download-source-cell
+  [{:keys [url download-source-name]}]
+  {:text (str download-source-name " ( at " url " )")})
+
+(defn download-window
+  [{:keys [downloading file-cache download-filter download-type download-source-name downloadables-by-url
+           show-downloader]}]
+  (let [download-source (->> download-sources
+                             (filter (comp #{download-source-name} :download-source-name))
+                             first)]
+    {:fx/type :stage
+     :x 400
+     :y 400
+     :showing show-downloader
+     :title "alt-spring-lobby Downloader"
+     :on-close-request (fn [& args]
+                         (log/debug args)
+                         (swap! *state assoc :show-downloader false))
+     :width download-window-width
+     :height download-window-height
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
+       :children
+       [{:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         (concat
+           [{:fx/type :label
+             :text " Filter source: "}
+            {:fx/type :combo-box
+             :value download-source
+             :items download-sources
+             :button-cell download-source-cell
+             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :cell-factory
+             {:fx/cell-type :list-cell
+              :describe download-source-cell}
+             :on-value-changed {:event/type ::download-source-change}
+             :tooltip {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text "Choose download source"}}]
+           (when download-source
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Clear source filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :download-source-name}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Open download source url"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::desktop-open-url
+                            :url (:url download-source)}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-web:16:white"}}}]))}
+        {:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         (concat
+           [{:fx/type :label
+             :text " Filter: "}
+            {:fx/type :text-field
+             :text download-filter
+             :prompt-text "Filter by name or path"
+             :on-text-changed {:event/type ::assoc
+                               :key :download-filter}}]
+           (when-not (string/blank? download-filter)
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Clear filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :download-filter}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}])
+           [{:fx/type :label
+             :text " Filter type: "}
+            {:fx/type :combo-box
+             :value download-type
+             :items resource-types
+             :button-cell import-type-cell
+             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :cell-factory
+             {:fx/cell-type :list-cell
+              :describe import-type-cell}
+             :on-value-changed {:event/type ::assoc
+                                :key :download-type}
+             :tooltip {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text "Choose download type"}}]
+           (when download-type
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Clear type filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :download-type}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}]))}
+        {:fx/type :table-view
+         :column-resize-policy :constrained ; TODO auto resize
+         :v-box/vgrow :always
+         :items (->> (or (vals downloadables-by-url) [])
+                     (filter (fn [downloadable]
+                               (if download-source-name
+                                 (= download-source-name (:download-source-name downloadable))
+                                 true)))
+                     (filter (fn [{:keys [resource-filename resource-name]}]
+                               (if download-filter
+                                 (or (and resource-filename
+                                          (string/includes?
+                                            (string/lower-case resource-filename)
+                                            (string/lower-case download-filter)))
+                                     (and resource-name
+                                          (string/includes?
+                                            (string/lower-case resource-name)
+                                            (string/lower-case download-filter))))
+                                 true)))
+                     (filter (fn [{:keys [resource-type]}]
+                               (if download-type
+                                 (= download-type resource-type)
+                                 true))))
+         :columns
+         [{:fx/type :table-column
+           :text "Source"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:download-source-name i))})}}
+          {:fx/type :table-column
+           :text "Type"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (comp import-type-cell :resource-type)}}
+          {:fx/type :table-column
+           :text "Name"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:resource-name i))})}}
+          {:fx/type :table-column
+           :text "File"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:resource-filename i))})}}
+          {:fx/type :table-column
+           :text "URL"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe (fn [i] {:text (str (:download-url i))})}}
+          {:fx/type :table-column
+           :text "Download"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [{:keys [download-url] :as downloadable}]
+              (let [dest-path (some-> downloadable resource-dest fs/absolute-path)
+                    disable (boolean
+                              (or (-> downloading (get download-url) :status) ; TODO standard fn
+                                  (file-exists? file-cache dest-path)))]
+                {:text ""
+                 :graphic
+                 {:fx/type :button
+                  :disable disable
+                  :tooltip
+                  {:fx/type :tooltip
+                   :show-delay [10 :ms]
+                   :text (str "Download to " dest-path)}
+                  :on-action {:event/type ::add-task
+                              :task
+                              {::task-type ::download
+                               :downloadable downloadable}}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-download:16:white"}}}))}}]}]}}}))
 
 
 (defn rapid-download-window
@@ -4122,6 +4394,11 @@
     (add-task! *state (merge
                         {::task-type ::scan-imports}
                         import-source)))
+  #_
+  (doseq [download-source download-sources]
+    (add-task! *state (merge
+                        {::task-type ::update-downloadables}
+                        download-source)))
   (add-task! *state {::task-type ::reconcile-engines})
   (add-task! *state {::task-type ::reconcile-mods})
   (add-task! *state {::task-type ::reconcile-maps})
@@ -4175,8 +4452,8 @@
           (System/exit 0))))))
 
 (defn root-view
-  [{{:keys [battle battles file-events last-failed-message pop-out-battle show-http-downloader
-            show-importer show-rapid-downloader standalone tasks users]
+  [{{:keys [battle battles file-events last-failed-message pop-out-battle show-downloader
+            show-http-downloader show-importer show-rapid-downloader standalone tasks users]
      :as state}
     :state}]
   {:fx/type fx/ext-on-instance-lifecycle
@@ -4288,6 +4565,12 @@
            (select-keys state
              [:copying :file-cache :import-filter :import-source-name :import-type
               :importables-by-path :show-importer]))])
+      (when show-downloader
+        [(merge
+           {:fx/type download-window}
+           (select-keys state
+             [:downloading :download-filter :download-source-name :download-type
+              :downloadables-by-url :file-cache :show-downloader]))])
       (when show-rapid-downloader
         [(merge
            {:fx/type rapid-download-window}

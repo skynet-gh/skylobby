@@ -7,6 +7,7 @@
     [clojure.xml :as xml]
     [crouton.html :as html]
     [spring-lobby.fs :as fs]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log]))
 
 
@@ -233,3 +234,31 @@
 (defn engine-download-file [engine-version]
   (when engine-version
     (io/file (fs/download-dir) "engine" (engine-archive engine-version))))
+
+
+(defn spring-resource? [filename]
+  (and filename
+    (or (string/ends-with? filename ".sdz")
+        (string/ends-with? filename ".sd7"))))
+
+(defn resource-type [url]
+  (if (spring-resource? url)
+    :spring-lobby/map ; TODO
+    nil))
+
+(defn html-downloadables
+  [{:keys [url download-source-name]}]
+  (let [base-url url
+        now (u/curr-millis)]
+    (->> base-url
+         html/parse
+         files
+         (map
+           (fn [{:keys [filename url date size]}]
+             {:download-url (str base-url "/" url)
+              :download-source-name download-source-name
+              :resource-filename filename
+              :resource-type (resource-type url)
+              :resource-size size
+              :resource-date date
+              :resource-updated now})))))
