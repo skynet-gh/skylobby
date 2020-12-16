@@ -266,26 +266,6 @@
 (mod-name-sans-git "Beyond All Reason $VERSION")
 
 
-(defn force-update-battle-mod
-  ([]
-   (force-update-battle-mod *state))
-  ([state-atom]
-   (let [{:keys [battle battles mods]} @state-atom
-         battle-id (:battle-id battle)
-         battle-modname (-> battles (get battle-id) :battle-modname)
-         _ (log/debug "Force updating battle mod details for" battle-modname)
-         battle-modname-sans-git (mod-name-sans-git battle-modname)
-         mod-name-set (set [battle-modname battle-modname-sans-git])
-         filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
-         mod-details (some->> mods
-                              (filter filter-fn)
-                              first
-                              :absolute-path
-                              io/file
-                              read-mod-data)]
-     (swap! *state assoc :battle-mod-details mod-details)
-     mod-details)))
-
 (defn select-debug [state]
   (select-keys state [:pop-out-battle]))
 
@@ -358,13 +338,13 @@
                               (filter filter-fn)
                               first)))
             (log/debug "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-            (when-let [mod-details (some->> new-state
-                                            :mods
-                                            (filter filter-fn)
-                                            first
-                                            :absolute-path
-                                            io/file
-                                            read-mod-data)]
+            (let [mod-details (some->> new-state
+                                       :mods
+                                       (filter filter-fn)
+                                       first
+                                       :absolute-path
+                                       io/file
+                                       read-mod-data)]
               (swap! *state assoc :battle-mod-details mod-details))))
         (catch Exception e
           (log/error e "Error in :battle-map-details state watcher")))))
@@ -688,6 +668,26 @@
     {:to-add-file-count (count to-add-file)
      :to-add-rapid-count (count to-add-rapid)}))
 
+(defn force-update-battle-mod
+  ([]
+   (force-update-battle-mod *state))
+  ([state-atom]
+   (reconcile-mods state-atom)
+   (let [{:keys [battle battles mods]} @state-atom
+         battle-id (:battle-id battle)
+         battle-modname (-> battles (get battle-id) :battle-modname)
+         _ (log/debug "Force updating battle mod details for" battle-modname)
+         battle-modname-sans-git (mod-name-sans-git battle-modname)
+         mod-name-set (set [battle-modname battle-modname-sans-git])
+         filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+         mod-details (some->> mods
+                              (filter filter-fn)
+                              first
+                              :absolute-path
+                              io/file
+                              read-mod-data)]
+     (swap! *state assoc :battle-mod-details mod-details)
+     mod-details)))
 
 (def ^java.io.File maps-cache-root
   (io/file (fs/app-root) "maps-cache"))
@@ -1916,7 +1916,8 @@
     (case resource-type
       ::engine (when resource-name (io/file (fs/engines-dir) resource-name))
       ::mod (when filename (io/file (fs/mod-file filename))) ; TODO mod format types
-      ::map (when filename (io/file (fs/map-file filename)))))) ; TODO mod format types
+      ::map (when filename (io/file (fs/map-file filename))) ; TODO mod format types
+      nil)))
 
 (defmethod task-handler ::import [{:keys [importable]}]
   (let [{:keys [resource-file]} importable
@@ -2077,9 +2078,13 @@
         (swap! *state assoc-in [:git-clone repo-url :status] false)))))
 
 (defmethod event-handler ::download-mod
-  [{:keys [engine-dir-filename git-url mod-name rapid-id]}]
+  [{:keys [download-url engine-dir-filename git-url mod-name rapid-id]}]
   (cond
     rapid-id
+    (event-handler {:event/type ::rapid-download
+                    :engine-dir-filename engine-dir-filename
+                    :rapid-id rapid-id})
+    download-url
     (event-handler {:event/type ::rapid-download
                     :engine-dir-filename engine-dir-filename
                     :rapid-id rapid-id})
@@ -2537,9 +2542,61 @@
      ;(filter (comp #{::map} :resource-type))
      (filter (comp #{"Claymore_v2"} :resource-name)))
 
+(defn git-repo-url [battle-modname]
+  (cond
+    (string/starts-with? battle-modname "Beyond All Reason")
+    git/bar-repo-url
+    (string/starts-with? battle-modname "Balanced Annihilation")
+    git/ba-repo-url))
+
+(defn could-be-this-engine?
+  "Returns true if this downloadable item might be this engine, by magic, false otherwise."
+  [engine-version {:keys [resource-filename]}]
+  #p engine-version
+  (when (and engine-version resource-filename)
+    (= #p (http/engine-archive engine-version)
+       #p resource-filename)))
+
+#_
+(->> user/*state
+     deref
+     :downloadables-by-url
+     vals
+     (filter (comp #{::engine} :resource-type))
+     (filter (partial could-be-this-engine? "103.0"))
+     first)
+
+(defn normalize-mod [mod-name-or-filename]
+  (-> mod-name-or-filename
+      string/lower-case
+      (string/replace #"\s+" "_")
+      (string/replace #"-" "_")
+      (string/replace #"\.sd[7z]$" "")))
+
+#_
+(normalize-mod "Balanced Annihilation V9.79.4")
+#_
+(normalize-mod "balanced_annihilation-v9.79.4.sdz")
+
+(defn could-be-this-mod?
+  "Returns true if this downloadable item might be this mod, by magic, false otherwise."
+  [mod-name {:keys [resource-filename]}]
+  (when (and mod-name resource-filename)
+    (= (normalize-mod mod-name)
+       (normalize-mod resource-filename))))
+
+#_
+(->> user/*state
+     deref
+     :downloadables-by-url
+     vals
+     (filter (comp #{::mod} :resource-type))
+     (filter (partial could-be-this-mod? "Balanced Annihilation V9.79.4"))
+     first)
+
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-   :bot-username :bot-version :cleaning :copying :drag-team :engine-version
+   :bot-username :bot-version :cleaning :copying :downloadables-by-url :downloads :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :minimap-type :mods :rapid-data-by-version
@@ -2547,7 +2604,7 @@
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           copying drag-team engines extracting file-cache git-clone gitting http-download importables-by-path
+           copying downloadables-by-url drag-team engines extracting file-cache git-clone gitting http-download importables-by-path
            isolation-type
            map-input-prefix maps minimap-type rapid-data-by-version rapid-download users username]
     :as state}]
@@ -2691,7 +2748,7 @@
                                        (:map-name battle-map-details)
                                        (str "Download map " (:map-name battle-map-details))) ; TODO filename
                          :tooltip (if (zero? severity)
-                                    map-filename ; TODO map absolute path here
+                                    (:absolute-path battle-map-details)
                                     (str "Download from " url))
                          :in-progress in-progress
                          :action {:event/type ::download-map
@@ -2733,27 +2790,52 @@
                  :refresh-action {:event/type ::force-update-battle-mod}
                  :issues
                  (concat
-                   (let [git-url (cond
-                                   (string/starts-with? battle-modname "Beyond All Reason")
-                                   git/bar-repo-url
-                                   (string/starts-with? battle-modname "Balanced Annihilation")
-                                   git/ba-repo-url)
-                         rapid-id (:id (get rapid-data-by-version battle-modname))
-                         in-progress (or (-> rapid-download (get rapid-id) :running)
-                                         (-> git-clone (get git-url) :status))
-                         download-via :todo]
+                   (when-not battle-mod-details
+                     [{:severity 2
+                       :text "info"
+                       :human-text battle-modname
+                       :tooltip (str "Game '" battle-modname "' not found locally")}])
+                   (let [downloadable (->> downloadables-by-url
+                                           vals
+                                           (filter (comp #{::mod} :resource-type))
+                                           (filter (partial could-be-this-mod? battle-modname))
+                                           first)
+                         download-url (:download-url downloadable)
+                         in-progress (-> http-download (get download-url) :running)
+                         {:keys [download-source-name download-url]} downloadable]
+                     #p (->> downloadables-by-url
+                             vals
+                             (filter (comp #{::mod} :resource-type))
+                             first)
                      [{:severity (if battle-mod-details 0 2)
                        :text "download"
                        :human-text (if battle-mod-details
                                      (:mod-name battle-mod-details)
-                                     (str "Download using" download-via))
+                                     (if downloadable
+                                       (str "Download from " download-source-name)
+                                       (str "No download for " battle-modname)))
                        :in-progress in-progress
-                       :tooltip (str "Located at " absolute-path)
-                       :action {:event/type ::download-mod
-                                :mod-name battle-modname
-                                :rapid-id rapid-id
-                                :git-url git-url
-                                :engine-dir-filename (spring/engine-dir-filename engines engine-version)}}])
+                       :tooltip (if downloadable
+                                  (str "Download from " download-source-name " at " download-url)
+                                  (str "No http download found for " battle-modname))
+                       :action
+                       (when downloadable
+                         {:event/type ::http-downloadable
+                          :downloadable downloadable})}])
+                   (when-not battle-mod-details
+                     (when-let [rapid-id (:id (get rapid-data-by-version battle-modname))]
+                       (let [in-progress (-> rapid-download (get rapid-id) :running)]
+                         [{:severity 2
+                           :text "rapid"
+                           :human-text (str "Download rapid " rapid-id)
+                           :tooltip (str "Use rapid downloader to get resource id " rapid-id
+                                         " using engine " (:engine-version engine-details))
+                           :in-progress in-progress
+                           :action
+                           (when rapid-id
+                             {:event/type ::rapid-download
+                              :rapid-id rapid-id
+                              :engine-absolute-path (:absolute-path engine-details)})}])))
                    (when-not battle-mod-details
                      (when-let [importable (some->> importables-by-path
                                                     vals
@@ -2763,8 +2845,8 @@
                        (let [resource-file (:resource-file importable)]
                          [{:severity 2
                            :text "import"
-                           :human-text (str "Import from" resource-file)
-                           :tooltip (str "Copy game dir from" (:import-source-name importable)
+                           :human-text (str "Import from " (:import-source-name importable))
+                           :tooltip (str "Copy game from " (:import-source-name importable)
                                          " at " resource-file)
                            :in-progress (get copying resource-file)
                            :action {:event/type ::copy-file
@@ -2808,58 +2890,73 @@
                ;:delete-action {:event/type ::delete-engine
                ;                :engines engines
                ;                :engine-version engine-version
+               :refresh-action {:event/type ::reload-engines}
                :browse-action {:event/type ::desktop-browse-dir
                                :file (or engine-dir-file
                                          (fs/engines-dir))}
                :issues
-               (if (and (not (file-exists? file-cache engine-download-file))
-                        (not (file-exists? file-cache engine-dir-file)))
-                 (if-let [importable (some->> importables-by-path
-                                              vals
-                                              (filter (comp #{::engine} :resource-type))
-                                              (filter (comp #{engine-version} :resource-name))
-                                              first)]
-                   (let [resource-file (:resource-file importable)
-                         resource-path (fs/absolute-path resource-file)]
-                     [{:severity 2
-                       :text "import"
-                       :human-text (str "Import from" resource-file)
-                       :tooltip (str "Copy engine dir from" (:import-source-name importable)
-                                     " at " resource-file)
-                       :in-progress (-> copying (get resource-path) :status)
-                       :action
-                       {:event/type ::add-task
-                        :task
-                        {:event/type ::import
-                         :importable importable}}}])
-                   (let [url (http/engine-url engine-version)
-                         download (get http-download url)
-                         in-progress (:running download)
-                         text (or (when in-progress (:message download))
-                                  "download")
-                         download-file engine-download-file]
-                     [{:severity 2
-                       :text text
-                       :human-text "Download using http"
-                       :tooltip (str "Download " url)
-                       :in-progress in-progress
-                       :action {:event/type ::http-download
-                                :url url
-                                :dest download-file}}]))
-                 (let [severity (if (file-exists? file-cache engine-dir-file)
-                                  0 2)]
+               (concat
+                 (let [severity (if engine-details 0 2)]
                    [{:severity severity
+                     :text "info"
+                     :human-text (str "Spring " engine-version)
+                     :tooltip (if (zero? severity)
+                                (:absolute-path engine-details)
+                                (str "Engine '" engine-version "' not found locally"))}])
+                 (when-not engine-details
+                   (if-let [importable (some->> importables-by-path
+                                                vals
+                                                (filter (comp #{::engine} :resource-type))
+                                                (filter (comp #{engine-version} :resource-name))
+                                                first)]
+                     (let [resource-file (:resource-file importable)
+                           resource-path (fs/absolute-path resource-file)]
+                       [{:severity 2
+                         :text "import"
+                         :human-text (str "Import from" resource-file)
+                         :tooltip (str "Copy engine dir from" (:import-source-name importable)
+                                       " at " resource-file)
+                         :in-progress (-> copying (get resource-path) :status)
+                         :action
+                         {:event/type ::add-task
+                          :task
+                          {:event/type ::import
+                           :importable importable}}}])
+                     (let [downloadable (->> downloadables-by-url
+                                             vals
+                                             (filter (comp #{::engine} :resource-type))
+                                             (filter (partial could-be-this-engine? engine-version))
+                                             first)
+                           url (:download-url downloadable)
+                           download (get http-download url)
+                           in-progress (:running download)]
+                       #p (->> downloadables-by-url
+                               vals
+                               (filter (comp #{::engine} :resource-type))
+                               first)
+                       [{:severity 2
+                         :text "download"
+                         :human-text (if downloadable
+                                       (str "Download from " (:download-source-name downloadable))
+                                       (str "No download for " engine-version))
+                         :tooltip (if in-progress
+                                    (str "Downloading: " (:message download))
+                                    (str "Download " url))
+                         :in-progress in-progress
+                         :action (when downloadable
+                                   {:event/type ::http-downloadable
+                                    :downloadable downloadable})}])))
+                 (when (and (not engine-details) 
+                            (file-exists? file-cache engine-download-file))
+                   [{:severity 2
                      :text "extract"
                      :in-progress (get extracting engine-download-file)
-                     :human-text (if (zero? severity)
-                                   (:engine-version engine-details)
-                                   "Extract engine archive")
-                     :tooltip (if (zero? severity)
-                                (str "Engine dir at " engine-absolute-path)
-                                (str "Click to extract " engine-download-file))
+                     :human-text "Extract engine archive"
+                     :tooltip (str "Click to extract " engine-download-file)
                      :action {:event/type ::extract-7z
                               :file engine-download-file
-                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}]))}]} ; TODO fn for engine dir
+                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}]))}]}
+                                    ; ^ TODO fn for engine dir
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
@@ -3275,20 +3372,21 @@
         (log/error e)))))
 
 (defmethod event-handler ::rapid-download
-  [{:keys [engine-dir-filename rapid-id]}]
+  [{:keys [engine-absolute-path rapid-id]}]
   (swap! *state assoc-in [:rapid-download rapid-id] {:running true
                                                      :message "Preparing to run pr-downloader"})
   (future
     (try
-      (let [pr-downloader-file (io/file (fs/spring-root) "engine" engine-dir-filename (fs/executable "pr-downloader"))
+      (let [pr-downloader-file (io/file engine-absolute-path (fs/executable "pr-downloader"))
+            root (fs/isolation-dir) ; TODO always?
             command [(fs/absolute-path pr-downloader-file)
-                     "--filesystem-writepath" (fs/wslpath (fs/spring-root))
+                     "--filesystem-writepath" (fs/wslpath root)
                      "--rapid-download" rapid-id]
             runtime (Runtime/getRuntime)]
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp nil
-              ^java.lang.Process process (.exec runtime cmdarray envp (fs/spring-root))]
+              ^java.lang.Process process (.exec runtime cmdarray envp root)]
           (future
             (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
               (loop []
@@ -3309,7 +3407,7 @@
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (.waitFor process)
           (swap! *state assoc-in [:rapid-download rapid-id :running] false)
-          (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files)))))
+          (swap! *state assoc :sdp-files-cached (doall (rapid/sdp-files root)))))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
@@ -3451,6 +3549,13 @@
         (log/info "Finished downloading" url "to" dest)))))
 
 
+(defmethod event-handler ::http-downloadable
+  [{:keys [downloadable]}]
+  (event-handler {:event/type ::http-download
+                  :dest (resource-dest downloadable)
+                  :url (:download-url downloadable)}))
+
+
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
   (future
@@ -3516,11 +3621,6 @@
                          :importable importable}))))
 
 
-#_
-(defn html-resources [{:keys [url download-source-name]}]
-  (let [parsed (html/parse url)
-        links (http/links parsed)]
-    (http/html-downloadables url download-source-name links)))
 
 (def download-sources
   [{:download-source-name "SpringFiles Maps"
@@ -3528,7 +3628,18 @@
     :resources-fn http/html-downloadables}
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
-    :resources-fn http/html-downloadables}])
+    :resources-fn http/html-downloadables}
+   {:download-source-name "SpringFightClub Games"
+    :url http/springfightclub-root
+    :resources-fn (partial http/html-downloadables
+                           (fn [url]
+                             (when (and url (string/ends-with? url ".sdz"))
+                               ::mod)))}
+   {:download-source-name "SpringLauncher"
+    :url http/springlauncher-root
+    :resources-fn http/get-springlauncher-downloadables}])
+  ; TODO springrts buildbot crawling for engines
+  ; TODO bar github releases crawling for engines
 
 
 (defmethod task-handler ::update-downloadables
@@ -3540,7 +3651,13 @@
                                   (into {}))]
     (log/info "Found downloadables from" download-source-name "at" url
               (frequencies (map :resource-type downloadables)))
-    (swap! *state update :downloadables-by-url merge downloadables-by-url)))
+    (swap! *state update :downloadables-by-url merge downloadables-by-url)
+    downloadables-by-url))
+
+#_
+(task-handler
+  (merge {::task-type ::update-downloadables}
+         (last download-sources)))
 
 
 (defmethod event-handler ::import-source-change
@@ -3794,6 +3911,13 @@
   [{:keys [url download-source-name]}]
   {:text (str download-source-name " ( at " url " )")})
 
+(defmethod event-handler ::update-downloadables
+  [_e]
+  (doseq [download-source download-sources]
+    (add-task! *state (merge
+                        {::task-type ::update-downloadables}
+                        download-source))))
+
 (defn download-window
   [{:keys [downloading file-cache download-filter download-type download-source-name downloadables-by-url
            show-downloader]}]
@@ -3921,6 +4045,7 @@
          :column-resize-policy :constrained ; TODO auto resize
          :v-box/vgrow :always
          :items (->> (or (vals downloadables-by-url) [])
+                     (filter :resource-type)
                      (filter (fn [downloadable]
                                (if download-source-name
                                  (= download-source-name (:download-source-name downloadable))
@@ -4214,7 +4339,8 @@
             (fn [i]
               (if-let [url (:url i)]
                 (let [[_all version] (re-find #"(.*)/" url)
-                      url (http/engine-url version)
+                      url nil
+                      ;url (http/engine-url version)
                       download (get http-download url)
                       dest (engine-dest version)
                       engine-version (str version
@@ -4564,6 +4690,7 @@
   (add-task! *state {::task-type ::reconcile-mods})
   (add-task! *state {::task-type ::reconcile-maps})
   (event-handler {:event/type ::scan-imports})
+  (event-handler {:event/type ::update-downloadables})
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
                           (fn [state]

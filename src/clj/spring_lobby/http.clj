@@ -1,7 +1,8 @@
 (ns spring-lobby.http
+  "Resources for "
   (:require
     [clj-http.client :as http]
-    [clojure.core.memoize :as mem]
+    ;[clojure.core.memoize :as mem]
     [clojure.java.io :as io]
     [clojure.string :as string]
     [clojure.xml :as xml]
@@ -12,6 +13,7 @@
 
 
 (set! *warn-on-reflection* true)
+
 
 (def default-engine-branch "master")
 (def engine-branches
@@ -195,26 +197,66 @@
     (str springfiles-maps-url "/" (fs/map-filename map-name))))
 
 
-(defn get-springlauncher-root
-  "Returns parsed XML string body from springlauncher root."
-  []
-  (log/info "GET" springlauncher-root)
-  (->> (clj-http.client/get springlauncher-root {:as :stream})
-       :body
-       xml/parse
-       :content
-       (filter (comp #{:Contents} :tag))
-       (mapcat
-         (fn [{:keys [content]}]
-           (->> content
-                (filter (comp #{:Key} :tag))
-                first
-                :content)))))
+(defn- tag-content
+  "Returns the content for the first matching tag (for parsed XML)."
+  [content tag]
+  (some->> content
+           (filter (comp #{tag} :tag))
+           first
+           :content
+           first))
 
+(defn seven-zip? [filename]
+  (string/ends-with? filename ".7z"))
 
+(defn spring-resource? [filename]
+  (and filename
+    (or (string/ends-with? filename ".sdz")
+        (string/ends-with? filename ".sd7"))))
+
+(defn springlauncher-resource-type [url]
+  (cond
+    (not url) nil
+    (and (string/starts-with? url "engines/")
+         (seven-zip? url))
+    :spring-lobby/engine
+    (and (string/starts-with? url "maps/")
+         (spring-resource? url))
+    :spring-lobby/map
+    :else nil))
+
+(defn filename [url]
+  (when url
+    (last (string/split url #"/"))))
+
+(defn get-springlauncher-downloadables
+  "Returns parsed downloadable resources from the XML at springlauncher root."
+  ([{:keys [url download-source-name]}]
+   (let [base-url url
+         now (u/curr-millis)]
+     (log/info "GET" base-url)
+     (->> (http/get base-url {:as :stream})
+          :body
+          xml/parse
+          :content
+          (filter (comp #{:Contents} :tag))
+          (map
+            (fn [{:keys [content]}]
+              (let [path (tag-content content :Key)
+                    url (str base-url "/" path)]
+                {:resource-type (springlauncher-resource-type path)
+                 :download-url url
+                 :resource-filename (filename url)
+                 :resource-date (tag-content content :LastModified)
+                 :download-source-name download-source-name
+                 :resource-updated now})))
+          (filter :resource-type)))))
+
+#_
 (def springlauncher-links
   (mem/ttl (partial get-springlauncher-root) :ttl/threshold 3600000))
 
+#_
 (defn springlauncher-engine-url [engine-version]
   (let [engine-archive (engine-archive engine-version)]
     (->> (springlauncher-links)
@@ -225,6 +267,7 @@
          first
          (str springlauncher-root "/"))))
 
+#_
 (defn engine-url
   "Returns the url for the archive for the given engine version."
   [engine-version]
@@ -235,30 +278,28 @@
   (when engine-version
     (io/file (fs/download-dir) "engine" (engine-archive engine-version))))
 
-
-(defn spring-resource? [filename]
-  (and filename
-    (or (string/ends-with? filename ".sdz")
-        (string/ends-with? filename ".sd7"))))
-
-(defn resource-type [url]
-  (if (spring-resource? url)
-    :spring-lobby/map ; TODO
+(defn guess-resource-type [url]
+  (cond
+    (spring-resource? url) :spring-lobby/map ; TODO mods?
+    (seven-zip? url) :spring-lobby/engine ; TODO
+    :else
     nil))
 
 (defn html-downloadables
-  [{:keys [url download-source-name]}]
-  (let [base-url url
-        now (u/curr-millis)]
-    (->> base-url
-         html/parse
-         files
-         (map
-           (fn [{:keys [filename url date size]}]
-             {:download-url (str base-url "/" url)
-              :download-source-name download-source-name
-              :resource-filename filename
-              :resource-type (resource-type url)
-              :resource-size size
-              :resource-date date
-              :resource-updated now})))))
+  ([downloadable]
+   (html-downloadables guess-resource-type downloadable))
+  ([resource-type-fn {:keys [url download-source-name]}]
+   (let [base-url url
+         now (u/curr-millis)]
+     (->> base-url
+          html/parse
+          files
+          (map
+            (fn [{:keys [filename url date size]}]
+              {:download-url (str base-url "/" url)
+               :download-source-name download-source-name
+               :resource-filename filename
+               :resource-type (resource-type-fn url)
+               :resource-size size
+               :resource-date date
+               :resource-updated now}))))))

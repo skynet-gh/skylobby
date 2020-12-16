@@ -1,10 +1,14 @@
 (ns spring-lobby.git
+  "Utils for working with git resources."
   (:require
     [clj-jgit.porcelain :as git]
     [clj-jgit.querying :as querying]
     [taoensso.timbre :as log])
   (:import
     (org.eclipse.jgit.lib ProgressMonitor)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def ba-repo-url

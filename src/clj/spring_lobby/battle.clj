@@ -1,4 +1,8 @@
-(ns spring-lobby.battle)
+(ns spring-lobby.battle
+  "Utilities for processing battle data.")
+
+
+(set! *warn-on-reflection* true)
 
 
 (defn battle-players-and-bots-users
