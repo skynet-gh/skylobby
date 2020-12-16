@@ -1914,7 +1914,10 @@
   (let [filename (or resource-filename
                      (when resource-file (.getName resource-file)))]
     (case resource-type
-      ::engine (when resource-name (io/file (fs/engines-dir) resource-name))
+      ::engine (cond
+                 filename (io/file (fs/download-dir) "engine" filename)
+                 resource-name (http/engine-download-file resource-name)
+                 :else nil)
       ::mod (when filename (io/file (fs/mod-file filename))) ; TODO mod format types
       ::map (when filename (io/file (fs/map-file filename))) ; TODO mod format types
       nil)))
@@ -2552,10 +2555,9 @@
 (defn could-be-this-engine?
   "Returns true if this downloadable item might be this engine, by magic, false otherwise."
   [engine-version {:keys [resource-filename]}]
-  #p engine-version
   (when (and engine-version resource-filename)
-    (= #p (http/engine-archive engine-version)
-       #p resource-filename)))
+    (= (http/engine-archive engine-version)
+       resource-filename)))
 
 #_
 (->> user/*state
@@ -2626,7 +2628,7 @@
         engine-dir-file (when engine-absolute-path (io/file engine-absolute-path))
         ;engine-dir-filename (spring/engine-dir-filename engines engine-version)
         ;engine-archive-file (engine-dest engine-version)
-        engine-download-file (http/engine-download-file engine-version)
+        engine-download-file (http/engine-download-file engine-version) ; TODO duplicate of downloadable?
         bots (fs/bots engine-absolute-path)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
@@ -2803,10 +2805,6 @@
                          download-url (:download-url downloadable)
                          in-progress (-> http-download (get download-url) :running)
                          {:keys [download-source-name download-url]} downloadable]
-                     #p (->> downloadables-by-url
-                             vals
-                             (filter (comp #{::mod} :resource-type))
-                             first)
                      [{:severity (if battle-mod-details 0 2)
                        :text "download"
                        :human-text (if battle-mod-details
@@ -2904,49 +2902,34 @@
                                 (:absolute-path engine-details)
                                 (str "Engine '" engine-version "' not found locally"))}])
                  (when-not engine-details
-                   (if-let [importable (some->> importables-by-path
+                   (when-let [downloadable (->> downloadables-by-url
                                                 vals
                                                 (filter (comp #{::engine} :resource-type))
-                                                (filter (comp #{engine-version} :resource-name))
+                                                (filter (partial could-be-this-engine? engine-version))
                                                 first)]
-                     (let [resource-file (:resource-file importable)
-                           resource-path (fs/absolute-path resource-file)]
-                       [{:severity 2
-                         :text "import"
-                         :human-text (str "Import from" resource-file)
-                         :tooltip (str "Copy engine dir from" (:import-source-name importable)
-                                       " at " resource-file)
-                         :in-progress (-> copying (get resource-path) :status)
-                         :action
-                         {:event/type ::add-task
-                          :task
-                          {:event/type ::import
-                           :importable importable}}}])
-                     (let [downloadable (->> downloadables-by-url
-                                             vals
-                                             (filter (comp #{::engine} :resource-type))
-                                             (filter (partial could-be-this-engine? engine-version))
-                                             first)
-                           url (:download-url downloadable)
+                     (let [url (:download-url downloadable)
                            download (get http-download url)
-                           in-progress (:running download)]
-                       #p (->> downloadables-by-url
-                               vals
-                               (filter (comp #{::engine} :resource-type))
-                               first)
-                       [{:severity 2
+                           in-progress (:running download)
+                           dest (resource-dest downloadable)
+                           dest-exists (file-exists? file-cache dest)
+                           severity (if dest-exists 0 2)]
+                       [{:severity severity
                          :text "download"
                          :human-text (if downloadable
-                                       (str "Download from " (:download-source-name downloadable))
+                                       (if dest-exists
+                                         (str "Downloaded " (.getName dest))
+                                         (str "Download from " (:download-source-name downloadable)))
                                        (str "No download for " engine-version))
                          :tooltip (if in-progress
-                                    (str "Downloading: " (:message download))
-                                    (str "Download " url))
+                                    (str (:current download) " / " (:total download))
+                                    (if dest-exists
+                                      (str "Downloaded to " (fs/absolute-path dest))
+                                      (str "Download " url)))
                          :in-progress in-progress
-                         :action (when downloadable
+                         :action (when (and downloadable (not dest-exists))
                                    {:event/type ::http-downloadable
                                     :downloadable downloadable})}])))
-                 (when (and (not engine-details) 
+                 (when (and (not engine-details)
                             (file-exists? file-cache engine-download-file))
                    [{:severity 2
                      :text "extract"
@@ -2955,8 +2938,26 @@
                      :tooltip (str "Click to extract " engine-download-file)
                      :action {:event/type ::extract-7z
                               :file engine-download-file
-                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}]))}]}
-                                    ; ^ TODO fn for engine dir
+                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}])
+                 (when-not engine-details
+                   (when-let [importable (some->> importables-by-path
+                                                  vals
+                                                  (filter (comp #{::engine} :resource-type))
+                                                  (filter (comp #{engine-version} :resource-name))
+                                                  first)]
+                     (let [{:keys [import-source-name resource-file]} importable
+                           resource-path (fs/absolute-path resource-file)]
+                       [{:severity 2
+                         :text "import"
+                         :human-text (str "Import from " import-source-name)
+                         :tooltip (str "Copy engine dir from" import-source-name
+                                       " at " resource-path)
+                         :in-progress (-> copying (get resource-path) :status)
+                         :action
+                         {:event/type ::add-task
+                          :task
+                          {:event/type ::import
+                           :importable importable}}}]))))}]}
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
@@ -3527,6 +3528,10 @@
               ^String content-length (get-in request [:headers "content-length"] "0")
               length (Integer/valueOf content-length)
               buffer-size (* 1024 10)]
+          (swap! *state update-in [:http-download url]
+                 merge
+                 {:current 0
+                  :total length})
           (with-open [^java.io.InputStream input (:body request)
                       output (io/output-stream dest)]
             (let [buffer (make-array Byte/TYPE buffer-size)
@@ -3536,24 +3541,33 @@
                   (when (pos? size)
                     (.write output buffer 0 size)
                     (when counter
-                      (let [msg (with-out-str
+                      (let [current (.getByteCount counter)
+                            msg (with-out-str
                                   (print-progress-bar
-                                    (.getByteCount counter)
+                                    current
                                     length))]
-                        (swap! *state assoc-in [:http-download url :message] msg)))
+                        (swap! *state update-in [:http-download url]
+                               merge
+                               {:current current
+                                :total length
+                                :message msg}))) ; TODO is message really required?
                     (recur))))))))
       (catch Exception e
-        (log/error e "Error downloading" url "to" dest))
+        (log/error e "Error downloading" url "to" dest)
+        (raynes-fs/delete dest))
       (finally
         (swap! *state assoc-in [:http-download url :running] false)
+        (update-file-cache! dest)
         (log/info "Finished downloading" url "to" dest)))))
 
 
 (defmethod event-handler ::http-downloadable
   [{:keys [downloadable]}]
-  (event-handler {:event/type ::http-download
-                  :dest (resource-dest downloadable)
-                  :url (:download-url downloadable)}))
+  (log/info "Request to download" downloadable)
+  (event-handler
+    {:event/type ::http-download
+     :dest (resource-dest downloadable)
+     :url (:download-url downloadable)}))
 
 
 (defmethod event-handler ::extract-7z
@@ -3637,8 +3651,10 @@
                                ::mod)))}
    {:download-source-name "SpringLauncher"
     :url http/springlauncher-root
-    :resources-fn http/get-springlauncher-downloadables}])
-  ; TODO springrts buildbot crawling for engines
+    :resources-fn http/get-springlauncher-downloadables}
+   {:download-source-name "SpringRTS buildbot"
+    :url http/springrts-buildbot-root
+    :resources-fn http/crawl-springrts-engine-downloadables}])
   ; TODO bar github releases crawling for engines
 
 

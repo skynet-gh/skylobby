@@ -149,12 +149,7 @@
   ([version]
    (engine-archive (detect-engine-branch version) version))
   ([branch version]
-   (let [{:keys [os-name]} (fs/sys-data)
-         platform (if (and (string/includes? os-name "Linux")
-                           (not (fs/wsl?)))
-                    "linux64"
-                    "win32")]
-     (engine-archive branch version platform)))
+   (engine-archive branch version (fs/platform)))
   ([branch version platform]
    (when version
      (let [mp "minimal-portable"
@@ -173,14 +168,11 @@
   ([version]
    (engine-path (detect-engine-branch version) version))
   ([branch version]
+   (engine-path branch version (fs/platform)))
+  ([branch version platform]
    (when version
-     (let [{:keys [os-name]} (fs/sys-data)
-           platform (if (and (string/includes? os-name "Linux")
-                             (not (fs/wsl?)))
-                      "linux64"
-                      "win32")]
-       (str (first (string/split version #"\s"))
-            "/" platform "/" (engine-archive branch version platform))))))
+     (str (first (string/split version #"\s"))
+          "/" platform "/" (engine-archive branch version platform)))))
 
 
 (defn springrts-engine-url
@@ -303,3 +295,60 @@
                :resource-size size
                :resource-date date
                :resource-updated now}))))))
+
+
+(defn- trim-trailing [url]
+  (string/replace url #"/$" ""))
+
+(defn- urls [files]
+  (->> files
+       (map :url)
+       (filter some?)))
+
+(defn- link? [url]
+  (string/ends-with? url "/"))
+
+(defn crawl-springrts-engine-downloadables
+  [{:keys [download-source-name url]}]
+  (let [base-url url
+        branches (->> (springrts-buildbot-files)
+                      urls
+                      (filter link?))
+        now (u/curr-millis)]
+    (mapcat
+      (fn [branch]
+        (let [versions (->> (springrts-buildbot-files [branch])
+                            urls
+                            (filter link?)
+                            (remove #(string/starts-with? % "LATEST")))]
+           (mapcat
+             (fn [version]
+               (let [platforms (->> (springrts-buildbot-files [(str branch version)])
+                                    urls
+                                    (filter link?))]
+                 (mapcat
+                   (fn [platform]
+                     (let [files (->> (springrts-buildbot-files [(str branch version platform)])
+                                      (remove link?)
+                                      (filter (every-pred :filename :url))
+                                      (filter (comp seven-zip? :filename)))]
+                       (map
+                         (fn [{:keys [filename url size date]}]
+                           {:download-source-name download-source-name
+                            :download-url (str base-url "/" branch version platform url)
+                            :resource-date date
+                            :resource-filename filename
+                            :resource-size size
+                            :resource-type :spring-lobby/engine
+                            :resource-updated now})
+                         files)))
+                   platforms)))
+             versions)))
+      branches)))
+
+#_
+(springrts-buildbot-files ["maintenance/"])
+#_
+(springrts-buildbot-files ["maintenance/104.0.1-1560-g50390f6/"])
+#_
+(springrts-buildbot-files ["maintenance/104.0.1-1560-g50390f6/win32/"])

@@ -73,6 +73,16 @@
 (defn wsl-or-windows? []
   (or (windows?) (wsl?)))
 
+(defn platform
+  ([]
+   (platform (sys-data)))
+  ([{:keys [os-name]}]
+   (if (and os-name
+            (string/includes? os-name "Linux")
+            (not (wsl?)))
+     "linux64"
+     "win32")))
+
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."
   [^java.io.File f]
