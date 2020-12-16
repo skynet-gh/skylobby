@@ -31,9 +31,22 @@
 (def maps-filename "maps.edn")
 
 
+(defn canonical-path [^java.io.File f]
+  (when f
+    (.getCanonicalPath f)))
+
+; TODO always use canonical-path
 (defn absolute-path [^java.io.File f]
   (when f
     (.getAbsolutePath f)))
+
+(defn filename [^java.io.File f]
+  (when f
+    (.getName f)))
+
+(defn exists [^java.io.File f]
+  (when f
+    (.exists f)))
 
 
 (defn os-name []

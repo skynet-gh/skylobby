@@ -25,65 +25,35 @@
 
 (def *state (atom nil))
 
+; state from init to clean up (chimers)
+
+(def init-state (atom nil))
+
 ; prevent duplicate refreshes
 
 (def refreshing (atom false))
 
-
 ; renderer var, create in init
 
 (def ^:dynamic renderer nil)
-(def ^:dynamic hawk nil)
-(def ^:dynamic tasks-chimer nil)
-(def ^:dynamic file-events-chimer nil)
 
+
+(defn stop-chimer [chimer]
+  (when chimer
+    (try
+      (chimer)
+      (catch Exception e
+        (println "error stopping chimer" chimer e)))))
 
 (defn rerender []
   (try
+    (println "Stopping old chimers")
+    (let [{:keys [tasks-chimer file-events-chimer]} @init-state]
+      (stop-chimer tasks-chimer)
+      (stop-chimer file-events-chimer))
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
-    (future
-      (try
-        (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))]
-          (watch-fn *state))
-        (catch Exception e
-          (println "error adding watchers" e))))
-    (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
-    #_
-    (future
-      (when hawk
-        (try
-          (hawk/stop! hawk)
-          (catch Exception e
-            (println "error stopping hawk" e))))
-      (try
-        (let [hawk-fn (var-get (find-var 'spring-lobby/add-hawk))]
-          (alter-var-root #'hawk (fn [& _] (hawk-fn *state))))
-        (catch Exception e
-          (println "error starting hawk" e))))
-    (future
-      (when tasks-chimer
-        (try
-          (tasks-chimer)
-          (catch Exception e
-            (println "error stopping tasks" e))))
-      (try
-        (let [chimer-fn (var-get (find-var 'spring-lobby/tasks-chimer-fn))]
-          (alter-var-root #'tasks-chimer (fn [& _] (chimer-fn *state))))
-        (catch Exception e
-          (println "error starting tasks" e))))
-    (future
-      (when file-events-chimer
-        (try
-          (file-events-chimer)
-          (catch Exception e
-            (println "error stopping file events" e))))
-      (try
-        (let [chimer-fn (var-get (find-var 'spring-lobby/file-events-chimer-fn))]
-          (alter-var-root #'file-events-chimer (fn [& _] (chimer-fn *state))))
-        (catch Exception e
-          (println "error starting file events" e))))
     (if renderer
       (do
         (println "Re-rendering")
@@ -92,6 +62,12 @@
           (catch Exception e
             (println "error rendering" e))))
       (println "No renderer"))
+    (future
+      (try
+        (let [init-fn (var-get (find-var 'spring-lobby/init))]
+          (init-fn *state))
+        (catch Exception e
+          (println "init error" e))))
     (catch Exception e
       (println e))))
 
@@ -133,29 +109,29 @@
 
 (defn init []
   (try
-    [datafy pprint]
+    [datafy pprint chime/chime-at string/split]
     (hawk/watch! [{:paths ["src/clj"]
                    :handler refresh-on-file-change}])
     (require 'spring-lobby)
     (require 'spring-lobby.fs)
     (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
-      (init-7z-fn))
+      (future
+        (try
+          (println "Initializing 7zip")
+          (init-7z-fn)
+          (println "Finally finished initializing 7zip")
+          (catch Exception e
+            (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
-    (let [watch-fn (var-get (find-var 'spring-lobby/add-watchers))
-          ;hawk-fn (var-get (find-var 'spring-lobby/add-hawk))
-          tasks-chimer-fn (var-get (find-var 'spring-lobby/tasks-chimer-fn))
-          file-events-chimer-fn (var-get (find-var 'spring-lobby/file-events-chimer-fn))
+    (let [init-fn (var-get (find-var 'spring-lobby/init))
           r (fx/create-renderer
               :middleware (fx/wrap-map-desc
                             (fn [state]
                               {:fx/type view
                                :state state}))
               :opts {:fx.opt/map-event-handler event-handler})]
-      (watch-fn *state)
-      ;(alter-var-root #'hawk (fn [& _] (hawk-fn *state)))
-      (alter-var-root #'tasks-chimer (fn [& _] (tasks-chimer-fn *state)))
-      (alter-var-root #'file-events-chimer(fn [& _] (file-events-chimer-fn *state)))
+      (reset! init-state (init-fn *state))
       (alter-var-root #'renderer (constantly r)))
     (fx/mount-renderer *state renderer)
     (catch Exception e
