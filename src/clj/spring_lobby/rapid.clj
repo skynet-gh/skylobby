@@ -163,6 +163,7 @@
        (io/file "rapid" "packages.springrts.com" "versions.gz")
        (rapid-versions))))
 
+#_
 (def package-by-hash
   (or
     (try

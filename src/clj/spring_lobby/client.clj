@@ -257,23 +257,23 @@
   (let [[_all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state assoc-in [:channels channel-name :users username] {})))
 
-(defmethod handler/handle "JOINEDBATTLE" [_c state m]
+(defmethod handler/handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state
+    (swap! state-atom
       (fn [state]
         (let [initial-status {}
-              state (assoc-in state [:battles battle-id :users username] initial-status)]
-          (if (= battle-id (-> state :battle :battle-id))
-            (assoc-in state [:battle :users username] initial-status)
-            state))))))
+              next-state (assoc-in state [:battles battle-id :users username] initial-status)]
+          (if (= battle-id (-> next-state :battle :battle-id))
+            (assoc-in next-state [:battle :users username] initial-status)
+            next-state))))))
 
 (defmethod handler/handle "LEFT" [_c state m]
   (let [[_all _channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
     (swap! state update-in [:channels :users] dissoc username)))
 
-(defmethod handler/handle "LEFTBATTLE" [_c state m]
+(defmethod handler/handle "LEFTBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state
+    (swap! state-atom
       (fn [state]
         (update-in
           (if (= username (:username state))
@@ -290,13 +290,13 @@
            :battle-status decoded
            :team-color team-color)))
 
-(defmethod handler/handle "UPDATEBOT" [_c state m]
+(defmethod handler/handle "UPDATEBOT" [_c state-atom m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+)" m)
         decoded-status (decode-battle-status battle-status)
         bot-data {:battle-status decoded-status
                   :team-color team-color}]
     (log/debug username (pr-str decoded-status) team-color)
-    (swap! state
+    (swap! state-atom
       (fn [state]
         (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
           (if (= battle-id (-> state :battle :battle-id))
@@ -369,10 +369,10 @@
   (.close c)
   (log/info "connection closed?" (.isClosed c)))
 
-(defmethod handler/handle "DENIED" [client state m]
+(defmethod handler/handle "DENIED" [client state-atom m]
   (log/info (str "Login denied: '" m "'"))
   (disconnect client)
-  (swap! state
+  (swap! state-atom
     (fn [state]
       (-> state
           (dissoc :client :client-deferred)

@@ -8,6 +8,7 @@
     [cljfx.ext.table-view :as fx.ext.table-view]
     [cljfx.lifecycle :as fx.lifecycle]
     [clojure.core.async :as async]
+    clojure.data
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
@@ -15,6 +16,7 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [crouton.html :as html]
+    hashp.core
     [hawk.core :as hawk]
     java-time
     [me.raynes.fs :as raynes-fs]
@@ -90,7 +92,9 @@
 (def priority-overrides
   {::update-engine 4
    ::update-map 4
-   ::update-mod 4})
+   ::update-mod 4
+   ::import 4
+   ::download 4})
 
 (defn task-priority [{::keys [task-priority task-type]}]
   (or task-priority
@@ -110,7 +114,6 @@
     (slurp-app-edn "maps.edn")
     (slurp-app-edn "engines.edn")
     (slurp-app-edn "mods.edn")
-    (slurp-app-edn "download.edn")
     (slurp-app-edn "importables.edn")
     (slurp-app-edn "downloadables.edn")
     {:file-events (initial-file-events)
@@ -283,24 +286,40 @@
      (swap! *state assoc :battle-mod-details mod-details)
      mod-details)))
 
+(defn select-debug [state]
+  (select-keys state [:pop-out-battle]))
+
+
 (defn add-watchers
   "Adds all *state watchers."
   [state-atom]
+  (remove-watch state-atom :debug)
   (remove-watch state-atom :config)
   (remove-watch state-atom :maps)
   (remove-watch state-atom :engines)
   (remove-watch state-atom :mods)
-  (remove-watch state-atom :download)
   (remove-watch state-atom :importables)
   (remove-watch state-atom :downloadables)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
+  (add-watch state-atom :debug
+    (fn [_k _ref old-state new-state]
+      (try
+        (let [dold (select-debug old-state)
+              dnew (select-debug new-state)]
+          (when (not= dold dnew)
+            #p dold
+            #p dnew
+            (let [[old-only new-only] (clojure.data/diff old-state new-state)]
+              #p old-only
+              #p new-only)))
+        (catch Exception e
+          (log/error e "Error in debug")))))
   (add-watch-state-to-edn state-atom :config select-config "config.edn")
   (add-watch-state-to-edn state-atom :maps select-maps "maps.edn")
   (add-watch-state-to-edn state-atom :engines select-engines "engines.edn")
   (add-watch-state-to-edn state-atom :mods select-mods "mods.edn")
-  (add-watch-state-to-edn state-atom :download select-download "download.edn")
   (add-watch-state-to-edn state-atom :importables select-importables "importables.edn")
   (add-watch-state-to-edn state-atom :downloadables select-downloadables "downloadables.edn")
   (add-watch state-atom :battle-map-details
@@ -429,6 +448,7 @@
           (chime/periodic-seq
             (java-time/instant)
             (java-time/duration 1 :seconds))
+            ;(java-time/duration 100 :millis))
           (fn [_chimestamp]
             (handle-task! state-atom))
           {:error-handler
@@ -3461,10 +3481,12 @@
                         ::map (:map-name (fs/read-map-data resource-file))
                         ::mod (:mod-name (read-mod-data resource-file))
                         ::engine (:engine-version (fs/engine-data resource-file))
-                        ::sdp (:mod-name (read-mod-data resource-file)))]
-    (swap! *state update-in [:importables-by-path (fs/absolute-path resource-file)]
+                        ::sdp (:mod-name (read-mod-data resource-file)))
+        absolute-path (fs/absolute-path resource-file)
+        now (u/curr-millis)]
+    (swap! *state update-in [:importables-by-path absolute-path]
            assoc :resource-name resource-name
-           :resource-updated (u/curr-millis))
+           :resource-updated now)
     resource-name))
 
 (defmethod task-handler ::update-importable [{:keys [importable]}]
@@ -3549,6 +3571,13 @@
   [e]
   (swap! *state dissoc (:key e)))
 
+(defmethod event-handler ::scan-imports
+  [_e]
+  (doseq [import-source import-sources]
+    (add-task! *state (merge
+                        {::task-type ::scan-imports}
+                        import-source))))
+
 
 (defn import-window
   [{:keys [copying file-cache import-filter import-type import-source-name importables-by-path
@@ -3561,9 +3590,9 @@
      :y 400
      :showing show-importer
      :title "alt-spring-lobby Importer"
-     :on-close-request (fn [& args]
-                         (log/debug args)
-                         (swap! *state assoc :show-importer false))
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-importer false)
+                         (.consume e))
      :width download-window-width
      :height download-window-height
      :scene
@@ -3572,7 +3601,11 @@
       :root
       {:fx/type :v-box
        :children
-       [{:fx/type :h-box
+       [{:fx/type :button
+         :style {:-fx-font-size 16}
+         :text "Scan Imports"
+         :on-action {:event/type ::scan-imports}}
+        {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
          :children
@@ -3772,9 +3805,9 @@
      :y 400
      :showing show-downloader
      :title "alt-spring-lobby Downloader"
-     :on-close-request (fn [& args]
-                         (log/debug args)
-                         (swap! *state assoc :show-downloader false))
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-downloader false)
+                         (.consume e))
      :width download-window-width
      :height download-window-height
      :scene
@@ -3974,9 +4007,9 @@
     {:fx/type :stage
      :showing show-rapid-downloader
      :title "alt-spring-lobby Rapid Downloader"
-     :on-close-request (fn [& args]
-                         (log/debug args)
-                         (swap! *state assoc :show-rapid-downloader false))
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-rapid-downloader false)
+                         (.consume e))
      :width download-window-width
      :height download-window-height
      :scene
@@ -4105,9 +4138,9 @@
     {:fx/type :stage
      :showing show-http-downloader
      :title "alt-spring-lobby HTTP Downloader"
-     :on-close-request (fn [& args]
-                         (log/debug args)
-                         (swap! *state assoc :show-http-downloader false))
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-http-downloader false)
+                         (.consume e))
      :width download-window-width
      :height download-window-height
      :scene
@@ -4386,59 +4419,6 @@
                 {:text "-"}))}}]}]}}}))
 
 
-; TODO remove and delay most of this stuff
-(defn root-on-created [& args]
-  (log/trace "on-created" args)
-  #_
-  (doseq [import-source import-sources]
-    (add-task! *state (merge
-                        {::task-type ::scan-imports}
-                        import-source)))
-  #_
-  (doseq [download-source download-sources]
-    (add-task! *state (merge
-                        {::task-type ::update-downloadables}
-                        download-source)))
-  (add-task! *state {::task-type ::reconcile-engines})
-  (add-task! *state {::task-type ::reconcile-mods})
-  (add-task! *state {::task-type ::reconcile-maps})
-  #_
-  (swap! *state assoc :sdp-files-cached
-    (delay
-      (try
-        (doall (rapid/sdp-files))
-        (catch Exception e
-          (log/error e "Error loading SDP files")))))
-  #_
-  (swap! *state assoc :rapid-cache
-    (delay
-      (try
-        (let [rapid-repos (sort (rapid/repos))]
-          {:rapid-repos-cached rapid-repos
-           :rapid-versions-by-hash
-           (->> rapid-repos
-                (mapcat rapid/versions)
-                (map (juxt :hash identity))
-                (into {}))
-           :rapid-data-by-version
-           (->> rapid-repos
-                (mapcat rapid/versions)
-                (map (juxt :version identity))
-                (into {}))})
-        (catch Exception e
-          (log/error e "Error loading rapid versions by hash")))))
-  #_
-  (future
-    (try
-      (when-let [rapid-repo (:rapid-repo @*state)]
-        (let [versions (->> (rapid/versions rapid-repo)
-                            (sort-by :version version/version-compare)
-                            reverse
-                            doall)]
-          (swap! *state assoc :rapid-versions-cached versions)))
-      (catch Exception e
-        (log/error e "Error loading rapid versions")))))
-
 (defn main-window-on-close-request
   [standalone e]
   (log/debug "Main window close request" e)
@@ -4452,137 +4432,125 @@
           (System/exit 0))))))
 
 (defn root-view
-  [{{:keys [battle battles file-events last-failed-message pop-out-battle show-downloader
-            show-http-downloader show-importer show-rapid-downloader standalone tasks users]
+  [{{:keys [battle battles file-events last-failed-message pop-out-battle standalone tasks users]
      :as state}
     :state}]
-  {:fx/type fx/ext-on-instance-lifecycle
-   :on-created root-on-created
-   :on-advanced (fn [& args]
-                  (log/trace "on-advanced" args))
-   :on-deleted (fn [& args]
-                 (log/trace "on-deleted" args))
+  {:fx/type fx/ext-many
    :desc
-   {:fx/type fx/ext-many
-    :desc
-    (concat
-      [{:fx/type :stage
-        :showing true
-        :title "Alt Spring Lobby"
-        :x 100
-        :y 100
-        :width main-window-width
-        :height main-window-height
-        :on-close-request (partial main-window-on-close-request standalone)
-        :scene
-        {:fx/type :scene
-         :stylesheets stylesheets
-         :root
-         {:fx/type :v-box
-          :alignment :top-left
-          :children
-          (concat
-            [(merge
-               {:fx/type client-buttons}
-               (select-keys state
-                 [:client :client-deferred :username :password :login-error
-                  :server-url]))
-             {:fx/type :split-pane
-              :v-box/vgrow :always
-              :divider-positions [0.75]
-              :items
-              [{:fx/type :v-box
-                :children
-                [{:fx/type :label
-                  :text "Battles"
-                  :style {:-fx-font-size 16}}
-                 {:fx/type battles-table
-                  :v-box/vgrow :always
-                  :battles battles
-                  :users users}]}
-               {:fx/type :v-box
-                :children
-                [{:fx/type :label
-                  :text "Users"
-                  :style {:-fx-font-size 16}}
-                 {:fx/type users-table
-                  :v-box/vgrow :always
-                  :users users}]}]}
-             (merge
-               {:fx/type battles-buttons}
-               (select-keys state
-                 [:battle :battle-password :battle-title :battles :client :engines :engine-filter
-                  :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-                  :pop-out-battle :scripttags :selected-battle]))]
-            (when battle
-              (if (:battle-id battle)
-                (when (not pop-out-battle)
-                  [(merge
-                     {:fx/type battle-view}
-                     (select-keys state battle-view-keys))])
-                [{:fx/type :h-box
-                  :alignment :top-left
-                  :children
-                  [{:fx/type :v-box
-                    :h-box/hgrow :always
-                    :children
-                    [{:fx/type :label
-                      :style {:-fx-font-size 20}
-                      :text "Waiting for server to start battle..."}]}]}]))
-            [{:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :label
-                :text (str last-failed-message)
-                :style {:-fx-text-fill "#FF0000"}}
-               {:fx/type :pane
-                :h-box/hgrow :always}
-               {:fx/type :label
-                :text (str (count file-events) " file events  ")}
-               {:fx/type :label
-                :text (str (count tasks) " tasks")}]}])}}}]
-      (when pop-out-battle
-        [{:fx/type :stage
-          :showing pop-out-battle
-          :title "alt-spring-lobby Battle"
-          :on-close-request (fn [& args]
-                              (log/debug args)
-                              (swap! *state assoc :pop-out-battle false))
-          :x 300
-          :y 300
-          :width battle-window-width
-          :height battle-window-height
-          :scene
-          {:fx/type :scene
-           :stylesheets stylesheets
-           :root
-           (merge
-             {:fx/type battle-view}
-             (select-keys state battle-view-keys))}}])
-      (when show-importer
-        [(merge
-           {:fx/type import-window}
-           (select-keys state
-             [:copying :file-cache :import-filter :import-source-name :import-type
-              :importables-by-path :show-importer]))])
-      (when show-downloader
-        [(merge
-           {:fx/type download-window}
-           (select-keys state
-             [:downloading :download-filter :download-source-name :download-type
-              :downloadables-by-url :file-cache :show-downloader]))])
-      (when show-rapid-downloader
-        [(merge
-           {:fx/type rapid-download-window}
-           (select-keys state
-             [:engine-version :engines :rapid-download :rapid-repo :rapid-repos-cached :rapid-versions-cached
-              :rapid-versions-by-hash :sdp-files-cached :show-rapid-downloader]))])
-      (when show-http-downloader
-        [(merge
-           {:fx/type http-download-window}
-           (select-keys state
-             [:engine-branch :engine-versions-cached :engines :extracting :file-cache :http-download :map-files-cache
-              :maps-index-url :mod-files-cache :mods-index-url :show-http-downloader]))]))}})
+   [{:fx/type :stage
+     :showing true
+     :title "Alt Spring Lobby"
+     :x 100
+     :y 100
+     :width main-window-width
+     :height main-window-height
+     :on-close-request (partial main-window-on-close-request standalone)
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
+       :alignment :top-left
+       :children
+       (concat
+         [(merge
+            {:fx/type client-buttons}
+            (select-keys state
+              [:client :client-deferred :username :password :login-error
+               :server-url]))
+          {:fx/type :split-pane
+           :v-box/vgrow :always
+           :divider-positions [0.75]
+           :items
+           [{:fx/type :v-box
+             :children
+             [{:fx/type :label
+               :text "Battles"
+               :style {:-fx-font-size 16}}
+              {:fx/type battles-table
+               :v-box/vgrow :always
+               :battles battles
+               :users users}]}
+            {:fx/type :v-box
+             :children
+             [{:fx/type :label
+               :text "Users"
+               :style {:-fx-font-size 16}}
+              {:fx/type users-table
+               :v-box/vgrow :always
+               :users users}]}]}
+          (merge
+            {:fx/type battles-buttons}
+            (select-keys state
+              [:battle :battle-password :battle-title :battles :client :engines :engine-filter
+               :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
+               :pop-out-battle :scripttags :selected-battle]))]
+         (when battle
+           (if (:battle-id battle)
+             (when (not pop-out-battle)
+               [(merge
+                  {:fx/type battle-view}
+                  (select-keys state battle-view-keys))])
+             [{:fx/type :h-box
+               :alignment :top-left
+               :children
+               [{:fx/type :v-box
+                 :h-box/hgrow :always
+                 :children
+                 [{:fx/type :label
+                   :style {:-fx-font-size 20}
+                   :text "Waiting for server to start battle..."}]}]}]))
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text (str last-failed-message)
+             :style {:-fx-text-fill "#FF0000"}}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :label
+             :text (str (count file-events) " file events  ")}
+            {:fx/type :label
+             :text (str (count tasks) " tasks")}]}])}}}
+    (merge
+      {:fx/type import-window}
+      (select-keys state
+        [:copying :file-cache :import-filter :import-source-name :import-type
+         :importables-by-path :show-importer]))
+    (merge
+      {:fx/type download-window}
+      (select-keys state
+        [:downloading :download-filter :download-source-name :download-type
+         :downloadables-by-url :file-cache :show-downloader]))
+    (merge
+      {:fx/type rapid-download-window}
+      (select-keys state
+        [:engine-version :engines :rapid-download :rapid-repo :rapid-repos-cached :rapid-versions-cached
+         :rapid-versions-by-hash :sdp-files-cached :show-rapid-downloader]))
+    (merge
+      {:fx/type http-download-window}
+      (select-keys state
+        [:engine-branch :engine-versions-cached :engines :extracting :file-cache :http-download :map-files-cache
+         :maps-index-url :mod-files-cache :mods-index-url :show-http-downloader]))
+    {:fx/type :stage
+     :showing pop-out-battle
+     :title "alt-spring-lobby Battle"
+     :on-close-request {:event/type ::pop-in-battle}
+     :x 300
+     :y 300
+     :width battle-window-width
+     :height battle-window-height
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :h-box
+       :children
+       (concat []
+         (when pop-out-battle
+           [(merge
+              {:fx/type battle-view}
+              (select-keys state battle-view-keys))]))}}}]})
 
 
 (defn -main [& _args]
@@ -4590,9 +4558,12 @@
   (fs/init-7z!)
   (swap! *state assoc :standalone true)
   (add-watchers *state)
-  ;(add-hawk *state)
   (tasks-chimer-fn *state)
   (file-events-chimer-fn *state)
+  (add-task! *state {::task-type ::reconcile-engines})
+  (add-task! *state {::task-type ::reconcile-mods})
+  (add-task! *state {::task-type ::reconcile-maps})
+  (event-handler {:event/type ::scan-imports})
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc
                           (fn [state]
