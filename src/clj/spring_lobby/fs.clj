@@ -11,15 +11,13 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    ;(java.awt.image BufferedImage)
     (java.io FileOutputStream RandomAccessFile)
     (java.nio ByteBuffer)
     (java.util.zip CRC32 ZipEntry ZipFile)
-    ;(javax.imageio ImageIO)
-    (net.sf.sevenzipjbinding ISequentialOutStream SevenZip)
+    (net.sf.sevenzipjbinding IArchiveExtractCallback ISequentialOutStream PropID SevenZip SevenZipException)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
     (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
-    (org.apache.commons.io FilenameUtils)))
+    (org.apache.commons.io FilenameUtils FileUtils)))
 
 
 (set! *warn-on-reflection* true)
@@ -277,7 +275,7 @@
               (log/info "Extract result" res)
               (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
 
-(defn extract-7z
+(defn- extract-7z
   ([^java.io.File f]
    (let [fname (.getName f)
          dir (if (string/includes? fname ".")
@@ -310,6 +308,77 @@
            (catch Exception e
              (log/warn e "Error extracting"))))))
    (log/info "Finished extracting" f "to" dest)))
+
+
+(defn- close-7z-stream [callback-state]
+  (when-let [output-stream (:stream @callback-state)]
+    (try
+      (.close output-stream)
+      (catch Exception e
+        (log/error e "Error closing output stream")
+        (throw (SevenZipException. "Error closing output stream"))))))
+
+(defn extract-7z-fast
+  ([^java.io.File f]
+   (let [fname (.getName f)
+         dir (if (string/includes? fname ".")
+               (subs fname 0 (.lastIndexOf fname "."))
+               fname)
+         dest (io/file (.getParentFile f) dir)]
+     (extract-7z-fast f dest)))
+  ([^java.io.File f ^java.io.File dest]
+   (let [before (u/curr-millis)]
+     (log/info "Extracting" f "to" dest)
+     (FileUtils/forceMkdir dest)
+     (with-open [raf (new RandomAccessFile f "r")
+                 rafis (new RandomAccessFileInStream raf)
+                 archive (SevenZip/openInArchive nil rafis)]
+       (log/debug f "is of format" (.getArchiveFormat archive)
+                  "and has" (.getNumberOfItems archive) "items")
+       ; http://sevenzipjbind.sourceforge.net/javadoc/net/sf/sevenzipjbinding/IInArchive.html#extract(int[],%20boolean,%20net.sf.sevenzipjbinding.IArchiveExtractCallback)
+       (let [callback-state (atom {})]
+         (.extract archive
+                   nil ; all items
+                   false ; not test mode
+                   ; http://sevenzipjbind.sourceforge.net/javadoc/net/sf/sevenzipjbinding/IArchiveExtractCallback.html
+                   ; https://gist.github.com/borisbrodski/6120309
+                   (reify IArchiveExtractCallback
+                     (getStream [this index extract-ask-mode]
+                       (swap! callback-state assoc :index index)
+                       (close-7z-stream callback-state)
+                       (try
+                         (let [path (.getProperty archive index PropID/PATH)
+                               to (io/file dest path)
+                               is-folder (.getProperty archive index PropID/IS_FOLDER)]
+                           (if is-folder
+                             (do
+                               (log/debug "Creating dir" to)
+                               (FileUtils/forceMkdir to))
+                             (do
+                               (FileUtils/forceMkdir (.getParentFile to))
+                               (log/debug "Stream for index" index "to" to)
+                               (let [fos (FileOutputStream. to)] ; not with-open
+                                 (swap! callback-state assoc :stream fos)
+                                 (reify ISequentialOutStream
+                                   (write [this data]
+                                     (.write fos data 0 (count data))
+                                     (count data)))))))
+                         (catch Throwable e
+                           (log/error e "Error getting stream for item" index))))
+                     (prepareOperation [this extract-ask-mode]
+                       (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+                       (log/trace "preparing" extract-ask-mode))
+                     (setOperationResult [this extract-operation-result]
+                       (close-7z-stream callback-state)
+                       (swap! callback-state assoc :operation-result extract-operation-result)
+                       (log/trace "result" extract-operation-result))
+                     (setTotal [this total]
+                       (swap! callback-state assoc :total total)
+                       (log/trace "total" total))
+                     (setCompleted [this complete]
+                       (swap! callback-state assoc :complete complete)
+                       (log/trace "completed" complete))))))
+     (log/info "Finished extracting" f "to" dest "in" (- (u/curr-millis) before) "ms"))))
 
 
 (defn sync-version-to-engine-version

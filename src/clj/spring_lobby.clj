@@ -577,6 +577,7 @@
   ([]
    (reconcile-engines *state))
   ([state-atom]
+   (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
          engine-dirs (fs/engine-dirs)
          known-absolute-paths (->> state-atom deref :engines (map :absolute-path) (filter some?) set)
@@ -1339,30 +1340,6 @@
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-folder:16:white"}}}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Browse and download engines with http"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::show-http-downloader}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-download:16:white")}}}]
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
-             :text "Browse and download engines with http"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::show-http-downloader}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal (str "mdi-download:16:white")}}}
           {:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -3576,8 +3553,8 @@
     (try
       (swap! *state assoc-in [:extracting file] true)
       (if dest
-        (fs/extract-7z file dest)
-        (fs/extract-7z file))
+        (fs/extract-7z-fast file dest)
+        (fs/extract-7z-fast file))
       (reconcile-engines *state)
       (catch Exception e
         (log/error e "Error extracting 7z" file))
