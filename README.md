@@ -34,15 +34,6 @@ which will start an interactive compiler as well as the UI. If you make a change
 
 Logs are written to `repl.log`.
 
-
 ## TODO
 
-There are a number of things left before this is usable
-
-- Add downloading of engines, maps, and games
-- Store multiple servers
-- Handle the rapid format somehow
-- Improve map load performance, cache somewhere
-- Remove antlr parsing
-- Make repo public
-- Clean up ns organization
+[See the Changelog](./CHANGELOG.md) for history and some future plans.
