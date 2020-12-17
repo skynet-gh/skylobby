@@ -119,8 +119,7 @@
      :tasks (initial-tasks)}))
 
 
-(def ^:dynamic *state
-  (atom (initial-state)))
+(def ^:dynamic *state (atom {}))
 
 
 (defn spit-app-edn
@@ -4517,7 +4516,7 @@
 (defn -main [& _args]
   (Platform/setImplicitExit true)
   (fs/init-7z!)
-  (swap! *state assoc :standalone true)
+  (reset! *state (assoc (initial-state) :standalone true))
   (init *state)
   (let [r (fx/create-renderer
             :middleware (fx/wrap-map-desc

@@ -165,6 +165,8 @@
           (catch Exception e
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
+    (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))]
+      (reset! *state (initial-state-fn)))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
     (alter-var-root #'old-view (constantly (var-get (find-var 'spring-lobby/root-view))))
     (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))
