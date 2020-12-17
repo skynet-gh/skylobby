@@ -3177,7 +3177,14 @@
                (fn [^javafx.scene.canvas.Canvas canvas]
                  (let [gc (.getGraphicsContext2D canvas)
                        border-color (if (= "minimap" minimap-type)
-                                      Color/BLACK Color/WHITE)]
+                                      Color/BLACK Color/WHITE)
+                       random (= "Random" startpostype)
+                       random-teams (when random
+                                      (let [teams (spring/teams battle-details)]
+                                        (set (map str (take (count teams) (iterate inc 0))))))
+                       starting-points (if random
+                                         (filter (comp random-teams :team) starting-points)
+                                         starting-points)]
                    (.clearRect gc 0 0 minimap-width minimap-height)
                    (.setFill gc Color/RED)
                    (doseq [{:keys [x y team color]} starting-points]
@@ -3190,7 +3197,8 @@
                                      (* start-pos-r -0.6)
                                      (* start-pos-r -0.2)))
                            yc (+ y (/ start-pos-r 0.75))
-                           text (if (= "Random" startpostype) "?" team)]
+                           text (if random "?" team)
+                           fill-color (if random Color/RED color)]
                        (cond
                          (#{"Fixed" "Random" "Choose before game"} startpostype)
                          (do
@@ -3198,7 +3206,7 @@
                            (.rect gc x y
                                   (* 2 start-pos-r)
                                   (* 2 start-pos-r))
-                           (.setFill gc (if (= "Random" startpostype) Color/RED color))
+                           (.setFill gc fill-color)
                            (.fill gc)
                            (.setStroke gc border-color)
                            (.stroke gc)
