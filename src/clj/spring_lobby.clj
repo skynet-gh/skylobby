@@ -225,15 +225,6 @@
         mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])]
     (log/info "Caching" mod-name "to" cache-file)
     (spit cache-file (with-out-str (pprint mod-data)))
-    (let [state @state-atom
-          battle-id (-> state :battle :battle-id)
-          battle-modname (-> state :battles (get battle-id) :battle-modname)
-          battle-mod-details (:battle-mod-details state)]
-      (when (or (= (fs/canonical-path (:file mod-data))
-                   (fs/canonical-path (:file battle-mod-details)))
-                (= (:mod-name mod-details) battle-modname)) ; can this ever happen?
-        (log/info "Updating battle mod details")
-        (swap! state-atom assoc :battle-mod-details mod-data))) ; TODO avoid dupe swap
     (swap! state-atom update :mods
            (fn [mods]
              (-> (remove (comp #{(fs/canonical-path (:file mod-details))} fs/canonical-path :file) mods)
@@ -284,7 +275,6 @@
   (remove-watch state-atom :mods)
   (remove-watch state-atom :importables)
   (remove-watch state-atom :downloadables)
-  ;(remove-watch state-atom :rapid)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
@@ -307,7 +297,6 @@
   (add-watch-state-to-edn state-atom :mods select-mods "mods.edn")
   (add-watch-state-to-edn state-atom :importables select-importables "importables.edn")
   (add-watch-state-to-edn state-atom :downloadables select-downloadables "downloadables.edn")
-  ;(add-watch-state-to-edn state-atom :rapid select-rapid "rapid.edn")
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (try
@@ -678,9 +667,10 @@
         sdp-files (rapid/sdp-files)
         _ (log/info "Found" (count mod-files) "files and"
                     (count sdp-files) "rapid archives to scan for mods")
-        to-add-file (concat
-                      (remove (comp known-file-paths fs/canonical-path) mod-files)
-                      (map :file directory)) ; always scan dirs in case git changed
+        to-add-file (set
+                      (concat
+                        (remove (comp known-file-paths fs/canonical-path) mod-files)
+                        (map :file directory))) ; always scan dirs in case git changed
         to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
         all-paths (filter some? (concat known-file-paths known-rapid-paths))
         missing-files (set
@@ -799,8 +789,9 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/instant)
-            (java-time/duration 1 :minutes))
+            (java-time/duration 3 :minutes))
           (fn [_chimestamp]
+            (log/info "Force updating battle resources")
             (force-update-battle-engine state-atom)
             (force-update-battle-mod state-atom)
             (force-update-battle-map state-atom))
@@ -1155,12 +1146,17 @@
 
 
 (defmethod event-handler ::host-battle
-  [{:keys [client scripttags host-battle-state]}]
+  [{:keys [client scripttags host-battle-state use-springlobby-modname]}]
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)
                   (string/blank? map-name))
-      (open-battle client host-battle-state)
+      (let [mod-name-parsed (parse-mod-name-git mod-name)
+            [_ mod-prefix _git] mod-name-parsed
+            adjusted-modname (if (and use-springlobby-modname mod-name-parsed)
+                                 (str mod-prefix " $VERSION")
+                                 mod-name)]
+        (open-battle client (assoc host-battle-state :mod-name adjusted-modname)))
       (when (seq scripttags)
         (message/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
 
@@ -1309,7 +1305,8 @@
 
 (defn battles-buttons
   [{:keys [battle battles battle-password battle-title client engine-version mod-name map-name maps
-           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle]
+           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
+           use-springlobby-modname]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -1499,7 +1496,7 @@
                host-battle-action (merge
                                     {:event/type ::host-battle
                                      :host-battle-state host-battle-state}
-                                    (select-keys state [:client :scripttags]))]
+                                    (select-keys state [:client :scripttags :use-springlobby-modname]))]
            [{:fx/type :button
              :text "Host Battle"
              :disable (boolean
@@ -1520,7 +1517,24 @@
              :text (str battle-password)
              :prompt-text "Battle Password"
              :on-action host-battle-action
-             :on-text-changed {:event/type ::battle-password-change}}])))}
+             :on-text-changed {:event/type ::battle-password-change}}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :style {:-fx-font-size 14}
+               :text "If using git, set version to $VERSION so SpringLobby is happier"}}
+             :desc
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [{:fx/type :check-box
+                :selected (boolean use-springlobby-modname)
+                :h-box/margin 8
+                :on-selected-changed {:event/type ::use-springlobby-modname-change}}
+               {:fx/type :label
+                :text "Use SpringLobby Game Name"}]}}])))}
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 16}
@@ -1569,6 +1583,11 @@
 (defmethod event-handler ::battle-title-change
   [{:fx/keys [event]}]
   (swap! *state assoc :battle-title event))
+
+(defmethod event-handler ::use-springlobby-modname-change
+  [{:fx/keys [event]}]
+  (swap! *state assoc :use-springlobby-modname event))
+
 
 (defmethod event-handler ::minimap-type-change
   [{:fx/keys [event]}]
@@ -2569,8 +2588,9 @@
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           copying downloadables-by-url drag-team engines extracting file-cache git-clone gitting http-download importables-by-path
-           map-input-prefix maps minimap-type rapid-data-by-version rapid-download users username]
+           copying downloadables-by-url drag-team engines extracting file-cache gitting
+           http-download importables-by-path map-input-prefix maps minimap-type
+           rapid-data-by-version rapid-download users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -2861,7 +2881,8 @@
                                {:event/type ::git-mod
                                 :file mod-file
                                 :battle-mod-git-ref battle-mod-git-ref}}))]
-                         (when-not (zero? severity)
+                         (when (and (not (zero? severity))
+                                    (not= battle-mod-git-ref "$VERSION"))
                            [(merge
                               {:severity 1
                                :text "rehost"
@@ -4406,7 +4427,7 @@
             (select-keys state
               [:battle :battle-password :battle-title :battles :client :engines :engine-filter
                :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-               :pop-out-battle :scripttags :selected-battle]))]
+               :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
          (when battle
            (if (:battle-id battle)
              (when (not pop-out-battle)

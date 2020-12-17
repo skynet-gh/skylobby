@@ -19,6 +19,7 @@
   hashp/hashp {:mvn/version "0.2.0"}
   hawk/hawk {:mvn/version "0.2.11"}
   instaparse/instaparse {:mvn/version "1.4.10"}
+  io.aviso/pretty {:mvn/version "0.1.37"}
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
@@ -55,7 +56,7 @@
                 pjstadig/humane-test-output {:mvn/version "0.10.0"}}
    :main-opts ["-m" "tests"]}
   :uberjar
-  {:extra-paths ["dev/clj/uberjar"]
+  {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}

@@ -58,15 +58,15 @@
   (loop []
     (when
       (try
-        (println "Sleeping and trying REPLy")
-        (Thread/sleep 500)
+        (println "Trying to start REPLy")
         (reply.main/launch-nrepl
           {:attach (slurp ".nrepl-port")
            :caught io.aviso.repl/pretty-pst
            :color true})
         false
         (catch Exception _e
-          (println "Error connecting REPLy")
+          (println "Error connecting REPLy, sleeping")
+          (Thread/sleep 500)
           true))
       (recur)))
   (System/exit 0))

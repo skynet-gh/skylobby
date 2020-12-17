@@ -15,11 +15,11 @@
   (testing "no players"
     (is (= expected-script-data
            (assoc-in
-             (spring/script-data battle)
+             (spring/script-data battle {:is-host true :game {:myplayername "me"}})
              [:game :hostip] nil))))
   (testing "player and bot"
     (is (= expected-script-data-players
-           (spring/script-data battle-players)))))
+           (spring/script-data battle-players {:is-host true :game {:myplayername "me"}})))))
 
 (deftest script-test
   (is (= expected-script-txt
@@ -54,8 +54,9 @@
     :mapname "Dworld Acidic"
     :hostport 8452
     :hostip nil
-    :ishost 0
-    :modoptions {}}})
+    :ishost 1
+    :modoptions {}
+    :myplayername "me"}})
 
 (def battle-players
   {:battle-modhash -1
@@ -96,7 +97,8 @@
     :mapname "Dworld Duo"
     :hostport 8452
     :hostip nil
-    :ishost 0
+    :ishost 1
+    :myplayername "me"
     :modoptions {}
     :team0
     {:teamleader 0
@@ -133,12 +135,13 @@
 \tgametype = Balanced Annihilation V9.79.4;
 \thostip = ;
 \thostport = 8452;
-\tishost = 0;
+\tishost = 1;
 \tmapname = Dworld Acidic;
 \t[modoptions]
 \t{
 \t}
 
+\tmyplayername = me;
 }
 
 ")
@@ -173,12 +176,13 @@
 \tgametype = Balanced Annihilation V10.24;
 \thostip = ;
 \thostport = 8452;
-\tishost = 0;
+\tishost = 1;
 \tmapname = Dworld Duo;
 \t[modoptions]
 \t{
 \t}
 
+\tmyplayername = me;
 \t[player0]
 \t{
 \t\tcountrycode = ;

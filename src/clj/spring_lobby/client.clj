@@ -23,6 +23,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def ^:dynamic handler handler/handle) ; for overriding in dev
+
+
 (def agent-string "alt-spring-lobby-0.1")
 
 
@@ -321,7 +324,8 @@
           (log/error e "Error in ping loop"))))))
 
 
-(defn print-loop [state-atom c]
+(defn print-loop 
+  [state-atom c]
   (swap! state-atom
     assoc
     :print-loop
@@ -333,8 +337,7 @@
             (when-let [m @d]
               (log/info "<" (str "'" m "'"))
               (try
-                (require 'spring-lobby.client.handler) ; is there a better way?
-                ((var-get (find-var 'spring-lobby.client.handler/handle)) c state-atom m)
+                (handler c state-atom m)
                 (catch Exception e
                   (log/error e "Error handling message")))
               (when-not (Thread/interrupted)
@@ -355,13 +358,11 @@
 
 
 (defn connect
-  ([state-atom]
-   (connect state-atom (client (:server-url @state-atom))))
-  ([state-atom client]
-   (let [{:keys [username password]} @state-atom]
-     (print-loop state-atom client)
-     (login client "*" username password)
-     (ping-loop state-atom client))))
+  [state-atom client]
+  (let [{:keys [username password]} @state-atom]
+    (print-loop state-atom client)
+    (login client "*" username password)
+    (ping-loop state-atom client)))
 
 (defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
