@@ -50,7 +50,7 @@
     reply/reply {:mvn/version "0.4.4"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "repl"]}
-  :test
+  :test-refresh
   {:extra-paths ["dev/clj/test" "test/clj"]
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
                 pjstadig/humane-test-output {:mvn/version "0.10.0"}}
@@ -63,4 +63,21 @@
   :kaocha
   {:extra-paths ["test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}
-   :main-opts ["-m" "kaocha.runner" "--watch"]}}}
+   :main-opts ["-m" "kaocha.runner" "--watch"]}
+  :test-once
+  {:extra-paths ["test/clj"]
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}
+   :main-opts ["-m" "kaocha.runner"]}
+  :test
+  {:extra-paths ["test/clj"]}
+  ; https://github.com/cljfx/cljfx/blob/9a3c696d6f18828d35e4d1f4d71e8104b7a85576/deps.edn#L27-L28
+  :headless
+  {:jvm-opts ["-Dtestfx.robot=glass" "-Dglass.platform=Monocle" "-Dmonocle.platform=Headless" "-Dprism.order=sw"]
+   :extra-deps
+   {org.testfx/openjfx-monocle {:mvn/version "jdk-12.0.1+2"}}}
+  :runner
+  {:extra-deps
+   {com.cognitect/test-runner
+    {:git/url "https://github.com/cognitect-labs/test-runner"
+     :sha "b6b3193fcc42659d7e46ecd1884a228993441182"}}
+   :main-opts ["-m" "cognitect.test-runner" "-d" "test/clj"]}}}

@@ -283,11 +283,11 @@
         (let [dold (select-debug old-state)
               dnew (select-debug new-state)]
           (when (not= dold dnew)
-            #p dold
-            #p dnew
+            (println dold)
+            (println dnew)
             (let [[old-only new-only] (clojure.data/diff old-state new-state)]
-              #p old-only
-              #p new-only)))
+              (println old-only)
+              (println new-only))))
         (catch Exception e
           (log/error e "Error in debug")))))
   (add-watch-state-to-edn state-atom :config select-config "config.edn")

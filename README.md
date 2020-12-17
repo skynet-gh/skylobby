@@ -1,4 +1,4 @@
-# alt-spring-lobby
+# alt-spring-lobby ![test](https://github.com/skynet-gh/alt-spring-lobby/workflows/test/badge.svg)
 
 A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com/spring/uberserver).
 

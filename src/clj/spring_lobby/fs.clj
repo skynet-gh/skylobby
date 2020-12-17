@@ -52,11 +52,6 @@
   (when f
     (.isDirectory f)))
 
-(defn is-file [^File f]
-  #p f
-  (when f
-    (.isFile f)))
-
 (defn is-file? [^File f]
   (when f
     (.isFile f)))
@@ -488,7 +483,7 @@
 (defn map-names []
   (->> (list-files (io/file (spring-root) "maps"))
        seq
-       (filter is-file)
+       (filter is-file?)
        (map
          (fn [^File file]
            (let [filename (filename file)]
@@ -779,7 +774,7 @@
     (doseq [source (file-seq source-dir)]
       (let [dest (io/file dest-dir (str (.relativize source-path (to-path source))))]
         (cond
-          (not (is-file source)) (log/warn "Not a file" source)
+          (not (is-file? source)) (log/warn "Not a file" source)
           (exists dest) (log/trace "Skipping copy of" source "since it exists at" dest)
           :else
           (try
