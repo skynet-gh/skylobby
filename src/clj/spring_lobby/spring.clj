@@ -10,14 +10,8 @@
     [com.evocomputing.colors :as colors]
     [spring-lobby.client.message :as client]
     [spring-lobby.fs :as fs]
-    [spring-lobby.rapid :as rapid]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
-  (:import
-    (java.io FileOutputStream)
-    (java.nio.file CopyOption StandardCopyOption)
-    (java.util.zip ZipEntry ZipOutputStream)
-    (org.apache.commons.io FileUtils)))
+    [taoensso.timbre :as log]))
 
 
 (set! *warn-on-reflection* true)
@@ -41,7 +35,7 @@
   ([]
    (sides nil))
   ([mod-name]
-   (if (and mod-name (string/starts-with? "Beyond All Reason" mod-name)) ; TODO where to get this
+   (if (and mod-name (string/starts-with? mod-name "Beyond All Reason")) ; TODO where to get this
      bar-sides
      ba-sides)))
 
@@ -282,198 +276,10 @@
            (filter (comp #{engine-version} :engine-version))
            first))
 
-(defn engine-dir-filename [engines engine-version]
-  (:engine-dir-filename (engine-details engines engine-version)))
-
-(defn copy-dir ; TODO move to fs
-  [^java.io.File source ^java.io.File dest]
-  (if (.exists source)
-    (do
-      (FileUtils/forceMkdir dest)
-      (log/info "Copying" source "to" dest)
-      (FileUtils/copyDirectory source dest))
-    (log/warn "No source to copy from" (.getAbsolutePath source) "to" (.getAbsolutePath dest))))
-
-(defn copy-engine [engines engine-version]
-  (if engine-version
-    (let [source (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
-          dest (io/file (fs/isolation-dir) "engine" engine-version)]
-      (copy-dir source dest))
-    (throw
-      (ex-info "Missing engine to copy to isolation dir"
-               {:engine-version engine-version}))))
-
-; TODO move to fs
-(defn java-nio-copy
-  ([^java.io.File source ^java.io.File dest]
-   (java-nio-copy source dest nil))
-  ([^java.io.File source ^java.io.File dest {:keys [copy-options]
-                                             :or {copy-options
-                                                  [StandardCopyOption/COPY_ATTRIBUTES
-                                                   StandardCopyOption/REPLACE_EXISTING]}}]
-   (let [^java.nio.file.Path source-path (.toPath source)
-         ^java.nio.file.Path dest-path (.toPath dest)
-         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)
-         dest-parent (.getParentFile dest)]
-     (when (and dest-parent (not (.exists dest-parent)))
-       (.mkdirs dest-parent))
-     (java.nio.file.Files/copy source-path dest-path options))))
-
-(defn copy-missing [source-dir dest-dir]
-  (let [source-path (.toPath source-dir)]
-    (doseq [source (file-seq source-dir)]
-      (let [dest (io/file dest-dir (str (.relativize source-path (.toPath source))))]
-        (cond
-          (not (.isFile source)) (log/warn "Not a file" source)
-          (.exists dest) (log/trace "Skipping copy of" source "since it exists at" dest)
-          :else
-          (try
-            (log/info "Copying" source "to" dest)
-            (java-nio-copy source dest {:copy-options [StandardCopyOption/COPY_ATTRIBUTES]})
-            (catch Exception e
-              (log/warn e "Unable to copy file" source "to" dest
-                        {:exists (.exists dest)}))))))))
-
-(defn copy-engine-missing [engines engine-version]
-  (if engine-version
-    (let [source-dir (io/file (fs/spring-root) "engine" (engine-dir-filename engines engine-version))
-          dest-dir (io/file (fs/isolation-dir) "engine" engine-version)]
-      (copy-missing source-dir dest-dir))
-    (throw
-      (ex-info "Missing engine to copy to isolation dir"
-               {:engine-version engine-version}))))
-
-(defn mod-isolation-file ^java.io.File
-  [{::fs/keys [source] :keys [filename]}]
-  (when filename
-    (case source
-      :rapid
-      (io/file (fs/isolation-dir) "packages" filename)
-      ; else
-      (io/file (fs/isolation-dir) "games" filename))))
-
-
-(defn mod-isolation-archive-file ^java.io.File
-  [{::fs/keys [source] :keys [mod-name]}]
-  (cond
-    (#{:rapid} source)
-    (let [filename (str mod-name ".sdz")]
-      (io/file (fs/isolation-dir) "games" filename))
-    :else
-    (log/info "No archive for mod type" source "for" mod-name)))
-
-(defn copy-mod [mod-details engine-version]
-  (let [mod-filename (:filename mod-details)
-        absolute-path (:absolute-path mod-details)]
-    (cond
-      (not (and mod-filename engine-version))
-      (throw
-        (ex-info "Missing mod or engine to copy to isolation dir"
-                 {:mod-filename mod-filename
-                  :engine-version engine-version}))
-      (= :directory (::fs/source mod-details))
-      (let [source (io/file absolute-path)
-            dest (io/file (fs/isolation-dir) "games" mod-filename)]
-        (if (.exists source)
-          (copy-missing source dest)
-          (log/warn "No mod file to copy from" source "to" dest)))
-      (= :rapid (::fs/source mod-details))
-      (let [sdp-decoded (rapid/decode-sdp (io/file absolute-path))
-            source (io/file absolute-path)
-            dest (io/file (fs/isolation-dir) "packages" mod-filename)]
-        (java-nio-copy source dest)
-        (doseq [item (:items sdp-decoded)]
-          (let [md5 (:md5 item)
-                ^java.io.File pool-source (rapid/file-in-pool md5)
-                ^java.io.File pool-dest (rapid/file-in-pool (fs/isolation-dir) md5)]
-            (log/info "Copying" pool-source "to" pool-dest)
-            (java-nio-copy pool-source pool-dest))))
-      (= :archive (::fs/source mod-details))
-      (let [source (io/file (fs/spring-root) "games" mod-filename)
-            dest (io/file (fs/isolation-dir) "games" mod-filename)]
-        (if (.exists source)
-          (java-nio-copy source dest)
-          (log/warn "No mod file to copy from" (.getAbsolutePath source)
-                    "to" (.getAbsolutePath dest)))))))
-
 (defn hidden-directory? [path-str]
   (or (re-find #"^\." path-str)
       (re-find #"/\." path-str)
       (re-find #"\\\." path-str)))
-
-(defn archive-mod [mod-details engine-version]
-  (let [mod-filename (:filename mod-details)
-        absolute-path (:absolute-path mod-details)]
-    (cond
-      (not (and mod-filename engine-version))
-      (throw
-        (ex-info "Missing mod or engine to copy to isolation dir"
-                 {:mod-filename mod-filename
-                  :engine-version engine-version}))
-      (= :rapid (::fs/source mod-details))
-      (let [sdp-decoded (rapid/decode-sdp (io/file absolute-path))
-            parent (io/file (fs/isolation-dir) "games")
-            ^java.io.File dest (mod-isolation-archive-file mod-details)]
-        (.mkdirs parent)
-        (with-open [fos (FileOutputStream. dest)
-                    zos (ZipOutputStream. fos)]
-          (doseq [{:keys [filename]} (:items sdp-decoded)]
-            (let [{:keys [content-bytes]} (rapid/inner sdp-decoded filename)
-                  ze (ZipEntry. ^String filename)]
-              (log/debug "Adding zip entry for" filename)
-              (.putNextEntry zos ze)
-              (.write zos content-bytes 0 (count content-bytes))
-              (.closeEntry zos))))
-        (log/info "Finished creating" dest))
-      (= :directory (::fs/source mod-details))
-      (let [source-dir (io/file absolute-path)
-            source-path (.toPath source-dir)
-            parent (io/file (fs/isolation-dir) "games")
-            ^java.io.File dest (mod-isolation-archive-file mod-details)]
-        (.mkdirs parent)
-        (with-open [fos (FileOutputStream. dest)
-                    zos (ZipOutputStream. fos)]
-          (doseq [subfile (->> source-dir
-                               file-seq
-                               (filter #(.isFile %)))]
-            (let [file-bytes (rapid/slurp-bytes subfile)
-                  path (.toPath subfile)
-                  relative-path (str (.relativize source-path path))]
-              (if-not (hidden-directory? relative-path)
-                (let [ze (ZipEntry. ^String relative-path)]
-                  (log/debug "Adding zip entry for" relative-path)
-                  (.putNextEntry zos ze)
-                  (.write zos file-bytes 0 (count file-bytes))
-                  (.closeEntry zos))
-                (log/trace "Skipping hidden directory" relative-path)))))
-        (log/info "Finished creating" dest))
-      :else
-      (log/info "Nothing to do, mod is already an archive: " (:filename mod-details)))))
-
-(defn map-isolation-file ^java.io.File
-  [map-filename engine-version]
-  (when (and map-filename engine-version)
-    (io/file (fs/isolation-dir) "maps" map-filename)))
-
-(defn copy-map [map-filename engine-version]
-  (if (and map-filename engine-version)
-    (let [source (io/file (fs/spring-root) "maps" map-filename)
-          ^java.io.File dest (map-isolation-file map-filename engine-version)
-          ^java.nio.file.Path source-path (.toPath source)
-          ^java.nio.file.Path dest-path (.toPath dest)
-          ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption
-                                                   [StandardCopyOption/COPY_ATTRIBUTES
-                                                    StandardCopyOption/REPLACE_EXISTING])]
-      (if (.exists source)
-        (do
-          (.mkdirs dest)
-          (java.nio.file.Files/copy source-path dest-path options))
-        (log/warn "No map file to copy from" (.getAbsolutePath source)
-                  "to" (.getAbsolutePath dest))))
-    (throw
-      (ex-info "Missing map or engine to copy to isolation dir"
-               {:map-filename map-filename
-                :engine-version engine-version}))))
 
 (defn start-game [{:keys [client engines] :as state}]
   (try
@@ -488,8 +294,7 @@
           engine-dir (some->> engines
                               (filter (comp #{battle-version} :engine-version))
                               first
-                              :absolute-path
-                              io/file)
+                              :file)
           engine-file (io/file engine-dir (fs/spring-executable))
           _ (log/info "Engine executable" engine-file)
           script-file (io/file (fs/app-root) "spring" "script.txt") ; TODO match isolation?
@@ -498,7 +303,7 @@
           write-dir-param (fs/wslpath engine-dir)]
       (spit script-file script-txt)
       (log/info "Wrote script to" script-file)
-      (let [command [(.getAbsolutePath engine-file)
+      (let [command [(fs/canonical-path engine-file)
                      "--isolation-dir" write-dir-param
                      "--write-dir" isolation-dir-param
                      script-file-param]

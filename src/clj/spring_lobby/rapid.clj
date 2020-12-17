@@ -46,7 +46,7 @@
 (defn decode-sdp [^java.io.File f]
   (with-open [is (io/input-stream f)
               gz (GZIPInputStream. is)]
-    {::source (.getAbsolutePath f)
+    {:file f
      :items (b/decode (b/repeated sdp-line) gz)}))
 
 (defn sdp-files
@@ -104,14 +104,13 @@
                                first)]
      (assoc inner-details :content-bytes (slurp-bytes-from-pool root (:md5 inner-details)))
      (log/warn "No such inner rapid file"
-               (pr-str {:package (::source decoded-sdp)
+               (pr-str {:package-file (:file decoded-sdp)
                         :inner-filename inner-filename})))))
 
 (defn root-from-sdp
   "Returns the spring root for the given sdp file."
   [f]
-  (when-let [parent (.getParentFile f)] ; packages dir
-    (.getParentFile parent)))
+  (-> f fs/parent-file fs/parent-file))
 
 (defn rapid-inner [sdp-file inner-filename]
   (let [root (root-from-sdp sdp-file)]
@@ -121,7 +120,7 @@
       inner-filename)))
 
 (defn sdp-hash [^java.io.File sdp-file]
-  (-> (.getName sdp-file)
+  (-> (fs/filename sdp-file)
       (string/split #"\.")
       first))
 
@@ -134,10 +133,10 @@
    (repos (fs/isolation-dir)))
   ([root]
    (log/debug "Loading rapid repo names")
-   (->> (.listFiles (io/file root "rapid" "repos.springrts.com"))
+   (->> (fs/list-files (io/file root "rapid" "repos.springrts.com"))
         seq
-        (filter #(.isDirectory ^java.io.File %))
-        (map #(.getName ^java.io.File %)))))
+        (filter fs/is-directory)
+        (map fs/filename))))
 
 (defn rapid-versions [f]
   (with-open [is (io/input-stream f)
@@ -198,8 +197,7 @@
    (let [modinfo (try-inner-lua f "modinfo.lua")] ; TODO don't parse the .sdp over and over
      (merge
        {::fs/source :rapid
-        :filename (.getName f)
-        :absolute-path (.getAbsolutePath f)
+        :file f
         :modinfo modinfo}
        (when-not modinfo-only
          (when modinfo

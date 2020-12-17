@@ -11,9 +11,9 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.io FileOutputStream RandomAccessFile)
-    (java.nio ByteBuffer)
-    (java.util.zip CRC32 ZipEntry ZipFile)
+    (java.io File FileOutputStream RandomAccessFile)
+    (java.nio.file CopyOption Files Path StandardCopyOption)
+    (java.util.zip ZipEntry ZipFile)
     (net.sf.sevenzipjbinding IArchiveExtractCallback ISequentialOutStream PropID SevenZip SevenZipException)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
     (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
@@ -31,22 +31,47 @@
 (def maps-filename "maps.edn")
 
 
-(defn canonical-path [^java.io.File f]
+(defn canonical-path [^File f]
   (when f
     (.getCanonicalPath f)))
 
 ; TODO always use canonical-path
-(defn absolute-path [^java.io.File f]
+(defn absolute-path [^File f]
   (when f
     (.getAbsolutePath f)))
 
-(defn filename [^java.io.File f]
+(defn filename [^File f]
   (when f
     (.getName f)))
 
-(defn exists [^java.io.File f]
+(defn exists [^File f]
   (when f
     (.exists f)))
+
+(defn is-directory [^File f]
+  (when f
+    (.isDirectory f)))
+
+(defn is-file [^File f]
+  #p f
+  (when f
+    (.isFile f)))
+
+(defn is-file? [^File f]
+  (when f
+    (.isFile f)))
+
+(defn parent-file [^File f]
+  (when f
+    (.getParentFile f)))
+
+(defn list-files [^File f]
+  (when f
+    (.listFiles f)))
+
+(defn to-path [^File f]
+  (when f
+    (.toPath f)))
 
 
 (defn os-name []
@@ -96,18 +121,18 @@
 
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."
-  [^java.io.File f]
-  (if (wsl?)
-    (let [path (.getAbsolutePath f)
-          command ["wslpath" "-w" path]
-          ^"[Ljava.lang.String;" cmdarray (into-array String command)
-          runtime (Runtime/getRuntime)
-          process (.exec runtime cmdarray)]
-      (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
-      (let [windows-path (string/trim (slurp (.getInputStream process)))]
-        (log/info "Converted path" path "to" windows-path)
-        windows-path))
-    (.getAbsolutePath f)))
+  [^File f]
+  (let [path (canonical-path f)]
+    (if (wsl?)
+      (let [command ["wslpath" "-w" path]
+            ^"[Ljava.lang.String;" cmdarray (into-array String command)
+            runtime (Runtime/getRuntime)
+            process (.exec runtime cmdarray)]
+        (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
+        (let [windows-path (string/trim (slurp (.getInputStream process)))]
+          (log/info "Converted path" path "to" windows-path)
+          windows-path))
+      path)))
 
 
 (defn envp
@@ -137,7 +162,7 @@
 
 (defn bar-root
   "Returns the root directory for BAR"
-  ^java.io.File []
+  ^File []
   (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
@@ -155,7 +180,7 @@
 
 (defn spring-root
   "Returns the root directory for Spring"
-  ^java.io.File []
+  ^File []
   (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
@@ -204,25 +229,13 @@
       (throw (ex-info "Unable to determine app root for this system"
                       {:sys-data sys-data})))))
 
-(defn map-files-7z []
-  (->> (io/file (spring-root) "maps")
-       file-seq
-       (filter #(.isFile ^java.io.File %))
-       (filter #(string/ends-with? (.getName ^java.io.File %) ".sd7"))))
-
-(defn map-files-zip []
-  (->> (io/file (spring-root) "maps")
-       file-seq
-       (filter #(.isFile ^java.io.File %))
-       (filter #(string/ends-with? (.getName ^java.io.File %) ".sdz"))))
-
-(defn download-dir ^java.io.File
+(defn download-dir ^File
   []
   (io/file (app-root) "download"))
 
 (defn isolation-dir
   "Returns the isolation dir for spring in this app, usually $HOME/.alt-spring-lobby/spring"
-  ^java.io.File
+  ^File
   []
   (io/file (app-root) "spring"))
 
@@ -232,71 +245,22 @@
   ([root]
    (->> (io/file root "maps")
         file-seq
-        (filter #(.isFile ^java.io.File %))
-        (filter #(or (string/ends-with? (.getName ^java.io.File %) ".sd7")
-                     (string/ends-with? (.getName ^java.io.File %) ".sdz"))))))
+        (filter is-file?)
+        (filter #(or (string/ends-with? (filename %) ".sd7")
+                     (string/ends-with? (filename %) ".sdz"))))))
 
 #_
-(defn open-zip [^java.io.File from]
-  (let [zf (new ZipFile from)
-        entries (enumeration-seq (.entries zf))]
-    (doseq [^java.util.zip.ZipEntry entry entries]
-      (println (.getName entry) (.getCrc entry))
-      (let [entry-name (.getName entry)
-            crc-long (.getCrc entry)
-            dir (.isDirectory entry)]
-        (when (re-find #"(?i)mini" entry-name)
-          (println (.getName from) entry-name))))))
-
-; https://github.com/spring/spring/blob/master/rts/System/FileSystem/ArchiveScanner.cpp#L782-L858
-(defn spring-crc [named-crcs]
-  (let [^CRC32 res (CRC32.)
-        sorted (sort-by :crc-name named-crcs)]
-    (doseq [{:keys [^String crc-name crc-long]} sorted]
-      (.update res (.getBytes crc-name))
-      (.update res (.array (.putLong (ByteBuffer/allocate 4) crc-long)))) ; TODO fix array overflow
-    (.getValue res))) ; TODO 4711 if 0
-
-
-#_
-(defn open-7z [^java.io.File from]
-  (with-open [raf (new RandomAccessFile from "r")
-              rafis (new RandomAccessFileInStream raf)
-              archive (SevenZip/openInArchive nil rafis)
-              simple (.getSimpleInterface archive)]
-    (log/trace from "has" (.getNumberOfItems archive) "items")
-    (doseq [^ISimpleInArchiveItem item (.getArchiveItems simple)]
-      (let [path (.getPath item)
-            crc (.getCRC item)
-            crc-long (Integer/toUnsignedString crc)
-            dir (.isFolder item)
-            from-path (.getPath (io/file from))
-            to (str (subs from-path 0 (.lastIndexOf from-path ".")) ".png")]
-        (when (string/includes? (string/lower-case path) "mini")
-          (log/info path))
-        (when (re-find #"(?i)mini\.png" path)
-          (log/info "Extracting" path "to" to)
-          (with-open [baos (java.io.ByteArrayOutputStream.)]
-            (let [res (.extractSlow item
-                        (reify ISequentialOutStream
-                          (write [this data]
-                            (log/trace "got" (count data) "bytes")
-                            (.write baos data 0 (count data))
-                            (count data))))
-                  ^BufferedImage image (with-open [is (io/input-stream (.toByteArray baos))]
-                                         (ImageIO/read is))]
-              (log/info "Extract result" res)
-              (log/info "Wrote image" (ImageIO/write image "png" (io/file to))))))))))
+(map-files)
 
 (defn- extract-7z
-  ([^java.io.File f]
+  ([^File f]
    (let [fname (.getName f)
          dir (if (string/includes? fname ".")
                (subs fname 0 (.lastIndexOf fname "."))
                fname)
          dest (io/file (.getParentFile f) dir)]
      (extract-7z f dest)))
-  ([^java.io.File f ^java.io.File dest]
+  ([^File f ^File dest]
    (with-open [raf (new RandomAccessFile f "r")
                rafis (new RandomAccessFileInStream raf)
                archive (SevenZip/openInArchive nil rafis)
@@ -332,14 +296,14 @@
         (throw (SevenZipException. "Error closing output stream"))))))
 
 (defn extract-7z-fast
-  ([^java.io.File f]
-   (let [fname (.getName f)
+  ([^File f]
+   (let [fname (filename f)
          dir (if (string/includes? fname ".")
                (subs fname 0 (.lastIndexOf fname "."))
                fname)
-         dest (io/file (.getParentFile f) dir)]
+         dest (io/file (parent-file f) dir)]
      (extract-7z-fast f dest)))
-  ([^java.io.File f ^java.io.File dest]
+  ([^File f ^File dest]
    (let [before (u/curr-millis)]
      (log/info "Extracting" f "to" dest)
      (FileUtils/forceMkdir dest)
@@ -407,7 +371,7 @@
 (defn sync-version [engine-dir]
   (let [engine-exe (io/file engine-dir (spring-headless-executable))
         _ (.setExecutable engine-exe true)
-        command [(.getAbsolutePath engine-exe) "--sync-version"]
+        command [(canonical-path engine-exe) "--sync-version"]
         ^"[Ljava.lang.String;" cmdarray (into-array String command)
         runtime (Runtime/getRuntime)
         process (.exec runtime cmdarray)]
@@ -427,14 +391,13 @@
   ([]
    (engine-dirs (isolation-dir)))
   ([root]
-   (->> (.listFiles (io/file root "engine"))
+   (->> (list-files (io/file root "engine"))
         seq
-        (filter #(.isDirectory ^java.io.File %)))))
+        (filter is-directory))))
 
-(defn engine-data [^java.io.File engine-dir]
+(defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]
-    {:absolute-path (.getAbsolutePath engine-dir)
-     :engine-dir-filename (.getName engine-dir)
+    {:file engine-dir
      :sync-version sync-version
      :engine-version (sync-version-to-engine-version sync-version)}))
 
@@ -464,7 +427,7 @@
   ([]
    (mod-files (isolation-dir)))
   ([root]
-   (seq (.listFiles (io/file root "games")))))
+   (seq (list-files (io/file root "games")))))
 
 (defn read-mod-zip-file
   ([^java.io.File file]
@@ -479,8 +442,7 @@
                              (catch Exception e
                                (log/warn e "Error loading" filename "from" file))))]
        (merge
-         {:filename (.getName file)
-          :absolute-path (.getAbsolutePath file)
+         {:file file
           :modinfo (try-entry-lua "modinfo.lua")
           ::source :archive}
          (when-not modinfo-only
@@ -499,8 +461,7 @@
                           (catch Exception e
                             (log/warn e "Error loading" filename "from" file))))]
      (merge
-       {:filename (.getName file)
-        :absolute-path (.getAbsolutePath file)
+       {:file file
         :modinfo (try-file-lua "modinfo.lua")
         :git-commit-id (try
                          (git/latest-id file)
@@ -517,20 +478,20 @@
    (read-mod-file file nil))
   ([^java.io.File file opts]
    (cond
-     (.isDirectory file)
+     (is-directory file)
      (read-mod-directory file opts)
-     (string/ends-with? (.getName file) ".sdz")
+     (string/ends-with? (filename file) ".sdz")
      (read-mod-zip-file file opts)
      :else
      (log/warn "Unknown mod file type" file))))
 
 (defn map-names []
-  (->> (.listFiles (io/file (spring-root) "maps"))
+  (->> (list-files (io/file (spring-root) "maps"))
        seq
-       (filter #(.isFile ^java.io.File %))
+       (filter is-file)
        (map
-         (fn [^java.io.File file]
-           (let [filename (.getName file)]
+         (fn [^File file]
+           (let [filename (filename file)]
              (first (string/split filename #"\.")))))))
 
 (defn map-filename [map-name]
@@ -581,7 +542,7 @@
                           (when-not (string/ends-with? (:name mapinfo) (string/trim version))
                             (str " " version)))))})
     (catch Exception e
-      (log/error e "Failed to parse mapinfo.lua from" (.getName file)))))
+      (log/error e "Failed to parse mapinfo.lua from" file))))
 
 (defn read-zip-smf
   ([zf ^ZipEntry smf-entry]
@@ -715,12 +676,11 @@
   ([^java.io.File file]
    (read-map-data file nil))
   ([^java.io.File file opts]
-   (let [filename (.getName file)]
-     (log/info "Loading map" filename)
+   (let [filename (filename file)]
+     (log/info "Loading map" file)
      (try
        (merge
-         {:filename filename
-          :absolute-path (absolute-path file)}
+         {:file file}
          (cond
            (string/ends-with? filename ".sdz")
            (read-zip-map file opts)
@@ -741,22 +701,22 @@
     (or m [])))
 
 (defn bots
-  ([engine-absolute-path]
+  ([engine-file]
    (or
      (try
-       (when engine-absolute-path
-         (let [ai-skirmish-dir (io/file engine-absolute-path "AI" "Skirmish")
-               ai-dirs (some->> (.listFiles ai-skirmish-dir)
+       (when engine-file
+         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
+               ai-dirs (some->> (list-files ai-skirmish-dir)
                                 seq
-                                (filter #(.isDirectory ^java.io.File %)))]
+                                (filter is-directory))]
            (mapcat
              (fn [^java.io.File ai-dir]
-               (->> (.listFiles ai-dir)
-                    (filter #(.isDirectory ^java.io.File %))
+               (->> (list-files ai-dir)
+                    (filter is-directory)
                     (map
                       (fn [^java.io.File version-dir]
-                        {:bot-name (.getName ai-dir)
-                         :bot-version (.getName version-dir)}))))
+                        {:bot-name (filename ai-dir)
+                         :bot-version (filename version-dir)}))))
              ai-dirs)))
        (catch Exception e
          (log/error e "Error loading bots")))
@@ -772,13 +732,59 @@
   "Returns true if f is a possible descendant of dir."
   [dir f]
   (string/starts-with?
-    (.getCanonicalPath f)
-    (.getCanonicalPath dir)))
+    (canonical-path f)
+    (canonical-path dir)))
 
 (defn child?
   "Returns true if f is a possible descendant of dir."
   [dir f]
   (and dir f
-       (= (.getCanonicalPath dir)
-          (when-let [parent (.getParentFile f)]
-            (.getCanonicalPath parent)))))
+       (= (canonical-path dir)
+          (when-let [parent (parent-file f)]
+            (canonical-path parent)))))
+
+(defn copy-dir
+  [^java.io.File source ^java.io.File dest]
+  (if (exists source)
+    (do
+      (FileUtils/forceMkdir dest)
+      (log/info "Copying" source "to" dest)
+      (FileUtils/copyDirectory source dest))
+    (log/warn "No source to copy from" source "to" dest)))
+
+(defn- java-nio-copy
+  ([^File source ^File dest]
+   (java-nio-copy source dest nil))
+  ([^File source ^File dest {:keys [copy-options]
+                             :or {copy-options
+                                  [StandardCopyOption/COPY_ATTRIBUTES
+                                   StandardCopyOption/REPLACE_EXISTING]}}]
+   (let [^Path source-path (to-path source)
+         ^Path dest-path (to-path dest)
+         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)
+         dest-parent (parent-file dest)]
+     (when (and dest-parent (not (exists dest-parent)))
+       (.mkdirs dest-parent))
+     (Files/copy source-path dest-path options))))
+
+(defn copy
+  "Copy a file or directory from source to dest."
+  [source dest]
+  (if (is-directory source)
+    (copy-dir source dest)
+    (java-nio-copy source dest)))
+
+(defn copy-missing [source-dir dest-dir]
+  (let [source-path (to-path source-dir)]
+    (doseq [source (file-seq source-dir)]
+      (let [dest (io/file dest-dir (str (.relativize source-path (to-path source))))]
+        (cond
+          (not (is-file source)) (log/warn "Not a file" source)
+          (exists dest) (log/trace "Skipping copy of" source "since it exists at" dest)
+          :else
+          (try
+            (log/info "Copying" source "to" dest)
+            (java-nio-copy source dest {:copy-options [StandardCopyOption/COPY_ATTRIBUTES]})
+            (catch Exception e
+              (log/warn e "Unable to copy file" source "to" dest
+                        {:exists (exists dest)}))))))))

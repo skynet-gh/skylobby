@@ -41,6 +41,7 @@
 (defn stop-chimer [chimer]
   (when chimer
     (try
+      (println "Stopping chimer" chimer)
       (chimer)
       (catch Exception e
         (println "error stopping chimer" chimer e)))))
@@ -48,9 +49,9 @@
 (defn rerender []
   (try
     (println "Stopping old chimers")
-    (let [{:keys [tasks-chimer file-events-chimer]} @init-state]
-      (stop-chimer tasks-chimer)
-      (stop-chimer file-events-chimer))
+    (let [{:keys [chimers]} @init-state]
+      (doseq [chimer chimers]
+        (stop-chimer chimer)))
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
@@ -60,14 +61,14 @@
         (try
           (renderer)
           (catch Exception e
-            (println "error rendering" e))))
+            (println "error rendering" e)
+            (throw e))))
       (println "No renderer"))
-    (future
-      (try
-        (let [init-fn (var-get (find-var 'spring-lobby/init))]
-          (init-fn *state))
-        (catch Exception e
-          (println "init error" e))))
+    (try
+      (let [init-fn (var-get (find-var 'spring-lobby/init))]
+        (reset! init-state (init-fn *state)))
+      (catch Exception e
+        (println "init error" e)))
     (catch Exception e
       (println e))))
 
@@ -98,8 +99,12 @@
 
 (defn view [state]
   (require 'spring-lobby)
-  (let [actual-view (var-get (find-var 'spring-lobby/root-view))]
-    (actual-view state)))
+  (try
+    (let [actual-view (var-get (find-var 'spring-lobby/root-view))]
+      (actual-view state))
+    (catch Exception e
+      (println "compile error" e)
+      (throw e))))
 
 (defn event-handler [e]
   (require 'spring-lobby)
@@ -119,7 +124,7 @@
         (try
           (println "Initializing 7zip")
           (init-7z-fn)
-          (println "Finally finished initializing 7zip")
+          (println "Finished initializing 7zip")
           (catch Exception e
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
@@ -135,7 +140,8 @@
       (alter-var-root #'renderer (constantly r)))
     (fx/mount-renderer *state renderer)
     (catch Exception e
-      (println e))))
+      (println e)
+      (throw e))))
 
 
 (defn add-dependencies [coordinates]
