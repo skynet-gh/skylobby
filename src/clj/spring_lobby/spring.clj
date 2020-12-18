@@ -29,7 +29,8 @@
 
 (def bar-sides
   {0 "Armada"
-   1 "Cortex"})
+   1 "Cortex"
+   2 "Random"})
 
 (defn sides
   ([]
