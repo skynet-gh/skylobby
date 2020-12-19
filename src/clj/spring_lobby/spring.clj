@@ -112,11 +112,14 @@
 
 (defn script-data-client
   [battle {:keys [game]}]
-  {:game
-   {:hostip (:battle-ip battle)
-    :hostport (:battle-port battle)
-    :ishost 0
-    :myplayername (:myplayername game)}})
+  (let [hostip-override (-> battle :scripttags :game :hostip)]
+    {:game
+     {:hostip (if (string/blank? hostip-override)
+                (:battle-ip battle)
+                hostip-override)
+      :hostport (:battle-port battle)
+      :ishost 0
+      :myplayername (:myplayername game)}}))
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."

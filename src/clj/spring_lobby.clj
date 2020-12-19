@@ -2447,6 +2447,15 @@
                                :is-bot (-> i :user :client-status :bot)
                                :id i}}}}})}}]})
 
+(defmethod event-handler ::hostip-changed
+  [{:fx/keys [event]}]
+  (let [scripttags {:game {:hostip (str event)}}]
+    (swap! *state update :scripttags u/deep-merge scripttags)
+    (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
+    (message/send-message
+      (:client @*state)
+      (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
+
 (defmethod event-handler ::isolation-type-change [{:fx/keys [event]}]
   (log/info event))
 
@@ -2668,6 +2677,14 @@
                :disable (string/blank? bot-name)
                :on-value-changed {:event/type ::change-bot-version}
                :items (or bot-versions [])}]}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text " Host IP: "}
+              {:fx/type :text-field
+               :text (-> battle :scripttags :game :hostip str)
+               :on-text-changed {:event/type ::hostip-changed}}]}
             #_
             {:fx/type :h-box
              :alignment :center-left
