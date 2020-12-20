@@ -93,7 +93,8 @@
    ::update-map 4
    ::update-mod 4
    ::import 4
-   ::download 4})
+   ::http-downloadable 4
+   ::rapid-downloadable 4})
 
 (defn task-priority [{::keys [task-priority task-type]}]
   (or task-priority
@@ -4173,10 +4174,8 @@
                   {:fx/type :tooltip
                    :show-delay [10 :ms]
                    :text (str "Download to " dest-path)}
-                  :on-action {:event/type ::add-task
-                              :task
-                              {::task-type ::download
-                               :downloadable downloadable}}
+                  :on-action {:event/type ::http-downloadable
+                              :downloadable downloadable}
                   :graphic
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-download:16:white"}}}))}}]}]}}}))
