@@ -70,19 +70,24 @@
     (let [[r g b _a] (:rgba (colors/create-color decimal-color))]
       (str (unit-rgb b) " " (unit-rgb g) " " (unit-rgb r))))) ; Spring lobby uses bgr
 
-(defn team-name [battle-status]
-  (keyword (str "team" (:id battle-status))))
+(defn team-name [id]
+  (keyword (str "team" id)))
+
+(defn players-and-bots
+  "Returns the non-spectating players and bots in a battle."
+  [battle]
+  (filter
+    (comp :mode :battle-status second)
+    (merge (:users battle) (:bots battle))))
 
 (defn teams [battle]
   (map
     (comp first second)
     (group-by (comp :id :battle-status second)
-      (filter
-        (comp :mode :battle-status second)
-        (merge (:users battle) (:bots battle))))))
+      (players-and-bots battle))))
 
 (defn team-keys [teams]
-  (set (map (comp team-name :battle-status second) teams)))
+  (set (map (comp team-name :id :battle-status second) teams)))
 
 (defn normalize-team
   "Returns :team1 from either :team1 or :1."
@@ -144,9 +149,20 @@
                                       {:startposx (:x startpos)
                                        :startposz (:z startpos)}]))
                                  (filter existing-team?)
-                                 (into {}))}]
+                                 (into {}))}
+         startpostype (-> battle :scripttags :game :startpostype str)
+         team-ids (->> battle
+                       players-and-bots
+                       (map (comp :id :battle-status second))
+                       set)
+         shuffled-ids (zipmap
+                        team-ids
+                        (if (= "1" startpostype)
+                          (shuffle team-ids)
+                          team-ids))
+         actual-team-id (fn [id] (get shuffled-ids id id))]
      (u/deep-merge
-       (when (= "3" (-> battle :scripttags :game :startpostype str))
+       (when (= "3" startpostype)
          default-map-teams)
        (update
          (:scripttags battle)
@@ -179,34 +195,40 @@
           (concat
             (map
               (fn [[player {:keys [battle-status user]}]]
-                [(keyword (str "player" (:id battle-status)))
-                 {:name player
-                  :team (:id battle-status)
-                  :isfromdemo 0 ; TODO replays
-                  :spectator (if (:mode battle-status) 0 1)
-                  :countrycode (:country user)}])
+                (let [team (-> battle-status :id actual-team-id)
+                      spectator (if (:mode battle-status) 0 1)]
+                  [(keyword (str "player" team))
+                   {:name player
+                    :team team
+                    :isfromdemo 0 ; TODO replays
+                    :spectator spectator
+                    :countrycode (:country user)}]))
               (:users battle))
             (map
               (fn [[_player {:keys [battle-status team-color owner]}]]
-                [(team-name battle-status)
-                 {:teamleader (if owner
-                                (-> battle :users (get owner) :battle-status :id)
-                                (:id battle-status))
-                  :handicap (:handicap battle-status)
-                  :allyteam (:ally battle-status)
-                  :rgbcolor (format-color team-color)
-                  :side (get (sides (:battle-modname battle)) (:side battle-status))}])
+                (let [team-id (-> battle-status :id actual-team-id)
+                      team-leader (if owner
+                                    (-> battle :users (get owner) :battle-status :id actual-team-id)
+                                    team-id)]
+                    [(team-name team-id)
+                     {:teamleader team-leader
+                      :handicap (:handicap battle-status)
+                      :allyteam (:ally battle-status)
+                      :rgbcolor (format-color team-color)
+                      :side (get (sides (:battle-modname battle)) (:side battle-status))}]))
               teams)
             (map
               (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
-                [(keyword (str "ai" (:id battle-status)))
-                 {:name bot-name
-                  :shortname ai-name
-                  :version ai-version
-                  :host (-> battle :users (get owner) :battle-status :id)
-                  :isfromdemo 0 ; TODO replays
-                  :team (:id battle-status)
-                  :options {}}]) ; TODO ai options
+                (let [team (-> battle-status :id actual-team-id)
+                      host (-> battle :users (get owner) :battle-status :id actual-team-id)]
+                  [(keyword (str "ai" team))
+                   {:name bot-name
+                    :shortname ai-name
+                    :version ai-version
+                    :host host
+                    :isfromdemo 0 ; TODO replays
+                    :team team
+                    :options {}}])) ; TODO ai options
               (:bots battle))
             (map
               (fn [ally]
