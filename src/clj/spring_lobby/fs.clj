@@ -95,11 +95,15 @@
 
 (defn wsl?
   "Returns true if this system appears to be the Windows Subsystem for Linux."
-  []
-  (let [{:keys [os-name os-version]} (sys-data)]
-    (and
-      (string/includes? os-name "Linux")
-      (string/includes? os-version "Microsoft")))) ; WSL
+  ([]
+   (wsl? (sys-data)))
+  ([sys-data]
+   (let [{:keys [os-name os-version]} sys-data]
+     (and
+       (string/includes? os-name "Linux")
+       (or
+         (string/includes? os-version "Microsoft") ; WSL
+         (string/includes? os-version "microsoft")))))) ; WSL 2
 
 (defn wsl-or-windows? []
   (or (windows?) (wsl?)))
@@ -158,10 +162,10 @@
 (defn bar-root
   "Returns the root directory for BAR"
   ^File []
-  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
-      (if (string/includes? os-version "Microsoft") ; WSL
+      (if (wsl? sys-data)
         (io/file "/mnt" "c" "Users" user-name "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
         (let [snap-dir (io/file user-home "snap" "springlobby-nsg" "common" ".spring")]
           (if (.exists snap-dir)
@@ -176,10 +180,10 @@
 (defn spring-root
   "Returns the root directory for Spring"
   ^File []
-  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
-      (if (string/includes? os-version "Microsoft") ; WSL
+      (if (wsl? sys-data)
         (io/file "/mnt" "c" "Users" user-name "Documents" "My Games" "Spring")
         (let [snap-dir (io/file user-home "snap" "springlobby-nsg" "common" ".spring")]
           (if (.exists snap-dir)
@@ -194,10 +198,10 @@
 (defn springlobby-root
   "Returns the root directory for Spring"
   []
-  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
-      (if (string/includes? os-version "Microsoft") ; WSL
+      (if (wsl? sys-data)
         (io/file "/mnt" "c" "Users" user-name "AppData" "Roaming" "springlobby")
         (let [linux-home (io/file user-home ".springlobby")]
           (if (.exists linux-home)
@@ -212,10 +216,10 @@
 (defn app-root
   "Returns the root directory for this application"
   []
-  (let [{:keys [os-name os-version user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
     (cond
       (string/includes? os-name "Linux")
-      (if (string/includes? os-version "Microsoft") ; WSL
+      (if (wsl? sys-data)
         (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby")
         (io/file user-home ".alt-spring-lobby"))
       (string/includes? os-name "Windows")
