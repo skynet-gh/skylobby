@@ -65,6 +65,10 @@
 (def minimap-size 512)
 
 
+(def map-browse-image-size 98)
+(def map-browse-box-height 160)
+
+
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn read-file-tag [cs]
   (io/file cs))
@@ -188,16 +192,18 @@
     [:rapid-repo :rapid-repos :rapid-data-by-hash :rapid-data-by-version :rapid-versions]))
 
 
-(defn safe-read-map-cache [map-name]
-  (log/info "Reading map cache for" (str "'" map-name "'"))
-  (try
-    (when-let [map-file (some->> *state deref :maps
+(defn read-map-data [maps map-name]
+  (let [log-map-name (str "'" map-name "'")]
+    (log/info "Reading map data for" log-map-name)
+    (try
+      (if-let [map-file (some->> maps
                                  (filter (comp #{map-name} :map-name))
                                  first
                                  :file)]
-      (fs/read-map-data map-file))
-    (catch Exception e
-      (log/warn e "Error loading map cache for" (str "'" map-name "'")))))
+        (fs/read-map-data map-file)
+        (log/warn "No file found for map" log-map-name))
+      (catch Exception e
+        (log/warn e "Error loading map data for" log-map-name)))))
 
 (def ^java.io.File mods-cache-root
   (io/file (fs/app-root) "mods-cache"))
@@ -221,11 +227,11 @@
 
 (defn update-mod [state-atom file]
   (let [mod-data (read-mod-data file {:modinfo-only false})
-        mod-name (:mod-name mod-data)
-        cache-file (mod-cache-file mod-name)
+        ;mod-name (:mod-name mod-data)
+        ;cache-file (mod-cache-file mod-name)
         mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])]
-    (log/info "Caching" mod-name "to" cache-file)
-    (spit cache-file (with-out-str (pprint mod-data)))
+    ;(log/info "Caching" mod-name "to" cache-file)
+    ;(spit cache-file (with-out-str (pprint mod-data)))
     (swap! state-atom update :mods
            (fn [mods]
              (-> (remove (comp #{(fs/canonical-path (:file mod-details))} fs/canonical-path :file) mods)
@@ -312,7 +318,7 @@
                          (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
             (log/debug "Updating battle map details for" new-battle-map
                        "was" old-battle-map)
-            (let [map-details (safe-read-map-cache new-battle-map)]
+            (let [map-details (read-map-data (:maps new-state) new-battle-map)]
               (swap! *state assoc :battle-map-details map-details))))
         (catch Exception e
           (log/error e "Error in :battle-map-details state watcher")))))
@@ -725,6 +731,55 @@
 (defn map-cache-file [map-name]
   (io/file maps-cache-root (str map-name ".edn")))
 
+
+(defn scale-minimap-image [minimap-width minimap-height minimap-image]
+  (when minimap-image
+    (let [^sun.awt.image.ToolkitImage scaled
+          (.getScaledInstance ^java.awt.Image minimap-image
+            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
+          _ (.getWidth scaled)
+          _ (.getHeight scaled)]
+      (.getBufferedImage scaled))))
+
+(defn minimap-dimensions [map-smf-header]
+  (let [{:keys [map-width map-height]} map-smf-header]
+    (when (and map-width)
+      (let [ratio-x (/ minimap-size map-width)
+            ratio-y (/ minimap-size map-height)
+            min-ratio (min ratio-x ratio-y)
+            normal-x (/ ratio-x min-ratio)
+            normal-y (/ ratio-y min-ratio)
+            invert-x (/ min-ratio ratio-x)
+            invert-y (/ min-ratio ratio-y)
+            convert-x (if (< ratio-y ratio-x) invert-x normal-x)
+            convert-y (if (< ratio-x ratio-y) invert-y normal-y)
+            minimap-width (* minimap-size convert-x)
+            minimap-height (* minimap-size convert-y)]
+        {:minimap-width minimap-width
+         :minimap-height minimap-height}))))
+
+
+(defn scaled-minimap-image [{:keys [header minimap-image]}]
+  (when minimap-image
+    (let [{:keys [minimap-width minimap-height] :or {minimap-width minimap-size
+                                                     minimap-height minimap-size}} (minimap-dimensions header)]
+      (scale-minimap-image minimap-width minimap-height minimap-image))))
+
+(defn update-cached-minimaps
+  ([maps]
+   (update-cached-minimaps maps nil))
+  ([maps opts]
+   (let [to-update
+         (->> maps
+              (map (comp fs/minimap-image-cache-file :map-name))
+              (filter (fn [f] (or (:force opts) (not (fs/exists f))))))]
+     (log/info (count to-update) "maps do not have cached minimap image files")
+     (doseq [map-details to-update]
+       (when-let [map-file (:file map-details)]
+         (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
+           (when-let [minimap-image (scaled-minimap-image smf)]
+             (fs/write-image-png minimap-image (fs/minimap-image-cache-file map-name)))))))))
+
 (defn reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
   [state-atom]
@@ -734,22 +789,28 @@
         known-files (->> state-atom deref :maps (map :file) set)
         known-paths (->> known-files (map fs/canonical-path) set)
         todo (remove (comp known-paths fs/canonical-path) map-files)
-        missing-paths (->> known-files
-                           (remove fs/exists)
-                           (map fs/canonical-path)
-                           set)]
+        missing-paths (set
+                        (concat
+                          (->> known-files
+                               (remove fs/exists)
+                               (map fs/canonical-path))
+                          (->> known-files
+                               (remove (partial fs/descendant? (fs/isolation-dir)))
+                               (map fs/canonical-path))))]
     (apply update-file-cache! map-files)
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (when-not (fs/exists maps-cache-root)
       (.mkdirs maps-cache-root))
     (doseq [map-file todo]
       (log/info "Reading" map-file)
-      (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file {:header-only true})
-            map-cache-file (map-cache-file (:map-name map-data))]
+      (let [{:keys [map-name smf] :as map-data} (fs/read-map-data map-file)]
+            ;map-cache-file (map-cache-file (:map-name map-data))]
         (if map-name
           (do
-            (log/info "Caching" map-file "to" map-cache-file)
-            (spit map-cache-file (with-out-str (pprint map-data)))
+            ;(log/info "Caching" map-file "to" map-cache-file)
+            ;(spit map-cache-file (with-out-str (pprint map-data)))
+            (when-let [minimap-image (scaled-minimap-image smf)]
+              (fs/write-image-png minimap-image (fs/minimap-image-cache-file map-name)))
             (swap! state-atom update :maps
                    (fn [maps]
                      (set (conj maps (select-keys map-data [:file :map-name]))))))
@@ -762,6 +823,7 @@
                   (remove (comp string/blank? :map-name))
                   (remove (comp missing-paths fs/canonical-path :file))
                   set)))
+    (update-cached-minimaps (:maps @*state))
     {:todo-count (count todo)}))
 
 (defn force-update-battle-map
@@ -1232,21 +1294,25 @@
             (fn [map-name]
               {:text (if (string/blank? map-name)
                        "< choose a map >"
-                       map-name)
-               ;:graphic nil
-               #_ ; TODO too slow, separate window with caching
-               {:fx/type :image-view
-                :image {:url (str (io/as-url (io/file (fs/map-minimap map-name))))
-                        :background-loading true}
-                :fit-width 64
-                :fit-height 64
-                :preserve-ratio true}})}
+                       map-name)})}
            :on-key-pressed {:event/type ::maps-key-pressed}
            :on-hidden {:event/type ::maps-hidden}
            :tooltip {:fx/type :tooltip
                      :show-delay [10 :ms]
                      :text (or map-input-prefix "Choose map")}})])
-     [{:fx/type fx.ext.node/with-tooltip-props
+     [{:fx/type :button
+       :text ""
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :style {:-fx-font-size 14}
+        :text "Show maps window"}
+       :on-action {:event/type ::assoc
+                   :key :show-maps}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-magnify:16:white"}}
+      {:fx/type fx.ext.node/with-tooltip-props
        :props
        {:tooltip
         {:fx/type :tooltip
@@ -1620,19 +1686,16 @@
   [{:fx/keys [event] :keys [map-name] :as e}]
   (log/info e)
   (let [map-name (or map-name event)]
-    (swap! *state assoc
-           :map-name map-name
-           :map-details (safe-read-map-cache map-name))))
+    (swap! *state assoc :map-name map-name)))
 
 (defmethod event-handler ::battle-map-change
-  [{:fx/keys [event] :keys [map-name]}]
+  [{:fx/keys [event] :keys [map-name maps]}]
   (let [spectator-count 0 ; TODO
         locked 0
         map-hash -1 ; TODO
         map-name (or map-name event)
         m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-    (swap! *state assoc
-           :battle-map-details (safe-read-map-cache map-name))
+    (swap! *state assoc :battle-map-details (read-map-data maps map-name))
     (message/send-message (:client @*state) m)))
 
 (defmethod event-handler ::kick-battle
@@ -1818,24 +1881,6 @@
       (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
       (message/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
   (swap! *state dissoc :drag-team))
-
-
-(defn minimap-dimensions [map-smf-header]
-  (let [{:keys [map-width map-height]} map-smf-header]
-    (when (and map-width)
-      (let [ratio-x (/ minimap-size map-width)
-            ratio-y (/ minimap-size map-height)
-            min-ratio (min ratio-x ratio-y)
-            normal-x (/ ratio-x min-ratio)
-            normal-y (/ ratio-y min-ratio)
-            invert-x (/ min-ratio ratio-x)
-            invert-y (/ min-ratio ratio-y)
-            convert-x (if (< ratio-y ratio-x) invert-x normal-x)
-            convert-y (if (< ratio-x ratio-y) invert-y normal-y)
-            minimap-width (* minimap-size convert-x)
-            minimap-height (* minimap-size convert-y)]
-        {:minimap-width minimap-width
-         :minimap-height minimap-height}))))
 
 
 (def ok-green "#008000")
@@ -2061,31 +2106,6 @@
         (log/error e "Error cloning git repo" repo-url))
       (finally
         (swap! *state assoc-in [:git-clone repo-url :status] false)))))
-
-(defmethod event-handler ::download-map
-  [{:keys [map-name]}]
-  (let [url (http/map-url map-name)
-        dest (fs/map-file (fs/map-filename map-name))
-        http-future (event-handler {:event/type ::http-download
-                                    :dest dest
-                                    :url url})]
-    (future
-      (try
-        @http-future
-        (reconcile-maps *state)
-        (swap! *state assoc :battle-map-details (safe-read-map-cache map-name))
-        (catch Exception e
-          (log/error e "Error downloading map"))))))
-
-
-(defn scale-minimap-image [minimap-width minimap-height minimap-image]
-  (when minimap-image
-    (let [^sun.awt.image.ToolkitImage scaled
-          (.getScaledInstance ^java.awt.Image minimap-image
-            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
-          _ (.getWidth scaled)
-          _ (.getHeight scaled)]
-      (.getBufferedImage scaled))))
 
 
 (defn battle-players-and-bots
@@ -3274,7 +3294,8 @@
            :map-name battle-map
            :maps maps
            :map-input-prefix map-input-prefix
-           :on-value-changed {:event/type ::battle-map-change}}]}
+           :on-value-changed {:event/type ::battle-map-change
+                              :maps maps}}]}
         {:fx/type :h-box
          :alignment :center-left
          :children
@@ -4536,6 +4557,88 @@
                    (->> i
                         :header)))})}}]}]}}}))
 
+(defn maps-window
+  [{:keys [filter-maps-name maps show-maps]}]
+  {:fx/type :stage
+   :x 400
+   :y 400
+   :showing show-maps
+   :title "alt-spring-lobby Maps"
+   :on-close-request (fn [^javafx.stage.WindowEvent e]
+                       (swap! *state assoc :show-maps false)
+                       (.consume e))
+   :width download-window-width
+   :height download-window-height
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :v-box
+     :children
+     [{:fx/type :h-box
+       :alignment :center-left
+       :style {:-fx-font-size 16}
+       :children
+       (concat
+         [{:fx/type :label
+           :text " Filter: "}
+          {:fx/type :text-field
+           :text (str filter-maps-name)
+           :prompt-text "Filter by name or path"
+           :on-text-changed {:event/type ::assoc
+                             :key :filter-maps-name}}]
+         (when-not (string/blank? filter-maps-name)
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Clear filter"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::dissoc
+                          :key :filter-maps-name}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-close:16:white"}}}]))}
+      {:fx/type :flow-pane
+       :vgap 5
+       :hgap 5
+       :padding 5
+       :children
+       (map
+         (fn [{:keys [map-name]}]
+           {:fx/type :v-box
+            :style
+            {:-fx-min-width map-browse-image-size
+             :-fx-max-width map-browse-image-size
+             :-fx-min-height map-browse-box-height
+             :-fx-max-height map-browse-box-height}
+            :children
+            [{:fx/type :stack-pane
+              :children
+              [{:fx/type :image-view
+                :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
+                        :background-loading true}
+                :fit-width map-browse-image-size
+                :fit-height map-browse-image-size
+                :preserve-ratio true}
+               {:fx/type :pane
+                :style
+                {:-fx-min-width map-browse-image-size
+                 :-fx-max-width map-browse-image-size
+                 :-fx-min-height map-browse-image-size
+                 :-fx-max-height map-browse-image-size}}]}
+             {:fx/type :label
+              :wrap-text true
+              :text (str map-name)}]})
+         (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
+           (->> maps
+                (filter (fn [{:keys [map-name]}]
+                          (and map-name
+                               (string/includes? (string/lower-case map-name) filter-lc))))
+                (sort-by :map-name))))}]}}})
+
 (defn main-window-on-close-request
   [standalone e]
   (log/debug "Main window close request" e)
@@ -4549,124 +4652,137 @@
           (System/exit 0))))))
 
 (defn root-view
-  [{{:keys [battle battles file-events last-failed-message pop-out-battle standalone tasks users]
+  [{{:keys [battle battles file-events last-failed-message pop-out-battle
+            show-downloader show-importer show-maps show-rapid-downloader show-replays
+            standalone tasks users]
      :as state}
     :state}]
   {:fx/type fx/ext-many
    :desc
-   [{:fx/type :stage
-     :showing true
-     :title "Alt Spring Lobby"
-     :x 100
-     :y 100
-     :width main-window-width
-     :height main-window-height
-     :on-close-request (partial main-window-on-close-request standalone)
-     :scene
-     {:fx/type :scene
-      :stylesheets stylesheets
-      :root
-      {:fx/type :v-box
-       :alignment :top-left
-       :children
-       (concat
-         [(merge
-            {:fx/type client-buttons}
-            (select-keys state
-              [:client :client-deferred :username :password :login-error
-               :server-url]))
-          {:fx/type :split-pane
-           :v-box/vgrow :always
-           :divider-positions [0.75]
-           :items
-           [{:fx/type :v-box
+   (concat
+     [{:fx/type :stage
+       :showing true
+       :title "Alt Spring Lobby"
+       :x 100
+       :y 100
+       :width main-window-width
+       :height main-window-height
+       :on-close-request (partial main-window-on-close-request standalone)
+       :scene
+       {:fx/type :scene
+        :stylesheets stylesheets
+        :root
+        {:fx/type :v-box
+         :alignment :top-left
+         :children
+         (concat
+           [(merge
+              {:fx/type client-buttons}
+              (select-keys state
+                [:client :client-deferred :username :password :login-error
+                 :server-url]))
+            {:fx/type :split-pane
+             :v-box/vgrow :always
+             :divider-positions [0.75]
+             :items
+             [{:fx/type :v-box
+               :children
+               [{:fx/type :label
+                 :text "Battles"
+                 :style {:-fx-font-size 16}}
+                {:fx/type battles-table
+                 :v-box/vgrow :always
+                 :battles battles
+                 :users users}]}
+              {:fx/type :v-box
+               :children
+               [{:fx/type :label
+                 :text "Users"
+                 :style {:-fx-font-size 16}}
+                {:fx/type users-table
+                 :v-box/vgrow :always
+                 :users users}]}]}
+            (merge
+              {:fx/type battles-buttons}
+              (select-keys state
+                [:battle :battle-password :battle-title :battles :client :engines :engine-filter
+                 :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
+                 :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
+           (when battle
+             (if (:battle-id battle)
+               (when (not pop-out-battle)
+                 [(merge
+                    {:fx/type battle-view}
+                    (select-keys state battle-view-keys))])
+               [{:fx/type :h-box
+                 :alignment :top-left
+                 :children
+                 [{:fx/type :v-box
+                   :h-box/hgrow :always
+                   :children
+                   [{:fx/type :label
+                     :style {:-fx-font-size 20}
+                     :text "Waiting for server to start battle..."}]}]}]))
+           [{:fx/type :h-box
+             :alignment :center-left
              :children
              [{:fx/type :label
-               :text "Battles"
-               :style {:-fx-font-size 16}}
-              {:fx/type battles-table
-               :v-box/vgrow :always
-               :battles battles
-               :users users}]}
-            {:fx/type :v-box
-             :children
-             [{:fx/type :label
-               :text "Users"
-               :style {:-fx-font-size 16}}
-              {:fx/type users-table
-               :v-box/vgrow :always
-               :users users}]}]}
-          (merge
-            {:fx/type battles-buttons}
-            (select-keys state
-              [:battle :battle-password :battle-title :battles :client :engines :engine-filter
-               :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-               :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
-         (when battle
-           (if (:battle-id battle)
-             (when (not pop-out-battle)
+               :text (str last-failed-message)
+               :style {:-fx-text-fill "#FF0000"}}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :label
+               :text (str (count file-events) " file events  ")}
+              {:fx/type :label
+               :text (str (count tasks) " tasks")}]}])}}}]
+     (when pop-out-battle
+       [{:fx/type :stage
+         :showing pop-out-battle
+         :title "alt-spring-lobby Battle"
+         :on-close-request {:event/type ::pop-in-battle}
+         :x 300
+         :y 300
+         :width battle-window-width
+         :height battle-window-height
+         :scene
+         {:fx/type :scene
+          :stylesheets stylesheets
+          :root
+          {:fx/type :h-box
+           :children
+           (concat []
+             (when pop-out-battle
                [(merge
                   {:fx/type battle-view}
-                  (select-keys state battle-view-keys))])
-             [{:fx/type :h-box
-               :alignment :top-left
-               :children
-               [{:fx/type :v-box
-                 :h-box/hgrow :always
-                 :children
-                 [{:fx/type :label
-                   :style {:-fx-font-size 20}
-                   :text "Waiting for server to start battle..."}]}]}]))
-         [{:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text (str last-failed-message)
-             :style {:-fx-text-fill "#FF0000"}}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :label
-             :text (str (count file-events) " file events  ")}
-            {:fx/type :label
-             :text (str (count tasks) " tasks")}]}])}}}
-    (merge
-      {:fx/type import-window}
-      (select-keys state
-        [:copying :file-cache :import-filter :import-source-name :import-type
-         :importables-by-path :show-importer]))
-    (merge
-      {:fx/type download-window}
-      (select-keys state
-        [:downloading :download-filter :download-source-name :download-type
-         :downloadables-by-url :file-cache :show-downloader]))
-    (merge
-      {:fx/type rapid-download-window}
-      (select-keys state
-        [:engine-version :engines :rapid-download :rapid-filter :rapid-repo :rapid-repos :rapid-versions
-         :rapid-data-by-hash :sdp-files :show-rapid-downloader]))
-    (merge
-      {:fx/type replays-window}
-      (select-keys state
-        [:engines :show-replays]))
-    {:fx/type :stage
-     :showing pop-out-battle
-     :title "alt-spring-lobby Battle"
-     :on-close-request {:event/type ::pop-in-battle}
-     :x 300
-     :y 300
-     :width battle-window-width
-     :height battle-window-height
-     :scene
-     {:fx/type :scene
-      :stylesheets stylesheets
-      :root
-      {:fx/type :h-box
-       :children
-       (concat []
-         (when pop-out-battle
-           [(merge
-              {:fx/type battle-view}
-              (select-keys state battle-view-keys))]))}}}]})
+                  (select-keys state battle-view-keys))]))}}}])
+     (when show-downloader
+       [(merge
+          {:fx/type download-window}
+          (select-keys state
+            [:downloading :download-filter :download-source-name :download-type
+             :downloadables-by-url :file-cache :show-downloader]))])
+     (when show-importer
+       [(merge
+          {:fx/type import-window}
+          (select-keys state
+            [:copying :file-cache :import-filter :import-source-name :import-type
+             :importables-by-path :show-importer]))])
+     (when show-maps
+       [(merge
+          {:fx/type maps-window}
+          (select-keys state
+            [:filter-maps-name :maps :show-maps]))])
+     (when show-rapid-downloader
+      (merge
+        {:fx/type rapid-download-window}
+        (select-keys state
+          [:engine-version :engines :rapid-download :rapid-filter :rapid-repo :rapid-repos :rapid-versions
+           :rapid-data-by-hash :sdp-files :show-rapid-downloader])))
+     (when show-replays
+       [(merge
+          {:fx/type replays-window}
+          (select-keys state
+            [:engines :show-replays]))]))})
 
 
 (defn init

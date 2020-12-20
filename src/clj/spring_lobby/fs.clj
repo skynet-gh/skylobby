@@ -11,9 +11,10 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.io File FileOutputStream RandomAccessFile)
+    (java.io ByteArrayOutputStream File FileOutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
     (java.util.zip ZipEntry ZipFile)
+    (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding IArchiveExtractCallback ISequentialOutStream PropID SevenZip SevenZipException)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
     (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
@@ -582,10 +583,10 @@
                  {::source smf-path
                   :header header}
                  (when-let [minimap (:minimap body)]
-                   {:minimap-bytes minimap
+                   {;:minimap-bytes minimap
                     :minimap-image (smf/decompress-minimap minimap)})
                  (when-let [metalmap (:metalmap body)]
-                   {:metalmap-bytes metalmap
+                   {;:metalmap-bytes metalmap
                     :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
 
 (defn read-zip-map
@@ -616,7 +617,7 @@
 
 
 (defn slurp-7z-item [^ISimpleInArchiveItem item]
-  (with-open [baos (java.io.ByteArrayOutputStream.)]
+  (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
               (write [this data]
@@ -626,7 +627,7 @@
       (byte-streams/convert (.toByteArray baos) String))))
 
 (defn slurp-7z-item-bytes [^ISimpleInArchiveItem item]
-  (with-open [baos (java.io.ByteArrayOutputStream.)]
+  (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
               (write [this data]
@@ -634,6 +635,28 @@
                 (.write baos data 0 (count data))
                 (count data))))
       (.toByteArray baos))))
+
+(defn read-7z-smf-bytes
+  [smf-path smf-bytes {:keys [header-only]}]
+  (if header-only
+    (let [header (smf/decode-map-header (io/input-stream smf-bytes))]
+      {:map-name (map-name smf-path)
+       :smf (merge
+              {::source smf-path
+               :header header})})
+    (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-bytes))
+          {:keys [map-width map-height]} header]
+      {:map-name (map-name smf-path)
+       ; TODO extract only what's needed
+       :smf (merge
+              {::source smf-path
+               :header header}
+              (when-let [minimap (:minimap body)]
+                {;:minimap-bytes minimap
+                 :minimap-image (smf/decompress-minimap minimap)})
+              (when-let [metalmap (:metalmap body)]
+                {;:metalmap-bytes metalmap
+                 :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))
 
 (defn read-7z-smf
   ([^ISimpleInArchiveItem smf-item]
@@ -660,7 +683,7 @@
                    {:metalmap-bytes metalmap
                     :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
 
-(defn read-7z-map
+(defn- read-7z-map
   ([^java.io.File file]
    (read-7z-map file nil))
   ([^java.io.File file opts]
@@ -690,6 +713,96 @@
          (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
            {:smd (assoc smd ::source (.getPath smd-item))}))))))
 
+#_
+(time (read-7z-map (map-file "altored_divide_bar_remake_1.5.sd7")))
+
+
+(defn read-7z-map-fast
+  ([^java.io.File file]
+   (read-7z-map-fast file nil))
+  ([^java.io.File file opts]
+   (with-open [raf (new RandomAccessFile file "r")
+               rafis (new RandomAccessFileInStream raf)
+               archive (SevenZip/openInArchive nil rafis)]
+     (log/debug file "is of format" (.getArchiveFormat archive)
+                "and has" (.getNumberOfItems archive) "items")
+     (let [n (.getNumberOfItems archive)
+           ids (filter
+                 (fn [id]
+                   (let [path (.getProperty archive id PropID/PATH)
+                         path-lc (string/lower-case path)]
+                     (or
+                       (string/ends-with? path-lc ".smd")
+                       (string/ends-with? path-lc ".smf")
+                       (string/ends-with? path-lc "mapinfo.lua"))))
+                 (take n (iterate inc 0)))
+           extracted-state (atom {})
+           callback-state (atom {})]
+       (.extract archive
+                 (int-array ids)
+                 false
+                 (reify IArchiveExtractCallback
+                   (getStream [this index extract-ask-mode]
+                     (swap! callback-state assoc :index index)
+                     (try
+                       (let [path (.getProperty archive index PropID/PATH)
+                             is-folder (.getProperty archive index PropID/IS_FOLDER)]
+                         (when-not is-folder
+                           (log/debug "Stream for index" index "path" path)
+                           (let [baos (ByteArrayOutputStream.)] ; not with-open
+                             (swap! callback-state assoc :stream baos :path path)
+                             (reify ISequentialOutStream
+                               (write [this data]
+                                 (.write baos data 0 (count data))
+                                 (count data))))))
+                       (catch Throwable e
+                         (log/error e "Error getting stream for item" index))))
+                   (prepareOperation [this extract-ask-mode]
+                     (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+                     (log/trace "preparing" extract-ask-mode))
+                   (setOperationResult [this extract-operation-result]
+                     (let [cs @callback-state]
+                       (when-let [output-stream (:stream cs)]
+                         (try
+                           (.close output-stream)
+                           (let [ba (.toByteArray output-stream)]
+                             (swap! extracted-state assoc (:path cs) ba))
+                           (catch Exception e
+                             (log/error e "Error closing output stream")
+                             (throw (SevenZipException. "Error closing output stream"))))))
+                     (swap! callback-state assoc :operation-result extract-operation-result)
+                     (log/trace "result" extract-operation-result))
+                   (setTotal [this total]
+                     (swap! callback-state assoc :total total)
+                     (log/trace "total" total))
+                   (setCompleted [this complete]
+                     (swap! callback-state assoc :complete complete)
+                     (log/trace "completed" complete))))
+       (let [extracted @extracted-state]
+         (merge
+           (when-let [[path smf-bytes]
+                      (->> extracted
+                           (filter (comp #(string/ends-with? % ".smf") first))
+                           first)]
+             (read-7z-smf-bytes path smf-bytes opts))
+           (when-let [[path mapinfo-bytes]
+                      (->> extracted
+                           (filter (comp #{"mapinfo.lua"}
+                                         string/lower-case
+                                         first))
+                           first)]
+             (parse-mapinfo file (slurp mapinfo-bytes) path))
+           (when-let [[path smd-bytes]
+                      (->> extracted
+                           (filter (comp #(string/ends-with? % ".smd") first))
+                           first)]
+             (let [smd (spring-script/parse-script (slurp smd-bytes))]
+               {:smd (assoc smd ::source path)}))))))))
+
+
+#_
+(time (read-7z-map-fast (map-file "altored_divide_bar_remake_1.5.sd7")))
+
 
 (defn read-map-data
   ([^java.io.File file]
@@ -704,7 +817,7 @@
            (string/ends-with? filename ".sdz")
            (read-zip-map file opts)
            (string/ends-with? filename ".sd7")
-           (read-7z-map file opts)
+           (read-7z-map-fast file opts)
            :else
            nil))
        (catch Exception e
@@ -742,8 +855,14 @@
      [])))
 
 
-(defn map-minimap [map-name]
+(defn springlobby-map-minimap [map-name]
   (io/file (springlobby-root) "cache" (str map-name ".minimap.png")))
+
+(defn minimap-image-cache-file
+  ([map-name]
+   (minimap-image-cache-file (app-root) map-name))
+  ([root map-name]
+   (io/file root "maps-cache" (str map-name ".minimap.png"))))
 
 
 ; https://stackoverflow.com/a/25267111/984393
@@ -807,3 +926,7 @@
             (catch Exception e
               (log/warn e "Unable to copy file" source "to" dest
                         {:exists (exists dest)}))))))))
+
+(defn write-image-png [^java.awt.Image image ^File dest]
+  (log/debug "Writing image to" dest)
+  (ImageIO/write image "png" dest))
