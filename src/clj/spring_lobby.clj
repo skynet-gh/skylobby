@@ -78,7 +78,7 @@
   {'spring-lobby/java.io.File #'spring-lobby/read-file-tag})
 
 ; https://stackoverflow.com/a/23592006/984393
-(defmethod print-method java.io.File [f w]
+(defmethod print-method java.io.File [f ^java.io.Writer w]
   (.write w (str "#spring-lobby/java.io.File \"" (fs/canonical-path f) "\"")))
 
 
@@ -461,7 +461,7 @@
                      (if f
                        {:canonical-path (fs/canonical-path f)
                         :exists (fs/exists f)
-                        :is-directory (.isDirectory f)}
+                        :is-directory (fs/is-directory f)}
                        (log/warn "Attempt to update file cache for nil file"))))
         status-by-path (->> statuses
                             (filter some?)
@@ -508,21 +508,21 @@
           (if (fs/child? games parent)
             {::task-type ::update-mod
              :file parent}
-            (recur (.getParentFile parent)))))
+            (recur (fs/parent-file parent)))))
       (partial fs/descendant? maps)
       (loop [parent file] ; find file in maps
         (when parent
           (if (fs/child? maps parent)
             {::task-type ::update-map
              :file parent}
-            (recur (.getParentFile parent)))))
+            (recur (fs/parent-file parent)))))
       (partial fs/descendant? engines)
       (loop [parent file] ; find directory in engines
         (when parent
           (if (fs/child? maps parent)
             {::task-type ::update-engine
              :file parent}
-            (recur (.getParentFile parent)))))
+            (recur (fs/parent-file parent)))))
       (fn [file]
         (some (comp #(when (fs/descendant? % file) file) :file) import-sources))
       :>>
@@ -557,7 +557,7 @@
             (java-time/duration 1 :seconds))
           (fn [_chimestamp]
             (let [hawk @hawk-atom]
-              (when-not (.isAlive (:thread hawk))
+              (when-not (.isAlive ^java.lang.Thread (:thread hawk))
                 (log/warn "Hawk watcher died, starting a new one")
                 (hawk/stop! hawk)
                 (reset! hawk-atom (add-hawk! state-atom))))
@@ -2025,7 +2025,7 @@
                      (fs/filename resource-file))]
     (case resource-type
       ::engine (cond
-                 (and resource-file (fs/exists resource-file) (.isDirectory resource-file))
+                 (and resource-file (fs/exists resource-file) (fs/is-directory resource-file))
                  (io/file (fs/engines-dir) filename)
                  filename (io/file (fs/download-dir) "engine" filename)
                  resource-name (http/engine-download-file resource-name)
@@ -2087,7 +2087,7 @@
   (swap! *state
          (fn [{:keys [minimap-type] :as state}]
            (let [next-index (mod
-                              (inc (.indexOf minimap-types minimap-type))
+                              (inc (.indexOf ^java.util.List minimap-types minimap-type))
                               (count minimap-types))
                  next-type (get minimap-types next-index)]
              (assoc state :minimap-type next-type)))))
@@ -3579,7 +3579,7 @@
   (log/info "Request to download" url "to" dest)
   (future
     (try
-      (let [parent (.getParentFile dest)]
+      (let [parent (fs/parent-file dest)]
         (.mkdirs parent))
       (clj-http/with-middleware
         (-> clj-http/default-middleware

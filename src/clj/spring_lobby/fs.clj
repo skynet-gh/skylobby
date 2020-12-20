@@ -57,7 +57,7 @@
   (when f
     (.isFile f)))
 
-(defn parent-file [^File f]
+(defn parent-file ^File [^File f]
   (when f
     (.getParentFile f)))
 
