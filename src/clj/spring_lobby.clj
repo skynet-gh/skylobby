@@ -24,6 +24,7 @@
     [spring-lobby.client :as client]
     [spring-lobby.client.message :as message]
     [spring-lobby.fs :as fs]
+    [spring-lobby.fs.sdfz :as replay]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.git :as git]
     [spring-lobby.http :as http]
@@ -1111,7 +1112,21 @@
      [{:fx/type :label
        :text (str login-error)
        :style {:-fx-text-fill "#FF0000"
-               :-fx-max-width "360px"}}]}]})
+               :-fx-max-width "360px"}}]}
+    {:fx/type :pane
+     :h-box/hgrow :always}
+    {:fx/type :button
+     :text "Replays"
+     :tooltip
+     {:fx/type :tooltip
+      :show-delay [10 :ms]
+      :style {:-fx-font-size 14}
+      :text "Show replays window"}
+     :on-action {:event/type ::assoc
+                 :key :show-replays}
+     :graphic
+     {:fx/type font-icon/lifecycle
+      :icon-literal "mdi-open-in-new:16:white"}}]})
 
 
 (defmethod event-handler ::username-change
@@ -1316,7 +1331,7 @@
      :style {:-fx-font-size 16}
      :children
      [{:fx/type :label
-       :text "Resources: "}
+       :text " Resources: "}
       {:fx/type fx.ext.node/with-tooltip-props
        :props
        {:tooltip
@@ -4385,6 +4400,142 @@
                           :version
                           str)})}}]}]}}}))
 
+(defmethod event-handler ::watch-replay
+  [{:keys [engine-version engines replay-file]}]
+  (future
+    (try
+      (let [state @*state
+            demofile (fs/wslpath replay-file)]
+        (spring/start-game
+          (merge
+            (select-keys state [:client :username])
+            {:engines engines
+             :battle {:battle-id "replay"} ; fake battle and battles
+             :battles {"replay"
+                       {:battle-version engine-version
+                        :host-username (:username state)
+                        :scripttags
+                        {:game {:demofile demofile}}}}})))
+      (catch Exception e
+        (log/error e "Error watching replay" replay-file)))))
+
+
+(defn replays-window
+  [{:keys [engines show-replays]}]
+  (let [replay-files (fs/replay-files) ; TODO FIXME IO IN RENDER
+        replays (->> replay-files
+                     (map
+                       (fn [f]
+                         {:file f
+                          :filename (fs/filename f)
+                          :file-size (fs/size f)
+                          :parsed-filename (replay/parse-replay-filename f)
+                          :header (replay/decode-replay-header f)}))
+                     (sort-by :filename)
+                     reverse
+                     doall)]
+    {:fx/type :stage
+     :x 400
+     :y 400
+     :showing show-replays
+     :title "alt-spring-lobby Replays"
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-replays false)
+                         (.consume e))
+     :width download-window-width
+     :height download-window-height
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
+       :children
+       [
+        {:fx/type :table-view
+         :v-box/vgrow :always
+         :column-resize-policy :constrained ; TODO auto resize
+         :items replays
+         :columns
+         [{:fx/type :table-column
+           :text "Filename"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i] {:text (-> i :file fs/filename str)})}}
+          {:fx/type :table-column
+           :text "Timestamp"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i] {:text (-> i :parsed-filename :timestamp str)})}}
+          {:fx/type :table-column
+           :text "Map"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i] {:text (-> i :parsed-filename :map-name str)})}}
+          {:fx/type :table-column
+           :text "Engine"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i] {:text (-> i :parsed-filename :engine-version str)})}}
+          {:fx/type :table-column
+           :text "Size"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i] {:text (-> i :file-size str)})}}
+          {:fx/type :table-column
+           :text "Watch"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text ""
+               :graphic
+               {:fx/type :button
+                :text " Watch"
+                :on-action
+                {:event/type ::watch-replay
+                 :replay-file (:file i)
+                 :engines engines
+                 :engine-version (-> i :parsed-filename :engine-version)}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-movie:16:white"}}})}}
+          #_
+          {:fx/type :table-column
+           :text "Parsed Filename"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text
+               (with-out-str
+                 (pprint
+                   (->> i :parsed-filename)))})}}
+          #_
+          {:fx/type :table-column
+           :text "Header"
+           :cell-value-factory identity
+           :cell-factory
+           {:fx/cell-type :table-cell
+            :describe
+            (fn [i]
+              {:text
+               (with-out-str
+                 (pprint
+                   (->> i
+                        :header)))})}}]}]}}}))
+
 (defn main-window-on-close-request
   [standalone e]
   (log/debug "Main window close request" e)
@@ -4493,6 +4644,10 @@
       (select-keys state
         [:engine-version :engines :rapid-download :rapid-filter :rapid-repo :rapid-repos :rapid-versions
          :rapid-data-by-hash :sdp-files :show-rapid-downloader]))
+    (merge
+      {:fx/type replays-window}
+      (select-keys state
+        [:engines :show-replays]))
     {:fx/type :stage
      :showing pop-out-battle
      :title "alt-spring-lobby Battle"

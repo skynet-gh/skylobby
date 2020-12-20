@@ -68,6 +68,11 @@
   (when f
     (.toPath f)))
 
+(defn size [^File f]
+  (when f
+    (when-let [path (.toPath f)]
+      (Files/size path))))
+
 
 (defn os-name []
   (System/getProperty "os.name"))
@@ -237,6 +242,21 @@
   ^File
   []
   (io/file (app-root) "spring"))
+
+(defn replays-dir
+  ([]
+   (replays-dir (isolation-dir)))
+  ([root]
+   (io/file root "demos")))
+
+(defn replay-files
+  ([]
+   (replay-files (isolation-dir)))
+  ([root]
+   (->> (replays-dir root)
+        list-files
+        (filter #(.isFile %))
+        (filter (comp #(string/ends-with? % ".sdfz") filename)))))
 
 (defn map-files
   ([]
