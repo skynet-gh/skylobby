@@ -1775,7 +1775,7 @@
         teams (spring/teams battle-details)
         team-by-key (->> teams
                          (map second)
-                         (map (juxt (comp spring/team-name :battle-status) identity))
+                         (map (juxt (comp spring/team-name :id :battle-status) identity))
                          (into {}))
         battle-team-keys (spring/team-keys teams)
         map-teams (spring/map-teams map-details)
