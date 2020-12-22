@@ -2,7 +2,6 @@
   "Resources for "
   (:require
     [clj-http.client :as http]
-    ;[clojure.core.memoize :as mem]
     [clojure.java.io :as io]
     [clojure.string :as string]
     [clojure.xml :as xml]
@@ -163,6 +162,16 @@
             (first (string/split version #"\s"))
             "_" suffix ".7z")))))
 
+(def engine-archive-re
+  #"^spring_(\{\w+\})?([^_]*)_([0-9a-z\-]+)\.7z$")
+
+(defn engine-archive?
+  "Returns true if the given filename appears to be a spring engine archive, false otherwise."
+  [filename]
+  (boolean
+    (re-find engine-archive-re filename)))
+
+
 (defn engine-path
   "Returns the path to the Spring archive to download for this system."
   ([version]
@@ -182,11 +191,6 @@
     (let [engine-branch (detect-engine-branch engine-version)
           archive-path (engine-path engine-branch engine-version)]
       (str springrts-buildbot-root "/" engine-branch "/" archive-path))))
-
-
-(defn map-url [map-name]
-  (when map-name
-    (str springfiles-maps-url "/" (fs/map-filename map-name))))
 
 
 (defn- tag-content
@@ -244,28 +248,6 @@
                  :resource-updated now})))
           (filter :resource-type)))))
 
-#_
-(def springlauncher-links
-  (mem/ttl (partial get-springlauncher-root) :ttl/threshold 3600000))
-
-#_
-(defn springlauncher-engine-url [engine-version]
-  (let [engine-archive (engine-archive engine-version)]
-    (->> (springlauncher-links)
-         (filter (comp #(clojure.string/starts-with? % "engines/")))
-         (remove #{"engines/"})
-         (filter (comp #(and % engine-archive
-                             (clojure.string/ends-with? % engine-archive))))
-         first
-         (str springlauncher-root "/"))))
-
-#_
-(defn engine-url
-  "Returns the url for the archive for the given engine version."
-  [engine-version]
-  (or (springlauncher-engine-url engine-version)
-      (springrts-engine-url engine-version)))
-
 (defn engine-download-file [engine-version]
   (when engine-version
     (io/file (fs/download-dir) "engine" (engine-archive engine-version))))
@@ -296,9 +278,6 @@
                :resource-date date
                :resource-updated now}))))))
 
-
-(defn- trim-trailing [url]
-  (string/replace url #"/$" ""))
 
 (defn- urls [files]
   (->> files
@@ -331,7 +310,7 @@
                      (let [files (->> (springrts-buildbot-files [(str branch version platform)])
                                       (remove link?)
                                       (filter (every-pred :filename :url))
-                                      (filter (comp seven-zip? :filename)))]
+                                      (filter (comp engine-archive? :filename)))]
                        (map
                          (fn [{:keys [filename url size date]}]
                            {:download-source-name download-source-name
@@ -345,10 +324,3 @@
                    platforms)))
              versions)))
       branches)))
-
-#_
-(springrts-buildbot-files ["maintenance/"])
-#_
-(springrts-buildbot-files ["maintenance/104.0.1-1560-g50390f6/"])
-#_
-(springrts-buildbot-files ["maintenance/104.0.1-1560-g50390f6/win32/"])

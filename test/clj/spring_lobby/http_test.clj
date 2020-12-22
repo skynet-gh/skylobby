@@ -15,20 +15,33 @@
   (is (= "develop"
          (http/detect-engine-branch "104.0.1-2141-gfb2f9d5 develop"))))
 
-#_
-(deftest engine-url
-  (is (= "https://springrts.com/dl/buildbot/default/maintenance/104.0.1-1560-g50390f6/linux64/spring_{maintenance}104.0.1-1560-g50390f6_minimal-portable-linux64-static.7z"
+(deftest engine-archive
+  (is (= "spring_{maintenance}104.0.1-1560-g50390f6_minimal-portable-linux64-static.7z"
          (with-redefs [fs/sys-data (constantly {:os-name "Linux"
                                                 :os-version ""})]
-           (http/engine-url "104.0.1-1560-g50390f6 maintenance"))))
-  (is (= "https://springrts.com/dl/buildbot/default/develop/104.0.1-2141-gfb2f9d5/linux64/spring_{develop}104.0.1-2141-gfb2f9d5_minimal-portable-linux64-static.7z"
+           (http/engine-archive "104.0.1-1560-g50390f6 maintenance"))))
+  (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_minimal-portable-linux64-static.7z"
          (with-redefs [fs/sys-data (constantly {:os-name "Linux"
                                                 :os-version ""})]
-           (http/engine-url "104.0.1-2141-gfb2f9d5 develop"))))
-  (is (= "https://springrts.com/dl/buildbot/default/develop/104.0.1-2141-gfb2f9d5/win32/spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z"
+           (http/engine-archive "104.0.1-2141-gfb2f9d5 develop"))))
+  (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z"
          (with-redefs [fs/sys-data (constantly {:os-name "Windows"})]
-           (http/engine-url "104.0.1-2141-gfb2f9d5 develop")))))
+           (http/engine-archive "104.0.1-2141-gfb2f9d5 develop")))))
 
-(deftest map-url
-  (is (= "http://api.springfiles.com/files/maps/pentos_v1.sd7"
-         (http/map-url "Pentos_V1"))))
+(deftest engine-archive?
+  (is (true?
+        (http/engine-archive? "spring_{maintenance}104.0.1-1560-g50390f6_minimal-portable-linux64-static.7z")))
+  (is (true?
+        (http/engine-archive? "spring_{develop}104.0.1-2141-gfb2f9d5_minimal-portable-linux64-static.7z")))
+  (is (true?
+        (http/engine-archive? "spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z")))
+  (is (false?
+        (http/engine-archive? "{maintenance}104.0.1-1563-g66cad77_win32_UnitTests.7z")))
+  (is (false?
+        (http/engine-archive? "spring_{maintenance}104.0.1-1563-g66cad77_win32_portable.7z")))
+  (is (true?
+        (http/engine-archive? "spring_104.0_win32-minimal-portable.7z")))
+  (is (true?
+        (http/engine-archive? "spring_104.0_minimal-portable-linux64-static.7z")))
+  (is (false?
+        (http/engine-archive? "104.0_spring_dbg.7z"))))
