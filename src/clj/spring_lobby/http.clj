@@ -337,6 +337,18 @@
   (boolean
     (re-find bar-engine-re filename)))
 
+(def bar-platforms
+  {"linux64" "linux-64"
+   "win32" "windows-32"})
+
+(defn bar-engine-filename
+  ([version]
+   (bar-engine-filename version (fs/platform)))
+  ([version platform]
+   (let [bar-platform (get bar-platforms platform)]
+     (str "spring_bar_.BAR." (first (string/split version #"\s"))
+          "_" bar-platform "-minimal-portable.7z"))))
+
 
 (defn get-github-release-engine-downloadables
   [{:keys [download-source-name url]}]

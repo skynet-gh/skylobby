@@ -2541,7 +2541,19 @@
       (when (and engine-version resource-filename)
         (or (= engine-version resource-filename)
             (= (http/engine-archive engine-version)
-               resource-filename)))))
+               resource-filename)
+            (= (http/bar-engine-filename engine-version) resource-filename)))))
+
+#_
+(http/engine-archive "104.0.1-1695-gbd6b256 BAR")
+#_
+(->> user/*state
+     deref
+     :downloadables-by-url
+     vals
+     ;(filter (comp (partial could-be-this-engine? "104.0.1-1563-g66cad77 maintenance"))))
+     (filter (comp (partial could-be-this-engine? "104.0.1-1707-gc0fc18e BAR"))))
+
 
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
@@ -2612,7 +2624,6 @@
         engine-version (:battle-version battle-details)
         engine-details (spring/engine-details engines engine-version)
         engine-file (:file engine-details)
-        engine-download-file (http/engine-download-file engine-version) ; TODO duplicate of downloadable?
         bots (fs/bots engine-file)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
@@ -2931,36 +2942,37 @@
                          download (get http-download url)
                          in-progress (:running download)
                          dest (resource-dest downloadable)
+                         dest-path (fs/canonical-path dest)
                          dest-exists (file-exists? file-cache dest)
                          severity (if dest-exists 0 2)]
-                     [{:severity severity
-                       :text "download"
-                       :human-text (if in-progress
-                                     (download-progress download)
-                                     (if downloadable
-                                       (if dest-exists
-                                         (str "Downloaded " (fs/filename dest))
-                                         (str "Download from " (:download-source-name downloadable)))
-                                       (str "No download for " engine-version)))
-                       :tooltip (if in-progress
-                                  (str "Downloading " (download-progress download))
-                                  (if dest-exists
-                                    (str "Downloaded to " (fs/canonical-path dest))
-                                    (str "Download " url)))
-                       :in-progress in-progress
-                       :action (when (and downloadable (not dest-exists))
-                                 {:event/type ::http-downloadable
-                                  :downloadable downloadable})}]))
-                 (when (and (not engine-details)
-                            (file-exists? file-cache engine-download-file))
-                   [{:severity 2
-                     :text "extract"
-                     :in-progress (get extracting engine-download-file)
-                     :human-text "Extract engine archive"
-                     :tooltip (str "Click to extract " engine-download-file)
-                     :action {:event/type ::extract-7z
-                              :file engine-download-file
-                              :dest (io/file (fs/isolation-dir) "engine" engine-version)}}])
+                     (concat
+                       [{:severity severity
+                         :text "download"
+                         :human-text (if in-progress
+                                       (download-progress download)
+                                       (if downloadable
+                                         (if dest-exists
+                                           (str "Downloaded " (fs/filename dest))
+                                           (str "Download from " (:download-source-name downloadable)))
+                                         (str "No download for " engine-version)))
+                         :tooltip (if in-progress
+                                    (str "Downloading " (download-progress download))
+                                    (if dest-exists
+                                      (str "Downloaded to " (fs/canonical-path dest))
+                                      (str "Download " url)))
+                         :in-progress in-progress
+                         :action (when (and downloadable (not dest-exists))
+                                   {:event/type ::http-downloadable
+                                    :downloadable downloadable})}]
+                       (when dest-exists
+                         [{:severity 2
+                           :text "extract"
+                           :in-progress (get extracting dest)
+                           :human-text "Extract engine archive"
+                           :tooltip (str "Click to extract " dest-path)
+                           :action {:event/type ::extract-7z
+                                    :file dest
+                                    :dest (io/file (fs/isolation-dir) "engine" (:resource-filename downloadable))}}]))))
                  (when-not engine-details
                    (let [importable (some->> importables-by-path
                                              vals

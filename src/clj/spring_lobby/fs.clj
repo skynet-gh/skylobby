@@ -107,6 +107,7 @@
    (let [{:keys [os-name os-version]} sys-data]
      (and
        (string/includes? os-name "Linux")
+       os-version
        (or
          (string/includes? os-version "Microsoft") ; WSL
          (string/includes? os-version "microsoft")))))) ; WSL 2

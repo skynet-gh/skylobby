@@ -47,6 +47,14 @@
         (http/engine-archive? "104.0_spring_dbg.7z"))))
 
 
+(deftest bar-engine-filename
+  (is (= "spring_bar_.BAR.104.0.1-1656-gad7994a_linux-64-minimal-portable.7z",
+         (with-redefs [fs/sys-data (constantly {:os-name "Linux"})]
+           (http/bar-engine-filename "104.0.1-1656-gad7994a BAR"))))
+  (is (= "spring_bar_.BAR.104.0.1-1695-gbd6b256_windows-32-minimal-portable.7z",
+         (with-redefs [fs/sys-data (constantly {:os-name "Windows"})]
+           (http/bar-engine-filename "104.0.1-1695-gbd6b256 BAR")))))
+
 (deftest bar-engine-filename?
   (is (false?
         (http/bar-engine-filename?
