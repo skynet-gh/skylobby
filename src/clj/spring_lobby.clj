@@ -114,48 +114,6 @@
   (clojure.lang.PersistentQueue/EMPTY))
 
 
-(defn initial-state []
-  (merge
-    (slurp-app-edn "config.edn")
-    (slurp-app-edn "maps.edn")
-    (slurp-app-edn "engines.edn")
-    (slurp-app-edn "mods.edn")
-    (slurp-app-edn "importables.edn")
-    (slurp-app-edn "downloadables.edn")
-    {:file-events (initial-file-events)
-     :tasks (initial-tasks)}))
-
-
-(def ^:dynamic *state (atom {}))
-
-
-(defn spit-app-edn
-  "Writes the given data as edn to the given file in the application directory."
-  [data filename]
-  (let [app-root (io/file (fs/app-root))
-        file (io/file app-root filename)]
-    (when-not (fs/exists app-root)
-      (.mkdirs app-root))
-    (spit file (with-out-str (pprint data)))))
-
-
-(defn add-watch-state-to-edn
-  "Adds a watcher to *state that writes the data, returned by applying filter-fn, when that data
-  changes, to output-filename in the app directory."
-  [state-atom watcher-kw filter-fn output-filename]
-  (add-watch state-atom
-    watcher-kw
-    (fn [_k _ref old-state new-state]
-      (try
-        (let [old-data (filter-fn old-state)
-              new-data (filter-fn new-state)]
-          (when (not= old-data new-data)
-            (log/debug "Updating" output-filename)
-            (spit-app-edn new-data output-filename)))
-        (catch Exception e
-          (log/error e "Error in" watcher-kw "state watcher"))))))
-
-
 (def config-keys
   [:username :password :server-url :engine-version :mod-name :map-name
    :battle-title :battle-password
@@ -175,11 +133,6 @@
 (defn select-mods [state]
   (select-keys state [:mods]))
 
-(defn select-download [state]
-  (select-keys state
-    [:engine-versions-cache :map-files-cache
-     :engine-branch :maps-index-url :rapid-repo :mods-index-url]))
-
 (defn select-importables [state]
   (select-keys state
     [:importables-by-path]))
@@ -188,9 +141,58 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
-(defn select-rapid [state]
-  (select-keys state
-    [:rapid-repo :rapid-repos :rapid-data-by-hash :rapid-data-by-version :rapid-versions]))
+
+(def state-to-edn
+  [{:select-fn select-config
+    :filename "config.edn"}
+   {:select-fn select-maps
+    :filename "maps.edn"}
+   {:select-fn select-engines
+    :filename "engines.edn"}
+   {:select-fn select-mods
+    :filename "mods.edn"}
+   {:select-fn select-importables
+    :filename "importables.edn"}
+   {:select-fn select-downloadables
+    :filename "downloadables.edn"}])
+
+
+(defn initial-state []
+  (merge
+    (apply
+      merge
+      (doall
+        (map (comp slurp-app-edn :filename) state-to-edn)))
+    {:file-events (initial-file-events)
+     :tasks (initial-tasks)}))
+
+
+(def ^:dynamic *state (atom {}))
+
+
+(defn spit-app-edn
+  "Writes the given data as edn to the given file in the application directory."
+  [data filename]
+  (let [app-root (io/file (fs/app-root))
+        file (io/file app-root filename)]
+    (when-not (fs/exists app-root)
+      (.mkdirs app-root))
+    (spit file (with-out-str (pprint data)))))
+
+
+(defn add-watch-state-to-edn
+  [state-atom]
+  (add-watch state-atom :state-to-edn
+    (fn [_k _ref old-state new-state]
+      (doseq [{:keys [select-fn filename]} state-to-edn]
+        (try
+          (let [old-data (select-fn old-state)
+                new-data (select-fn new-state)]
+            (when (not= old-data new-data)
+              (log/debug "Updating" filename)
+              (spit-app-edn new-data filename)))
+          (catch Exception e
+            (log/error e "Error in :state-to-edn for" filename "state watcher")))))))
 
 
 (defn read-map-data [maps map-name]
@@ -268,12 +270,7 @@
   "Adds all *state watchers."
   [state-atom]
   (remove-watch state-atom :debug)
-  (remove-watch state-atom :config)
-  (remove-watch state-atom :maps)
-  (remove-watch state-atom :engines)
-  (remove-watch state-atom :mods)
-  (remove-watch state-atom :importables)
-  (remove-watch state-atom :downloadables)
+  (remove-watch state-atom :state-to-edn)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
@@ -290,12 +287,7 @@
               (println new-only))))
         (catch Exception e
           (log/error e "Error in debug")))))
-  (add-watch-state-to-edn state-atom :config select-config "config.edn")
-  (add-watch-state-to-edn state-atom :maps select-maps "maps.edn")
-  (add-watch-state-to-edn state-atom :engines select-engines "engines.edn")
-  (add-watch-state-to-edn state-atom :mods select-mods "mods.edn")
-  (add-watch-state-to-edn state-atom :importables select-importables "importables.edn")
-  (add-watch-state-to-edn state-atom :downloadables select-downloadables "downloadables.edn")
+  (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (try
