@@ -223,8 +223,6 @@
          mod-name (spring/mod-name mod-data)]
      (assoc mod-data :mod-name mod-name))))
 
-#_
-(read-mod-data (io/file "/mnt/c/Users/craig/AppData/Local/Programs/Beyond-All-Reason/data/packages/ce1411570bf8ed64222a1ee241a22234.sdp"))
 
 (defn update-mod [state-atom file]
   (let [mod-data (read-mod-data file {:modinfo-only false})
@@ -257,13 +255,6 @@
   [mod-name]
   (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
     git))
-
-#_
-(re-find #"(.+)\s([0-9a-f]+)$" "Beyond All Reason $VERSION")
-#_
-(re-find #"(.+)\s(\$VERSION)$" "Beyond All Reason $VERSION")
-#_
-(mod-name-sans-git "Beyond All Reason $VERSION")
 
 
 (defn select-debug [state]
@@ -2544,15 +2535,6 @@
       (catch Exception e
         (log/error e "Error nuking data dir")))))
 
-#_
-(-> user/*state deref :battle-map-details keys)
-
-#_
-(->> user/*state deref :importables-by-path
-     vals
-     ;(filter (comp #{::map} :resource-type))
-     (filter (comp #{"Claymore_v2"} :resource-name)))
-
 (defn git-repo-url [battle-modname]
   (cond
     (string/starts-with? battle-modname "Beyond All Reason")
@@ -2569,26 +2551,12 @@
             (= (http/engine-archive engine-version)
                resource-filename)))))
 
-#_
-(->> user/*state
-     deref
-     :downloadables-by-url
-     vals
-     (filter (comp #{::engine} :resource-type))
-     (filter (partial could-be-this-engine? "103.0"))
-     first)
-
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
       string/lower-case
       (string/replace #"\s+" "_")
       (string/replace #"-" "_")
       (string/replace #"\.sd[7z]$" "")))
-
-#_
-(normalize-mod "Balanced Annihilation V9.79.4")
-#_
-(normalize-mod "balanced_annihilation-v9.79.4.sdz")
 
 (defn could-be-this-mod?
   "Returns true if this resource might be the mod with the given name, by magic, false otherwise."
@@ -2598,14 +2566,6 @@
         (= (normalize-mod mod-name)
            (normalize-mod resource-filename)))))
 
-#_
-(->> user/*state
-     deref
-     :downloadables-by-url
-     vals
-     (filter (comp #{::mod} :resource-type))
-     (filter (partial could-be-this-mod? "Balanced Annihilation V9.79.4"))
-     first)
 
 (defn normalize-map [map-name-or-filename]
   (some-> map-name-or-filename
@@ -3734,8 +3694,10 @@
     :resources-fn http/get-springlauncher-downloadables}
    {:download-source-name "SpringRTS buildbot"
     :url http/springrts-buildbot-root
-    :resources-fn http/crawl-springrts-engine-downloadables}])
-  ; TODO bar github releases crawling for engines
+    :resources-fn http/crawl-springrts-engine-downloadables}
+   {:download-source-name "BAR GitHub spring"
+    :url http/bar-spring-releases-url
+    :resources-fn http/get-github-release-engine-downloadables}])
 
 
 (def downloadable-update-cooldown
@@ -4277,7 +4239,7 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [{:keys [download-url] :as downloadable}]
+            (fn [{:keys [download-url resource-filename] :as downloadable}]
               (let [dest-file (some-> downloadable resource-dest)
                     dest-path (some-> dest-file fs/canonical-path)
                     download (get http-download download-url)
@@ -4305,7 +4267,9 @@
                    (and
                         (file-exists? file-cache dest-path)
                         dest-file
-                        (http/engine-archive? (fs/filename dest-file))
+                        (or
+                          (http/engine-archive? resource-filename)
+                          (http/bar-engine-filename? resource-filename))
                         extract-file
                         (not (file-exists? file-cache (fs/canonical-path extract-file))))
                    {:fx/type :button

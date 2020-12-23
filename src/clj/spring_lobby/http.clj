@@ -30,6 +30,9 @@
 (def springlauncher-root
   "https://content.spring-launcher.com")
 
+(def bar-spring-releases-url
+  "https://api.github.com/repos/beyond-all-reason/spring/releases")
+
 
 (defn- by-tag [element tag]
   (->> element
@@ -324,3 +327,38 @@
                    platforms)))
              versions)))
       branches)))
+
+
+(def bar-engine-re
+  #"^spring_bar_\.BAR\.([^_]*)_([0-9a-z\-]+)\.7z$")
+
+(defn bar-engine-filename?
+  [filename]
+  (boolean
+    (re-find bar-engine-re filename)))
+
+
+(defn get-github-release-engine-downloadables
+  [{:keys [download-source-name url]}]
+  (let [now (u/curr-millis)]
+    (->> (http/get url {:as :auto})
+         :body
+         (mapcat
+           (fn [{:keys [assets html_url]}]
+             (map
+               (fn [{:keys [browser_download_url created_at]}]
+                 {:release-url html_url
+                  :asset-url browser_download_url
+                  :created-at created_at})
+               assets)))
+         (map
+           (fn [{:keys [asset-url created-at]}]
+             (let [decoded-url (u/decode asset-url)
+                   filename (filename decoded-url)]
+               {:download-url asset-url
+                :resource-filename filename
+                :resource-type (when (bar-engine-filename? filename)
+                                 :spring-lobby/engine)
+                :resource-date created-at
+                :download-source-name download-source-name
+                :resource-updated now}))))))

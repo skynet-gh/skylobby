@@ -45,3 +45,12 @@
         (http/engine-archive? "spring_104.0_minimal-portable-linux64-static.7z")))
   (is (false?
         (http/engine-archive? "104.0_spring_dbg.7z"))))
+
+
+(deftest bar-engine-filename?
+  (is (false?
+        (http/bar-engine-filename?
+          "spring_bar_.BAR.104.0.1-1656-gad7994a_windows-64-minimal-symbols.tgz",)))
+  (is (true?
+        (http/bar-engine-filename?
+          "spring_bar_.BAR.104.0.1-1656-gad7994a_windows-64-minimal-portable.7z",))))

@@ -383,8 +383,12 @@
   version '103' whereas for engine 104.0.1-1553-gd3c0012 maintenance the sync version is the same,
   '104.0.1-1553-gd3c0012 maintenance'."
   [sync-version]
-  (if (= sync-version (string/replace sync-version #"[^\d]" ""))
+  (cond
+    (string/blank? sync-version)
+    ""
+    (= sync-version (string/replace sync-version #"[^\d]" ""))
     (str sync-version ".0")
+    :else
     sync-version))
 
 

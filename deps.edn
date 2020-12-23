@@ -2,7 +2,7 @@
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
   byte-streams/byte-streams {:mvn/version "0.2.4"}
-  jarohen/chime {:mvn/version "0.3.2"}
+  cheshire/cheshire {:mvn/version  "5.10.0"}
   clj-jgit/clj-jgit {:mvn/version "1.0.1"}
   clj-http/clj-http {:mvn/version "3.11.0"}
   cljfx/cljfx {:mvn/version "1.7.10"}
@@ -21,6 +21,7 @@
   hawk/hawk {:mvn/version "0.2.11"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   io.aviso/pretty {:mvn/version "0.1.37"}
+  jarohen/chime {:mvn/version "0.3.2"}
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}

@@ -2,6 +2,8 @@
   (:require
     [clojure.edn :as edn])
   (:import
+    (java.net URLDecoder)
+    (java.nio.charset StandardCharsets)
     (org.apache.commons.io FileUtils)))
 
 
@@ -54,3 +56,7 @@
   [n]
   (when (number? n)
     (FileUtils/byteCountToDisplaySize (long n))))
+
+
+(defn decode [s]
+  (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))

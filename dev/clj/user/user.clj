@@ -3,6 +3,7 @@
     [cemerick.pomegranate :as pomegranate]
     [cemerick.pomegranate.aether :refer [maven-central]]
     [chime.core :as chime]
+    [clj-http.client :as http]
     [cljfx.api :as fx]
     [clojure.datafy :refer [datafy]]
     [clojure.edn :as edn]
@@ -151,7 +152,7 @@
 
 (defn init []
   (try
-    [datafy pprint chime/chime-at string/split edn/read-string]
+    [datafy pprint chime/chime-at string/split edn/read-string http/get]
     (hawk/watch! [{:paths ["src/clj"]
                    :handler refresh-on-file-change}])
     (require 'spring-lobby)
