@@ -1,6 +1,8 @@
 (ns spring-lobby.util
   (:require
-    [clojure.edn :as edn]))
+    [clojure.edn :as edn])
+  (:import
+    (org.apache.commons.io FileUtils)))
 
 
 (set! *warn-on-reflection* true)
@@ -45,3 +47,10 @@
 (defn random-color
   []
   (long (rand (* 255 255 255))))
+
+
+(defn format-bytes
+  "Returns a string of the given byte count in human readable format."
+  [n]
+  (when (number? n)
+    (FileUtils/byteCountToDisplaySize (long n))))
