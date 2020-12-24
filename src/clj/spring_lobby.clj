@@ -41,6 +41,7 @@
     (javafx.embed.swing SwingFXUtils)
     (javafx.scene.input KeyCode)
     (javafx.scene.paint Color)
+    (javafx.stage WindowEvent)
     (manifold.stream SplicedStream)
     (org.apache.commons.io.input CountingInputStream))
   (:gen-class))
@@ -211,8 +212,6 @@
 (def ^java.io.File mods-cache-root
   (io/file (fs/app-root) "mods-cache"))
 
-(defn mod-cache-file [mod-name]
-  (io/file mods-cache-root (str mod-name ".edn")))
 
 (defn read-mod-data
   ([f]
@@ -227,17 +226,18 @@
 
 
 (defn update-mod [state-atom file]
-  (let [mod-data (read-mod-data file {:modinfo-only false})
-        ;mod-name (:mod-name mod-data)
-        ;cache-file (mod-cache-file mod-name)
+  (let [path (fs/canonical-path file)
+        mod-data (try
+                   (read-mod-data file {:modinfo-only false})
+                   (catch Exception e
+                     (log/error e "Error reading mod data for" file)))
         mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])]
-    ;(log/info "Caching" mod-name "to" cache-file)
-    ;(spit cache-file (with-out-str (pprint mod-data)))
     (swap! state-atom update :mods
            (fn [mods]
-             (-> (remove (comp #{(fs/canonical-path (:file mod-details))} fs/canonical-path :file) mods)
-                 (conj mod-details)
-                 set)))
+             (set
+               (cond->
+                 (remove (comp #{path} fs/canonical-path :file) mods)
+                 mod-details (conj mod-details)))))
     mod-data))
 
 
@@ -1060,11 +1060,6 @@
 (defmethod event-handler ::print-state [_e]
   (pprint *state))
 
-(defmethod event-handler ::show-rapid-downloader [_e]
-  (swap! *state assoc :show-rapid-downloader true))
-
-(defmethod event-handler ::show-http-downloader [_e]
-  (swap! *state assoc :show-http-downloader true))
 
 (defmethod event-handler ::disconnect [_e]
   (let [state @*state]
@@ -1417,7 +1412,8 @@
        :desc
        {:fx/type :button
         :text "rapid"
-        :on-action {:event/type ::show-rapid-downloader}
+        :on-action {:event/type ::assoc
+                    :key :show-rapid-downloader}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal (str "mdi-download:16:white")}}}
@@ -4301,7 +4297,7 @@
     {:fx/type :stage
      :showing show-rapid-downloader
      :title "alt-spring-lobby Rapid Downloader"
-     :on-close-request (fn [^javafx.stage.WindowEvent e]
+     :on-close-request (fn [^WindowEvent e]
                          (swap! *state assoc :show-rapid-downloader false)
                          (.consume e))
      :width download-window-width
@@ -4380,11 +4376,15 @@
                                (string/starts-with? id (str rapid-repo ":"))
                                true)))
                          (filter
-                           (fn [{:keys [version]}]
+                           (fn [{:keys [version] :as i}]
                              (if-not (string/blank? rapid-filter)
-                               (string/includes?
-                                 (string/lower-case version)
-                                 (string/lower-case rapid-filter))
+                               (or
+                                 (string/includes?
+                                   (string/lower-case version)
+                                   (string/lower-case rapid-filter))
+                                 (string/includes?
+                                   (:hash i)
+                                   (string/lower-case rapid-filter)))
                                true))))
                     [])
          :columns
@@ -4606,32 +4606,7 @@
                  :engine-version (-> i :parsed-filename :engine-version)}
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-movie:16:white"}}})}}
-          #_
-          {:fx/type :table-column
-           :text "Parsed Filename"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text
-               (with-out-str
-                 (pprint
-                   (->> i :parsed-filename)))})}}
-          #_
-          {:fx/type :table-column
-           :text "Header"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text
-               (with-out-str
-                 (pprint
-                   (->> i
-                        :header)))})}}]}]}}}))
+                 :icon-literal "mdi-movie:16:white"}}})}}]}]}}}))
 
 (defn maps-window
   [{:keys [filter-maps-name maps show-maps]}]
@@ -4849,11 +4824,11 @@
           (select-keys state
             [:filter-maps-name :maps :show-maps]))])
      (when show-rapid-downloader
-      (merge
-        {:fx/type rapid-download-window}
-        (select-keys state
-          [:engine-version :engines :rapid-download :rapid-filter :rapid-repo :rapid-repos :rapid-versions
-           :rapid-data-by-hash :sdp-files :show-rapid-downloader])))
+       [(merge
+          {:fx/type rapid-download-window}
+          (select-keys state
+            [:engine-version :engines :rapid-download :rapid-filter :rapid-repo :rapid-repos :rapid-versions
+             :rapid-data-by-hash :sdp-files :show-rapid-downloader]))])
      (when show-replays
        [(merge
           {:fx/type replays-window}

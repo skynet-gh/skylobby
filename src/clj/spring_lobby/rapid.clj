@@ -195,6 +195,8 @@
    (read-sdp-mod f nil))
   ([^java.io.File f {:keys [modinfo-only]}]
    (let [modinfo (try-inner-lua f "modinfo.lua")] ; TODO don't parse the .sdp over and over
+     (when-not modinfo
+       (throw (ex-info "Could not read mod" {:file f})))
      (merge
        {::fs/source :rapid
         :file f
