@@ -6,11 +6,8 @@ Notable changes
 
 - Chat
 - Store multiple servers and login per server
-- Switch map load to fast 7zip
-- Map detail browser with minimap images
 - Starting position rectangles for choose in game
 - Compatability warnings for known bad engine/game/AI combinations
-- Download BAR engine from GitHub
 
 ### [0.2] - upcoming soon
 
@@ -18,7 +15,14 @@ Initial public release.
 - GitHub Actions to tag and publish releases
 - GitHub Pages for dev blog and user guide
 
-### [0.1.0] - 2020-11-15 to 2020-12-17
+### [0.1.0] - 2020-12-18 to 2020-12-27
+
+- GitHub Actions for unit tests
+- Switch map load to fast 7zip
+- Map detail browser with minimap images
+- Download BAR engine from GitHub
+
+### [pre-0.1.0 part 3] - 2020-11-15 to 2020-12-17
 
 Fairly usable now.
 - Manage resources (engines, mods/games, maps).
