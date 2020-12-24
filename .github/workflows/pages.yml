@@ -1,0 +1,23 @@
+name: GitHub Pages
+on:
+  push:
+    branches: [ master ]
+
+  workflow_dispatch:
+jobs:
+  pages:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: DeLaGuardo/setup-graalvm@3.0
+        with:
+          graalvm-version: '19.3.4.java11'
+      - uses: DeLaGuardo/setup-clojure@3.0
+        with:
+          cli: '1.10.1.763'
+      - run: clojure -M:build
+        working-directory: ./cryogen
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./cryogen/public/alt-spring-lobby

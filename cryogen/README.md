@@ -14,17 +14,8 @@ A browser should be opened to http://localhost:3000/alt-spring-lobby
 
 ### Build
 
-Until GitHub actions are working, build with
+GitHub actions now publishes content to the `gh-pages` branch automatically. To build manually, run
 
 ```
 clj -M:build
 ```
-
-Then, assuming you have another repo at `../asl-cryogen` checked out to the `gh-pages` branch, copy
-into place with
-
-```
-cp public/* ../asl-cryogen/
-```
-
-And commit and push changes.
