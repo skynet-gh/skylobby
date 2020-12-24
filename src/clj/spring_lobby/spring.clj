@@ -311,10 +311,7 @@
   (try
     (log/info "Starting game")
     (client/send-message client "MYSTATUS 1")
-    (let [battle (-> state
-                     :battles
-                     (get (-> state :battle :battle-id)))
-          {:keys [battle-version]} battle
+    (let [{:keys [battle-version]} (battle-details state)
           script-txt (battle-script-txt state)
           isolation-dir (fs/isolation-dir)
           engine-dir (some->> engines
