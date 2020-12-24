@@ -96,17 +96,21 @@
 
 
 (def priority-overrides
-  {::update-engine 4
+  {::update-downloadables 2
+   ::scan-imports 2
+   ::update-engine 4
    ::update-map 4
    ::update-mod 4
    ::import 5
    ::http-downloadable 5
    ::rapid-downloadable 5})
 
+(def default-task-priority 3)
+
 (defn task-priority [{::keys [task-priority task-type]}]
   (or task-priority
       (get priority-overrides task-type)
-      3))
+      default-task-priority))
 
 (defn initial-tasks []
   (pq/priority-queue task-priority :variant :set))
@@ -395,32 +399,44 @@
 
 
 ; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
-(defn handle-task! [state-atom]
-  (let [[before _after] (swap-vals! state-atom update :tasks
-                                    (fn [tasks]
-                                      (if-not (empty? tasks)
-                                        (pop tasks)
-                                        tasks)))
-        tasks (:tasks before)
-        task (when-not (empty? tasks)
-               (peek tasks))]
-    (task-handler task)
-    task))
+(defn handle-task!
+  ([state-atom]
+   (handle-task! state-atom 1))
+  ([state-atom min-priority]
+   (let [[before _after] (swap-vals! state-atom update :tasks
+                                     (fn [tasks]
+                                       (if-not (empty? tasks)
+                                         (let [{::keys [task-priority]} (peek tasks)]
+                                           (if (<= min-priority (or task-priority default-task-priority))
+                                             (pop tasks)
+                                             tasks)
+                                           (pop tasks))
+                                         tasks)))
+         tasks (:tasks before)
+         task (when-not (empty? tasks)
+                (when-let [{::keys [task-priority] :as task} (peek tasks)]
+                  (when (<= min-priority (or task-priority default-task-priority))
+                    task)))]
+     (task-handler task)
+     task)))
 
-(defn tasks-chimer-fn [state-atom]
-  (log/info "Starting tasks chimer")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/instant)
-            (java-time/duration 1 :seconds))
-          (fn [_chimestamp]
-            (handle-task! state-atom))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error handling task")
-             true)})]
-    (fn [] (.close chimer))))
+(defn tasks-chimer-fn
+  ([state-atom]
+   (tasks-chimer-fn state-atom 1))
+  ([state-atom min-priority]
+   (log/info "Starting tasks chimer")
+   (let [chimer
+         (chime/chime-at
+           (chime/periodic-seq
+             (java-time/instant)
+             (java-time/duration 1 :seconds))
+           (fn [_chimestamp]
+             (handle-task! state-atom min-priority))
+           {:error-handler
+            (fn [e]
+              (log/error e "Error handling task")
+              true)})]
+     (fn [] (.close chimer)))))
 
 (defn handle-all-tasks! [state-atom]
   (while (handle-task! state-atom)))
@@ -1183,7 +1199,6 @@
   (swap! *state assoc :server-url event))
 
 
-
 (defn open-battle
   [client {:keys [battle-type nat-type battle-password host-port max-players mod-hash rank map-hash
                   engine engine-version map-name title mod-name]
@@ -1247,6 +1262,12 @@
 (defmethod event-handler ::maps-hidden [_e]
   (swap! *state dissoc :map-input-prefix))
 
+(defmethod event-handler ::show-maps-window
+  [{:keys [on-change-map]}]
+  (swap! *state assoc
+         :show-maps true
+         :on-change-map on-change-map))
+
 (defn map-list
   [{:keys [disable map-name maps on-value-changed map-input-prefix]}]
   {:fx/type :h-box
@@ -1286,8 +1307,8 @@
         :show-delay [10 :ms]
         :style {:-fx-font-size 14}
         :text "Show maps window"}
-       :on-action {:event/type ::assoc
-                   :key :show-maps}
+       :on-action {:event/type ::show-maps-window
+                   :on-change-map on-value-changed}
        :graphic
        {:fx/type font-icon/lifecycle
         :icon-literal "mdi-magnify:16:white"}}
@@ -1357,12 +1378,6 @@
     (let [desktop (Desktop/getDesktop)]
       (.browseFileDirectory desktop file))))
 
-(defmethod event-handler ::show-importer [_e]
-  (swap! *state assoc :show-importer true))
-
-(defmethod event-handler ::show-downloader [_e]
-  (swap! *state assoc :show-downloader true))
-
 (defn battles-buttons
   [{:keys [battle battles battle-password battle-title client engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
@@ -1386,7 +1401,8 @@
        :desc
        {:fx/type :button
         :text "import"
-        :on-action {:event/type ::show-importer}
+        :on-action {:event/type ::assoc
+                    :key :show-importer}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal (str "mdi-file-import:16:white")}}}
@@ -1399,7 +1415,8 @@
        :desc
        {:fx/type :button
         :text "http"
-        :on-action {:event/type ::show-downloader}
+        :on-action {:event/type ::assoc
+                    :key :show-downloader}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal (str "mdi-download:16:white")}}}
@@ -1667,6 +1684,12 @@
   (log/info e)
   (let [map-name (or map-name event)]
     (swap! *state assoc :map-name map-name)))
+
+(defmethod event-handler ::map-window-action
+  [{:keys [on-change-map]}]
+  (when on-change-map
+    (event-handler on-change-map))
+  (swap! *state assoc :show-maps false))
 
 (defmethod event-handler ::battle-map-change
   [{:fx/keys [event] :keys [map-name maps]}]
@@ -4470,8 +4493,8 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [^java.io.File i]
-              {:text (str (fs/filename i))})}}
+            (fn [i]
+              {:text (-> i fs/filename str)})}}
           {:fx/type :table-column
            :text "ID"
            :cell-value-factory identity
@@ -4609,7 +4632,7 @@
                  :icon-literal "mdi-movie:16:white"}}})}}]}]}}}))
 
 (defn maps-window
-  [{:keys [filter-maps-name maps show-maps]}]
+  [{:keys [filter-maps-name maps on-change-map show-maps]}]
   {:fx/type :stage
    :x 400
    :y 400
@@ -4652,21 +4675,26 @@
               :graphic
               {:fx/type font-icon/lifecycle
                :icon-literal "mdi-close:16:white"}}}]))}
-      {:fx/type :flow-pane
-       :vgap 5
-       :hgap 5
-       :padding 5
-       :children
-       (map
-         (fn [{:keys [map-name]}]
-           {:fx/type :v-box
-            :style
-            {:-fx-min-width map-browse-image-size
-             :-fx-max-width map-browse-image-size
-             :-fx-min-height map-browse-box-height
-             :-fx-max-height map-browse-box-height}
-            :children
-            [{:fx/type :stack-pane
+      {:fx/type :scroll-pane
+       :fit-to-width true
+       :content
+       {:fx/type :flow-pane
+        :vgap 5
+        :hgap 5
+        :padding 5
+        :children
+        (map
+          (fn [{:keys [map-name]}]
+            {:fx/type :button
+             :style
+             {:-fx-min-width map-browse-image-size
+              :-fx-max-width map-browse-image-size
+              :-fx-min-height map-browse-box-height
+              :-fx-max-height map-browse-box-height}
+             :on-action {:event/type ::map-window-action
+                         :on-change-map (assoc on-change-map :map-name map-name)}
+             :graphic
+             {:fx/type :v-box
               :children
               [{:fx/type :image-view
                 :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
@@ -4674,21 +4702,15 @@
                 :fit-width map-browse-image-size
                 :fit-height map-browse-image-size
                 :preserve-ratio true}
-               {:fx/type :pane
-                :style
-                {:-fx-min-width map-browse-image-size
-                 :-fx-max-width map-browse-image-size
-                 :-fx-min-height map-browse-image-size
-                 :-fx-max-height map-browse-image-size}}]}
-             {:fx/type :label
-              :wrap-text true
-              :text (str map-name)}]})
-         (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
-           (->> maps
-                (filter (fn [{:keys [map-name]}]
-                          (and map-name
-                               (string/includes? (string/lower-case map-name) filter-lc))))
-                (sort-by :map-name))))}]}}})
+               {:fx/type :label
+                :wrap-text true
+                :text (str map-name)}]}})
+          (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
+            (->> maps
+                 (filter (fn [{:keys [map-name]}]
+                           (and map-name
+                                (string/includes? (string/lower-case map-name) filter-lc))))
+                 (sort-by :map-name))))}}]}}})
 
 (defn main-window-on-close-request
   [standalone e]
@@ -4822,7 +4844,7 @@
        [(merge
           {:fx/type maps-window}
           (select-keys state
-            [:filter-maps-name :maps :show-maps]))])
+            [:filter-maps-name :maps :on-change-map :show-maps]))])
      (when show-rapid-downloader
        [(merge
           {:fx/type rapid-download-window}
@@ -4839,7 +4861,8 @@
 (defn init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
-  (let [tasks-chimer (tasks-chimer-fn state-atom)
+  (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
+        high-tasks-chimer (tasks-chimer-fn state-atom 3)
         force-update-chimer (force-update-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
@@ -4848,7 +4871,7 @@
     (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
-    {:chimers [tasks-chimer force-update-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer force-update-chimer]}))
 
 
 (defn -main [& _args]
