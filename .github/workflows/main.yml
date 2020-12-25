@@ -27,7 +27,7 @@ jobs:
       - uses: DeLaGuardo/setup-graalvm@3.0
         with:
           graalvm-version: '19.3.4.java11'
-      - uses: DeLaGuardo/setup-clojure@3.0
+      - uses: DeLaGuardo/setup-clojure@3.1
         with:
           cli: '1.10.1.763'
 

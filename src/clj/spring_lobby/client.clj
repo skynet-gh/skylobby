@@ -4,19 +4,23 @@
     [byte-streams]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
+    [clojure.java.io :as io]
     [gloss.core :as gloss]
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
+    [spring-lobby.git :as git]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
+    (java.net URL)
     (java.nio ByteBuffer)
     (java.security MessageDigest)
     (java.util Base64)
+    (java.util.jar Manifest)
     (manifold.stream SplicedStream)))
 
 
@@ -26,7 +30,22 @@
 (def ^:dynamic handler handler/handle) ; for overriding in dev
 
 
-(def agent-string "alt-spring-lobby-0.1")
+; https://stackoverflow.com/a/16431226/984393
+(defn manifest-version []
+  (try
+    (when-let [clazz (Class/forName "spring_lobby")]
+      (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
+        (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
+            URL. .openStream Manifest. .getMainAttributes
+            (.getValue "Build-Number"))))
+    (catch Exception e
+      (log/warn e "Unable to read version from manifest"))))
+
+(defn agent-string []
+  (str "alt-spring-lobby-"
+       (or (manifest-version)
+           (git/tag-or-latest-id (io/file "."))
+           "UNKNOWN")))
 
 
 (def default-port 8200)
@@ -324,7 +343,7 @@
           (log/error e "Error in ping loop"))))))
 
 
-(defn print-loop 
+(defn print-loop
   [state-atom c]
   (swap! state-atom
     assoc
@@ -353,7 +372,7 @@
         user-id (rand-int Integer/MAX_VALUE)
         compat-flags "sp u"
         msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                 " " agent-string "\t" user-id " " git-ref "\t" compat-flags)]
+                 " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
     (message/send-message client msg)))
 
 

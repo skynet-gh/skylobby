@@ -3420,7 +3420,7 @@
 
 (defmethod event-handler ::battle-color-action
   [{:keys [id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
-  (let [^javafx.scene.control.ComboBoxBase source (.getSource event)
+  (let [source (.getSource event)
         javafx-color (.getValue source)
         color-int (spring-color javafx-color)]
     (when is-me
