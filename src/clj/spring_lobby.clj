@@ -3799,8 +3799,6 @@
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)]
     {:fx/type :stage
-     :x 300
-     :y 300
      :showing show-importer
      :title "alt-spring-lobby Importer"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -4057,8 +4055,6 @@
                                        (= download-type resource-type)
                                        true))))]
     {:fx/type :stage
-     :x 200
-     :y 200
      :showing show-downloader
      :title "alt-spring-lobby Downloader"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -4529,8 +4525,6 @@
                      reverse
                      doall)]
     {:fx/type :stage
-     :x 400
-     :y 400
      :showing show-replays
      :title "alt-spring-lobby Replays"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -4608,8 +4602,6 @@
 (defn maps-window
   [{:keys [filter-maps-name maps on-change-map show-maps]}]
   {:fx/type :stage
-   :x 400
-   :y 400
    :showing show-maps
    :title "alt-spring-lobby Maps"
    :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -4710,8 +4702,6 @@
      [{:fx/type :stage
        :showing true
        :title "Alt Spring Lobby"
-       :x 100
-       :y 100
        :width main-window-width
        :height main-window-height
        :on-close-request (partial main-window-on-close-request standalone)
@@ -4786,8 +4776,6 @@
          :title "alt-spring-lobby Battle"
          :on-close-request {:event/type ::dissoc
                             :key :pop-out-battle}
-         :x 300
-         :y 300
          :width battle-window-width
          :height battle-window-height
          :scene
