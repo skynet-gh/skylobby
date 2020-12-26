@@ -133,7 +133,7 @@
   (try
     (old-handler event)
     (catch Exception e
-      (println "exception in old event handler, probably unbound fn, fix asap"))))
+      (println "exception in old event handler" e))))
 
 
 (defn client-handler [client state message]

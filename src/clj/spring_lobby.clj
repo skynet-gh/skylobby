@@ -262,34 +262,16 @@
     git))
 
 
-(defn select-debug [state]
-  (select-keys state [:pop-out-battle]))
-
-
 (defmulti event-handler :event/type)
 
 
 (defn add-watchers
   "Adds all *state watchers."
   [state-atom]
-  (remove-watch state-atom :debug)
   (remove-watch state-atom :state-to-edn)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
-  (add-watch state-atom :debug
-    (fn [_k _ref old-state new-state]
-      (try
-        (let [dold (select-debug old-state)
-              dnew (select-debug new-state)]
-          (when (not= dold dnew)
-            (println dold)
-            (println dnew)
-            (let [[old-only new-only] (clojure.data/diff old-state new-state)]
-              (println old-only)
-              (println new-only))))
-        (catch Exception e
-          (log/error e "Error in debug")))))
   (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
@@ -1003,10 +985,14 @@
            nil)))
 
 (defmethod event-handler ::connect [_e]
-  (let [server-url (:server-url @*state)
-        client-deferred (client/client server-url)]
-    (swap! *state assoc :client-deferred client-deferred)
-    (connected-loop *state client-deferred)))
+  (future
+    (try
+      (let [server-url (:server-url @*state)
+            client-deferred (client/client server-url)]
+        (swap! *state assoc :client-deferred client-deferred)
+        (connected-loop *state client-deferred))
+      (catch Exception e
+        (log/error e "Error connecting")))))
 
 
 (defn client-buttons
@@ -1121,21 +1107,25 @@
 
 
 (defmethod event-handler ::leave-battle [_e]
-  (message/send-message (:client @*state) "LEAVEBATTLE"))
+  (future
+    (try
+      (let [client (:client @*state)]
+        (message/send-message client "LEAVEBATTLE"))
+      (catch Exception e
+        (log/error e "Error leaving battle")))))
 
-(defmethod event-handler ::pop-out-battle [_e]
-  (swap! *state assoc :pop-out-battle true))
-
-(defmethod event-handler ::pop-in-battle [_e]
-  (swap! *state assoc :pop-out-battle false))
 
 (defmethod event-handler ::join-battle [_e]
-  (let [{:keys [battles battle-password selected-battle]} @*state]
-    (when selected-battle
-      (message/send-message (:client @*state)
-        (str "JOINBATTLE " selected-battle
-             (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
-               (str " " battle-password)))))))
+  (future
+    (try
+      (let [{:keys [battles battle-password selected-battle]} @*state]
+        (when selected-battle
+          (message/send-message (:client @*state)
+            (str "JOINBATTLE " selected-battle
+                 (when (= "1" (-> battles (get selected-battle) :battle-passworded)) ; TODO
+                   (str " " battle-password))))))
+      (catch Exception e
+        (log/error e "Error joining battle")))))
 
 
 (defn update-filter-fn [^javafx.scene.input.KeyEvent event]
@@ -1518,13 +1508,15 @@
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-window-maximize:16:white"}
-             :on-action {:event/type ::pop-in-battle}}
+             :on-action {:event/type ::dissoc
+                         :key :pop-out-battle}}
             {:fx/type :button
              :text "Pop Out Battle "
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-open-in-new:16:white"}
-             :on-action {:event/type ::pop-out-battle}})])
+             :on-action {:event/type ::assoc
+                         :key :pop-out-battle}})])
        (when (and (not battle) selected-battle (-> battles (get selected-battle)))
          (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
            (concat
@@ -1581,20 +1573,28 @@
 
 (defmethod event-handler ::battle-map-change
   [{:fx/keys [event] :keys [map-name maps]}]
-  (let [spectator-count 0 ; TODO
-        locked 0
-        map-hash -1 ; TODO
-        map-name (or map-name event)
-        m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-    (swap! *state assoc :battle-map-details (read-map-data maps map-name))
-    (message/send-message (:client @*state) m)))
+  (future
+    (try
+      (let [spectator-count 0 ; TODO
+            locked 0
+            map-hash -1 ; TODO
+            map-name (or map-name event)
+            m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
+        (swap! *state assoc :battle-map-details (read-map-data maps map-name))
+        (message/send-message (:client @*state) m))
+      (catch Exception e
+        (log/error e "Error changing battle map")))))
 
 (defmethod event-handler ::kick-battle
   [{:keys [bot-name username]}]
-  (when-let [client (:client @*state)]
-    (if bot-name
-      (message/send-message client (str "REMOVEBOT " bot-name))
-      (message/send-message client (str "KICKFROMBATTLE " username)))))
+  (future
+    (try
+      (when-let [client (:client @*state)]
+        (if bot-name
+          (message/send-message client (str "REMOVEBOT " bot-name))
+          (message/send-message client (str "KICKFROMBATTLE " username))))
+      (catch Exception e
+        (log/error e "Error kicking from battle")))))
 
 
 (defn available-name [existing-names desired-name]
@@ -1608,19 +1608,23 @@
         (str desired-name 0)))))
 
 (defmethod event-handler ::add-bot [{:keys [battle bot-username bot-name bot-version]}]
-  (let [existing-bots (keys (:bots battle))
-        bot-username (available-name existing-bots bot-username)
-        bot-status (client/encode-battle-status
-                     (assoc client/default-battle-status
-                            :ready true
-                            :mode 1
-                            :sync 1
-                            :id (battle/available-team-id battle)
-                            :ally (battle/available-ally battle)
-                            :side (rand-nth [0 1])))
-        bot-color (u/random-color)
-        message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-    (message/send-message (:client @*state) message)))
+  (future
+    (try
+      (let [existing-bots (keys (:bots battle))
+            bot-username (available-name existing-bots bot-username)
+            bot-status (client/encode-battle-status
+                         (assoc client/default-battle-status
+                                :ready true
+                                :mode 1
+                                :sync 1
+                                :id (battle/available-team-id battle)
+                                :ally (battle/available-ally battle)
+                                :side (rand-nth [0 1])))
+            bot-color (u/random-color)
+            message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
+        (message/send-message (:client @*state) message))
+      (catch Exception e
+        (log/error e "Error adding bot")))))
 
 (defmethod event-handler ::change-bot-username
   [{:fx/keys [event]}]
@@ -1706,7 +1710,8 @@
                     :team team
                     :color (or (-> team-by-key team-kw :team-color fix-color)
                                Color/WHITE)}))))
-           (filter some?)))))
+           (filter some?)
+           doall))))
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
 (def ext-recreate-on-key-changed
@@ -1731,47 +1736,65 @@
 
 (defmethod event-handler ::minimap-mouse-pressed
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [starting-points startpostype]}]
-  (when (= "Choose before game" startpostype)
-    (let [ex (.getX event)
-          ey (.getY event)]
-      (when-let [target (some
-                          (fn [{:keys [x y] :as target}]
-                            (when (and
-                                    (< x ex (+ x (* 2 start-pos-r)))
-                                    (< y ey (+ y (* 2 start-pos-r))))
-                              target))
-                          starting-points)]
-        (swap! *state assoc :drag-team {:team (:team target)
-                                        :x (- ex start-pos-r)
-                                        :y (- ey start-pos-r)})))))
+  (future
+    (try
+      (when (= "Choose before game" startpostype)
+        (let [ex (.getX event)
+              ey (.getY event)]
+          (when-let [target (some
+                              (fn [{:keys [x y] :as target}]
+                                (when (and
+                                        (< x ex (+ x (* 2 start-pos-r)))
+                                        (< y ey (+ y (* 2 start-pos-r))))
+                                  target))
+                              starting-points)]
+            (swap! *state assoc :drag-team {:team (:team target)
+                                            :x (- ex start-pos-r)
+                                            :y (- ey start-pos-r)}))))
+      (catch Exception e
+        (log/error e "Error pressing minimap")))))
 
 
 (defmethod event-handler ::minimap-mouse-dragged
   [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
-  (swap! *state
-         (fn [state]
-           (if (:drag-team state)
-             (update state :drag-team assoc
-                     :x (- (.getX event) start-pos-r)
-                     :y (- (.getY event) start-pos-r))
-             state))))
+  (future
+    (try
+      (let [x (.getX event)
+            y (.getY event)]
+        (swap! *state
+               (fn [state]
+                 (if (:drag-team state)
+                   (update state :drag-team assoc
+                           :x (- x start-pos-r)
+                           :y (- y start-pos-r))
+                   state))))
+      (catch Exception e
+        (log/error e "Error dragging minimap")))))
 
 (defmethod event-handler ::minimap-mouse-released
   [{:keys [minimap-width minimap-height map-details]}]
-  (when-let [{:keys [team x y]} (-> *state deref :drag-team)]
-    (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-          x (int (* (/ x minimap-width) map-width spring/map-multiplier))
-          z (int (* (/ y minimap-height) map-height spring/map-multiplier))
-          scripttags {:game
-                      {(keyword (str "team" team))
-                       {:startposx x
-                        :startposy z ; for SpringLobby bug
-                        :startposz z}}}]
-      (log/debug scripttags)
-      (swap! *state update :scripttags u/deep-merge scripttags)
-      (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
-      (message/send-message (:client @*state) (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
-  (swap! *state dissoc :drag-team))
+  (future
+    (try
+      (let [[before _after] (swap-vals! *state dissoc :drag-team)]
+        (when-let [{:keys [team x y]} (:drag-team before)]
+          (let [{:keys [map-width map-height]} (-> map-details :smf :header)
+                x (int (* (/ x minimap-width) map-width spring/map-multiplier))
+                z (int (* (/ y minimap-height) map-height spring/map-multiplier))
+                scripttags {:game
+                            {(keyword (str "team" team))
+                             {:startposx x
+                              :startposy z ; for SpringLobby bug
+                              :startposz z}}}]
+            (swap! *state
+                   (fn [state]
+                     (-> state
+                         (update :scripttags u/deep-merge scripttags)
+                         (update-in [:battle :scripttags] u/deep-merge scripttags))))
+            (message/send-message
+              (:client before)
+              (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
+      (catch Exception e
+        (log/error e "Error releasing minimap")))))
 
 
 (def ok-green "#008000")
@@ -2031,81 +2054,113 @@
              team-color)))))
 
 (defn update-color [id {:keys [is-me is-bot] :as opts} color-int]
-  (if (or is-me is-bot)
-    (update-battle-status @*state (assoc opts :id id) (:battle-status id) color-int)
-    (message/send-message (:client @*state)
-      (str "FORCETEAMCOLOR " (:username id) " " color-int))))
+  (future
+    (try
+      (if (or is-me is-bot)
+        (update-battle-status @*state (assoc opts :id id) (:battle-status id) color-int)
+        (message/send-message (:client @*state)
+          (str "FORCETEAMCOLOR " (:username id) " " color-int)))
+      (catch Exception e
+        (log/error e "Error updating color")))))
 
 (defn update-team [id {:keys [is-me is-bot] :as opts} player-id]
-  (if (or is-me is-bot)
-    (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
-    (message/send-message (:client @*state)
-      (str "FORCETEAMNO " (:username id) " " player-id))))
+  (future
+    (try
+      (if (or is-me is-bot)
+        (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
+        (message/send-message (:client @*state)
+          (str "FORCETEAMNO " (:username id) " " player-id)))
+      (catch Exception e
+        (log/error e "Error updating team")))))
 
 (defn update-ally [id {:keys [is-me is-bot] :as opts} ally]
-  (if (or is-me is-bot)
-    (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
-    (message/send-message (:client @*state)
-      (str "FORCEALLYNO " (:username id) " " ally))))
+  (future
+    (try
+      (if (or is-me is-bot)
+        (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
+        (message/send-message (:client @*state)
+          (str "FORCEALLYNO " (:username id) " " ally)))
+      (catch Exception e
+        (log/error e "Error updating ally")))))
 
 (defn update-handicap [id {:keys [is-bot] :as opts} handicap]
-  (if is-bot
-    (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
-    (message/send-message (:client @*state)
-      (str "HANDICAP " (:username id) " " handicap))))
+  (future
+    (try
+      (if is-bot
+        (update-battle-status @*state (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
+        (message/send-message (:client @*state)
+          (str "HANDICAP " (:username id) " " handicap)))
+      (catch Exception e
+        (log/error e "Error updating handicap")))))
 
 (defn apply-battle-status-changes
   [id {:keys [is-me is-bot] :as opts} status-changes]
-  (if (or is-me is-bot)
-    (update-battle-status @*state (assoc opts :id id) (merge (:battle-status id) status-changes) (:team-color id))
-    (doseq [[k v] status-changes]
-      (let [msg (case k
-                  :id "FORCETEAMNO"
-                  :ally "FORCEALLYNO"
-                  :handicap "HANDICAP")]
-        (message/send-message (:client @*state) (str msg " " (:username id) " " v))))))
+  (future
+    (try
+      (let [state @*state]
+        (if (or is-me is-bot)
+          (update-battle-status state (assoc opts :id id) (merge (:battle-status id) status-changes) (:team-color id))
+          (doseq [[k v] status-changes]
+            (let [msg (case k
+                        :id "FORCETEAMNO"
+                        :ally "FORCEALLYNO"
+                        :handicap "HANDICAP")]
+              (message/send-message (:client state) (str msg " " (:username id) " " v))))))
+      (catch Exception e
+        (log/error e "Error applying battle status changes")))))
 
 
 (defmethod event-handler ::battle-randomize-colors
   [e]
-  (let [players-and-bots (battle-players-and-bots e)]
-    (doseq [id players-and-bots]
-      (let [is-bot (boolean (:bot-name id))
-            is-me (= (:username e) (:username id))]
-        (update-color id {:is-me is-me :is-bot is-bot} (u/random-color))))))
+  (future
+    (try
+      (let [players-and-bots (battle-players-and-bots e)]
+        (doseq [id players-and-bots]
+          (let [is-bot (boolean (:bot-name id))
+                is-me (= (:username e) (:username id))]
+            (update-color id {:is-me is-me :is-bot is-bot} (u/random-color)))))
+      (catch Exception e
+        (log/error e "Error randomizing colors")))))
 
 (defmethod event-handler ::battle-teams-ffa
   [e]
-  (let [players-and-bots (battle-players-and-bots e)]
-    (doall
-      (map-indexed
-        (fn [i id]
-          (let [is-bot (boolean (:bot-name id))
-                is-me (= (:username e) (:username id))]
-            (apply-battle-status-changes id {:is-me is-me :is-bot is-bot} {:id i :ally i})))
-        players-and-bots))))
+  (future
+    (try
+      (let [players-and-bots (battle-players-and-bots e)]
+        (doall
+          (map-indexed
+            (fn [i id]
+              (let [is-bot (boolean (:bot-name id))
+                    is-me (= (:username e) (:username id))]
+                (apply-battle-status-changes id {:is-me is-me :is-bot is-bot} {:id i :ally i})))
+            players-and-bots)))
+      (catch Exception e
+        (log/error e "Error updating battle teams to ffa")))))
 
 (defn n-teams [e n]
-  (let [players-and-bots (battle-players-and-bots e)
-        per-partition (int (Math/ceil (/ (count players-and-bots) n)))
-        by-ally (->> players-and-bots
-                     (shuffle)
-                     (map-indexed vector)
-                     (partition-all per-partition)
-                     vec)]
-    (log/debug by-ally)
-    (doall
-      (map-indexed
-        (fn [a players]
-          (log/debug a (pr-str players))
-          (doall
-            (map
-              (fn [[i id]]
-                (let [is-bot (boolean (:bot-name id))
-                      is-me (= (:username e) (:username id))]
-                  (apply-battle-status-changes id {:is-me is-me :is-bot is-bot} {:id i :ally a})))
-              players)))
-        by-ally))))
+  (future
+    (try
+      (let [players-and-bots (battle-players-and-bots e)
+            per-partition (int (Math/ceil (/ (count players-and-bots) n)))
+            by-ally (->> players-and-bots
+                         (shuffle)
+                         (map-indexed vector)
+                         (partition-all per-partition)
+                         vec)]
+        (doall
+          (map-indexed
+            (fn [a players]
+              (log/debug a (pr-str players))
+              (doall
+                (map
+                  (fn [[i id]]
+                    (let [is-bot (boolean (:bot-name id))
+                          is-me (= (:username e) (:username id))]
+                      (apply-battle-status-changes id {:is-me is-me :is-bot is-bot} {:id i :ally a})))
+                  players)))
+            by-ally)))
+      (catch Exception e
+        (log/error e "Error updating to" n "teams")))))
 
 (defmethod event-handler ::battle-teams-2
   [e]
@@ -2376,12 +2431,19 @@
 
 (defmethod event-handler ::hostip-changed
   [{:fx/keys [event]}]
-  (let [scripttags {:game {:hostip (str event)}}]
-    (swap! *state update :scripttags u/deep-merge scripttags)
-    (swap! *state update-in [:battle :scripttags] u/deep-merge scripttags)
-    (message/send-message
-      (:client @*state)
-      (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
+  (future
+    (try
+      (let [scripttags {:game {:hostip (str event)}}
+            state (swap! *state
+                         (fn [state]
+                           (-> state
+                               (update :scripttags u/deep-merge scripttags)
+                               (update-in [:battle :scripttags] u/deep-merge scripttags))))]
+        (message/send-message
+          (:client state)
+          (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+      (catch Exception e
+        (log/error e "Error updating hostip")))))
 
 (defmethod event-handler ::isolation-type-change [{:fx/keys [event]}]
   (log/info event))
@@ -3222,88 +3284,127 @@
 
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event]}]
-  (let [startpostype (get spring/startpostypes-by-name event)]
-    (swap! *state assoc-in [:scripttags :game :startpostype] startpostype)
-    (swap! *state assoc-in [:battle :scripttags :game :startpostype] startpostype)
-    (message/send-message (:client @*state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
+  (let [startpostype (get spring/startpostypes-by-name event)
+        state (swap! *state
+                     (fn [state]
+                       (-> state
+                           (assoc-in [:scripttags :game :startpostype] startpostype)
+                           (assoc-in [:battle :scripttags :game :startpostype] startpostype))))]
+    (message/send-message (:client state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
 (defmethod event-handler ::reset-start-positions
   [_e]
   (let [team-ids (take 16 (iterate inc 0))
-        scripttag-keys (map (fn [i] (str "game/team" i)) team-ids)]
-    (doseq [i team-ids]
-      (let [team (keyword (str "team" i))]
-        (swap! *state update-in [:scripttags :game] dissoc team)
-        (swap! *state update-in [:battle :scripttags :game] dissoc team)))
-    (message/send-message (:client @*state) (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
+        scripttag-keys (map (fn [i] (str "game/team" i)) team-ids)
+        team-kws (map #(keyword (str "team" %)) team-ids)
+        dissoc-fn #(apply dissoc % team-kws)
+        state (swap! *state
+                     (fn [state]
+                       (-> state
+                           (update-in [:scripttags :game] dissoc-fn)
+                           (update-in [:battle :scripttags :game] dissoc-fn))))]
+    (message/send-message
+      (:client state)
+      (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
-  (let [value (str event)]
-    (swap! *state assoc-in [:scripttags :game :modoptions modoption-key] (str event))
-    (swap! *state assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event))
-    (message/send-message (:client @*state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
+  (let [value (str event)
+        state (swap! *state
+                     (fn [state]
+                       (-> state
+                           (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
+                           (assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event)))))]
+    (message/send-message (:client state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status team-color] :as id}]
-  (update-battle-status @*state {:id id} (assoc battle-status :ready event) team-color))
+  (future
+    (try
+      (update-battle-status @*state {:id id} (assoc battle-status :ready event) team-color)
+      (catch Exception e
+        (log/error e "Error updating battle ready")))))
 
 
 (defmethod event-handler ::battle-spectate-change
   [{:keys [id is-me is-bot] :fx/keys [event] :as data}]
-  (if (or is-me is-bot)
-    (update-battle-status @*state data
-      (assoc (:battle-status id) :mode (not event))
-      (:team-color id))
-    (message/send-message (:client @*state)
-      (str "FORCESPECTATORMODE " (:username id)))))
+  (future
+    (try
+      (if (or is-me is-bot)
+        (update-battle-status @*state data
+          (assoc (:battle-status id) :mode (not event))
+          (:team-color id))
+        (message/send-message (:client @*state)
+          (str "FORCESPECTATORMODE " (:username id))))
+      (catch Exception e
+        (log/error e "Error updating battle spectate")))))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
-    (if (not= side (-> id :battle-status :side))
-      (do
-        (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
-        (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
-      (log/debug "No change for side"))))
+  (future
+    (try
+      (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
+        (if (not= side (-> id :battle-status :side))
+          (do
+            (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
+            (update-battle-status @*state data (assoc (:battle-status id) :side side) (:team-color id)))
+          (log/debug "No change for side")))
+      (catch Exception e
+        (log/error e "Error updating battle side")))))
 
 (defmethod event-handler ::battle-team-changed
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
-    (if (not= player-id (-> id :battle-status :id))
-      (do
-        (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
-        (update-team id data player-id))
-      (log/debug "No change for team"))))
+  (future
+    (try
+      (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
+        (if (not= player-id (-> id :battle-status :id))
+          (do
+            (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
+            (update-team id data player-id))
+          (log/debug "No change for team")))
+      (catch Exception e
+        (log/error e "Error updating battle team")))))
 
 (defmethod event-handler ::battle-ally-changed
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
-    (if (not= ally (-> id :battle-status :ally))
-      (do
-        (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
-        (update-ally id data ally))
-      (log/debug "No change for ally"))))
+  (future
+    (try
+      (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
+        (if (not= ally (-> id :battle-status :ally))
+          (do
+            (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
+            (update-ally id data ally))
+          (log/debug "No change for ally")))
+      (catch Exception e
+        (log/error e "Error updating battle ally")))))
 
 (defmethod event-handler ::battle-handicap-change
   [{:keys [id] :fx/keys [event] :as data}]
-  (when-let [handicap (max 0
-                        (min 100
-                          event))]
-    (if (not= handicap (-> id :battle-status :handicap))
-      (do
-        (log/info "Updating handicap for" id "from" (-> id :battle-status :ally) "to" handicap)
-        (update-handicap id data handicap))
-      (log/debug "No change for handicap"))))
+  (future
+    (try
+      (when-let [handicap (max 0
+                            (min 100
+                              event))]
+        (if (not= handicap (-> id :battle-status :handicap))
+          (do
+            (log/info "Updating handicap for" id "from" (-> id :battle-status :ally) "to" handicap)
+            (update-handicap id data handicap))
+          (log/debug "No change for handicap")))
+      (catch Exception e
+        (log/error e "Error updating battle handicap")))))
 
 (defmethod event-handler ::battle-color-action
   [{:keys [id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
-  (let [source (.getSource event)
-        javafx-color (.getValue source)
-        color-int (spring-color javafx-color)]
-    (when is-me
-      (swap! *state assoc :preferred-color color-int))
-    (update-color id opts color-int)))
+  (future
+    (try
+      (let [source (.getSource event)
+            javafx-color (.getValue source)
+            color-int (spring-color javafx-color)]
+        (when is-me
+          (swap! *state assoc :preferred-color color-int))
+        (update-color id opts color-int))
+      (catch Exception e
+        (log/error e "Error updating battle color")))))
 
 (defmethod task-handler ::update-rapid
   [_e]
@@ -4679,11 +4780,12 @@
                :h-box/hgrow :always}
               {:fx/type :label
                :text (str (count tasks) " tasks")}]}])}}}]
-     (when pop-out-battle
+     (when (and battle pop-out-battle)
        [{:fx/type :stage
          :showing pop-out-battle
          :title "alt-spring-lobby Battle"
-         :on-close-request {:event/type ::pop-in-battle}
+         :on-close-request {:event/type ::dissoc
+                            :key :pop-out-battle}
          :x 300
          :y 300
          :width battle-window-width
