@@ -13,6 +13,7 @@
   clojure.java-time/clojure.java-time {:mvn/version "0.3.2"}
   com.climate/claypoole {:mvn/version "1.1.4"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
+  com.fzakaria/slf4j-timbre {:mvn/version "0.3.20"}
   com.taoensso/timbre {:mvn/version "5.1.0"}
   commons-io/commons-io {:mvn/version "2.8.0"}
   crouton/crouton {:mvn/version "0.1.2"}
@@ -32,11 +33,15 @@
   org.clojure/core.cache {:mvn/version "1.0.207"}
   org.clojure/core.memoize {:mvn/version "1.0.236"}
   org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
+  org.clojure/tools.logging {:mvn/version "1.1.0"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.0.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.0.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-controls {:mvn/version "15.0.1"}
   org.openjfx/javafx-swing {:mvn/version "15.0.1"}
+  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.30"}
+  org.slf4j/jul-to-slf4j {:mvn/version "1.7.30"}
+  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
   toml/toml {:mvn/version "0.1.3"}
