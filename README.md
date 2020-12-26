@@ -11,7 +11,6 @@ You will need the [Clojure CLI tools](https://clojure.org/guides/getting_started
 To build an executable jar file, run
 
 ```bash
-clojure -Spom
 clojure -M:uberjar
 ```
 

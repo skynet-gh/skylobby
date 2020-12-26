@@ -9,14 +9,11 @@ Notable changes
 - Starting position rectangles for choose in game
 - Compatability warnings for known bad engine/game/AI combinations
 
-### [0.2] - upcoming soon
-
-Initial public release.
-- GitHub Actions to tag and publish releases
-- GitHub Pages for dev blog and user guide
-
 ### [0.1.0] - 2020-12-18 to 2020-12-27
 
+Initial public release.
+- GitHub Actions to publish releases and build jars and installers
+- GitHub Pages for dev blog and user guide
 - GitHub Actions for unit tests
 - Switch map load to fast 7zip
 - Map detail browser with minimap images
