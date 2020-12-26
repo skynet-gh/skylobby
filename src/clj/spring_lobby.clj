@@ -17,7 +17,6 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     hashp.core
-    [hawk.core :as hawk]
     java-time
     [me.raynes.fs :as raynes-fs]
     [shams.priority-queue :as pq]
@@ -367,26 +366,6 @@
           (log/error e "Error in :battle-map-details state watcher"))))))
 
 
-(defn add-hawk! [state-atom]
-  (log/info "Adding hawk file watcher")
-  (hawk/watch!
-    #_ ; TODO look into alternatives for file watching
-    {:watcher :polling
-     :sensitivity :low} ;:medium} ;:high} ;:low}
-    [{:paths [(fs/download-dir)
-              ;(fs/isolation-dir)
-              ;(fs/spring-root)] ; TODO slow or dangerous
-              (fs/maps-dir)]
-      :handler (fn [ctx e]
-                 (try
-                   (log/trace "Hawk event:" e)
-                   (swap! state-atom update :file-events conj e)
-                   (catch Exception e
-                     (log/error e "Error in hawk handler"))
-                   (finally
-                     ctx)))}]))
-
-
 (defmulti task-handler ::task-type)
 
 (defmethod task-handler ::update-mod
@@ -486,91 +465,6 @@
     :file (fs/spring-root)}
    {:import-source-name "Beyond All Reason"
     :file (fs/bar-root)}])
-
-(defn file-event-task [file-event]
-  (let [{:keys [file]} file-event
-        root (fs/isolation-dir)
-        engines (io/file root "engine")
-        games (io/file root "games")
-        maps (io/file root "maps")]
-    (condp (fn [f x] (f x)) file
-      not (log/info "no file")
-      (fn [file]
-        (or (fs/child? games file) ; update possible mod file
-            (and (fs/child? (io/file root "packages") file)
-                 (string/ends-with? (fs/filename file) ".sdp"))))
-      {::task-type ::update-mod
-       :file file}
-      ; or mod in directory / git format
-      (partial fs/descendant? games)
-      (loop [parent file] ; find directory in games
-        (when parent
-          (if (fs/child? games parent)
-            {::task-type ::update-mod
-             :file parent}
-            (recur (fs/parent-file parent)))))
-      (partial fs/descendant? maps)
-      (loop [parent file] ; find file in maps
-        (when parent
-          (if (fs/child? maps parent)
-            {::task-type ::update-map
-             :file parent}
-            (recur (fs/parent-file parent)))))
-      (partial fs/descendant? engines)
-      (loop [parent file] ; find directory in engines
-        (when parent
-          (if (fs/child? maps parent)
-            {::task-type ::update-engine
-             :file parent}
-            (recur (fs/parent-file parent)))))
-      (fn [file]
-        (some (comp #(when (fs/descendant? % file) file) :file) import-sources))
-      :>>
-      (fn [import-source]
-        (log/info "Looks like" file "is a descendant of import source" import-source))
-      any?
-      (log/warn "Nothing to do for" file-event))))
-
-; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
-(defn pop-file-event! [state-atom]
-  (let [[before _after] (swap-vals! state-atom update :file-events pop)]
-    (-> before :file-events peek)))
-
-(defn handle-all-file-events! [state-atom]
-  (let [events (loop [all []]
-                 (if-let [event (pop-file-event! state-atom)]
-                   (recur (conj all event))
-                   all))
-        tasks (set (filter some? (map file-event-task events)))]
-    (when (seq events)
-      (log/info "From" (count events) "file events got" (count tasks) "tasks"))
-    (doseq [task tasks] ; TODO all at once?
-      (add-task! state-atom task))))
-
-(defn file-events-chimer-fn [state-atom]
-  (log/info "Starting file events chimer")
-  (let [hawk-atom (atom (add-hawk! state-atom))
-        chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/instant)
-            (java-time/duration 1 :seconds))
-          (fn [_chimestamp]
-            (let [hawk @hawk-atom]
-              (when-not (.isAlive ^java.lang.Thread (:thread hawk))
-                (log/warn "Hawk watcher died, starting a new one")
-                (hawk/stop! hawk)
-                (reset! hawk-atom (add-hawk! state-atom))))
-            (handle-all-file-events! state-atom))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error handling file event")
-             true)})]
-    (fn []
-      (let [hawk @hawk-atom]
-        (when hawk
-          (hawk/stop! hawk)))
-      (.close chimer))))
 
 
 (defn reconcile-engines
@@ -803,17 +697,11 @@
       (.mkdirs maps-cache-root))
     (doseq [map-file todo]
       (log/info "Reading" map-file)
-      (let [{:keys [map-name smf] :as map-data} (fs/read-map-data map-file)]
-            ;map-cache-file (map-cache-file (:map-name map-data))]
+      (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)]
         (if map-name
-          (do
-            ;(log/info "Caching" map-file "to" map-cache-file)
-            ;(spit map-cache-file (with-out-str (pprint map-data)))
-            (when-let [minimap-image (scaled-minimap-image smf)]
-              (fs/write-image-png minimap-image (fs/minimap-image-cache-file map-name)))
-            (swap! state-atom update :maps
-                   (fn [maps]
-                     (set (conj maps (select-keys map-data [:file :map-name]))))))
+          (swap! state-atom update :maps
+                 (fn [maps]
+                   (set (conj maps (select-keys map-data [:file :map-name])))))
           (log/warn "No map name found for" map-file))))
     (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
     (swap! state-atom update :maps
@@ -823,7 +711,7 @@
                   (remove (comp string/blank? :map-name))
                   (remove (comp missing-paths fs/canonical-path :file))
                   set)))
-    (update-cached-minimaps (:maps @*state))
+    (update-cached-minimaps (:maps @state-atom))
     {:todo-count (count todo)}))
 
 (defn force-update-battle-map
@@ -1334,26 +1222,26 @@
            :text "Random map"}}
          :desc
          {:fx/type :button
-          :disable disable
+          :disable (boolean disable)
           :on-action (fn [& _]
                        (event-handler
                          (let [random-map-name (:map-name (rand-nth (seq maps)))]
                            (assoc on-value-changed :map-name random-map-name))))
           :graphic
           {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}]
-      [{:fx/type fx.ext.node/with-tooltip-props
-        :props
-        {:tooltip
-         {:fx/type :tooltip
-          :show-delay [10 :ms]
-          :text "Reload maps"}}
-        :desc
-        {:fx/type :button
-         :on-action {:event/type ::reload-maps}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-refresh:16:white"}}}]))})
+           :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+     [{:fx/type fx.ext.node/with-tooltip-props
+       :props
+       {:tooltip
+        {:fx/type :tooltip
+         :show-delay [10 :ms]
+         :text "Reload maps"}}
+       :desc
+       {:fx/type :button
+        :on-action {:event/type ::reload-maps}
+        :graphic
+        {:fx/type font-icon/lifecycle
+         :icon-literal "mdi-refresh:16:white"}}}])})
 
 (defmethod event-handler ::engines-key-pressed [{:fx/keys [event]}]
   (swap! *state update :engine-filter (update-filter-fn event)))
@@ -2563,16 +2451,6 @@
                resource-filename)
             (= (http/bar-engine-filename engine-version) resource-filename)))))
 
-#_
-(http/engine-archive "104.0.1-1695-gbd6b256 BAR")
-#_
-(->> user/*state
-     deref
-     :downloadables-by-url
-     vals
-     ;(filter (comp (partial could-be-this-engine? "104.0.1-1563-g66cad77 maintenance"))))
-     (filter (comp (partial could-be-this-engine? "104.0.1-1707-gc0fc18e BAR"))))
-
 
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
@@ -3168,7 +3046,7 @@
              :text "script.txt preview"}
             {:fx/type :text-area
              :editable false
-             :text (str (string/replace (spring/battle-script-txt @*state) #"\t" "  "))
+             :text (str (string/replace (spring/battle-script-txt state) #"\t" "  "))
              :style {:-fx-font-family "monospace"}
              :v-box/vgrow :always}]}]}]}
       {:fx/type :v-box
@@ -3744,11 +3622,6 @@
           (swap! *state update :downloadables-by-url merge downloadables-by-url)
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
-
-#_
-(task-handler
-  (merge {::task-type ::update-downloadables}
-         (last download-sources)))
 
 
 (defmethod event-handler ::import-source-change
@@ -4725,7 +4598,7 @@
           (System/exit 0))))))
 
 (defn root-view
-  [{{:keys [battle battles file-events last-failed-message pop-out-battle
+  [{{:keys [battle battles last-failed-message pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-replays
             standalone tasks users]
      :as state}
@@ -4804,8 +4677,6 @@
                :style {:-fx-text-fill "#FF0000"}}
               {:fx/type :pane
                :h-box/hgrow :always}
-              {:fx/type :label
-               :text (str (count file-events) " file events  ")}
               {:fx/type :label
                :text (str (count tasks) " tasks")}]}])}}}]
      (when pop-out-battle
