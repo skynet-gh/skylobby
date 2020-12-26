@@ -11,7 +11,7 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.io ByteArrayOutputStream File FileOutputStream RandomAccessFile)
+    (java.io ByteArrayOutputStream File FileOutputStream OutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
     (java.util.zip ZipEntry ZipFile)
     (javax.imageio ImageIO)
@@ -44,7 +44,7 @@
   (when f
     (.getAbsolutePath f)))
 
-(defn filename [^File f]
+(defn filename ^String [^File f]
   (when f
     (.getName f)))
 
@@ -52,7 +52,7 @@
   (when f
     (.exists f)))
 
-(defn is-directory [^File f]
+(defn is-directory? [^File f]
   (when f
     (.isDirectory f)))
 
@@ -68,7 +68,7 @@
   (when f
     (.listFiles f)))
 
-(defn to-path [^File f]
+(defn to-path ^Path [^File f]
   (when f
     (.toPath f)))
 
@@ -256,7 +256,7 @@
   ([root]
    (->> (replays-dir root)
         list-files
-        (filter #(.isFile %))
+        (filter is-file?)
         (filter (comp #(string/ends-with? % ".sdfz") filename)))))
 
 (defn map-files
@@ -308,7 +308,7 @@
 
 
 (defn- close-7z-stream [callback-state]
-  (when-let [output-stream (:stream @callback-state)]
+  (when-let [^OutputStream output-stream (:stream @callback-state)]
     (try
       (.close output-stream)
       (catch Exception e
@@ -417,7 +417,7 @@
   ([root]
    (->> (list-files (io/file root "engine"))
         seq
-        (filter is-directory))))
+        (filter is-directory?))))
 
 (defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]
@@ -502,7 +502,7 @@
    (read-mod-file file nil))
   ([^java.io.File file opts]
    (cond
-     (is-directory file)
+     (is-directory? file)
      (read-mod-directory file opts)
      (string/ends-with? (filename file) ".sdz")
      (read-mod-zip-file file opts)
@@ -569,9 +569,9 @@
       (log/error e "Failed to parse mapinfo.lua from" file))))
 
 (defn read-zip-smf
-  ([zf ^ZipEntry smf-entry]
+  ([^ZipFile zf ^ZipEntry smf-entry]
    (read-zip-smf zf smf-entry nil))
-  ([zf ^ZipEntry smf-entry {:keys [header-only]}]
+  ([^ZipFile zf ^ZipEntry smf-entry {:keys [header-only]}]
    (let [smf-path (.getName smf-entry)]
      (if header-only
        (let [header (smf/decode-map-header (.getInputStream zf smf-entry))]
@@ -766,7 +766,7 @@
                      (log/trace "preparing" extract-ask-mode))
                    (setOperationResult [this extract-operation-result]
                      (let [cs @callback-state]
-                       (when-let [output-stream (:stream cs)]
+                       (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
                          (try
                            (.close output-stream)
                            (let [ba (.toByteArray output-stream)]
@@ -844,11 +844,11 @@
          (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
                ai-dirs (some->> (list-files ai-skirmish-dir)
                                 seq
-                                (filter is-directory))]
+                                (filter is-directory?))]
            (mapcat
              (fn [^java.io.File ai-dir]
                (->> (list-files ai-dir)
-                    (filter is-directory)
+                    (filter is-directory?)
                     (map
                       (fn [^java.io.File version-dir]
                         {:bot-name (filename ai-dir)
@@ -913,7 +913,7 @@
 (defn copy
   "Copy a file or directory from source to dest."
   [source dest]
-  (if (is-directory source)
+  (if (is-directory? source)
     (copy-dir source dest)
     (java-nio-copy source dest)))
 
@@ -932,6 +932,6 @@
               (log/warn e "Unable to copy file" source "to" dest
                         {:exists (exists dest)}))))))))
 
-(defn write-image-png [^java.awt.Image image ^File dest]
+(defn write-image-png [^java.awt.image.RenderedImage image ^File dest]
   (log/debug "Writing image to" dest)
   (ImageIO/write image "png" dest))

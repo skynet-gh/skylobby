@@ -422,7 +422,7 @@
                      (if f
                        {:canonical-path (fs/canonical-path f)
                         :exists (fs/exists f)
-                        :is-directory (fs/is-directory f)}
+                        :is-directory (fs/is-directory? f)}
                        (log/warn "Attempt to update file cache for nil file"))))
         status-by-path (->> statuses
                             (filter some?)
@@ -1939,7 +1939,7 @@
                      (fs/filename resource-file))]
     (case resource-type
       ::engine (cond
-                 (and resource-file (fs/exists resource-file) (fs/is-directory resource-file))
+                 (and resource-file (fs/exists resource-file) (fs/is-directory? resource-file))
                  (io/file (fs/engines-dir) filename)
                  filename (io/file (fs/download-dir) "engine" filename)
                  resource-name (http/engine-download-file resource-name)
@@ -3397,7 +3397,7 @@
   [{:keys [id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
   (future
     (try
-      (let [source (.getSource event)
+      (let [^javafx.scene.control.ColorPicker source (.getSource event)
             javafx-color (.getValue source)
             color-int (spring-color javafx-color)]
         (when is-me

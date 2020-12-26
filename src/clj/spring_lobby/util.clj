@@ -60,7 +60,7 @@
     (FileUtils/byteCountToDisplaySize (long n))))
 
 
-(defn decode [s]
+(defn decode [^String s]
   (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))
 
 

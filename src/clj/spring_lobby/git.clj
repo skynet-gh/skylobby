@@ -2,11 +2,12 @@
   "Utils for working with git resources."
   (:require
     [clj-jgit.porcelain :as git]
-    [clj-jgit.querying :as querying]
     [taoensso.timbre :as log])
   (:import
     (java.io File)
-    (org.eclipse.jgit.lib ObjectId ProgressMonitor Repository)))
+    (org.eclipse.jgit.api Git)
+    (org.eclipse.jgit.lib ObjectId ProgressMonitor Ref Repository)
+    (org.eclipse.jgit.revwalk RevCommit)))
 
 
 (set! *warn-on-reflection* true)
@@ -21,7 +22,7 @@
    bar-repo-url])
 
 (defn- repo-latest-id [repo]
-  (when-let [first-log (first (git/git-log repo))]
+  (when-let [^RevCommit first-log (first (git/git-log repo))]
     (ObjectId/toString (.getId first-log))))
 
 (defn latest-id [^File f]
@@ -62,8 +63,8 @@
   (with-open [repo (git/load-repo f)]
     (git/git-reset repo :mode :hard :ref commit-id)))
 
-(defn- repo-tag-list [repo]
-  (for [tag (.call (.tagList repo))]
+(defn- repo-tag-list [^Git repo]
+  (for [^Ref tag (.call (.tagList repo))]
     (let [tag-name (.getName tag)]
       {:tag-name tag-name
        :short-tag-name (when tag-name (Repository/shortenRefName tag-name))

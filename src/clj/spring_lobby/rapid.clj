@@ -135,7 +135,7 @@
    (log/debug "Loading rapid repo names")
    (->> (fs/list-files (io/file root "rapid" "repos.springrts.com"))
         seq
-        (filter fs/is-directory)
+        (filter fs/is-directory?)
         (map fs/filename))))
 
 (defn rapid-versions [f]
