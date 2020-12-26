@@ -66,7 +66,7 @@
                                 {:os-name "Linux"
                                  :os-version "blahblah Microsoft"
                                  :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/.alt-spring-lobby")
+      (is (= (str "/mnt/c/Users/me/.alt-spring-lobby/wsl")
              (.getAbsolutePath
                (fs/app-root))))))
   (testing "Linux"

@@ -11,17 +11,23 @@
     user))
 
 
-(def ^:private log-file "repl.log")
+(def ^:private dev-log-path "repl.log")
+
 
 (defn log-to-file []
-  (println "Setting up log to" log-file)
+  (println "Setting up log to" dev-log-path)
   (timbre/merge-config!
     {:appenders
-     {:println {:enabled? false}
-      :rotor (rotor/rotor-appender
-               {:path log-file
+     {:rotor (rotor/rotor-appender
+               {:path dev-log-path
                 :max-size 100000000
-                :backlog 1})}}))
+                :backlog 1
+                :stacktrace-fonts {}})}}))
+
+(defn disable-print-log []
+  (timbre/merge-config!
+    {:appenders
+     {:println {:enabled? false}}}))
 
 
 (def middleware
@@ -48,6 +54,7 @@
 
 (defn -main [& _args]
   (log-to-file)
+  (disable-print-log)
   (future
     (nrepl.cmdline/-main
       "--middleware"

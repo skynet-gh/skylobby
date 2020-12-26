@@ -1,6 +1,8 @@
 (ns spring-lobby.util
   (:require
-    [clojure.edn :as edn])
+    [clojure.edn :as edn]
+    [taoensso.timbre :as timbre]
+    [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
     (java.net URLDecoder)
     (java.nio.charset StandardCharsets)
@@ -60,3 +62,14 @@
 
 (defn decode [s]
   (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))
+
+
+(defn log-to-file [log-path]
+  (println "Setting up log to" log-path)
+  (timbre/merge-config!
+    {:appenders
+     {:rotor (rotor/rotor-appender
+               {:path log-path
+                :max-size 100000000
+                :backlog 9
+                :stacktrace-fonts {}})}}))

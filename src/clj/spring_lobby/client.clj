@@ -30,11 +30,18 @@
 (def ^:dynamic handler handler/handle) ; for overriding in dev
 
 
+(defn manifest-attributes [url]
+  (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
+      URL. .openStream Manifest. .getMainAttributes))
+      ;(.getValue "Build-Number")))
+
 ; https://stackoverflow.com/a/16431226/984393
 (defn manifest-version []
   (try
     (when-let [clazz (Class/forName "spring_lobby")]
+      (log/debug "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
+        (log/debug "Discovered location" loc)
         (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
             URL. .openStream Manifest. .getMainAttributes
             (.getValue "Build-Number"))))
@@ -44,7 +51,11 @@
 (defn agent-string []
   (str "alt-spring-lobby-"
        (or (manifest-version)
-           (git/tag-or-latest-id (io/file "."))
+           (try
+             (git/tag-or-latest-id (io/file "."))
+             (catch Exception e
+               (log/warn e "Error getting git version")))
+           (slurp (io/resource "alt-spring-lobby.version"))
            "UNKNOWN")))
 
 

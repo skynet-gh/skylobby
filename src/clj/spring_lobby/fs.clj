@@ -12,7 +12,8 @@
     [taoensso.timbre :as log])
   (:import
     (java.io ByteArrayOutputStream File FileOutputStream RandomAccessFile)
-    (java.nio.file CopyOption Files Path StandardCopyOption)
+    (java.net URI)
+    (java.nio.file CopyOption Files FileSystems OpenOption Path StandardCopyOption StandardOpenOption)
     (java.util.zip ZipEntry ZipFile)
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding IArchiveExtractCallback ISequentialOutStream PropID SevenZip SevenZipException)
@@ -224,7 +225,7 @@
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
-        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby")
+        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby" "wsl")
         (io/file user-home ".alt-spring-lobby"))
       (string/includes? os-name "Windows")
       (io/file user-home ".alt-spring-lobby")

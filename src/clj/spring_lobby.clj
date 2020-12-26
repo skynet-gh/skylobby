@@ -73,7 +73,7 @@
 
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn read-file-tag [cs]
-  (io/file cs))
+  (io/file (edn/read-string cs)))
 
 ; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
 (def custom-readers
@@ -81,7 +81,7 @@
 
 ; https://stackoverflow.com/a/23592006/984393
 (defmethod print-method java.io.File [f ^java.io.Writer w]
-  (.write w (str "#spring-lobby/java.io.File \"" (fs/canonical-path f) "\"")))
+  (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
 
 
 (defn slurp-app-edn
@@ -4877,6 +4877,7 @@
 (defn -main [& _args]
   (Platform/setImplicitExit true)
   (fs/init-7z!)
+  (u/log-to-file (fs/canonical-path (io/file (fs/app-root) "alt-spring-lobby.log")))
   (reset! *state (assoc (initial-state) :standalone true))
   (init *state)
   (let [r (fx/create-renderer
