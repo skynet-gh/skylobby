@@ -5,7 +5,6 @@
     [clojure.data.xml :as xml]
     [hf.depstar.uberjar]
     [me.raynes.fs :as raynes-fs]
-    [spring-lobby.fs :as fs]
     [spring-lobby.git :as git])
   (:import
     (javafx.application Platform)))
@@ -53,11 +52,11 @@
 (defn fix-manifest []
   (println "Fixing version in jar manifest")
   (let [dist-dir "dist"
-        jar-path (spring-lobby.fs/canonical-path
+        jar-path (.getCanonicalPath
                    (clojure.java.io/file dist-dir "alt-spring-lobby.jar"))
         mf-file (clojure.java.io/file dist-dir "manifest-add.txt")]
     (spit mf-file (str "Build-Number: " (version) "\n"))
-    (let [command ["jar" "ufm" jar-path (spring-lobby.fs/canonical-path mf-file)]
+    (let [command ["jar" "ufm" jar-path (.getCanonicalPath mf-file)]
           ^"[Ljava.lang.String;" cmdarray (into-array String command)
           runtime (Runtime/getRuntime)
           process (.exec runtime cmdarray)

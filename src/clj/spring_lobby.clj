@@ -73,7 +73,7 @@
 
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn read-file-tag [cs]
-  (io/file (edn/read-string cs)))
+  (io/file cs))
 
 ; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
 (def custom-readers
@@ -609,7 +609,7 @@
      (swap! state-atom update :engines
             (fn [engines]
               (->> engines
-                   (filter :file)
+                   (filter (comp fs/canonical-path :file))
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
      {:to-add-count (count to-add)
@@ -819,7 +819,7 @@
     (swap! state-atom update :maps
            (fn [maps]
              (->> maps
-                  (filter :file)
+                  (filter (comp fs/canonical-path :file))
                   (remove (comp string/blank? :map-name))
                   (remove (comp missing-paths fs/canonical-path :file))
                   set)))
@@ -3434,7 +3434,7 @@
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
                          (->> engines
-                              (filter :file)
+                              (filter (comp fs/canonical-path :file))
                               first))
         root (fs/isolation-dir)]
     (if (and engine-details (:file engine-details))

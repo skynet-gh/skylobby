@@ -12,8 +12,7 @@
     [taoensso.timbre :as log])
   (:import
     (java.io ByteArrayOutputStream File FileOutputStream RandomAccessFile)
-    (java.net URI)
-    (java.nio.file CopyOption Files FileSystems OpenOption Path StandardCopyOption StandardOpenOption)
+    (java.nio.file CopyOption Files Path StandardCopyOption)
     (java.util.zip ZipEntry ZipFile)
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding IArchiveExtractCallback ISequentialOutStream PropID SevenZip SevenZipException)
@@ -35,7 +34,10 @@
 
 (defn canonical-path [^File f]
   (when f
-    (.getCanonicalPath f)))
+    (try
+      (.getCanonicalPath f)
+      (catch Exception e
+        (log/trace e "Error getting canonical path for" f)))))
 
 ; TODO always use canonical-path
 (defn absolute-path [^File f]
@@ -871,9 +873,10 @@
 (defn descendant?
   "Returns true if f is a possible descendant of dir."
   [dir f]
-  (string/starts-with?
-    (canonical-path f)
-    (canonical-path dir)))
+  (let [fp (canonical-path f)
+        dp (canonical-path dir)]
+    (and fp dp
+      (string/starts-with? fp dp))))
 
 (defn child?
   "Returns true if f is a possible descendant of dir."
