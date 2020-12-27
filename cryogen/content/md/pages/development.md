@@ -4,7 +4,7 @@
 
 ## Introduction
 
-In June this year, Good Old Games had a promotion where they gave away the classic RTS game Total Annihilation for free. I never played the original game before, but I had played games on the open source engine inspired by it, [Spring](https://springrts.com/), back in the late 2000s ([proof](https://springrts.com/phpbb/viewtopic.php?f=11&t=13885)). So me and a friend fired it up to try it out on LAN.
+In June this year, Good Old Games had a promotion where they gave away the classic RTS game Total Annihilation for free. I never played the original game before, but I had played games on the open source engine inspired by it, [Spring](https://springrts.com/), back in the late 2000s ([proof](https://springrts.com/phpbb/viewtopic.php?f=11&t=13885)). So me and some friends fired it up to try it out on LAN.
 
 Turns out it is pretty hard to get the networking going, which is expected for an old game. So we turned instead to what we knew, and downloaded the main way people have been running Spring games for over a decade, [SpringLobby](https://springlobby.springrts.com/).
 
@@ -34,9 +34,7 @@ Once I had the server running, I added the [Aleph](https://github.com/clj-common
 
 After that, I took a break from things for a month, and when I returned I added the [7-Zip-JBinding](http://sevenzipjbind.sourceforge.net/) library for parsing most maps, and extracting engine archives. I also added [basic exec of the Spring executable](https://github.com/skynet-gh/alt-spring-lobby/commit/8c17ad911ba2cd1b3658b416a186570011c8b95f#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R301), and some more parts of the protocol, like adding bots.
 
-
 [Screenshot of UI With Battle and Bots](battle-and-bots.png)
-
 
 ## Parsing Maps
 
@@ -45,7 +43,6 @@ Parsing map files involves multiple archive formats (Zip and 7-Zip), a [custom b
 I started with the old SMD format, which also seems to be the same format that the `script.txt` is written in. There's a library for creating grammars for parsing called [instaparse](https://github.com/engelberg/instaparse) that often makes describing custom formats like these fairly straightforward. In this case the grammar [came out to roughly ten lines](https://github.com/skynet-gh/alt-spring-lobby/blob/cc337af57d8b5ad88599d36b3e0c0bf739299557/src/clj/spring_lobby/spring/script.clj#L66-L75) plus a number of lines to postprocess it into a format that's easier to work with.
 
 However, there is a possible case with instaparse where [parsing never terminates](https://github.com/Engelberg/instaparse/issues/196). So I wrap its execution with a library called [clojail](https://github.com/flatland/clojail), which basically runs a Thread, and calls `.stop` if it doesn't complete in time.
-
 
 For the new `mapinfo.lua` format though, it's more difficult, since the map data is now stored as Lua code. I'm sure this is fine in the engine itself when the Lua is being executed, but it's a pain to deal with outside of that context. Thankfully, there's a Java library for executing Lua code, [luaj](https://github.com/luaj/luaj). This, along with some [mocking of the Spring internals](https://github.com/skynet-gh/alt-spring-lobby/commit/838c01ecbdab69d81dac133ce4f558d0ad0908ba#diff-d599e6e8d4aaec917ba9ab99739b5eb3ef9ea9ca83e9208e16fdfe92e7754002R19-R32) that sometimes leak into map "data", allows parsing across all maps I've tested.
 
@@ -59,11 +56,9 @@ I looked at a number of other implementations of this, like [BALobby](https://gi
 
 Not sure there's a better way, perhaps maybe just using JNI to call some C++ or Lua implementation. But that might just lead to more reliance on these obscure formats in the first place.
 
-
 ## Resources
 
 Now we have some basic processing of local resources, but it would be useful to be able to get new resources like games to play. One method of doing so is also custom to Spring, called [Rapid](https://springrts.com/wiki/Rapid). Rapid seems like a way to deal with small changes between game versions without rolling a new archive, which can be quite overall hundreds of megabytes or larger. In other words, similar to git in many ways. The `.sdp` format is binary and can be parsed with the same binary library mentioned earlier. To actually download packages, I just shell out to the [`pr-downloader` executable](https://github.com/spring/pr-downloader).
-
 
 Other resources can be downloaded with http, if you know where to look. I use the main [`clj-http`](https://github.com/dakrone/clj-http) library which wraps Apache HttpComponents, and this allows easy download to a file, and progress monitoring. At first I tried to build urls based on specific content to look for, but there are issues such as not knowing what case the file will have, or if it is `.sdz` or `.sd7`. Now it periodically fetches and parses [a few known websites](https://github.com/skynet-gh/alt-spring-lobby/blob/5ea022f03380ab9f6065e5d38f0442277f918e43/src/clj/spring_lobby/http.clj#L22-L32) that are usually html or xml.
 
@@ -77,14 +72,25 @@ Basically, the program uses one [`atom`](https://clojure.org/reference/atoms) fo
 
 There are a few situations where reloading would not update the running program, that needed special treatment. The UI view, the UI event handler, and the TCP client handler. For these, in dev mode, I use `(var-get (find-var ...)` to dynamically get the new version when namespaces are refreshed. That way, the program will keep its entire state, keep rendering the UI, talking to the server, etc., even after recompile, which is usually less than a second. This works fairly well, although compile errors sometimes cause namespaces to not be reloaded, and various things will break until full compilation happens again.
 
+Another caveat with cljfx, if you are using an atom directly and not using the [pure event handling](https://github.com/cljfx/cljfx#event-handling-on-steroids), be careful not to deref the state atom again within the component rendering fns. I had an issue with the for a while which caused double rendering, and only [found and fixed it recently](https://github.com/skynet-gh/alt-spring-lobby/commit/d793124bedca96c06be734fdbb16d64bd38b07fe#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R3049).
+
+I would be remiss if I didn't mention my editor setup, which is [Neovim](https://github.com/neovim/neovim) with the [Conjure plugin](https://github.com/Olical/conjure/) as well as [parinfer](https://github.com/eraserhd/parinfer-rust). It's not perfect, but it allows me to connect the editor to the running repl and evaluate code, which is very nice for prototyping. Since starting the project, I learned about another interactive dev tool, [reveal](https://github.com/vlaaad/reveal), but I haven't tried it out yet.
+
+## Debugging
+
+While I don't use a full step-through debugger, there's a nice lightweight library [hashp](https://github.com/weavejester/hashp) that lets you insert `#p` before any form, which will print the data when that form is evaluated, plus the file, line, and function. I've seen debuggers in [Calva](https://calva.io/debugger/) as well as [Cursive](https://cursive-ide.com/). More recently I've seen the [flow-storm debugger](https://github.com/jpmonettas/flow-storm-debugger) which looks cool.
 
 ## File Scanning
 
-My first attempt to updating resources over time was to use file watchers with something like [hawk](https://github.com/wkf/hawk) which I use in the development loop.
+My first attempt to updating resources over time was to use file watchers with something like [hawk](https://github.com/wkf/hawk) which I use in the development loop. However, this proved to be very slow and used way too much CPU to track all the Spring folders. I think it's due to the number of files, especially with git folders, extracted archives, and rapid packages. So I abandoned using file watchers and switched to periodically checking files in a few select directories. While it doesn't necessarily react to file changes as quickly, it does check after downloading or extracting resources, or when joining a battle.
 
+## Now
+
+The project is fairly usable right now, albeit it assumes some prior knowledge and setup in terms of registration on an uberserver. The lobby allows download of various game resources, connecting to various servers, starting or joining battles, playing with bots or other players, choosing starting positions (no rects yet...), and customizing game options. Here's a recent screenshot:
 
 ![Present Day Screenshot](/img/battle-minimap-and-resources.png)
 
+I'll describe some enhancements I'd like to make, which should also be kept in [the changelog](https://github.com/skynet-gh/alt-spring-lobby/blob/master/CHANGELOG.md).
 
 ## Advancements
 
@@ -94,17 +100,28 @@ Another issue, depending on where the uberserver is located, the wrong IP addres
 
 One thing I want to do soon, is add a key customization UI, and some alternative configurations, so that my Starcraft friends can play the game.
 
+## GitHub Actions
+
+Based on the great example app [cljfx/hn](https://github.com/cljfx/hn) I added some GitHub actions to build the platform-specific [jars and installers](https://github.com/skynet-gh/alt-spring-lobby/releases/tag/v0.1.0) for Windows, Linux, and Mac.
+
 ## Future
 
 Since it's part of the lobby protocol, I do want to implement chatting sometime, despite the prevalence of discord.
 
 I need to add multiple servers and logins support, soon.
 
-Need to parse the `.smf` file more properly. Don't try to use `ordered-map` to parse the body, just use offsets and `ByteBuffer.wrap`. Then we can get the heightmap too.
+Need to parse the `.smf` file more properly in order to get the heightmap as well. Don't try to use `ordered-map` to parse the body, since it is unordered, just use offsets and `ByteBuffer.wrap`.
 
-
-I try to capture these in CHANGELOG.md
+I also try to capture these in [CHANGELOG.md](https://github.com/skynet-gh/alt-spring-lobby/blob/master/CHANGELOG.md).
 
 ## This Website
 
-To make these web pages, I used, you guessed it, another Clojure library called [Cryogen](http://cryogenweb.org/index.html). After a few false starts I figured out the URI paths and how to export to the [`gh-pages` branch](https://github.com/skynet-gh/alt-spring-lobby/tree/gh-pages) so it will be hosted here.
+To make these web pages, I used, you guessed it, another Clojure library called [Cryogen](http://cryogenweb.org/index.html). After a few false starts I figured out the URI paths and how to export to the [`gh-pages` branch](https://github.com/skynet-gh/alt-spring-lobby/tree/gh-pages) so it will be hosted here. I was also able to find examples of how to use [a GitHub action](https://github.com/skynet-gh/alt-spring-lobby/blob/master/.github/workflows/pages.yml) to build the page and commit to `gh-pages` automatically when `master` changes. This, along with running a local server as [described here](https://github.com/skynet-gh/alt-spring-lobby/tree/master/cryogen), makes the process fairly smooth.
+
+## Conclusion
+
+This project started out as scratching an itch with playing an open source game, but it turned into something of a survey of what's available from the Clojure community for making a desktop app in 2020. The creator of cljfx [has done a lot of work on this](https://vlaaad.github.io/year-of-clojure-on-the-desktop) so it's easier than ever. In some cases, you may be able to get away with an Electron app (which you could use ClojureScript for), but I think for an app like this, it is useful to run in a multithreaded manner, and to work more directly with the filesystem. I actually don't know if it's possible for an Electron app to do everything this app does, but I imagine there would be some friction.
+
+One thing I haven't touched on is interacting with native code directly using [JNI](https://docs.oracle.com/en/java/javase/15/docs/specs/jni/intro.html). I tried to use Java based solutions as much as possible, but I think it may be necessary for some thing like [Spring's unitsync](https://github.com/spring/spring/blob/8581792eac65e07cbed182ccb1e90424ce3bd8fc/tools/unitsync/unitsync.cpp) to generate consistent hashes of resources. I'm keeping an eye on the upcoming [Foreign Linker API](https://openjdk.java.net/jeps/389) related to this as well.
+
+To sum up, the ecosystem provides integrations with the wide variety of technologies needed for this project: [git](https://github.com/clj-jgit/clj-jgit), [7-Zip](sevenzipjbind.sourceforge.net/), [custom binary formats](https://github.com/smee/binary), [TCP](https://github.com/clj-commons/aleph) and the [message format](https://github.com/ztellman/gloss), [parsing HTML](https://github.com/weavejester/crouton), [parsing custom text formats](https://github.com/engelberg/instaparse), [executing Lua code](https://github.com/luaj/luaj), and even the obscure compression library [Squish](https://github.com/acmi/jsqush/). Chances are, there are libraries available that get you close to whatever you're trying to build.
