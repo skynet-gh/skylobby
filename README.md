@@ -2,11 +2,16 @@
 
 A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com/spring/uberserver).
 
-You will need the [Clojure CLI tools](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools).
+
+## Install
+
+You can download a platform installer on the [releases page](https://github.com/skynet-gh/alt-spring-lobby/releases/latest). Or, you can use one of the standalone jar files there, and you'll need to [install a recent Java version](https://adoptopenjdk.net/?variant=openjdk15) as well.
 
 
 ## Build
 
+
+You will need the [Clojure CLI tools](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools).
 
 To build an executable jar file, run
 
@@ -18,6 +23,12 @@ And then run it with
 
 ```bash
 java -jar alt-spring-lobby.jar
+```
+
+To build an installer, then run `jpackage` for your platform, for example on Windows
+
+```bash
+jpackage @jpackage/common @jpackage/windows
 ```
 
 

@@ -4,8 +4,11 @@ Notable changes
 
 ### TODO - future
 
-- Chat
+- Add ability to register on server
 - Store multiple servers and login per server
+- Add support for TLS communication to the server
+- Call Spring unitsync to get resource hashes
+- Chat
 - Starting position rectangles for choose in game
 - Compatability warnings for known bad engine/game/AI combinations
 
