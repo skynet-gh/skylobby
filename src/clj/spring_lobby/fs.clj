@@ -3,7 +3,6 @@
     [byte-streams]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    [com.climate.claypoole :as cp]
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.git :as git]
     [spring-lobby.lua :as lua]
@@ -826,15 +825,6 @@
            nil))
        (catch Exception e
          (log/warn e "Error reading map data for" filename))))))
-
-(defn maps []
-  (let [before (u/curr-millis)
-        m (some->> (map-files)
-                   (cp/pmap 2 read-map-data)
-                   (filter some?)
-                   doall)]
-    (log/info "Maps loaded in" (- (u/curr-millis) before) "ms")
-    (or m [])))
 
 (defn bots
   ([engine-file]

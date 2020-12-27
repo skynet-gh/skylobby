@@ -11,7 +11,6 @@
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
   clojure.java-time/clojure.java-time {:mvn/version "0.3.2"}
-  com.climate/claypoole {:mvn/version "1.1.4"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.20"}
   com.taoensso/timbre {:mvn/version "5.1.0"}
@@ -21,18 +20,13 @@
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   hashp/hashp {:mvn/version "0.2.0"}
-  hawk/hawk {:mvn/version "0.2.11"}
   instaparse/instaparse {:mvn/version "1.4.10"}
-  io.aviso/pretty {:mvn/version "0.1.37"}
   jarohen/chime {:mvn/version "0.3.2"}
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.clojure/clojure {:mvn/version "1.10.2-rc1"}
   org.clojure/core.async {:mvn/version "1.3.610"}
-  org.clojure/core.cache {:mvn/version "1.0.207"}
-  org.clojure/core.memoize {:mvn/version "1.0.236"}
-  org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.0.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.0.0"}
@@ -44,7 +38,6 @@
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
-  toml/toml {:mvn/version "0.1.3"}
   version-clj/version-clj {:mvn/version "0.1.2"}}
  :aliases
  {:nrepl
@@ -53,6 +46,8 @@
    {cider/cider-nrepl {:mvn/version "0.25.5"}
     clj-commons/pomegranate {:mvn/version "1.2.0"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
+    hawk/hawk {:mvn/version "0.2.11"}
+    io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
     org.clojure/tools.deps.alpha {:mvn/version "0.9.833"}
@@ -70,7 +65,8 @@
   :uberjar
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
-   {org.clojure/tools.deps.alpha {:mvn/version "0.9.833"}
+   {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.833"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
