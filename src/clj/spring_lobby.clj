@@ -1250,7 +1250,7 @@
   {:fx/type :v-box
    :alignment :top-left
    :children
-   [{:fx/type :h-box
+   [{:fx/type :flow-pane
      :alignment :center-left
      :style {:-fx-font-size 16}
      :children
@@ -1413,15 +1413,17 @@
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])}
-      {:fx/type :label
+      {:fx/type :h-box
        :alignment :center-left
-       :text " Map: "}
-      {:fx/type map-list
-       ;:disable (boolean battle)
-       :map-name map-name
-       :maps maps
-       :map-input-prefix map-input-prefix
-       :on-value-changed {:event/type ::map-change}}]}
+       :children
+       [{:fx/type :label
+         :alignment :center-left
+         :text " Map: "}
+        {:fx/type map-list
+         :map-name map-name
+         :maps maps
+         :map-input-prefix map-input-prefix
+         :on-value-changed {:event/type ::map-change}}]}]}
     {:fx/type :h-box
      :style {:-fx-font-size 16}
      :alignment :center-left
