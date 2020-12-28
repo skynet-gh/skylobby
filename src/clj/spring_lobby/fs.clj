@@ -51,6 +51,10 @@
   (when f
     (.exists f)))
 
+(defn exists? [^File f]
+  (when f
+    (.exists f)))
+
 (defn is-directory? [^File f]
   (when f
     (.isDirectory f)))
@@ -76,6 +80,14 @@
     (when-let [path (.toPath f)]
       (Files/size path))))
 
+(defn make-dirs [^File f]
+  (when f
+    (.mkdirs f)))
+
+(defn make-parent-dirs [f]
+  (when-not (exists? f)
+    (make-dirs (parent-file f))))
+
 
 (defn os-name []
   (System/getProperty "os.name"))
@@ -89,7 +101,7 @@
 (defn user-name []
   (System/getProperty "user.name"))
 
-(defn sys-data []
+(defn get-sys-data []
   {:os-name (os-name)
    :os-version (os-version)
    :user-home (user-home)
@@ -97,17 +109,18 @@
 
 (defn windows?
   ([]
-   (windows? (sys-data)))
+   (windows? (get-sys-data)))
   ([{:keys [os-name]}]
    (string/includes? os-name "Windows")))
 
 (defn wsl?
   "Returns true if this system appears to be the Windows Subsystem for Linux."
   ([]
-   (wsl? (sys-data)))
+   (wsl? (get-sys-data)))
   ([sys-data]
    (let [{:keys [os-name os-version]} sys-data]
      (and
+       os-name
        (string/includes? os-name "Linux")
        os-version
        (or
@@ -119,7 +132,7 @@
 
 (defn platform
   ([]
-   (platform (sys-data)))
+   (platform (get-sys-data)))
   ([{:keys [os-name]}]
    (if (and os-name
             (string/includes? os-name "Linux")
@@ -171,7 +184,7 @@
 (defn bar-root
   "Returns the root directory for BAR"
   ^File []
-  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
@@ -188,7 +201,7 @@
 (defn spring-root
   "Returns the root directory for Spring"
   ^File []
-  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
@@ -205,7 +218,7 @@
 (defn springlobby-root
   "Returns the root directory for Spring"
   []
-  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
@@ -222,16 +235,27 @@
 (defn app-root
   "Returns the root directory for this application"
   []
-  (let [{:keys [os-name user-name user-home] :as sys-data} (sys-data)]
+  (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
-        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby" "wsl")
+        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby")
         (io/file user-home ".alt-spring-lobby"))
       (string/includes? os-name "Windows")
       (io/file user-home ".alt-spring-lobby")
       :else
       (io/file user-home ".alt-spring-lobby"))))
+
+(defn config-root
+  []
+  (if (wsl?)
+    (io/file (app-root) "wsl")
+    (app-root)))
+
+(defn config-file
+  [& path]
+  (apply io/file (config-root) path))
+
 
 (defn download-dir ^File
   []
@@ -268,9 +292,6 @@
         (filter #(or (string/ends-with? (filename %) ".sd7")
                      (string/ends-with? (filename %) ".sdz"))))))
 
-#_
-(map-files)
-
 (defn- extract-7z
   ([^File f]
    (let [fname (.getName f)
@@ -290,9 +311,8 @@
              to (io/file dest path)]
          (try
            (when-not (.isFolder item)
-             (when-not (.exists to)
-               (let [parent (.getParentFile to)]
-                 (.mkdirs parent))
+             (when-not (exists? to)
+               (make-parent-dirs to)
                (log/info "Extracting" path "to" to)
                (with-open [fos (FileOutputStream. to)]
                  (let [res (.extractSlow item
@@ -852,11 +872,14 @@
 (defn springlobby-map-minimap [map-name]
   (io/file (springlobby-root) "cache" (str map-name ".minimap.png")))
 
+(def ^java.io.File maps-cache-root
+  (io/file (app-root) "maps-cache"))
+
 (defn minimap-image-cache-file
   ([map-name]
-   (minimap-image-cache-file (app-root) map-name))
+   (minimap-image-cache-file maps-cache-root map-name))
   ([root map-name]
-   (io/file root "maps-cache" (str map-name ".minimap.png"))))
+   (io/file root (str map-name ".minimap.png"))))
 
 
 ; https://stackoverflow.com/a/25267111/984393
@@ -894,10 +917,8 @@
                                    StandardCopyOption/REPLACE_EXISTING]}}]
    (let [^Path source-path (to-path source)
          ^Path dest-path (to-path dest)
-         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)
-         dest-parent (parent-file dest)]
-     (when (and dest-parent (not (exists dest-parent)))
-       (.mkdirs dest-parent))
+         ^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)]
+     (make-parent-dirs dest)
      (Files/copy source-path dest-path options))))
 
 (defn copy

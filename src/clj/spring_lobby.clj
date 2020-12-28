@@ -87,8 +87,8 @@
   "Returns data loaded from a .edn file in this application's root directory."
   [edn-filename]
   (try
-    (let [config-file (io/file (fs/app-root) edn-filename)]
-      (when (fs/exists config-file)
+    (let [config-file (fs/config-file edn-filename)]
+      (when (fs/exists? config-file)
         (->> config-file slurp (edn/read-string {:readers custom-readers}))))
     (catch Exception e
       (log/warn e "Exception loading app edn file" edn-filename))))
@@ -177,10 +177,8 @@
 (defn spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
   [data filename]
-  (let [app-root (io/file (fs/app-root))
-        file (io/file app-root filename)]
-    (when-not (fs/exists app-root)
-      (.mkdirs app-root))
+  (let [file (fs/config-file filename)]
+    (fs/make-parent-dirs file)
     (spit file (with-out-str (pprint data)))))
 
 
@@ -211,9 +209,6 @@
         (log/warn "No file found for map" log-map-name))
       (catch Exception e
         (log/warn e "Error loading map data for" log-map-name)))))
-
-(def ^java.io.File mods-cache-root
-  (io/file (fs/app-root) "mods-cache"))
 
 
 (defn read-mod-data
@@ -563,8 +558,6 @@
                           (->> all-paths
                                (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))]
     (apply update-file-cache! all-paths)
-    (when-not (fs/exists mods-cache-root)
-      (.mkdirs mods-cache-root))
     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
     (doseq [file (concat to-add-file to-add-rapid)]
@@ -600,12 +593,6 @@
                               read-mod-data)]
      (swap! *state assoc :battle-mod-details mod-details)
      mod-details)))
-
-(def ^java.io.File maps-cache-root
-  (io/file (fs/app-root) "maps-cache"))
-
-(defn map-cache-file [map-name]
-  (io/file maps-cache-root (str map-name ".edn")))
 
 
 (defn scale-minimap-image [minimap-width minimap-height minimap-image]
@@ -675,8 +662,7 @@
                                (map fs/canonical-path))))]
     (apply update-file-cache! map-files)
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
-    (when-not (fs/exists maps-cache-root)
-      (.mkdirs maps-cache-root))
+    (fs/make-dirs fs/maps-cache-root)
     (doseq [map-file todo]
       (log/info "Reading" map-file)
       (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)]
@@ -3550,8 +3536,7 @@
   (log/info "Request to download" url "to" dest)
   (future
     (try
-      (let [parent (fs/parent-file dest)]
-        (.mkdirs parent))
+      (fs/make-parent-dirs dest)
       (clj-http/with-middleware
         (-> clj-http/default-middleware
             (insert-after clj-http/wrap-url wrap-downloaded-bytes-counter)
@@ -4838,7 +4823,7 @@
 (defn -main [& _args]
   (Platform/setImplicitExit true)
   (fs/init-7z!)
-  (u/log-to-file (fs/canonical-path (io/file (fs/app-root) "alt-spring-lobby.log")))
+  (u/log-to-file (fs/canonical-path (fs/config-file "alt-spring-lobby.log")))
   (reset! *state (assoc (initial-state) :standalone true))
   (init *state)
   (let [r (fx/create-renderer

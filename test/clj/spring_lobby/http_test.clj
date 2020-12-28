@@ -17,15 +17,15 @@
 
 (deftest engine-archive
   (is (= "spring_{maintenance}104.0.1-1560-g50390f6_minimal-portable-linux64-static.7z"
-         (with-redefs [fs/sys-data (constantly {:os-name "Linux"
-                                                :os-version ""})]
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Linux"
+                                                    :os-version ""})]
            (http/engine-archive "104.0.1-1560-g50390f6 maintenance"))))
   (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_minimal-portable-linux64-static.7z"
-         (with-redefs [fs/sys-data (constantly {:os-name "Linux"
-                                                :os-version ""})]
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Linux"
+                                                    :os-version ""})]
            (http/engine-archive "104.0.1-2141-gfb2f9d5 develop"))))
   (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z"
-         (with-redefs [fs/sys-data (constantly {:os-name "Windows"})]
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Windows"})]
            (http/engine-archive "104.0.1-2141-gfb2f9d5 develop")))))
 
 (deftest engine-archive?
@@ -49,10 +49,10 @@
 
 (deftest bar-engine-filename
   (is (= "spring_bar_.BAR.104.0.1-1656-gad7994a_linux-64-minimal-portable.7z",
-         (with-redefs [fs/sys-data (constantly {:os-name "Linux"})]
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Linux"})]
            (http/bar-engine-filename "104.0.1-1656-gad7994a BAR"))))
   (is (= "spring_bar_.BAR.104.0.1-1695-gbd6b256_windows-32-minimal-portable.7z",
-         (with-redefs [fs/sys-data (constantly {:os-name "Windows"})]
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Windows"})]
            (http/bar-engine-filename "104.0.1-1695-gbd6b256 BAR")))))
 
 (deftest bar-engine-filename?
