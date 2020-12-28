@@ -8,7 +8,6 @@
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [cljfx.lifecycle :as fx.lifecycle]
-    [clojure.core.async :as async]
     clojure.data
     [clojure.edn :as edn]
     [clojure.java.io :as io]
@@ -18,6 +17,8 @@
     [com.evocomputing.colors :as colors]
     hashp.core
     java-time
+    [manifold.deferred :as deferred]
+    [manifold.stream :as s]
     [me.raynes.fs :as raynes-fs]
     [shams.priority-queue :as pq]
     [spring-lobby.battle :as battle]
@@ -83,11 +84,12 @@
   (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
 
 
-(defn slurp-app-edn
+(defn slurp-config-edn
   "Returns data loaded from a .edn file in this application's root directory."
   [edn-filename]
   (try
     (let [config-file (fs/config-file edn-filename)]
+      (log/info "Slurping config edn from" config-file)
       (when (fs/exists? config-file)
         (->> config-file slurp (edn/read-string {:readers custom-readers}))))
     (catch Exception e
@@ -119,7 +121,7 @@
 
 
 (def config-keys
-  [:username :password :server-url :engine-version :mod-name :map-name
+  [:username :password :server-url :servers :server :engine-version :mod-name :map-name
    :battle-title :battle-password
    :bot-username :bot-name :bot-version :minimap-type :pop-out-battle
    :scripttags :preferred-color :rapid-repo])
@@ -160,13 +162,30 @@
    {:select-fn select-downloadables
     :filename "downloadables.edn"}])
 
+(def default-server-port 8200)
+
+(def default-servers
+  {"lobby.springrts.com:8200"
+   {:host "lobby.springrts.com"
+    :port 8200
+    :alias "SpringLobby"}
+   "springfightclub.com:8200"
+   {:host "springfightclub.com"
+    :port 8200
+    :alias "Spring Fight Club"}
+   "road-flag.bnr.la:8200"
+   {:host "road-flag.bnr.la"
+    :port 8200
+    :alias "Beyond All Reason"}})
+
 
 (defn initial-state []
   (merge
+    {:servers default-servers}
     (apply
       merge
       (doall
-        (map (comp slurp-app-edn :filename) state-to-edn)))
+        (map (comp slurp-config-edn :filename) state-to-edn)))
     {:file-events (initial-file-events)
      :tasks (initial-tasks)}))
 
@@ -179,6 +198,7 @@
   [data filename]
   (let [file (fs/config-file filename)]
     (fs/make-parent-dirs file)
+    (log/info "Spitting edn to" file)
     (spit file (with-out-str (pprint data)))))
 
 
@@ -199,16 +219,13 @@
 
 (defn read-map-data [maps map-name]
   (let [log-map-name (str "'" map-name "'")]
-    (log/info "Reading map data for" log-map-name)
-    (try
+    (u/try-log (str "reading map data for" log-map-name)
       (if-let [map-file (some->> maps
                                  (filter (comp #{map-name} :map-name))
                                  first
                                  :file)]
         (fs/read-map-data map-file)
-        (log/warn "No file found for map" log-map-name))
-      (catch Exception e
-        (log/warn e "Error loading map data for" log-map-name)))))
+        (log/warn "No file found for map" log-map-name)))))
 
 
 (defn read-mod-data
@@ -282,7 +299,7 @@
                          (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
             (log/debug "Updating battle map details for" new-battle-map
                        "was" old-battle-map)
-            (let [map-details (read-map-data (:maps new-state) new-battle-map)]
+            (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
               (swap! *state assoc :battle-map-details map-details))))
         (catch Exception e
           (log/error e "Error in :battle-map-details state watcher")))))
@@ -304,12 +321,14 @@
                               (filter filter-fn)
                               first)))
             (log/debug "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-            (let [mod-details (some->> new-state
-                                       :mods
-                                       (filter filter-fn)
-                                       first
-                                       :file
-                                       read-mod-data)]
+            (let [mod-details (or
+                                (some->> new-state
+                                         :mods
+                                         (filter filter-fn)
+                                         first
+                                         :file
+                                         read-mod-data)
+                                {})]
               (swap! *state assoc :battle-mod-details mod-details))))
         (catch Exception e
           (log/error e "Error in :battle-map-details state watcher")))))
@@ -922,11 +941,20 @@
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-agent i))})}}]})
 
-(defn update-disconnected []
-  (log/warn (ex-info "stacktrace" {}) "Updating state after disconnect")
-  (swap! *state dissoc
-         :battle :battles :channels :client :client-deferred :my-channels :users
-         :last-failed-message)
+(defn update-disconnected! [state-atom]
+  ;(log/debug (ex-info "stacktrace" {}) "Updating state after disconnect")
+  (log/info "Updating state after disconnect")
+  (let [[{:keys [client ping-loop print-loop]} _new-state]
+        (swap-vals! state-atom dissoc
+                    :accepted
+                    :battle :battles :channels :client :client-deferred :last-failed-message :my-channels
+                    :ping-loop :print-loop :users)]
+    (when client
+      (client/disconnect client))
+    (when ping-loop
+      (future-cancel ping-loop))
+    (when print-loop
+      (future-cancel print-loop)))
   nil)
 
 (defmethod event-handler ::print-state [_e]
@@ -934,116 +962,349 @@
 
 
 (defmethod event-handler ::disconnect [_e]
-  (let [state @*state]
-    (when-let [client (:client state)]
-      (when-let [f (:connected-loop state)]
-        (future-cancel f))
-      (when-let [f (:print-loop state)]
-        (future-cancel f))
-      (when-let [f (:ping-loop state)]
-        (future-cancel f))
-      (client/disconnect client)))
-  (update-disconnected))
+  (update-disconnected! *state))
 
-(defn connected-loop [state-atom client-deferred]
-  (swap! state-atom assoc
-         :connected-loop
-         (future
-           (try
-             (let [^SplicedStream client @client-deferred]
-               (client/connect state-atom client)
-               (swap! state-atom assoc :client client :login-error nil)
-               (loop []
-                 (if (and client (not (.isClosed client)))
-                   (when-not (Thread/interrupted)
-                     (log/debug "Client is still connected")
-                     (async/<!! (async/timeout 20000))
-                     (recur))
-                   (when-not (Thread/interrupted)
-                     (log/info "Client was disconnected")
-                     (update-disconnected))))
-               (log/info "Connect loop closed"))
-             (catch Exception e
-               (log/error e "Connect loop error")
-               (when-not (or (Thread/interrupted) (instance? java.lang.InterruptedException e))
-                 (swap! state-atom assoc :login-error (str (.getMessage e)))
-                 (update-disconnected))))
-           nil)))
-
-(defmethod event-handler ::connect [_e]
+(defn connect [state-atom client-deferred]
   (future
     (try
-      (let [server-url (:server-url @*state)
-            client-deferred (client/client server-url)]
+      (let [^SplicedStream client @client-deferred]
+        (s/on-closed client
+          (fn []
+            (log/info "client closed")
+            (update-disconnected! *state)))
+        (s/on-drained client
+          (fn []
+            (log/info "client drained")
+            (update-disconnected! *state)))
+        (if (s/closed? client)
+          (log/warn "client was closed on create")
+          (do
+            (swap! state-atom assoc :client client :login-error nil)
+            (client/connect state-atom client))))
+      (catch Exception e
+        (log/error e "Connect error")
+        (swap! state-atom assoc :login-error (str (.getMessage e)))
+        (update-disconnected! *state)))
+    nil))
+
+(defmethod event-handler ::connect [{:keys [server-url]}]
+  (future
+    (try
+      (let [client-deferred (client/client server-url)] ; TODO catch connect errors somehow
         (swap! *state assoc :client-deferred client-deferred)
-        (connected-loop *state client-deferred))
+        (connect *state client-deferred))
       (catch Exception e
         (log/error e "Error connecting")))))
 
+(defmethod event-handler ::cancel-connect [{:keys [client client-deferred]}]
+  (future
+    (try
+      (if client-deferred
+        (deferred/error! client-deferred (ex-info "User cancel connect" {}))
+        (log/warn "No client-deferred to cancel"))
+      (when client
+        (log/warn "client found during cancel")
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error cancelling connect")))))
+
+
+(defn server-cell
+  [[server-url server-data]]
+  {:text (when server-url
+           (str server-url (when-let [a (:alias server-data)] (str " (" a ")"))))})
+
+(defn server-combo-box [{:keys [server servers]}]
+  {:fx/type :combo-box
+   :value server
+   :items (or (seq servers) [])
+   :prompt-text "< choose a server >"
+   :on-value-changed {:event/type ::assoc
+                      :key :server}
+   :button-cell server-cell
+   :cell-factory
+   {:fx/cell-type :list-cell
+    :describe server-cell}})
+
 
 (defn client-buttons
-  [{:keys [client client-deferred username password login-error server-url]}]
+  [{:keys [accepted client client-deferred username password login-error server servers]}]
   {:fx/type :h-box
    :alignment :top-left
    :style {:-fx-font-size 16}
    :children
-   [{:fx/type :button
-     :text (if client
-             "Disconnect"
-             (if client-deferred
-               "Connecting..."
-               "Connect"))
-     :disable (boolean (and (not client) client-deferred))
-     :on-action {:event/type (if client ::disconnect ::connect)}}
-    {:fx/type :v-box
-     :alignment :center-left
-     :children
-     [{:fx/type :label
+   (concat
+     [{:fx/type :button
+       :text (if client
+               (if accepted
+                 "Disconnect"
+                 "Logging in...")
+               (if client-deferred
+                 "Connecting..."
+                 "Connect"))
+       :disable (boolean
+                  (or
+                    (and client (not accepted))
+                    (and
+                      server
+                      (not client)
+                      client-deferred)))
+       :on-action (assoc {:event/type (if client ::disconnect ::connect)}
+                         :server-url (first server))}]
+     (when (and client-deferred (not client))
+       [{:fx/type :button
+         :text ""
+         :tooltip
+         {:fx/type :tooltip
+          :show-delay [10 :ms]
+          :style {:-fx-font-size 14}
+          :text "Cancel connect"}
+         :on-action {:event/type ::cancel-connect
+                     :client-deferred client-deferred
+                     :client client}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-close-octagon:16:white"}}])
+     [{:fx/type :v-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :alignment :center
+         :text " Login: "}]}
+      {:fx/type :text-field
+       :text username
+       :prompt-text "Username"
+       :disable (boolean (or client client-deferred))
+       :on-text-changed {:event/type ::username-change}}
+      {:fx/type :password-field
+       :text password
+       :prompt-text "Password"
+       :disable (boolean (or client client-deferred))
+       :on-text-changed {:event/type ::password-change}}
+      {:fx/type :button
+       :text "Register"
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :style {:-fx-font-size 14}
+        :text "Show server registration window"}
+       :on-action {:event/type ::assoc
+                   :key :show-register-window}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-account-plus:16:white"}}
+      (assoc
+        {:fx/type server-combo-box}
+        :server server
+        :servers servers)
+      {:fx/type :button
+       :text "Add Server"
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :style {:-fx-font-size 14}
+        :text "Show server add window"}
+       :on-action {:event/type ::assoc
+                   :key :show-servers-window}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-plus:16:white"}}
+      {:fx/type :v-box
+       :h-box/hgrow :always
        :alignment :center
-       :text " Login: "}]}
-    {:fx/type :text-field
-     :text username
-     :prompt-text "Username"
-     :disable (boolean (or client client-deferred))
-     :on-text-changed {:event/type ::username-change}}
-    {:fx/type :password-field
-     :text password
-     :prompt-text "Password"
-     :disable (boolean (or client client-deferred))
-     :on-text-changed {:event/type ::password-change}}
+       :children
+       [{:fx/type :label
+         :text (str login-error)
+         :style {:-fx-text-fill "#FF0000"
+                 :-fx-max-width "360px"}}]}
+      {:fx/type :pane
+       :h-box/hgrow :always}
+      {:fx/type :button
+       :text "Replays"
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :style {:-fx-font-size 14}
+        :text "Show replays window"}
+       :on-action {:event/type ::assoc
+                   :key :show-replays}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-open-in-new:16:white"}}])})
+
+
+(defmethod event-handler ::register [{:keys [email password server username]}]
+  (future
+    (try
+      (let [server-url (first server)
+            client-deferred (client/client server-url) ; TODO catch connect errors somehow
+            client @client-deferred]
+        (message/send-message client
+          (str "REGISTER " username " " (client/base64-md5 password) " " email))
+        (loop []
+          (when-let [d (s/take! client)]
+            (when-let [m @d]
+              (log/info "(register) <" (str "'" m "'"))
+              (swap! *state assoc :register-response m)
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error registering with" server "as" username)))))
+
+(defmethod event-handler ::confirm-agreement [{:keys [client password username verification-code]}]
+  (future
+    (try
+      (message/send-message client
+        (str "CONFIRMAGREEMENT " verification-code))
+      (swap! *state dissoc :agreement)
+      (client/login client username password)
+      (catch Exception e
+        (log/error e "Error confirming agreement")))))
+
+(defmethod event-handler ::update-server
+  [{:keys [server-url server-data]}]
+  (swap! *state update-in [:servers server-url] merge server-data))
+
+(defn servers-window
+  [{:keys [show-servers-window server-host server-port server-alias servers]}]
+  (let [port (if (string/blank? server-port) default-server-port server-port)
+        server-url (str server-host ":" port)]
+    {:fx/type :stage
+     :showing show-servers-window
+     :title "alt-spring-lobby Servers"
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-servers-window false)
+                         (.consume e))
+     :width 400
+     :height 300
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
+       :style {:-fx-font-size 16}
+       :children
+       [
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Host: "}
+          {:fx/type :text-field
+           :text server-host
+           :on-text-changed {:event/type ::assoc
+                             :key :server-host}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Port: "}
+          {:fx/type :text-field
+           :text server-port
+           :prompt-text "8200"
+           :on-text-changed {:event/type ::assoc
+                             :key :server-port}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Alias: "}
+          {:fx/type :text-field
+           :text server-alias
+           :on-text-changed {:event/type ::assoc
+                             :key :server-alias}}]}
+        {:fx/type :button
+         :text (str
+                 (if (contains? servers server-url) "Update" "Add")
+                 " server")
+         :style {:-fx-font-size 20}
+         :disable (string/blank? server-host)
+         :on-action {:event/type ::update-server
+                     :server-url server-url
+                     :server-data
+                     {:port port
+                      :host server-host
+                      :alias server-alias}}}]}}}))
+
+(defn register-window
+  [{:keys [email password password-confirm register-response server servers show-register-window username]}]
+  {:fx/type :stage
+   :showing show-register-window
+   :title "alt-spring-lobby Register"
+   :on-close-request (fn [^javafx.stage.WindowEvent e]
+                       (swap! *state assoc :show-register-window false)
+                       (.consume e))
+   :width 400
+   :height 300
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
     {:fx/type :v-box
-     :alignment :center-left
+     :style {:-fx-font-size 16}
      :children
-     [{:fx/type :label
-       :alignment :center
-       :text " Server: "}]}
-    {:fx/type :text-field
-     :text server-url
-     :prompt-text "server:port"
-     :disable (boolean (or client client-deferred))
-     :on-text-changed {:event/type ::server-url-change}}
-    {:fx/type :v-box
-     :h-box/hgrow :always
-     :alignment :center
-     :children
-     [{:fx/type :label
-       :text (str login-error)
-       :style {:-fx-text-fill "#FF0000"
-               :-fx-max-width "360px"}}]}
-    {:fx/type :pane
-     :h-box/hgrow :always}
-    {:fx/type :button
-     :text "Replays"
-     :tooltip
-     {:fx/type :tooltip
-      :show-delay [10 :ms]
-      :style {:-fx-font-size 14}
-      :text "Show replays window"}
-     :on-action {:event/type ::assoc
-                 :key :show-replays}
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-open-in-new:16:white"}}]})
+     [
+      (assoc
+        {:fx/type server-combo-box}
+        :server server
+        :servers servers)
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :text " Username: "}
+        {:fx/type :text-field
+         :text username
+         :on-text-changed {:event/type ::username-change}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :text " Password: "}
+        {:fx/type :password-field
+         :text password
+         :on-text-changed {:event/type ::password-change}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :text " Confirm: "}
+        {:fx/type :password-field
+         :text password-confirm
+         :on-text-changed {:event/type ::assoc
+                           :key :password-confirm}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :text " Email: "}
+        {:fx/type :text-field
+         :text email
+         :on-text-changed {:event/type ::assoc
+                           :key :email}}]}
+      {:fx/type :label
+       :text (str register-response)}
+      {:fx/type :button
+       :text "Register"
+       :style {:-fx-font-size 20}
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :text "Register with server"}
+       :disable (not (and server
+                          username
+                          password
+                          password-confirm
+                          (= password password-confirm)))
+       :on-action {:event/type ::register
+                   :server server
+                   :username username
+                   :password password
+                   :email email}}]}}})
 
 
 (defmethod event-handler ::username-change
@@ -1243,7 +1504,7 @@
       (.browseFileDirectory desktop file))))
 
 (defn battles-buttons
-  [{:keys [battle battles battle-password battle-title client engine-version mod-name map-name maps
+  [{:keys [accepted battle battles battle-password battle-title client engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
            use-springlobby-modname]
     :as state}]
@@ -1429,7 +1690,7 @@
      :alignment :center-left
      :children
      (concat
-       (when (and client (not battle))
+       (when (and accepted client (not battle))
          (let [host-battle-state
                (-> state
                    (clojure.set/rename-keys {:battle-title :title})
@@ -1446,7 +1707,8 @@
              :disable (boolean
                         (or (string/blank? engine-version)
                             (string/blank? map-name)
-                            (string/blank? mod-name)))
+                            (string/blank? mod-name)
+                            (string/blank? battle-title)))
              :on-action host-battle-action}
             {:fx/type :label
              :text " Battle Name: "}
@@ -1568,8 +1830,8 @@
             map-hash -1 ; TODO
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-        (swap! *state assoc :battle-map-details (read-map-data maps map-name))
-        (message/send-message (:client @*state) m))
+        (message/send-message (:client @*state) m)
+        (swap! *state assoc :battle-map-details (read-map-data maps map-name)))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -1982,7 +2244,7 @@
 
 
 (def minimap-types
-  ["minimap" "metalmap"])
+  ["minimap" "metalmap" "heightmap"])
 
 (defmethod event-handler ::minimap-scroll
   [_e]
@@ -2574,6 +2836,7 @@
         bots (fs/bots engine-file)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
+                        "heightmap" (:heightmap-image smf)
                         ; else
                         (scale-minimap-image minimap-width minimap-height (:minimap-image smf)))
         bots (concat bots
@@ -3148,8 +3411,8 @@
                :draw
                (fn [^javafx.scene.canvas.Canvas canvas]
                  (let [gc (.getGraphicsContext2D canvas)
-                       border-color (if (= "minimap" minimap-type)
-                                      Color/BLACK Color/WHITE)
+                       border-color (if (not= "minimap" minimap-type)
+                                      Color/WHITE Color/BLACK)
                        random (= "Random" startpostype)
                        random-teams (when random
                                       (let [teams (spring/teams battle-details)]
@@ -4678,9 +4941,9 @@
           (System/exit 0))))))
 
 (defn root-view
-  [{{:keys [battle battles last-failed-message pop-out-battle
-            show-downloader show-importer show-maps show-rapid-downloader show-replays
-            standalone tasks users]
+  [{{:keys [agreement battle battles client last-failed-message password pop-out-battle
+            show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
+            show-servers-window standalone tasks username users verification-code]
      :as state}
     :state}]
   {:fx/type fx/ext-many
@@ -4703,9 +4966,30 @@
            [(merge
               {:fx/type client-buttons}
               (select-keys state
-                [:client :client-deferred :username :password :login-error
-                 :server-url]))
-            {:fx/type :split-pane
+                [:accepted :client :client-deferred :username :password :login-error
+                 :server-url :servers :server :show-register-popup]))]
+           (when agreement
+             [{:fx/type :label
+               :style {:-fx-font-size 20}
+               :text " Server agreement: "}
+              {:fx/type :text-area
+               :editable false
+               :text (str agreement)}
+              {:fx/type :h-box
+               :style {:-fx-font-size 20}
+               :children
+               [{:fx/type :text-field
+                 :prompt-text "Email Verification Code"
+                 :on-action {:event/type ::assoc
+                             :key :verification-code}}
+                {:fx/type :button
+                 :text "Confirm"
+                 :on-action {:event/type ::confirm-agreement
+                             :client client
+                             :password password
+                             :username username
+                             :verification-code verification-code}}]}])
+           [{:fx/type :split-pane
              :v-box/vgrow :always
              :divider-positions [0.75]
              :items
@@ -4729,7 +5013,7 @@
             (merge
               {:fx/type battles-buttons}
               (select-keys state
-                [:battle :battle-password :battle-title :battles :client :engines :engine-filter
+                [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
                  :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
                  :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
            (when battle
@@ -4803,7 +5087,18 @@
        [(merge
           {:fx/type replays-window}
           (select-keys state
-            [:engines :show-replays]))]))})
+            [:engines :show-replays]))])
+     (when show-servers-window
+       [(merge
+          {:fx/type servers-window}
+          (select-keys state
+            [:server-host :server-port :server-alias :servers :show-servers-window]))])
+     (when show-register-window
+       [(merge
+          {:fx/type register-window}
+          (select-keys state
+            [:email :password :password-confirm :register-response :server :servers :show-register-window
+             :username]))]))})
 
 
 (defn init

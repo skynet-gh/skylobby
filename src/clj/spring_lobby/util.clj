@@ -73,3 +73,16 @@
                 :max-size 100000000
                 :backlog 9
                 :stacktrace-fonts {}})}}))
+
+
+(defmacro try-log
+  "Log message, try an operation, log any Exceptions with message, and log and rethrow Throwables."
+  [message & body]
+  `(try
+     (log/info (str "Start " ~message))
+     ~@body
+     (catch Exception e#
+       (log/error e# (str "Exception " ~message)))
+     (catch Throwable t#
+       (log/error t# (str "Error " ~message))
+       (throw t#))))

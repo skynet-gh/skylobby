@@ -30,6 +30,9 @@
 (def ^:dynamic handler handler/handle) ; for overriding in dev
 
 
+(def default-ssl false) ; TODO
+
+
 (defn manifest-attributes [url]
   (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
       URL. .openStream Manifest. .getMainAttributes))
@@ -181,8 +184,11 @@
   ([server-url]
    (apply client (parse-host-port server-url)))
   ([host port]
+   (client host port nil))
+  ([host port {:keys [ssl] :or {ssl default-ssl}}]
    (d/chain (tcp/client {:host host
-                         :port port})
+                         :port port
+                         :ssl? ssl})
      #(wrap-duplex-stream protocol %))))
 
 
@@ -376,29 +382,38 @@
         (catch Exception e
           (log/error e "Error in print loop"))))))
 
+(defn base64-md5 [password]
+  (base64-encode (md5-bytes password)))
+
 (defn login
-  [client local-addr username password]
-  (let [pw-md5-base64 (base64-encode (md5-bytes password))
-        git-ref "b6e84c6023cbffac"
-        user-id (rand-int Integer/MAX_VALUE)
-        compat-flags "sp u"
-        msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                 " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
-    (message/send-message client msg)))
+  ([client username password]
+   (login client "*" username password))
+  ([client local-addr username password]
+   (let [pw-md5-base64 (base64-md5 password)
+         git-ref "b6e84c6023cbffac"
+         user-id (rand-int Integer/MAX_VALUE)
+         compat-flags "sp u"
+         msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
+                  " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
+     (message/send-message client msg))))
 
 
 (defn connect
   [state-atom client]
   (let [{:keys [username password]} @state-atom]
+    (when default-ssl ; TODO
+      (message/send-message client "STLS"))
     (print-loop state-atom client)
+    (message/send-message client "LISTCOMPFLAGS")
     (login client "*" username password)
     (ping-loop state-atom client)))
 
 (defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
-  (message/send-message c "EXIT")
-  (.close c)
-  (log/info "connection closed?" (.isClosed c)))
+  (when-not (s/closed? c)
+    (message/send-message c "EXIT"))
+  (s/close! c)
+  (log/info "connection closed?" (s/closed? c)))
 
 (defmethod handler/handle "DENIED" [client state-atom m]
   (log/info (str "Login denied: '" m "'"))

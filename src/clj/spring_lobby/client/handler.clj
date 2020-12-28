@@ -182,3 +182,22 @@
           (if (= battle-id curr-battle-id)
             (dissoc next-state :battle)
             next-state))))))
+
+(defmethod handle "AGREEMENT" [_c state-atom m]
+  (let [[_all agreement-text] (re-find #"\w+ (.*)" m)]
+    (swap! state-atom update :agreement-part str "\n" agreement-text)))
+
+(defmethod handle "AGREEMENTEND" [_c state-atom _m]
+  (swap! state-atom
+         (fn [state]
+           (-> state
+               (assoc :agreement (:agreement-part state))
+               (dissoc :agreement-part)))))
+
+(defmethod handle "OPENBATTLEFAILED" [_c state-atom _m]
+  (swap! state-atom dissoc :battle))
+
+(defmethod handle "COMPFLAGS" [_c state-atom m]
+  (let [[_all remaining] (re-find #"\w+ (.*)" m)
+        compflags (string/split remaining #"\s+")]
+    (swap! state-atom assoc :compflags compflags)))
