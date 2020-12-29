@@ -9,6 +9,8 @@
 
 
 (defn send-message [c m]
-  (when c
-    (log/info ">" (str "'" m "'"))
-    @(s/put! c (str m "\n"))))
+  (if c
+    (do
+      (log/info ">" (str "'" m "'"))
+      @(s/put! c (str m "\n")))
+    (log/warn "No client to send message!" (str "'" m "'"))))

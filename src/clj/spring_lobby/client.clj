@@ -334,7 +334,6 @@
         decoded-status (decode-battle-status battle-status)
         bot-data {:battle-status decoded-status
                   :team-color team-color}]
-    (log/debug username (pr-str decoded-status) team-color)
     (swap! state-atom
       (fn [state]
         (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
