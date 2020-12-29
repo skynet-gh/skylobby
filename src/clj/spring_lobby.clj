@@ -54,7 +54,7 @@
   [(str (io/resource "dark.css"))])
 
 (def main-window-width 1920)
-(def main-window-height 1000)
+(def main-window-height 1020)
 
 (def download-window-width 1600)
 (def download-window-height 800)
@@ -121,7 +121,7 @@
 
 
 (def config-keys
-  [:username :password :server-url :servers :server :engine-version :mod-name :map-name
+  [:username :password :servers :server :engine-version :mod-name :map-name
    :battle-title :battle-password
    :bot-username :bot-name :bot-version :minimap-type :pop-out-battle
    :scripttags :preferred-color :rapid-repo])
@@ -219,7 +219,7 @@
 
 (defn read-map-data [maps map-name]
   (let [log-map-name (str "'" map-name "'")]
-    (u/try-log (str "reading map data for" log-map-name)
+    (u/try-log (str "reading map data for " log-map-name)
       (if-let [map-file (some->> maps
                                  (filter (comp #{map-name} :map-name))
                                  first
@@ -299,6 +299,7 @@
                          (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
             (log/debug "Updating battle map details for" new-battle-map
                        "was" old-battle-map)
+            (swap! *state assoc :battle-map-details {:loading true})
             (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
               (swap! *state assoc :battle-map-details map-details))))
         (catch Exception e
@@ -321,6 +322,7 @@
                               (filter filter-fn)
                               first)))
             (log/debug "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
+            (swap! *state assoc :battle-mod-details {:loading true})
             (let [mod-details (or
                                 (some->> new-state
                                          :mods
@@ -1826,7 +1828,7 @@
   (swap! *state assoc :show-maps false))
 
 (defmethod event-handler ::battle-map-change
-  [{:fx/keys [event] :keys [client map-name maps]}]
+  [{:fx/keys [event] :keys [client map-name]}]
   (future
     (try
       (let [spectator-count 0 ; TODO
@@ -1835,7 +1837,7 @@
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
         (message/send-message client m)
-        (swap! *state assoc :battle-map-details (read-map-data maps map-name)))
+        (swap! *state assoc :battle-map-details {:loading true}))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -3376,7 +3378,8 @@
                  :text (str battle-map)
                  :style {:-fx-font-size 16}}
                 {:fx/type :label
-                 :text "(not found)"
+                 :text (if (:loading battle-map-details)
+                         "(loading...)" "(not found)")
                  :alignment :center}]}])
            [(merge
               (when am-host
