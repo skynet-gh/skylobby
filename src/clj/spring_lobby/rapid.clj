@@ -6,6 +6,7 @@
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
     [spring-lobby.lua :as lua]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
@@ -77,14 +78,6 @@
                  gz (GZIPInputStream. is)]
        (slurp gz)))))
 
-; https://clojuredocs.org/clojure.core/slurp
-(defn slurp-bytes
-  "Slurp the bytes from a slurpable thing"
-  [x]
-  (with-open [out (java.io.ByteArrayOutputStream.)]
-    (clojure.java.io/copy (clojure.java.io/input-stream x) out)
-    (.toByteArray out)))
-
 (defn slurp-bytes-from-pool
   ([md5]
    (slurp-bytes-from-pool (fs/isolation-dir) md5))
@@ -92,7 +85,7 @@
    (let [f (file-in-pool root md5)]
      (with-open [is (io/input-stream f)
                  gz (GZIPInputStream. is)]
-       (slurp-bytes gz)))))
+       (u/slurp-bytes gz)))))
 
 (defn inner
   ([decoded-sdp inner-filename]

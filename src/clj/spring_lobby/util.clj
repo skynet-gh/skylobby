@@ -1,6 +1,7 @@
 (ns spring-lobby.util
   (:require
     [clojure.edn :as edn]
+    [clojure.java.io :as io]
     [taoensso.timbre :as timbre]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
@@ -86,3 +87,11 @@
      (catch Throwable t#
        (log/error t# (str "Error " ~message))
        (throw t#))))
+
+; https://clojuredocs.org/clojure.core/slurp
+(defn slurp-bytes
+  "Slurp the bytes from a slurpable thing"
+  [x]
+  (with-open [out (java.io.ByteArrayOutputStream.)]
+    (io/copy (io/input-stream x) out)
+    (.toByteArray out)))

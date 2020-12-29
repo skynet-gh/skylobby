@@ -598,19 +598,13 @@
           :smf (merge
                  {::source smf-path
                   :header header})})
-       (let [{:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))
-             {:keys [map-width map-height]} header]
+       (let [{:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))]
          {:map-name (map-name smf-path)
           ; TODO extract only what's needed
           :smf (merge
                  {::source smf-path
                   :header header}
-                 (when-let [minimap (:minimap body)]
-                   {;:minimap-bytes minimap
-                    :minimap-image (smf/decompress-minimap minimap)})
-                 (when-let [metalmap (:metalmap body)]
-                   {;:metalmap-bytes metalmap
-                    :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
+                 body)})))))
 
 (defn read-zip-map
   ([^java.io.File file]
@@ -667,77 +661,13 @@
        :smf (merge
               {::source smf-path
                :header header})})
-    (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-bytes))
-          {:keys [map-width map-height]} header]
+    (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-bytes))]
       {:map-name (map-name smf-path)
        ; TODO extract only what's needed
        :smf (merge
               {::source smf-path
                :header header}
-              (when-let [minimap (:minimap body)]
-                {;:minimap-bytes minimap
-                 :minimap-image (smf/decompress-minimap minimap)})
-              (when-let [metalmap (:metalmap body)]
-                {;:metalmap-bytes metalmap
-                 :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))
-
-(defn read-7z-smf
-  ([^ISimpleInArchiveItem smf-item]
-   (read-7z-smf smf-item nil))
-  ([^ISimpleInArchiveItem smf-item {:keys [header-only]}]
-   (let [smf-path (.getPath smf-item)]
-     (if header-only
-       (let [header (smf/decode-map-header (io/input-stream (slurp-7z-item-bytes smf-item)))]
-         {:map-name (map-name smf-path)
-          :smf (merge
-                 {::source smf-path
-                  :header header})})
-       (let [{:keys [body header]} (smf/decode-map (io/input-stream (slurp-7z-item-bytes smf-item)))
-             {:keys [map-width map-height]} header]
-         {:map-name (map-name smf-path)
-          ; TODO extract only what's needed
-          :smf (merge
-                 {::source smf-path
-                  :header header}
-                 (when-let [minimap (:minimap body)]
-                   {:minimap-bytes minimap
-                    :minimap-image (smf/decompress-minimap minimap)})
-                 (when-let [metalmap (:metalmap body)]
-                   {:metalmap-bytes metalmap
-                    :metalmap-image (smf/metalmap-image map-width map-height metalmap)}))})))))
-
-(defn- read-7z-map
-  ([^java.io.File file]
-   (read-7z-map file nil))
-  ([^java.io.File file opts]
-   (with-open [raf (new RandomAccessFile file "r")
-               rafis (new RandomAccessFileInStream raf)
-               archive (SevenZip/openInArchive nil rafis)
-               simple (.getSimpleInterface archive)]
-     (merge
-       (when-let [^ISimpleInArchiveItem smf-item
-                  (->> (.getArchiveItems simple)
-                       (filter (comp #(string/ends-with? % ".smf")
-                                     string/lower-case
-                                     #(.getPath ^ISimpleInArchiveItem %)))
-                       first)]
-         (read-7z-smf smf-item opts))
-       (when-let [^ISimpleInArchiveItem mapinfo-item
-                  (->> (.getArchiveItems simple)
-                       (filter (comp #{"mapinfo.lua"}
-                                     string/lower-case
-                                     #(.getPath ^ISimpleInArchiveItem %)))
-                       first)]
-         (parse-mapinfo file (slurp-7z-item mapinfo-item) (.getPath mapinfo-item)))
-       (when-let [^ISimpleInArchiveItem smd-item
-                  (->> (.getArchiveItems simple)
-                       (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getPath ^ISimpleInArchiveItem %)))
-                       first)]
-         (let [smd (spring-script/parse-script (slurp-7z-item smd-item))]
-           {:smd (assoc smd ::source (.getPath smd-item))}))))))
-
-#_
-(time (read-7z-map (map-file "altored_divide_bar_remake_1.5.sd7")))
+              body)})))
 
 
 (defn read-7z-map-fast
