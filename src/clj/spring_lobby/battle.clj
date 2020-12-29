@@ -34,9 +34,17 @@
       i)))
 
 (defn available-team-id [battle]
-  (let [ids (set (map (comp :id :battle-status) (battle-players-and-bots battle)))]
+  (let [ids (->> battle
+                 battle-players-and-bots
+                 (filter (comp :mode :battle-status)) ; remove spectators
+                 (map (comp :id :battle-status))
+                 set)]
     (first-avail ids)))
 
 (defn available-ally [battle]
-  (let [allies (set (map (comp :ally :battle-status) (battle-players-and-bots battle)))]
+  (let [allies (->> battle
+                    battle-players-and-bots
+                    (filter (comp :mode :battle-status)) ; remove spectators
+                    (map (comp :ally :battle-status))
+                    set)]
     (first-avail allies)))
