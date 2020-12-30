@@ -68,7 +68,8 @@
 (defn log-to-file [log-path]
   (println "Setting up log to" log-path)
   (timbre/merge-config!
-    {:appenders
+    {:min-level :info
+     :appenders
      {:rotor (rotor/rotor-appender
                {:path log-path
                 :max-size 100000000

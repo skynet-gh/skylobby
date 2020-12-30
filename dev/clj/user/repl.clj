@@ -17,7 +17,8 @@
 (defn log-to-file []
   (println "Setting up log to" dev-log-path)
   (timbre/merge-config!
-    {:appenders
+    {:min-level :info
+     :appenders
      {:rotor (rotor/rotor-appender
                {:path dev-log-path
                 :max-size 100000000

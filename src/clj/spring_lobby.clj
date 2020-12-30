@@ -42,6 +42,7 @@
     (javafx.embed.swing SwingFXUtils)
     (javafx.scene.input KeyCode)
     (javafx.scene.paint Color)
+    (javafx.scene.text Font FontWeight)
     (javafx.stage WindowEvent)
     (manifold.stream SplicedStream)
     (org.apache.commons.io.input CountingInputStream))
@@ -210,8 +211,9 @@
           (let [old-data (select-fn old-state)
                 new-data (select-fn new-state)]
             (when (not= old-data new-data)
-              (log/debug "Updating" filename)
-              (spit-app-edn new-data filename)))
+              (future
+                (u/try-log (str "update " filename)
+                  (spit-app-edn new-data filename)))))
           (catch Exception e
             (log/error e "Error in :state-to-edn for" filename "state watcher")))))))
 
@@ -672,6 +674,8 @@
         known-files (->> state-atom deref :maps (map :file) set)
         known-paths (->> known-files (map fs/canonical-path) set)
         todo (remove (comp known-paths fs/canonical-path) map-files)
+        this-round (take 5 todo)
+        next-round (drop 5 todo)
         missing-paths (set
                         (concat
                           (->> known-files
@@ -683,7 +687,9 @@
     (apply update-file-cache! map-files)
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
     (fs/make-dirs fs/maps-cache-root)
-    (doseq [map-file todo]
+    (when (seq this-round)
+      (log/info "Adding" (count this-round) "maps this iteration"))
+    (doseq [map-file this-round]
       (log/info "Reading" map-file)
       (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)]
         (if map-name
@@ -700,6 +706,9 @@
                   (remove (comp missing-paths fs/canonical-path :file))
                   set)))
     (update-cached-minimaps (:maps @state-atom))
+    (when (seq next-round)
+      (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
+      (add-task! state-atom {::task-type ::reconcile-maps}))
     {:todo-count (count todo)}))
 
 (defn force-update-battle-map
@@ -1429,6 +1438,27 @@
          :show-maps true
          :on-change-map on-change-map))
 
+
+; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
+(def ext-recreate-on-key-changed
+  "Extension lifecycle that recreates its component when lifecycle's key is changed
+
+  Supported keys:
+  - `:key` (required) - a value that determines if returned component should be recreated
+  - `:desc` (required) - a component description with additional lifecycle semantics"
+  (reify fx.lifecycle/Lifecycle
+    (create [_ {:keys [key desc]} opts]
+      (with-meta {:key key
+                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
+                 {`fx.component/instance #(-> % :child fx.component/instance)}))
+    (advance [this component {:keys [key desc] :as this-desc} opts]
+      (if (= (:key component) key)
+        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
+        (do (fx.lifecycle/delete this component opts)
+            (fx.lifecycle/create this this-desc opts))))
+    (delete [_ component opts]
+      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
 (defn map-list
   [{:keys [disable map-name maps on-value-changed map-input-prefix]}]
   {:fx/type :h-box
@@ -1438,29 +1468,32 @@
      (if (empty? maps)
        [{:fx/type :label
          :text "No maps "}]
-       [(let [filter-lc (if map-input-prefix (string/lower-case map-input-prefix) "")
-              filtered-maps
-              (->> maps
-                   (map :map-name)
-                   (filter #(string/includes? (string/lower-case %) filter-lc))
-                   (sort String/CASE_INSENSITIVE_ORDER))]
-          {:fx/type :combo-box
-           :value (str map-name)
-           :items filtered-maps
-           :disable (boolean disable)
-           :on-value-changed on-value-changed
-           :cell-factory
-           {:fx/cell-type :list-cell
-            :describe
-            (fn [map-name]
-              {:text (if (string/blank? map-name)
-                       "< choose a map >"
-                       map-name)})}
-           :on-key-pressed {:event/type ::maps-key-pressed}
-           :on-hidden {:event/type ::maps-hidden}
-           :tooltip {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text (or map-input-prefix "Choose map")}})])
+       (let [filter-lc (if map-input-prefix (string/lower-case map-input-prefix) "")
+             filtered-map-names
+             (->> maps
+                  (map :map-name)
+                  (filter #(string/includes? (string/lower-case %) filter-lc))
+                  (sort String/CASE_INSENSITIVE_ORDER))]
+         [{:fx/type ext-recreate-on-key-changed
+           :key filtered-map-names
+           :desc
+           {:fx/type :combo-box
+            :value (str map-name)
+            :items filtered-map-names
+            :disable (boolean disable)
+            :on-value-changed on-value-changed
+            :cell-factory
+            {:fx/cell-type :list-cell
+             :describe
+             (fn [map-name]
+               {:text (if (string/blank? map-name)
+                        "< choose a map >"
+                        map-name)})}
+            :on-key-pressed {:event/type ::maps-key-pressed}
+            :on-hidden {:event/type ::maps-hidden}
+            :tooltip {:fx/type :tooltip
+                      :show-delay [10 :ms]
+                      :text (or map-input-prefix "Choose map")}}}]))
      [{:fx/type :button
        :text ""
        :tooltip
@@ -1610,23 +1643,26 @@
                                        (filter some?)
                                        (filter #(string/includes? (string/lower-case %) filter-lc))
                                        sort)]
-             [{:fx/type :combo-box
-               :value (str engine-version)
-               :items filtered-engines
-               ;:disable (boolean battle)
-               :on-value-changed {:event/type ::version-change}
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [engine]
-                  {:text (if (string/blank? engine)
-                           "< choose an engine >"
-                           engine)})}
-               :on-key-pressed {:event/type ::engines-key-pressed}
-               :on-hidden {:event/type ::engines-hidden}
-               :tooltip {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text (or engine-filter "Choose engine")}}]))
+             [{:fx/type ext-recreate-on-key-changed
+               :key filtered-engines
+               :desc
+               {:fx/type :combo-box
+                :value (str engine-version)
+                :items filtered-engines
+                ;:disable (boolean battle)
+                :on-value-changed {:event/type ::version-change}
+                :cell-factory
+                {:fx/cell-type :list-cell
+                 :describe
+                 (fn [engine]
+                   {:text (if (string/blank? engine)
+                            "< choose an engine >"
+                            engine)})}
+                :on-key-pressed {:event/type ::engines-key-pressed}
+                :on-hidden {:event/type ::engines-hidden}
+                :tooltip {:fx/type :tooltip
+                          :show-delay [10 :ms]
+                          :text (or engine-filter "Choose engine")}}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -1668,23 +1704,26 @@
                                     (filter string?)
                                     (filter #(string/includes? (string/lower-case %) filter-lc))
                                     (sort version/version-compare))]
-             [{:fx/type :combo-box
-               :value mod-name
-               :items filtered-mods
-               ;:disable (boolean battle)
-               :on-value-changed {:event/type ::mod-change}
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [mod-name]
-                  {:text (if (string/blank? mod-name)
-                           "< choose a game >"
-                           mod-name)})}
-               :on-key-pressed {:event/type ::mods-key-pressed}
-               :on-hidden {:event/type ::mods-hidden}
-               :tooltip {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text (or mod-filter "Choose game")}}]))
+             [{:fx/type ext-recreate-on-key-changed
+               :key filtered-mods
+               :desc
+               {:fx/type :combo-box
+                :value mod-name
+                :items filtered-mods
+                ;:disable (boolean battle)
+                :on-value-changed {:event/type ::mod-change}
+                :cell-factory
+                {:fx/cell-type :list-cell
+                 :describe
+                 (fn [mod-name]
+                   {:text (if (string/blank? mod-name)
+                            "< choose a game >"
+                            mod-name)})}
+                :on-key-pressed {:event/type ::mods-key-pressed}
+                :on-hidden {:event/type ::mods-hidden}
+                :tooltip {:fx/type :tooltip
+                          :show-delay [10 :ms]
+                          :text (or mod-filter "Choose game")}}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -2004,27 +2043,6 @@
                                Color/WHITE)}))))
            (filter some?)
            doall))))
-
-; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
-(def ext-recreate-on-key-changed
-  "Extension lifecycle that recreates its component when lifecycle's key is changed
-
-  Supported keys:
-  - `:key` (required) - a value that determines if returned component should be recreated
-  - `:desc` (required) - a component description with additional lifecycle semantics"
-  (reify fx.lifecycle/Lifecycle
-    (create [_ {:keys [key desc]} opts]
-      (with-meta {:key key
-                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
-                 {`fx.component/instance #(-> % :child fx.component/instance)}))
-    (advance [this component {:keys [key desc] :as this-desc} opts]
-      (if (= (:key component) key)
-        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
-        (do (fx.lifecycle/delete this component opts)
-            (fx.lifecycle/create this this-desc opts))))
-    (delete [_ component opts]
-      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
-
 
 (defmethod event-handler ::minimap-mouse-pressed
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [starting-points startpostype]}]
@@ -3464,6 +3482,7 @@
                                          starting-points)]
                    (.clearRect gc 0 0 minimap-width minimap-height)
                    (.setFill gc Color/RED)
+                   (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
                    (doseq [{:keys [x y team color]} starting-points]
                      (let [drag (when (and drag-team
                                            (= team (:team drag-team)))
