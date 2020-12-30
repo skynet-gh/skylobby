@@ -122,11 +122,9 @@
 
 
 (def config-keys
-  [:username :password :servers :server :engine-version :mod-name :map-name
-   :battle-title :battle-password
-   :bot-username :bot-name :bot-version :minimap-type :pop-out-battle
-   :scripttags :preferred-color :rapid-repo])
-
+  [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version :map-name
+   :mod-name :minimap-type :password :pop-out-battle :preferred-color :rapid-repo :scripttags
+   :server :servers :uikeys :username])
 
 (defn select-config [state]
   (select-keys state config-keys))
@@ -1308,6 +1306,43 @@
                    :username username
                    :password password
                    :email email}}]}}})
+
+
+(defn uikeys-window [{:keys [show-uikeys-window uikeys]}]
+  {:fx/type :stage
+   :showing show-uikeys-window
+   :title "alt-spring-lobby UI Keys Editor"
+   :on-close-request (fn [^javafx.stage.WindowEvent e]
+                       (swap! *state assoc :show-uikeys-window false)
+                       (.consume e))
+   :width 400
+   :height 300
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :v-box
+     :children
+     [{:fx/type :table-view
+       :column-resize-policy :constrained
+       :items (or (seq uikeys) [])
+       :columns
+       [{:fx/type :table-column
+         :text "Key"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (first i))})}}
+        {:fx/type :table-column
+         :text "Value"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (second i))})}}]}]}}})
 
 
 (defmethod event-handler ::username-change
@@ -2872,12 +2907,16 @@
                :prompt-text "Bot Name"
                :text (str bot-username)
                :on-text-changed {:event/type ::change-bot-username}}
+              {:fx/type :label
+               :text " AI: "}
               {:fx/type :choice-box
                :value bot-name
                :disable (empty? bot-names)
                :on-value-changed {:event/type ::change-bot-name
                                   :bots bots}
                :items bot-names}
+              {:fx/type :label
+               :text " Version: "}
               {:fx/type :choice-box
                :value bot-version
                :disable (string/blank? bot-name)
@@ -2918,9 +2957,10 @@
                :graphic
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-nuke:32:white"}}]}
-            {:fx/type :pane
-             :v-box/vgrow :always}
-            {:fx/type :h-box
+            {:fx/type :flow-pane
+             :vgap 5
+             :hgap 5
+             :padding 5
              :children
              [(let [map-file (:file battle-map-details)]
                 {:fx/type resource-sync-pane
@@ -3232,6 +3272,18 @@
                   :on-action {:event/type ::start-battle}})}]}]}
           {:fx/type :pane
            :h-box/hgrow :always}
+          {:fx/type :v-box
+           :alignment :top-left
+           :children
+           [{:fx/type :button
+             :text "uikeys.txt"
+             :on-action {:event/type ::assoc
+                         :key :show-uikeys-window}}
+            {:fx/type :text-area
+             :editable false
+             :text (str (slurp (io/resource "uikeys.txt")))
+             :style {:-fx-font-family "monospace"}
+             :v-box/vgrow :always}]}
           {:fx/type :v-box
            :alignment :top-left
            :h-box/hgrow :always
@@ -4941,7 +4993,7 @@
 (defn root-view
   [{{:keys [agreement battle battles client last-failed-message password pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
-            show-servers-window standalone tasks username users verification-code]
+            show-servers-window show-uikeys-window standalone tasks username users verification-code]
      :as state}
     :state}]
   {:fx/type fx/ext-many
@@ -4950,6 +5002,8 @@
      [{:fx/type :stage
        :showing true
        :title "Alt Spring Lobby"
+       :x 100
+       :y 100
        :width main-window-width
        :height main-window-height
        :on-close-request (partial main-window-on-close-request client standalone)
@@ -5096,7 +5150,12 @@
           {:fx/type register-window}
           (select-keys state
             [:email :password :password-confirm :register-response :server :servers :show-register-window
-             :username]))]))})
+             :username]))])
+     (when show-uikeys-window
+       [(merge
+          {:fx/type uikeys-window}
+          (select-keys state
+            [:show-uikeys-window :uikeys]))]))})
 
 
 (defn init
