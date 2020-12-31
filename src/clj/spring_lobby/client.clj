@@ -216,40 +216,6 @@
 (defmethod handler/handle "LOGININFOEND" [_client _state _m]
   (log/trace "end of login info"))
 
-(defmethod handler/handle "FAILED" [_client state m]
-  (swap! state assoc :last-failed-message m))
-
-(defmethod handler/handle "JOINBATTLEFAILED" [_client state m]
-  (swap! state assoc :last-failed-message m))
-
-
-(defn parse-adduser [m]
-  (re-find #"\w+ (\w+) ([^\s]+) (\w+) (.*)" m))
-
-(defmethod handler/handle "ADDUSER" [_c state m]
-  (let [[_all username country user-id user-agent] (parse-adduser m)
-        user {:username username
-              :country country
-              :user-id user-id
-              :user-agent user-agent
-              :client-status (decode-client-status default-client-status)}]
-    (swap! state assoc-in [:users username] user)))
-
-(defmethod handler/handle "REMOVEUSER" [_c state m]
-  (let [[_all username] (re-find #"\w+ (\w+)" m)]
-    (swap! state update :users dissoc username)))
-
-
-(defmethod handler/handle "REMOVEBOT" [_c state m]
-  (if-let [[_all battle-id botname] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state
-      (fn [state]
-        (-> state
-            (update-in [:battles battle-id :bots] dissoc botname)
-            (update-in [:battle :bots] dissoc botname))))
-    (let [[_all botname] (re-find #"\w+ (\w+)" m)]
-      (swap! state update-in [:battle :bots] dissoc botname))))
-
 
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
@@ -287,59 +253,6 @@
            :battle-locked battle-locked
            :battle-maphash battle-maphash
            :battle-map battle-map)))
-
-(defmethod handler/handle "JOIN" [_c state m]
-  (let [[_all channel-name] (re-find #"\w+ (\w+)" m)]
-    (swap! state assoc-in [:my-channels channel-name] {})))
-
-(defmethod handler/handle "JOINED" [_c state m]
-  (let [[_all channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state assoc-in [:channels channel-name :users username] {})))
-
-(defmethod handler/handle "JOINEDBATTLE" [_c state-atom m]
-  (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state-atom
-      (fn [state]
-        (let [initial-status {}
-              next-state (assoc-in state [:battles battle-id :users username] initial-status)]
-          (if (= battle-id (-> next-state :battle :battle-id))
-            (assoc-in next-state [:battle :users username] initial-status)
-            next-state))))))
-
-(defmethod handler/handle "LEFT" [_c state m]
-  (let [[_all _channel-name username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state update-in [:channels :users] dissoc username)))
-
-(defmethod handler/handle "LEFTBATTLE" [_c state-atom m]
-  (let [[_all battle-id username] (re-find #"\w+ (\w+) (\w+)" m)]
-    (swap! state-atom
-      (fn [state]
-        (update-in
-          (if (= username (:username state))
-            (dissoc state :battle)
-            (update-in state [:battle :users] dissoc username))
-          [:battles battle-id :users] dissoc username)))))
-
-(defmethod handler/handle "CLIENTBATTLESTATUS" [_c state m]
-  (let [[_all username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+)" m)
-        decoded (decode-battle-status battle-status)]
-    (log/debug "Updating status of" username "to" decoded "with color" team-color)
-    (swap! state update-in [:battle :users username]
-           assoc
-           :battle-status decoded
-           :team-color team-color)))
-
-(defmethod handler/handle "UPDATEBOT" [_c state-atom m]
-  (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+)" m)
-        decoded-status (decode-battle-status battle-status)
-        bot-data {:battle-status decoded-status
-                  :team-color team-color}]
-    (swap! state-atom
-      (fn [state]
-        (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
-          (if (= battle-id (-> state :battle :battle-id))
-            (update-in state [:battle :bots username] merge bot-data)
-            state))))))
 
 
 (defn ping-loop [state-atom c]

@@ -3257,37 +3257,39 @@
              :alignment :center-left
              :style {:-fx-font-size 24}
              :children
-             [(let [{:keys [battle-status] :as me} (-> battle :users (get username))]
-                {:fx/type :check-box
+             (let [{:keys [battle-status] :as me} (-> battle :users (get username))
+                   iam-ingame (-> users (get username) :client-status :ingame)
+                   host-ingame (-> host-user :client-status :ingame)]
+               [{:fx/type :check-box
                  :selected (-> battle-status :ready boolean)
                  :style {:-fx-padding "10px"}
                  :on-selected-changed (merge me
                                         {:event/type ::battle-ready-change
                                          :client client
-                                         :username username})})
-              {:fx/type :label
-               :text " Ready"}
-              {:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type fx.ext.node/with-tooltip-props
-               :props
-               {:tooltip
-                {:fx/type :tooltip
-                 :show-delay [10 :ms]
-                 :style {:-fx-font-size 12}
-                 :text (if am-host
-                         "You are the host, start battle for everyone"
-                         (str "Waiting for host " host-username))}}
-               :desc
-               (let [iam-ingame (-> users (get username) :client-status :ingame)]
+                                         :username username})}
+                {:fx/type :label
+                 :text " Ready"}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type fx.ext.node/with-tooltip-props
+                 :props
+                 {:tooltip
+                  {:fx/type :tooltip
+                   :show-delay [10 :ms]
+                   :style {:-fx-font-size 12}
+                   :text (cond
+                           am-host "You are the host, start battle for everyone"
+                           host-ingame "Join game in progress"
+                           :else (str "Waiting for host " host-username "to start game"))}}
+                 :desc
                  {:fx/type :button
                   :text (if iam-ingame
                           "Game started"
                           (str (if am-host "Start" "Join") " Game"))
                   :disable (boolean (or (and (not am-host)
-                                             (not (-> host-user :client-status :ingame)))
+                                             (not host-ingame))
                                         iam-ingame))
-                  :on-action {:event/type ::start-battle}})}]}]}
+                  :on-action {:event/type ::start-battle}}}])}]}
           {:fx/type :pane
            :h-box/hgrow :always}
           {:fx/type :v-box

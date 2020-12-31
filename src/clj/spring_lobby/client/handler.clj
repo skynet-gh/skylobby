@@ -100,8 +100,25 @@
         (string/split #"\s")
         first)))
 
+
+(defn parse-adduser [m]
+  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
+
+(defmethod handle "ADDUSER" [_c state m]
+  (let [[_all username country user-id user-agent] (parse-adduser m)
+        user {:username username
+              :country country
+              :user-id user-id
+              :user-agent user-agent
+              :client-status (decode-client-status default-client-status)}]
+    (swap! state assoc-in [:users username] user)))
+
+(defmethod handle "REMOVEUSER" [_c state m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
+    (swap! state update :users dissoc username)))
+
 (defmethod handle "CLIENTSTATUS" [_c state-atom m]
-  (let [[_all username client-status] (re-find #"\w+ (\w+) (\w+)" m)
+  (let [[_all username client-status] (re-find #"\w+ ([^\s]+) (\w+)" m)
         decoded-status (decode-client-status client-status)
         {:keys [battle battles] :as prev-state} @state-atom
         _ (swap! state-atom assoc-in [:users username :client-status] decoded-status)
@@ -120,6 +137,62 @@
         (log/info "Starting game to join host" username)
         (spring/start-game prev-state)))))
 
+(defmethod handle "CLIENTBATTLESTATUS" [_c state m]
+  (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
+        decoded (decode-battle-status battle-status)]
+    (log/debug "Updating status of" username "to" decoded "with color" team-color)
+    (swap! state update-in [:battle :users username]
+           assoc
+           :battle-status decoded
+           :team-color team-color)))
+
+(defmethod handle "UPDATEBOT" [_c state-atom m]
+  (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) ([^\s]+) (\w+) (\w+)" m)
+        decoded-status (decode-battle-status battle-status)
+        bot-data {:battle-status decoded-status
+                  :team-color team-color}]
+    (swap! state-atom
+      (fn [state]
+        (let [state (update-in state [:battles battle-id :bots username] merge bot-data)]
+          (if (= battle-id (-> state :battle :battle-id))
+            (update-in state [:battle :bots username] merge bot-data)
+            state))))))
+
+(defmethod handle "LEFTBATTLE" [_c state-atom m]
+  (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
+    (swap! state-atom
+      (fn [state]
+        (update-in
+          (cond
+            (= username (:username state)) (dissoc state :battle)
+            (when-let [battle (:battle state)]
+              (= battle-id (:battle-id battle)))
+            (update-in state [:battle :users] dissoc username)
+            :else state)
+          [:battles battle-id :users] dissoc username)))))
+
+(defmethod handle "JOIN" [_c state m]
+  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
+    (swap! state assoc-in [:my-channels channel-name] {})))
+
+(defmethod handle "JOINED" [_c state m]
+  (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
+    (swap! state assoc-in [:channels channel-name :users username] {})))
+
+(defmethod handle "JOINEDBATTLE" [_c state-atom m]
+  (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
+    (swap! state-atom
+      (fn [state]
+        (let [initial-status {}
+              next-state (assoc-in state [:battles battle-id :users username] initial-status)]
+          (if (= battle-id (-> next-state :battle :battle-id))
+            (assoc-in next-state [:battle :users username] initial-status)
+            next-state))))))
+
+(defmethod handle "LEFT" [_c state m]
+  (let [[_all _channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
+    (swap! state update-in [:channels :users] dissoc username)))
+
 (defmethod handle "REMOVESCRIPTTAGS" [_c state m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
         scripttag-keys-parsed (map spring-script/parse-scripttag-key (string/split remaining #"\s+"))]
@@ -133,7 +206,7 @@
 
 
 (defn parse-addbot [m]
-  (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+) ([^\s]+)" m))
+  (re-find #"\w+ (\w+) ([^\s]+) ([^\s]+) (\w+) (\w+) ([^\s]+)" m))
 
 (defmethod handle "ADDBOT" [_c state-atom m]
   (let [[_all battle-id bot-name owner battle-status team-color ai] (parse-addbot m)
@@ -150,6 +223,21 @@
           (if (= battle-id (-> state :battle :battle-id))
             (assoc-in state [:battle :bots bot-name] bot)
             state))))))
+
+(defmethod handle "REMOVEBOT" [_c state-atom m]
+  (if-let [[_all battle-id botname] (re-find #"\w+ (\w+) ([^\s]+)" m)]
+    (swap! state-atom
+      (fn [state]
+        (let [next-state (update-in state [:battles battle-id :bots] dissoc botname)]
+          (if (:battle next-state)
+            (update-in next-state [:battle :bots] dissoc botname)
+            next-state))))
+    (let [[_all botname] (re-find #"\w+ (\w+)" m)]
+      (swap! state-atom
+             (fn [state]
+               (if (:battle state)
+                 (update-in state [:battle :bots] dissoc botname)
+                 state))))))
 
 
 (defn parse-joinbattle [m]
@@ -201,3 +289,13 @@
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
         compflags (string/split remaining #"\s+")]
     (swap! state-atom assoc :compflags compflags)))
+
+(defmethod handle "FAILED" [_client state m]
+  (swap! state assoc :last-failed-message m))
+
+(defmethod handle "JOINBATTLEFAILED" [_client state-atom m]
+  (swap! state-atom
+         (fn [state]
+           (-> state
+               (dissoc :battle)
+               (assoc :last-failed-message m)))))

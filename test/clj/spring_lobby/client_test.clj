@@ -55,18 +55,6 @@
            encoded))))
 
 
-(deftest parse-adduser
-  (is (= ["skynet"
-          "??"
-          "8"
-          "SpringLobby 0.270 (win x32)"]
-         (rest (client/parse-adduser "ADDUSER skynet ?? 8 SpringLobby 0.270 (win x32)"))))
-  (is (= ["ChanServ"
-          "US"
-          "None"
-          "ChanServ"]
-         (rest (client/parse-adduser "ADDUSER ChanServ US None ChanServ")))))
-
 (deftest parse-battleopened
   (is (= ["1"
           "0"
