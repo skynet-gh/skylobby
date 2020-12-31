@@ -806,7 +806,10 @@
    {:fx/type :table-view
     :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row}
     :column-resize-policy :constrained ; TODO auto resize
-    :items (vec (vals battles))
+    :items (->> battles
+                vals
+                (sort-by :battle-title String/CASE_INSENSITIVE_ORDER)
+                vec)
     :columns
     [{:fx/type :table-column
       :text "Battle Name"
@@ -895,7 +898,10 @@
 (defn users-table [{:keys [users]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
-   :items (vec (vals users))
+   :items (->> users
+               vals
+               (sort-by :username String/CASE_INSENSITIVE_ORDER)
+               vec)
    :columns
    [{:fx/type :table-column
      :text "Username"
@@ -950,6 +956,73 @@
      :cell-factory
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-agent i))})}}]})
+
+
+(defmethod event-handler ::join-channel [{:keys [channel-name client]}]
+  (future
+    (try
+      (message/send-message client (str "JOIN " channel-name))
+      (catch Exception e
+        (log/error e "Error joining channel" channel-name)))))
+
+(defmethod event-handler ::leave-channel [{:keys [channel-name client]}]
+  (future
+    (try
+      (message/send-message client (str "LEAVE " channel-name))
+      (catch Exception e
+        (log/error e "Error leaving channel" channel-name)))))
+
+(defn non-battle-channels
+  [channels]
+  (->> channels
+       (filter :channel-name)
+       (remove (comp #(string/starts-with? % "__battle__") :channel-name))))
+
+(defn channels-table [{:keys [channels client my-channels]}]
+  {:fx/type :table-view
+   :column-resize-policy :constrained ; TODO auto resize
+   :items (->> (vals channels)
+               non-battle-channels
+               (sort-by :channel-name String/CASE_INSENSITIVE_ORDER))
+   :columns
+   [{:fx/type :table-column
+     :text "Channel"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:channel-name i))})}}
+    {:fx/type :table-column
+     :text "User Count"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:user-count i))})}}
+    {:fx/type :table-column
+     :text "Topic"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe (fn [i] {:text (str (:topic i))})}}
+    {:fx/type :table-column
+     :text "Actions"
+     :cell-value-factory identity
+     :cell-factory
+     {:fx/cell-type :table-cell
+      :describe
+      (fn [{:keys [channel-name]}]
+        {:text ""
+         :graphic
+         (merge
+           {:fx/type :button}
+           (if (contains? my-channels channel-name)
+             {:text "Leave"
+              :on-action {:event/type ::leave-channel
+                          :channel-name channel-name
+                          :client client}}
+             {:text "Join"
+              :on-action {:event/type ::join-channel
+                          :channel-name channel-name
+                          :client client}}))})}}]})
 
 (defn update-disconnected! [state-atom]
   ;(log/debug (ex-info "stacktrace" {}) "Updating state after disconnect")
@@ -5011,8 +5084,61 @@
           (recur))
         (System/exit 0)))))
 
+(defmethod event-handler ::my-channels-tab-action [e]
+  #p e
+  (log/info e))
+
+
+(defn my-channels-view [{:keys [channels client my-channels]}]
+  {:fx/type :tab-pane
+   :on-tabs-changed {:event/type ::my-channels-tab-action}
+   :style {:-fx-font-size 16}
+   :tabs
+   (map
+     (fn [[channel-name]]
+       (let [channel-details (get channels channel-name)
+             users (:users channel-details)]
+         {:fx/type :tab
+          :graphic {:fx/type :label
+                    :text (str channel-name)}
+          :id channel-name
+          :closable true
+          :on-close-request {:event/type ::leave-channel
+                             :channel-name channel-name
+                             :client client}
+          :content
+          {:fx/type :h-box
+           :children
+           [
+            {:fx/type :text-area
+             :h-box/hgrow :always
+             :editable false
+             :text (->> channel-details
+                        :messages
+                        reverse
+                        (map
+                          (fn [{:keys [text username]}]
+                            (str username ": " text)))
+                        (string/join "\n"))
+             :style {:-fx-font-family "monospace"}}
+            {:fx/type :table-view
+             :column-resize-policy :constrained ; TODO auto resize
+             :items (->> users
+                         keys
+                         (sort String/CASE_INSENSITIVE_ORDER)
+                         vec)
+             :columns
+             [{:fx/type :table-column
+               :text "Username"
+               :cell-value-factory identity
+               :cell-factory
+               {:fx/cell-type :table-cell
+                :describe (fn [i] {:text (-> i str)})}}]}]}}))
+     my-channels)})
+
+
 (defn root-view
-  [{{:keys [agreement battle battles client last-failed-message password pop-out-battle
+  [{{:keys [agreement battle battles channels client last-failed-message my-channels password pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
             show-servers-window show-uikeys-window standalone tasks username users verification-code]
      :as state}
@@ -5068,21 +5194,34 @@
              :items
              [{:fx/type :v-box
                :children
-               [{:fx/type :label
-                 :text "Battles"
-                 :style {:-fx-font-size 16}}
-                {:fx/type battles-table
-                 :v-box/vgrow :always
-                 :battles battles
-                 :users users}]}
+               (concat
+                 [{:fx/type :label
+                   :text (str "Battles (" (count battles) ")")
+                   :style {:-fx-font-size 16}}
+                  {:fx/type battles-table
+                   :v-box/vgrow :always
+                   :battles battles
+                   :users users}]
+                 (when (seq my-channels)
+                   [(merge
+                      {:fx/type my-channels-view
+                       :v-box/vgrow :always}
+                      (select-keys state [:channels :client :my-channels]))]))}
               {:fx/type :v-box
                :children
                [{:fx/type :label
-                 :text "Users"
+                 :text (str "Users (" (count users) ")")
                  :style {:-fx-font-size 16}}
                 {:fx/type users-table
                  :v-box/vgrow :always
-                 :users users}]}]}
+                 :users users}
+                {:fx/type :label
+                 :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
+                 :style {:-fx-font-size 16}}
+                (merge
+                  {:fx/type channels-table
+                   :v-box/vgrow :always}
+                  (select-keys state [:channels :client :my-channels]))]}]}
             (merge
               {:fx/type battles-buttons}
               (select-keys state

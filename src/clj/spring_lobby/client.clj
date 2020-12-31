@@ -317,6 +317,7 @@
       (message/send-message client "STLS"))
     (print-loop state-atom client)
     (message/send-message client "LISTCOMPFLAGS")
+    (message/send-message client "CHANNELS")
     (login client "*" username password)
     (ping-loop state-atom client)))
 

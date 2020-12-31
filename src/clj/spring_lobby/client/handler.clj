@@ -179,6 +179,24 @@
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
     (swap! state assoc-in [:channels channel-name :users username] {})))
 
+(defmethod handle "CLIENTS" [_c state-atom m]
+  (let [[_all remaining] (re-find #"\w+ (.*)" m)
+        parts (string/split remaining #"\s+")
+        channel-name (first parts)
+        clients (rest parts)]
+    (swap! state-atom update-in [:channels channel-name :users]
+           (fn [users]
+             (apply assoc users
+                    (mapcat (fn [client] [client {}]) clients))))))
+
+(defmethod handle "SAID" [_c state-atom m]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
+        now (u/curr-millis)]
+    (swap! state-atom update-in [:channels channel-name :messages]
+           conj {:text message
+                 :timestamp now
+                 :username username})))
+
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
     (swap! state-atom
@@ -189,9 +207,14 @@
             (assoc-in next-state [:battle :users username] initial-status)
             next-state))))))
 
-(defmethod handle "LEFT" [_c state m]
-  (let [[_all _channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
-    (swap! state update-in [:channels :users] dissoc username)))
+(defmethod handle "LEFT" [_c state-atom m]
+  (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
+    (swap! state-atom
+           (fn [state]
+             (let [next-state (update-in state [:channels channel-name :users] dissoc username)]
+               (if (= (:username state) username) ; me
+                 (update next-state :my-channels dissoc channel-name)
+                 next-state))))))
 
 (defmethod handle "REMOVESCRIPTTAGS" [_c state m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
@@ -299,3 +322,10 @@
            (-> state
                (dissoc :battle)
                (assoc :last-failed-message m)))))
+
+
+(defmethod handle "CHANNEL" [_client state-atom m]
+  (let [[_all channel-name user-count topic] (re-find #"\w+ ([^\s]+) (\w+) (.+)?" m)]
+    (swap! state-atom assoc-in [:channels channel-name] {:channel-name channel-name
+                                                         :user-count user-count
+                                                         :topic topic})))
