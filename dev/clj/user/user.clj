@@ -64,6 +64,8 @@
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
+    (require 'spring-lobby.client)
+    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly old-client-handler))
     (if renderer
       (do
         (println "Re-rendering")
@@ -115,11 +117,11 @@
     (let [new-view (var-get (find-var 'spring-lobby/root-view))]
       (when (not (identical? old-view new-view))
         (alter-var-root #'old-view (constantly new-view))))
-    (catch Exception e
+    (catch Exception _e
       (println "compile error, using old view")))
   (try
     (old-view state)
-    (catch Exception e
+    (catch Exception _e
       (println "exception in old view, probably unbound fn, fix asap"))))
 
 (defn event-handler [event]
@@ -128,7 +130,7 @@
     (let [new-handler (var-get (find-var 'spring-lobby/event-handler))]
       (when (not (identical? old-handler new-handler))
         (alter-var-root #'old-handler (constantly new-handler))))
-    (catch Exception e
+    (catch Exception _e
       (println "compile error, using old event handler")))
   (try
     (old-handler event)
@@ -142,11 +144,11 @@
     (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
       (when (not (identical? old-client-handler new-handler))
         (alter-var-root #'old-client-handler (constantly new-handler))))
-    (catch Exception e
+    (catch Exception _e
       (println "compile error, using old client handler")))
   (try
     (old-client-handler client state message)
-    (catch Exception e
+    (catch Exception _e
       (println "exception in old client, probably unbound fn, fix asap"))))
 
 
@@ -171,8 +173,9 @@
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
     (alter-var-root #'old-view (constantly (var-get (find-var 'spring-lobby/root-view))))
     (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))
-    (require 'spring-lobby.client.handler)
-    (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client.handler/handle))))
+    (require 'spring-lobby.client)
+    (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
+    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (let [init-fn (var-get (find-var 'spring-lobby/init))
           r (fx/create-renderer
               :middleware (fx/wrap-map-desc
