@@ -1915,7 +1915,8 @@
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-open-in-new:16:white"}
              :on-action {:event/type ::assoc
-                         :key :pop-out-battle}})])
+                         :key :pop-out-battle
+                         :value true}})])
        (when (and (not battle) selected-battle (-> battles (get selected-battle)))
          (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
            (concat
@@ -4138,7 +4139,7 @@
 
 (defmethod event-handler ::assoc
   [{:fx/keys [event] :as e}]
-  (swap! *state assoc (:key e) event))
+  (swap! *state assoc (:key e) (or (:value e) event)))
 
 (defmethod event-handler ::assoc-in
   [{:fx/keys [event] :keys [path]}]
