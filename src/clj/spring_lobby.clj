@@ -793,18 +793,23 @@
 
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
+  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
   (when (< 1 (.getClickCount event))
-    (event-handler {:event/type ::join-battle})))
+    (event-handler (merge e {:event/type ::join-battle}))))
 
 
-(defn battles-table [{:keys [battles users]}]
+(defn battles-table [{:keys [battle-password battles client selected-battle users]}]
   {:fx/type fx.ext.table-view/with-selection-props
    :props {:selection-mode :single
            :on-selected-item-changed {:event/type ::select-battle}}
    :desc
    {:fx/type :table-view
-    :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row}
+    :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row
+                       :battle-password battle-password
+                       :client client
+                       :selected-battle selected-battle
+                       :battle-passworded
+                       (= "1" (-> battles (get selected-battle) :battle-passworded))} ; TODO
     :column-resize-policy :constrained ; TODO auto resize
     :items (->> battles
                 vals
@@ -1481,14 +1486,16 @@
         (log/error e "Error leaving battle")))))
 
 
-(defmethod event-handler ::join-battle [{:keys [battle-password battle-passworded client selected-battle]}]
+(defmethod event-handler ::join-battle [{:keys [battle-password battle-passworded client selected-battle] :as e}]
+  #p e
   (future
     (try
-      (when selected-battle
+      (if selected-battle
         (message/send-message client
           (str "JOINBATTLE " selected-battle
                (when battle-passworded
-                 (str " " battle-password)))))
+                 (str " " battle-password))))
+        (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
@@ -5199,10 +5206,10 @@
                  [{:fx/type :label
                    :text (str "Battles (" (count battles) ")")
                    :style {:-fx-font-size 16}}
-                  {:fx/type battles-table
-                   :v-box/vgrow :always
-                   :battles battles
-                   :users users}]
+                  (merge
+                    {:fx/type battles-table
+                     :v-box/vgrow :always}
+                    (select-keys state [:battle-password :battles :client :selected-battle :users]))]
                  (when (seq my-channels)
                    [(merge
                       {:fx/type my-channels-view
