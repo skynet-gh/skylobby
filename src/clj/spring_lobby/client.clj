@@ -237,7 +237,8 @@
                   :battle-map battle-map
                   :battle-title battle-title
                   :battle-modname battle-modname
-                  :channel-name channel-name}]
+                  :channel-name channel-name
+                  :users {host-username {}}}]
       (swap! state assoc-in [:battles battle-id] battle))
     (log/warn "Unable to parse BATTLEOPENED")))
 

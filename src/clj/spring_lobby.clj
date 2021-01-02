@@ -8,6 +8,8 @@
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [cljfx.lifecycle :as fx.lifecycle]
+    [cljfx.mutator :as fx.mutator]
+    [cljfx.prop :as fx.prop]
     clojure.data
     clojure.core.async
     [clojure.edn :as edn]
@@ -38,6 +40,8 @@
     [version-clj.core :as version])
   (:import
     (java.awt Desktop)
+    (java.time LocalDateTime)
+    (java.util TimeZone)
     (javafx.application Platform)
     (javafx.embed.swing SwingFXUtils)
     (javafx.scene.input KeyCode)
@@ -56,7 +60,7 @@
   [(str (io/resource "dark.css"))])
 
 (def main-window-width 1920)
-(def main-window-height 1020)
+(def main-window-height 1060)
 
 (def download-window-width 1600)
 (def download-window-height 800)
@@ -749,6 +753,23 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn update-channels-chimer-fn [state-atom]
+  (log/info "Starting channels update chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/instant)
+            (java-time/duration 1 :minutes))
+          (fn [_chimestamp]
+            (when-let [{:keys [client]} @state-atom]
+              (log/info "Updating channel list")
+              (message/send-message client "CHANNELS")))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error force updating resources")
+             true)})]
+    (fn [] (.close chimer))))
+
 
 (defmethod task-handler ::reconcile-engines [_]
   (reconcile-engines *state))
@@ -970,18 +991,23 @@
       (catch Exception e
         (log/error e "Error joining channel" channel-name)))))
 
-(defmethod event-handler ::leave-channel [{:keys [channel-name client]}]
+(defmethod event-handler ::leave-channel [{:keys [channel-name client] :fx/keys [event]}]
   (future
     (try
       (message/send-message client (str "LEAVE " channel-name))
       (catch Exception e
-        (log/error e "Error leaving channel" channel-name)))))
+        (log/error e "Error leaving channel" channel-name))))
+  (.consume event))
+
+(defn battle-channel-name? [channel-name]
+  (and channel-name
+       (string/starts-with? channel-name "__battle__")))
 
 (defn non-battle-channels
   [channels]
   (->> channels
-       (filter :channel-name)
-       (remove (comp #(string/starts-with? % "__battle__") :channel-name))))
+       (remove (comp string/blank? :channel-name))
+       (remove (comp battle-channel-name? :channel-name))))
 
 (defn channels-table [{:keys [channels client my-channels]}]
   {:fx/type :table-view
@@ -2988,8 +3014,7 @@
          [
           {:fx/type :v-box
            :children
-           [{:fx/type :h-box
-             :alignment :top-left
+           [{:fx/type :flow-pane
              :children
              [{:fx/type :button
                :text "Add Bot"
@@ -3002,25 +3027,38 @@
                            :bot-name bot-name
                            :bot-version bot-version
                            :client client}}
-              {:fx/type :text-field
-               :prompt-text "Bot Name"
-               :text (str bot-username)
-               :on-text-changed {:event/type ::change-bot-username}}
-              {:fx/type :label
-               :text " AI: "}
-              {:fx/type :choice-box
-               :value bot-name
-               :disable (empty? bot-names)
-               :on-value-changed {:event/type ::change-bot-name
-                                  :bots bots}
-               :items bot-names}
-              {:fx/type :label
-               :text " Version: "}
-              {:fx/type :choice-box
-               :value bot-version
-               :disable (string/blank? bot-name)
-               :on-value-changed {:event/type ::change-bot-version}
-               :items (or bot-versions [])}]}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :text " Bot Name: "}
+                {:fx/type :text-field
+                 :prompt-text "Bot Name"
+                 :text (str bot-username)
+                 :on-text-changed {:event/type ::change-bot-username}}]}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [
+                {:fx/type :label
+                 :text " AI: "}
+                {:fx/type :choice-box
+                 :value bot-name
+                 :disable (empty? bot-names)
+                 :on-value-changed {:event/type ::change-bot-name
+                                    :bots bots}
+                 :items bot-names}]}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [
+                {:fx/type :label
+                 :text " Version: "}
+                {:fx/type :choice-box
+                 :value bot-version
+                 :disable (string/blank? bot-name)
+                 :on-value-changed {:event/type ::change-bot-version}
+                 :items (or bot-versions [])}]}]}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -3028,6 +3066,7 @@
                :text " Host IP: "}
               {:fx/type :text-field
                :text (-> battle :scripttags :game :hostip str)
+               :prompt-text " <override> "
                :on-text-changed {:event/type ::hostip-changed}}]}
             #_
             {:fx/type :h-box
@@ -3506,6 +3545,7 @@
              :v-box/vgrow :always}]}]}]}
       {:fx/type :v-box
        :alignment :top-left
+       :style {:-fx-min-height (+ minimap-size 100)}
        :children
        [
         {:fx/type :stack-pane
@@ -3596,97 +3636,94 @@
                            (.fillText gc text xc yc))
                          :else ; TODO choose starting rects
                          nil)))))})])}
-        {:fx/type :scroll-pane
-         :fit-to-width true
-         :content
-         {:fx/type :v-box
-          :children
-          [
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [
-             {:fx/type :label
-              :text (str " Size: "
-                         (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
-                           (str
-                             (when map-width (quot map-width 64))
-                             " x "
-                             (when map-height (quot map-height 64)))))}
-             {:fx/type :pane
-              :h-box/hgrow :always}
-             {:fx/type :combo-box
-              :value minimap-type
-              :items minimap-types
-              :on-value-changed {:event/type ::minimap-type-change}}]}
-           {:fx/type :h-box
-            :style {:-fx-max-width minimap-size}
-            :children
-            [{:fx/type map-list
-              :disable (not am-host)
-              :map-name battle-map
-              :maps maps
-              :map-input-prefix map-input-prefix
-              :on-value-changed {:event/type ::battle-map-change
-                                 :client client
-                                 :maps maps}}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            (concat
-              [{:fx/type :label
-                :alignment :center-left
-                :text " Start Positions: "}
-               {:fx/type :choice-box
-                :value startpostype
-                :items (map str (vals spring/startpostypes))
-                :disable (not am-host)
-                :on-value-changed {:event/type ::battle-startpostype-change}}]
-              (when (= "Choose before game" startpostype)
-                [{:fx/type :button
-                  :text "Reset"
-                  :disable (not am-host)
-                  :on-action {:event/type ::reset-start-positions}}]))}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            (concat
-              (when am-host
-                [{:fx/type :button
-                  :text "FFA"
-                  :on-action {:event/type ::battle-teams-ffa
-                              :battle battle
-                              :client client
-                              :users users
-                              :username username}}
-                 {:fx/type :button
-                  :text "2 teams"
-                  :on-action {:event/type ::battle-teams-2
-                              :battle battle
-                              :client client
-                              :users users
-                              :username username}}
-                 {:fx/type :button
-                  :text "3 teams"
-                  :on-action {:event/type ::battle-teams-3
-                              :battle battle
-                              :client client
-                              :users users
-                              :username username}}
-                 {:fx/type :button
-                  :text "4 teams"
-                  :on-action {:event/type ::battle-teams-4
-                              :battle battle
-                              :client client
-                              :users users
-                              :username username}}
-                 {:fx/type :button
-                  :text "Humans vs Bots"
-                  :on-action {:event/type ::battle-teams-humans-vs-bots
-                              :battle battle
-                              :client client
-                              :users users
-                              :username username}}]))}]}}]}]}))
+        {:fx/type :v-box
+         :children
+         [
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :label
+             :text (str " Size: "
+                        (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
+                          (str
+                            (when map-width (quot map-width 64))
+                            " x "
+                            (when map-height (quot map-height 64)))))}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :combo-box
+             :value minimap-type
+             :items minimap-types
+             :on-value-changed {:event/type ::minimap-type-change}}]}
+          {:fx/type :h-box
+           :style {:-fx-max-width minimap-size}
+           :children
+           [{:fx/type map-list
+             :disable (not am-host)
+             :map-name battle-map
+             :maps maps
+             :map-input-prefix map-input-prefix
+             :on-value-changed {:event/type ::battle-map-change
+                                :client client
+                                :maps maps}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           (concat
+             [{:fx/type :label
+               :alignment :center-left
+               :text " Start Positions: "}
+              {:fx/type :choice-box
+               :value startpostype
+               :items (map str (vals spring/startpostypes))
+               :disable (not am-host)
+               :on-value-changed {:event/type ::battle-startpostype-change}}]
+             (when (= "Choose before game" startpostype)
+               [{:fx/type :button
+                 :text "Reset"
+                 :disable (not am-host)
+                 :on-action {:event/type ::reset-start-positions}}]))}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           (concat
+             (when am-host
+               [{:fx/type :button
+                 :text "FFA"
+                 :on-action {:event/type ::battle-teams-ffa
+                             :battle battle
+                             :client client
+                             :users users
+                             :username username}}
+                {:fx/type :button
+                 :text "2 teams"
+                 :on-action {:event/type ::battle-teams-2
+                             :battle battle
+                             :client client
+                             :users users
+                             :username username}}
+                {:fx/type :button
+                 :text "3 teams"
+                 :on-action {:event/type ::battle-teams-3
+                             :battle battle
+                             :client client
+                             :users users
+                             :username username}}
+                {:fx/type :button
+                 :text "4 teams"
+                 :on-action {:event/type ::battle-teams-4
+                             :battle battle
+                             :client client
+                             :users users
+                             :username username}}
+                {:fx/type :button
+                 :text "Humans vs Bots"
+                 :on-action {:event/type ::battle-teams-humans-vs-bots
+                             :battle battle
+                             :client client
+                             :users users
+                             :username username}}]))}]}]}]}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -5096,8 +5133,36 @@
   #p e
   (log/info e))
 
+(defmethod event-handler ::send-message [{:keys [channel-name client message]}]
+  (future
+    (try
+      (swap! *state dissoc :message-draft)
+      (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+        (message/send-message client (str "SAYEX " channel-name " " message))
+        (message/send-message client (str "SAY " channel-name " " message)))
+      (catch Exception e
+        (log/error e "Error sending message" message "to channel" channel-name)))))
 
-(defn my-channels-view [{:keys [channels client my-channels]}]
+
+; https://github.com/cljfx/cljfx/issues/51#issuecomment-583974585
+(def with-scroll-text-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:scroll-text (fx.prop/make
+                   (fx.mutator/setter
+                     (fn [text-area [txt auto-scroll]]
+                       (let [scroll-pos (if auto-scroll
+                                          ##Inf
+                                          (.getScrollTop text-area))]
+                         (doto text-area
+                           (.setText txt)
+                           (some-> .getParent .layout)
+                           (.setScrollTop scroll-pos)))))
+                  fx.lifecycle/scalar
+                  :default ["" 0])}))
+
+
+(defn my-channels-view [{:keys [channels client message-draft my-channels]}]
   {:fx/type :tab-pane
    :on-tabs-changed {:event/type ::my-channels-tab-action}
    :style {:-fx-font-size 16}
@@ -5105,30 +5170,62 @@
    (map
      (fn [[channel-name]]
        (let [channel-details (get channels channel-name)
-             users (:users channel-details)]
+             users (:users channel-details)
+             time-zone-id (.toZoneId (TimeZone/getDefault))
+             text (->> channel-details
+                       :messages
+                       reverse
+                       (map
+                         (fn [{:keys [ex text timestamp username]}]
+                           (str
+                             "["
+                             (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
+                                                            (java-time/instant timestamp)
+                                                            time-zone-id))
+                             "] "
+                             (if ex
+                               (str "* " username " " text)
+                               (str username ": " text)))))
+                       (string/join "\n"))]
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text (str channel-name)}
           :id channel-name
-          :closable true
+          :closable (not (battle-channel-name? channel-name))
           :on-close-request {:event/type ::leave-channel
                              :channel-name channel-name
                              :client client}
           :content
           {:fx/type :h-box
            :children
-           [
-            {:fx/type :text-area
+           [{:fx/type :v-box
              :h-box/hgrow :always
-             :editable false
-             :text (->> channel-details
-                        :messages
-                        reverse
-                        (map
-                          (fn [{:keys [text username]}]
-                            (str username ": " text)))
-                        (string/join "\n"))
-             :style {:-fx-font-family "monospace"}}
+             :children
+             [{:fx/type with-scroll-text-prop
+               :v-box/vgrow :always
+               :props {:scroll-text [text true]}
+               :desc
+               {:fx/type :text-area
+                :editable false
+                :wrap-text true
+                :style {:-fx-font-family "monospace"}}}
+              {:fx/type :h-box
+               :children
+               [{:fx/type :button
+                 :text "Send"
+                 :on-action {:event/type ::send-message
+                             :channel-name channel-name
+                             :client client
+                             :message message-draft}}
+                {:fx/type :text-field
+                 :h-box/hgrow :always
+                 :text (str message-draft)
+                 :on-text-changed {:event/type ::assoc
+                                   :key :message-draft}
+                 :on-action {:event/type ::send-message
+                             :channel-name channel-name
+                             :client client
+                             :message message-draft}}]}]}
             {:fx/type :table-view
              :column-resize-policy :constrained ; TODO auto resize
              :items (->> users
@@ -5214,7 +5311,7 @@
                    [(merge
                       {:fx/type my-channels-view
                        :v-box/vgrow :always}
-                      (select-keys state [:channels :client :my-channels]))]))}
+                      (select-keys state [:channels :client :message-draft :my-channels]))]))}
               {:fx/type :v-box
                :children
                [{:fx/type :label
@@ -5227,8 +5324,7 @@
                  :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
                  :style {:-fx-font-size 16}}
                 (merge
-                  {:fx/type channels-table
-                   :v-box/vgrow :always}
+                  {:fx/type channels-table}
                   (select-keys state [:channels :client :my-channels]))]}]}
             (merge
               {:fx/type battles-buttons}
@@ -5331,7 +5427,8 @@
   [state-atom]
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        force-update-chimer (force-update-chimer-fn state-atom)]
+        force-update-chimer (force-update-chimer-fn state-atom)
+        update-channels-chimer (update-channels-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -5339,7 +5436,7 @@
     (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
-    {:chimers [low-tasks-chimer high-tasks-chimer force-update-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer force-update-chimer update-channels-chimer]}))
 
 
 (defn -main [& _args]

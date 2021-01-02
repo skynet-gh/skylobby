@@ -197,6 +197,15 @@
                  :timestamp now
                  :username username})))
 
+(defmethod handle "SAIDEX" [_c state-atom m]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
+        now (u/curr-millis)]
+    (swap! state-atom update-in [:channels channel-name :messages]
+           conj {:text message
+                 :timestamp now
+                 :username username
+                 :ex true})))
+
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
     (swap! state-atom
