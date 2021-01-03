@@ -4960,7 +4960,10 @@
                           :filename (fs/filename f)
                           :file-size (fs/size f)
                           :parsed-filename (replay/parse-replay-filename f)
-                          :header (replay/decode-replay-header f)}))
+                          :header (try
+                                    (replay/decode-replay-header f)
+                                    (catch Exception e
+                                      (log/error e "Error reading replay header" f)))}))
                      (sort-by :filename)
                      reverse
                      doall)]
