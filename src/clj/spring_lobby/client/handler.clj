@@ -335,6 +335,6 @@
 
 (defmethod handle "CHANNEL" [_client state-atom m]
   (let [[_all channel-name user-count topic] (re-find #"\w+ ([^\s]+) (\w+) (.+)?" m)]
-    (swap! state-atom assoc-in [:channels channel-name] {:channel-name channel-name
-                                                         :user-count user-count
-                                                         :topic topic})))
+    (swap! state-atom update-in [:channels channel-name] merge {:channel-name channel-name
+                                                                :user-count user-count
+                                                                :topic topic})))
