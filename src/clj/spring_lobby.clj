@@ -35,6 +35,7 @@
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
+    [spring-lobby.spring.uikeys :as uikeys]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [version-clj.core :as version])
@@ -1428,17 +1429,23 @@
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-uikeys-window false)
                        (.consume e))
-   :width 400
-   :height 300
+   :width 800
+   :height 1000
    :scene
    {:fx/type :scene
     :stylesheets stylesheets
     :root
     {:fx/type :v-box
+     :style {:-fx-font-size 14}
      :children
      [{:fx/type :table-view
+       :v-box/vgrow :always
        :column-resize-policy :constrained
-       :items (or (seq uikeys) [])
+       :items
+       (sort-by :bind-key
+         (or (seq uikeys)
+             (u/try-log "parse uikeys" (uikeys/parse-uikeys))
+             []))
        :columns
        [{:fx/type :table-column
          :text "Key"
@@ -1447,7 +1454,7 @@
          {:fx/cell-type :table-cell
           :describe
           (fn [i]
-            {:text (str (first i))})}}
+            {:text (str (:bind-key i))})}}
         {:fx/type :table-column
          :text "Value"
          :cell-value-factory identity
@@ -1455,7 +1462,15 @@
          {:fx/cell-type :table-cell
           :describe
           (fn [i]
-            {:text (str (second i))})}}]}]}}})
+            {:text (str (:bind-action i))})}}
+        {:fx/type :table-column
+         :text "Comment"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (:bind-comment i))})}}]}]}}})
 
 
 (defmethod event-handler ::username-change
@@ -5267,6 +5282,7 @@
         :stylesheets stylesheets
         :root
         {:fx/type :v-box
+         :style {:-fx-font-size 14}
          :alignment :top-left
          :children
          (concat

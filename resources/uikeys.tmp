@@ -1,0 +1,312 @@
+
+unbindall          // clear the defaults
+unbind enter chat  // clear the defaults
+
+fakemeta  0x020
+
+bind             Ctrl+2  specteam 11
+bind              Any+5  group5
+bind      Alt+backspace  fullscreen
+bind                  r  repair
+bind                  a  attack
+bind              alt+z  buildspacing inc
+bind            Shift+s  stop
+bind             Ctrl+q  aiselect
+bind              Any+t  track
+bind         Ctrl+right  edit_next_word
+bind            Ctrl+f5  viewfree
+bind        Shift+enter  chatspec
+bind        Shift+enter  chatswitchspec
+bind                  m  move
+bind      Any+§,Any+§  drawlabel
+bind             Any+§  drawinmap
+bind            Shift+]  buildfacing dec
+bind        Any+^,Any+^  drawlabel
+bind              Any+^  drawinmap
+bind            numpad6  moveright
+bind            Any+end  edit_end
+bind            Any+end  decreaseViewRadius
+bind             Ctrl+9  specteam 18
+bind             Any+f3  LastMsgPos
+bind          Any+shift  movefast
+bind                  .  buildfacing dec
+bind             Any+up  edit_prev_line
+bind             Any+up  moveforward
+bind            Any+tab  toggleoverview
+bind            Any+tab  edit_complete
+bind              Any+0  group0
+bind                  y  settargetnoground
+bind            shift+z  buildunit_armmex      // Metal Extractor - Extracts Metal from Metalspots
+bind            shift+z  buildunit_armamex     // Twilight - Stealthy Cloakable Metal Extractor
+bind            shift+z  buildunit_cormex      // Metal Extractor - Extracts Metal from Metalspots
+bind            shift+z  buildunit_corexp      // Exploiter - Armed Metal Extractor
+bind            shift+z  buildunit_armmoho     // Moho Mine - Advanced Metal Extractor / Storage
+bind            shift+z  buildunit_cormoho     // Moho Mine - Advanced Metal Extractor / Storage
+bind            shift+z  buildunit_cormexp     // Moho Exploiter - Armed Moho Metal Extractor
+bind            shift+z  buildunit_coruwmex    // Offshore Metal Extractor - Extracts Metal
+bind            shift+z  buildunit_armuwmex    // Offshore Metal Extractor - Extracts Metal
+bind            shift+z  buildunit_coruwmme    // Underwater Moho Mine - Advanced Metal Extractor / Storage
+bind            shift+z  buildunit_armuwmme    // Underwater Moho Mine - Advanced Metal Extractor / Storage
+bind            shift+z  areamex
+bind              Alt+p  debugpath
+bind             Ctrl+x  select AllMap+_InPrevSel_Not_InHotkeyGroup+_SelectAll+
+bind                  5  specteam 4
+bind              Alt+=  speedup
+bind            numpad1  movefast
+bind          Any+pause  pause
+bind              Any+7  group7
+bind    Shift+backspace  togglecammode
+bind                  c  buildunit_armllt      // LLT - Light Laser Tower. Transportable (Heavy)
+bind                  c  buildunit_armrad      // Radar Tower - Early Warning System. Transportable (Heavy)
+bind                  c  buildunit_corllt      // LLT - Light Laser Tower. Transportable (Heavy)
+bind                  c  buildunit_corrad      // Radar Tower - Early Warning System. Transportable (Heavy)
+bind                  c  buildunit_corrl       // Pulverizer - Light Anti-air Tower. Transportable (Heavy)
+bind                  c  buildunit_armrl       // Defender - Light Anti-air Tower. Transportable (Heavy)
+bind                  c  buildunit_armpb       // Pit Bull - Pop-up Gauss Cannon
+bind                  c  buildunit_armflak     // Flakker - Anti-Air Flak Gun
+bind                  c  buildunit_corvipe     // Viper - Pop-up Sabot Battery
+bind                  c  buildunit_corflak     // Cobra - Anti-Air Flak Gun
+bind                  c  buildunit_armgplat    // Gun Platform - Light Plasma Defense
+bind                  c  buildunit_corgplat    // Gun Platform - Light Plasma Defense
+bind                  c  buildunit_armtl       // Harpoon - Offshore Torpedo Launcher
+bind                  c  buildunit_cortl       // Urchin - Offshore Torpedo Launcher
+bind                  c  buildunit_armsonar    // Sonar Station - Locates Water Units
+bind                  c  buildunit_corsonar    // Sonar Station - Locates Water Units
+bind                  c  buildunit_armfrad     // Floating Radar/Sonar Tower - Early Warning System
+bind                  c  buildunit_corfrad     // Floating Radar/Sonar Tower - Early Warning System
+bind                  c  buildunit_armfrt      // Sentry - Floating Anti-air Tower
+bind                  c  buildunit_corfrt      // Stinger - Floating Anti-air Tower
+bind            Shift+u  unloadunits
+bind            Shift+d  manualfire
+bind         Alt+insert  speedup
+bind                  0  specteam 9
+bind             Ctrl+b  select AllMap+_Builder_Idle+_ClearSelection_SelectOne+
+bind              Any+j  mouse2
+bind              Any+2  group2
+bind             Ctrl+4  specteam 13
+bind         Ctrl+enter  chatall
+bind         Ctrl+enter  chatswitchall
+bind                  o  buildfacing inc
+bind            Shift+p  patrol
+bind              Alt+f  forcestart
+bind        shift+alt+x  buildspacing dec
+bind                  q  drawinmap
+bind        Any+`,Any+`  drawlabel
+bind              Any+`  drawinmap
+bind            numpad8  moveforward
+bind            Shift+,  decguiopacity
+bind            Ctrl+f2  viewta
+bind             Any+f5  HideInterface
+bind     Ctrl+backspace  togglecammode
+bind      Ctrl+Shift+f8  savegame
+bind                  j  canceltarget
+bind            Shift+k  cloak
+bind             Ctrl+z  select AllMap+_InPrevSel+_ClearSelection_SelectAll+
+bind           Alt+left  edit_home
+bind              Any+l  togglelos
+bind            numpad3  movedown
+bind           Any+home  edit_home
+bind           Any+home  increaseViewRadius
+bind             Ctrl+6  specteam 15
+bind          Any+right  edit_next_char
+bind          Any+right  moveright
+bind                  v  buildunit_armnanotc   // Nano Turret - Assist & Repair in large radius. Transportable
+bind                  v  buildunit_armnanotcplat  // Nano Turret - Repairs and builds in large radius
+bind                  v  buildunit_cornanotcplat  // Nano Turret - Repairs and builds in large radius
+bind                  v  buildunit_armlab      // Bot Lab - Produces Level 1 Bots
+bind                  v  buildunit_armvp       // Vehicle Plant - Produces Level 1 Vehicles
+bind                  v  buildunit_cornanotc   // Nano Turret - Assist & Repair in large radius. Transportable
+bind                  v  buildunit_corlab      // Bot Lab - Produces Level 1 Bots
+bind                  v  buildunit_corvp       // Vehicle Plant - Produces Level 1 Vehicles
+bind                  v  buildunit_armsy       // Shipyard - Produces Level 1 Ships
+bind                  v  buildunit_corsy       // Shipyard - Produces Level 1 Ships
+bind                  e  reclaim
+bind            Shift+w  wait queued
+bind            Shift+f  fight
+bind                f10  options
+bind          any+alt+x  buildspacing dec
+bind                  2  specteam 1
+bind             Ctrl+d  selfd
+bind              Alt+a  areaattack
+bind                  7  specteam 6
+bind            Any+f12  screenshot
+bind              Any+4  group4
+bind     Ctrl+Shift+f10  createvideo
+bind              Any+9  group9
+bind              alt+y  settarget
+bind            Shift+r  repair
+bind            Shift+a  attack
+bind        shift+alt+z  buildspacing inc
+bind           Any+down  edit_next_line
+bind           Any+down  moveback
+bind            Shift+.  incguiopacity
+bind            Ctrl+f4  viewrot
+bind             Any+f7  DynamicSky
+bind             Ctrl+1  specteam 10
+bind          Any+enter  chat
+bind          Any+enter  edit_return
+bind                  l  loadunits
+bind                  [  buildfacing inc
+bind            Shift+m  move
+bind                  q  groupselect
+bind                  q  groupadd
+bind         Any+delete  edit_delete
+bind                  9  specteam 8
+bind Alt+ctrl+s,Alt+ctrl+s  chatswitchspec
+bind        Alt+numpad+  speedup
+bind             Ctrl+8  specteam 17
+bind             Any+f2  ShowPathTraversability
+bind              Any+;  losradar
+bind      Any+backspace  edit_backspace
+bind                  x  onoff
+bind                  x  buildunit_armsolar    // Solar Collector - Produces 20 Energy
+bind                  x  buildunit_armwin      // Wind Generator - Produces Energy. Depends on wind strength.
+bind                  x  buildunit_corsolar    // Solar Collector - Produces 20 Energy
+bind                  x  buildunit_corwin      // Wind Generator - Produces Energy. Depends on wind strength.
+bind                  x  buildunit_armadvsol   // Advanced Solar Collector - Produces 75 Energy
+bind                  x  buildunit_coradvsol   // Advanced Solar Collector - Produces 75 Energy
+bind                  x  buildunit_armfus      // Fusion Reactor - Produces 1000 Energy
+bind                  x  buildunit_armmmkr     // Energy Converter - Converts 600 energy into 10.3 metal
+bind                  x  buildunit_corfus      // Fusion Reactor - Produces 1100 Energy
+bind                  x  buildunit_cormmkr     // Energy Converter - Converts 600 energy into 10.3 metal per sec
+bind                  x  buildunit_armtide     // Tidal Generator - Produces Energy (depends on map)
+bind                  x  buildunit_cortide     // Tidal Generator - Produces Energy (depends on map)
+bind                  x  buildunit_armuwfus    // Underwater Fusion Plant - Produces 1200 Energy
+bind                  x  buildunit_coruwfus    // Underwater Fusion Plant - Produces 1220 Energy
+bind                  x  buildunit_armuwmmm    // Floating Energy Converter - Converts 650 energy into 11 metal per sec
+bind                  x  buildunit_coruwmmm    // Floating Energy Converter - Converts 650 energy into 11 metal per sec
+bind                  g  guard
+bind              Alt+o  singlestep
+bind             Ctrl+w  select AllMap+_Not_Aircraft_Weapons+_ClearSelection_SelectAll+
+bind              Alt++  speedup
+bind              C+f11  luaui tweakgui
+bind             Ctrl+3  specteam 12
+bind           Any+ctrl  moveslow
+bind                  s  stop
+bind            shift+c  buildunit_armllt      // LLT - Light Laser Tower. Transportable (Heavy)
+bind            shift+c  buildunit_armrad      // Radar Tower - Early Warning System. Transportable (Heavy)
+bind            shift+c  buildunit_corllt      // LLT - Light Laser Tower. Transportable (Heavy)
+bind            shift+c  buildunit_corrad      // Radar Tower - Early Warning System. Transportable (Heavy)
+bind            shift+c  buildunit_corrl       // Pulverizer - Light Anti-air Tower. Transportable (Heavy)
+bind            shift+c  buildunit_armrl       // Defender - Light Anti-air Tower. Transportable (Heavy)
+bind            shift+c  buildunit_armpb       // Pit Bull - Pop-up Gauss Cannon
+bind            shift+c  buildunit_armflak     // Flakker - Anti-Air Flak Gun
+bind            shift+c  buildunit_corvipe     // Viper - Pop-up Sabot Battery
+bind            shift+c  buildunit_corflak     // Cobra - Anti-Air Flak Gun
+bind            shift+c  buildunit_armgplat    // Gun Platform - Light Plasma Defense
+bind            shift+c  buildunit_corgplat    // Gun Platform - Light Plasma Defense
+bind            shift+c  buildunit_armtl       // Harpoon - Offshore Torpedo Launcher
+bind            shift+c  buildunit_cortl       // Urchin - Offshore Torpedo Launcher
+bind            shift+c  buildunit_armsonar    // Sonar Station - Locates Water Units
+bind            shift+c  buildunit_corsonar    // Sonar Station - Locates Water Units
+bind            shift+c  buildunit_armfrad     // Floating Radar/Sonar Tower - Early Warning System
+bind            shift+c  buildunit_corfrad     // Floating Radar/Sonar Tower - Early Warning System
+bind            shift+c  buildunit_armfrt      // Sentry - Floating Anti-air Tower
+bind            shift+c  buildunit_corfrt      // Stinger - Floating Anti-air Tower
+bind             Ctrl+r  select AllMap+_Radar+_ClearSelection_SelectAll+
+bind             Ctrl+a  select AllMap++_ClearSelection_SelectAll+
+bind         ctrl+alt+z  areamex
+bind                  4  specteam 3
+bind              Any+1  group1
+bind              Any+6  group6
+bind      Alt+Shift+esc  reloadforce
+bind                  ]  buildfacing dec
+bind              Alt+v  debugcolvol
+bind       Any+pagedown  movedown
+bind          backspace  mousestate
+bind            Ctrl+f1  viewfps
+bind             Any+f4  ShowMetalMap
+bind          Ctrl+left  edit_prev_word
+bind         Any+escape  edit_escape
+bind                  z  buildunit_armmex      // Metal Extractor - Extracts Metal from Metalspots
+bind                  z  buildunit_armamex     // Twilight - Stealthy Cloakable Metal Extractor
+bind                  z  buildunit_cormex      // Metal Extractor - Extracts Metal from Metalspots
+bind                  z  buildunit_corexp      // Exploiter - Armed Metal Extractor
+bind                  z  buildunit_armmoho     // Moho Mine - Advanced Metal Extractor / Storage
+bind                  z  buildunit_cormoho     // Moho Mine - Advanced Metal Extractor / Storage
+bind                  z  buildunit_cormexp     // Moho Exploiter - Armed Moho Metal Extractor
+bind                  z  buildunit_coruwmex    // Offshore Metal Extractor - Extracts Metal
+bind                  z  buildunit_armuwmex    // Offshore Metal Extractor - Extracts Metal
+bind                  z  buildunit_coruwmme    // Underwater Moho Mine - Advanced Metal Extractor / Storage
+bind                  z  buildunit_armuwmme    // Underwater Moho Mine - Advanced Metal Extractor / Storage
+bind                  z  areamex
+bind                  i  customgameinfo
+bind          Alt+right  edit_end
+bind                  6  specteam 5
+bind        Alt+Shift+a  areaattack
+bind              any+k  wantcloak
+bind            numpad2  moveback
+bind              Alt+-  slowdown
+bind             Ctrl+5  specteam 14
+bind              Any+8  group8
+bind                  u  unloadunits
+bind                  d  manualfire
+bind            Shift+e  reclaim
+bind             Ctrl+t  trackmode
+bind                 f9  luaui showhealthbars
+bind             Ctrl+c  select AllMap+_ManualFireUnit+_ClearSelection_SelectOne+
+bind       Ctrl+Shift+d  selfd queued
+bind             Ctrl+0  specteam 19
+bind                  p  patrol
+bind            Shift+q  groupclear
+bind        Alt+numpad-  slowdown
+bind            shift+v  buildunit_armnanotc   // Nano Turret - Assist & Repair in large radius. Transportable
+bind            shift+v  buildunit_armnanotcplat  // Nano Turret - Repairs and builds in large radius
+bind            shift+v  buildunit_cornanotcplat  // Nano Turret - Repairs and builds in large radius
+bind            shift+v  buildunit_armlab      // Bot Lab - Produces Level 1 Bots
+bind            shift+v  buildunit_armvp       // Vehicle Plant - Produces Level 1 Vehicles
+bind            shift+v  buildunit_cornanotc   // Nano Turret - Assist & Repair in large radius. Transportable
+bind            shift+v  buildunit_corlab      // Bot Lab - Produces Level 1 Bots
+bind            shift+v  buildunit_corvp       // Vehicle Plant - Produces Level 1 Vehicles
+bind            shift+v  buildunit_armsy       // Shipyard - Produces Level 1 Ships
+bind            shift+v  buildunit_corsy       // Shipyard - Produces Level 1 Ships
+bind                  ,  buildfacing inc
+bind            numpad9  moveup
+bind                esc  quitmessage
+bind           Any+left  edit_prev_char
+bind           Any+left  moveleft
+bind                  1  specteam 0
+bind            Ctrl+f3  viewspring
+bind             Any+f6  MuteSound
+bind              Any+3  group3
+bind     Ctrl+Shift+esc  quitforce
+bind            Shift+l  loadunits
+bind              Alt+b  debug
+bind            Shift+[  buildfacing inc
+bind                  8  specteam 7
+bind        Any+\,Any+\  drawlabel
+bind              Any+\  drawinmap
+bind            numpad4  moveleft
+bind Alt+ctrl+a,Alt+ctrl+a  chatswitchally
+bind         Any+pageup  moveup
+bind             Ctrl+7  specteam 16
+bind             Any+f1  ShowElevation
+bind          Alt+enter  chatally
+bind          Alt+enter  chatswitchally
+bind                  w  wait
+bind         Alt+delete  slowdown
+bind                  f  fight
+bind            Shift+x  onoff
+bind            shift+x  buildunit_armsolar    // Solar Collector - Produces 20 Energy
+bind            shift+x  buildunit_armwin      // Wind Generator - Produces Energy. Depends on wind strength.
+bind            shift+x  buildunit_corsolar    // Solar Collector - Produces 20 Energy
+bind            shift+x  buildunit_corwin      // Wind Generator - Produces Energy. Depends on wind strength.
+bind            shift+x  buildunit_armadvsol   // Advanced Solar Collector - Produces 75 Energy
+bind            shift+x  buildunit_coradvsol   // Advanced Solar Collector - Produces 75 Energy
+bind            shift+x  buildunit_armfus      // Fusion Reactor - Produces 1000 Energy
+bind            shift+x  buildunit_armmmkr     // Energy Converter - Converts 600 energy into 10.3 metal
+bind            shift+x  buildunit_corfus      // Fusion Reactor - Produces 1100 Energy
+bind            shift+x  buildunit_cormmkr     // Energy Converter - Converts 600 energy into 10.3 metal per sec
+bind            shift+x  buildunit_armtide     // Tidal Generator - Produces Energy (depends on map)
+bind            shift+x  buildunit_cortide     // Tidal Generator - Produces Energy (depends on map)
+bind            shift+x  buildunit_armuwfus    // Underwater Fusion Plant - Produces 1200 Energy
+bind            shift+x  buildunit_coruwfus    // Underwater Fusion Plant - Produces 1220 Energy
+bind            shift+x  buildunit_armuwmmm    // Floating Energy Converter - Converts 650 energy into 11 metal per sec
+bind            shift+x  buildunit_coruwmmm    // Floating Energy Converter - Converts 650 energy into 11 metal per sec
+bind            Shift+g  guard
+bind             Ctrl+v  pastetext
+bind             Ctrl+v  select AllMap+_Not_Builder_Not_Commander_InPrevSel_Not_InHotkeyGroup+_SelectAll+
+bind                  k  cloak
+bind                  k  wantcloak
+bind                  3  specteam 2
+bind              Any+h  sharedialog
