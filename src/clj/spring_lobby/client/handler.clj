@@ -171,9 +171,12 @@
             :else state)
           [:battles battle-id :users] dissoc username)))))
 
-(defmethod handle "JOIN" [_c state m]
+(defmethod handle "JOIN" [_c state-atom m]
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
-    (swap! state assoc-in [:my-channels channel-name] {})))
+    (swap! state-atom
+           (fn [{:keys [server] :as state}]
+             (-> state
+                 (assoc-in [:my-channels channel-name] {:server server}))))))
 
 (defmethod handle "JOINED" [_c state m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]

@@ -313,13 +313,17 @@
 
 (defn connect
   [state-atom client]
-  (let [{:keys [username password]} @state-atom]
+  (let [{:keys [my-channels server password username]} @state-atom]
     (when default-ssl ; TODO
       (message/send-message client "STLS"))
     (print-loop state-atom client)
     (message/send-message client "LISTCOMPFLAGS")
-    (message/send-message client "CHANNELS")
     (login client "*" username password)
+    (message/send-message client "CHANNELS")
+    (doseq [channel my-channels]
+      (let [[channel-name {channel-server :server}] channel]
+        (when (= server channel-server)
+          (message/send-message client (str "JOIN " channel-name)))))
     (ping-loop state-atom client)))
 
 (defn disconnect [^SplicedStream c]

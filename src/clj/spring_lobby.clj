@@ -129,7 +129,7 @@
 
 (def config-keys
   [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version :map-name
-   :mod-name :minimap-type :password :pop-out-battle :preferred-color :rapid-repo :scripttags
+   :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color :rapid-repo :scripttags
    :server :servers :uikeys :username])
 
 (defn select-config [state]
@@ -204,7 +204,7 @@
   (let [file (fs/config-file filename)]
     (fs/make-parent-dirs file)
     (log/info "Spitting edn to" file)
-    (spit file (with-out-str (pprint data)))))
+    (spit file (with-out-str (pprint (into (sorted-map) data))))))
 
 
 (defn add-watch-state-to-edn
@@ -1060,7 +1060,7 @@
   (let [[{:keys [client ping-loop print-loop]} _new-state]
         (swap-vals! state-atom dissoc
                     :accepted
-                    :battle :battles :channels :client :client-deferred :last-failed-message :my-channels
+                    :battle :battles :channels :client :client-deferred :last-failed-message
                     :ping-loop :print-loop :users)]
     (when client
       (client/disconnect client))
@@ -1143,7 +1143,7 @@
 (defn client-buttons
   [{:keys [accepted client client-deferred username password login-error server servers]}]
   {:fx/type :h-box
-   :alignment :top-left
+   :alignment :center-left
    :style {:-fx-font-size 16}
    :children
    (concat
@@ -1178,12 +1178,9 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal "mdi-close-octagon:16:white"}}])
-     [{:fx/type :v-box
-       :alignment :center-left
-       :children
-       [{:fx/type :label
-         :alignment :center
-         :text " Login: "}]}
+     [{:fx/type :label
+       :alignment :center
+       :text " Login: "}
       {:fx/type :text-field
        :text username
        :prompt-text "Username"
@@ -1533,7 +1530,6 @@
 
 
 (defmethod event-handler ::join-battle [{:keys [battle-password battle-passworded client selected-battle] :as e}]
-  #p e
   (future
     (try
       (if selected-battle
@@ -5154,7 +5150,6 @@
         (System/exit 0)))))
 
 (defmethod event-handler ::my-channels-tab-action [e]
-  #p e
   (log/info e))
 
 (defmethod event-handler ::send-message [{:keys [channel-name client message]}]
@@ -5345,12 +5340,33 @@
                 {:fx/type users-table
                  :v-box/vgrow :always
                  :users users}
-                {:fx/type :label
-                 :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
-                 :style {:-fx-font-size 16}}
-                (merge
-                  {:fx/type channels-table}
-                  (select-keys state [:channels :client :my-channels]))]}]}
+                {:fx/type :v-box
+                 :children
+                 [{:fx/type :label
+                   :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
+                   :style {:-fx-font-size 16}}
+                  (merge
+                    {:fx/type channels-table
+                     :v-box/vgrow :always}
+                    (select-keys state [:channels :client :my-channels]))
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   [{:fx/type :label
+                     :text " Custom Channel: "}
+                    {:fx/type :text-field
+                     :text (:join-channel-name state)
+                     :prompt-text "Name"
+                     :on-text-changed {:event/type ::assoc
+                                       :key :join-channel-name}
+                     :on-action {:event/type ::join-channel
+                                 :channel-name (:join-channel-name state)
+                                 :client (:client state)}}
+                    {:fx/type :button
+                     :text "Join"
+                     :on-action {:event/type ::join-channel
+                                 :channel-name (:join-channel-name state)
+                                 :client (:client state)}}]}]}]}]}
             (merge
               {:fx/type battles-buttons}
               (select-keys state
