@@ -293,81 +293,79 @@
   (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
-      (try
-        (let [old-battle-id (-> old-state :battle :battle-id)
-              new-battle-id (-> new-state :battle :battle-id)
-              old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
-              new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)]
-          (when (or (not= old-battle-id new-battle-id)
-                    (not= old-battle-map new-battle-map)
-                    (and new-battle-map
-                         (not (:battle-map-details new-state))
-                         (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
-            (log/debug "Updating battle map details for" new-battle-map
-                       "was" old-battle-map)
-            (swap! *state assoc :battle-map-details {:loading true})
-            (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
-              (swap! *state assoc :battle-map-details map-details))))
-        (catch Exception e
-          (log/error e "Error in :battle-map-details state watcher")))))
+      (future
+        (try
+          (let [old-battle-id (-> old-state :battle :battle-id)
+                new-battle-id (-> new-state :battle :battle-id)
+                old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
+                new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)]
+            (when (and (or (not= old-battle-id new-battle-id)
+                           (not= old-battle-map new-battle-map))
+                       (and (not (string/blank? new-battle-map))
+                            (not (:battle-map-details new-state))
+                            (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
+              (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
+              (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
+                (swap! *state assoc :battle-map-details map-details))))
+          (catch Exception e
+            (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
     (fn [_k _ref old-state new-state]
-      (try
-        (let [old-battle-id (-> old-state :battle :battle-id)
-              new-battle-id (-> new-state :battle :battle-id)
-              old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
-              new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
-              new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
-              mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
-              filter-fn (comp mod-name-set mod-name-sans-git :mod-name)]
-          (when (or (not= old-battle-id new-battle-id)
-                    (not= old-battle-mod new-battle-mod)
-                    (and new-battle-mod
-                         (not (:battle-mod-details new-state))
-                         (->> new-state :mods
-                              (filter filter-fn)
-                              first)))
-            (log/debug "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-            (swap! *state assoc :battle-mod-details {:loading true})
-            (let [mod-details (or
-                                (some->> new-state
-                                         :mods
-                                         (filter filter-fn)
-                                         first
-                                         :file
-                                         read-mod-data)
-                                {})]
-              (swap! *state assoc :battle-mod-details mod-details))))
-        (catch Exception e
-          (log/error e "Error in :battle-map-details state watcher")))))
+      (future
+        (try
+          (let [old-battle-id (-> old-state :battle :battle-id)
+                new-battle-id (-> new-state :battle :battle-id)
+                old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
+                new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
+                new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
+                mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
+                filter-fn (comp mod-name-set mod-name-sans-git :mod-name)]
+            (when (and (or (not= old-battle-id new-battle-id)
+                           (not= old-battle-mod new-battle-mod))
+                       (and (not (string/blank? new-battle-mod))
+                            (not (:battle-mod-details new-state))
+                            (->> new-state :mods (filter filter-fn) first)))
+              (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
+              (let [mod-details (or
+                                  (some->> new-state
+                                           :mods
+                                           (filter filter-fn)
+                                           first
+                                           :file
+                                           read-mod-data)
+                                  {})]
+                (swap! *state assoc :battle-mod-details mod-details))))
+          (catch Exception e
+            (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :fix-missing-resource
     (fn [_k _ref _old-state new-state]
-      (try
-        (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
-              engine-fix (when engine-version
-                           (when-not (->> engines
-                                          (filter (comp #{engine-version} :engine-version))
-                                          first)
-                             (-> engines first :engine-version)))
-              mod-fix (when mod-name
-                        (when-not (->> mods
-                                       (filter (comp #{mod-name} :mod-name))
-                                       first)
-                          (-> mods first :mod-name)))
-              map-fix (when map-name
-                        (when-not (->> maps
-                                       (filter (comp #{map-name} :map-name))
-                                       first)
-                          (-> maps first :map-name)))]
-          (when (or engine-fix mod-fix map-fix)
-            (swap! state-atom
-                   (fn [state]
-                     (cond-> state
-                       engine-fix (assoc :engine-version engine-fix)
-                       mod-fix (assoc :mod-name mod-fix)
-                       map-fix (assoc :map-name map-fix))))))
-        (catch Exception e
-          (log/error e "Error in :battle-map-details state watcher"))))))
+      (future
+        (try
+          (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
+                engine-fix (when engine-version
+                             (when-not (->> engines
+                                            (filter (comp #{engine-version} :engine-version))
+                                            first)
+                               (-> engines first :engine-version)))
+                mod-fix (when mod-name
+                          (when-not (->> mods
+                                         (filter (comp #{mod-name} :mod-name))
+                                         first)
+                            (-> mods first :mod-name)))
+                map-fix (when map-name
+                          (when-not (->> maps
+                                         (filter (comp #{map-name} :map-name))
+                                         first)
+                            (-> maps first :map-name)))]
+            (when (or engine-fix mod-fix map-fix)
+              (swap! state-atom
+                     (fn [state]
+                       (cond-> state
+                         engine-fix (assoc :engine-version engine-fix)
+                         mod-fix (assoc :mod-name mod-fix)
+                         map-fix (assoc :map-name map-fix))))))
+          (catch Exception e
+            (log/error e "Error in :battle-map-details state watcher")))))))
 
 
 (defmulti task-handler ::task-type)
@@ -1496,7 +1494,6 @@
                 max-players 8
                 rank 0
                 engine "Spring"}}]
-  (swap! *state assoc :battle {})
   (message/send-message client
     (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
          " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
@@ -1505,18 +1502,26 @@
 
 (defmethod event-handler ::host-battle
   [{:keys [client scripttags host-battle-state use-springlobby-modname]}]
+  (swap! *state assoc
+         :battle {}
+         :battle-map-details nil
+         :battle-mod-details nil)
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)
                   (string/blank? map-name))
-      (let [mod-name-parsed (parse-mod-name-git mod-name)
-            [_ mod-prefix _git] mod-name-parsed
-            adjusted-modname (if (and use-springlobby-modname mod-name-parsed)
-                                 (str mod-prefix " $VERSION")
-                                 mod-name)]
-        (open-battle client (assoc host-battle-state :mod-name adjusted-modname)))
-      (when (seq scripttags)
-        (message/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
+      (future
+        (try
+          (let [mod-name-parsed (parse-mod-name-git mod-name)
+                [_ mod-prefix _git] mod-name-parsed
+                adjusted-modname (if (and use-springlobby-modname mod-name-parsed)
+                                     (str mod-prefix " $VERSION")
+                                     mod-name)]
+            (open-battle client (assoc host-battle-state :mod-name adjusted-modname)))
+          (when (seq scripttags)
+            (message/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+          (catch Exception e
+            (log/error e "Error opening battle")))))))
 
 
 (defmethod event-handler ::leave-battle [{:keys [client]}]
@@ -1595,26 +1600,23 @@
                   (map :map-name)
                   (filter #(string/includes? (string/lower-case %) filter-lc))
                   (sort String/CASE_INSENSITIVE_ORDER))]
-         [{:fx/type ext-recreate-on-key-changed
-           :key filtered-map-names
-           :desc
-           {:fx/type :combo-box
-            :value (str map-name)
-            :items filtered-map-names
-            :disable (boolean disable)
-            :on-value-changed on-value-changed
-            :cell-factory
-            {:fx/cell-type :list-cell
-             :describe
-             (fn [map-name]
-               {:text (if (string/blank? map-name)
-                        "< choose a map >"
-                        map-name)})}
-            :on-key-pressed {:event/type ::maps-key-pressed}
-            :on-hidden {:event/type ::maps-hidden}
-            :tooltip {:fx/type :tooltip
-                      :show-delay [10 :ms]
-                      :text (or map-input-prefix "Choose map")}}}]))
+         [{:fx/type :combo-box
+           :value (str map-name)
+           :items filtered-map-names
+           :disable (boolean disable)
+           :on-value-changed on-value-changed
+           :cell-factory
+           {:fx/cell-type :list-cell
+            :describe
+            (fn [map-name]
+              {:text (if (string/blank? map-name)
+                       "< choose a map >"
+                       map-name)})}
+           :on-key-pressed {:event/type ::maps-key-pressed}
+           :on-hidden {:event/type ::maps-hidden}
+           :tooltip {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (or map-input-prefix "Choose map")}}]))
      [{:fx/type :button
        :text ""
        :tooltip
@@ -1764,26 +1766,23 @@
                                        (filter some?)
                                        (filter #(string/includes? (string/lower-case %) filter-lc))
                                        sort)]
-             [{:fx/type ext-recreate-on-key-changed
-               :key filtered-engines
-               :desc
-               {:fx/type :combo-box
-                :value (str engine-version)
-                :items filtered-engines
-                ;:disable (boolean battle)
-                :on-value-changed {:event/type ::version-change}
-                :cell-factory
-                {:fx/cell-type :list-cell
-                 :describe
-                 (fn [engine]
-                   {:text (if (string/blank? engine)
-                            "< choose an engine >"
-                            engine)})}
-                :on-key-pressed {:event/type ::engines-key-pressed}
-                :on-hidden {:event/type ::engines-hidden}
-                :tooltip {:fx/type :tooltip
-                          :show-delay [10 :ms]
-                          :text (or engine-filter "Choose engine")}}}]))
+             [{:fx/type :combo-box
+               :value (str engine-version)
+               :items filtered-engines
+               ;:disable (boolean battle)
+               :on-value-changed {:event/type ::version-change}
+               :cell-factory
+               {:fx/cell-type :list-cell
+                :describe
+                (fn [engine]
+                  {:text (if (string/blank? engine)
+                           "< choose an engine >"
+                           engine)})}
+               :on-key-pressed {:event/type ::engines-key-pressed}
+               :on-hidden {:event/type ::engines-hidden}
+               :tooltip {:fx/type :tooltip
+                         :show-delay [10 :ms]
+                         :text (or engine-filter "Choose engine")}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -1825,26 +1824,23 @@
                                     (filter string?)
                                     (filter #(string/includes? (string/lower-case %) filter-lc))
                                     (sort version/version-compare))]
-             [{:fx/type ext-recreate-on-key-changed
-               :key filtered-mods
-               :desc
-               {:fx/type :combo-box
-                :value mod-name
-                :items filtered-mods
-                ;:disable (boolean battle)
-                :on-value-changed {:event/type ::mod-change}
-                :cell-factory
-                {:fx/cell-type :list-cell
-                 :describe
-                 (fn [mod-name]
-                   {:text (if (string/blank? mod-name)
-                            "< choose a game >"
-                            mod-name)})}
-                :on-key-pressed {:event/type ::mods-key-pressed}
-                :on-hidden {:event/type ::mods-hidden}
-                :tooltip {:fx/type :tooltip
-                          :show-delay [10 :ms]
-                          :text (or mod-filter "Choose game")}}}]))
+             [{:fx/type :combo-box
+               :value mod-name
+               :items filtered-mods
+               ;:disable (boolean battle)
+               :on-value-changed {:event/type ::mod-change}
+               :cell-factory
+               {:fx/cell-type :list-cell
+                :describe
+                (fn [mod-name]
+                  {:text (if (string/blank? mod-name)
+                           "< choose a game >"
+                           mod-name)})}
+               :on-key-pressed {:event/type ::mods-key-pressed}
+               :on-hidden {:event/type ::mods-hidden}
+               :tooltip {:fx/type :tooltip
+                         :show-delay [10 :ms]
+                         :text (or mod-filter "Choose game")}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -2034,7 +2030,7 @@
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
         (message/send-message client m)
-        (swap! *state assoc :battle-map-details {:loading true}))
+        (swap! *state assoc :battle-map-details nil))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -2248,7 +2244,7 @@
   (let [worst-severity (reduce
                          (fn [worst {:keys [severity]}]
                            (max worst severity))
-                         0
+                         -1
                          issues)]
     {:fx/type :v-box
      :style (merge
@@ -3115,7 +3111,9 @@
              :hgap 5
              :padding 5
              :children
-             [(let [map-file (:file battle-map-details)]
+             [(let [map-details-loading (not battle-map-details)
+                    no-map-details (not (seq battle-map-details))
+                    map-file (:file battle-map-details)]
                 {:fx/type resource-sync-pane
                  :h-box/margin 8
                  :resource "Map" ;battle-map ; (str "map (" battle-map ")")
@@ -3125,68 +3123,73 @@
                  :refresh-action {:event/type ::force-update-battle-map}
                  :issues
                  (concat
-                   (let [severity (if battle-map-details 0 2)]
+                   (let [severity (cond
+                                    map-details-loading -1
+                                    no-map-details 2
+                                    :else 0)]
                      [{:severity severity
                        :text "info"
                        :human-text battle-map
                        :tooltip (if (zero? severity)
                                   (fs/canonical-path (:file battle-map-details))
                                   (str "Map '" battle-map "' not found locally"))}])
-                   (when-not battle-map-details
-                     (let [downloadable (->> downloadables-by-url
-                                             vals
-                                             (filter (comp #{::map} :resource-type))
-                                             (filter (partial could-be-this-map? battle-map))
-                                             first)
-                           url (:download-url downloadable)
-                           download (get http-download url)
-                           in-progress (:running download)
-                           dest (resource-dest downloadable)
-                           dest-exists (file-exists? file-cache dest)
-                           severity (if battle-map-details 0 2)]
-                       [{:severity severity
-                         :text "download"
-                         :human-text (if in-progress
-                                       (download-progress download)
-                                       (if downloadable
-                                         (if dest-exists
-                                           (str "Downloaded " (fs/filename dest))
-                                           (str "Download from " (:download-source-name downloadable)))
-                                         (str "No download for " battle-map)))
-                         :tooltip (if in-progress
-                                    (str "Downloading " (download-progress download))
-                                    (if dest-exists
-                                      (str "Downloaded to " (fs/canonical-path dest))
-                                      (str "Download " url)))
-                         :in-progress in-progress
-                         :action (when (and downloadable (not dest-exists))
-                                   {:event/type ::http-downloadable
-                                    :downloadable downloadable})}]))
-                   (when-not battle-map-details
-                     (let [importable (some->> importables-by-path
+                   (when (and no-map-details (not map-details-loading))
+                     (concat
+                       (let [downloadable (->> downloadables-by-url
                                                vals
                                                (filter (comp #{::map} :resource-type))
                                                (filter (partial could-be-this-map? battle-map))
                                                first)
-                           resource-file (:resource-file importable)
-                           canonical-path (fs/canonical-path resource-file)]
-                       [{:severity 2
-                         :text "import"
-                         :human-text (if importable
-                                       (str "Import from " (:import-source-name importable))
-                                       "No import found")
-                         :tooltip (if importable
-                                    (str "Copy map archive from " canonical-path)
-                                    (str "No local import found for map " battle-map))
-                         :in-progress (-> copying (get canonical-path) :status)
-                         :action
-                         (when (and importable
-                                    (not (file-exists? file-cache (resource-dest importable))))
-                           {:event/type ::add-task
-                            :task
-                            {::task-type ::import
-                             :importable importable}})}])))})
-              (let [mod-file (:file battle-mod-details)
+                             url (:download-url downloadable)
+                             download (get http-download url)
+                             in-progress (:running download)
+                             dest (resource-dest downloadable)
+                             dest-exists (file-exists? file-cache dest)
+                             severity (if battle-map-details 0 2)]
+                         [{:severity severity
+                           :text "download"
+                           :human-text (if in-progress
+                                         (download-progress download)
+                                         (if downloadable
+                                           (if dest-exists
+                                             (str "Downloaded " (fs/filename dest))
+                                             (str "Download from " (:download-source-name downloadable)))
+                                           (str "No download for " battle-map)))
+                           :tooltip (if in-progress
+                                      (str "Downloading " (download-progress download))
+                                      (if dest-exists
+                                        (str "Downloaded to " (fs/canonical-path dest))
+                                        (str "Download " url)))
+                           :in-progress in-progress
+                           :action (when (and downloadable (not dest-exists))
+                                     {:event/type ::http-downloadable
+                                      :downloadable downloadable})}])
+                       (let [importable (some->> importables-by-path
+                                                 vals
+                                                 (filter (comp #{::map} :resource-type))
+                                                 (filter (partial could-be-this-map? battle-map))
+                                                 first)
+                             resource-file (:resource-file importable)
+                             canonical-path (fs/canonical-path resource-file)]
+                         [{:severity 2
+                           :text "import"
+                           :human-text (if importable
+                                         (str "Import from " (:import-source-name importable))
+                                         "No import found")
+                           :tooltip (if importable
+                                      (str "Copy map archive from " canonical-path)
+                                      (str "No local import found for map " battle-map))
+                           :in-progress (-> copying (get canonical-path) :status)
+                           :action
+                           (when (and importable
+                                      (not (file-exists? file-cache (resource-dest importable))))
+                             {:event/type ::add-task
+                              :task
+                              {::task-type ::import
+                               :importable importable}})}]))))})
+              (let [mod-details-loading (not battle-mod-details)
+                    no-mod-details (not (seq battle-mod-details))
+                    mod-file (:file battle-mod-details)
                     canonical-path (fs/canonical-path mod-file)]
                 {:fx/type resource-sync-pane
                  :h-box/margin 8
@@ -3197,81 +3200,83 @@
                  :refresh-action {:event/type ::force-update-battle-mod}
                  :issues
                  (concat
-                   (let [severity (if battle-mod-details 0 2)]
+                   (let [severity (cond
+                                    mod-details-loading -1
+                                    no-mod-details 2
+                                    :else 0)]
                      [{:severity severity
                        :text "info"
                        :human-text battle-modname
                        :tooltip (if (zero? severity)
                                   canonical-path
                                   (str "Game '" battle-modname "' not found locally"))}])
-                   (when-not battle-mod-details
-                     (let [downloadable (->> downloadables-by-url
-                                             vals
-                                             (filter (comp #{::mod} :resource-type))
-                                             (filter (partial could-be-this-mod? battle-modname))
-                                             first)
-                           download-url (:download-url downloadable)
-                           in-progress (-> http-download (get download-url) :running)
-                           {:keys [download-source-name download-url]} downloadable]
-                       [{:severity (if battle-mod-details 0 2)
-                         :text "download"
-                         :human-text (if battle-mod-details
-                                       (:mod-name battle-mod-details)
-                                       (if downloadable
-                                         (str "Download from " download-source-name)
-                                         (str "No download for " battle-modname)))
-                         :in-progress in-progress
-                         :tooltip (if downloadable
-                                    (str "Download from " download-source-name " at " download-url)
-                                    (str "No http download found for " battle-modname))
-                         :action
-                         (when downloadable
-                           {:event/type ::http-downloadable
-                            :downloadable downloadable})}]))
-                   (when-not battle-mod-details
-                     (let [rapid-id (:id (get rapid-data-by-version battle-modname))
-                           in-progress (-> rapid-download (get rapid-id) :running)]
-                       [{:severity 2
-                         :text "rapid"
-                         :human-text (if rapid-id
-                                       (if engine-file
-                                         (str "Download rapid " rapid-id)
-                                         "Needs engine first to download with rapid")
-                                       "No rapid download")
-                         :tooltip (if rapid-id
-                                    (if engine-file
-                                      (str "Use rapid downloader to get resource id " rapid-id
-                                           " using engine " (:engine-version engine-details))
-                                      "Rapid requires an engine to work, get engine first")
-                                    (str "No rapid download found for" battle-modname))
-                         :in-progress in-progress
-                         :action
-                         (when (and rapid-id engine-file)
-                           {:event/type ::rapid-download
-                            :rapid-id rapid-id
-                            :engine-file engine-file})}]))
-                   (when-not battle-mod-details
-                     (let [importable (some->> importables-by-path
+                   (when (and no-mod-details (not mod-details-loading))
+                     (concat
+                       (let [downloadable (->> downloadables-by-url
                                                vals
                                                (filter (comp #{::mod} :resource-type))
                                                (filter (partial could-be-this-mod? battle-modname))
                                                first)
-                           resource-file (:resource-file importable)]
-                       [{:severity 2
-                         :text "import"
-                         :human-text (if importable
-                                       (str "Import from " (:import-source-name importable))
-                                       "No import found")
-                         :tooltip (if importable
-                                    (str "Copy game from " (:import-source-name importable)
-                                         " at " resource-file)
-                                    (str "No local import found for " battle-modname))
-                         :in-progress (get copying resource-file)
-                         :action (when importable
-                                   {:event/type ::add-task
-                                    :task
-                                    {::task-type ::import
-                                     :importable importable}})}]))
+                             download-url (:download-url downloadable)
+                             in-progress (-> http-download (get download-url) :running)
+                             {:keys [download-source-name download-url]} downloadable]
+                         [{:severity (if battle-mod-details 0 2)
+                           :text "download"
+                           :human-text (if battle-mod-details
+                                         (:mod-name battle-mod-details)
+                                         (if downloadable
+                                           (str "Download from " download-source-name)
+                                           (str "No download for " battle-modname)))
+                           :in-progress in-progress
+                           :tooltip (if downloadable
+                                      (str "Download from " download-source-name " at " download-url)
+                                      (str "No http download found for " battle-modname))
+                           :action
+                           (when downloadable
+                             {:event/type ::http-downloadable
+                              :downloadable downloadable})}])
+                       (let [rapid-id (:id (get rapid-data-by-version battle-modname))
+                             in-progress (-> rapid-download (get rapid-id) :running)]
+                         [{:severity 2
+                           :text "rapid"
+                           :human-text (if rapid-id
+                                         (if engine-file
+                                           (str "Download rapid " rapid-id)
+                                           "Needs engine first to download with rapid")
+                                         "No rapid download")
+                           :tooltip (if rapid-id
+                                      (if engine-file
+                                        (str "Use rapid downloader to get resource id " rapid-id
+                                             " using engine " (:engine-version engine-details))
+                                        "Rapid requires an engine to work, get engine first")
+                                      (str "No rapid download found for" battle-modname))
+                           :in-progress in-progress
+                           :action
+                           (when (and rapid-id engine-file)
+                             {:event/type ::rapid-download
+                              :rapid-id rapid-id
+                              :engine-file engine-file})}])
+                       (let [importable (some->> importables-by-path
+                                                 vals
+                                                 (filter (comp #{::mod} :resource-type))
+                                                 (filter (partial could-be-this-mod? battle-modname))
+                                                 first)
+                             resource-file (:resource-file importable)]
+                         [{:severity 2
+                           :text "import"
+                           :human-text (if importable
+                                         (str "Import from " (:import-source-name importable))
+                                         "No import found")
+                           :tooltip (if importable
+                                      (str "Copy game from " (:import-source-name importable)
+                                           " at " resource-file)
+                                      (str "No local import found for " battle-modname))
+                           :in-progress (get copying resource-file)
+                           :action (when importable
+                                     {:event/type ::add-task
+                                      :task
+                                      {::task-type ::import
+                                       :importable importable}})}])))
                    (when (and (= :directory
                                  (::fs/source battle-mod-details)))
                      (let [battle-mod-git-ref (mod-git-ref battle-modname)
@@ -3587,8 +3592,9 @@
                  :text (str battle-map)
                  :style {:-fx-font-size 16}}
                 {:fx/type :label
-                 :text (if (:loading battle-map-details)
-                         "(loading...)" "(not found)")
+                 :text (if battle-map-details ; nil vs empty map
+                         "(not found)"
+                         "(loading...)")
                  :alignment :center}]}])
            [(merge
               (when am-host
@@ -5365,7 +5371,7 @@
                    :children
                    [{:fx/type :label
                      :style {:-fx-font-size 20}
-                     :text "Waiting for server to start battle..."}]}]}]))
+                     :text "Waiting for server to open battle..."}]}]}]))
            [{:fx/type :h-box
              :alignment :center-left
              :children

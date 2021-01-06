@@ -277,10 +277,13 @@
 
 (defmethod handle "JOINBATTLE" [_c state-atom m]
   (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]
-    (swap! state-atom assoc :battle {:battle-id battle-id
-                                     :hash-code hash-code
-                                     :channel-name channel-name
-                                     :scripttags default-scripttags})))
+    (swap! state-atom assoc
+           :battle {:battle-id battle-id
+                    :hash-code hash-code
+                    :channel-name channel-name
+                    :scripttags default-scripttags}
+           :battle-map-details nil
+           :battle-mod-details nil)))
 
 (defmethod handle "REQUESTBATTLESTATUS" [client state-atom _m]
   (let [{:keys [battle preferred-color]} @state-atom
