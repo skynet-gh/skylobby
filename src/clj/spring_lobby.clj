@@ -1417,6 +1417,33 @@
                    :email email}}]}}})
 
 
+(def bind-keycodes
+  {"CTRL" KeyCode/CONTROL
+   "ESC" KeyCode/ESCAPE
+   "BACKSPACE" KeyCode/BACK_SPACE
+   "." KeyCode/PERIOD
+   "," KeyCode/COMMA
+   "+" KeyCode/PLUS
+   "-" KeyCode/MINUS
+   "=" KeyCode/EQUALS
+   "_" KeyCode/UNDERSCORE
+   ";" KeyCode/SEMICOLON
+   "^" KeyCode/CIRCUMFLEX
+   "`" KeyCode/BACK_QUOTE
+   "[" KeyCode/OPEN_BRACKET
+   "]" KeyCode/CLOSE_BRACKET
+   "/" KeyCode/SLASH
+   "\\" KeyCode/BACK_SLASH
+   "PAGEUP" KeyCode/PAGE_UP
+   "PAGEDOWN" KeyCode/PAGE_DOWN})
+
+(defn bind-key-to-javafx-keycode [bind-key-piece]
+  (or (KeyCode/getKeyCode bind-key-piece)
+      (get bind-keycodes bind-key-piece)
+      (try (KeyCode/valueOf bind-key-piece)
+           (catch Exception e
+             (log/trace e "Error getting KeyCode for" bind-key-piece)))))
+
 (defn uikeys-window [{:keys [show-uikeys-window uikeys]}]
   {:fx/type :stage
    :showing show-uikeys-window
@@ -1424,7 +1451,7 @@
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-uikeys-window false)
                        (.consume e))
-   :width 800
+   :width 1200
    :height 1000
    :scene
    {:fx/type :scene
@@ -1442,16 +1469,9 @@
              (u/try-log "parse uikeys" (uikeys/parse-uikeys))
              []))
        :columns
-       [{:fx/type :table-column
-         :text "Key"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [i]
-            {:text (str (:bind-key i))})}}
+       [
         {:fx/type :table-column
-         :text "Value"
+         :text "Action"
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
@@ -1459,13 +1479,49 @@
           (fn [i]
             {:text (str (:bind-action i))})}}
         {:fx/type :table-column
-         :text "Comment"
+         :text "Bind"
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
           :describe
           (fn [i]
-            {:text (str (:bind-comment i))})}}]}]}}})
+            {:text (pr-str (:bind-key i))})}}
+        {:fx/type :table-column
+         :text "Parsed"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
+        {:fx/type :table-column
+         :text "JavaFX KeyCode"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            (let [bind-key-uc (string/upper-case (:bind-key i))
+                  parsed (uikeys/parse-bind-keys bind-key-uc)
+                  key-codes (map
+                              (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
+                              parsed)]
+              {:text (pr-str key-codes)}))}}
+        {:fx/type :table-column
+         :text "Comment"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [{:keys [bind-comment]}]
+            (merge
+              {:text (str bind-comment)}
+              (when bind-comment
+                {:tooltip
+                 {:fx/type :tooltip
+                  :show-delay [10 :ms]
+                  :style {:-fx-font-size 15}
+                  :text (str bind-comment)}})))}}]}]}}})
 
 
 (defmethod event-handler ::username-change
@@ -5327,7 +5383,7 @@
                     {:fx/type battles-table
                      :v-box/vgrow :always}
                     (select-keys state [:battle-password :battles :client :selected-battle :users]))]
-                 (when (seq my-channels)
+                 (when (and client (seq my-channels))
                    [(merge
                       {:fx/type my-channels-view
                        :v-box/vgrow :always}

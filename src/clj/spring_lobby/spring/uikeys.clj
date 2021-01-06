@@ -43,3 +43,32 @@
 
 #_
 (parse-uikeys)
+
+
+(defn parse-bind-keys [bind-keys-str]
+  (let [combos (string/split bind-keys-str #"(?<!,),(?=.)")]
+    (map
+      #(when %
+         (string/split % #"(?<!\+)\+(?=.)"))
+      combos)))
+
+#_
+(parse-bind-keys "Alt+ctrl+a,Alt+ctrl+a")
+#_
+(rest (re-find #"(?:([^,]+),)*(.+)" "Alt+ctrl+a,Alt+ctrl+a"))
+#_
+(rest (re-find #"(?:([^,]+),)*(.+)" "Alt+ctrl+a,Alt+ctrl+a,Alt+ctrl+a"))
+#_
+(string/split "Alt+ctrl+a,Alt+ctrl+a,Alt+ctrl+a" #"(?<!,),")
+#_
+(string/split "," #"(?<!,),(?=.)")
+#_
+(rest (re-find #"^(?:([^,]+),)*(.+)$" ","))
+#_
+(rest (re-find bind-seq-re "Alt+ctrl+a,Alt+ctrl+a,Alt+ctrl+a"))
+#_
+(rest (re-find bind-seq-re "Alt+ctrl+a,Alt+ctrl+a"))
+#_
+(string/split "Alt+ctrl+a" #"(?<!\+)\+")
+#_
+(string/split "Alt++" #"(?<!\+)\+")

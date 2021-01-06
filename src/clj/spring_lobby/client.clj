@@ -12,6 +12,7 @@
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
     [spring-lobby.git :as git]
+    [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
@@ -55,7 +56,7 @@
   (str "alt-spring-lobby-"
        (or (manifest-version)
            (try
-             (git/tag-or-latest-id (io/file "."))
+             (spring/short-git-commit (git/tag-or-latest-id (io/file ".")))
              (catch Exception e
                (log/warn e "Error getting git version")))
            (slurp (io/resource "alt-spring-lobby.version"))
