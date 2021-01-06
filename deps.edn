@@ -44,6 +44,7 @@
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.25.5"}
+    cider/orchard {:mvn/version "0.6.2"}
     clj-commons/pomegranate {:mvn/version "1.2.0"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
