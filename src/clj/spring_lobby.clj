@@ -45,7 +45,9 @@
     (java.util TimeZone)
     (javafx.application Platform)
     (javafx.embed.swing SwingFXUtils)
-    (javafx.scene.input KeyCode)
+    (javafx.event Event)
+    (javafx.scene.control TextArea)
+    (javafx.scene.input KeyCode ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
     (javafx.stage WindowEvent)
@@ -990,7 +992,8 @@
       (catch Exception e
         (log/error e "Error joining channel" channel-name)))))
 
-(defmethod event-handler ::leave-channel [{:keys [channel-name client] :fx/keys [event]}]
+(defmethod event-handler ::leave-channel
+  [{:keys [channel-name client] :fx/keys [^Event event]}]
   (future
     (try
       (message/send-message client (str "LEAVE " channel-name))
@@ -2477,7 +2480,7 @@
   ["minimap" "metalmap" "heightmap"])
 
 (defmethod event-handler ::minimap-scroll
-  [{:fx/keys [event]}]
+  [{:fx/keys [^ScrollEvent event]}]
   (swap! *state
          (fn [{:keys [minimap-type] :as state}]
            (let [direction (if (pos? (.getDeltaY event))
@@ -5225,7 +5228,7 @@
    fx.lifecycle/dynamic
    {:scroll-text (fx.prop/make
                    (fx.mutator/setter
-                     (fn [text-area [txt auto-scroll]]
+                     (fn [^TextArea text-area [txt auto-scroll]]
                        (let [scroll-pos (if auto-scroll
                                           ##Inf
                                           (.getScrollTop text-area))]
