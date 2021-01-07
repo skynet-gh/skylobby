@@ -47,7 +47,7 @@
     (javafx.embed.swing SwingFXUtils)
     (javafx.event Event)
     (javafx.scene.control TextArea)
-    (javafx.scene.input KeyCode ScrollEvent)
+    (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
     (javafx.stage WindowEvent)
@@ -1447,84 +1447,143 @@
            (catch Exception e
              (log/trace e "Error getting KeyCode for" bind-key-piece)))))
 
-(defn uikeys-window [{:keys [show-uikeys-window uikeys]}]
-  {:fx/type :stage
-   :showing show-uikeys-window
-   :title "alt-spring-lobby UI Keys Editor"
-   :on-close-request (fn [^javafx.stage.WindowEvent e]
-                       (swap! *state assoc :show-uikeys-window false)
-                       (.consume e))
-   :width 1200
-   :height 1000
-   :scene
-   {:fx/type :scene
-    :stylesheets stylesheets
-    :root
-    {:fx/type :v-box
-     :style {:-fx-font-size 14}
-     :children
-     [{:fx/type :table-view
-       :v-box/vgrow :always
-       :column-resize-policy :constrained
-       :items
-       (sort-by :bind-key
-         (or (seq uikeys)
-             (u/try-log "parse uikeys" (uikeys/parse-uikeys))
-             []))
-       :columns
-       [
-        {:fx/type :table-column
-         :text "Action"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [i]
-            {:text (str (:bind-action i))})}}
-        {:fx/type :table-column
-         :text "Bind"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [i]
-            {:text (pr-str (:bind-key i))})}}
-        {:fx/type :table-column
-         :text "Parsed"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [i]
-            {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
-        {:fx/type :table-column
-         :text "JavaFX KeyCode"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [i]
-            (let [bind-key-uc (string/upper-case (:bind-key i))
-                  parsed (uikeys/parse-bind-keys bind-key-uc)
-                  key-codes (map
-                              (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
-                              parsed)]
-              {:text (pr-str key-codes)}))}}
-        {:fx/type :table-column
-         :text "Comment"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe
-          (fn [{:keys [bind-comment]}]
-            (merge
-              {:text (str bind-comment)}
-              (when bind-comment
-                {:tooltip
-                 {:fx/type :tooltip
-                  :show-delay [10 :ms]
-                  :style {:-fx-font-size 15}
-                  :text (str bind-comment)}})))}}]}]}}})
+(def keycode-binds
+  (clojure.set/map-invert bind-keycodes))
+
+(defn key-event-to-uikeys-bind [^KeyEvent key-event]
+  (str
+    (when (.isAltDown key-event)
+      "alt,")
+    (when (.isControlDown key-event)
+      "ctrl,")
+    (when (.isShiftDown key-event)
+      "shift,")
+    (or (get keycode-binds (.getCode key-event))
+        (.getText key-event))))
+
+(defmethod event-handler ::uikeys-pressed [{:fx/keys [^KeyEvent event] :keys [selected-uikeys-action]}]
+  (if (.isModifierKey (.getCode event))
+    (log/debug "Ignoring modifier key event for uikeys")
+    (do
+      (log/info event)
+      (swap! *state assoc-in [:uikeys selected-uikeys-action] (key-event-to-uikeys-bind event)))))
+
+(defmethod event-handler ::uikeys-select
+  [{:fx/keys [event]}]
+  (swap! *state assoc :selected-uikeys-action (:bind-action event)))
+
+(defn uikeys-window [{:keys [filter-uikeys-action selected-uikeys-action show-uikeys-window uikeys]}]
+  (let [default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
+                           [])
+        filtered-uikeys (->>  default-uikeys
+                              (filter
+                                (fn [{:keys [bind-action]}]
+                                  (if (string/blank? filter-uikeys-action)
+                                    true
+                                    (string/includes?
+                                      (string/lower-case bind-action)
+                                      (string/lower-case filter-uikeys-action)))))
+                              (sort-by :bind-key))
+        uikeys-overrides (or uikeys {})]
+    {:fx/type :stage
+     :showing show-uikeys-window
+     :title "alt-spring-lobby UI Keys Editor"
+     :on-close-request (fn [^Event e]
+                         (swap! *state assoc :show-uikeys-window false)
+                         (.consume e))
+     :width 1200
+     :height 1000
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
+       :style {:-fx-font-size 14}
+       :children
+       [{:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :text " Filter action: "}
+          {:fx/type :text-field
+           :text (str filter-uikeys-action)
+           :prompt-text "filter"
+           :on-text-changed {:event/type ::assoc
+                             :key :filter-uikeys-action}}]}
+        {:fx/type fx.ext.table-view/with-selection-props
+         :v-box/vgrow :always
+         :props
+         {:selection-mode :single
+          :on-selected-item-changed
+          {:event/type ::uikeys-select}}
+         :desc
+         {:fx/type :table-view
+          :column-resize-policy :constrained
+          :items filtered-uikeys
+          :on-key-pressed {:event/type ::uikeys-pressed
+                           :selected-uikeys-action selected-uikeys-action}
+          :columns
+          [
+           {:fx/type :table-column
+            :text "Action"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [i]
+               {:text (str (:bind-action i))})}}
+           {:fx/type :table-column
+            :text "Bind"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [i]
+               {:text (pr-str (:bind-key i))})}}
+           {:fx/type :table-column
+            :text "Parsed"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [i]
+               {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
+           {:fx/type :table-column
+            :text "JavaFX KeyCode"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [i]
+               (let [bind-key-uc (string/upper-case (:bind-key i))
+                     parsed (uikeys/parse-bind-keys bind-key-uc)
+                     key-codes (map
+                                 (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
+                                 parsed)]
+                 {:text (pr-str key-codes)}))}}
+           {:fx/type :table-column
+            :text "Comment"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [{:keys [bind-comment]}]
+               (merge
+                 {:text (str bind-comment)}
+                 (when bind-comment
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :style {:-fx-font-size 15}
+                     :text (str bind-comment)}})))}}
+           {:fx/type :table-column
+            :text "Override"
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [i]
+               {:text (pr-str (get uikeys-overrides (:bind-action i)))})}}]}}]}}}))
 
 
 (defmethod event-handler ::username-change
@@ -5519,7 +5578,7 @@
        [(merge
           {:fx/type uikeys-window}
           (select-keys state
-            [:show-uikeys-window :uikeys]))]))})
+            [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]))})
 
 
 (defn init
