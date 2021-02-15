@@ -185,13 +185,19 @@
                   (into {})))))
        {:game
         (into
-          {:gametype (if-let [modinfo (:modinfo mod-details)]
-                       (str (:name modinfo) " " (:version modinfo))
-                       (:battle-modname battle))
-           :mapname (:battle-map battle)
-           :hostip (when-not is-host (:battle-ip battle))
-           :hostport (:battle-port battle)
-           :ishost (if is-host 1 0)}
+          (merge
+            {:ishost (if is-host 1 0)}
+            (when-let [gametype (if-let [modinfo (:modinfo mod-details)]
+                                  (str (:name modinfo) " " (:version modinfo))
+                                  (:battle-modname battle))]
+              {:gametype gametype})
+            (when-let [hostip (:battle-ip battle)]
+              (when-not is-host
+                {:hostip hostip}))
+            (when-let [hostport (:battle-port battle)]
+              {:hostport hostport})
+            (when-let [mapname (:battle-map battle)]
+              {:mapname mapname}))
           (concat
             (map
               (fn [[player {:keys [battle-status user]}]]

@@ -3,7 +3,8 @@
   (:require
     [clojure.java.io :as io]
     [org.clojars.smee.binary.core :as b]
-    [spring-lobby.fs :as fs])
+    [spring-lobby.fs :as fs]
+    [spring-lobby.spring.script :as spring-script])
   (:import
     (java.util.zip GZIPInputStream)))
 
@@ -20,7 +21,7 @@
     :magic (b/string "ISO-8859-1" :length 16)
     :version :int-le
     :header-size :int-le
-    :engine-version (b/string "ISO-8859-1" :length 16)
+    :engine-version (b/string "ISO-8859-1" :length 256)
     :game-id (b/blob :length 16)
     :unix-time :ulong-le
     :script-size :int-le
@@ -34,6 +35,17 @@
     :team-stat-period :int-le
     :winning-ally-team :int-le))
 
+; https://github.com/spring/spring/blob/master/rts/System/LoadSave/demofile.h#L31-L42
+(def sdfz-protocol
+  (b/header
+    sdfz-header
+    (fn [{:keys [script-size]}]
+      (b/ordered-map
+        :something :int-le
+        :something2 :int-le
+        :script-txt (b/string "ISO-8859-1" :length script-size)))
+    (constantly nil) ; TODO writing replays
+    :keep-header? true))
 
 (defn decode-replay-header [^java.io.File f]
   (with-open [is (io/input-stream f)
@@ -42,11 +54,21 @@
          (b/decode sdfz-header)
          (into (sorted-map)))))
 
+(defn decode-replay [^java.io.File f]
+  (with-open [is (io/input-stream f)
+              gz (GZIPInputStream. is)]
+    (update
+      (->> (b/decode sdfz-protocol gz)
+           (into (sorted-map)))
+      :body
+      (fn [body]
+        (assoc body :script-data (spring-script/parse-script (:script-txt body)))))))
+
 
 (defn parse-replay-filename [^java.io.File f]
   (let [filename (fs/filename f)
-        [_all timestamp game-id map-name engine-version] (re-find replay-filename-re filename)]
+        [_all timestamp game-id map-name sync-version] (re-find replay-filename-re filename)]
     {:timestamp timestamp
      :game-id game-id
      :map-name map-name
-     :engine-version engine-version}))
+     :engine-version (fs/sync-version-to-engine-version sync-version)}))

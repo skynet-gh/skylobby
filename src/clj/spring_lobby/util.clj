@@ -2,6 +2,7 @@
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]
+    [clojure.string :as string]
     [taoensso.timbre :as timbre]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
@@ -96,3 +97,7 @@
   (with-open [out (java.io.ByteArrayOutputStream.)]
     (io/copy (io/input-stream x) out)
     (.toByteArray out)))
+
+(defn battle-channel-name? [channel-name]
+  (and channel-name
+       (string/starts-with? channel-name "__battle__")))

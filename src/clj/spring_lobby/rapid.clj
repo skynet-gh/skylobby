@@ -50,6 +50,13 @@
     {:file f
      :items (b/decode (b/repeated sdp-line) gz)}))
 
+(defn sdp-file
+  ([sdp-filename]
+   (sdp-file (fs/isolation-dir) sdp-filename))
+  ([root sdp-filename]
+   (when sdp-filename
+     (io/file root "packages" sdp-filename))))
+
 (defn sdp-files
   ([]
    (sdp-files (fs/isolation-dir)))
@@ -166,11 +173,14 @@
     {}))
 
 
-(defn versions [repo]
-  (log/debug "Loading rapid versions for repo" repo)
-  (-> (fs/spring-root)
-      (io/file "rapid" "repos.springrts.com" repo "versions.gz")
-      (rapid-versions)))
+(defn versions
+  ([repo]
+   (versions repo (fs/isolation-dir)))
+  ([repo root]
+   (log/debug "Loading rapid versions for repo" repo)
+   (-> root
+       (io/file "rapid" "repos.springrts.com" repo "versions.gz")
+       (rapid-versions))))
 
 
 (defn- try-inner-lua
@@ -205,3 +215,19 @@
            (map read-sdp-mod)
            (filter :modinfo)
            doall))
+
+(defn copy-package [source-sdp-file dest-spring-root]
+  (log/info "Copying rapid package from" source-sdp-file "into" dest-spring-root)
+  (let [{:keys [items]} (decode-sdp source-sdp-file)
+        source-spring-root (fs/parent-file (fs/parent-file source-sdp-file))]
+    (log/info "Copying" (count items))
+    (doseq [{:keys [filename md5]} items]
+      (try
+        (let [source-file (file-in-pool source-spring-root md5)
+              dest-file (file-in-pool dest-spring-root md5)]
+          (log/info "Copying" source-file "(" filename ") to" dest-file)
+          (fs/copy source-file dest-file))
+        (catch Exception e
+          (log/warn e "Error copying rapid pool file for" md5 "(" filename ")"))))
+    (log/info "Copying package file" source-sdp-file)
+    (fs/copy source-sdp-file (io/file dest-spring-root "packages" (fs/filename source-sdp-file)))))

@@ -339,7 +339,8 @@
 
 (def bar-platforms
   {"linux64" "linux-64"
-   "win32" "windows-32"})
+   "win32" "windows-64"
+   "win64" "windows-64"})
 
 (defn bar-engine-filename
   ([version]

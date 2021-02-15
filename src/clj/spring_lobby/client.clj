@@ -310,6 +310,7 @@
          msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
                   " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
      (message/send-message client msg))))
+     ;(message/send-message client (str "LI " username)))))
 
 
 (defn connect
@@ -323,7 +324,7 @@
     (message/send-message client "CHANNELS")
     (doseq [channel my-channels]
       (let [[channel-name {channel-server :server}] channel]
-        (when (= server channel-server)
+        (when (and (= server channel-server)) (not (u/battle-channel-name? channel-name))
           (message/send-message client (str "JOIN " channel-name)))))
     (ping-loop state-atom client)))
 

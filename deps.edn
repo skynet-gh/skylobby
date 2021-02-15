@@ -41,7 +41,7 @@
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
-  version-clj/version-clj {:mvn/version "1.0.0"}}
+  version-clj/version-clj {:mvn/version "2.0.1"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
@@ -54,7 +54,7 @@
     io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.884"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.10.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -72,7 +72,7 @@
     io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.884"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.10.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -89,7 +89,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.884"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
