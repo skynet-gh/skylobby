@@ -6,17 +6,18 @@
   byte-streams/byte-streams {:mvn/version "0.2.4"}
   cheshire/cheshire {:mvn/version  "5.10.0"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
-  clj-http/clj-http {:mvn/version "3.11.0"}
-  cljfx/cljfx {:mvn/version "1.7.12"}
+  clj-http/clj-http {:mvn/version "3.12.1"}
+  cljfx/cljfx {:mvn/version "1.7.13"}
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
   clojure.java-time/clojure.java-time {:mvn/version "0.3.2"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.20"}
-  com.taoensso/timbre {:mvn/version "5.1.0"}
+  com.taoensso/timbre {:mvn/version "5.1.2"}
   commons-io/commons-io {:mvn/version "2.8.0"}
   crouton/crouton {:mvn/version "0.1.2"}
   digest/digest {:mvn/version "1.4.10"}
+  expound/expound {:mvn/version "0.8.9"}
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   hashp/hashp {:mvn/version "0.2.0"}
@@ -25,11 +26,13 @@
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-  org.clojure/clojure {:mvn/version "1.10.2-rc1"}
+  org.clojure/clojure {:mvn/version "1.10.2"}
   org.clojure/core.async {:mvn/version "1.3.610"}
+  org.clojure/spec.alpha {:mvn/version "0.2.194"}
+  org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
-  org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.1.0"}
-  org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.1.0"}
+  org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.2.0"}
+  org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.2.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-controls {:mvn/version "15.0.1"}
   org.openjfx/javafx-swing {:mvn/version "15.0.1"}
@@ -38,26 +41,45 @@
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
-  version-clj/version-clj {:mvn/version "0.1.2"}}
+  version-clj/version-clj {:mvn/version "1.0.0"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.25.6"}
-    cider/orchard {:mvn/version "0.6.2"}
+   {cider/cider-nrepl {:mvn/version "0.25.9"}
+    cider/orchard {:mvn/version "0.6.5"}
     clj-commons/pomegranate {:mvn/version "1.2.0"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.9.857"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.10.0"}
     reply/reply {:mvn/version "0.4.4"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "repl"]}
+  :reveal
+  {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
+   :extra-deps
+   {cider/cider-nrepl {:mvn/version "0.25.9"}
+    cider/orchard {:mvn/version "0.6.5"}
+    clj-commons/pomegranate {:mvn/version "1.2.0"}
+    com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
+    hawk/hawk {:mvn/version "0.2.11"}
+    io.aviso/pretty {:mvn/version "0.1.37"}
+    net.cgrand/parsley {:mvn/version "0.9.3"}
+    nrepl/nrepl {:mvn/version "0.8.3"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
+    org.clojure/tools.namespace {:mvn/version "1.1.0"}
+    pjstadig/humane-test-output {:mvn/version "0.10.0"}
+    reply/reply {:mvn/version "0.4.4"}
+    seancorfield/depstar {:mvn/version "1.1.136"}
+    vlaaad/reveal {:mvn/version "1.3.196"}}
+   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
+   :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-refresh
   {:extra-paths ["dev/clj/test" "test/clj"]
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
@@ -67,7 +89,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.9.833"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.9.871"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
