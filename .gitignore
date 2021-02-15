@@ -3,7 +3,9 @@
 /*.log*
 /.calva/
 /.classpath
+/.clj-kondo/
 /.cpcache/
+/.lsp/
 /.nrepl-port
 /.project
 /.settings/
