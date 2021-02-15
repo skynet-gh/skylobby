@@ -24,7 +24,7 @@ jobs:
     steps:
       # https://github.com/marketplace/actions/setup-clojure
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@3.0
+      - uses: DeLaGuardo/setup-graalvm@3.1
         with:
           graalvm-version: '19.3.4.java11'
       - uses: DeLaGuardo/setup-clojure@3.1
