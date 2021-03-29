@@ -51,9 +51,12 @@
   (is (= "spring_bar_.BAR.104.0.1-1656-gad7994a_linux-64-minimal-portable.7z",
          (with-redefs [fs/get-sys-data (constantly {:os-name "Linux"})]
            (http/bar-engine-filename "104.0.1-1656-gad7994a BAR"))))
-  (is (= "spring_bar_.BAR.104.0.1-1695-gbd6b256_windows-32-minimal-portable.7z",
+  (is (= "spring_bar_.BAR.104.0.1-1695-gbd6b256_windows-64-minimal-portable.7z",
          (with-redefs [fs/get-sys-data (constantly {:os-name "Windows"})]
-           (http/bar-engine-filename "104.0.1-1695-gbd6b256 BAR")))))
+           (http/bar-engine-filename "104.0.1-1695-gbd6b256 BAR"))))
+  (is (= "spring_bar_.BAR.104.0.1.1828-g1f481b7_windows-64-minimal-portable.7z"
+         (with-redefs [fs/get-sys-data (constantly {:os-name "Windows"})]
+           (http/bar-engine-filename "104.0.1.1828-g1f481b7 BAR")))))
 
 (deftest bar-engine-filename?
   (is (false?

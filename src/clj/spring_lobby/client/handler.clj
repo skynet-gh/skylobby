@@ -344,3 +344,10 @@
     (swap! state-atom update-in [:channels channel-name] merge {:channel-name channel-name
                                                                 :user-count user-count
                                                                 :topic topic})))
+
+(defmethod handle "CHANNELTOPIC" [_client state-atom m]
+  (let [[_all channel-name topic] (re-find #"\w+ ([^\s]+) (\w+)" m)]
+    (swap! state-atom update-in [:channels channel-name] merge {:topic topic})))
+
+(defmethod handle "ENDOFCHANNELS" [_client _state-atom _m]
+  (log/debug "Ignore ENDOFCHANNELS message"))

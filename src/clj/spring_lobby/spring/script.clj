@@ -1,7 +1,6 @@
 (ns spring-lobby.spring.script
   (:require
     [clojail.core :as clojail]
-    [clojure.edn :as edn]
     [clojure.string :as string]
     [instaparse.core :as instaparse]
     [spring-lobby.util :as u]
@@ -79,14 +78,16 @@
 
 (defn parse-number
   [v]
-  (try
-    (if-let [e (edn/read-string v)] ; TODO clean
-       (if (number? e)
-         e
-         v)
-       v)
-    (catch Exception _e
-      v)))
+  (or
+      (try
+        (Long/parseLong v)
+        (catch Exception e
+          (log/trace e "Error parsing long from" v)))
+      (try
+        (Double/parseDouble v)
+        (catch Exception e
+          (log/trace e "Error parsing double from" v)))
+      v))
 
 (defn parse-field-or-block [field-or-block]
   (let [kind (first field-or-block)]

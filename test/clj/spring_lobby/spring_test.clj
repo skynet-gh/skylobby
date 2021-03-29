@@ -96,7 +96,6 @@
    {:gametype "Balanced Annihilation V10.24"
     :mapname "Dworld Duo"
     :hostport 8452
-    :hostip nil
     :ishost 1
     :myplayername "me"
     :modoptions {}
@@ -174,7 +173,6 @@
 \t}
 
 \tgametype = Balanced Annihilation V10.24;
-\thostip = ;
 \thostport = 8452;
 \tishost = 1;
 \tmapname = Dworld Duo;

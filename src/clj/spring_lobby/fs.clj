@@ -501,6 +501,8 @@
                         (try
                           (when-let [slurped (slurp (io/file file filename))]
                             (lua/read-modinfo slurped))
+                          (catch java.io.FileNotFoundException _e
+                            (log/warn "Mod" file "is missing expected file" filename))
                           (catch Exception e
                             (log/warn e "Error loading" filename "from" file))))]
      (merge
