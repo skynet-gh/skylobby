@@ -24,11 +24,11 @@ jobs:
     steps:
       # https://github.com/marketplace/actions/setup-clojure
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@3.1
+      - uses: DeLaGuardo/setup-graalvm@4.0
         with:
           graalvm-version: '19.3.4.java11'
-      - uses: DeLaGuardo/setup-clojure@3.1
+      - uses: DeLaGuardo/setup-clojure@3.2
         with:
-          cli: '1.10.1.763'
+          cli: '1.10.3.814'
 
       - run: clojure -M:test:headless:runner
