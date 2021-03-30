@@ -351,3 +351,26 @@
 
 (defmethod handle "ENDOFCHANNELS" [_client _state-atom _m]
   (log/debug "Ignore ENDOFCHANNELS message"))
+
+(defn normalize-startrect [rect-str]
+  (let [parsed (Long/parseLong rect-str)]
+    (with-precision 10
+      (/ parsed 200))))
+
+(defmethod handle "ADDSTARTRECT" [_client state-atom m]
+  (let [[_all allyteam left top right bottom] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+)" m)
+        allyteam-kw (keyword (str "allyteam" allyteam))]
+    (swap! state-atom update-in [:battle :scripttags :game allyteam-kw]
+           (fn [allyteam]
+             (assoc allyteam
+                    :startrectleft (normalize-startrect left)
+                    :startrecttop (normalize-startrect top)
+                    :startrectright (normalize-startrect right)
+                    :startrectbottom (normalize-startrect bottom))))))
+
+(defmethod handle "REMOVESTARTRECT" [_client state-atom m]
+  (let [[_all allyteam] (re-find #"\w+ (\w+)" m)
+        allyteam-kw (keyword (str "allyteam" allyteam))]
+    (swap! state-atom update-in [:battle :scripttags :game allyteam-kw]
+           (fn [allyteam]
+             (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))

@@ -2486,30 +2486,51 @@
            (filter some?)
            doall))))
 
-(defn minimap-start-boxes [minimap-width minimap-height scripttags]
+(defn minimap-start-boxes [minimap-width minimap-height scripttags drag-allyteam]
   (let [game (:game scripttags)
         allyteams (->> game
                        (filter (comp #(string/starts-with? % "allyteam") name first))
                        (map
                          (fn [[teamid team]]
-                           (let [[_all id] (re-find #"team(\d+)" (name teamid))]
+                           (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
                              [id team])))
                        (into {}))]
-    (map
-      (fn [[id {:keys [startrectbottom startrectleft startrectright startrecttop]}]]
-        {:allyteam id
-         :x (* startrectleft minimap-width)
-         :y (* startrecttop minimap-height)
-         :width (* (- startrectright startrectleft) minimap-width)
-         :height (* (- startrectbottom startrecttop) minimap-height)})
-      allyteams)))
+    (conj
+      (->> allyteams
+           (map
+             (fn [[id {:keys [startrectbottom startrectleft startrectright startrecttop]
+                       :as at}]]
+               (if (and id
+                        (number? startrectleft)
+                        (number? startrecttop)
+                        (number? startrectright)
+                        (number? startrectbottom)
+                        (number? minimap-width)
+                        (number? minimap-height))
+                 (merge
+                   {:allyteam id
+                    :x (* startrectleft minimap-width)
+                    :y (* startrecttop minimap-height)
+                    :width (* (- startrectright startrectleft) minimap-width)
+                    :height (* (- startrectbottom startrecttop) minimap-height)})
+                 (log/warn "Invalid allyteam:" id at))))
+           (filter some?))
+      (when drag-allyteam
+        (let [{:keys [startx starty endx endy]} drag-allyteam]
+          {:allyteam (str (:allyteam-id drag-allyteam))
+           :x (min startx endx)
+           :y (min starty endy)
+           :width (Math/abs (- endx startx))
+           :height (Math/abs (- endy starty))})))))
 
 
 (defmethod event-handler ::minimap-mouse-pressed
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [starting-points startpostype]}]
+  [{:fx/keys [^javafx.scene.input.MouseEvent event]
+    :keys [start-boxes starting-points startpostype]}]
   (future
     (try
-      (when (= "Choose before game" startpostype)
+      (cond
+        (= startpostype "Choose before game")
         (let [ex (.getX event)
               ey (.getY event)]
           (when-let [target (some
@@ -2521,7 +2542,28 @@
                               starting-points)]
             (swap! *state assoc :drag-team {:team (:team target)
                                             :x (- ex start-pos-r)
-                                            :y (- ey start-pos-r)}))))
+                                            :y (- ey start-pos-r)})))
+        (= startpostype "Choose in game")
+        (let [ex (.getX event)
+              ey (.getY event)
+              allyteam-ids (->> start-boxes
+                                (map :allyteam)
+                                (filter some?)
+                                (map
+                                  (fn [allyteam]
+                                    (Integer/parseInt allyteam)))
+                                set)
+              allyteam-id (loop [i 0]
+                            (if (contains? allyteam-ids i)
+                              (recur (inc i))
+                              i))]
+          (swap! *state assoc :drag-allyteam {:allyteam-id allyteam-id
+                                              :startx ex
+                                              :starty ey
+                                              :endx ex
+                                              :endy ey}))
+        :else
+        nil)
       (catch Exception e
         (log/error e "Error pressing minimap")))))
 
@@ -2534,10 +2576,16 @@
             y (.getY event)]
         (swap! *state
                (fn [state]
-                 (if (:drag-team state)
+                 (cond
+                   (:drag-team state)
                    (update state :drag-team assoc
                            :x (- x start-pos-r)
                            :y (- y start-pos-r))
+                   (:drag-allyteam state)
+                   (update state :drag-allyteam assoc
+                     :endx x
+                     :endy y)
+                   :else
                    state))))
       (catch Exception e
         (log/error e "Error dragging minimap")))))
@@ -2546,7 +2594,7 @@
   [{:keys [minimap-width minimap-height map-details]}]
   (future
     (try
-      (let [[before _after] (swap-vals! *state dissoc :drag-team)]
+      (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
         (when-let [{:keys [team x y]} (:drag-team before)]
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
                 x (int (* (/ x minimap-width) map-width spring/map-multiplier))
@@ -2563,7 +2611,35 @@
                          (update-in [:battle :scripttags] u/deep-merge scripttags))))
             (message/send-message
               (:client before)
-              (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
+              (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
+        (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
+          (let [l (min startx endx)
+                t (min starty endy)
+                r (max startx endx)
+                b (max starty endy)
+                left (with-precision 10 (/ l minimap-width))
+                top (with-precision 10 (/ t minimap-height))
+                right (with-precision 10 (/ r minimap-width))
+                bottom (with-precision 10 (/ b minimap-height))
+                allyteam-kw (keyword (str "allyteam" allyteam-id))
+                scripttags {:game
+                            {allyteam-kw
+                             {:startrectleft left
+                              :startrecttop top
+                              :startrectright right
+                              :startrectbottom bottom}}}]
+            (swap! *state
+                   (fn [state]
+                     (-> state
+                         (update :scripttags u/deep-merge scripttags)
+                         (update-in [:battle :scripttags] u/deep-merge scripttags))))
+            (message/send-message
+              (:client before)
+              (str "ADDSTARTRECT " allyteam-id " "
+                   (int (* 200 left)) " "
+                   (int (* 200 top)) " "
+                   (int (* 200 right)) " "
+                   (int (* 200 bottom)))))))
       (catch Exception e
         (log/error e "Error releasing minimap")))))
 
@@ -3277,11 +3353,11 @@
 
 
 (defn minimap-pane
-  [{:keys [am-host battle-details drag-team map-details map-name minimap-type scripttags]}]
+  [{:keys [am-host battle-details drag-team drag-allyteam map-details map-name minimap-type scripttags]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
-        start-boxes (minimap-start-boxes minimap-width minimap-height scripttags)
+        start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
                         "heightmap" (:heightmap-image smf)
@@ -3323,12 +3399,10 @@
           (when am-host
             {:on-mouse-pressed {:event/type ::minimap-mouse-pressed
                                 :startpostype startpostype
-                                :starting-points starting-points}
-             :on-mouse-dragged {:event/type ::minimap-mouse-dragged
-                                :startpostype startpostype
-                                :starting-points starting-points}
+                                :starting-points starting-points
+                                :start-boxes start-boxes}
+             :on-mouse-dragged {:event/type ::minimap-mouse-dragged}
              :on-mouse-released {:event/type ::minimap-mouse-released
-                                 :startpostype startpostype
                                  :map-details map-details
                                  :minimap-width minimap-width
                                  :minimap-height minimap-height}})
@@ -3378,30 +3452,31 @@
                      (.fillText gc text xc yc)))
                  (when minimap-image
                    (doseq [{:keys [allyteam x y width height]} start-boxes]
-                     (let [color (Color/color 0.5 0.5 0.5 0.5)
-                           border 4
-                           text allyteam
-                           font-size 20.0
-                           xt (+ x (quot font-size 2))
-                           yt (+ y (* font-size 1.2))]
-                       (.beginPath gc)
-                       (.rect gc (+ x (quot border 2)) (+ y (quot border 2)) (inc (- width border)) (inc (- height border)))
-                       (.setFill gc color)
-                       (.fill gc)
-                       (.setStroke gc Color/BLACK)
-                       (.setLineWidth gc border)
-                       (.stroke gc)
-                       (.closePath gc)
-                       (.setFont gc (Font/font "Regular" FontWeight/BOLD font-size))
-                       (.setStroke gc Color/BLACK)
-                       (.setLineWidth gc 2.0)
-                       (.strokeText gc text xt yt)
-                       (.setFill gc Color/WHITE)
-                       (.fillText gc text xt yt)))))))})])}))
+                     (when (and x y width height)
+                       (let [color (Color/color 0.5 0.5 0.5 0.5)
+                             border 4
+                             text allyteam
+                             font-size 20.0
+                             xt (+ x (quot font-size 2))
+                             yt (+ y (* font-size 1.2))]
+                         (.beginPath gc)
+                         (.rect gc (+ x (quot border 2)) (+ y (quot border 2)) (inc (- width border)) (inc (- height border)))
+                         (.setFill gc color)
+                         (.fill gc)
+                         (.setStroke gc Color/BLACK)
+                         (.setLineWidth gc border)
+                         (.stroke gc)
+                         (.closePath gc)
+                         (.setFont gc (Font/font "Regular" FontWeight/BOLD font-size))
+                         (.setStroke gc Color/BLACK)
+                         (.setLineWidth gc 2.0)
+                         (.strokeText gc text xt yt)
+                         (.setFill gc Color/WHITE)
+                         (.fillText gc text xt yt))))))))})])}))
 
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-   :bot-username :bot-version :cleaning :client :copying :downloadables-by-url :downloads :drag-team :engine-version
+   :bot-username :bot-version :cleaning :client :copying :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :minimap-type :mods :rapid-data-by-version
@@ -3410,7 +3485,7 @@
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            client
-           copying downloadables-by-url drag-team engines extracting file-cache gitting
+           copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
            http-download importables-by-path map-input-prefix maps minimap-type
            rapid-data-by-version rapid-download users username]
     :as state}]
@@ -3422,19 +3497,11 @@
                           :game
                           :startpostype
                           spring/startpostype-name)
-        {:keys [smf]} battle-map-details
-        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
-        starting-points (minimap-starting-points battle-details battle-map-details scripttags minimap-width minimap-height)
         engine-version (:battle-version battle-details)
         engine-details (spring/engine-details engines engine-version)
         engine-file (:file engine-details)
         bots (fs/bots engine-file)
-        minimap-image (case minimap-type
-                        "metalmap" (:metalmap-image smf)
-                        "heightmap" (:heightmap-image smf)
-                        ; else
-                        (scale-minimap-image minimap-width minimap-height (:minimap-image smf)))
         bots (concat bots
                      (->> battle-mod-details :luaai
                           (map second)
@@ -4008,104 +4075,21 @@
        :alignment :top-left
        :style {:-fx-min-height (+ minimap-size 120)}
        :children
-       [
-        {:fx/type :stack-pane
-         :on-scroll {:event/type ::minimap-scroll}
-         :style
-         {:-fx-min-width minimap-size
-          :-fx-max-width minimap-size
-          :-fx-min-height minimap-size
-          :-fx-max-height minimap-size}
-         :children
-         (concat
-           (if minimap-image
-             (let [image (SwingFXUtils/toFXImage minimap-image nil)]
-               [{:fx/type :image-view
-                 :image image
-                 :fit-width minimap-width
-                 :fit-height minimap-height
-                 :preserve-ratio true}])
-             [{:fx/type :v-box
-               :alignment :center
-               :children
-               [
-                {:fx/type :label
-                 :text (str battle-map)
-                 :style {:-fx-font-size 16}}
-                {:fx/type :label
-                 :text (if battle-map-details ; nil vs empty map
-                         "(not found)"
-                         "(loading...)")
-                 :alignment :center}]}])
-           [(merge
-              (when am-host
-                {:on-mouse-pressed {:event/type ::minimap-mouse-pressed
-                                    :startpostype startpostype
-                                    :starting-points starting-points}
-                 :on-mouse-dragged {:event/type ::minimap-mouse-dragged
-                                    :startpostype startpostype
-                                    :starting-points starting-points}
-                 :on-mouse-released {:event/type ::minimap-mouse-released
-                                     :startpostype startpostype
-                                     :map-details battle-map-details
-                                     :minimap-width minimap-width
-                                     :minimap-height minimap-height}})
-              {:fx/type :canvas
-               :width minimap-width
-               :height minimap-height
-               :draw
-               (fn [^javafx.scene.canvas.Canvas canvas]
-                 (let [gc (.getGraphicsContext2D canvas)
-                       border-color (if (not= "minimap" minimap-type)
-                                      Color/WHITE Color/BLACK)
-                       random (= "Random" startpostype)
-                       random-teams (when random
-                                      (let [teams (spring/teams battle-details)]
-                                        (set (map str (take (count teams) (iterate inc 0))))))
-                       starting-points (if random
-                                         (filter (comp random-teams :team) starting-points)
-                                         starting-points)]
-                   (.clearRect gc 0 0 minimap-width minimap-height)
-                   (.setFill gc Color/RED)
-                   (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
-                   (doseq [{:keys [x y team color]} starting-points]
-                     (let [drag (when (and drag-team
-                                           (= team (:team drag-team)))
-                                  drag-team)
-                           x (or (:x drag) x)
-                           y (or (:y drag) y)
-                           xc (- x (if (= 1 (count team)) ; single digit
-                                     (* start-pos-r -0.6)
-                                     (* start-pos-r -0.2)))
-                           yc (+ y (/ start-pos-r 0.75))
-                           text (if random "?" team)
-                           fill-color (if random Color/RED color)]
-                       (cond
-                         (#{"Fixed" "Random" "Choose before game"} startpostype)
-                         (do
-                           (.beginPath gc)
-                           (.rect gc x y
-                                  (* 2 start-pos-r)
-                                  (* 2 start-pos-r))
-                           (.setFill gc fill-color)
-                           (.fill gc)
-                           (.setStroke gc border-color)
-                           (.stroke gc)
-                           (.closePath gc)
-                           (.setStroke gc Color/BLACK)
-                           (.strokeText gc text xc yc)
-                           (.setFill gc Color/WHITE)
-                           (.fillText gc text xc yc))
-                         :else ; TODO choose starting rects
-                         nil)))))})])}
+       [{:fx/type minimap-pane
+         :am-host am-host
+         :battle-details battle-details
+         :drag-allyteam drag-allyteam
+         :drag-team drag-team
+         :map-name battle-map
+         :map-details battle-map-details
+         :minimap-type minimap-type
+         :scripttags scripttags}
         {:fx/type :v-box
          :children
-         [
-          {:fx/type :h-box
+         [{:fx/type :h-box
            :alignment :center-left
            :children
-           [
-            {:fx/type :label
+           [{:fx/type :label
              :text (str " Size: "
                         (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                           (str
@@ -4145,7 +4129,12 @@
                [{:fx/type :button
                  :text "Reset"
                  :disable (not am-host)
-                 :on-action {:event/type ::reset-start-positions}}]))}
+                 :on-action {:event/type ::reset-start-positions}}])
+             (when (= "Choose in game" startpostype)
+               [{:fx/type :button
+                 :text "Clear boxes"
+                 :disable (not am-host)
+                 :on-action {:event/type ::clear-start-boxes}}]))}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -4212,6 +4201,27 @@
     (message/send-message
       (:client state)
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
+
+(defmethod event-handler ::clear-start-boxes
+  [_e]
+  (let [{:keys [battle client]} @*state
+        allyteam-ids (->> battle
+                          :scripttags
+                          :game
+                          (filter (comp #(string/starts-with? % "allyteam") name first))
+                          (map
+                            (fn [[allyteamid _]]
+                              (let [[_all id] (re-find #"allyteam(\d+)" (name allyteamid))]
+                                id)))
+                          set)]
+    (doseq [allyteam-id allyteam-ids]
+      (let [allyteam-kw (keyword (str "allyteam" allyteam-id))]
+        (swap! *state
+               (fn [state]
+                 (-> state
+                     (update-in [:scripttags :game] dissoc allyteam-kw)
+                     (update-in [:battle :scripttags :game] dissoc allyteam-kw)))))
+      (message/send-message client (str "REMOVESTARTRECT " allyteam-id)))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
@@ -5746,7 +5756,7 @@
                                         {:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
                                         team-color (try (spring-script-color-to-int rgbcolor)
                                                         (catch Exception e
-                                                          (log/warn e "Error parsing color")
+                                                          (log/debug e "Error parsing color")
                                                           0))
                                         side-id-by-name (clojure.set/map-invert
                                                           (spring/sides gametype))]
