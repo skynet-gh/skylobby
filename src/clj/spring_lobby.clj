@@ -5462,23 +5462,11 @@
   [{:keys [engine-version engines replay]}]
   (future
     (try
-      (let [state @*state ; TODO remove deref
-            replay-file (:file replay)
-            demofile (fs/wslpath replay-file)]
-        (spring/start-game
-          (merge
-            (select-keys state [:client :username])
-            {:engines engines
-             :battle {:battle-id "replay"} ; fake battle and battles
-             :battles {"replay"
-                       {:battle-version engine-version
-                        :host-username (:username state)
-                        :scripttags
-                        (u/deep-merge
-                          nil
-                          ;(-> replay :body :script-data)
-                          {:game {:demofile demofile
-                                  :onlylocal 1}})}}})))
+      (let [replay-file (:file replay)]
+        (spring/watch-replay
+          {:engine-version engine-version
+           :engines engines
+           :replay-file replay-file}))
       (catch Exception e
         (log/error e "Error watching replay" replay)))))
 
@@ -5669,9 +5657,9 @@
                          :text " Watch"
                          :on-action
                          {:event/type ::watch-replay
-                          :replay i
                           :engines engines
-                          :engine-version engine-version}
+                          :engine-version engine-version
+                          :replay i}
                          :graphic
                          {:fx/type font-icon/lifecycle
                           :icon-literal "mdi-movie:16:white"}}
@@ -5737,6 +5725,7 @@
                         {:fx/type :label
                          :text " No map"})}))}}]}}
            {:fx/type :label
+            :style {:-fx-font-size 24}
             :text " Loading replays..."})]
          (when selected-replay
            (let [script-data (-> selected-replay :body :script-data)

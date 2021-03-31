@@ -364,3 +364,46 @@
     (catch Exception e
       (log/error e "Error starting game")
       (client/send-message client "MYSTATUS 0"))))
+
+(defn watch-replay [{:keys [engine-version engines replay-file]}]
+  (try
+    (log/info "Watching replay" replay-file)
+    (let [isolation-dir (fs/isolation-dir)
+          engine-dir (some->> engines
+                              (filter (comp #{engine-version} :engine-version))
+                              first
+                              :file)
+          engine-file (io/file engine-dir (fs/spring-executable))
+          _ (log/info "Engine executable" engine-file)
+          replay-file-param (fs/wslpath replay-file)
+          isolation-dir-param (fs/wslpath isolation-dir)
+          write-dir-param (fs/wslpath engine-dir)
+          command [(fs/canonical-path engine-file)
+                   "--isolation-dir" write-dir-param
+                   "--write-dir" isolation-dir-param
+                   replay-file-param]
+          runtime (Runtime/getRuntime)]
+      (log/info "Running '" command "'")
+      (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+            ^"[Ljava.lang.String;" envp (fs/envp)
+            process (.exec runtime cmdarray envp isolation-dir)]
+        (async/thread
+          (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+            (loop []
+              (if-let [line (.readLine reader)]
+                (do
+                  (log/info "(spring out)" line)
+                  (recur))
+                (log/info "Spring stdout stream closed")))))
+        (async/thread
+          (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+            (loop []
+              (if-let [line (.readLine reader)]
+                (do
+                  (log/info "(spring err)" line)
+                  (recur))
+                (log/info "Spring stderr stream closed")))))
+        (future
+          (.waitFor process))))
+    (catch Exception e
+      (log/error e "Error starting replay" replay-file))))
