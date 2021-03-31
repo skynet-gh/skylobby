@@ -4,13 +4,20 @@ Notable changes
 
 ### TODO - future
 
-- Add ability to register on server
-- Store multiple servers and login per server
 - Add support for TLS communication to the server
 - Call Spring unitsync to get resource hashes
-- Chat
-- Starting position rectangles for choose in game
 - Compatability warnings for known bad engine/game/AI combinations
+
+### [0.1.2]
+
+- Replay watcher
+- Starting position rectangles for choose in game
+- Chat
+- Store multiple servers and login per server
+
+### [0.1.1]
+
+- Add ability to register on server
 
 ### [0.1.0] - 2020-12-18 to 2020-12-27
 
