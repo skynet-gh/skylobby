@@ -4,9 +4,17 @@ Notable changes
 
 ### TODO - future
 
+- Hosted replay watching
 - Add support for TLS communication to the server
 - Call Spring unitsync to get resource hashes
 - Compatability warnings for known bad engine/game/AI combinations
+
+### [0.1.3]
+
+- Store replay details in a file and track watched status
+- Filter replays by game type and number of players
+- Add progress indicators for replay resource buttons
+- Improve performance for downloads and imports
 
 ### [0.1.2]
 
