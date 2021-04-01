@@ -334,14 +334,15 @@
         (log/error e "Error closing output stream")
         (throw (SevenZipException. "Error closing output stream"))))))
 
+(defn without-extension [^String fname]
+  (when fname
+    (if (string/includes? fname ".")
+      (subs fname 0 (.lastIndexOf fname "."))
+      fname)))
+
 (defn extract-7z-fast
   ([^File f]
-   (let [fname (filename f)
-         dir (if (string/includes? fname ".")
-               (subs fname 0 (.lastIndexOf fname "."))
-               fname)
-         dest (io/file (parent-file f) dir)]
-     (extract-7z-fast f dest)))
+   (extract-7z-fast f (io/file (parent-file f) (without-extension (filename f)))))
   ([^File f ^File dest]
    (let [before (u/curr-millis)]
      (log/info "Extracting" f "to" dest)

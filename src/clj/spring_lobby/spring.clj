@@ -328,13 +328,13 @@
           _ (log/info "Engine executable" engine-file)
           script-file (io/file (fs/app-root) "spring" "script.txt") ; TODO match isolation?
           script-file-param (fs/wslpath script-file)
-          isolation-dir-param (fs/wslpath isolation-dir)
-          write-dir-param (fs/wslpath engine-dir)]
+          isolation-dir-param (fs/wslpath engine-dir)
+          write-dir-param (fs/wslpath isolation-dir)]
       (spit script-file script-txt)
       (log/info "Wrote script to" script-file)
       (let [command [(fs/canonical-path engine-file)
-                     "--isolation-dir" write-dir-param
-                     "--write-dir" isolation-dir-param
+                     "--isolation-dir" isolation-dir-param
+                     "--write-dir" write-dir-param
                      script-file-param]
             runtime (Runtime/getRuntime)]
         (log/info "Running '" command "'")
@@ -376,11 +376,11 @@
           engine-file (io/file engine-dir (fs/spring-executable))
           _ (log/info "Engine executable" engine-file)
           replay-file-param (fs/wslpath replay-file)
-          isolation-dir-param (fs/wslpath isolation-dir)
-          write-dir-param (fs/wslpath engine-dir)
+          isolation-dir-param (fs/wslpath engine-dir)
+          write-dir-param (fs/wslpath isolation-dir)
           command [(fs/canonical-path engine-file)
-                   "--isolation-dir" write-dir-param
-                   "--write-dir" isolation-dir-param
+                   "--isolation-dir" isolation-dir-param
+                   "--write-dir" write-dir-param
                    replay-file-param]
           runtime (Runtime/getRuntime)]
       (log/info "Running '" command "'")

@@ -320,6 +320,9 @@
                (assoc :agreement (:agreement-part state))
                (dissoc :agreement-part)))))
 
+(defmethod handle "OPENBATTLE" [_c _state-atom m]
+  (log/info "Battle opened:" m))
+
 (defmethod handle "OPENBATTLEFAILED" [_c state-atom _m]
   (swap! state-atom dissoc :battle))
 

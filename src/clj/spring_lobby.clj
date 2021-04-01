@@ -4,7 +4,6 @@
     [clj-http.client :as clj-http]
     [cljfx.api :as fx]
     [cljfx.component :as fx.component]
-    [clojure.contrib.humanize :as humanize]
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [cljfx.lifecycle :as fx.lifecycle]
@@ -70,7 +69,7 @@
 (def download-window-width 1600)
 (def download-window-height 800)
 
-(def replays-window-width 1800)
+(def replays-window-width 2200)
 (def replays-window-height 1200)
 
 (def battle-window-width 1740)
@@ -399,32 +398,40 @@
     (log/warn "Unknown task type" task)))
 
 
+(defn peek-task [min-priority tasks]
+  (when-not (empty? tasks)
+    (when-let [{::keys [task-priority] :as task} (peek tasks)]
+      (when (<= min-priority (or task-priority default-task-priority))
+        task))))
+
 ; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
 (defn handle-task!
-  ([state-atom]
-   (handle-task! state-atom 1))
-  ([state-atom min-priority]
-   (let [[before _after] (swap-vals! state-atom update :tasks
-                                     (fn [tasks]
-                                       (if-not (empty? tasks)
-                                         (let [{::keys [task-priority]} (peek tasks)]
-                                           (if (<= min-priority (or task-priority default-task-priority))
-                                             (pop tasks)
-                                             tasks)
-                                           (pop tasks))
-                                         tasks)))
+  ([state-atom worker-id]
+   (handle-task! state-atom worker-id 1))
+  ([state-atom worker-id min-priority]
+   (let [[before _after] (swap-vals! state-atom
+                           (fn [{:keys [tasks] :as state}]
+                             (let [next-tasks (if-not (empty? tasks)
+                                                (let [{::keys [task-priority]} (peek tasks)]
+                                                  (if (<= min-priority (or task-priority default-task-priority))
+                                                    (pop tasks)
+                                                    tasks)
+                                                  (pop tasks))
+                                                tasks)
+                                   task (peek-task min-priority tasks)]
+                               (-> state
+                                   (assoc :tasks next-tasks)
+                                   (assoc-in [:current-tasks worker-id] task)))))
          tasks (:tasks before)
-         task (when-not (empty? tasks)
-                (when-let [{::keys [task-priority] :as task} (peek tasks)]
-                  (when (<= min-priority (or task-priority default-task-priority))
-                    task)))]
+         task (peek-task min-priority tasks)]
      (task-handler task)
+     (swap! state-atom update :current-tasks dissoc worker-id)
      task)))
 
 (defn tasks-chimer-fn
-  ([state-atom]
-   (tasks-chimer-fn state-atom 1))
-  ([state-atom min-priority]
+  ([state-atom worker-id]
+   (tasks-chimer-fn state-atom worker-id 1))
+  ([state-atom worker-id min-priority]
    (log/info "Starting tasks chimer")
    (let [chimer
          (chime/chime-at
@@ -432,7 +439,7 @@
              (java-time/instant)
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (handle-task! state-atom min-priority))
+             (handle-task! state-atom worker-id min-priority))
            {:error-handler
             (fn [e]
               (log/error e "Error handling task")
@@ -440,7 +447,7 @@
      (fn [] (.close chimer)))))
 
 (defn handle-all-tasks! [state-atom]
-  (while (handle-task! state-atom)))
+  (while (handle-task! :repl state-atom)))
 
 
 (defn add-task! [state-atom task]
@@ -565,12 +572,15 @@
   (let [before (u/curr-millis)
         existing (-> state-atom deref :parsed-replays-by-path)
         existing-paths (set (keys existing))
-        todo (->> (concat
+        all-files (concat
                     (fs/replay-files)
                     (fs/replay-files (fs/bar-root))
                     (fs/replay-files (fs/spring-root)))
-                  (remove (comp existing-paths fs/canonical-path)))
-        new-paths (set (map fs/canonical-path todo))
+        todo (->> all-files
+                  (remove (comp existing-paths fs/canonical-path))
+                  (sort-by fs/filename)
+                  reverse)
+        all-paths (set (map fs/canonical-path all-files))
         this-round (take 100 todo)
         next-round (drop 100 todo)
         parsed-replays (->> this-round
@@ -594,7 +604,7 @@
                            (fn [old-replays]
                              (let [replays-by-path (if (map? old-replays) old-replays {})]
                                (->> replays-by-path
-                                    (remove (comp new-paths first))
+                                    (filter (comp all-paths first)) ; remove missing files
                                     (concat parsed-replays)
                                     (into {})))))]
       (if (seq next-round)
@@ -682,6 +692,7 @@
   ([]
    (reconcile-engines *state))
   ([state-atom]
+   (swap! state-atom assoc :update-engines true)
    (log/info "Reconciling engines")
    (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
@@ -716,6 +727,7 @@
                    (filter (comp fs/canonical-path :file))
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
+     (swap! state-atom assoc :update-engines false)
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 
@@ -767,6 +779,7 @@
 (defn reconcile-mods
   "Reads mod details and updates missing mods in :mods in state."
   [state-atom]
+  (swap! state-atom assoc :update-mods true)
   (log/info "Reconciling mods")
   (remove-all-duplicate-mods state-atom)
   (let [before (u/curr-millis)
@@ -797,12 +810,15 @@
       (log/info "Reading mod from" file)
       (update-mod *state file))
     (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
-    (swap! state-atom update :mods
-           (fn [mods]
-             (->> mods
-                  (remove (comp string/blank? :mod-name))
-                  (remove (comp missing-files fs/canonical-path :file))
-                  set)))
+    (swap! state-atom
+           (fn [state]
+             (-> state
+                 (update :mods (fn [mods]
+                                 (->> mods
+                                      (remove (comp string/blank? :mod-name))
+                                      (remove (comp missing-files fs/canonical-path :file))
+                                      set)))
+                 (dissoc :update-mods))))
     {:to-add-file-count (count to-add-file)
      :to-add-rapid-count (count to-add-rapid)}))
 
@@ -885,6 +901,7 @@
 (defn reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
   [state-atom]
+  (swap! state-atom assoc :update-maps true)
   (log/info "Reconciling maps")
   (let [before (u/curr-millis)
         map-files (fs/map-files)
@@ -922,6 +939,7 @@
                   (remove (comp string/blank? :map-name))
                   (remove (comp missing-paths fs/canonical-path :file))
                   set)))
+    (swap! state-atom assoc :update-maps false)
     (if (seq next-round)
       (do
         (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
@@ -3412,7 +3430,7 @@
     (str (u/format-bytes current)
          " / "
          (u/format-bytes total))
-    "-"))
+    "Downloading..."))
 
 
 (defn minimap-pane
@@ -3934,7 +3952,7 @@
                        (when dest-exists
                          [{:severity 2
                            :text "extract"
-                           :in-progress (get extracting dest)
+                           :in-progress (get extracting dest-path)
                            :human-text "Extract engine archive"
                            :tooltip (str "Click to extract " dest-path)
                            :action {:event/type ::extract-7z
@@ -4384,6 +4402,7 @@
 
 (defmethod task-handler ::update-rapid
   [_e]
+  (swap! *state assoc :rapid-update true)
   (let [{:keys [engine-version engines]} @*state ; TODO remove deref
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
@@ -4398,7 +4417,7 @@
         (deref
           (event-handler
             {:event/type ::rapid-download
-             :rapid-id "engine:stable" ;"byar:test" ; TODO how else to init rapid without download...
+             :rapid-id "byar:test" ; TODO how else to init rapid without download...
              :engine-file (:file engine-details)})))
       (log/warn "No engine details to do rapid init"))
     (log/info "Updating rapid versions in" root)
@@ -4421,12 +4440,14 @@
              :rapid-repos rapid-repos
              :rapid-data-by-hash rapid-data-by-hash
              :rapid-data-by-version rapid-data-by-version
-             :rapid-versions rapid-versions)
+             :rapid-versions rapid-versions
+             :rapid-update true)
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms")
       (add-task! *state {::task-type ::update-rapid-packages}))))
 
 (defmethod task-handler ::update-rapid-packages
   [_e]
+  (swap! *state assoc :rapid-update true)
   (let [{:keys [rapid-data-by-hash]} @*state
         sdp-files (doall (rapid/sdp-files))
         packages (->> sdp-files
@@ -4441,14 +4462,24 @@
                              :filename (-> f fs/filename str)
                              :version (->> rapid-data :version str)})))
                       (sort-by :version version/version-compare)
-                      reverse)]
+                      reverse
+                      doall)]
     (swap! *state assoc
            :sdp-files sdp-files
-           :rapid-packages packages)))
+           :rapid-packages packages
+           :rapid-update false)))
 
 (defmethod event-handler ::rapid-repo-change
   [{:fx/keys [event]}]
   (swap! *state assoc :rapid-repo event))
+
+(defn parse-rapid-progress [line]
+  (when (string/starts-with? line "[Progress]")
+    (if-let [[_all _percent _bar current total] (re-find #"\[Progress\]\s+(\d+)%\s+\[([\s=]+)\]\s+(\d+)/(\d+)" line)]
+      {:current (Long/parseLong current)
+       :total (Long/parseLong total)}
+      (log/warn "Unable to parse rapid progress" (pr-str line)))))
+
 
 (defmethod event-handler ::rapid-download
   [{:keys [engine-file rapid-id]}]
@@ -4470,8 +4501,12 @@
             (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
               (loop []
                 (if-let [line (.readLine reader)]
-                  (do
-                    (swap! *state assoc-in [:rapid-download rapid-id :message] line)
+                  (let [progress (try (parse-rapid-progress line)
+                                      (catch Exception e
+                                        (log/debug e "Error parsing rapid progress")))]
+                    (swap! *state update-in [:rapid-download rapid-id] merge
+                           {:message line}
+                           progress)
                     (log/info "(pr-downloader" rapid-id "out)" line)
                     (recur))
                   (log/info "pr-downloader" rapid-id "stdout stream closed")))))
@@ -4611,16 +4646,21 @@
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
   (future
-    (try
-      (swap! *state assoc-in [:extracting file] true)
-      (if dest
-        (fs/extract-7z-fast file dest)
-        (fs/extract-7z-fast file))
-      (reconcile-engines *state)
-      (catch Exception e
-        (log/error e "Error extracting 7z" file))
-      (finally
-        (swap! *state assoc-in [:extracting file] false)))))
+    (let [path (fs/canonical-path file)]
+      (try
+        (swap! *state assoc-in [:extracting path] true)
+        (if dest
+          (fs/extract-7z-fast file dest)
+          (fs/extract-7z-fast file))
+        (reconcile-engines *state)
+        (catch Exception e
+          (log/error e "Error extracting 7z" file))
+        (finally
+          (swap! *state assoc-in [:extracting path] false))))))
+
+(defmethod task-handler ::extract-7z
+  [task]
+  (event-handler (assoc task :event/type ::extract-7z)))
 
 
 (def resource-types
@@ -4668,7 +4708,12 @@
                                  (map (juxt (comp fs/canonical-path :resource-file) identity))
                                  (into {}))]
     (log/info "Found imports" (frequencies (map :resource-type importables)))
-    (swap! *state update :importables-by-path merge importables-by-path)
+    (swap! *state update :importables-by-path
+           (fn [old]
+             (->> old
+                  (remove (comp #{import-source-name} :import-source-name second))
+                  (into {})
+                  (merge importables-by-path))))
     importables-by-path
     #_
     (doseq [importable (filter (comp #{::engine} :resource-type) importables)]
@@ -4721,7 +4766,12 @@
                                         (into {}))]
           (log/info "Found downloadables from" download-source-name "at" url
                     (frequencies (map :resource-type downloadables)))
-          (swap! *state update :downloadables-by-url merge downloadables-by-url)
+          (swap! *state update :downloadables-by-url
+                 (fn [old]
+                   (->> old
+                        (remove (comp #{download-source-name} :download-source-name second))
+                        (into {})
+                        (merge downloadables-by-url))))
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
 
@@ -4815,7 +4865,7 @@
        :children
        [{:fx/type :button
          :style {:-fx-font-size 16}
-         :text "Scan Imports"
+         :text "Refresh All Imports"
          :on-action {:event/type ::scan-imports}}
         {:fx/type :h-box
          :alignment :center-left
@@ -4863,31 +4913,34 @@
                 :graphic
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-folder:16:white"}}}])
-           [{:fx/type :button
-             :text " Reload "
-             :on-action {:event/type ::add-task
-                         :task {::task-type ::scan-imports}}
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-refresh:16:white"}}
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               ;:show-delay [10 :ms]
-               :style {:-fx-font-size 14}
-               :text "Hide importables not discovered in the last polling cycle, default 24h"}}
-             :desc
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :check-box
-                :selected (boolean show-stale)
-                :h-box/margin 8
-                :on-selected-changed {:event/type ::assoc
-                                      :key :show-stale}}
-               {:fx/type :label
-                :text "Show stale artifacts"}]}}])}
+           (when import-source
+             [{:fx/type :button
+               :text " Refresh "
+               :on-action {:event/type ::add-task
+                           :task (merge {::task-type ::scan-imports}
+                                        import-source)}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-refresh:16:white"}}
+              #_
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 ;:show-delay [10 :ms]
+                 :style {:-fx-font-size 14}
+                 :text "Hide importables not discovered in the last polling cycle, default 24h"}}
+               :desc
+               {:fx/type :h-box
+                :alignment :center-left
+                :children
+                [{:fx/type :check-box
+                  :selected (boolean show-stale)
+                  :h-box/margin 8
+                  :on-selected-changed {:event/type ::assoc
+                                        :key :show-stale}}
+                 {:fx/type :label
+                  :text "Show stale artifacts"}]}}]))}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
@@ -4950,7 +5003,8 @@
          :v-box/vgrow :always
          :items importables
          :columns
-         [{:fx/type :table-column
+         [#_
+          {:fx/type :table-column
            :text "Last Seen Ago"
            :cell-value-factory identity
            :cell-factory
@@ -5131,9 +5185,9 @@
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-web:16:white"}}}])
            [{:fx/type :button
-             :text " Reload "
+             :text " Refresh "
              :on-action
-             (if download-source-name
+             (if download-source
                {:event/type ::add-task
                 :task
                 (merge
@@ -5145,6 +5199,7 @@
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-refresh:16:white"}}
+            #_
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
@@ -5225,7 +5280,8 @@
          :v-box/vgrow :always
          :items downloadables
          :columns
-         [{:fx/type :table-column
+         [#_
+          {:fx/type :table-column
            :text "Last Seen Ago"
            :cell-value-factory identity
            :cell-factory
@@ -5368,7 +5424,7 @@
            :items sorted-engine-versions
            :on-value-changed {:event/type ::version-change}}
           {:fx/type :button
-           :text " Reload "
+           :text " Refresh "
            :on-action {:event/type ::add-task
                        :task {::task-type ::update-rapid}}
            :graphic
@@ -5558,18 +5614,19 @@
   (reduce (fnil + 0) 0 player-counts))
 
 (def replays-window-keys
-  [:engines :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players
-   :filter-replay-type :maps :mods :parsed-replays-by-path :rapid-data-by-version
+  [:copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players
+   :filter-replay-type :http-download :maps :mods :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-map-details :selected-replay-file
-   :show-replays])
+   :show-replays :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
-  [{:keys [engines file-cache filter-replay filter-replay-max-players filter-replay-min-players
-           filter-replay-type maps mods rapid-data-by-version parsed-replays-by-path
-           replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
+  [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players
+           filter-replay-type http-download maps mods parsed-replays-by-path rapid-data-by-version rapid-download
+           rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-map-details selected-replay-file
-           show-replays]}]
+           show-replays tasks update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
                             vals
@@ -5624,7 +5681,22 @@
                              first)
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         mods-by-version (into {} (map (juxt :mod-name identity) mods))
-        maps-by-version (into {} (map (juxt :map-name identity) maps))]
+        maps-by-version (into {} (map (juxt :map-name identity) maps))
+
+        selected-engine-version (-> selected-replay :header :engine-version)
+        selected-matching-engine (get engines-by-version selected-engine-version)
+        selected-matching-mod (get mods-by-version (-> selected-replay :body :script-data :game :gametype))
+        selected-matching-map (get maps-by-version (-> selected-replay :body :script-data :game :mapname))
+        all-tasks (concat tasks (vals current-tasks))
+        extract-tasks (->> all-tasks
+                           (filter (comp #{::extract-7z} ::task-type))
+                           (map (comp fs/canonical-path :file))
+                           set)
+        import-tasks (->> all-tasks
+                          (filter (comp #{::import} ::task-type))
+                          (map (comp fs/canonical-path :resource-file :importable))
+                          set)
+        refresh-tasks (filter (comp #{::refresh-replays} ::task-type) all-tasks)]
     {:fx/type :stage
      :showing show-replays
      :title "alt-spring-lobby Replays"
@@ -5742,13 +5814,17 @@
                       :graphic
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-close:16:white"}}}]))}
-              {:fx/type :button
-               :text " Refresh "
-               :on-action {:event/type ::add-task
-                           :task {::task-type ::refresh-replays}}
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-refresh:16:white"}}])}
+              (let [refreshing (boolean (seq refresh-tasks))]
+                {:fx/type :button
+                 :text (if refreshing
+                         " Refreshing... "
+                         " Refresh ")
+                 :on-action {:event/type ::add-task
+                             :task {::task-type ::refresh-replays}}
+                 :disable refreshing
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-refresh:16:white"}})])}
           (if parsed-replays
             (if (empty? parsed-replays)
               {:fx/type :label
@@ -5767,6 +5843,7 @@
                 :columns
                 [
                  {:fx/type :table-column
+                  :sortable false
                   :text "Source"
                   :cell-value-factory identity
                   :cell-factory
@@ -5774,6 +5851,7 @@
                    :describe
                    (fn [i] {:text (-> i :source fs/filename str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Filename"
                   :cell-value-factory identity
                   :cell-factory
@@ -5781,6 +5859,7 @@
                    :describe
                    (fn [i] {:text (-> i :file fs/filename str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Type"
                   :cell-value-factory identity
                   :cell-factory
@@ -5788,6 +5867,7 @@
                    :describe
                    (fn [i] {:text (some-> i :game-type name)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Player Counts"
                   :cell-value-factory identity
                   :cell-factory
@@ -5795,6 +5875,7 @@
                    :describe
                    (fn [i] {:text (->> i :player-counts (string/join "v"))})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Timestamp"
                   :cell-value-factory identity
                   :cell-factory
@@ -5802,6 +5883,7 @@
                    :describe
                    (fn [i] {:text (-> i :header :unix-time str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Map"
                   :cell-value-factory identity
                   :cell-factory
@@ -5809,6 +5891,7 @@
                    :describe
                    (fn [i] {:text (-> i :body :script-data :game :mapname str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Engine"
                   :cell-value-factory identity
                   :cell-factory
@@ -5816,6 +5899,7 @@
                    :describe
                    (fn [i] {:text (-> i :header :engine-version str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Game"
                   :cell-value-factory identity
                   :cell-factory
@@ -5824,6 +5908,7 @@
                    (fn [i]
                      {:text (-> i :body :script-data :game :gametype str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Size"
                   :cell-value-factory identity
                   :cell-factory
@@ -5831,6 +5916,7 @@
                    :describe
                    (fn [i] {:text (-> i :file-size u/format-bytes)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Duration"
                   :cell-value-factory identity
                   :cell-factory
@@ -5838,6 +5924,7 @@
                    :describe
                    (fn [i] {:text (-> i :header :game-time str)})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Watched"
                   :cell-value-factory identity
                   :cell-factory
@@ -5854,6 +5941,7 @@
                         :on-selected-changed {:event/type ::assoc-in
                                               :path [:parsed-replays-by-path (fs/canonical-path (:file i)) :watched]}}}})}}
                  {:fx/type :table-column
+                  :sortable false
                   :text "Watch"
                   :cell-value-factory identity
                   :cell-factory
@@ -5871,7 +5959,8 @@
                            map-name (-> i :body :script-data :game :mapname)
                            matching-map (get maps-by-version map-name)
                            map-downloadable (get replay-downloads-by-map map-name)
-                           map-importable (get replay-imports-by-map map-name)]
+                           map-importable (get replay-imports-by-map map-name)
+                           mod-rapid-download (get rapid-download (:id mod-rapid))]
                        {:text ""
                         :graphic
                         (cond
@@ -5886,30 +5975,73 @@
                            :graphic
                            {:fx/type font-icon/lifecycle
                             :icon-literal "mdi-movie:16:white"}}
+                          (and (not matching-engine) update-engines)
+                          {:fx/type :button
+                           :text " Engines updating..."
+                           :disable true}
                           (and (not matching-engine) engine-downloadable)
                           (let [source (resource-dest engine-downloadable)]
                             (if (file-exists? file-cache source)
-                              (let [dest (io/file (fs/isolation-dir) "engine" (:resource-filename engine-downloadable))]
+                              (let [dest (io/file (fs/isolation-dir) "engine"
+                                                  (fs/without-extension
+                                                    (:resource-filename engine-downloadable)))
+                                    in-progress (boolean
+                                                  (or (get extracting (fs/canonical-path source))
+                                                      (contains? extract-tasks (fs/canonical-path source))))]
                                 {:fx/type :button
-                                 :text " Extract engine"
+                                 :text (if in-progress "Extracting..." " Extract engine")
+                                 :disable in-progress
+                                 :graphic
+                                 {:fx/type font-icon/lifecycle
+                                  :icon-literal "mdi-archive:16:white"}
                                  :on-action
-                                 {:event/type ::extract-7z
-                                  :file source
-                                  :dest dest}})
-                              {:fx/type :button
-                               :text " Download engine"
-                               :on-action {:event/type ::http-downloadable
-                                           :downloadable engine-downloadable}}))
-                          (and (not matching-mod) mod-importable)
+                                 {:event/type ::add-task
+                                  :task
+                                  {::task-type ::extract-7z
+                                   :file source
+                                   :dest dest}}})
+                              (let [{:keys [download-url]} engine-downloadable
+                                    {:keys [running] :as download} (get http-download download-url)]
+                                {:fx/type :button
+                                 :text (if running
+                                         (str (download-progress download))
+                                         " Download engine")
+                                 :disable (boolean running)
+                                 :on-action {:event/type ::http-downloadable
+                                             :downloadable engine-downloadable}
+                                 :graphic
+                                 {:fx/type font-icon/lifecycle
+                                  :icon-literal "mdi-download:16:white"}})))
+                          (:running mod-rapid-download)
                           {:fx/type :button
-                           :text " Import game"
-                           :on-action {:event/type ::add-task
-                                       :task
-                                       {::task-type ::import
-                                        :importable mod-importable}}}
+                           :text (str (download-progress mod-rapid-download))
+                           :disable true}
+                          (and (not matching-mod) update-mods)
+                          {:fx/type :button
+                           :text " Games updating..."
+                           :disable true}
+                          (and (not matching-mod) mod-importable)
+                          (let [{:keys [resource-file]} mod-importable
+                                resource-path (fs/canonical-path resource-file)
+                                in-progress (boolean
+                                              (or (-> copying (get resource-path) :status boolean)
+                                                  (-> copying (get resource-path) :status boolean)
+                                                  (contains? import-tasks resource-path)))]
+                            {:fx/type :button
+                             :text (if in-progress
+                                     " Importing..."
+                                     " Import game")
+                             :disable in-progress
+                             :on-action {:event/type ::add-task
+                                         :task
+                                         {::task-type ::import
+                                          :importable mod-importable}}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-content-copy:16:white"}})
                           (and (not matching-mod) mod-rapid)
                           {:fx/type :button
-                           :text (str " Download game with rapid ")
+                           :text (str " Download game")
                            :on-action {:event/type ::rapid-download
                                        :rapid-id (:id mod-rapid)
                                        :engine-file (:file matching-engine)}
@@ -5917,28 +6049,63 @@
                            {:fx/type font-icon/lifecycle
                             :icon-literal "mdi-download:16:white"}}
                           (and (not matching-mod) mod-downloadable)
+                          (let [{:keys [download-url]} mod-downloadable
+                                {:keys [running] :as download} (get http-download download-url)]
+                            {:fx/type :button
+                             :text (if running
+                                     (str (download-progress download))
+                                     " Download game")
+                             :disable (boolean running)
+                             :on-action {:event/type ::http-downloadable
+                                         :downloadable mod-downloadable}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-download:16:white"}})
+                          (and (not matching-map) update-maps)
                           {:fx/type :button
-                           :text " Download mod"
-                           :on-action {:event/type ::http-downloadable
-                                       :downloadable mod-downloadable}}
+                           :text " Maps updating..."
+                           :disable true}
                           (and (not matching-map) map-importable)
-                          {:fx/type :button
-                           :text " Import map"
-                           :on-action {:event/type ::add-task
-                                       :task
-                                       {::task-type ::import
-                                        :importable map-importable}}}
+                          (let [{:keys [resource-file]} map-importable
+                                resource-path (fs/canonical-path resource-file)
+                                in-progress (boolean
+                                              (or (-> copying (get resource-path) :status boolean)
+                                                  (-> copying (get resource-path) :status boolean)
+                                                  (contains? import-tasks resource-path)))]
+                            {:fx/type :button
+                             :text (if in-progress
+                                     " Importing..."
+                                     " Import map")
+                             :disable in-progress
+                             :on-action {:event/type ::add-task
+                                         :task
+                                         {::task-type ::import
+                                          :importable map-importable}}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-content-copy:16:white"}})
                           (and (not matching-map) map-downloadable)
-                          {:fx/type :button
-                           :text " Download map"
-                           :on-action {:event/type ::http-downloadable
-                                       :downloadable map-downloadable}}
+                          (let [{:keys [download-url]} map-downloadable
+                                {:keys [running] :as download} (get http-download download-url)]
+                            {:fx/type :button
+                             :text (if running
+                                     (str (download-progress download))
+                                     " Download map")
+                             :disable (boolean running)
+                             :on-action {:event/type ::http-downloadable
+                                         :downloadable map-downloadable}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-download:16:white"}})
                           (not matching-engine)
                           {:fx/type :label
                            :text " No engine"}
                           (not matching-mod)
                           {:fx/type :button
-                           :text " No game, update rapid "
+                           :text (if rapid-update
+                                   " Updating rapid..."
+                                   " Update rapid")
+                           :disable (boolean rapid-update)
                            :on-action {:event/type ::add-task
                                        :task {::task-type ::update-rapid}}
                            :graphic
@@ -6010,11 +6177,27 @@
                :alignment :center-left
                :children
                [
-                {:fx/type battle-players-table
+                {:fx/type :v-box
                  :h-box/hgrow :always
-                 :am-host false
-                 :battle-modname gametype
-                 :players (concat players bots)}
+                 :children
+                 (concat
+                   [{:fx/type battle-players-table
+                     :v-box/vgrow :always
+                     :am-host false
+                     :battle-modname gametype
+                     :players (concat players bots)}]
+                   (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+                     [{:fx/type :button
+                       :style {:-fx-font-size 24}
+                       :text " Watch"
+                       :on-action
+                       {:event/type ::watch-replay
+                        :engines engines
+                        :engine-version selected-engine-version
+                        :replay selected-replay}
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-movie:24:white"}}]))}
                 {:fx/type minimap-pane
                  :map-name mapname
                  :map-details replay-map-details
@@ -6358,7 +6541,7 @@
               {:fx/type :pane
                :h-box/hgrow :always}
               {:fx/type :label
-               :text (str (count tasks) " tasks")}]}])}}}]
+               :text (str (count (seq tasks)) " tasks")}]}])}}}]
      (when (and battle pop-out-battle)
        [{:fx/type :stage
          :showing pop-out-battle

@@ -26,3 +26,15 @@
              :resource-date "2021-03-20T17:30:16Z",
              :download-source-name "BAR GitHub spring",
              :resource-updated 1616282430238})))))
+
+
+(deftest parse-rapid-progress
+  (is (= {:current 332922
+          :total 332922}
+         (spring-lobby/parse-rapid-progress "[Progress] 100% [==============================] 332922/332922")))
+  (is (= {:current 0
+          :total 0}
+         (spring-lobby/parse-rapid-progress "[Progress]   0% [         ] 0/0")))
+  (is (= {:current 171880
+          :total 1024954}
+         (spring-lobby/parse-rapid-progress "[Progress]  17% [=====         ] 171880/1024954"))))
