@@ -59,7 +59,10 @@
              (spring/short-git-commit (git/tag-or-latest-id (io/file ".")))
              (catch Exception e
                (log/warn e "Error getting git version")))
-           (slurp (io/resource "alt-spring-lobby.version"))
+           (try
+             (slurp (io/resource "alt-spring-lobby.version"))
+             (catch Exception e
+               (log/warn e "Error getting version from file")))
            "UNKNOWN")))
 
 

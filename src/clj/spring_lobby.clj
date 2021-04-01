@@ -135,9 +135,11 @@
 
 
 (def config-keys
-  [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version :map-name
-   :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color :rapid-repo :scripttags
-   :server :servers :uikeys :username])
+  [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version
+   :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players
+   :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
+   :rapid-repo :scripttags :server :servers :uikeys :username])
+
 
 (defn select-config [state]
   (select-keys state config-keys))
@@ -159,16 +161,19 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
-
 (def state-to-edn
   [{:select-fn select-config
-    :filename "config.edn"}
+    :filename "config.edn"
+    :pretty true}
    {:select-fn select-maps
-    :filename "maps.edn"}
+    :filename "maps.edn"
+    :pretty true}
    {:select-fn select-engines
-    :filename "engines.edn"}
+    :filename "engines.edn"
+    :pretty true}
    {:select-fn select-mods
-    :filename "mods.edn"}
+    :filename "mods.edn"
+    :pretty true}
    {:select-fn select-importables
     :filename "importables.edn"}
    {:select-fn select-downloadables
@@ -198,6 +203,7 @@
       merge
       (doall
         (map (comp slurp-config-edn :filename) state-to-edn)))
+    (slurp-config-edn "parsed-replays.edn")
     {:file-events (initial-file-events)
      :tasks (initial-tasks)}))
 
@@ -207,11 +213,18 @@
 
 (defn spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
-  [data filename]
-  (let [file (fs/config-file filename)]
-    (fs/make-parent-dirs file)
-    (log/info "Spitting edn to" file)
-    (spit file (with-out-str (pprint (into (sorted-map) data))))))
+  ([data filename]
+   (spit-app-edn data filename nil))
+  ([data filename {:keys [pretty]}]
+   (let [file (fs/config-file filename)]
+     (fs/make-parent-dirs file)
+     (log/info "Spitting edn to" file)
+     (spit file
+       (if pretty
+         (with-out-str (pprint (if (map? data)
+                                 (into (sorted-map) data)
+                                 data)))
+         (pr-str data))))))
 
 
 (defn add-watch-state-to-edn
@@ -476,9 +489,6 @@
     :file (fs/bar-root)}])
 
 
-(defn sanitize-replay-engine [replay-engine-version]
-  (some-> replay-engine-version (string/replace #"\P{Print}" "") string/trim fs/sync-version-to-engine-version))
-
 (defn could-be-this-engine?
   "Returns true if this resource might be the engine with the given name, by magic, false otherwise."
   [engine-version {:keys [resource-filename resource-name]}]
@@ -519,38 +529,92 @@
         (= (normalize-map map-name)
            (normalize-map resource-filename)))))
 
+(defn replay-type-and-players [parsed-replay]
+  (let [allyteams (->> parsed-replay
+                       :body
+                       :script-data
+                       :game
+                       (filter (comp #(string/starts-with? % "allyteam") name first)))
+        num-allyteams (count allyteams)
+        teams (->> parsed-replay
+                   :body
+                   :script-data
+                   :game
+                   (filter (comp #(string/starts-with? % "team") name first)))
+        teams-by-allyteam (->> teams
+                               (group-by (comp keyword (partial str "allyteam") :allyteam second)))
+        team-counts (sort (map (comp count second) teams-by-allyteam))
+        one-per-team? (= #{1} (set team-counts))
+        game-type (cond
+                    (= 2 num-allyteams)
+                    (if one-per-team?
+                      :duel
+                      :team)
+                    (< 2 num-allyteams)
+                    (if one-per-team?
+                      :ffa
+                      :teamffa)
+                    :else
+                    :unknown)]
+    {:game-type game-type
+     :player-counts team-counts}))
+
 (defn refresh-replays
   [state-atom]
   (log/info "Refreshing replays")
   (let [before (u/curr-millis)
-        existing (-> state-atom deref :parsed-replays)
-        existing-paths (set (map (comp fs/canonical-path :file) existing))
-        todo (->> (fs/replay-files)
+        existing (-> state-atom deref :parsed-replays-by-path)
+        existing-paths (set (keys existing))
+        todo (->> (concat
+                    (fs/replay-files)
+                    (fs/replay-files (fs/bar-root))
+                    (fs/replay-files (fs/spring-root)))
                   (remove (comp existing-paths fs/canonical-path)))
-        parsed-replays (->> todo
+        new-paths (set (map fs/canonical-path todo))
+        this-round (take 100 todo)
+        next-round (drop 100 todo)
+        parsed-replays (->> this-round
                             (map
                               (fn [f]
                                 (let [replay (try
                                                (replay/decode-replay f)
                                                (catch Exception e
                                                  (log/error e "Error reading replay" f)))]
-                                  (merge
-                                    {:file f
-                                     :filename (fs/filename f)
-                                     :file-size (fs/size f)}
-                                    replay))))
+                                  [(fs/canonical-path f)
+                                   (merge
+                                     {:file f
+                                      :filename (fs/filename f)
+                                      :file-size (fs/size f)}
+                                     replay
+                                     {:source (-> f fs/parent-file fs/parent-file fs/parent-file)}
+                                     (replay-type-and-players replay))])))
                             doall)]
-    (log/info "Parsed" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
-    (swap! state-atom assoc :parsed-replays (concat existing parsed-replays))
-    (add-task! state-atom {::task-type ::refresh-replay-resources})))
+    (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
+    (let [new-state (swap! state-atom update :parsed-replays-by-path
+                           (fn [old-replays]
+                             (let [replays-by-path (if (map? old-replays) old-replays {})]
+                               (->> replays-by-path
+                                    (remove (comp new-paths first))
+                                    (concat parsed-replays)
+                                    (into {})))))]
+      (if (seq next-round)
+        (add-task! state-atom {::task-type ::refresh-replays})
+        (do
+          (when (seq this-round)
+            (spit-app-edn
+              (select-keys new-state [:parsed-replays-by-path])
+              "parsed-replays.edn"))
+          (add-task! state-atom {::task-type ::refresh-replay-resources}))))))
 
 (defn refresh-replay-resources
   [state-atom]
   (log/info "Refresh replay resources")
   (let [before (u/curr-millis)
-        {:keys [downloadables-by-url importables-by-path parsed-replays]} @state-atom
+        {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
+        parsed-replays (vals parsed-replays-by-path)
         engine-versions (->> parsed-replays
-                             (map (comp sanitize-replay-engine :engine-version :header))
+                             (map (comp :engine-version :header))
+                             (filter some?)
                              set)
         mod-names (->> parsed-replays
                        (map (comp :gametype :game :script-data :body))
@@ -607,7 +671,6 @@
                                   (into {}))]
     (log/info "Refreshed replay resources in" (- (u/curr-millis) before) "ms")
     (swap! state-atom assoc
-           :parsed-replays parsed-replays
            :replay-downloads-by-engine replay-engine-downloads
            :replay-downloads-by-mod replay-mod-downloads
            :replay-imports-by-mod replay-mod-imports
@@ -5463,6 +5526,7 @@
   (future
     (try
       (let [replay-file (:file replay)]
+        (swap! *state assoc-in [:parsed-replays-by-path (fs/canonical-path replay-file) :watched] true)
         (spring/watch-replay
           {:engine-version engine-version
            :engines engines
@@ -5486,18 +5550,58 @@
           (log/error e "Error loading replay map details"))))))
 
 
+(defn sanitize-replay-filter [s]
+  (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
+
+(defn replay-player-count
+  [{:keys [player-counts]}]
+  (reduce (fnil + 0) 0 player-counts))
+
+(def replays-window-keys
+  [:engines :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players
+   :filter-replay-type :maps :mods :parsed-replays-by-path :rapid-data-by-version
+   :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :selected-replay-file
+   :show-replays])
+
 (defn replays-window
-  [{:keys [engines file-cache filter-replay maps mods
-           rapid-data-by-version parsed-replays
+  [{:keys [engines file-cache filter-replay filter-replay-max-players filter-replay-min-players
+           filter-replay-type maps mods rapid-data-by-version parsed-replays-by-path
            replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details
-           selected-replay-file show-replays]}]
-  (let [replays (->> parsed-replays
+           replay-imports-by-map replay-imports-by-mod replay-map-details selected-replay-file
+           show-replays]}]
+  (let [
+        parsed-replays (->> parsed-replays-by-path
+                            vals
+                            (sort-by (comp str :unix-time :header))
+                            reverse
+                            doall)
+        replay-types (set (map :game-type parsed-replays))
+        num-players (->> parsed-replays
+                         (map replay-player-count)
+                         set
+                         sort)
+        replays (->> parsed-replays
+                     (filter
+                       (fn [replay]
+                         (if filter-replay-type
+                           (= filter-replay-type (:game-type replay))
+                           true)))
+                     (filter
+                       (fn [replay]
+                         (if filter-replay-min-players
+                           (<= filter-replay-min-players (replay-player-count replay))
+                           true)))
+                     (filter
+                       (fn [replay]
+                         (if filter-replay-max-players
+                           (<= (replay-player-count replay) filter-replay-max-players)
+                           true)))
                      (filter
                        (fn [replay]
                          (if (string/blank? filter-replay)
                            true
-                           (let [lc (string/lower-case filter-replay)]
+                           (let [lc (sanitize-replay-filter filter-replay)]
                              (or
                                (string/includes?
                                  (string/lower-case (:filename replay))
@@ -5510,9 +5614,11 @@
                                  lc)
                                (string/includes?
                                  (or (some-> replay :body :script-data :game :mapname string/lower-case) "")
-                                 lc))))))
-                     (sort-by :timestamp)
-                     reverse)
+                                 lc)
+                               (let [players (some->> replay :body :script-data :game
+                                                      (filter (comp #(string/starts-with? % "player") name first))
+                                                      (map (comp sanitize-replay-filter :name second)))]
+                                 (some #(string/includes? % lc) players))))))))
         selected-replay (->> replays
                              (filter (comp #{selected-replay-file} :file))
                              first)
@@ -5544,7 +5650,7 @@
               {:fx/type :text-field
                :style {:-fx-min-width 500}
                :text (str filter-replay)
-               :prompt-text "Filter by filename, engine, map, or game"
+               :prompt-text "Filter by filename, engine, map, game, player"
                :on-text-changed {:event/type ::assoc
                                  :key :filter-replay}}]
              (when-not (string/blank? filter-replay)
@@ -5561,7 +5667,82 @@
                   :graphic
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-close:16:white"}}}])
-             [{:fx/type :button
+             [{:fx/type :h-box
+               :alignment :center-left
+               :children
+               (concat
+                 [{:fx/type :label
+                   :text " Type: "}
+                  {:fx/type :combo-box
+                   :value filter-replay-type
+                   :on-value-changed {:event/type ::assoc
+                                      :key :filter-replay-type}
+                   :items (concat [nil] replay-types)}]
+                 (when filter-replay-type
+                   [{:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       ;:show-delay [10 :ms]
+                       :text "Clear type"}}
+                     :desc
+                     {:fx/type :button
+                      :on-action {:event/type ::dissoc
+                                  :key :filter-replay-type}
+                      :graphic
+                      {:fx/type font-icon/lifecycle
+                       :icon-literal "mdi-close:16:white"}}}]))}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               (concat
+                 [{:fx/type :label
+                   :text " Min Players: "}
+                  {:fx/type :combo-box
+                   :value filter-replay-min-players
+                   :on-value-changed {:event/type ::assoc
+                                      :key :filter-replay-min-players}
+                   :items (concat [nil] num-players)}]
+                 (when filter-replay-min-players
+                   [{:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       ;:show-delay [10 :ms]
+                       :text "Clear min players"}}
+                     :desc
+                     {:fx/type :button
+                      :on-action {:event/type ::dissoc
+                                  :key :filter-replay-min-players}
+                      :graphic
+                      {:fx/type font-icon/lifecycle
+                       :icon-literal "mdi-close:16:white"}}}]))}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               (concat
+                 [{:fx/type :label
+                   :text " Max Players: "}
+                  {:fx/type :combo-box
+                   :value filter-replay-max-players
+                   :on-value-changed {:event/type ::assoc
+                                      :key :filter-replay-max-players}
+                   :items (concat [nil] num-players)}]
+                 (when filter-replay-max-players
+                   [{:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       ;:show-delay [10 :ms]
+                       :text "Clear max players"}}
+                     :desc
+                     {:fx/type :button
+                      :on-action {:event/type ::dissoc
+                                  :key :filter-replay-max-players}
+                      :graphic
+                      {:fx/type font-icon/lifecycle
+                       :icon-literal "mdi-close:16:white"}}}]))}
+              {:fx/type :button
                :text " Refresh "
                :on-action {:event/type ::add-task
                            :task {::task-type ::refresh-replays}}
@@ -5569,161 +5750,203 @@
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-refresh:16:white"}}])}
           (if parsed-replays
-            {:fx/type fx.ext.table-view/with-selection-props
-             :v-box/vgrow :always
-             :props {:selection-mode :single
-                     :on-selected-item-changed {:event/type ::select-replay
-                                                :maps maps}
-                     :selected-item selected-replay}
-             :desc
-             {:fx/type :table-view
-              :column-resize-policy :constrained ; TODO auto resize
-              :items replays
-              :columns
-              [{:fx/type :table-column
-                :text "Filename"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :file fs/filename str)})}}
-               {:fx/type :table-column
-                :text "Timestamp"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :header :unix-time str)})}}
-               {:fx/type :table-column
-                :text "Map"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :body :script-data :game :mapname str)})}}
-               {:fx/type :table-column
-                :text "Engine"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :header :engine-version sanitize-replay-engine str)})}}
-               {:fx/type :table-column
-                :text "Game"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (-> i :body :script-data :game :gametype str)})}}
-               {:fx/type :table-column
-                :text "Size"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :file-size u/format-bytes)})}}
-               {:fx/type :table-column
-                :text "Duration"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i] {:text (-> i :header :game-time str)})}}
-               {:fx/type :table-column
-                :text "Watch"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   (let [engine-version (-> i :header :engine-version sanitize-replay-engine)
-                         matching-engine (get engines-by-version engine-version)
-                         engine-downloadable (get replay-downloads-by-engine engine-version)
-                         mod-version (-> i :body :script-data :game :gametype)
-                         matching-mod (get mods-by-version mod-version)
-                         mod-downloadable (get replay-downloads-by-mod mod-version)
-                         mod-importable (get replay-imports-by-mod mod-version)
-                         mod-rapid (get rapid-data-by-version mod-version)
-                         map-name (-> i :body :script-data :game :mapname)
-                         matching-map (get maps-by-version map-name)
-                         map-downloadable (get replay-downloads-by-map map-name)
-                         map-importable (get replay-imports-by-map map-name)]
+            (if (empty? parsed-replays)
+              {:fx/type :label
+               :style {:-fx-font-size 24}
+               :text " No replays"}
+              {:fx/type fx.ext.table-view/with-selection-props
+               :v-box/vgrow :always
+               :props {:selection-mode :single
+                       :on-selected-item-changed {:event/type ::select-replay
+                                                  :maps maps}
+                       :selected-item selected-replay}
+               :desc
+               {:fx/type :table-view
+                :column-resize-policy :constrained ; TODO auto resize
+                :items replays
+                :columns
+                [
+                 {:fx/type :table-column
+                  :text "Source"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :source fs/filename str)})}}
+                 {:fx/type :table-column
+                  :text "Filename"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :file fs/filename str)})}}
+                 {:fx/type :table-column
+                  :text "Type"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (some-> i :game-type name)})}}
+                 {:fx/type :table-column
+                  :text "Player Counts"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (->> i :player-counts (string/join "v"))})}}
+                 {:fx/type :table-column
+                  :text "Timestamp"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :header :unix-time str)})}}
+                 {:fx/type :table-column
+                  :text "Map"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :body :script-data :game :mapname str)})}}
+                 {:fx/type :table-column
+                  :text "Engine"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :header :engine-version str)})}}
+                 {:fx/type :table-column
+                  :text "Game"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     {:text (-> i :body :script-data :game :gametype str)})}}
+                 {:fx/type :table-column
+                  :text "Size"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :file-size u/format-bytes)})}}
+                 {:fx/type :table-column
+                  :text "Duration"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i] {:text (-> i :header :game-time str)})}}
+                 {:fx/type :table-column
+                  :text "Watched"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
                      {:text ""
                       :graphic
-                      (cond
-                        (and matching-engine matching-mod matching-map)
-                        {:fx/type :button
-                         :text " Watch"
-                         :on-action
-                         {:event/type ::watch-replay
-                          :engines engines
-                          :engine-version engine-version
-                          :replay i}
-                         :graphic
-                         {:fx/type font-icon/lifecycle
-                          :icon-literal "mdi-movie:16:white"}}
-                        (and (not matching-engine) engine-downloadable)
-                        (let [source (resource-dest engine-downloadable)]
-                          (if (file-exists? file-cache source)
-                            (let [dest (io/file (fs/isolation-dir) "engine" (:resource-filename engine-downloadable))]
+                      {:fx/type ext-recreate-on-key-changed
+                       :key (str (:file i))
+                       :desc
+                       {:fx/type :check-box
+                        :selected (boolean (:watched i))
+                        :on-selected-changed {:event/type ::assoc-in
+                                              :path [:parsed-replays-by-path (fs/canonical-path (:file i)) :watched]}}}})}}
+                 {:fx/type :table-column
+                  :text "Watch"
+                  :cell-value-factory identity
+                  :cell-factory
+                  {:fx/cell-type :table-cell
+                   :describe
+                   (fn [i]
+                     (let [engine-version (-> i :header :engine-version)
+                           matching-engine (get engines-by-version engine-version)
+                           engine-downloadable (get replay-downloads-by-engine engine-version)
+                           mod-version (-> i :body :script-data :game :gametype)
+                           matching-mod (get mods-by-version mod-version)
+                           mod-downloadable (get replay-downloads-by-mod mod-version)
+                           mod-importable (get replay-imports-by-mod mod-version)
+                           mod-rapid (get rapid-data-by-version mod-version)
+                           map-name (-> i :body :script-data :game :mapname)
+                           matching-map (get maps-by-version map-name)
+                           map-downloadable (get replay-downloads-by-map map-name)
+                           map-importable (get replay-imports-by-map map-name)]
+                       {:text ""
+                        :graphic
+                        (cond
+                          (and matching-engine matching-mod matching-map)
+                          {:fx/type :button
+                           :text " Watch"
+                           :on-action
+                           {:event/type ::watch-replay
+                            :engines engines
+                            :engine-version engine-version
+                            :replay i}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-movie:16:white"}}
+                          (and (not matching-engine) engine-downloadable)
+                          (let [source (resource-dest engine-downloadable)]
+                            (if (file-exists? file-cache source)
+                              (let [dest (io/file (fs/isolation-dir) "engine" (:resource-filename engine-downloadable))]
+                                {:fx/type :button
+                                 :text " Extract engine"
+                                 :on-action
+                                 {:event/type ::extract-7z
+                                  :file source
+                                  :dest dest}})
                               {:fx/type :button
-                               :text " Extract engine"
-                               :on-action
-                               {:event/type ::extract-7z
-                                :file source
-                                :dest dest}})
-                            {:fx/type :button
-                             :text " Download engine"
-                             :on-action {:event/type ::http-downloadable
-                                         :downloadable engine-downloadable}}))
-                        (and (not matching-mod) mod-importable)
-                        {:fx/type :button
-                         :text " Import game"
-                         :on-action {:event/type ::add-task
-                                     :task
-                                     {::task-type ::import
-                                      :importable mod-importable}}}
-                        (and (not matching-mod) mod-rapid)
-                        {:fx/type :button
-                         :text (str " Download game with rapid ")
-                         :on-action {:event/type ::rapid-download
-                                     :rapid-id (:id mod-rapid)
-                                     :engine-file (:file matching-engine)}
-                         :graphic
-                         {:fx/type font-icon/lifecycle
-                          :icon-literal "mdi-download:16:white"}}
-                        (and (not matching-mod) mod-downloadable)
-                        {:fx/type :button
-                         :text " Download mod"
-                         :on-action {:event/type ::http-downloadable
-                                     :downloadable mod-downloadable}}
-                        (and (not matching-map) map-importable)
-                        {:fx/type :button
-                         :text " Import map"
-                         :on-action {:event/type ::add-task
-                                     :task
-                                     {::task-type ::import
-                                      :importable map-importable}}}
-                        (and (not matching-map) map-downloadable)
-                        {:fx/type :button
-                         :text " Download map"
-                         :on-action {:event/type ::http-downloadable
-                                     :downloadable map-downloadable}}
-                        (not matching-engine)
-                        {:fx/type :label
-                         :text " No engine"}
-                        (not matching-mod)
-                        {:fx/type :button
-                         :text " No game, update rapid "
-                         :on-action {:event/type ::add-task
-                                     :task {::task-type ::update-rapid}}
-                         :graphic
-                         {:fx/type font-icon/lifecycle
-                          :icon-literal "mdi-refresh:16:white"}}
-                        (not matching-map)
-                        {:fx/type :label
-                         :text " No map"})}))}}]}}
+                               :text " Download engine"
+                               :on-action {:event/type ::http-downloadable
+                                           :downloadable engine-downloadable}}))
+                          (and (not matching-mod) mod-importable)
+                          {:fx/type :button
+                           :text " Import game"
+                           :on-action {:event/type ::add-task
+                                       :task
+                                       {::task-type ::import
+                                        :importable mod-importable}}}
+                          (and (not matching-mod) mod-rapid)
+                          {:fx/type :button
+                           :text (str " Download game with rapid ")
+                           :on-action {:event/type ::rapid-download
+                                       :rapid-id (:id mod-rapid)
+                                       :engine-file (:file matching-engine)}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-download:16:white"}}
+                          (and (not matching-mod) mod-downloadable)
+                          {:fx/type :button
+                           :text " Download mod"
+                           :on-action {:event/type ::http-downloadable
+                                       :downloadable mod-downloadable}}
+                          (and (not matching-map) map-importable)
+                          {:fx/type :button
+                           :text " Import map"
+                           :on-action {:event/type ::add-task
+                                       :task
+                                       {::task-type ::import
+                                        :importable map-importable}}}
+                          (and (not matching-map) map-downloadable)
+                          {:fx/type :button
+                           :text " Download map"
+                           :on-action {:event/type ::http-downloadable
+                                       :downloadable map-downloadable}}
+                          (not matching-engine)
+                          {:fx/type :label
+                           :text " No engine"}
+                          (not matching-mod)
+                          {:fx/type :button
+                           :text " No game, update rapid "
+                           :on-action {:event/type ::add-task
+                                       :task {::task-type ::update-rapid}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-refresh:16:white"}}
+                          (not matching-map)
+                          {:fx/type :label
+                           :text " No map"})}))}}]}})
            {:fx/type :label
             :style {:-fx-font-size 24}
             :text " Loading replays..."})]
@@ -5760,7 +5983,29 @@
                                                 :handicap handicap
                                                 :side (get side-id-by-name side)
                                                 :ally allyteam}
-                                               :team-color team-color))))))]
+                                               :team-color team-color))))))
+                 bots (->> game
+                           (filter (comp #(string/starts-with? % "ai") name first))
+                           (map
+                             (fn [[aiid {:keys [team] :as ai}]]
+                               (let [{:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
+                                     team-color (try (spring-script-color-to-int rgbcolor)
+                                                     (catch Exception e
+                                                       (log/debug e "Error parsing color")
+                                                       0))
+                                     side-id-by-name (clojure.set/map-invert
+                                                       (spring/sides gametype))]
+                                 (-> ai
+                                     (clojure.set/rename-keys
+                                       {:name :username})
+                                     (assoc :battle-status
+                                            {:id aiid
+                                             :team team
+                                             :mode true
+                                             :handicap handicap
+                                             :side (get side-id-by-name side)
+                                             :ally allyteam}
+                                            :team-color team-color))))))]
              [{:fx/type :h-box
                :alignment :center-left
                :children
@@ -5769,18 +6014,7 @@
                  :h-box/hgrow :always
                  :am-host false
                  :battle-modname gametype
-                 :players players}
-                #_
-                {:fx/type :v-box
-                 :alignment :top-left
-                 :children
-                 [{:fx/type :label
-                   :text "script.txt"}
-                  {:fx/type :text-area
-                   :editable false
-                   :text (str (string/replace (-> selected-replay :body :script-txt str) #"\t" "  "))
-                   :style {:-fx-font-family "monospace"}
-                   :v-box/vgrow :always}]}
+                 :players (concat players bots)}
                 {:fx/type minimap-pane
                  :map-name mapname
                  :map-details replay-map-details
@@ -6170,11 +6404,7 @@
      (when show-replays
        [(merge
           {:fx/type replays-window}
-          (select-keys state
-            [:engines :file-cache :filter-replay :maps :mods :parsed-replays :rapid-data-by-version
-             :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-             :replay-imports-by-map :replay-imports-by-mod :replay-map-details
-             :selected-replay-file :show-replays]))])
+          (select-keys state replays-window-keys))])
      (when show-servers-window
        [(merge
           {:fx/type servers-window}
@@ -6197,7 +6427,7 @@
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
-        ;high-tasks-chimer (tasks-chimer-fn state-atom 3)
+        high-tasks-chimer (tasks-chimer-fn state-atom 3)
         force-update-chimer (force-update-chimer-fn state-atom)
         update-channels-chimer (update-channels-chimer-fn state-atom)]
     (add-watchers state-atom)
@@ -6208,7 +6438,7 @@
     (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
-    {:chimers [low-tasks-chimer ;high-tasks-chimer
+    {:chimers [low-tasks-chimer high-tasks-chimer
                force-update-chimer update-channels-chimer]}))
 
 

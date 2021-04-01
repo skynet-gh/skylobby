@@ -2,6 +2,7 @@
   "Parsing of Spring demo files aka replays."
   (:require
     [clojure.java.io :as io]
+    [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring.script :as spring-script])
@@ -54,15 +55,24 @@
          (b/decode sdfz-header)
          (into (sorted-map)))))
 
+(defn sanitize-replay-engine [replay-engine-version]
+  (some-> replay-engine-version (string/replace #"\P{Print}" "") string/trim fs/sync-version-to-engine-version))
+
 (defn decode-replay [^java.io.File f]
   (with-open [is (io/input-stream f)
               gz (GZIPInputStream. is)]
-    (update
-      (->> (b/decode sdfz-protocol gz)
-           (into (sorted-map)))
-      :body
-      (fn [body]
-        (assoc body :script-data (spring-script/parse-script (:script-txt body)))))))
+    (-> (->> (b/decode sdfz-protocol gz)
+             (into (sorted-map)))
+        (update :header
+          (fn [header]
+            (-> header
+                (update :engine-version sanitize-replay-engine)
+                (dissoc :game-id))))
+        (update :body
+          (fn [body]
+            (-> body
+                (assoc :script-data (spring-script/parse-script (:script-txt body)))
+                (dissoc :script-txt)))))))
 
 
 (defn parse-replay-filename [^java.io.File f]
