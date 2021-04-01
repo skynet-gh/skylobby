@@ -562,7 +562,7 @@
                       :ffa
                       :teamffa)
                     :else
-                    :unknown)]
+                    :invalid)]
     {:game-type game-type
      :player-counts team-counts}))
 
@@ -605,6 +605,8 @@
                              (let [replays-by-path (if (map? old-replays) old-replays {})]
                                (->> replays-by-path
                                     (filter (comp all-paths first)) ; remove missing files
+                                    (remove (comp zero? :file-size second)) ; remove empty files
+                                    (remove (comp #{:invalid} :game-type second)) ; remove invalid
                                     (concat parsed-replays)
                                     (into {})))))]
       (if (seq next-round)
@@ -2601,8 +2603,8 @@
           {:allyteam (str (:allyteam-id drag-allyteam))
            :x (min startx endx)
            :y (min starty endy)
-           :width (Math/abs (- endx startx))
-           :height (Math/abs (- endy starty))})))))
+           :width (Math/abs (double (- endx startx)))
+           :height (Math/abs (double (- endy starty)))})))))
 
 
 (defmethod event-handler ::minimap-mouse-pressed
