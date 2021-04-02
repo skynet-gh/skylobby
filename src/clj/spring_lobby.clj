@@ -3562,14 +3562,14 @@
    :bot-username :bot-version :cleaning :client :copying :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
-   :map-input-prefix :maps :minimap-type :mods :rapid-data-by-version
+   :map-input-prefix :maps :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
    :rapid-download :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            client
            copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
-           http-download importables-by-path map-input-prefix maps minimap-type
+           http-download importables-by-path map-input-prefix maps minimap-type parsed-replays-by-path
            rapid-data-by-version rapid-download users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname]} (get battles (:battle-id battle))
@@ -3670,6 +3670,29 @@
                :text (-> battle :scripttags :game :hostip str)
                :prompt-text " <override> "
                :on-text-changed {:event/type ::hostip-changed}}]}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             (concat
+               [{:fx/type :label
+                 :text " Replay: "}
+                {:fx/type :combo-box
+                 :style {:-fx-max-width 300}
+                 :value (-> scripttags :game :demofile)
+                 :on-value-changed {:event/type ::assoc-in
+                                    :path [:battle :scripttags :game :demofile]}
+                 :items (->> parsed-replays-by-path
+                             (sort-by (comp :filename second))
+                             reverse
+                             (mapv first))
+                 :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]
+               (when (-> scripttags :game :demofile)
+                 [{:fx/type :button
+                   :on-action {:event/type ::dissoc-in
+                               :path [:battle :scripttags :game :demofile]}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-close:16:white"}}]))}
             #_
             {:fx/type :h-box
              :alignment :center-left
@@ -4805,6 +4828,10 @@
 (defmethod event-handler ::dissoc
   [e]
   (swap! *state dissoc (:key e)))
+
+(defmethod event-handler ::dissoc-in
+  [{:keys [path]}]
+  (swap! *state update-in (drop-last path) dissoc (last path)))
 
 (defmethod event-handler ::scan-imports
   [_e]
