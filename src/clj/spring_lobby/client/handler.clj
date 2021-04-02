@@ -276,7 +276,7 @@
 
 
 (defn parse-joinbattle [m]
-  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)" m))
+  (re-find #"\w+ ([^\s]+) ([^\s]+)( ([^\s]+))?" m))
 
 (defmethod handle "JOINBATTLE" [_c state-atom m]
   (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]

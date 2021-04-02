@@ -222,7 +222,7 @@
 
 
 (defn parse-battleopened [m]
-  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)" m))
+  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
 
 (defmethod handler/handle "BATTLEOPENED" [_c state m]
   (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname channel-name] (parse-battleopened m)]
@@ -244,7 +244,7 @@
                   :channel-name channel-name
                   :users {host-username {}}}]
       (swap! state assoc-in [:battles battle-id] battle))
-    (log/warn "Unable to parse BATTLEOPENED")))
+    (log/warn "Unable to parse BATTLEOPENED" (pr-str m))))
 
 (defn parse-updatebattleinfo [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
