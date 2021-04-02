@@ -1889,10 +1889,11 @@
                 max-players 8
                 rank 0
                 engine "Spring"}}]
-  (message/send-message client
-    (str "OPENBATTLE " battle-type " " nat-type " " battle-password " " host-port " " max-players
-         " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
-         "\t" mod-name)))
+  (let [password (if (string/blank? battle-password) "*" battle-password)]
+    (message/send-message client
+      (str "OPENBATTLE " battle-type " " nat-type " " password " " host-port " " max-players
+           " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
+           "\t" mod-name))))
 
 
 (defmethod event-handler ::host-battle
