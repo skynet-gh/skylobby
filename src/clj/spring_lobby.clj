@@ -846,11 +846,12 @@
          battle-modname-sans-git (mod-name-sans-git battle-modname)
          mod-name-set (set [battle-modname battle-modname-sans-git])
          filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
-         mod-details (some->> mods
-                              (filter filter-fn)
-                              first
-                              :file
-                              read-mod-data)]
+         mod-details (or (some->> mods
+                                  (filter filter-fn)
+                                  first
+                                  :file
+                                  read-mod-data)
+                         {})]
      (swap! *state assoc :battle-mod-details mod-details)
      mod-details)))
 
@@ -969,11 +970,12 @@
          battle-map (-> battles (get battle-id) :battle-map)
          _ (log/debug "Force updating battle map details for" battle-map)
          filter-fn (comp #{battle-map} :map-name)
-         map-details (some->> maps
-                              (filter filter-fn)
-                              first
-                              :file
-                              fs/read-map-data)]
+         map-details (or (some->> maps
+                                  (filter filter-fn)
+                                  first
+                                  :file
+                                  fs/read-map-data)
+                         {})]
      (swap! *state assoc :battle-map-details map-details)
      map-details)))
 
@@ -3864,7 +3866,7 @@
                              in-progress (:running download)
                              dest (resource-dest downloadable)
                              dest-exists (file-exists? file-cache dest)
-                             severity (if battle-map-details 0 2)]
+                             severity (if no-map-details 2 0)]
                          [{:severity severity
                            :text "download"
                            :human-text (if in-progress
@@ -3939,13 +3941,13 @@
                              download-url (:download-url downloadable)
                              in-progress (-> http-download (get download-url) :running)
                              {:keys [download-source-name download-url]} downloadable]
-                         [{:severity (if battle-mod-details 0 2)
+                         [{:severity (if no-mod-details 2 0)
                            :text "download"
-                           :human-text (if battle-mod-details
-                                         (:mod-name battle-mod-details)
+                           :human-text (if no-mod-details
                                          (if downloadable
                                            (str "Download from " download-source-name)
-                                           (str "No download for " battle-modname)))
+                                           (str "No download for " battle-modname))
+                                         (:mod-name battle-mod-details))
                            :in-progress in-progress
                            :tooltip (if downloadable
                                       (str "Download from " download-source-name " at " download-url)
