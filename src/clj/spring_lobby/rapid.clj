@@ -6,6 +6,7 @@
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
     [spring-lobby.lua :as lua]
+    [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -193,6 +194,16 @@
     (catch Exception e
       (log/warn e "Error reading" filename "in" f))))
 
+(defn- try-inner-script
+  [f filename]
+  (try
+    (when-let [inner (rapid-inner f filename)]
+      (let [contents (slurp (:content-bytes inner))]
+        (when-not (string/blank? contents)
+          (spring-script/parse-script contents))))
+    (catch Exception e
+      (log/warn e "Error reading" filename "in" f))))
+
 (defn read-sdp-mod
   ([^java.io.File f]
    (read-sdp-mod f nil))
@@ -208,7 +219,9 @@
          (when modinfo
            {:modoptions (try-inner-lua f "modoptions.lua")
             :engineoptions (try-inner-lua f "engineoptions.lua")
-            :luaai (try-inner-lua f "luaai.lua")}))))))
+            :luaai (try-inner-lua f "luaai.lua")
+            :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
+                          (try-inner-script f "gamedata/sidedata.tdf"))}))))))
 
 (defn mods []
   (some->> (sdp-files)

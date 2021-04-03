@@ -6,10 +6,14 @@
 
 (deftest parse-addbot
   (is (= ["12" "kekbot1" "skynet9001" "0" "0" "KAIK|0.13"]
-         (rest (handler/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13")))))
+         (rest (handler/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13"))))
+  (is (= ["4" "Bot2" "skynet9001" "4195534" "16744322" "MFAI : normal (air)|<not-versioned>"]
+         (rest (handler/parse-addbot "ADDBOT 4 Bot2 skynet9001 4195534 16744322 MFAI : normal (air)|<not-versioned>"))))
+  (is (= ["MFAI : normal (air)" "<not-versioned>"]
+         (rest (handler/parse-ai "MFAI : normal (air)|<not-versioned>")))))
 
 (deftest parse-joinbattle
-  (is (= ["32" "-1706632985" "__battle__1"]
+  (is (= ["32" "-1706632985" "__battle__1" "__battle__1"]
          (rest
            (handler/parse-joinbattle "JOINBATTLE 32 -1706632985 __battle__1")))))
 

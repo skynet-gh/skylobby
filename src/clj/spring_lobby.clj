@@ -2678,7 +2678,8 @@
   [{:keys [minimap-width minimap-height map-details]}]
   (future
     (try
-      (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
+      (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)
+            client (:client before)]
         (when-let [{:keys [team x y]} (:drag-team before)]
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
                 x (int (* (/ x minimap-width) map-width spring/map-multiplier))
@@ -2693,32 +2694,18 @@
                      (-> state
                          (update :scripttags u/deep-merge scripttags)
                          (update-in [:battle :scripttags] u/deep-merge scripttags))))
-            (message/send-message
-              (:client before)
+            (message/send-message client
               (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
         (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
           (let [l (min startx endx)
                 t (min starty endy)
                 r (max startx endx)
                 b (max starty endy)
-                left (with-precision 10 (/ l minimap-width))
-                top (with-precision 10 (/ t minimap-height))
-                right (with-precision 10 (/ r minimap-width))
-                bottom (with-precision 10 (/ b minimap-height))
-                allyteam-kw (keyword (str "allyteam" allyteam-id))
-                scripttags {:game
-                            {allyteam-kw
-                             {:startrectleft left
-                              :startrecttop top
-                              :startrectright right
-                              :startrectbottom bottom}}}]
-            (swap! *state
-                   (fn [state]
-                     (-> state
-                         (update :scripttags u/deep-merge scripttags)
-                         (update-in [:battle :scripttags] u/deep-merge scripttags))))
-            (message/send-message
-              (:client before)
+                left (/ l (* 1.0 minimap-width))
+                top (/ t (* 1.0 minimap-height))
+                right (/ r (* 1.0 minimap-width))
+                bottom (/ b (* 1.0 minimap-height))]
+            (message/send-message client
               (str "ADDSTARTRECT " allyteam-id " "
                    (int (* 200 left)) " "
                    (int (* 200 top)) " "
@@ -3127,7 +3114,7 @@
     true))
 
 (defn battle-players-table
-  [{:keys [am-host battle-modname client host-username players username]}]
+  [{:keys [am-host client host-username players sides username]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (or players [])
@@ -3235,13 +3222,14 @@
           :key (nickname i)
           :desc
           {:fx/type :combo-box
-           :value (->> i :battle-status :side (get (spring/sides battle-modname)) str)
+           :value (->> i :battle-status :side (get sides) str)
            :on-value-changed {:event/type ::battle-side-changed
                               :client client
                               :is-me (= (:username i) username)
                               :is-bot (-> i :user :client-status :bot)
-                              :id i}
-           :items (vals (spring/sides battle-modname))
+                              :id i
+                              :sides sides}
+           :items (->> sides seq (sort-by first) (map second))
            :disable (or (not username)
                         (not (or am-host
                                  (= (:username i) username)
@@ -3597,7 +3585,8 @@
                           (get (group-by :bot-name bots)
                                bot-name))
         bot-name (some #{bot-name} bot-names)
-        bot-version (some #{bot-version} bot-versions)]
+        bot-version (some #{bot-version} bot-versions)
+        sides (spring/mod-sides battle-mod-details)]
     {:fx/type :h-box
      :alignment :top-left
      :children
@@ -3610,6 +3599,7 @@
          :am-host am-host
          :host-username host-username
          :players (battle-players-and-bots state)
+         :sides sides
          :username username
          :battle-modname battle-modname}
         {:fx/type :h-box
@@ -4360,13 +4350,13 @@
         (log/error e "Error updating battle spectate")))))
 
 (defmethod event-handler ::battle-side-changed
-  [{:keys [client id] :fx/keys [event] :as data}]
+  [{:keys [client id sides] :fx/keys [event] :as data}]
   (future
     (try
-      (when-let [side (try (Integer/parseInt event) (catch Exception _e))]
+      (let [side (get (clojure.set/map-invert sides) event)]
         (if (not= side (-> id :battle-status :side))
-          (do
-            (log/info "Updating side for" id "from" (-> id :battle-status :side) "to" side)
+          (let [old-side (-> id :battle-status :side)]
+            (log/info "Updating side for" id "from" old-side "(" (get sides old-side) ") to" side "(" event ")")
             (update-battle-status client data (assoc (:battle-status id) :side side) (:team-color id)))
           (log/debug "No change for side")))
       (catch Exception e
@@ -5622,10 +5612,11 @@
 
 
 (defmethod event-handler ::select-replay
-  [{:keys [maps] :fx/keys [event]}]
+  [{:keys [maps mods] :fx/keys [event]}]
   (future
     (swap! *state assoc
            :replay-map-details nil
+           :replay-mod-details nil
            :selected-replay-file (:file event))
     (future
       (try
@@ -5633,7 +5624,18 @@
               map-details (or (read-map-data maps map-name) {})]
           (swap! *state assoc :replay-map-details map-details))
         (catch Exception e
-          (log/error e "Error loading replay map details"))))))
+          (log/error e "Error loading replay map details"))))
+    (future
+      (try
+        (let [mod-name (-> event :body :script-data :game :gametype)]
+          (when-let [mod-file (some->> mods
+                                       (filter (comp #{mod-name} :mod-name))
+                                       first
+                                       :file)]
+            (let [mod-details (or (read-mod-data mod-file) {})]
+              (swap! *state assoc :replay-mod-details mod-details))))
+        (catch Exception e
+          (log/error e "Error loading replay mod details"))))))
 
 
 (defn sanitize-replay-filter [s]
@@ -5648,14 +5650,14 @@
    :filter-replay-type :http-download :maps :mods :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :selected-replay-file
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :selected-replay-file
    :show-replays :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
   [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players
            filter-replay-type http-download maps mods parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details selected-replay-file
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details selected-replay-file
            show-replays tasks update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
@@ -5864,7 +5866,8 @@
                :v-box/vgrow :always
                :props {:selection-mode :single
                        :on-selected-item-changed {:event/type ::select-replay
-                                                  :maps maps}
+                                                  :maps maps
+                                                  :mods mods}
                        :selected-item selected-replay}
                :desc
                {:fx/type :table-view
@@ -6157,6 +6160,7 @@
                                       (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                         [id team])))
                                   (into {}))
+                 sides (spring/mod-sides replay-mod-details)
                  players (->> game
                               (filter (comp #(string/starts-with? % "player") name first))
                               (map
@@ -6167,8 +6171,7 @@
                                                         (catch Exception e
                                                           (log/debug e "Error parsing color")
                                                           0))
-                                        side-id-by-name (clojure.set/map-invert
-                                                          (spring/sides gametype))]
+                                        side-id-by-name (clojure.set/map-invert sides)]
                                     (-> player
                                         (clojure.set/rename-keys
                                           {:name :username
@@ -6190,8 +6193,7 @@
                                                      (catch Exception e
                                                        (log/debug e "Error parsing color")
                                                        0))
-                                     side-id-by-name (clojure.set/map-invert
-                                                       (spring/sides gametype))]
+                                     side-id-by-name (clojure.set/map-invert sides)]
                                  (-> ai
                                      (clojure.set/rename-keys
                                        {:name :username})
@@ -6215,7 +6217,8 @@
                      :v-box/vgrow :always
                      :am-host false
                      :battle-modname gametype
-                     :players (concat players bots)}]
+                     :players (concat players bots)
+                     :sides sides}]
                    (when (and selected-matching-engine selected-matching-mod selected-matching-map)
                      [{:fx/type :button
                        :style {:-fx-font-size 24}

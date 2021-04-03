@@ -492,7 +492,9 @@
          (when-not modinfo-only
            {:modoptions (try-entry-lua "modoptions.lua")
             :engineoptions (try-entry-lua "engineoptions.lua")
-            :luaai (try-entry-lua "luaai.lua")}))))))
+            :luaai (try-entry-lua "luaai.lua")
+            :sidedata (or (try-entry-lua "gamedata/sidedata.lua")
+                          (try-entry-lua "gamedata/sidedata.tdf"))}))))))
 
 (defn read-mod-directory
   ([^java.io.File file]
@@ -517,7 +519,9 @@
        (when-not modinfo-only
          {:modoptions (try-file-lua "modoptions.lua")
           :engineoptions (try-file-lua "engineoptions.lua")
-          :luaai (try-file-lua "luaai.lua")})))))
+          :luaai (try-file-lua "luaai.lua")
+          :sidedata (or (try-file-lua "gamedata/sidedata.lua")
+                        (try-file-lua "gamedata/sidedata.tdf"))})))))
 
 (defn read-mod-file
   ([^java.io.File file]

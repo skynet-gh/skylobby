@@ -23,23 +23,6 @@
    2 "Choose in game"
    3 "Choose before game"})
 
-(def ba-sides
-  {0 "ARM"
-   1 "CORE"})
-
-(def bar-sides
-  {0 "Armada"
-   1 "Cortex"
-   2 "Random"})
-
-(defn sides
-  ([]
-   (sides nil))
-  ([mod-name]
-   (if (and mod-name (string/starts-with? mod-name "Beyond All Reason")) ; TODO where to get this
-     bar-sides
-     ba-sides)))
-
 (def map-multiplier
   "Multiplier from positions in map file into positions that Spring uses."
   8.0)
@@ -128,7 +111,7 @@
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
-  ([battle {:keys [is-host map-details mod-details] :as opts}]
+  ([battle {:keys [is-host map-details mod-details sides] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
                       (map
@@ -215,13 +198,14 @@
                 (let [team-id (-> battle-status :id actual-team-id)
                       team-leader (if owner
                                     (-> battle :users (get owner) :battle-status :id actual-team-id)
-                                    team-id)]
+                                    team-id)
+                      side (:side battle-status)]
                     [(team-name team-id)
                      {:teamleader team-leader
                       :handicap (:handicap battle-status)
                       :allyteam (:ally battle-status)
                       :rgbcolor (format-color team-color)
-                      :side (get (sides (:battle-modname battle)) (:side battle-status))}]))
+                      :side (get sides side side)}]))
               teams)
             (map
               (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
@@ -294,13 +278,30 @@
            (filter (comp #{filter-mod-name} :mod-name))
            first))
 
+(defn parse-side-key [[k v]]
+  (try
+    (when-let [[_all n] (->> k name (re-find #"(?:side)?(\d+)"))]
+      (Integer/parseInt n))
+    (catch Exception e
+      (log/warn e "Error parsing side" k v))))
+
+(defn mod-sides [mod-details]
+  (->> mod-details
+       :sidedata
+       (filter parse-side-key)
+       (sort-by parse-side-key)
+       (map (comp :name second))
+       (map-indexed vector)
+       (into {})))
+
 (defn battle-script-txt [{:keys [username battle-map-details battle-mod-details] :as state}]
   (let [battle (battle-details state)
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}
                   :map-details battle-map-details
-                  :mod-details battle-mod-details})]
+                  :mod-details battle-mod-details
+                  :sides (mod-sides battle-mod-details)})]
     (script-txt script)))
 
 (defn engine-details [engines engine-version]

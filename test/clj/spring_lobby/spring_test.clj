@@ -19,7 +19,11 @@
              [:game :hostip] nil))))
   (testing "player and bot"
     (is (= expected-script-data-players
-           (spring/script-data battle-players {:is-host true :game {:myplayername "me"}})))))
+           (spring/script-data
+             battle-players
+             {:is-host true
+              :game {:myplayername "me"}
+              :sides {0 "ARM" 1 "CORE"}})))))
 
 (deftest script-test
   (is (= expected-script-txt

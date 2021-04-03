@@ -41,8 +41,8 @@
 (def battle-status-protocol
   (gloss/compile-frame
     (gloss/bit-map
-      :prefix 6
-      :side 2
+      :prefix 5
+      :side 3
       :sync 2
       :pad 4
       :handicap 7
@@ -140,7 +140,7 @@
 (defmethod handle "CLIENTBATTLESTATUS" [_c state m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (decode-battle-status battle-status)]
-    (log/debug "Updating status of" username "to" decoded "with color" team-color)
+    (log/info "Updating status of" username "to" decoded "with color" team-color)
     (swap! state update-in [:battle :users username]
            assoc
            :battle-status decoded
@@ -241,11 +241,15 @@
 
 
 (defn parse-addbot [m]
-  (re-find #"\w+ (\w+) ([^\s]+) ([^\s]+) (\w+) (\w+) ([^\s]+)" m))
+  (re-find #"\w+ (\w+) ([^\s]+) ([^\s]+) (\w+) (\w+) (.+)" m))
+
+(defn parse-ai [ai]
+  (when ai
+    (re-find #"(.+)\|([^\s]+)" ai)))
 
 (defmethod handle "ADDBOT" [_c state-atom m]
   (let [[_all battle-id bot-name owner battle-status team-color ai] (parse-addbot m)
-        [_all ai-name ai-version] (when ai (re-find #"([^\s]+)\|([^\s]+)" ai))
+        [_all ai-name ai-version] (parse-ai ai)
         bot {:bot-name bot-name
              :owner owner
              :battle-status (decode-battle-status battle-status)
@@ -357,8 +361,7 @@
 
 (defn normalize-startrect [rect-str]
   (let [parsed (Long/parseLong rect-str)]
-    (with-precision 10
-      (/ parsed 200))))
+    (double (/ parsed 200))))
 
 (defmethod handle "ADDSTARTRECT" [_client state-atom m]
   (let [[_all allyteam left top right bottom] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+)" m)
