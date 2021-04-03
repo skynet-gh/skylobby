@@ -51,7 +51,7 @@
     (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
-    (javafx.stage WindowEvent)
+    (javafx.stage Screen WindowEvent)
     (manifold.stream SplicedStream)
     (org.apache.commons.io.input CountingInputStream))
   (:gen-class))
@@ -74,6 +74,15 @@
 
 (def battle-window-width 1740)
 (def battle-window-height 800)
+
+(defn screen-bounds []
+  (let [screen (Screen/getPrimary)
+        bounds (.getVisualBounds screen)]
+    {:min-x (.getMinX bounds)
+     :min-y (.getMinY bounds)
+     :width (.getWidth bounds)
+     :height (.getHeight bounds)}))
+
 
 (def start-pos-r 10.0)
 
@@ -1062,19 +1071,21 @@
   (future
     (if (< 1 (.getClickCount event))
       (do
-        @(event-handler (merge e {:event/type ::leave-battle}))
+        (when (:battle e)
+          @(event-handler (merge e {:event/type ::leave-battle})))
         @(event-handler (merge e {:event/type ::join-battle})))
       (when (:battle-passworded e)
         (swap! *state assoc :battle-password "12345")))))
 
 
-(defn battles-table [{:keys [battle-password battles client selected-battle users]}]
+(defn battles-table [{:keys [battle battle-password battles client selected-battle users]}]
   {:fx/type fx.ext.table-view/with-selection-props
    :props {:selection-mode :single
            :on-selected-item-changed {:event/type ::select-battle}}
    :desc
    {:fx/type :table-view
     :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row
+                       :battle battle
                        :battle-password battle-password
                        :client client
                        :selected-battle selected-battle
@@ -3647,18 +3658,18 @@
 
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-   :bot-username :bot-version :channels :cleaning :client :copying :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
+   :bot-username :bot-version :channels :cleaning :client :copying :current-tasks :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :username :users])
+   :rapid-download :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            channels client
            copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
            http-download importables-by-path map-input-prefix maps message-draft minimap-type parsed-replays-by-path
-           rapid-data-by-version rapid-download users username]
+           rapid-data-by-version rapid-download update-maps update-mods users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -3755,28 +3766,31 @@
             {:fx/type :h-box
              :alignment :center-left
              :children
-             [{:fx/type :label
-               :text " Host IP: "}
-              {:fx/type :text-field
-               :text (-> battle :scripttags :game :hostip str)
-               :prompt-text " <override> "
-               :on-text-changed {:event/type ::hostip-changed}}]}
+             (concat []
+               (when false
+                 [{:fx/type :label
+                   :text " Host IP: "}
+                  {:fx/type :text-field
+                   :text (-> battle :scripttags :game :hostip str)
+                   :prompt-text " <override> "
+                   :on-text-changed {:event/type ::hostip-changed}}]))}
             {:fx/type :h-box
              :alignment :center-left
              :children
              (concat
-               [{:fx/type :label
-                 :text " Replay: "}
-                {:fx/type :combo-box
-                 :style {:-fx-max-width 300}
-                 :value (-> scripttags :game :demofile)
-                 :on-value-changed {:event/type ::assoc-in
-                                    :path [:battle :scripttags :game :demofile]}
-                 :items (->> parsed-replays-by-path
-                             (sort-by (comp :filename second))
-                             reverse
-                             (mapv first))
-                 :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]
+               (when am-host
+                 [{:fx/type :label
+                   :text " Replay: "}
+                  {:fx/type :combo-box
+                   :style {:-fx-max-width 300}
+                   :value (-> scripttags :game :demofile)
+                   :on-value-changed {:event/type ::assoc-in
+                                      :path [:battle :scripttags :game :demofile]}
+                   :items (->> parsed-replays-by-path
+                               (sort-by (comp :filename second))
+                               reverse
+                               (mapv first))
+                   :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
                (when (-> scripttags :game :demofile)
                  [{:fx/type :button
                    :on-action {:event/type ::dissoc-in
@@ -3816,7 +3830,7 @@
              :hgap 5
              :padding 5
              :children
-             [(let [map-details-loading (not battle-map-details)
+             [(let [map-loading (not battle-map-details)
                     no-map-details (not (seq battle-map-details))
                     map-file (:file battle-map-details)]
                 {:fx/type resource-sync-pane
@@ -3829,7 +3843,7 @@
                  :issues
                  (concat
                    (let [severity (cond
-                                    map-details-loading -1
+                                    map-loading -1
                                     no-map-details 2
                                     :else 0)]
                      [{:severity severity
@@ -3838,7 +3852,7 @@
                        :tooltip (if (zero? severity)
                                   (fs/canonical-path (:file battle-map-details))
                                   (str "Map '" battle-map "' not found locally"))}])
-                   (when (and no-map-details (not map-details-loading))
+                   (when (and no-map-details (not map-loading) (not update-maps))
                      (concat
                        (let [downloadable (->> downloadables-by-url
                                                vals
@@ -3892,7 +3906,7 @@
                               :task
                               {::task-type ::import
                                :importable importable}})}]))))})
-              (let [mod-details-loading (not battle-mod-details)
+              (let [mod-loading (not battle-mod-details)
                     no-mod-details (not (seq battle-mod-details))
                     mod-file (:file battle-mod-details)
                     canonical-path (fs/canonical-path mod-file)]
@@ -3906,7 +3920,7 @@
                  :issues
                  (concat
                    (let [severity (cond
-                                    mod-details-loading -1
+                                    mod-loading -1
                                     no-mod-details 2
                                     :else 0)]
                      [{:severity severity
@@ -3915,7 +3929,7 @@
                        :tooltip (if (zero? severity)
                                   canonical-path
                                   (str "Game '" battle-modname "' not found locally"))}])
-                   (when (and no-mod-details (not mod-details-loading))
+                   (when (and no-mod-details (not mod-loading) (not update-mods))
                      (concat
                        (let [downloadable (->> downloadables-by-url
                                                vals
@@ -4975,15 +4989,16 @@
         import-tasks (->> tasks
                           (filter (comp #{::import} ::task-type))
                           (map (comp fs/canonical-path :resource-file :importable))
-                          set)]
+                          set)
+        {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-importer
      :title "alt-spring-lobby Importer"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-importer false)
                          (.consume e))
-     :width download-window-width
-     :height download-window-height
+     :width (min download-window-width width)
+     :height (min download-window-height height)
      :scene
      {:fx/type :scene
       :stylesheets stylesheets
@@ -5249,15 +5264,16 @@
                            (filter (fn [{:keys [resource-type]}]
                                      (if download-type
                                        (= download-type resource-type)
-                                       true))))]
+                                       true))))
+        {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-downloader
      :title "alt-spring-lobby Downloader"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-downloader false)
                          (.consume e))
-     :width download-window-width
-     :height download-window-height
+     :width (min download-window-width width)
+     :height (min download-window-height height)
      :scene
      {:fx/type :scene
       :stylesheets stylesheets
@@ -5525,15 +5541,16 @@
                                                true))))
                                     [])
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
-        engine-file (:file (get engines-by-version engine-version))]
+        engine-file (:file (get engines-by-version engine-version))
+        {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-rapid-downloader
      :title "alt-spring-lobby Rapid Downloader"
      :on-close-request (fn [^WindowEvent e]
                          (swap! *state assoc :show-rapid-downloader false)
                          (.consume e))
-     :width download-window-width
-     :height download-window-height
+     :width (min download-window-width width)
+     :height (min download-window-height height)
      :scene
      {:fx/type :scene
       :stylesheets stylesheets
@@ -5835,15 +5852,16 @@
                           (filter (comp #{::import} ::task-type))
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
-        refresh-tasks (filter (comp #{::refresh-replays} ::task-type) all-tasks)]
+        refresh-tasks (filter (comp #{::refresh-replays} ::task-type) all-tasks)
+        {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-replays
      :title "alt-spring-lobby Replays"
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-replays false)
                          (.consume e))
-     :width replays-window-width
-     :height replays-window-height
+     :width (min replays-window-width width)
+     :height (min replays-window-height height)
      :scene
      {:fx/type :scene
       :stylesheets stylesheets
@@ -6345,82 +6363,83 @@
 
 (defn maps-window
   [{:keys [filter-maps-name maps on-change-map show-maps]}]
-  {:fx/type :stage
-   :showing show-maps
-   :title "alt-spring-lobby Maps"
-   :on-close-request (fn [^javafx.stage.WindowEvent e]
-                       (swap! *state assoc :show-maps false)
-                       (.consume e))
-   :width download-window-width
-   :height download-window-height
-   :scene
-   {:fx/type :scene
-    :stylesheets stylesheets
-    :root
-    {:fx/type :v-box
-     :children
-     [{:fx/type :h-box
-       :alignment :center-left
-       :style {:-fx-font-size 16}
+  (let [{:keys [width height]} (screen-bounds)]
+    {:fx/type :stage
+     :showing show-maps
+     :title "alt-spring-lobby Maps"
+     :on-close-request (fn [^javafx.stage.WindowEvent e]
+                         (swap! *state assoc :show-maps false)
+                         (.consume e))
+     :width (min download-window-width width)
+     :height (min download-window-height height)
+     :scene
+     {:fx/type :scene
+      :stylesheets stylesheets
+      :root
+      {:fx/type :v-box
        :children
-       (concat
-         [{:fx/type :label
-           :text " Filter: "}
-          {:fx/type :text-field
-           :text (str filter-maps-name)
-           :prompt-text "Filter by name or path"
-           :on-text-changed {:event/type ::assoc
-                             :key :filter-maps-name}}]
-         (when-not (string/blank? filter-maps-name)
-           [{:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               ;:show-delay [10 :ms]
-               :text "Clear filter"}}
-             :desc
-             {:fx/type :button
-              :on-action {:event/type ::dissoc
-                          :key :filter-maps-name}
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-close:16:white"}}}]))}
-      {:fx/type :scroll-pane
-       :fit-to-width true
-       :content
-       {:fx/type :flow-pane
-        :vgap 5
-        :hgap 5
-        :padding 5
-        :children
-        (map
-          (fn [{:keys [map-name]}]
-            {:fx/type :button
-             :style
-             {:-fx-min-width map-browse-image-size
-              :-fx-max-width map-browse-image-size
-              :-fx-min-height map-browse-box-height
-              :-fx-max-height map-browse-box-height}
-             :on-action {:event/type ::map-window-action
-                         :on-change-map (assoc on-change-map :map-name map-name)}
-             :graphic
-             {:fx/type :v-box
-              :children
-              [{:fx/type :image-view
-                :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
-                        :background-loading true}
-                :fit-width map-browse-image-size
-                :fit-height map-browse-image-size
-                :preserve-ratio true}
-               {:fx/type :label
-                :wrap-text true
-                :text (str map-name)}]}})
-          (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
-            (->> maps
-                 (filter (fn [{:keys [map-name]}]
-                           (and map-name
-                                (string/includes? (string/lower-case map-name) filter-lc))))
-                 (sort-by :map-name))))}}]}}})
+       [{:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         (concat
+           [{:fx/type :label
+             :text " Filter: "}
+            {:fx/type :text-field
+             :text (str filter-maps-name)
+             :prompt-text "Filter by name or path"
+             :on-text-changed {:event/type ::assoc
+                               :key :filter-maps-name}}]
+           (when-not (string/blank? filter-maps-name)
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 ;:show-delay [10 :ms]
+                 :text "Clear filter"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type ::dissoc
+                            :key :filter-maps-name}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-close:16:white"}}}]))}
+        {:fx/type :scroll-pane
+         :fit-to-width true
+         :content
+         {:fx/type :flow-pane
+          :vgap 5
+          :hgap 5
+          :padding 5
+          :children
+          (map
+            (fn [{:keys [map-name]}]
+              {:fx/type :button
+               :style
+               {:-fx-min-width map-browse-image-size
+                :-fx-max-width map-browse-image-size
+                :-fx-min-height map-browse-box-height
+                :-fx-max-height map-browse-box-height}
+               :on-action {:event/type ::map-window-action
+                           :on-change-map (assoc on-change-map :map-name map-name)}
+               :graphic
+               {:fx/type :v-box
+                :children
+                [{:fx/type :image-view
+                  :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
+                          :background-loading true}
+                  :fit-width map-browse-image-size
+                  :fit-height map-browse-image-size
+                  :preserve-ratio true}
+                 {:fx/type :label
+                  :wrap-text true
+                  :text (str map-name)}]}})
+            (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
+              (->> maps
+                   (filter (fn [{:keys [map-name]}]
+                             (and map-name
+                                  (string/includes? (string/lower-case map-name) filter-lc))))
+                   (sort-by :map-name))))}}]}}}))
 
 (defn main-window-on-close-request
   [client standalone e]
@@ -6477,215 +6496,216 @@
             show-servers-window show-uikeys-window standalone tasks username users verification-code]
      :as state}
     :state}]
-  {:fx/type fx/ext-many
-   :desc
-   (concat
-     [{:fx/type :stage
-       :showing true
-       :title "Alt Spring Lobby"
-       :x 100
-       :y 100
-       :width main-window-width
-       :height main-window-height
-       :on-close-request (partial main-window-on-close-request client standalone)
-       :scene
-       {:fx/type :scene
-        :stylesheets stylesheets
-        :root
-        {:fx/type :v-box
-         :style {:-fx-font-size 14}
-         :alignment :top-left
-         :children
-         (concat
-           [(merge
-              {:fx/type client-buttons}
-              (select-keys state
-                [:accepted :client :client-deferred :username :password :login-error
-                 :server-url :servers :server :show-register-popup]))]
-           (when agreement
-             [{:fx/type :label
-               :style {:-fx-font-size 20}
-               :text " Server agreement: "}
-              {:fx/type :text-area
-               :editable false
-               :text (str agreement)}
-              {:fx/type :h-box
-               :style {:-fx-font-size 20}
-               :children
-               [{:fx/type :text-field
-                 :prompt-text "Email Verification Code"
-                 :on-action {:event/type ::assoc
-                             :key :verification-code}}
-                {:fx/type :button
-                 :text "Confirm"
-                 :on-action {:event/type ::confirm-agreement
-                             :client client
-                             :password password
-                             :username username
-                             :verification-code verification-code}}]}])
-           [{:fx/type :tab-pane
-             :on-tabs-changed {:event/type ::main-tab-action}
-             :v-box/vgrow :always
-             :tabs
-             [{:fx/type :tab
-               :graphic {:fx/type :label
-                         :text "Battles"}
-               :closable false
-               :id "battles"
-               :content
-               {:fx/type :split-pane
-                :divider-positions [0.75]
-                :items
-                [
-                 {:fx/type :v-box
-                  :children
-                  [{:fx/type :label
-                    :text (str "Battles (" (count battles) ")")
-                    :style {:-fx-font-size 16}}
-                   (merge
-                     {:fx/type battles-table
-                      :v-box/vgrow :always}
-                     (select-keys state [:battle-password :battles :client :selected-battle :users]))]}
-                 {:fx/type :v-box
-                  :children
-                  [{:fx/type :label
-                    :text (str "Users (" (count users) ")")
-                    :style {:-fx-font-size 16}}
-                   {:fx/type users-table
-                    :v-box/vgrow :always
-                    :users users}]}]}}
-              {:fx/type :tab
-               :graphic {:fx/type :label
-                         :text "Chat"}
-               :closable false
-               :id "chat"
-               :content
-               {:fx/type :split-pane
-                :divider-positions [0.75]
-                :items
-                [(merge
-                   {:fx/type my-channels-view}
-                   (select-keys state [:channels :client :message-draft :my-channels]))
-                 {:fx/type :v-box
-                  :children
-                  [{:fx/type :label
-                    :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
-                    :style {:-fx-font-size 16}}
-                   (merge
-                     {:fx/type channels-table
-                      :v-box/vgrow :always}
-                     (select-keys state [:channels :client :my-channels]))
-                   {:fx/type :h-box
-                    :alignment :center-left
-                    :children
-                    [{:fx/type :label
-                      :text " Custom Channel: "}
-                     {:fx/type :text-field
-                      :text (:join-channel-name state)
-                      :prompt-text "Name"
-                      :on-text-changed {:event/type ::assoc
-                                        :key :join-channel-name}
-                      :on-action {:event/type ::join-channel
-                                  :channel-name (:join-channel-name state)
-                                  :client (:client state)}}
-                     {:fx/type :button
-                      :text "Join"
-                      :on-action {:event/type ::join-channel
-                                  :channel-name (:join-channel-name state)
-                                  :client (:client state)}}]}]}]}}]}
-            (merge
-              {:fx/type battles-buttons}
-              (select-keys state
-                [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
-                 :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-                 :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
-           (when battle
-             (if (:battle-id battle)
-               (when (not pop-out-battle)
-                 [(merge
-                    {:fx/type battle-view}
-                    (select-keys state battle-view-keys))])
-               [{:fx/type :h-box
-                 :alignment :top-left
-                 :children
-                 [{:fx/type :v-box
-                   :h-box/hgrow :always
-                   :children
-                   [{:fx/type :label
-                     :style {:-fx-font-size 20}
-                     :text "Waiting for server to open battle..."}]}]}]))
-           [{:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text (str last-failed-message)
-               :style {:-fx-text-fill "#FF0000"}}
-              {:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type :label
-               :text (str (count (seq tasks)) " tasks")}]}])}}}]
-     (when (and battle pop-out-battle)
+  (let [{:keys [width height]} (screen-bounds)]
+    {:fx/type fx/ext-many
+     :desc
+     (concat
        [{:fx/type :stage
-         :showing pop-out-battle
-         :title "alt-spring-lobby Battle"
-         :on-close-request {:event/type ::dissoc
-                            :key :pop-out-battle}
-         :width battle-window-width
-         :height battle-window-height
+         :showing true
+         :title "Alt Spring Lobby"
+         :x 100
+         :y 100
+         :width (min main-window-width width)
+         :height (min main-window-height height)
+         :on-close-request (partial main-window-on-close-request client standalone)
          :scene
          {:fx/type :scene
           :stylesheets stylesheets
           :root
-          {:fx/type :h-box
+          {:fx/type :v-box
+           :style {:-fx-font-size 14}
+           :alignment :top-left
            :children
-           (concat []
-             (when pop-out-battle
-               [(merge
-                  {:fx/type battle-view}
-                  (select-keys state battle-view-keys))]))}}}])
-     (when show-downloader
-       [(merge
-          {:fx/type download-window}
-          (select-keys state
-            [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
-             :http-download :show-downloader :show-stale]))])
-     (when show-importer
-       [(merge
-          {:fx/type import-window}
-          (select-keys state
-            [:copying :file-cache :import-filter :import-source-name :import-type
-             :importables-by-path :show-importer :show-stale :tasks]))])
-     (when show-maps
-       [(merge
-          {:fx/type maps-window}
-          (select-keys state
-            [:filter-maps-name :maps :on-change-map :show-maps]))])
-     (when show-rapid-downloader
-       [(merge
-          {:fx/type rapid-download-window}
-          (select-keys state
-            [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
-             :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader]))])
-     (when show-replays
-       [(merge
-          {:fx/type replays-window}
-          (select-keys state replays-window-keys))])
-     (when show-servers-window
-       [(merge
-          {:fx/type servers-window}
-          (select-keys state
-            [:server-host :server-port :server-alias :servers :show-servers-window]))])
-     (when show-register-window
-       [(merge
-          {:fx/type register-window}
-          (select-keys state
-            [:email :password :password-confirm :register-response :server :servers :show-register-window
-             :username]))])
-     (when show-uikeys-window
-       [(merge
-          {:fx/type uikeys-window}
-          (select-keys state
-            [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]))})
+           (concat
+             [(merge
+                {:fx/type client-buttons}
+                (select-keys state
+                  [:accepted :client :client-deferred :username :password :login-error
+                   :server-url :servers :server :show-register-popup]))]
+             (when agreement
+               [{:fx/type :label
+                 :style {:-fx-font-size 20}
+                 :text " Server agreement: "}
+                {:fx/type :text-area
+                 :editable false
+                 :text (str agreement)}
+                {:fx/type :h-box
+                 :style {:-fx-font-size 20}
+                 :children
+                 [{:fx/type :text-field
+                   :prompt-text "Email Verification Code"
+                   :on-action {:event/type ::assoc
+                               :key :verification-code}}
+                  {:fx/type :button
+                   :text "Confirm"
+                   :on-action {:event/type ::confirm-agreement
+                               :client client
+                               :password password
+                               :username username
+                               :verification-code verification-code}}]}])
+             [{:fx/type :tab-pane
+               :on-tabs-changed {:event/type ::main-tab-action}
+               :v-box/vgrow :always
+               :tabs
+               [{:fx/type :tab
+                 :graphic {:fx/type :label
+                           :text "Battles"}
+                 :closable false
+                 :id "battles"
+                 :content
+                 {:fx/type :split-pane
+                  :divider-positions [0.75]
+                  :items
+                  [
+                   {:fx/type :v-box
+                    :children
+                    [{:fx/type :label
+                      :text (str "Battles (" (count battles) ")")
+                      :style {:-fx-font-size 16}}
+                     (merge
+                       {:fx/type battles-table
+                        :v-box/vgrow :always}
+                       (select-keys state [:battle :battle-password :battles :client :selected-battle :users]))]}
+                   {:fx/type :v-box
+                    :children
+                    [{:fx/type :label
+                      :text (str "Users (" (count users) ")")
+                      :style {:-fx-font-size 16}}
+                     {:fx/type users-table
+                      :v-box/vgrow :always
+                      :users users}]}]}}
+                {:fx/type :tab
+                 :graphic {:fx/type :label
+                           :text "Chat"}
+                 :closable false
+                 :id "chat"
+                 :content
+                 {:fx/type :split-pane
+                  :divider-positions [0.75]
+                  :items
+                  [(merge
+                     {:fx/type my-channels-view}
+                     (select-keys state [:channels :client :message-draft :my-channels]))
+                   {:fx/type :v-box
+                    :children
+                    [{:fx/type :label
+                      :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
+                      :style {:-fx-font-size 16}}
+                     (merge
+                       {:fx/type channels-table
+                        :v-box/vgrow :always}
+                       (select-keys state [:channels :client :my-channels]))
+                     {:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      [{:fx/type :label
+                        :text " Custom Channel: "}
+                       {:fx/type :text-field
+                        :text (:join-channel-name state)
+                        :prompt-text "Name"
+                        :on-text-changed {:event/type ::assoc
+                                          :key :join-channel-name}
+                        :on-action {:event/type ::join-channel
+                                    :channel-name (:join-channel-name state)
+                                    :client (:client state)}}
+                       {:fx/type :button
+                        :text "Join"
+                        :on-action {:event/type ::join-channel
+                                    :channel-name (:join-channel-name state)
+                                    :client (:client state)}}]}]}]}}]}
+              (merge
+                {:fx/type battles-buttons}
+                (select-keys state
+                  [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
+                   :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
+                   :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
+             (when battle
+               (if (:battle-id battle)
+                 (when (not pop-out-battle)
+                   [(merge
+                      {:fx/type battle-view}
+                      (select-keys state battle-view-keys))])
+                 [{:fx/type :h-box
+                   :alignment :top-left
+                   :children
+                   [{:fx/type :v-box
+                     :h-box/hgrow :always
+                     :children
+                     [{:fx/type :label
+                       :style {:-fx-font-size 20}
+                       :text "Waiting for server to open battle..."}]}]}]))
+             [{:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :text (str last-failed-message)
+                 :style {:-fx-text-fill "#FF0000"}}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type :label
+                 :text (str (count (seq tasks)) " tasks")}]}])}}}]
+       (when (and battle pop-out-battle)
+         [{:fx/type :stage
+           :showing pop-out-battle
+           :title "alt-spring-lobby Battle"
+           :on-close-request {:event/type ::dissoc
+                              :key :pop-out-battle}
+           :width (min battle-window-width width)
+           :height (min battle-window-height height)
+           :scene
+           {:fx/type :scene
+            :stylesheets stylesheets
+            :root
+            {:fx/type :h-box
+             :children
+             (concat []
+               (when pop-out-battle
+                 [(merge
+                    {:fx/type battle-view}
+                    (select-keys state battle-view-keys))]))}}}])
+       (when show-downloader
+         [(merge
+            {:fx/type download-window}
+            (select-keys state
+              [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
+               :http-download :show-downloader :show-stale]))])
+       (when show-importer
+         [(merge
+            {:fx/type import-window}
+            (select-keys state
+              [:copying :file-cache :import-filter :import-source-name :import-type
+               :importables-by-path :show-importer :show-stale :tasks]))])
+       (when show-maps
+         [(merge
+            {:fx/type maps-window}
+            (select-keys state
+              [:filter-maps-name :maps :on-change-map :show-maps]))])
+       (when show-rapid-downloader
+         [(merge
+            {:fx/type rapid-download-window}
+            (select-keys state
+              [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
+               :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader]))])
+       (when show-replays
+         [(merge
+            {:fx/type replays-window}
+            (select-keys state replays-window-keys))])
+       (when show-servers-window
+         [(merge
+            {:fx/type servers-window}
+            (select-keys state
+              [:server-host :server-port :server-alias :servers :show-servers-window]))])
+       (when show-register-window
+         [(merge
+            {:fx/type register-window}
+            (select-keys state
+              [:email :password :password-confirm :register-response :server :servers :show-register-window
+               :username]))])
+       (when show-uikeys-window
+         [(merge
+            {:fx/type uikeys-window}
+            (select-keys state
+              [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]))}))
 
 
 (defn init

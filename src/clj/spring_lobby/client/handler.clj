@@ -21,7 +21,7 @@
   {:ready false
    :ally 0
    :handicap 0
-   :mode 1
+   :mode 0
    :sync 1
    :id 0
    :side 0})
@@ -297,7 +297,7 @@
         battle-status (assoc default-battle-status
                              :id (battle/available-team-id battle)
                              :ally (battle/available-ally battle)
-                             :mode true)
+                             :mode false)
         color (or preferred-color
                   (u/random-color))
         msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
