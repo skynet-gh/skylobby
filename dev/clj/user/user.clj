@@ -65,7 +65,6 @@
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
     (require 'spring-lobby.client)
-    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly old-client-handler))
     (if renderer
       (do
         (println "Re-rendering")

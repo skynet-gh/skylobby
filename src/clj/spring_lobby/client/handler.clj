@@ -117,17 +117,21 @@
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
     (swap! state update :users dissoc username)))
 
+(defn parse-client-status [m]
+  (re-find #"\w+ ([^\s]+) (\w+)" m))
+
 (defmethod handle "CLIENTSTATUS" [_c state-atom m]
-  (let [[_all username client-status] (re-find #"\w+ ([^\s]+) (\w+)" m)
+  (let [[_all username client-status] (parse-client-status m)
         decoded-status (decode-client-status client-status)
-        {:keys [battle battles] :as prev-state} @state-atom
-        _ (swap! state-atom assoc-in [:users username :client-status] decoded-status)
+        [prev-state _curr-state] (swap-vals! state-atom assoc-in [:users username :client-status] decoded-status)
+        {:keys [battle battles]} prev-state
         prev-status (-> prev-state :users (get username) :client-status)
         my-status (-> prev-state :users (get (:username prev-state)) :client-status)
         battle-detail (-> battles (get (:battle-id battle)))]
     (cond
-      (not (:ingame decoded-status)) (log/info "Not a game start")
-      (not= (:ingame prev-status) (:ingame decoded-status)) (log/info "Not a game status change")
+      (not (:ingame decoded-status)) (log/info "Not in game" username decoded-status)
+      (= (:ingame prev-status) (:ingame decoded-status))
+      (log/info "Not a game status change" username prev-status decoded-status)
       (= username (:username prev-state)) (log/info "Ignoring own game start")
       (:ingame my-status) (log/info "Already in game")
       (not battle) (log/debug "Not in a battle")
