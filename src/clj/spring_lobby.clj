@@ -5668,6 +5668,12 @@
                          (map replay-player-count)
                          set
                          sort)
+        filter-terms (->> (string/split (or filter-replay "") #"\s+")
+                          (remove string/blank?)
+                          (map string/lower-case))
+        includes-term? (fn [s term]
+                         (let [lc (string/lower-case (or s ""))]
+                           (string/includes? lc term)))
         replays (->> parsed-replays
                      (filter
                        (fn [replay]
@@ -5686,26 +5692,20 @@
                            true)))
                      (filter
                        (fn [replay]
-                         (if (string/blank? filter-replay)
+                         (if (empty? filter-terms)
                            true
-                           (let [lc (sanitize-replay-filter filter-replay)]
-                             (or
-                               (string/includes?
-                                 (string/lower-case (:filename replay))
-                                 lc)
-                               (string/includes?
-                                 (or (some-> replay :header :engine-version string/lower-case) "")
-                                 lc)
-                               (string/includes?
-                                 (or (some-> replay :body :script-data :game :gametype string/lower-case) "")
-                                 lc)
-                               (string/includes?
-                                 (or (some-> replay :body :script-data :game :mapname string/lower-case) "")
-                                 lc)
-                               (let [players (some->> replay :body :script-data :game
-                                                      (filter (comp #(string/starts-with? % "player") name first))
-                                                      (map (comp sanitize-replay-filter :name second)))]
-                                 (some #(string/includes? % lc) players))))))))
+                           (every?
+                             (some-fn
+                               (partial includes-term? (:filename replay))
+                               (partial includes-term? (-> replay :header :engine-version))
+                               (partial includes-term? (-> replay :body :script-data :game :gametype))
+                               (partial includes-term? (-> replay :body :script-data :game :mapname))
+                               (fn [term]
+                                 (let [players (some->> replay :body :script-data :game
+                                                        (filter (comp #(string/starts-with? % "player") name first))
+                                                        (map (comp sanitize-replay-filter :name second)))]
+                                   (some #(includes-term? % term) players))))
+                             filter-terms)))))
         selected-replay (->> replays
                              (filter (comp #{selected-replay-file} :file))
                              first)
