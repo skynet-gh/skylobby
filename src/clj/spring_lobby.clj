@@ -1059,8 +1059,10 @@
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
-  (when (< 1 (.getClickCount event))
-    (event-handler (merge e {:event/type ::join-battle}))))
+  (if (< 1 (.getClickCount event))
+    (event-handler (merge e {:event/type ::join-battle}))
+    (when (:battle-passworded e)
+      (swap! *state assoc :battle-password "12345"))))
 
 
 (defn battles-table [{:keys [battle-password battles client selected-battle users]}]
@@ -6454,7 +6456,7 @@
 
 
 (defn root-view
-  [{{:keys [agreement battle battles channels client last-failed-message my-channels password pop-out-battle
+  [{{:keys [agreement battle battles channels client last-failed-message password pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
             show-servers-window show-uikeys-window standalone tasks username users verification-code]
      :as state}
@@ -6505,60 +6507,76 @@
                              :password password
                              :username username
                              :verification-code verification-code}}]}])
-           [{:fx/type :split-pane
+           [{:fx/type :tab-pane
+             :on-tabs-changed {:event/type ::main-tab-action}
              :v-box/vgrow :always
-             :divider-positions [0.75]
-             :items
-             [{:fx/type :v-box
-               :children
-               (concat
-                 [{:fx/type :label
-                   :text (str "Battles (" (count battles) ")")
-                   :style {:-fx-font-size 16}}
-                  (merge
-                    {:fx/type battles-table
-                     :v-box/vgrow :always}
-                    (select-keys state [:battle-password :battles :client :selected-battle :users]))]
-                 (when (and client (seq my-channels))
-                   [(merge
-                      {:fx/type my-channels-view
-                       :v-box/vgrow :always}
-                      (select-keys state [:channels :client :message-draft :my-channels]))]))}
-              {:fx/type :v-box
-               :children
-               [{:fx/type :label
-                 :text (str "Users (" (count users) ")")
-                 :style {:-fx-font-size 16}}
-                {:fx/type users-table
-                 :v-box/vgrow :always
-                 :users users}
-                {:fx/type :v-box
-                 :children
-                 [{:fx/type :label
-                   :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
-                   :style {:-fx-font-size 16}}
-                  (merge
-                    {:fx/type channels-table
-                     :v-box/vgrow :always}
-                    (select-keys state [:channels :client :my-channels]))
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   [{:fx/type :label
-                     :text " Custom Channel: "}
-                    {:fx/type :text-field
-                     :text (:join-channel-name state)
-                     :prompt-text "Name"
-                     :on-text-changed {:event/type ::assoc
-                                       :key :join-channel-name}
-                     :on-action {:event/type ::join-channel
-                                 :channel-name (:join-channel-name state)
-                                 :client (:client state)}}
-                    {:fx/type :button
-                     :text "Join"
-                     :on-action {:event/type ::join-channel
-                                 :channel-name (:join-channel-name state)
-                                 :client (:client state)}}]}]}]}]}
+             :tabs
+             [{:fx/type :tab
+               :graphic {:fx/type :label
+                         :text "Battles"}
+               :closable false
+               :id "battles"
+               :content
+               {:fx/type :split-pane
+                :divider-positions [0.75]
+                :items
+                [
+                 {:fx/type :v-box
+                  :children
+                  [{:fx/type :label
+                    :text (str "Battles (" (count battles) ")")
+                    :style {:-fx-font-size 16}}
+                   (merge
+                     {:fx/type battles-table
+                      :v-box/vgrow :always}
+                     (select-keys state [:battle-password :battles :client :selected-battle :users]))]}
+                 {:fx/type :v-box
+                  :children
+                  [{:fx/type :label
+                    :text (str "Users (" (count users) ")")
+                    :style {:-fx-font-size 16}}
+                   {:fx/type users-table
+                    :v-box/vgrow :always
+                    :users users}]}]}}
+              {:fx/type :tab
+               :graphic {:fx/type :label
+                         :text "Chat"}
+               :closable false
+               :id "chat"
+               :content
+               {:fx/type :split-pane
+                :divider-positions [0.75]
+                :items
+                [(merge
+                   {:fx/type my-channels-view}
+                   (select-keys state [:channels :client :message-draft :my-channels]))
+                 {:fx/type :v-box
+                  :children
+                  [{:fx/type :label
+                    :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
+                    :style {:-fx-font-size 16}}
+                   (merge
+                     {:fx/type channels-table
+                      :v-box/vgrow :always}
+                     (select-keys state [:channels :client :my-channels]))
+                   {:fx/type :h-box
+                    :alignment :center-left
+                    :children
+                    [{:fx/type :label
+                      :text " Custom Channel: "}
+                     {:fx/type :text-field
+                      :text (:join-channel-name state)
+                      :prompt-text "Name"
+                      :on-text-changed {:event/type ::assoc
+                                        :key :join-channel-name}
+                      :on-action {:event/type ::join-channel
+                                  :channel-name (:join-channel-name state)
+                                  :client (:client state)}}
+                     {:fx/type :button
+                      :text "Join"
+                      :on-action {:event/type ::join-channel
+                                  :channel-name (:join-channel-name state)
+                                  :client (:client state)}}]}]}]}}]}
             (merge
               {:fx/type battles-buttons}
               (select-keys state
