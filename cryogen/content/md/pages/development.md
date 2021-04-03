@@ -22,21 +22,21 @@ There are many language features, as well as libraries in Clojure and Java that 
 
 ## First Steps
 
-I started with a basic UI using a library I've been keeping an eye on, [cljfx](https://github.com/cljfx/cljfx), which turns JavaFX into something resembling a React application, where you describe how state is rendered into the UI. Any changes you make to the state are watched by the renderer, which adjusts the UI accordingly. This is all done based on a [Clojure Atom](https://clojure.org/reference/atoms). You can see it [started off small](https://github.com/skynet-gh/alt-spring-lobby/blob/732453b5665d4a04c1c7c9f6c26dd7a2ea61c490/src/clj/spring_lobby.clj#L13).
+I started with a basic UI using a library I've been keeping an eye on, [cljfx](https://github.com/cljfx/cljfx), which turns JavaFX into something resembling a React application, where you describe how state is rendered into the UI. Any changes you make to the state are watched by the renderer, which adjusts the UI accordingly. This is all done based on a [Clojure Atom](https://clojure.org/reference/atoms). You can see it [started off small](https://github.com/skynet-gh/skylobby/blob/732453b5665d4a04c1c7c9f6c26dd7a2ea61c490/src/clj/spring_lobby.clj#L13).
 
 [Screenshot of Initial UI](/img/initial-ui.png)
 
 Around the same time, I started talking to a local uberserver instance. I needed to make some changes to get it working on Ubuntu 20.04 and add enable debug logging, so I [forked the repo and made changes here](https://github.com/skynet-gh/uberserver/tree/fix-mysql). If you want to see the project in action, you can run this server yourself and point the lobby to `localhost`.
 
-Once I had the server running, I added the [Aleph](https://github.com/clj-commons/aleph) networking library, which provides an easy wrapper over Netty for sending and receiving messages on a TCP connection. I also used [gloss](https://github.com/ztellman/gloss) both for splitting the TCP data into messages, as well as [parsing some of the encoded pieces of the messages](https://github.com/skynet-gh/alt-spring-lobby/commit/b91457792627504cc7e9f31a4d41625b373f2eb4#diff-8d4537ca92172eee422e0f23226d7478af9b95bed4cfc35c566b99a84af89109R33). I think it may be possible to do more message parsing using gloss, but for now I just dispatch on the first word of each message, which works for this protocol.
+Once I had the server running, I added the [Aleph](https://github.com/clj-commons/aleph) networking library, which provides an easy wrapper over Netty for sending and receiving messages on a TCP connection. I also used [gloss](https://github.com/ztellman/gloss) both for splitting the TCP data into messages, as well as [parsing some of the encoded pieces of the messages](https://github.com/skynet-gh/skylobby/commit/b91457792627504cc7e9f31a4d41625b373f2eb4#diff-8d4537ca92172eee422e0f23226d7478af9b95bed4cfc35c566b99a84af89109R33). I think it may be possible to do more message parsing using gloss, but for now I just dispatch on the first word of each message, which works for this protocol.
 
 ## Running Spring
 
-After that, I took a break from things for a month, and when I returned I added the [7-Zip-JBinding](http://sevenzipjbind.sourceforge.net/) library for parsing most maps, and extracting engine archives. I also added [basic exec of the Spring executable](https://github.com/skynet-gh/alt-spring-lobby/commit/8c17ad911ba2cd1b3658b416a186570011c8b95f#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R301), and some more parts of the protocol, like adding bots.
+After that, I took a break from things for a month, and when I returned I added the [7-Zip-JBinding](http://sevenzipjbind.sourceforge.net/) library for parsing most maps, and extracting engine archives. I also added [basic exec of the Spring executable](https://github.com/skynet-gh/skylobby/commit/8c17ad911ba2cd1b3658b416a186570011c8b95f#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R301), and some more parts of the protocol, like adding bots.
 
 [Screenshot of UI With Battle and Bots](battle-and-bots.png)
 
-One thing I ran into, the Spring process would hang at the same point in the logs every time. I wasn't reading the stdout or stderr streams from the process, so I [added that](https://github.com/skynet-gh/alt-spring-lobby/blob/8c17ad911ba2cd1b3658b416a186570011c8b95f/src/clj/spring_lobby.clj#L301-L313) to try to figure out what was going wrong. Turns out that fixed it, I guess a buffer was being filled
+One thing I ran into, the Spring process would hang at the same point in the logs every time. I wasn't reading the stdout or stderr streams from the process, so I [added that](https://github.com/skynet-gh/skylobby/blob/8c17ad911ba2cd1b3658b416a186570011c8b95f/src/clj/spring_lobby.clj#L301-L313) to try to figure out what was going wrong. Turns out that fixed it, I guess a buffer was being filled
 
 ```clj
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
@@ -66,11 +66,11 @@ One thing I ran into, the Spring process would hang at the same point in the log
 
 Parsing map files involves multiple archive formats (Zip and 7-Zip), a [custom binary format](https://springrts.com/wiki/Mapdev:SMF_format), a [custom config text format](https://springrts.com/wiki/Mapdev:SMD) for older maps, as well as [executing Lua](https://springrts.com/wiki/Mapdev:mapinfo.lua) for the *new* format.
 
-I started with the old SMD format, which also seems to be the same format that the `script.txt` is written in. There's a library for creating grammars for parsing called [instaparse](https://github.com/engelberg/instaparse) that often makes describing custom formats like these fairly straightforward. In this case the grammar [came out to roughly ten lines](https://github.com/skynet-gh/alt-spring-lobby/blob/cc337af57d8b5ad88599d36b3e0c0bf739299557/src/clj/spring_lobby/spring/script.clj#L66-L75) plus a number of lines to postprocess it into a format that's easier to work with.
+I started with the old SMD format, which also seems to be the same format that the `script.txt` is written in. There's a library for creating grammars for parsing called [instaparse](https://github.com/engelberg/instaparse) that often makes describing custom formats like these fairly straightforward. In this case the grammar [came out to roughly ten lines](https://github.com/skynet-gh/skylobby/blob/cc337af57d8b5ad88599d36b3e0c0bf739299557/src/clj/spring_lobby/spring/script.clj#L66-L75) plus a number of lines to postprocess it into a format that's easier to work with.
 
 However, there is a possible case with instaparse where [parsing never terminates](https://github.com/Engelberg/instaparse/issues/196). So I wrap its execution with a library called [clojail](https://github.com/flatland/clojail), which basically runs a Thread, and calls `.stop` if it doesn't complete in time.
 
-For the new `mapinfo.lua` format though, it's more difficult, since the map data is now stored as Lua code. I'm sure this is fine in the engine itself when the Lua is being executed, but it's a pain to deal with outside of that context. Thankfully, there's a Java library for executing Lua code, [luaj](https://github.com/luaj/luaj). This, along with some [mocking of the Spring internals](https://github.com/skynet-gh/alt-spring-lobby/commit/838c01ecbdab69d81dac133ce4f558d0ad0908ba#diff-d599e6e8d4aaec917ba9ab99739b5eb3ef9ea9ca83e9208e16fdfe92e7754002R19-R32) that sometimes leak into map "data", allows parsing across all maps I've tested.
+For the new `mapinfo.lua` format though, it's more difficult, since the map data is now stored as Lua code. I'm sure this is fine in the engine itself when the Lua is being executed, but it's a pain to deal with outside of that context. Thankfully, there's a Java library for executing Lua code, [luaj](https://github.com/luaj/luaj). This, along with some [mocking of the Spring internals](https://github.com/skynet-gh/skylobby/commit/838c01ecbdab69d81dac133ce4f558d0ad0908ba#diff-d599e6e8d4aaec917ba9ab99739b5eb3ef9ea9ca83e9208e16fdfe92e7754002R19-R32) that sometimes leak into map "data", allows parsing across all maps I've tested.
 
 ```clj
 (defn read-mapinfo [lua-source]
@@ -94,9 +94,9 @@ Not sure there's a better way, perhaps maybe just using JNI to call some C++ or 
 
 Now we have some basic processing of local resources, but it would be useful to be able to get new resources like games to play. One method of doing so is also custom to Spring, called [Rapid](https://springrts.com/wiki/Rapid). Rapid seems like a way to deal with small changes between game versions without rolling a new archive, which can be quite overall hundreds of megabytes or larger. In other words, similar to git in many ways. The `.sdp` format is binary and can be parsed with the same binary library mentioned earlier. To actually download packages, I just shell out to the [`pr-downloader` executable](https://github.com/spring/pr-downloader).
 
-Other resources can be downloaded with http, if you know where to look. I use the main [`clj-http`](https://github.com/dakrone/clj-http) library which wraps Apache HttpComponents, and this allows easy download to a file, and progress monitoring. At first I tried to build urls based on specific content to look for, but there are issues such as not knowing what case the file will have, or if it is `.sdz` or `.sd7`. Now it periodically fetches and parses [a few known websites](https://github.com/skynet-gh/alt-spring-lobby/blob/5ea022f03380ab9f6065e5d38f0442277f918e43/src/clj/spring_lobby/http.clj#L22-L32) that are usually html or xml.
+Other resources can be downloaded with http, if you know where to look. I use the main [`clj-http`](https://github.com/dakrone/clj-http) library which wraps Apache HttpComponents, and this allows easy download to a file, and progress monitoring. At first I tried to build urls based on specific content to look for, but there are issues such as not knowing what case the file will have, or if it is `.sdz` or `.sd7`. Now it periodically fetches and parses [a few known websites](https://github.com/skynet-gh/skylobby/blob/5ea022f03380ab9f6065e5d38f0442277f918e43/src/clj/spring_lobby/http.clj#L22-L32) that are usually html or xml.
 
-One thing I'm trying out in the project, is the "extensible" part of [EDN](https://github.com/edn-format/edn), the Clojure data format. I added [custom tags for `java.io.File`](https://github.com/skynet-gh/alt-spring-lobby/blob/4823e4edc0ea3a663caede76e70e5441cdd14d08/src/clj/spring_lobby.clj#L73-L83) which I use in basically every resource. The custom tag allows these objects to be written to and read from config files without any extra parsing steps
+One thing I'm trying out in the project, is the "extensible" part of [EDN](https://github.com/edn-format/edn), the Clojure data format. I added [custom tags for `java.io.File`](https://github.com/skynet-gh/skylobby/blob/4823e4edc0ea3a663caede76e70e5441cdd14d08/src/clj/spring_lobby.clj#L73-L83) which I use in basically every resource. The custom tag allows these objects to be written to and read from config files without any extra parsing steps
 
 ```clj
 (defn read-file-tag [cs]
@@ -115,7 +115,7 @@ A brief intermission to talk about development workflow. The goal is to have as 
 
 The main reloading library is [tools.namespace](https://github.com/clojure/tools.namespace) which is used for most reloading as far as I can tell. Basically, when `refresh` is called, all old namespaces (usually one file maps to one namespace) are unloaded, then the code is recompiled from what's now in the files on disk which should recreate the namespaces, and an optional `:after` function is called. I use a file watching library called [hawk](https://github.com/wkf/hawk) to do the file watching and some teardown (like stoping periodic tasks started with [chime](https://github.com/jarohen/chime/) as well as restoring the program state.
 
-Basically, the program uses one [`atom`](https://clojure.org/reference/atoms) for its state, and various threads makes changes to it. Another feature that I didn't know about until recently is [`add-watch`](https://clojure.github.io/clojure/clojure.core-api.html#clojure.core/add-watch) which calls a function whenever the state of a ref like an atom changes. I (ab)use this for things like [updating config files](https://github.com/skynet-gh/alt-spring-lobby/blob/master/src/clj/spring_lobby.clj#L189-L199) when the user makes changes in the UI, or loading the minimap from disk when the current map changes.
+Basically, the program uses one [`atom`](https://clojure.org/reference/atoms) for its state, and various threads makes changes to it. Another feature that I didn't know about until recently is [`add-watch`](https://clojure.github.io/clojure/clojure.core-api.html#clojure.core/add-watch) which calls a function whenever the state of a ref like an atom changes. I (ab)use this for things like [updating config files](https://github.com/skynet-gh/skylobby/blob/master/src/clj/spring_lobby.clj#L189-L199) when the user makes changes in the UI, or loading the minimap from disk when the current map changes.
 
 ```clj
   (add-watch state-atom :state-to-edn
@@ -129,7 +129,7 @@ Basically, the program uses one [`atom`](https://clojure.org/reference/atoms) fo
 
 There are a few situations where reloading would not update the running program, that needed special treatment. The UI view, the UI event handler, and the TCP client handler. For these, in dev mode, I use `(var-get (find-var ...)` to dynamically get the new version when namespaces are refreshed. That way, the program will keep its entire state, keep rendering the UI, talking to the server, etc., even after recompile, which is usually less than a second. This works fairly well, although compile errors sometimes cause namespaces to not be reloaded, and various things will break until full compilation happens again.
 
-Another caveat with cljfx, if you are using an atom directly and not using the [pure event handling](https://github.com/cljfx/cljfx#event-handling-on-steroids), be careful not to deref the state atom again within the component rendering fns. I had an issue with the for a while which caused double rendering, and only [found and fixed it recently](https://github.com/skynet-gh/alt-spring-lobby/commit/d793124bedca96c06be734fdbb16d64bd38b07fe#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R3049).
+Another caveat with cljfx, if you are using an atom directly and not using the [pure event handling](https://github.com/cljfx/cljfx#event-handling-on-steroids), be careful not to deref the state atom again within the component rendering fns. I had an issue with the for a while which caused double rendering, and only [found and fixed it recently](https://github.com/skynet-gh/skylobby/commit/d793124bedca96c06be734fdbb16d64bd38b07fe#diff-851cffb722e6a3673b05253c604a4dc51080128152956c9c0fef2d5f09e6d713R3049).
 
 I would be remiss if I didn't mention my editor setup, which is [Neovim](https://github.com/neovim/neovim) with the [Conjure plugin](https://github.com/Olical/conjure/) as well as [parinfer](https://github.com/eraserhd/parinfer-rust). It's not perfect, but it allows me to connect the editor to the running repl and evaluate code, which is very nice for prototyping. Since starting the project, I learned about another interactive dev tool, [reveal](https://github.com/vlaaad/reveal), but I haven't tried it out yet.
 
@@ -149,18 +149,18 @@ Despite that disclaimer, the lobby allows download of various game resources, re
 
 ![Present Day Screenshot](/img/battle-minimap-and-resources.png)
 
-I'll describe some enhancements I'd like to make, which should also be kept in [the changelog](https://github.com/skynet-gh/alt-spring-lobby/blob/master/CHANGELOG.md).
+I'll describe some enhancements I'd like to make, which should also be kept in [the changelog](https://github.com/skynet-gh/skylobby/blob/master/CHANGELOG.md).
 
 ## Advancements
 
-Now that we have feature parity with SpringLobby in a number of areas, I've started finally adding the improvements I set out to do in the first place. One annoyance, the "Random" starting positions didn't seem to be actually random, but rather just a hash or something. So I added [shuffling of team ids in this case](https://github.com/skynet-gh/alt-spring-lobby/commit/4eadacd84011c26918b905931344717790d86cdd), so my friends and I can start in different unknown locations.
+Now that we have feature parity with SpringLobby in a number of areas, I've started finally adding the improvements I set out to do in the first place. One annoyance, the "Random" starting positions didn't seem to be actually random, but rather just a hash or something. So I added [shuffling of team ids in this case](https://github.com/skynet-gh/skylobby/commit/4eadacd84011c26918b905931344717790d86cdd), so my friends and I can start in different unknown locations.
 
-Another issue, depending on where the uberserver is located, the wrong IP address for the host may be used. So I [added an override](https://github.com/skynet-gh/alt-spring-lobby/commit/ffe8eec18c3fadc2ffc9612a2aca0808da7c379b), since it is just a part of `script.txt` ultimately, although the lobby protocol uses it in battle open.
+Another issue, depending on where the uberserver is located, the wrong IP address for the host may be used. So I [added an override](https://github.com/skynet-gh/skylobby/commit/ffe8eec18c3fadc2ffc9612a2aca0808da7c379b), since it is just a part of `script.txt` ultimately, although the lobby protocol uses it in battle open.
 
 
 ## GitHub Actions
 
-Based on the great example app [cljfx/hn](https://github.com/cljfx/hn) I added some GitHub actions to build the platform-specific [jars and installers](https://github.com/skynet-gh/alt-spring-lobby/releases/latest) for Windows, Linux, and Mac.
+Based on the great example app [cljfx/hn](https://github.com/cljfx/hn) I added some GitHub actions to build the platform-specific [jars and installers](https://github.com/skynet-gh/skylobby/releases/latest) for Windows, Linux, and Mac.
 
 ## Future
 
@@ -172,11 +172,11 @@ Another friend tried out the game, but was very frustrated by the controls, due 
 
 One thing I haven't touched is interacting with native code directly using [JNI](https://docs.oracle.com/en/java/javase/15/docs/specs/jni/intro.html). I tried to use Java based solutions as much as possible, but I think it may be necessary for some thing like [Spring's unitsync](https://github.com/spring/spring/blob/8581792eac65e07cbed182ccb1e90424ce3bd8fc/tools/unitsync/unitsync.cpp) to generate consistent hashes of resources. I'm keeping an eye on the upcoming [Foreign Linker API](https://openjdk.java.net/jeps/389) related to this as well.
 
-I also try to capture these in [CHANGELOG.md](https://github.com/skynet-gh/alt-spring-lobby/blob/master/CHANGELOG.md).
+I also try to capture these in [CHANGELOG.md](https://github.com/skynet-gh/skylobby/blob/master/CHANGELOG.md).
 
 ## This Website
 
-To make these web pages, I used, you guessed it, another Clojure library called [Cryogen](http://cryogenweb.org/index.html). After a few false starts I figured out the URI paths and how to export to the [`gh-pages` branch](https://github.com/skynet-gh/alt-spring-lobby/tree/gh-pages) so it will be hosted here. I was also able to find examples of how to use [a GitHub action](https://github.com/skynet-gh/alt-spring-lobby/blob/master/.github/workflows/pages.yml) to build the page and commit to `gh-pages` automatically when `master` changes. This, along with running a local server as [described here](https://github.com/skynet-gh/alt-spring-lobby/tree/master/cryogen), makes the process fairly smooth.
+To make these web pages, I used, you guessed it, another Clojure library called [Cryogen](http://cryogenweb.org/index.html). After a few false starts I figured out the URI paths and how to export to the [`gh-pages` branch](https://github.com/skynet-gh/skylobby/tree/gh-pages) so it will be hosted here. I was also able to find examples of how to use [a GitHub action](https://github.com/skynet-gh/skylobby/blob/master/.github/workflows/pages.yml) to build the page and commit to `gh-pages` automatically when `master` changes. This, along with running a local server as [described here](https://github.com/skynet-gh/skylobby/tree/master/cryogen), makes the process fairly smooth.
 
 ## Conclusion
 

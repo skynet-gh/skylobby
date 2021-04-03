@@ -1,6 +1,6 @@
 --input dist
---main-jar alt-spring-lobby.jar
---name "alt-spring-lobby"
+--main-jar skylobby.jar
+--name "skylobby"
 --main-class clojure.main
 --arguments -m
 --arguments spring-lobby

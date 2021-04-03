@@ -1,6 +1,6 @@
 # Repo docs on gh-pages using Cryogen
 
-[GitHub Pages for this repo](https://skynet-gh/alt-spring-lobby/) using [Cryogen](https://github.com/cryogen-project/cryogen).
+[GitHub Pages for this repo](https://skynet-gh/skylobby/) using [Cryogen](https://github.com/cryogen-project/cryogen).
 
 ### Dev
 
@@ -10,7 +10,7 @@ To run a local server, run
 lein serve
 ```
 
-A browser should be opened to http://localhost:3000/alt-spring-lobby
+A browser should be opened to http://localhost:3000/skylobby
 
 ### Build
 

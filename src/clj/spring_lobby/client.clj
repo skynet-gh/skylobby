@@ -53,14 +53,15 @@
       (log/warn e "Unable to read version from manifest"))))
 
 (defn agent-string []
-  (str "alt-spring-lobby-"
+  (str u/app-name
+       "-"
        (or (manifest-version)
            (try
              (spring/short-git-commit (git/tag-or-latest-id (io/file ".")))
              (catch Exception e
                (log/warn e "Error getting git version")))
            (try
-             (slurp (io/resource "alt-spring-lobby.version"))
+             (slurp (io/resource u/app-name ".version"))
              (catch Exception e
                (log/warn e "Error getting version from file")))
            "UNKNOWN")))

@@ -30,6 +30,8 @@
 (def config-filename "config.edn")
 (def maps-filename "maps.edn")
 
+(def app-folder (str "." u/app-name))
+
 
 (defn canonical-path [^File f]
   (when f
@@ -239,12 +241,12 @@
     (cond
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
-        (io/file "/mnt" "c" "Users" user-name ".alt-spring-lobby")
-        (io/file user-home ".alt-spring-lobby"))
+        (io/file "/mnt" "c" "Users" user-name app-folder)
+        (io/file user-home app-folder))
       (string/includes? os-name "Windows")
-      (io/file user-home ".alt-spring-lobby")
+      (io/file user-home app-folder)
       :else
-      (io/file user-home ".alt-spring-lobby"))))
+      (io/file user-home app-folder))))
 
 (defn config-root
   []
@@ -262,7 +264,7 @@
   (io/file (app-root) "download"))
 
 (defn isolation-dir
-  "Returns the isolation dir for spring in this app, usually $HOME/.alt-spring-lobby/spring"
+  "Returns the isolation dir for spring in this app."
   ^File
   []
   (io/file (app-root) "spring"))

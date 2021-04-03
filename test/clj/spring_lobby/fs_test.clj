@@ -66,7 +66,7 @@
                                     {:os-name "Linux"
                                      :os-version "blahblah Microsoft"
                                      :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/.alt-spring-lobby")
+      (is (= (str "/mnt/c/Users/me/.skylobby")
              (fs/absolute-path
                (fs/app-root))))))
   (testing "Linux"
@@ -74,7 +74,7 @@
                                     {:os-name "Linux"
                                      :os-version ""
                                      :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.alt-spring-lobby")
+      (is (= (str "/home/me2/.skylobby")
              (fs/absolute-path
                (fs/app-root))))))
   (testing "Windows"
@@ -82,7 +82,7 @@
                                     {:os-name "somethingWindowssomething"
                                      :os-version "10.0"
                                      :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/.alt-spring-lobby")
+      (is (= (str "/C:/Users/me3/.skylobby")
              (fs/absolute-path
                (fs/app-root)))))))
 
@@ -92,7 +92,7 @@
                                     {:os-name "Linux"
                                      :os-version "blahblah Microsoft"
                                      :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/.alt-spring-lobby/wsl")
+      (is (= (str "/mnt/c/Users/me/.skylobby/wsl")
              (fs/absolute-path
                (fs/config-root))))))
   (testing "Linux"
@@ -100,7 +100,7 @@
                                     {:os-name "Linux"
                                      :os-version ""
                                      :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.alt-spring-lobby")
+      (is (= (str "/home/me2/.skylobby")
              (fs/absolute-path
                (fs/config-root))))))
   (testing "Windows"
@@ -108,7 +108,7 @@
                                     {:os-name "somethingWindowssomething"
                                      :os-version "10.0"
                                      :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/.alt-spring-lobby")
+      (is (= (str "/C:/Users/me3/.skylobby")
              (fs/absolute-path
                (fs/config-root)))))))
 

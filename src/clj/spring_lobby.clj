@@ -1579,7 +1579,7 @@
         server-url (str server-host ":" port)]
     {:fx/type :stage
      :showing show-servers-window
-     :title "alt-spring-lobby Servers"
+     :title (str u/app-name " Servers")
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-servers-window false)
                          (.consume e))
@@ -1643,7 +1643,7 @@
   [{:keys [email password password-confirm register-response server servers show-register-window username]}]
   {:fx/type :stage
    :showing show-register-window
-   :title "alt-spring-lobby Register"
+   :title (str u/app-name " Register")
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-register-window false)
                        (.consume e))
@@ -1783,7 +1783,7 @@
         uikeys-overrides (or uikeys {})]
     {:fx/type :stage
      :showing show-uikeys-window
-     :title "alt-spring-lobby UI Keys Editor"
+     :title (str u/app-name " UI Keys Editor")
      :on-close-request (fn [^Event e]
                          (swap! *state assoc :show-uikeys-window false)
                          (.consume e))
@@ -4993,7 +4993,7 @@
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-importer
-     :title "alt-spring-lobby Importer"
+     :title (str u/app-name " Importer")
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-importer false)
                          (.consume e))
@@ -5268,7 +5268,7 @@
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-downloader
-     :title "alt-spring-lobby Downloader"
+     :title (str u/app-name " Downloader")
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-downloader false)
                          (.consume e))
@@ -5545,7 +5545,7 @@
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-rapid-downloader
-     :title "alt-spring-lobby Rapid Downloader"
+     :title (str u/app-name " Rapid Downloader")
      :on-close-request (fn [^WindowEvent e]
                          (swap! *state assoc :show-rapid-downloader false)
                          (.consume e))
@@ -5857,7 +5857,7 @@
         time-zone-id (.toZoneId (TimeZone/getDefault))]
     {:fx/type :stage
      :showing show-replays
-     :title "alt-spring-lobby Replays"
+     :title (str u/app-name " Replays")
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-replays false)
                          (.consume e))
@@ -6397,7 +6397,7 @@
   (let [{:keys [width height]} (screen-bounds)]
     {:fx/type :stage
      :showing show-maps
-     :title "alt-spring-lobby Maps"
+     :title (str u/app-name " Maps")
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-maps false)
                          (.consume e))
@@ -6678,7 +6678,7 @@
        (when (and battle pop-out-battle)
          [{:fx/type :stage
            :showing pop-out-battle
-           :title "alt-spring-lobby Battle"
+           :title (str u/app-name " Battle")
            :on-close-request {:event/type ::dissoc
                               :key :pop-out-battle}
            :width (min battle-window-width width)
@@ -6761,7 +6761,7 @@
 (defn -main [& _args]
   (Platform/setImplicitExit true)
   (fs/init-7z!)
-  (u/log-to-file (fs/canonical-path (fs/config-file "alt-spring-lobby.log")))
+  (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
   (reset! *state (assoc (initial-state) :standalone true))
   (init *state)
   (let [r (fx/create-renderer

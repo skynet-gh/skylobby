@@ -1,11 +1,11 @@
-# alt-spring-lobby [![test](https://github.com/skynet-gh/alt-spring-lobby/actions/workflows/test.yml/badge.svg)](https://github.com/skynet-gh/alt-spring-lobby/actions/workflows/test.yml)
+# skylobby [![test](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml/badge.svg)](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml)
 
 A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com/spring/uberserver).
 
 
 ## Install
 
-You can download a platform installer on the [releases page](https://github.com/skynet-gh/alt-spring-lobby/releases/latest). Or, you can use one of the standalone jar files there, and you'll need to [install a recent Java version](https://adoptopenjdk.net/?variant=openjdk15) as well.
+You can download a platform installer on the [releases page](https://github.com/skynet-gh/skylobby/releases/latest). Or, you can use one of the standalone jar files there, and you'll need to [install a recent Java version](https://adoptopenjdk.net/?variant=openjdk15) as well.
 
 
 ## Build
@@ -22,7 +22,7 @@ clojure -M:uberjar
 And then run it with
 
 ```bash
-java -jar alt-spring-lobby.jar
+java -jar skylobby.jar
 ```
 
 To build an installer, then run `jpackage` for your platform, for example on Windows

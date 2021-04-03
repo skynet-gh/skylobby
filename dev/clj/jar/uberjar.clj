@@ -5,13 +5,14 @@
     [clojure.data.xml :as xml]
     [hf.depstar.uberjar]
     [me.raynes.fs :as raynes-fs]
-    [spring-lobby.git :as git])
+    [spring-lobby.git :as git]
+    [spring-lobby.util :as u])
   (:import
     (javafx.application Platform)))
 
 
 (def uberjar-opts
-  {:jar "dist/alt-spring-lobby.jar"
+  {:jar (str "dist/" u/app-name ".jar")
    :aot true
    :main-class "spring-lobby"})
 
@@ -44,7 +45,7 @@
 
 (defn spit-version-resource []
   (println "Spitting version resource file")
-  (spit (io/file "resources" "alt-spring-lobby.version") (version)))
+  (spit (io/file "resources" (str u/app-name ".version")) (version)))
 
 (defn uberjar []
   (hf.depstar.uberjar/run* uberjar-opts))
@@ -53,7 +54,7 @@
   (println "Fixing version in jar manifest")
   (let [dist-dir "dist"
         jar-path (.getCanonicalPath
-                   (clojure.java.io/file dist-dir "alt-spring-lobby.jar"))
+                   (clojure.java.io/file dist-dir (str u/app-name ".jar")))
         mf-file (clojure.java.io/file dist-dir "manifest-add.txt")]
     (spit mf-file (str "Build-Number: " (version) "\n"))
     (let [command ["jar" "ufm" jar-path (.getCanonicalPath mf-file)]

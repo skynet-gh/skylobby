@@ -14,6 +14,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def app-name "skylobby")
+
+
 ; https://stackoverflow.com/a/17328219/984393
 (defn deep-merge [& ms]
   (apply
