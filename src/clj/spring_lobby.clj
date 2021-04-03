@@ -3114,7 +3114,7 @@
     true))
 
 (defn battle-players-table
-  [{:keys [am-host client host-username players sides username]}]
+  [{:keys [am-host client host-username players scripttags sides username]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (or players [])
@@ -3245,7 +3245,21 @@
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:skill i))})}}
+      :describe
+      (fn [i]
+        (when-let [username (:username i)]
+          (let [username-kw (keyword (string/lower-case username))
+                tags (some-> scripttags :game :players (get username-kw))
+                uncertainty (or (try (u/to-number (:skilluncertainty tags))
+                                     (catch Exception e
+                                       (log/debug e "Error parsing skill uncertainty")))
+                                3)
+                ts (or (:skill i)
+                       (str
+                         (:skill tags)
+                         " "
+                         (apply str (repeat uncertainty "?"))))]
+            {:text (str ts)})))}}
     {:fx/type :table-column
      :text "Color"
      :cell-value-factory identity
@@ -3601,7 +3615,8 @@
          :players (battle-players-and-bots state)
          :sides sides
          :username username
-         :battle-modname battle-modname}
+         :battle-modname battle-modname
+         :scripttags scripttags}
         {:fx/type :h-box
          :children
          [

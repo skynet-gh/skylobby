@@ -245,11 +245,11 @@
 
 (defn parse-ai [ai]
   (when ai
-    (re-find #"(.+)\|([^\s]+)" ai)))
+    (re-find #"([^|]+)(\|([^\s]+))?" ai)))
 
 (defmethod handle "ADDBOT" [_c state-atom m]
   (let [[_all battle-id bot-name owner battle-status team-color ai] (parse-addbot m)
-        [_all ai-name ai-version] (parse-ai ai)
+        [_all ai-name _ ai-version] (parse-ai ai)
         bot {:bot-name bot-name
              :owner owner
              :battle-status (decode-battle-status battle-status)
@@ -283,7 +283,7 @@
   (re-find #"\w+ ([^\s]+) ([^\s]+)( ([^\s]+))?" m))
 
 (defmethod handle "JOINBATTLE" [_c state-atom m]
-  (let [[_all battle-id hash-code channel-name] (parse-joinbattle m)]
+  (let [[_all battle-id hash-code _ channel-name] (parse-joinbattle m)]
     (swap! state-atom assoc
            :battle {:battle-id battle-id
                     :hash-code hash-code

@@ -155,7 +155,7 @@
 (defn init []
   (try
     [datafy pprint chime/chime-at string/split edn/read-string http/get]
-    (hawk/watch! [{:paths ["src/clj"]
+    (hawk/watch! [{:paths ["src/clj" "test/clj"]
                    :handler refresh-on-file-change}])
     (require 'spring-lobby)
     (require 'spring-lobby.fs)

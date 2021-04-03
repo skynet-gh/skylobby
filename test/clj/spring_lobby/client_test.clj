@@ -71,6 +71,7 @@
           "Mini_SuperSpeedMetal"
           "deth"
           "Balanced Annihilation V10.24"
+          "\t__battle__8"
           "__battle__8"]
          (rest
            (client/parse-battleopened "BATTLEOPENED 1 0 0 skynet 192.168.1.6 8452 8 1 0 -1706632985 Spring	104.0.1-1510-g89bb8e3 maintenance	Mini_SuperSpeedMetal	deth	Balanced Annihilation V10.24	__battle__8")))))

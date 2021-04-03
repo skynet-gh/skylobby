@@ -9,11 +9,17 @@
          (rest (handler/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13"))))
   (is (= ["4" "Bot2" "skynet9001" "4195534" "16744322" "MFAI : normal (air)|<not-versioned>"]
          (rest (handler/parse-addbot "ADDBOT 4 Bot2 skynet9001 4195534 16744322 MFAI : normal (air)|<not-versioned>"))))
-  (is (= ["MFAI : normal (air)" "<not-versioned>"]
-         (rest (handler/parse-ai "MFAI : normal (air)|<not-versioned>")))))
+  (is (= ["13674" "BARbstable(1)" "owner" "4195334" "16747775" "BARb"]
+         (rest (handler/parse-addbot "ADDBOT 13674 BARbstable(1) owner 4195334 16747775 BARb")))))
+
+(deftest parse-ai
+  (is (= ["MFAI : normal (air)" "|<not-versioned>" "<not-versioned>"]
+         (rest (handler/parse-ai "MFAI : normal (air)|<not-versioned>"))))
+  (is (= ["BARb" nil nil]
+         (rest (handler/parse-ai "BARb")))))
 
 (deftest parse-joinbattle
-  (is (= ["32" "-1706632985" "__battle__1" "__battle__1"]
+  (is (= ["32" "-1706632985" " __battle__1" "__battle__1"]
          (rest
            (handler/parse-joinbattle "JOINBATTLE 32 -1706632985 __battle__1")))))
 
