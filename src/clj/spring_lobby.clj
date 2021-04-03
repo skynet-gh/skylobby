@@ -5769,19 +5769,54 @@
   [{:keys [player-counts]}]
   (reduce (fnil + 0) 0 player-counts))
 
+(defn parse-skill [skill]
+  (cond
+    (number? skill)
+    skill
+    (string? skill)
+    (let [[_all n] (re-find #"~?([\d]+)" skill)]
+      (try
+        (Double/parseDouble n)
+        (catch Exception e
+          (log/warn e "Error parsing skill" skill))))
+    :else nil))
+
+(defn replay-skills
+  [{:keys [body]}]
+  (let [skills (some->> body :script-data :game
+                        (filter (comp #(string/starts-with? % "player") name first))
+                        (map (comp :skill second))
+                        (map parse-skill)
+                        (filter some?))]
+    skills))
+
+(defn min-skill [coll]
+  (when (seq coll)
+    (reduce min Long/MAX_VALUE coll)))
+
+(defn average-skill [coll]
+  (when (seq coll)
+    (with-precision 3
+      (/ (bigdec (reduce + coll))
+         (bigdec (count coll))))))
+
+(defn max-skill [coll]
+  (when (seq coll)
+    (reduce max 0 coll)))
+
 (def replays-window-keys
-  [:copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players
+  [:copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
    :filter-replay-type :http-download :maps :mods :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-watched :replays-window-details :selected-replay-file
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file
    :show-replays :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
-  [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players
+  [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
            filter-replay-type http-download maps mods parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-watched replays-window-details selected-replay-file
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file
            show-replays tasks update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
@@ -5818,6 +5853,13 @@
                            true)))
                      (filter
                        (fn [replay]
+                         (if filter-replay-min-skill
+                           (if-let [avg (average-skill (replay-skills replay))]
+                             (<= filter-replay-min-skill avg)
+                             false)
+                           true)))
+                     (filter
+                       (fn [replay]
                          (if (empty? filter-terms)
                            true
                            (every?
@@ -5829,12 +5871,14 @@
                                (fn [term]
                                  (let [players (some->> replay :body :script-data :game
                                                         (filter (comp #(string/starts-with? % "player") name first))
+                                                        (filter
+                                                          (if replays-filter-specs
+                                                            (constantly true)
+                                                            (comp #{0 "0"} :spectator second)))
                                                         (map (comp sanitize-replay-filter :name second)))]
                                    (some #(includes-term? % term) players))))
                              filter-terms)))))
-        selected-replay (->> replays
-                             (filter (comp #{selected-replay-file} :file))
-                             first)
+        selected-replay (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         mods-by-version (into {} (map (juxt :mod-name identity) mods))
         maps-by-version (into {} (map (juxt :map-name identity) maps))
@@ -5901,6 +5945,17 @@
              [{:fx/type :h-box
                :alignment :center-left
                :children
+               [
+                {:fx/type :label
+                 :text " Filter specs:"}
+                {:fx/type :check-box
+                 :selected (boolean replays-filter-specs)
+                 :h-box/margin 8
+                 :on-selected-changed {:event/type ::assoc
+                                       :key :replays-filter-specs}}]}]
+             [{:fx/type :h-box
+               :alignment :center-left
+               :children
                (concat
                  [{:fx/type :label
                    :text " Type: "}
@@ -5959,6 +6014,16 @@
                    :on-value-changed {:event/type ::assoc
                                       :key :filter-replay-max-players}
                    :items (concat [nil] num-players)}]
+                 [{:fx/type :label
+                   :text " Min Avg Skill: "}
+                  {:fx/type :text-field
+                   :style {:-fx-max-width 60}
+                   :text-formatter
+                   {:fx/type :text-formatter
+                    :value-converter :integer
+                    :value (int (or filter-replay-min-skill 0))
+                    :on-value-changed {:event/type ::assoc
+                                       :key :filter-replay-min-skill}}}]
                  (when filter-replay-max-players
                    [{:fx/type fx.ext.node/with-tooltip-props
                      :props
@@ -6014,96 +6079,116 @@
                 (concat
                   (when replays-window-details
                     [{:fx/type :table-column
-                      :sortable false
                       :text "Source"
-                      :cell-value-factory identity
+                      :cell-value-factory #(-> % :source fs/filename)
                       :cell-factory
                       {:fx/cell-type :table-cell
                        :describe
-                       (fn [i] {:text (-> i :source fs/filename str)})}}
+                       (fn [source]
+                         {:text (str source)})}}
                      {:fx/type :table-column
-                      :sortable false
                       :text "Filename"
-                      :cell-value-factory identity
+                      :cell-value-factory #(-> % :file fs/filename)
                       :cell-factory
                       {:fx/cell-type :table-cell
                        :describe
-                       (fn [i] {:text (-> i :file fs/filename str)})}}])
+                       (fn [filename]
+                         {:text (str filename)})}}])
                   [
                    {:fx/type :table-column
-                    :sortable false
                     :text "Map"
-                    :cell-value-factory identity
+                    :cell-value-factory #(-> % :body :script-data :game :mapname)
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i] {:text (-> i :body :script-data :game :mapname str)})}}
+                     (fn [map-name]
+                       {:text (str map-name)})}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Game"
-                    :cell-value-factory identity
+                    :cell-value-factory #(-> % :body :script-data :game :gametype)
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i]
-                       {:text (-> i :body :script-data :game :gametype str)})}}
+                     (fn [mod-name]
+                       {:text (str mod-name)})}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Timestamp"
-                    :cell-value-factory identity
+                    :cell-value-factory #(some-> % :header :unix-time (* 1000))
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i]
-                       (let [ts (when-let [unix-time (some-> i :header :unix-time (* 1000))]
+                     (fn [unix-time]
+                       (let [ts (when unix-time
                                   (java-time/format
                                     (LocalDateTime/ofInstant
                                       (java-time/instant unix-time)
                                       time-zone-id)))]
                          {:text (str ts)}))}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Type"
-                    :cell-value-factory identity
+                    :cell-value-factory #(some-> % :game-type name)
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i] {:text (some-> i :game-type name)})}}
+                     (fn [game-type]
+                       {:text (str game-type)})}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Player Counts"
-                    :cell-value-factory identity
+                    :cell-value-factory :player-counts
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i] {:text (->> i :player-counts (string/join "v"))})}}
+                     (fn [player-counts]
+                       {:text (->> player-counts (string/join "v"))})}}
                    {:fx/type :table-column
-                    :sortable false
-                    :text "Engine"
-                    :cell-value-factory identity
+                    :text "Skill Min"
+                    :cell-value-factory (comp min-skill replay-skills)
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i] {:text (-> i :header :engine-version str)})}}]
+                     (fn [min-skill]
+                       {:text (str min-skill)})}}
+                   {:fx/type :table-column
+                    :text "Skill Avg"
+                    :cell-value-factory (comp average-skill replay-skills)
+                    :cell-factory
+                    {:fx/cell-type :table-cell
+                     :describe
+                     (fn [avg-skill]
+                       {:text (str avg-skill)})}}
+                   {:fx/type :table-column
+                    :text "Skill Max"
+                    :cell-value-factory (comp max-skill replay-skills)
+                    :cell-factory
+                    {:fx/cell-type :table-cell
+                     :describe
+                     (fn [max-skill]
+                       {:text (str max-skill)})}}
+                   {:fx/type :table-column
+                    :text "Engine"
+                    :cell-value-factory #(-> % :header :engine-version)
+                    :cell-factory
+                    {:fx/cell-type :table-cell
+                     :describe
+                     (fn [engine-version]
+                       {:text (str engine-version)})}}]
                   (when replays-window-details
                     [{:fx/type :table-column
-                      :sortable false
                       :text "Size"
-                      :cell-value-factory identity
+                      :cell-value-factory :file-size
                       :cell-factory
                       {:fx/cell-type :table-cell
                        :describe
-                       (fn [i] {:text (-> i :file-size u/format-bytes)})}}])
+                       (fn [file-size]
+                         {:text (u/format-bytes file-size)})}}])
                   [{:fx/type :table-column
-                    :sortable false
                     :text "Duration"
-                    :cell-value-factory identity
+                    :cell-value-factory #(-> % :header :game-time)
                     :cell-factory
                     {:fx/cell-type :table-cell
                      :describe
-                     (fn [i]
-                       (let [game-time (-> i :header :game-time)
-                             duration (when game-time (java-time/duration game-time :seconds))
+                     (fn [game-time]
+                       (let [duration (when game-time (java-time/duration game-time :seconds))
                              ; https://stackoverflow.com/a/44343699/984393
                              formatted (when duration
                                          (format "%d:%02d:%02d"
@@ -6112,8 +6197,8 @@
                                            (.toSecondsPart duration)))]
                          {:text (str formatted)}))}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Watched"
+                    :sortable false
                     :cell-value-factory identity
                     :cell-factory
                     {:fx/cell-type :table-cell
@@ -6130,8 +6215,8 @@
                             :on-selected-changed {:event/type ::assoc-in
                                                   :path [:replays-watched path]}}}}))}}
                    {:fx/type :table-column
-                    :sortable false
                     :text "Watch"
+                    :sortable false
                     :cell-value-factory identity
                     :cell-factory
                     {:fx/cell-type :table-cell
@@ -6339,7 +6424,13 @@
                                                 :handicap handicap
                                                 :side (get side-id-by-name side)
                                                 :ally allyteam}
-                                               :team-color team-color))))))
+                                               :team-color team-color)))))
+                              (sort-by
+                                (juxt
+                                  (comp :mode :battle-status)
+                                  (comp :ally :battle-status)
+                                  (comp parse-skill :skill)))
+                              reverse)
                  bots (->> game
                            (filter (comp #(string/starts-with? % "ai") name first))
                            (map
