@@ -5434,30 +5434,31 @@
                             {:text (str (humanize/duration (- now resource-updated)))}))}}
           {:fx/type :table-column
            :text "Source"
-           :cell-value-factory identity
+           :cell-value-factory :download-source-name
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:download-source-name i))})}}
+            :describe (fn [source] {:text (str source)})}}
           {:fx/type :table-column
            :text "Type"
-           :cell-value-factory identity
+           :cell-value-factory :resource-type
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (comp import-type-cell :resource-type)}}
+            :describe import-type-cell}}
           {:fx/type :table-column
            :text "File"
-           :cell-value-factory identity
+           :cell-value-factory :resource-filename
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:resource-filename i))})}}
+            :describe (fn [resource-filename] {:text (str resource-filename)})}}
           {:fx/type :table-column
            :text "URL"
-           :cell-value-factory identity
+           :cell-value-factory :download-url
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [i] {:text (str (:download-url i))})}}
+            :describe (fn [download-url] {:text (str download-url)})}}
           {:fx/type :table-column
            :text "Download"
+           :sortable false
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
@@ -5625,6 +5626,7 @@
          :items filtered-rapid-versions
          :columns
          [{:fx/type :table-column
+           :sortable false
            :text "ID"
            :cell-value-factory identity
            :cell-factory
@@ -5633,6 +5635,7 @@
             (fn [i]
               {:text (str (:id i))})}}
           {:fx/type :table-column
+           :sortable false
            :text "Hash"
            :cell-value-factory identity
            :cell-factory
@@ -5642,14 +5645,15 @@
               {:text (str (:hash i))})}}
           {:fx/type :table-column
            :text "Version"
-           :cell-value-factory identity
+           :cell-value-factory :version
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [i]
-              {:text (str (:version i))})}}
+            (fn [version]
+              {:text (str version)})}}
           {:fx/type :table-column
            :text "Download"
+           :sortable false
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
@@ -5666,6 +5670,8 @@
                       :icon-literal "mdi-check:16:white"}}
                     (:running download)
                     nil
+                    (not engine-file)
+                    {:text "Needs an engine"}
                     :else
                     {:graphic
                      {:fx/type :button
@@ -5700,12 +5706,14 @@
          :columns
          [{:fx/type :table-column
            :text "Filename"
+           :sortable false
            :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
             (fn [i] {:text (:filename i)})}}
           {:fx/type :table-column
+           :sortable false
            :text "ID"
            :cell-value-factory identity
            :cell-factory
@@ -5714,11 +5722,11 @@
             (fn [i] {:text (:id i)})}}
           {:fx/type :table-column
            :text "Version"
-           :cell-value-factory identity
+           :cell-value-factory :version
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [i] {:text (:version i)})}}]}]}}}))
+            (fn [version] {:text (str version)})}}]}]}}}))
 
 
 (defmethod event-handler ::watch-replay
