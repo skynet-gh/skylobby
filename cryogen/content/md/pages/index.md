@@ -4,7 +4,7 @@
  :navbar? true
  :home? true}
 
-## Alt Spring Lobby
+## skylobby
 
 Yet another Spring lobby.
 

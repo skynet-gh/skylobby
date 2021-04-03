@@ -6533,7 +6533,7 @@
      (concat
        [{:fx/type :stage
          :showing true
-         :title "Alt Spring Lobby"
+         :title "skylobby"
          :x 100
          :y 100
          :width (min main-window-width width)
