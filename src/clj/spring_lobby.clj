@@ -1059,10 +1059,13 @@
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
-  (if (< 1 (.getClickCount event))
-    (event-handler (merge e {:event/type ::join-battle}))
-    (when (:battle-passworded e)
-      (swap! *state assoc :battle-password "12345"))))
+  (future
+    (if (< 1 (.getClickCount event))
+      (do
+        @(event-handler (merge e {:event/type ::leave-battle}))
+        @(event-handler (merge e {:event/type ::join-battle})))
+      (when (:battle-passworded e)
+        (swap! *state assoc :battle-password "12345")))))
 
 
 (defn battles-table [{:keys [battle-password battles client selected-battle users]}]
@@ -3562,22 +3565,102 @@
                          (.setFill gc Color/WHITE)
                          (.fillText gc text xt yt))))))))})])}))
 
+; https://github.com/cljfx/cljfx/issues/51#issuecomment-583974585
+(def with-scroll-text-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:scroll-text (fx.prop/make
+                   (fx.mutator/setter
+                     (fn [^TextArea text-area [txt auto-scroll]]
+                       (let [scroll-pos (if auto-scroll
+                                          ##Inf
+                                          (.getScrollTop text-area))]
+                         (doto text-area
+                           (.setText txt)
+                           (some-> .getParent .layout)
+                           (.setScrollTop scroll-pos)))))
+                  fx.lifecycle/scalar
+                  :default ["" 0])}))
+
+(defn channel-view [{:keys [channels client message-draft channel-name]}]
+  (let [channel-details (get channels channel-name)
+        users (:users channel-details)
+        time-zone-id (.toZoneId (TimeZone/getDefault))
+        text (->> channel-details
+                  :messages
+                  reverse
+                  (map
+                    (fn [{:keys [ex text timestamp username]}]
+                      (str
+                        "["
+                        (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
+                                                       (java-time/instant timestamp)
+                                                       time-zone-id))
+                        "] "
+                        (if ex
+                          (str "* " username " " text)
+                          (str username ": " text)))))
+                  (string/join "\n"))]
+    {:fx/type :h-box
+     :children
+     [{:fx/type :v-box
+       :h-box/hgrow :always
+       :children
+       [{:fx/type with-scroll-text-prop
+         :v-box/vgrow :always
+         :props {:scroll-text [text true]}
+         :desc
+         {:fx/type :text-area
+          :editable false
+          :wrap-text true
+          :style {:-fx-font-family "monospace"}}}
+        {:fx/type :h-box
+         :children
+         [{:fx/type :button
+           :text "Send"
+           :on-action {:event/type ::send-message
+                       :channel-name channel-name
+                       :client client
+                       :message message-draft}}
+          {:fx/type :text-field
+           :h-box/hgrow :always
+           :text (str message-draft)
+           :on-text-changed {:event/type ::assoc
+                             :key :message-draft}
+           :on-action {:event/type ::send-message
+                       :channel-name channel-name
+                       :client client
+                       :message message-draft}}]}]}
+      {:fx/type :table-view
+       :column-resize-policy :constrained ; TODO auto resize
+       :items (->> users
+                   keys
+                   (sort String/CASE_INSENSITIVE_ORDER)
+                   vec)
+       :columns
+       [{:fx/type :table-column
+         :text "Username"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe (fn [i] {:text (-> i str)})}}]}]}))
+
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-   :bot-username :bot-version :cleaning :client :copying :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
+   :bot-username :bot-version :channels :cleaning :client :copying :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
-   :map-input-prefix :maps :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
+   :map-input-prefix :maps :message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
    :rapid-download :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           client
+           channels client
            copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
-           http-download importables-by-path map-input-prefix maps minimap-type parsed-replays-by-path
+           http-download importables-by-path map-input-prefix maps message-draft minimap-type parsed-replays-by-path
            rapid-data-by-version rapid-download users username]
     :as state}]
-  (let [{:keys [host-username battle-map battle-modname]} (get battles (:battle-id battle))
+  (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
         am-host (= username host-username)
         scripttags (:scripttags battle)
@@ -4052,8 +4135,13 @@
                                              (not host-ingame))
                                         iam-ingame))
                   :on-action {:event/type ::start-battle}}}])}]}
-          {:fx/type :pane
-           :h-box/hgrow :always}
+          {:fx/type channel-view
+           :h-box/hgrow :always
+           :channels channels
+           :client client
+           :message-draft message-draft
+           :channel-name channel-name}
+          #_
           {:fx/type :v-box
            :alignment :top-left
            :children
@@ -4066,6 +4154,7 @@
              :text (str (slurp (io/resource "uikeys.txt")))
              :style {:-fx-font-family "monospace"}
              :v-box/vgrow :always}]}
+          #_
           {:fx/type :v-box
            :alignment :top-left
            :h-box/hgrow :always
@@ -4175,6 +4264,7 @@
                           :items (or (map (comp :key second) (:items i))
                                      [])}}}}
                       {:text (str (:def i))})))}}]}]}
+          #_
           {:fx/type :v-box
            :alignment :top-left
            :children
@@ -6357,24 +6447,6 @@
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
 
-; https://github.com/cljfx/cljfx/issues/51#issuecomment-583974585
-(def with-scroll-text-prop
-  (fx.lifecycle/make-ext-with-props
-   fx.lifecycle/dynamic
-   {:scroll-text (fx.prop/make
-                   (fx.mutator/setter
-                     (fn [^TextArea text-area [txt auto-scroll]]
-                       (let [scroll-pos (if auto-scroll
-                                          ##Inf
-                                          (.getScrollTop text-area))]
-                         (doto text-area
-                           (.setText txt)
-                           (some-> .getParent .layout)
-                           (.setScrollTop scroll-pos)))))
-                  fx.lifecycle/scalar
-                  :default ["" 0])}))
-
-
 (defn my-channels-view [{:keys [channels client message-draft my-channels]}]
   {:fx/type :tab-pane
    :on-tabs-changed {:event/type ::my-channels-tab-action}
@@ -6382,77 +6454,21 @@
    :tabs
    (map
      (fn [[channel-name]]
-       (let [channel-details (get channels channel-name)
-             users (:users channel-details)
-             time-zone-id (.toZoneId (TimeZone/getDefault))
-             text (->> channel-details
-                       :messages
-                       reverse
-                       (map
-                         (fn [{:keys [ex text timestamp username]}]
-                           (str
-                             "["
-                             (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
-                                                            (java-time/instant timestamp)
-                                                            time-zone-id))
-                             "] "
-                             (if ex
-                               (str "* " username " " text)
-                               (str username ": " text)))))
-                       (string/join "\n"))]
-         {:fx/type :tab
-          :graphic {:fx/type :label
-                    :text (str channel-name)}
-          :id channel-name
-          :closable (not (u/battle-channel-name? channel-name))
-          :on-close-request {:event/type ::leave-channel
-                             :channel-name channel-name
-                             :client client}
-          :content
-          {:fx/type :h-box
-           :children
-           [{:fx/type :v-box
-             :h-box/hgrow :always
-             :children
-             [{:fx/type with-scroll-text-prop
-               :v-box/vgrow :always
-               :props {:scroll-text [text true]}
-               :desc
-               {:fx/type :text-area
-                :editable false
-                :wrap-text true
-                :style {:-fx-font-family "monospace"}}}
-              {:fx/type :h-box
-               :children
-               [{:fx/type :button
-                 :text "Send"
-                 :on-action {:event/type ::send-message
-                             :channel-name channel-name
-                             :client client
-                             :message message-draft}}
-                {:fx/type :text-field
-                 :h-box/hgrow :always
-                 :text (str message-draft)
-                 :on-text-changed {:event/type ::assoc
-                                   :key :message-draft}
-                 :on-action {:event/type ::send-message
-                             :channel-name channel-name
-                             :client client
-                             :message message-draft}}]}]}
-            {:fx/type :table-view
-             :column-resize-policy :constrained ; TODO auto resize
-             :items (->> users
-                         keys
-                         (sort String/CASE_INSENSITIVE_ORDER)
-                         vec)
-             :columns
-             [{:fx/type :table-column
-               :text "Username"
-               :cell-value-factory identity
-               :cell-factory
-               {:fx/cell-type :table-cell
-                :describe (fn [i] {:text (-> i str)})}}]}]}}))
-     my-channels)})
+       {:fx/type :tab
+        :graphic {:fx/type :label
+                  :text (str channel-name)}
+        :id channel-name
+        :closable (not (u/battle-channel-name? channel-name))
+        :on-close-request {:event/type ::leave-channel
+                           :channel-name channel-name
+                           :client client}
+        :content
+        {:fx/type channel-view
+         :channels channels
+         :client client
+         :message-draft message-draft
+         :channel-name channel-name}})
+     (remove (comp u/battle-channel-name? first) my-channels))})
 
 
 (defn root-view
