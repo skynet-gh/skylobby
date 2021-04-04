@@ -29,6 +29,6 @@ jobs:
           graalvm-version: '19.3.4.java11'
       - uses: DeLaGuardo/setup-clojure@3.2
         with:
-          cli: '1.10.3.814'
+          cli: '1.10.3.822'
 
       - run: clojure -M:test:headless:runner

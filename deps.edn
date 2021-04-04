@@ -54,7 +54,7 @@
     io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.905"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -72,7 +72,7 @@
     io.aviso/pretty {:mvn/version "0.1.37"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.905"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -89,7 +89,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.905"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
