@@ -6099,6 +6099,16 @@
                       :graphic
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-close:16:white"}}}]))}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :check-box
+                 :selected (boolean replays-window-details)
+                 :h-box/margin 8
+                 :on-selected-changed {:event/type ::assoc
+                                       :key :replays-window-details}}
+                {:fx/type :label
+                 :text "Detailed table "}]}
               (let [refreshing (boolean (seq refresh-tasks))]
                 {:fx/type :button
                  :text (if refreshing
@@ -6109,17 +6119,7 @@
                  :disable refreshing
                  :graphic
                  {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-refresh:16:white"}})
-              {:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :check-box
-                 :selected (boolean replays-window-details)
-                 :h-box/margin 8
-                 :on-selected-changed {:event/type ::assoc
-                                       :key :replays-window-details}}
-                {:fx/type :label
-                 :text "Details"}]}])}
+                  :icon-literal "mdi-refresh:16:white"}})])}
           (if parsed-replays
             (if (empty? parsed-replays)
               {:fx/type :label
@@ -6133,322 +6133,325 @@
                                                   :mods mods}
                        :selected-item selected-replay}
                :desc
-               {:fx/type :table-view
-                :column-resize-policy :constrained ; TODO auto resize
-                :items replays
-                :columns
-                (concat
-                  (when replays-window-details
-                    [{:fx/type :table-column
-                      :text "Source"
-                      :cell-value-factory #(-> % :source fs/filename)
-                      :cell-factory
-                      {:fx/cell-type :table-cell
-                       :describe
-                       (fn [source]
-                         {:text (str source)})}}
-                     {:fx/type :table-column
-                      :text "Filename"
-                      :cell-value-factory #(-> % :file fs/filename)
-                      :cell-factory
-                      {:fx/cell-type :table-cell
-                       :describe
-                       (fn [filename]
-                         {:text (str filename)})}}])
-                  [
-                   {:fx/type :table-column
-                    :text "Map"
-                    :cell-value-factory #(-> % :body :script-data :game :mapname)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [map-name]
-                       {:text (str map-name)})}}
-                   {:fx/type :table-column
-                    :text "Game"
-                    :cell-value-factory #(-> % :body :script-data :game :gametype)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [mod-name]
-                       {:text (str mod-name)})}}
-                   {:fx/type :table-column
-                    :text "Timestamp"
-                    :cell-value-factory #(some-> % :header :unix-time (* 1000))
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [unix-time]
-                       (let [ts (when unix-time
-                                  (java-time/format
-                                    (LocalDateTime/ofInstant
-                                      (java-time/instant unix-time)
-                                      time-zone-id)))]
-                         {:text (str ts)}))}}
-                   {:fx/type :table-column
-                    :text "Type"
-                    :cell-value-factory #(some-> % :game-type name)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [game-type]
-                       {:text (str game-type)})}}
-                   {:fx/type :table-column
-                    :text "Player Counts"
-                    :cell-value-factory :player-counts
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [player-counts]
-                       {:text (->> player-counts (string/join "v"))})}}
-                   {:fx/type :table-column
-                    :text "Skill Min"
-                    :cell-value-factory (comp min-skill replay-skills)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [min-skill]
-                       {:text (str min-skill)})}}
-                   {:fx/type :table-column
-                    :text "Skill Avg"
-                    :cell-value-factory (comp average-skill replay-skills)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [avg-skill]
-                       {:text (str avg-skill)})}}
-                   {:fx/type :table-column
-                    :text "Skill Max"
-                    :cell-value-factory (comp max-skill replay-skills)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [max-skill]
-                       {:text (str max-skill)})}}
-                   {:fx/type :table-column
-                    :text "Engine"
-                    :cell-value-factory #(-> % :header :engine-version)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [engine-version]
-                       {:text (str engine-version)})}}]
-                  (when replays-window-details
-                    [{:fx/type :table-column
-                      :text "Size"
-                      :cell-value-factory :file-size
-                      :cell-factory
-                      {:fx/cell-type :table-cell
-                       :describe
-                       (fn [file-size]
-                         {:text (u/format-bytes file-size)})}}])
-                  [{:fx/type :table-column
-                    :text "Duration"
-                    :cell-value-factory #(-> % :header :game-time)
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [game-time]
-                       (let [duration (when game-time (java-time/duration game-time :seconds))
-                             ; https://stackoverflow.com/a/44343699/984393
-                             formatted (when duration
-                                         (format "%d:%02d:%02d"
-                                           (.toHours duration)
-                                           (.toMinutesPart duration)
-                                           (.toSecondsPart duration)))]
-                         {:text (str formatted)}))}}
-                   {:fx/type :table-column
-                    :text "Watched"
-                    :sortable false
-                    :cell-value-factory identity
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [{:keys [file]}]
-                       (let [path (fs/canonical-path file)]
-                         {:text ""
-                          :graphic
-                          {:fx/type ext-recreate-on-key-changed
-                           :key (str path)
-                           :desc
-                           {:fx/type :check-box
-                            :selected (boolean (get replays-watched path))
-                            :on-selected-changed {:event/type ::assoc-in
-                                                  :path [:replays-watched path]}}}}))}}
-                   {:fx/type :table-column
-                    :text "Watch"
-                    :sortable false
-                    :cell-value-factory identity
-                    :cell-factory
-                    {:fx/cell-type :table-cell
-                     :describe
-                     (fn [i]
-                       (let [engine-version (-> i :header :engine-version)
-                             matching-engine (get engines-by-version engine-version)
-                             engine-downloadable (get replay-downloads-by-engine engine-version)
-                             mod-version (-> i :body :script-data :game :gametype)
-                             matching-mod (get mods-by-version mod-version)
-                             mod-downloadable (get replay-downloads-by-mod mod-version)
-                             mod-importable (get replay-imports-by-mod mod-version)
-                             mod-rapid (get rapid-data-by-version mod-version)
-                             map-name (-> i :body :script-data :game :mapname)
-                             matching-map (get maps-by-version map-name)
-                             map-downloadable (get replay-downloads-by-map map-name)
-                             map-importable (get replay-imports-by-map map-name)
-                             mod-rapid-download (get rapid-download (:id mod-rapid))]
-                         {:text ""
-                          :graphic
-                          (cond
-                            (and matching-engine matching-mod matching-map)
-                            {:fx/type :button
-                             :text " Watch"
-                             :on-action
-                             {:event/type ::watch-replay
-                              :engines engines
-                              :engine-version engine-version
-                              :replay i}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-movie:16:white"}}
-                            (and (not matching-engine) update-engines)
-                            {:fx/type :button
-                             :text " Engines updating..."
-                             :disable true}
-                            (and (not matching-engine) engine-downloadable)
-                            (let [source (resource-dest engine-downloadable)]
-                              (if (file-exists? file-cache source)
-                                (let [dest (io/file (fs/isolation-dir) "engine"
-                                                    (fs/without-extension
-                                                      (:resource-filename engine-downloadable)))
-                                      in-progress (boolean
-                                                    (or (get extracting (fs/canonical-path source))
-                                                        (contains? extract-tasks (fs/canonical-path source))))]
-                                  {:fx/type :button
-                                   :text (if in-progress "Extracting..." " Extract engine")
-                                   :disable in-progress
-                                   :graphic
-                                   {:fx/type font-icon/lifecycle
-                                    :icon-literal "mdi-archive:16:white"}
-                                   :on-action
-                                   {:event/type ::add-task
-                                    :task
-                                    {::task-type ::extract-7z
-                                     :file source
-                                     :dest dest}}})
-                                (let [{:keys [download-url]} engine-downloadable
-                                      {:keys [running] :as download} (get http-download download-url)]
-                                  {:fx/type :button
-                                   :text (if running
-                                           (str (download-progress download))
-                                           " Download engine")
-                                   :disable (boolean running)
-                                   :on-action {:event/type ::http-downloadable
-                                               :downloadable engine-downloadable}
-                                   :graphic
-                                   {:fx/type font-icon/lifecycle
-                                    :icon-literal "mdi-download:16:white"}})))
-                            (:running mod-rapid-download)
-                            {:fx/type :button
-                             :text (str (download-progress mod-rapid-download))
-                             :disable true}
-                            (and (not matching-mod) update-mods)
-                            {:fx/type :button
-                             :text " Games updating..."
-                             :disable true}
-                            (and (not matching-mod) mod-importable)
-                            (let [{:keys [resource-file]} mod-importable
-                                  resource-path (fs/canonical-path resource-file)
-                                  in-progress (boolean
-                                                (or (-> copying (get resource-path) :status boolean)
-                                                    (-> copying (get resource-path) :status boolean)
-                                                    (contains? import-tasks resource-path)))]
-                              {:fx/type :button
-                               :text (if in-progress
-                                       " Importing..."
-                                       " Import game")
-                               :disable in-progress
-                               :on-action {:event/type ::add-task
-                                           :task
-                                           {::task-type ::import
-                                            :importable mod-importable}}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-content-copy:16:white"}})
-                            (and (not matching-mod) mod-rapid)
-                            {:fx/type :button
-                             :text (str " Download game")
-                             :on-action {:event/type ::rapid-download
-                                         :rapid-id (:id mod-rapid)
-                                         :engine-file (:file matching-engine)}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-download:16:white"}}
-                            (and (not matching-mod) mod-downloadable)
-                            (let [{:keys [download-url]} mod-downloadable
-                                  {:keys [running] :as download} (get http-download download-url)]
-                              {:fx/type :button
-                               :text (if running
-                                       (str (download-progress download))
-                                       " Download game")
-                               :disable (boolean running)
-                               :on-action {:event/type ::http-downloadable
-                                           :downloadable mod-downloadable}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-download:16:white"}})
-                            (and (not matching-map) update-maps)
-                            {:fx/type :button
-                             :text " Maps updating..."
-                             :disable true}
-                            (and (not matching-map) map-importable)
-                            (let [{:keys [resource-file]} map-importable
-                                  resource-path (fs/canonical-path resource-file)
-                                  in-progress (boolean
-                                                (or (-> copying (get resource-path) :status boolean)
-                                                    (-> copying (get resource-path) :status boolean)
-                                                    (contains? import-tasks resource-path)))]
-                              {:fx/type :button
-                               :text (if in-progress
-                                       " Importing..."
-                                       " Import map")
-                               :disable in-progress
-                               :on-action {:event/type ::add-task
-                                           :task
-                                           {::task-type ::import
-                                            :importable map-importable}}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-content-copy:16:white"}})
-                            (and (not matching-map) map-downloadable)
-                            (let [{:keys [download-url]} map-downloadable
-                                  {:keys [running] :as download} (get http-download download-url)]
-                              {:fx/type :button
-                               :text (if running
-                                       (str (download-progress download))
-                                       " Download map")
-                               :disable (boolean running)
-                               :on-action {:event/type ::http-downloadable
-                                           :downloadable map-downloadable}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-download:16:white"}})
-                            (not matching-engine)
-                            {:fx/type :label
-                             :text " No engine"}
-                            (not matching-mod)
-                            {:fx/type :button
-                             :text (if rapid-update
-                                     " Updating rapid..."
-                                     " Update rapid")
-                             :disable (boolean rapid-update)
-                             :on-action {:event/type ::add-task
-                                         :task {::task-type ::update-rapid}}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-refresh:16:white"}}
-                            (not matching-map)
-                            {:fx/type :label
-                             :text " No map"})}))}}])}})
+               {:fx/type ext-recreate-on-key-changed
+                :key (str replays-window-details)
+                :desc
+                {:fx/type :table-view
+                 :column-resize-policy :constrained ; TODO auto resize
+                 :items replays
+                 :columns
+                 (concat
+                   (when replays-window-details
+                     [{:fx/type :table-column
+                       :text "Source"
+                       :cell-value-factory #(-> % :source fs/filename)
+                       :cell-factory
+                       {:fx/cell-type :table-cell
+                        :describe
+                        (fn [source]
+                          {:text (str source)})}}
+                      {:fx/type :table-column
+                       :text "Filename"
+                       :cell-value-factory #(-> % :file fs/filename)
+                       :cell-factory
+                       {:fx/cell-type :table-cell
+                        :describe
+                        (fn [filename]
+                          {:text (str filename)})}}])
+                   [
+                    {:fx/type :table-column
+                     :text "Map"
+                     :cell-value-factory #(-> % :body :script-data :game :mapname)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [map-name]
+                        {:text (str map-name)})}}
+                    {:fx/type :table-column
+                     :text "Game"
+                     :cell-value-factory #(-> % :body :script-data :game :gametype)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [mod-name]
+                        {:text (str mod-name)})}}
+                    {:fx/type :table-column
+                     :text "Timestamp"
+                     :cell-value-factory #(some-> % :header :unix-time (* 1000))
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [unix-time]
+                        (let [ts (when unix-time
+                                   (java-time/format
+                                     (LocalDateTime/ofInstant
+                                       (java-time/instant unix-time)
+                                       time-zone-id)))]
+                          {:text (str ts)}))}}
+                    {:fx/type :table-column
+                     :text "Type"
+                     :cell-value-factory #(some-> % :game-type name)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [game-type]
+                        {:text (str game-type)})}}
+                    {:fx/type :table-column
+                     :text "Player Counts"
+                     :cell-value-factory :player-counts
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [player-counts]
+                        {:text (->> player-counts (string/join "v"))})}}
+                    {:fx/type :table-column
+                     :text "Skill Min"
+                     :cell-value-factory (comp min-skill replay-skills)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [min-skill]
+                        {:text (str min-skill)})}}
+                    {:fx/type :table-column
+                     :text "Skill Avg"
+                     :cell-value-factory (comp average-skill replay-skills)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [avg-skill]
+                        {:text (str avg-skill)})}}
+                    {:fx/type :table-column
+                     :text "Skill Max"
+                     :cell-value-factory (comp max-skill replay-skills)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [max-skill]
+                        {:text (str max-skill)})}}]
+                   (when replays-window-details
+                     [{:fx/type :table-column
+                       :text "Engine"
+                       :cell-value-factory #(-> % :header :engine-version)
+                       :cell-factory
+                       {:fx/cell-type :table-cell
+                        :describe
+                        (fn [engine-version]
+                          {:text (str engine-version)})}}
+                      {:fx/type :table-column
+                       :text "Size"
+                       :cell-value-factory :file-size
+                       :cell-factory
+                       {:fx/cell-type :table-cell
+                        :describe
+                        (fn [file-size]
+                          {:text (u/format-bytes file-size)})}}])
+                   [{:fx/type :table-column
+                     :text "Duration"
+                     :cell-value-factory #(-> % :header :game-time)
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [game-time]
+                        (let [duration (when game-time (java-time/duration game-time :seconds))
+                              ; https://stackoverflow.com/a/44343699/984393
+                              formatted (when duration
+                                          (format "%d:%02d:%02d"
+                                            (.toHours duration)
+                                            (.toMinutesPart duration)
+                                            (.toSecondsPart duration)))]
+                          {:text (str formatted)}))}}
+                    {:fx/type :table-column
+                     :text "Watched"
+                     :sortable false
+                     :cell-value-factory identity
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [{:keys [file]}]
+                        (let [path (fs/canonical-path file)]
+                          {:text ""
+                           :graphic
+                           {:fx/type ext-recreate-on-key-changed
+                            :key (str path)
+                            :desc
+                            {:fx/type :check-box
+                             :selected (boolean (get replays-watched path))
+                             :on-selected-changed {:event/type ::assoc-in
+                                                   :path [:replays-watched path]}}}}))}}
+                    {:fx/type :table-column
+                     :text "Watch"
+                     :sortable false
+                     :cell-value-factory identity
+                     :cell-factory
+                     {:fx/cell-type :table-cell
+                      :describe
+                      (fn [i]
+                        (let [engine-version (-> i :header :engine-version)
+                              matching-engine (get engines-by-version engine-version)
+                              engine-downloadable (get replay-downloads-by-engine engine-version)
+                              mod-version (-> i :body :script-data :game :gametype)
+                              matching-mod (get mods-by-version mod-version)
+                              mod-downloadable (get replay-downloads-by-mod mod-version)
+                              mod-importable (get replay-imports-by-mod mod-version)
+                              mod-rapid (get rapid-data-by-version mod-version)
+                              map-name (-> i :body :script-data :game :mapname)
+                              matching-map (get maps-by-version map-name)
+                              map-downloadable (get replay-downloads-by-map map-name)
+                              map-importable (get replay-imports-by-map map-name)
+                              mod-rapid-download (get rapid-download (:id mod-rapid))]
+                          {:text ""
+                           :graphic
+                           (cond
+                             (and matching-engine matching-mod matching-map)
+                             {:fx/type :button
+                              :text " Watch"
+                              :on-action
+                              {:event/type ::watch-replay
+                               :engines engines
+                               :engine-version engine-version
+                               :replay i}
+                              :graphic
+                              {:fx/type font-icon/lifecycle
+                               :icon-literal "mdi-movie:16:white"}}
+                             (and (not matching-engine) update-engines)
+                             {:fx/type :button
+                              :text " Engines updating..."
+                              :disable true}
+                             (and (not matching-engine) engine-downloadable)
+                             (let [source (resource-dest engine-downloadable)]
+                               (if (file-exists? file-cache source)
+                                 (let [dest (io/file (fs/isolation-dir) "engine"
+                                                     (fs/without-extension
+                                                       (:resource-filename engine-downloadable)))
+                                       in-progress (boolean
+                                                     (or (get extracting (fs/canonical-path source))
+                                                         (contains? extract-tasks (fs/canonical-path source))))]
+                                   {:fx/type :button
+                                    :text (if in-progress "Extracting..." " Extract engine")
+                                    :disable in-progress
+                                    :graphic
+                                    {:fx/type font-icon/lifecycle
+                                     :icon-literal "mdi-archive:16:white"}
+                                    :on-action
+                                    {:event/type ::add-task
+                                     :task
+                                     {::task-type ::extract-7z
+                                      :file source
+                                      :dest dest}}})
+                                 (let [{:keys [download-url]} engine-downloadable
+                                       {:keys [running] :as download} (get http-download download-url)]
+                                   {:fx/type :button
+                                    :text (if running
+                                            (str (download-progress download))
+                                            " Download engine")
+                                    :disable (boolean running)
+                                    :on-action {:event/type ::http-downloadable
+                                                :downloadable engine-downloadable}
+                                    :graphic
+                                    {:fx/type font-icon/lifecycle
+                                     :icon-literal "mdi-download:16:white"}})))
+                             (:running mod-rapid-download)
+                             {:fx/type :button
+                              :text (str (download-progress mod-rapid-download))
+                              :disable true}
+                             (and (not matching-mod) update-mods)
+                             {:fx/type :button
+                              :text " Games updating..."
+                              :disable true}
+                             (and (not matching-mod) mod-importable)
+                             (let [{:keys [resource-file]} mod-importable
+                                   resource-path (fs/canonical-path resource-file)
+                                   in-progress (boolean
+                                                 (or (-> copying (get resource-path) :status boolean)
+                                                     (-> copying (get resource-path) :status boolean)
+                                                     (contains? import-tasks resource-path)))]
+                               {:fx/type :button
+                                :text (if in-progress
+                                        " Importing..."
+                                        " Import game")
+                                :disable in-progress
+                                :on-action {:event/type ::add-task
+                                            :task
+                                            {::task-type ::import
+                                             :importable mod-importable}}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-content-copy:16:white"}})
+                             (and (not matching-mod) mod-rapid)
+                             {:fx/type :button
+                              :text (str " Download game")
+                              :on-action {:event/type ::rapid-download
+                                          :rapid-id (:id mod-rapid)
+                                          :engine-file (:file matching-engine)}
+                              :graphic
+                              {:fx/type font-icon/lifecycle
+                               :icon-literal "mdi-download:16:white"}}
+                             (and (not matching-mod) mod-downloadable)
+                             (let [{:keys [download-url]} mod-downloadable
+                                   {:keys [running] :as download} (get http-download download-url)]
+                               {:fx/type :button
+                                :text (if running
+                                        (str (download-progress download))
+                                        " Download game")
+                                :disable (boolean running)
+                                :on-action {:event/type ::http-downloadable
+                                            :downloadable mod-downloadable}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-download:16:white"}})
+                             (and (not matching-map) update-maps)
+                             {:fx/type :button
+                              :text " Maps updating..."
+                              :disable true}
+                             (and (not matching-map) map-importable)
+                             (let [{:keys [resource-file]} map-importable
+                                   resource-path (fs/canonical-path resource-file)
+                                   in-progress (boolean
+                                                 (or (-> copying (get resource-path) :status boolean)
+                                                     (-> copying (get resource-path) :status boolean)
+                                                     (contains? import-tasks resource-path)))]
+                               {:fx/type :button
+                                :text (if in-progress
+                                        " Importing..."
+                                        " Import map")
+                                :disable in-progress
+                                :on-action {:event/type ::add-task
+                                            :task
+                                            {::task-type ::import
+                                             :importable map-importable}}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-content-copy:16:white"}})
+                             (and (not matching-map) map-downloadable)
+                             (let [{:keys [download-url]} map-downloadable
+                                   {:keys [running] :as download} (get http-download download-url)]
+                               {:fx/type :button
+                                :text (if running
+                                        (str (download-progress download))
+                                        " Download map")
+                                :disable (boolean running)
+                                :on-action {:event/type ::http-downloadable
+                                            :downloadable map-downloadable}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-download:16:white"}})
+                             (not matching-engine)
+                             {:fx/type :label
+                              :text " No engine"}
+                             (not matching-mod)
+                             {:fx/type :button
+                              :text (if rapid-update
+                                      " Updating rapid..."
+                                      " Update rapid")
+                              :disable (boolean rapid-update)
+                              :on-action {:event/type ::add-task
+                                          :task {::task-type ::update-rapid}}
+                              :graphic
+                              {:fx/type font-icon/lifecycle
+                               :icon-literal "mdi-refresh:16:white"}}
+                             (not matching-map)
+                             {:fx/type :label
+                              :text " No map"})}))}}])}}})
            {:fx/type :label
             :style {:-fx-font-size 24}
             :text " Loading replays..."})]
