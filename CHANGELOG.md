@@ -4,10 +4,26 @@ Notable changes
 
 ### TODO - future
 
-- Hosted replay watching
+- Ring sound
+- Add ability to configure directory, in order to just work in BAR or Spring
 - Add support for TLS communication to the server
+- Hosted replay watching
 - Call Spring unitsync to get resource hashes
-- Compatability warnings for known bad engine/game/AI combinations
+
+### [0.1.5]
+
+- Add direct messaging
+- Add console tab to send raw commands
+- Fix game not starting when host starts
+- Add skill filtering to replays window
+- Fix some table sorting issues
+
+### [0.1.4]
+
+- Rename to skylobby
+- Fix sidedata hardcoded for BA and BAR (now supports Metal Factions)
+- Fix windows being larger than screen
+- Improve replays viewer: remove invalid, fix watch status, filter terms with whitespace
 
 ### [0.1.3]
 
