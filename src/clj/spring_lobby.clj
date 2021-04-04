@@ -1183,6 +1183,14 @@
       {:fx/cell-type :table-cell
        :describe (fn [i] {:text (str (:battle-engine i) " " (:battle-version i))})}}]}})
 
+(defmethod event-handler ::join-direct-message
+  [{:keys [username]}]
+  (swap! *state assoc-in [:my-channels (str "@" username)] {}))
+
+(defmethod event-handler ::direct-message
+  [{:keys [client message username]}]
+  (message/send-message client (str "SAYPRIVATE " username " " message)))
+
 (defn users-table [{:keys [users]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
@@ -1191,13 +1199,27 @@
                (filter :username)
                (sort-by :username String/CASE_INSENSITIVE_ORDER)
                vec)
+   :row-factory
+   {:fx/cell-type :table-row
+    :describe (fn [i]
+                {
+                 :context-menu
+                 {:fx/type :context-menu
+                  :items
+                  [
+                   {:fx/type :menu-item
+                    :text "Message"
+                    :on-action {:event/type ::join-direct-message
+                                :username (:username i)}}]}})}
    :columns
    [{:fx/type :table-column
      :text "Username"
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:username i))})}}
+      :describe
+      (fn [i]
+        {:text (str (:username i))})}}
     {:fx/type :table-column
      :text "Status"
      :cell-value-factory identity
@@ -1206,27 +1228,26 @@
       :describe
       (fn [i]
         (let [status (select-keys (:client-status i) [:bot :access :away :ingame])]
-          (cond
-            (:bot status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-robot:16:white"}}
-            (:away status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-sleep:16:white"}}
-            (:access status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account-key:16:white"}}
-            :else
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account:16:white"}})))}}
+          {:text ""
+           :graphic
+           {:fx/type :h-box
+            :children
+            (concat
+              [{:fx/type font-icon/lifecycle
+                :icon-literal
+                (str
+                  "mdi-"
+                  (cond
+                    (:bot status) "robot"
+                    (:access status) "account-key"
+                    :else "account")
+                  ":16:white")}]
+              (when (:ingame status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sword:16:white"}])
+              (when (:away status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sleep:16:white"}]))}}))}}
     {:fx/type :table-column
      :text "Country"
      :cell-value-factory identity
@@ -1259,7 +1280,9 @@
   [{:keys [channel-name client] :fx/keys [^Event event]}]
   (future
     (try
-      (message/send-message client (str "LEAVE " channel-name))
+      (swap! *state update :my-channels dissoc channel-name)
+      (when-not (string/starts-with? channel-name "@")
+        (message/send-message client (str "LEAVE " channel-name)))
       (catch Exception e
         (log/error e "Error leaving channel" channel-name))))
   (.consume event))
@@ -1289,6 +1312,7 @@
      :cell-factory
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-count i))})}}
+    #_
     {:fx/type :table-column
      :text "Topic"
      :cell-value-factory identity
@@ -3616,47 +3640,49 @@
                   (string/join "\n"))]
     {:fx/type :h-box
      :children
-     [{:fx/type :v-box
-       :h-box/hgrow :always
-       :children
-       [{:fx/type with-scroll-text-prop
-         :v-box/vgrow :always
-         :props {:scroll-text [text true]}
-         :desc
-         {:fx/type :text-area
-          :editable false
-          :wrap-text true
-          :style {:-fx-font-family "monospace"}}}
-        {:fx/type :h-box
+     (concat
+       [{:fx/type :v-box
+         :h-box/hgrow :always
          :children
-         [{:fx/type :button
-           :text "Send"
-           :on-action {:event/type ::send-message
-                       :channel-name channel-name
-                       :client client
-                       :message message-draft}}
-          {:fx/type :text-field
-           :h-box/hgrow :always
-           :text (str message-draft)
-           :on-text-changed {:event/type ::assoc
-                             :key :message-draft}
-           :on-action {:event/type ::send-message
-                       :channel-name channel-name
-                       :client client
-                       :message message-draft}}]}]}
-      {:fx/type :table-view
-       :column-resize-policy :constrained ; TODO auto resize
-       :items (->> users
-                   keys
-                   (sort String/CASE_INSENSITIVE_ORDER)
-                   vec)
-       :columns
-       [{:fx/type :table-column
-         :text "Username"
-         :cell-value-factory identity
-         :cell-factory
-         {:fx/cell-type :table-cell
-          :describe (fn [i] {:text (-> i str)})}}]}]}))
+         [{:fx/type with-scroll-text-prop
+           :v-box/vgrow :always
+           :props {:scroll-text [text true]}
+           :desc
+           {:fx/type :text-area
+            :editable false
+            :wrap-text true
+            :style {:-fx-font-family "monospace"}}}
+          {:fx/type :h-box
+           :children
+           [{:fx/type :button
+             :text "Send"
+             :on-action {:event/type ::send-message
+                         :channel-name channel-name
+                         :client client
+                         :message message-draft}}
+            {:fx/type :text-field
+             :h-box/hgrow :always
+             :text (str message-draft)
+             :on-text-changed {:event/type ::assoc
+                               :key :message-draft}
+             :on-action {:event/type ::send-message
+                         :channel-name channel-name
+                         :client client
+                         :message message-draft}}]}]}]
+       (when-not (string/starts-with? channel-name "@")
+         [{:fx/type :table-view
+           :column-resize-policy :constrained ; TODO auto resize
+           :items (->> users
+                       keys
+                       (sort String/CASE_INSENSITIVE_ORDER)
+                       vec)
+           :columns
+           [{:fx/type :table-column
+             :text "Username"
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe (fn [i] {:text (-> i str)})}}]}]))}))
 
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
@@ -6591,9 +6617,14 @@
   (future
     (try
       (swap! *state dissoc :message-draft)
-      (if-let [[_all message] (re-find #"^/me (.*)$" message)]
-        (message/send-message client (str "SAYEX " channel-name " " message))
-        (message/send-message client (str "SAY " channel-name " " message)))
+      (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
+        (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+          (if private-message
+            (message/send-message client (str "SAYPRIVATEEX " username " " message))
+            (message/send-message client (str "SAYEX " channel-name " " message)))
+          (if private-message
+            (message/send-message client (str "SAYPRIVATE " username " " message))
+            (message/send-message client (str "SAY " channel-name " " message)))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
@@ -6713,11 +6744,19 @@
                  :id "chat"
                  :content
                  {:fx/type :split-pane
-                  :divider-positions [0.75]
+                  :divider-positions [0.70 0.9]
                   :items
                   [(merge
                      {:fx/type my-channels-view}
                      (select-keys state [:channels :client :message-draft :my-channels]))
+                   {:fx/type :v-box
+                    :children
+                    [{:fx/type :label
+                      :text (str "Users (" (count users) ")")
+                      :style {:-fx-font-size 16}}
+                     {:fx/type users-table
+                      :v-box/vgrow :always
+                      :users users}]}
                    {:fx/type :v-box
                     :children
                     [{:fx/type :label

@@ -213,6 +213,26 @@
                  :username username
                  :ex true})))
 
+(defn user-channel [username]
+  (str "@" username))
+
+(defmethod handle "SAIDPRIVATE" [_c state-atom m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        now (u/curr-millis)]
+    (swap! state-atom update-in [:channels (user-channel username) :messages]
+           conj {:text message
+                 :timestamp now
+                 :username username})))
+
+(defmethod handle "SAIDPRIVATEEX" [_c state-atom m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        now (u/curr-millis)]
+    (swap! state-atom update-in [:channels (user-channel username) :messages]
+           conj {:text message
+                 :timestamp now
+                 :username username
+                 :ex true})))
+
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
     (swap! state-atom
