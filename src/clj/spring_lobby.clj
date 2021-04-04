@@ -6894,20 +6894,35 @@
     (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
+    (log/info "Finished periodic jobs init")
     {:chimers [low-tasks-chimer high-tasks-chimer
                force-update-chimer update-channels-chimer]}))
 
 
 (defn -main [& _args]
-  (Platform/setImplicitExit true)
-  (fs/init-7z!)
   (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
-  (reset! *state (assoc (initial-state) :standalone true))
-  (init *state)
-  (let [r (fx/create-renderer
-            :middleware (fx/wrap-map-desc
-                          (fn [state]
-                            {:fx/type root-view
-                             :state state}))
-            :opts {:fx.opt/map-event-handler event-handler})]
-    (fx/mount-renderer *state r)))
+  (let [before (u/curr-millis)]
+    (log/info "Main start")
+    (Platform/setImplicitExit true)
+    (log/info "Set JavaFX implicit exit")
+    (future
+      (log/info "Start 7Zip init, async")
+      (fs/init-7z!)
+      (log/info "Finished 7Zip init"))
+    (let [before-state (u/curr-millis)
+          _ (log/info "Loading initial state")
+          state (assoc (initial-state) :standalone true)]
+      (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
+      (reset! *state state))
+    (log/info "Creating renderer")
+    (let [r (fx/create-renderer
+              :middleware (fx/wrap-map-desc
+                            (fn [state]
+                              {:fx/type root-view
+                               :state state}))
+              :opts {:fx.opt/map-event-handler event-handler})]
+      (log/info "Mounting renderer")
+      (fx/mount-renderer *state r))
+    (log/info "Initializing periodic jobs, async")
+    (future (init *state))
+    (log/info "Main finished in" (- (u/curr-millis) before) "ms")))

@@ -74,4 +74,5 @@
   (spit-version-resource)
   (uberjar)
   (fix-manifest)
+  (println "\nSuccessfully built jar, exiting\n")
   (Platform/exit))
