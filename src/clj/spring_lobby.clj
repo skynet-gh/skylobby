@@ -1101,16 +1101,16 @@
     :columns
     [{:fx/type :table-column
       :text "Battle Name"
-      :cell-value-factory identity
+      :cell-value-factory :battle-title
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-title i))})}}
+       :describe (fn [battle-title] {:text (str battle-title)})}}
      {:fx/type :table-column
       :text "Host"
-      :cell-value-factory identity
+      :cell-value-factory :host-username
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:host-username i))})}}
+       :describe (fn [host-username] {:text (str host-username)})}}
      {:fx/type :table-column
       :text "Status"
       :cell-value-factory identity
@@ -1130,58 +1130,58 @@
                :icon-literal "mdi-lock-open:16:white"}})))}}
      {:fx/type :table-column
       :text "Country"
-      :cell-value-factory identity
+      :cell-value-factory #(:country (get users (:host-username %)))
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:country (get users (:host-username i))))})}}
+       :describe (fn [country] {:text (str country)})}}
      {:fx/type :table-column
       :text "?"
-      :cell-value-factory identity
+      :cell-value-factory :battle-rank
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-rank i))})}}
+       :describe (fn [battle-rank] {:text (str battle-rank)})}}
      {:fx/type :table-column
       :text "Players"
-      :cell-value-factory identity
+      :cell-value-factory (comp count :users)
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (count (:users i)))})}}
+       :describe (fn [user-count] {:text (str user-count)})}}
      {:fx/type :table-column
       :text "Max"
-      :cell-value-factory identity
+      :cell-value-factory :battle-maxplayers
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-maxplayers i))})}}
+       :describe (fn [battle-maxplayers] {:text (str battle-maxplayers)})}}
      {:fx/type :table-column
       :text "Spectators"
-      :cell-value-factory identity
+      :cell-value-factory :battle-spectators
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-spectators i))})}}
+       :describe (fn [battle-spectators] {:text (str battle-spectators)})}}
      {:fx/type :table-column
       :text "Running"
-      :cell-value-factory identity
+      :cell-value-factory #(->> % :host-username (get users) :client-status :ingame)
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (->> i :host-username (get users) :client-status :ingame str)})}}
+       :describe (fn [running] {:text (str running)})}}
      {:fx/type :table-column
       :text "Game"
-      :cell-value-factory identity
+      :cell-value-factory :battle-modname
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-modname i))})}}
+       :describe (fn [battle-modname] {:text (str battle-modname)})}}
      {:fx/type :table-column
       :text "Map"
-      :cell-value-factory identity
+      :cell-value-factory :battle-map
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-map i))})}}
+       :describe (fn [battle-map] {:text (str battle-map)})}}
      {:fx/type :table-column
       :text "Engine"
-      :cell-value-factory identity
+      :cell-value-factory #(str (:battle-engine %) " " (:battle-version %))
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [i] {:text (str (:battle-engine i) " " (:battle-version i))})}}]}})
+       :describe (fn [engine] {:text (str engine)})}}]}})
 
 (defmethod event-handler ::join-direct-message
   [{:keys [username]}]
@@ -1214,58 +1214,58 @@
    :columns
    [{:fx/type :table-column
      :text "Username"
-     :cell-value-factory identity
+     :cell-value-factory :username
      :cell-factory
      {:fx/cell-type :table-cell
       :describe
-      (fn [i]
-        {:text (str (:username i))})}}
+      (fn [username]
+        {:text (str username)})}}
     {:fx/type :table-column
+     :sortable false
      :text "Status"
-     :cell-value-factory identity
+     :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame])
      :cell-factory
      {:fx/cell-type :table-cell
       :describe
-      (fn [i]
-        (let [status (select-keys (:client-status i) [:bot :access :away :ingame])]
-          {:text ""
-           :graphic
-           {:fx/type :h-box
-            :children
-            (concat
+      (fn [status]
+        {:text ""
+         :graphic
+         {:fx/type :h-box
+          :children
+          (concat
+            [{:fx/type font-icon/lifecycle
+              :icon-literal
+              (str
+                "mdi-"
+                (cond
+                  (:bot status) "robot"
+                  (:access status) "account-key"
+                  :else "account")
+                ":16:white")}]
+            (when (:ingame status)
               [{:fx/type font-icon/lifecycle
-                :icon-literal
-                (str
-                  "mdi-"
-                  (cond
-                    (:bot status) "robot"
-                    (:access status) "account-key"
-                    :else "account")
-                  ":16:white")}]
-              (when (:ingame status)
-                [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sword:16:white"}])
-              (when (:away status)
-                [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sleep:16:white"}]))}}))}}
+                :icon-literal "mdi-sword:16:white"}])
+            (when (:away status)
+              [{:fx/type font-icon/lifecycle
+                :icon-literal "mdi-sleep:16:white"}]))}})}}
     {:fx/type :table-column
      :text "Country"
-     :cell-value-factory identity
+     :cell-value-factory :country
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:country i))})}}
+      :describe (fn [country] {:text (str country)})}}
     {:fx/type :table-column
      :text "Rank"
-     :cell-value-factory identity
+     :cell-value-factory (comp :rank :client-status)
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:rank (:client-status i)))})}}
+      :describe (fn [rank] {:text (str rank)})}}
     {:fx/type :table-column
      :text "Lobby Client"
-     :cell-value-factory identity
+     :cell-value-factory :user-agent
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:user-agent i))})}}]})
+      :describe (fn [user-agent] {:text (str user-agent)})}}]})
 
 
 (defmethod event-handler ::join-channel [{:keys [channel-name client]}]
@@ -3186,10 +3186,10 @@
                :icon-literal "mdi-account-remove:16:white"}}})))}}
     {:fx/type :table-column
      :text "Country"
-     :cell-value-factory identity
+     :cell-value-factory (comp :country :user)
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:country (:user i)))})}}
+      :describe (fn [country] {:text (str country)})}}
     {:fx/type :table-column
      :text "Status"
      :cell-value-factory identity
@@ -3224,10 +3224,10 @@
               :icon-literal "mdi-account:16:white"}})))}}
     {:fx/type :table-column
      :text "Ingame"
-     :cell-value-factory identity
+     :cell-value-factory (comp :ingame :client-status :user)
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:ingame (:client-status (:user i))))})}}
+      :describe (fn [ingame] {:text (str ingame)})}}
     {:fx/type :table-column
      :text "Spectator"
      :cell-value-factory identity
@@ -3278,10 +3278,10 @@
                                  (= (:owner i) username))))}}})}}
     {:fx/type :table-column
      :text "Rank"
-     :cell-value-factory identity
+     :cell-value-factory (comp :rank :client-status :user)
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:rank (:client-status (:user i))))})}}
+      :describe (fn [rank] {:text (str rank)})}}
     {:fx/type :table-column
      :text "TrueSkill"
      :cell-value-factory identity
