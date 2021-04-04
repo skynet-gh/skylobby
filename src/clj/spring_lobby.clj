@@ -5,6 +5,7 @@
     [cljfx.api :as fx]
     [cljfx.component :as fx.component]
     [cljfx.ext.node :as fx.ext.node]
+    [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [cljfx.lifecycle :as fx.lifecycle]
     [cljfx.mutator :as fx.mutator]
@@ -64,7 +65,7 @@
   [(str (io/resource "dark.css"))])
 
 (def main-window-width 1920)
-(def main-window-height 1060)
+(def main-window-height 1200)
 
 (def download-window-width 1600)
 (def download-window-height 800)
@@ -218,6 +219,12 @@
 
 (def ^:dynamic *state (atom {}))
 
+
+(defn send-message [client message]
+  (swap! *state update :console-log conj {:timestamp (u/curr-millis)
+                                          :source :client
+                                          :message message})
+  (message/send-message client message))
 
 (defn spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
@@ -1009,7 +1016,7 @@
           (fn [_chimestamp]
             (when-let [{:keys [client]} @state-atom]
               (log/info "Updating channel list")
-              (message/send-message client "CHANNELS")))
+              (send-message client "CHANNELS")))
           {:error-handler
            (fn [e]
              (log/error e "Error force updating resources")
@@ -1071,14 +1078,14 @@
 (defmethod event-handler ::on-mouse-clicked-battles-row
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
   (future
-    (if (< 1 (.getClickCount event))
-      (do
-        (when (:battle e)
-          @(event-handler (merge e {:event/type ::leave-battle})))
-        @(event-handler (merge e {:event/type ::join-battle})))
-      (when (:battle-passworded e)
-        (swap! *state assoc :battle-password "12345")))))
+    (when (< 1 (.getClickCount event))
+      (when (:battle e)
+        @(event-handler (merge e {:event/type ::leave-battle})))
+      @(event-handler (merge e {:event/type ::join-battle})))))
 
+
+(def battles-table-keys
+  [:battle :battle-password :battles :client :selected-battle :users])
 
 (defn battles-table [{:keys [battle battle-password battles client selected-battle users]}]
   {:fx/type fx.ext.table-view/with-selection-props
@@ -1086,6 +1093,7 @@
            :on-selected-item-changed {:event/type ::select-battle}}
    :desc
    {:fx/type :table-view
+    :style {:-fx-font-size 15}
     :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row
                        :battle battle
                        :battle-password battle-password
@@ -1117,17 +1125,24 @@
       :cell-factory
       {:fx/cell-type :table-cell
        :describe
-       (fn [i]
-         (let [status (select-keys i [:battle-type :battle-passworded])]
-           (if (:battle-passworded status)
-             {:text ""
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-lock:16:white"}}
-             {:text ""
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-lock-open:16:white"}})))}}
+       (fn [status]
+         (cond
+           (or (= "1" (:battle-passworded status))
+               (= "1" (:battle-locked status)))
+           {:text ""
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-lock:16:white"}}
+           (->> status :host-username (get users) :client-status :ingame)
+           {:text ""
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-sword:16:white"}}
+           :else
+           {:text ""
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-checkbox-blank-circle-outline:16:white"}}))}}
      {:fx/type :table-column
       :text "Country"
       :cell-value-factory #(:country (get users (:host-username %)))
@@ -1135,7 +1150,7 @@
       {:fx/cell-type :table-cell
        :describe (fn [country] {:text (str country)})}}
      {:fx/type :table-column
-      :text "?"
+      :text "Rank"
       :cell-value-factory :battle-rank
       :cell-factory
       {:fx/cell-type :table-cell
@@ -1158,6 +1173,7 @@
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-spectators] {:text (str battle-spectators)})}}
+     #_
      {:fx/type :table-column
       :text "Running"
       :cell-value-factory #(->> % :host-username (get users) :client-status :ingame)
@@ -1185,14 +1201,19 @@
 
 (defmethod event-handler ::join-direct-message
   [{:keys [username]}]
-  (swap! *state assoc-in [:my-channels (str "@" username)] {}))
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc-in [:my-channels (str "@" username)] {})
+          (assoc :selected-tab-main "chat")))))
 
 (defmethod event-handler ::direct-message
   [{:keys [client message username]}]
-  (message/send-message client (str "SAYPRIVATE " username " " message)))
+  (send-message client (str "SAYPRIVATE " username " " message)))
 
 (defn users-table [{:keys [users]}]
   {:fx/type :table-view
+   :style {:-fx-font-size 15}
    :column-resize-policy :constrained ; TODO auto resize
    :items (->> users
                vals
@@ -1272,7 +1293,7 @@
   (future
     (try
       (swap! *state dissoc :join-channel-name)
-      (message/send-message client (str "JOIN " channel-name))
+      (send-message client (str "JOIN " channel-name))
       (catch Exception e
         (log/error e "Error joining channel" channel-name)))))
 
@@ -1282,7 +1303,7 @@
     (try
       (swap! *state update :my-channels dissoc channel-name)
       (when-not (string/starts-with? channel-name "@")
-        (message/send-message client (str "LEAVE " channel-name)))
+        (send-message client (str "LEAVE " channel-name)))
       (catch Exception e
         (log/error e "Error leaving channel" channel-name))))
   (.consume event))
@@ -1552,7 +1573,7 @@
       (let [server-url (first server)
             client-deferred (client/client server-url) ; TODO catch connect errors somehow
             client @client-deferred]
-        (message/send-message client
+        (send-message client
           (str "REGISTER " username " " (client/base64-md5 password) " " email))
         (loop []
           (when-let [d (s/take! client)]
@@ -1568,7 +1589,7 @@
 (defmethod event-handler ::confirm-agreement [{:keys [client password username verification-code]}]
   (future
     (try
-      (message/send-message client
+      (send-message client
         (str "CONFIRMAGREEMENT " verification-code))
       (swap! *state dissoc :agreement)
       (client/login client username password)
@@ -1932,7 +1953,7 @@
                 rank 0
                 engine "Spring"}}]
   (let [password (if (string/blank? battle-password) "*" battle-password)]
-    (message/send-message client
+    (send-message client
       (str "OPENBATTLE " battle-type " " nat-type " " password " " host-port " " max-players
            " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
            "\t" mod-name))))
@@ -1957,7 +1978,7 @@
                                      mod-name)]
             (open-battle client (assoc host-battle-state :mod-name adjusted-modname)))
           (when (seq scripttags)
-            (message/send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+            (send-message client (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
           (catch Exception e
             (log/error e "Error opening battle")))))))
 
@@ -1965,7 +1986,7 @@
 (defmethod event-handler ::leave-battle [{:keys [client]}]
   (future
     (try
-      (message/send-message client "LEAVEBATTLE")
+      (send-message client "LEAVEBATTLE")
       (swap! *state dissoc :battle)
       (catch Exception e
         (log/error e "Error leaving battle")))))
@@ -1975,7 +1996,7 @@
   (future
     (try
       (if selected-battle
-        (message/send-message client
+        (send-message client
           (str "JOINBATTLE " selected-battle
                (when battle-passworded
                  (str " " battle-password))))
@@ -2472,7 +2493,7 @@
             map-hash -1 ; TODO
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-        (message/send-message client m)
+        (send-message client m)
         (swap! *state assoc :battle-map-details nil))
       (catch Exception e
         (log/error e "Error changing battle map")))))
@@ -2483,8 +2504,8 @@
     (try
       (when client
         (if bot-name
-          (message/send-message client (str "REMOVEBOT " bot-name))
-          (message/send-message client (str "KICKFROMBATTLE " username))))
+          (send-message client (str "REMOVEBOT " bot-name))
+          (send-message client (str "KICKFROMBATTLE " username))))
       (catch Exception e
         (log/error e "Error kicking from battle")))))
 
@@ -2514,7 +2535,7 @@
                                 :side (rand-nth [0 1])))
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-        (message/send-message client message))
+        (send-message client message))
       (catch Exception e
         (log/error e "Error adding bot")))))
 
@@ -2736,7 +2757,7 @@
                      (-> state
                          (update :scripttags u/deep-merge scripttags)
                          (update-in [:battle :scripttags] u/deep-merge scripttags))))
-            (message/send-message client
+            (send-message client
               (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
         (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
           (let [l (min startx endx)
@@ -2747,7 +2768,7 @@
                 top (/ t (* 1.0 minimap-height))
                 right (/ r (* 1.0 minimap-width))
                 bottom (/ b (* 1.0 minimap-height))]
-            (message/send-message client
+            (send-message client
               (str "ADDSTARTRECT " allyteam-id " "
                    (int (* 200 left)) " "
                    (int (* 200 top)) " "
@@ -3014,7 +3035,7 @@
                    (str "UPDATEBOT " player-name) ; TODO normalize
                    "MYBATTLESTATUS")]
       (log/debug player-name (pr-str battle-status) team-color)
-      (message/send-message client
+      (send-message client
         (str prefix
              " "
              (client/encode-battle-status battle-status)
@@ -3026,7 +3047,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client (assoc opts :id id) (:battle-status id) color-int)
-        (message/send-message client
+        (send-message client
           (str "FORCETEAMCOLOR " (:username id) " " color-int)))
       (catch Exception e
         (log/error e "Error updating color")))))
@@ -3036,7 +3057,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
-        (message/send-message client
+        (send-message client
           (str "FORCETEAMNO " (:username id) " " player-id)))
       (catch Exception e
         (log/error e "Error updating team")))))
@@ -3046,7 +3067,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
-        (message/send-message client (str "FORCEALLYNO " (:username id) " " ally)))
+        (send-message client (str "FORCEALLYNO " (:username id) " " ally)))
       (catch Exception e
         (log/error e "Error updating ally")))))
 
@@ -3055,7 +3076,7 @@
     (try
       (if is-bot
         (update-battle-status client (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
-        (message/send-message client (str "HANDICAP " (:username id) " " handicap)))
+        (send-message client (str "HANDICAP " (:username id) " " handicap)))
       (catch Exception e
         (log/error e "Error updating handicap")))))
 
@@ -3070,7 +3091,7 @@
                       :id "FORCETEAMNO"
                       :ally "FORCEALLYNO"
                       :handicap "HANDICAP")]
-            (message/send-message client (str msg " " (:username id) " " v)))))
+            (send-message client (str msg " " (:username id) " " v)))))
       (catch Exception e
         (log/error e "Error applying battle status changes")))))
 
@@ -3406,7 +3427,7 @@
                            (-> state
                                (update :scripttags u/deep-merge scripttags)
                                (update-in [:battle :scripttags] u/deep-merge scripttags))))]
-        (message/send-message
+        (send-message
           (:client state)
           (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
       (catch Exception e
@@ -3619,21 +3640,24 @@
                   fx.lifecycle/scalar
                   :default ["" 0])}))
 
+(defn format-hours
+  ([timestamp-millis]
+   (format-hours (.toZoneId (TimeZone/getDefault)) timestamp-millis))
+  ([time-zone-id timestamp-millis]
+   (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
+                                  (java-time/instant timestamp-millis)
+                                  time-zone-id))))
+
 (defn channel-view [{:keys [channels client message-draft channel-name]}]
   (let [channel-details (get channels channel-name)
         users (:users channel-details)
-        time-zone-id (.toZoneId (TimeZone/getDefault))
         text (->> channel-details
                   :messages
                   reverse
                   (map
                     (fn [{:keys [ex text timestamp username]}]
                       (str
-                        "["
-                        (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
-                                                       (java-time/instant timestamp)
-                                                       time-zone-id))
-                        "] "
+                        "[" (format-hours timestamp) "] "
                         (if ex
                           (str "* " username " " text)
                           (str username ": " text)))))
@@ -3726,6 +3750,7 @@
         bot-version (some #{bot-version} bot-versions)
         sides (spring/mod-sides battle-mod-details)]
     {:fx/type :h-box
+     :style {:-fx-font-size 15}
      :alignment :top-left
      :children
      [{:fx/type :v-box
@@ -4431,7 +4456,7 @@
                        (-> state
                            (assoc-in [:scripttags :game :startpostype] startpostype)
                            (assoc-in [:battle :scripttags :game :startpostype] startpostype))))]
-    (message/send-message (:client state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
+    (send-message (:client state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
 
 (defmethod event-handler ::reset-start-positions
   [_e]
@@ -4444,7 +4469,7 @@
                        (-> state
                            (update-in [:scripttags :game] dissoc-fn)
                            (update-in [:battle :scripttags :game] dissoc-fn))))]
-    (message/send-message
+    (send-message
       (:client state)
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
@@ -4467,7 +4492,7 @@
                  (-> state
                      (update-in [:scripttags :game] dissoc allyteam-kw)
                      (update-in [:battle :scripttags :game] dissoc allyteam-kw)))))
-      (message/send-message client (str "REMOVESTARTRECT " allyteam-id)))))
+      (send-message client (str "REMOVESTARTRECT " allyteam-id)))))
 
 (defmethod event-handler ::modoption-change
   [{:keys [modoption-key] :fx/keys [event]}]
@@ -4477,7 +4502,7 @@
                        (-> state
                            (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
                            (assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event)))))]
-    (message/send-message (:client state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
+    (send-message (:client state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status client team-color] :as id}]
@@ -4494,7 +4519,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client data (assoc (:battle-status id) :mode (not event)) (:team-color id))
-        (message/send-message client (str "FORCESPECTATORMODE " (:username id))))
+        (send-message client (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
 
@@ -6620,43 +6645,206 @@
       (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
         (if-let [[_all message] (re-find #"^/me (.*)$" message)]
           (if private-message
-            (message/send-message client (str "SAYPRIVATEEX " username " " message))
-            (message/send-message client (str "SAYEX " channel-name " " message)))
+            (send-message client (str "SAYPRIVATEEX " username " " message))
+            (send-message client (str "SAYEX " channel-name " " message)))
           (if private-message
-            (message/send-message client (str "SAYPRIVATE " username " " message))
-            (message/send-message client (str "SAY " channel-name " " message)))))
+            (send-message client (str "SAYPRIVATE " username " " message))
+            (send-message client (str "SAY " channel-name " " message)))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
 
-(defn my-channels-view [{:keys [channels client message-draft my-channels]}]
-  {:fx/type :tab-pane
-   :on-tabs-changed {:event/type ::my-channels-tab-action}
-   :style {:-fx-font-size 16}
-   :tabs
-   (map
-     (fn [[channel-name]]
+(defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [event]}]
+  (swap! *state assoc :selected-tab-channel (.getId event)))
+
+(def my-channels-view-keys
+  [:channels :client :message-draft :my-channels :selected-tab-channel])
+
+(defn my-channels-view [{:keys [channels client message-draft my-channels selected-tab-channel]}]
+  (let [my-channel-names (->> my-channels
+                              keys
+                              (remove u/battle-channel-name?)
+                              (into []))
+        selected-index (if (contains? (set my-channel-names) selected-tab-channel)
+                         (.indexOf my-channel-names selected-tab-channel)
+                         0)]
+    {:fx/type fx.ext.tab-pane/with-selection-props
+     :props
+     {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}
+      :selected-index selected-index}
+     :desc
+     {:fx/type :tab-pane
+      :on-tabs-changed {:event/type ::my-channels-tab-action}
+      :style {:-fx-font-size 16}
+      :tabs
+      (map
+        (fn [channel-name]
+          {:fx/type :tab
+           :graphic {:fx/type :label
+                     :text (str channel-name)}
+           :id channel-name
+           :closable (not (u/battle-channel-name? channel-name))
+           :on-close-request {:event/type ::leave-channel
+                              :channel-name channel-name
+                              :client client}
+           :content
+           {:fx/type channel-view
+            :channels channels
+            :client client
+            :message-draft message-draft
+            :channel-name channel-name}})
+        my-channel-names)}}))
+
+
+(defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [event]}]
+  (swap! *state assoc :selected-tab-main (.getId event)))
+
+(defmethod event-handler ::send-console [{:keys [client message]}]
+  (future
+    (try
+      (swap! *state dissoc :console-message-draft)
+      (when-not (string/blank? message)
+        (send-message client message))
+      (catch Exception e
+        (log/error e "Error sending message" message "to server")))))
+
+(def channels-table-keys
+  [:channels :client :my-channels])
+
+(def main-tab-ids
+  ["battles" "chat" "console"])
+
+(def main-tab-view-keys
+  [:battles :client :channels :console-log :console-message-draft :join-channel-name
+   :selected-tab-main :users])
+
+(defn main-tab-view
+  [{:keys [battles client channels console-log console-message-draft join-channel-name
+           selected-tab-main users]
+    :as state}]
+  (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
+                         (.indexOf main-tab-ids selected-tab-main)
+                         0)
+        time-zone-id (.toZoneId (TimeZone/getDefault))
+        console-text (string/join "\n"
+                       (map
+                         (fn [{:keys [message source timestamp]}]
+                           (str (format-hours time-zone-id timestamp)
+                                (case source
+                                  :server " < "
+                                  :client " > "
+                                  " ")
+                                message))
+                         (reverse console-log)))
+        users-view {:fx/type :v-box
+                    :children
+                    [{:fx/type :label
+                      :text (str "Users (" (count users) ")")}
+                     {:fx/type users-table
+                      :v-box/vgrow :always
+                      :users users}]}]
+    {:fx/type fx.ext.tab-pane/with-selection-props
+     :props
+     {:on-selected-item-changed {:event/type ::selected-item-changed-main-tabs}
+      :selected-index selected-index}
+     :desc
+     {:fx/type :tab-pane
+      :style {:-fx-font-size 16}
+      :tabs
+      [{:fx/type :tab
+        :graphic {:fx/type :label
+                  :text "Battles"}
+        :closable false
+        :id "battles"
+        :content
+        {:fx/type :split-pane
+         :divider-positions [0.80]
+         :items
+         [
+          {:fx/type :v-box
+           :children
+           [{:fx/type :label
+             :text (str "Battles (" (count battles) ")")}
+            (merge
+              {:fx/type battles-table
+               :v-box/vgrow :always}
+              (select-keys state battles-table-keys))]}
+          users-view]}}
        {:fx/type :tab
         :graphic {:fx/type :label
-                  :text (str channel-name)}
-        :id channel-name
-        :closable (not (u/battle-channel-name? channel-name))
-        :on-close-request {:event/type ::leave-channel
-                           :channel-name channel-name
-                           :client client}
+                  :text "Chat"}
+        :closable false
+        :id "chat"
         :content
-        {:fx/type channel-view
-         :channels channels
-         :client client
-         :message-draft message-draft
-         :channel-name channel-name}})
-     (remove (comp u/battle-channel-name? first) my-channels))})
-
+        {:fx/type :split-pane
+         :divider-positions [0.70 0.9]
+         :items
+         [(merge
+            {:fx/type my-channels-view}
+            (select-keys state my-channels-view-keys))
+          users-view
+          {:fx/type :v-box
+           :children
+           [{:fx/type :label
+             :text (str "Channels (" (->> channels vals non-battle-channels count) ")")}
+            (merge
+              {:fx/type channels-table
+               :v-box/vgrow :always}
+              (select-keys state channels-table-keys))
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text " Custom Channel: "}
+              {:fx/type :text-field
+               :text join-channel-name
+               :prompt-text "Name"
+               :on-text-changed {:event/type ::assoc
+                                 :key :join-channel-name}
+               :on-action {:event/type ::join-channel
+                           :channel-name join-channel-name
+                           :client client}}
+              {:fx/type :button
+               :text "Join"
+               :on-action {:event/type ::join-channel
+                           :channel-name join-channel-name
+                           :client client}}]}]}]}}
+       {:fx/type :tab
+        :graphic {:fx/type :label
+                  :text "Console"}
+        :closable false
+        :id "console"
+        :content
+        {:fx/type :v-box
+         :children
+         [{:fx/type with-scroll-text-prop
+           :v-box/vgrow :always
+           :props {:scroll-text [console-text true]}
+           :desc
+           {:fx/type :text-area
+            :editable false
+            :wrap-text true
+            :style {:-fx-font-family "monospace"}}}
+          {:fx/type :h-box
+           :children
+           [{:fx/type :button
+             :text "Send"
+             :on-action {:event/type ::send-console
+                         :client client
+                         :message console-message-draft}}
+            {:fx/type :text-field
+             :h-box/hgrow :always
+             :text (str console-message-draft)
+             :on-text-changed {:event/type ::assoc
+                               :key :console-message-draft}
+             :on-action {:event/type ::send-console
+                         :client client
+                         :message console-message-draft}}]}]}}]}}))
 
 (defn root-view
-  [{{:keys [agreement battle battles channels client last-failed-message password pop-out-battle
+  [{{:keys [agreement battle client last-failed-message password pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
-            show-servers-window show-uikeys-window standalone tasks username users verification-code]
+            show-servers-window show-uikeys-window standalone tasks username verification-code]
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)]
@@ -6706,84 +6894,11 @@
                                :password password
                                :username username
                                :verification-code verification-code}}]}])
-             [{:fx/type :tab-pane
-               :on-tabs-changed {:event/type ::main-tab-action}
-               :v-box/vgrow :always
-               :tabs
-               [{:fx/type :tab
-                 :graphic {:fx/type :label
-                           :text "Battles"}
-                 :closable false
-                 :id "battles"
-                 :content
-                 {:fx/type :split-pane
-                  :divider-positions [0.75]
-                  :items
-                  [
-                   {:fx/type :v-box
-                    :children
-                    [{:fx/type :label
-                      :text (str "Battles (" (count battles) ")")
-                      :style {:-fx-font-size 16}}
-                     (merge
-                       {:fx/type battles-table
-                        :v-box/vgrow :always}
-                       (select-keys state [:battle :battle-password :battles :client :selected-battle :users]))]}
-                   {:fx/type :v-box
-                    :children
-                    [{:fx/type :label
-                      :text (str "Users (" (count users) ")")
-                      :style {:-fx-font-size 16}}
-                     {:fx/type users-table
-                      :v-box/vgrow :always
-                      :users users}]}]}}
-                {:fx/type :tab
-                 :graphic {:fx/type :label
-                           :text "Chat"}
-                 :closable false
-                 :id "chat"
-                 :content
-                 {:fx/type :split-pane
-                  :divider-positions [0.70 0.9]
-                  :items
-                  [(merge
-                     {:fx/type my-channels-view}
-                     (select-keys state [:channels :client :message-draft :my-channels]))
-                   {:fx/type :v-box
-                    :children
-                    [{:fx/type :label
-                      :text (str "Users (" (count users) ")")
-                      :style {:-fx-font-size 16}}
-                     {:fx/type users-table
-                      :v-box/vgrow :always
-                      :users users}]}
-                   {:fx/type :v-box
-                    :children
-                    [{:fx/type :label
-                      :text (str "Channels (" (->> channels vals non-battle-channels count) ")")
-                      :style {:-fx-font-size 16}}
-                     (merge
-                       {:fx/type channels-table
-                        :v-box/vgrow :always}
-                       (select-keys state [:channels :client :my-channels]))
-                     {:fx/type :h-box
-                      :alignment :center-left
-                      :children
-                      [{:fx/type :label
-                        :text " Custom Channel: "}
-                       {:fx/type :text-field
-                        :text (:join-channel-name state)
-                        :prompt-text "Name"
-                        :on-text-changed {:event/type ::assoc
-                                          :key :join-channel-name}
-                        :on-action {:event/type ::join-channel
-                                    :channel-name (:join-channel-name state)
-                                    :client (:client state)}}
-                       {:fx/type :button
-                        :text "Join"
-                        :on-action {:event/type ::join-channel
-                                    :channel-name (:join-channel-name state)
-                                    :client (:client state)}}]}]}]}}]}
+             [(merge
+                {:fx/type main-tab-view
+                 :v-box/vgrow :always}
+                (select-keys state
+                  (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
               (merge
                 {:fx/type battles-buttons}
                 (select-keys state
@@ -6827,13 +6942,9 @@
            {:fx/type :scene
             :stylesheets stylesheets
             :root
-            {:fx/type :h-box
-             :children
-             (concat []
-               (when pop-out-battle
-                 [(merge
-                    {:fx/type battle-view}
-                    (select-keys state battle-view-keys))]))}}}])
+            (merge
+              {:fx/type battle-view}
+              (select-keys state battle-view-keys))}}])
        (when show-downloader
          [(merge
             {:fx/type download-window}

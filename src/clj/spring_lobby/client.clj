@@ -291,6 +291,9 @@
             (when-let [m @d]
               (log/info "<" (str "'" m "'"))
               (try
+                (swap! state-atom update :console-log conj {:timestamp (u/curr-millis)
+                                                            :source :server
+                                                            :message m})
                 (handler c state-atom m)
                 (catch Exception e
                   (log/error e "Error handling message")))

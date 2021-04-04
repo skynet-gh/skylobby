@@ -216,22 +216,57 @@
 (defn user-channel [username]
   (str "@" username))
 
-(defmethod handle "SAIDPRIVATE" [_c state-atom m]
+(defmethod handle "SAYPRIVATE" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         now (u/curr-millis)]
-    (swap! state-atom update-in [:channels (user-channel username) :messages]
-           conj {:text message
-                 :timestamp now
-                 :username username})))
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update-in [:channels (user-channel username) :messages]
+              conj {:text message
+                    :timestamp now
+                    :username (:username state)}))))))
+
+(defmethod handle "SAIDPRIVATE" [_c state-atom m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        now (u/curr-millis)
+        channel-name (user-channel username)]
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update-in [:channels channel-name :messages]
+              conj {:text message
+                    :timestamp now
+                    :username username})
+            (assoc :selected-tab-main "chat")
+            (assoc :selected-tab-channels channel-name))))))
+
+(defmethod handle "SAYPRIVATEEX" [_c state-atom m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        now (u/curr-millis)]
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update-in [:channels (user-channel username) :messages]
+              conj {:text message
+                    :timestamp now
+                    :username (:username state)
+                    :ex true}))))))
 
 (defmethod handle "SAIDPRIVATEEX" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        now (u/curr-millis)]
-    (swap! state-atom update-in [:channels (user-channel username) :messages]
-           conj {:text message
-                 :timestamp now
-                 :username username
-                 :ex true})))
+        now (u/curr-millis)
+        channel-name (user-channel username)]
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update-in [:channels channel-name :messages]
+              conj {:text message
+                    :timestamp now
+                    :username username
+                    :ex true})
+            (assoc :selected-tab-main "chat")
+            (assoc :selected-tab-channels channel-name))))))
 
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
