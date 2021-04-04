@@ -115,6 +115,12 @@
   ([{:keys [os-name]}]
    (string/includes? os-name "Windows")))
 
+(defn linux?
+  ([]
+   (linux? (get-sys-data)))
+  ([{:keys [os-name]}]
+   (string/includes? os-name "Linux")))
+
 (defn wsl?
   "Returns true if this system appears to be the Windows Subsystem for Linux."
   ([]

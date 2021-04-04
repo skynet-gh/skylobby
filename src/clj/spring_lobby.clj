@@ -6670,8 +6670,10 @@
                          0)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
-     {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}
-      :selected-index selected-index}
+     (merge
+       {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}}
+       (when-not (fs/linux?)
+         {:selected-index selected-index}))
      :desc
      {:fx/type :tab-pane
       :on-tabs-changed {:event/type ::my-channels-tab-action}
@@ -6745,8 +6747,10 @@
                       :users users}]}]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
-     {:on-selected-item-changed {:event/type ::selected-item-changed-main-tabs}
-      :selected-index selected-index}
+     (merge
+       {:on-selected-item-changed {:event/type ::selected-item-changed-main-tabs}}
+       (when-not (fs/linux?)
+         {:selected-index selected-index}))
      :desc
      {:fx/type :tab-pane
       :style {:-fx-font-size 16}
