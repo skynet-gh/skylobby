@@ -212,6 +212,9 @@
 (defmethod handler/handle "TASSERVER" [_client state m]
   (swap! state assoc :tas-server m))
 
+(defmethod handler/handle "TASServer" [_client state m]
+  (swap! state assoc :tas-server m))
+
 (defmethod handler/handle "ACCEPTED" [_client state _m]
   (swap! state assoc :accepted true))
 
@@ -313,11 +316,10 @@
    (let [pw-md5-base64 (base64-md5 password)
          git-ref "b6e84c6023cbffac"
          user-id (rand-int Integer/MAX_VALUE)
-         compat-flags "sp u"
+         compat-flags "sp b t u cl lu" ; found at springfightclub, was "sp u"
          msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
                   " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
      (message/send-message client msg))))
-     ;(message/send-message client (str "LI " username)))))
 
 
 (defn connect

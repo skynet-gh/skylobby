@@ -1012,7 +1012,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/instant)
-            (java-time/duration 1 :minutes))
+            (java-time/duration 5 :minutes))
           (fn [_chimestamp]
             (when-let [client (:client @state-atom)]
               (log/info "Updating channel list")
@@ -1104,6 +1104,7 @@
     :column-resize-policy :constrained ; TODO auto resize
     :items (->> battles
                 vals
+                (filter :battle-title)
                 (sort-by :battle-title String/CASE_INSENSITIVE_ORDER)
                 vec)
     :columns

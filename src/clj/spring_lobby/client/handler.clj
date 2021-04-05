@@ -102,16 +102,17 @@
 
 
 (defn parse-adduser [m]
-  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
+  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)( (.+))?" m))
 
 (defmethod handle "ADDUSER" [_c state m]
-  (let [[_all username country user-id user-agent] (parse-adduser m)
-        user {:username username
-              :country country
-              :user-id user-id
-              :user-agent user-agent
-              :client-status (decode-client-status default-client-status)}]
-    (swap! state assoc-in [:users username] user)))
+  (if-let [[_all username country user-id _ user-agent] (parse-adduser m)]
+    (let [user {:username username
+                :country country
+                :user-id user-id
+                :user-agent user-agent
+                :client-status (decode-client-status default-client-status)}]
+      (swap! state assoc-in [:users username] user))
+    (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
 (defmethod handle "REMOVEUSER" [_c state m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]

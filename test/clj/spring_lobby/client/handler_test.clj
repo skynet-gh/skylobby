@@ -27,15 +27,22 @@
   (is (= ["skynet"
           "??"
           "8"
+          " SpringLobby 0.270 (win x32)"
           "SpringLobby 0.270 (win x32)"]
          (rest (handler/parse-adduser "ADDUSER skynet ?? 8 SpringLobby 0.270 (win x32)"))))
   (is (= ["ChanServ"
           "US"
           "None"
+          " ChanServ"
           "ChanServ"]
          (rest (handler/parse-adduser "ADDUSER ChanServ US None ChanServ"))))
   (is (= ["[teh]host20"
           "HU"
           "2218"
+          " SPADS v0.12.18"
           "SPADS v0.12.18"]
          (rest (handler/parse-adduser "ADDUSER [teh]host20 HU 2218 SPADS v0.12.18")))))
+(is (= ["skynet"
+        "??"
+        "8"]
+       (rest (handler/parse-adduser "ADDUSER skynet ?? 8"))))
