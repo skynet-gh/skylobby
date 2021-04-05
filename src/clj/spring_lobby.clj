@@ -156,6 +156,7 @@
 
 (def config-keys
   [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version
+   :extra-import-sources :extra-replay-sources
    :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins
    :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
    :rapid-repo :replays-watched :replays-window-details :scripttags :server :servers :uikeys :username])
@@ -298,7 +299,12 @@
                    (read-mod-data file {:modinfo-only false})
                    (catch Exception e
                      (log/error e "Error reading mod data for" file)))
-        mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])]
+        mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])
+        mod-details (assoc mod-details
+                           :is-game
+                           (boolean
+                             (or (:engineoptions mod-data)
+                                 (:modoptions mod-data))))]
     (swap! state-atom update :mods
            (fn [mods]
              (set
@@ -518,11 +524,15 @@
   (boolean (:exists (file-status file-cache f))))
 
 
-(def import-sources
-  [{:import-source-name "Spring"
-    :file (fs/spring-root)}
-   {:import-source-name "Beyond All Reason"
-    :file (fs/bar-root)}])
+(defn import-sources [extra-input-sources]
+  (concat
+    [{:import-source-name "Spring"
+      :file (fs/spring-root)
+      :builtin true}
+     {:import-source-name "Beyond All Reason"
+      :file (fs/bar-root)
+      :builtin true}]
+    extra-input-sources))
 
 
 (defn could-be-this-engine?
@@ -595,26 +605,43 @@
     {:game-type game-type
      :player-counts team-counts}))
 
+
+(defn replay-sources [extra-replay-sources]
+  (concat
+    [{:replay-source-name "skylobby"
+      :file (fs/replays-dir (fs/isolation-dir))
+      :builtin true}
+     {:replay-source-name "Beyond All Reason"
+      :file (fs/replays-dir (fs/bar-root))
+      :builtin true}
+     {:replay-source-name "Spring"
+      :file (fs/replays-dir (fs/spring-root))
+      :builtin true}]
+    extra-replay-sources))
+
+
 (defn refresh-replays
   [state-atom]
   (log/info "Refreshing replays")
   (let [before (u/curr-millis)
-        existing (-> state-atom deref :parsed-replays-by-path)
-        existing-paths (set (keys existing))
-        all-files (concat
-                    (fs/replay-files)
-                    (fs/replay-files (fs/bar-root))
-                    (fs/replay-files (fs/spring-root)))
+        {:keys [extra-replay-sources parsed-replays-by-path]} @state-atom
+        existing-paths (set (keys parsed-replays-by-path))
+        all-files (mapcat
+                    (fn [{:keys [file replay-source-name]}]
+                      (map
+                        (juxt (constantly replay-source-name) identity)
+                        (fs/replay-files file)))
+                    (replay-sources extra-replay-sources))
         todo (->> all-files
-                  (remove (comp existing-paths fs/canonical-path))
-                  (sort-by fs/filename)
+                  (remove (comp existing-paths fs/canonical-path second))
+                  (sort-by (comp fs/filename second))
                   reverse)
-        all-paths (set (map fs/canonical-path all-files))
+        all-paths (set (map (comp fs/canonical-path second) all-files))
         this-round (take 100 todo)
         next-round (drop 100 todo)
         parsed-replays (->> this-round
                             (map
-                              (fn [f]
+                              (fn [[source f]]
                                 (let [replay (try
                                                (replay/decode-replay f)
                                                (catch Exception e
@@ -625,7 +652,7 @@
                                       :filename (fs/filename f)
                                       :file-size (fs/size f)}
                                      replay
-                                     {:source (-> f fs/parent-file fs/parent-file fs/parent-file)}
+                                     {:source-name source}
                                      (replay-type-and-players replay))])))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
@@ -846,6 +873,7 @@
              (-> state
                  (update :mods (fn [mods]
                                  (->> mods
+                                      (filter #(contains? % :is-game))
                                       (remove (comp string/blank? :mod-name))
                                       (remove (comp missing-files fs/canonical-path :file))
                                       set)))
@@ -1572,7 +1600,7 @@
          :text ""
          :tooltip
          {:fx/type :tooltip
-          ;:show-delay [10 :ms]
+          :show-delay [10 :ms]
           :style {:-fx-font-size 14}
           :text "Cancel connect"}
          :on-action {:event/type ::cancel-connect
@@ -1716,6 +1744,19 @@
    :on-created focus-when-on-scene!
    :desc desc})
 
+
+
+(defmethod event-handler ::delete-extra-import-source [{:keys [file]}]
+  (swap! *state update :extra-input-sources
+    (fn [extra-input-sources]
+      (remove (comp #{(fs/canonical-path file)} fs/canonical-path :file) extra-input-sources))))
+
+(defmethod event-handler ::delete-extra-replay-source [{:keys [file]}]
+  (swap! *state update :extra-replay-sources
+    (fn [extra-replay-sources]
+      (remove (comp #{(fs/canonical-path file)} fs/canonical-path :file) extra-replay-sources))))
+
+
 (def servers-window-keys
   [:server-alias :server-edit :server-host :server-port :servers :show-servers-window])
 
@@ -1833,6 +1874,11 @@
                       :alias server-alias
                       :ssl (boolean server-ssl)}}}]}}}))
 
+
+(def register-window-keys
+  [:email :password :password-confirm :register-response :server :servers :show-register-window
+   :username])
+
 (defn register-window
   [{:keys [email password password-confirm register-response server servers show-register-window username]}]
   {:fx/type :stage
@@ -1912,6 +1958,157 @@
                    :password password
                    :email email}}]}}})
 
+(defmethod event-handler ::conj
+  [event]
+  (swap! *state update (:key event) conj (:value event)))
+
+(defmethod event-handler ::add-extra-import-source
+  [{:keys [extra-import-name extra-import-path]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (update :extra-input-sources conj {:import-source-name extra-import-name
+                                             :file (io/file extra-import-path)})
+          (dissoc :extra-input-name :extra-input-path)))))
+
+(defmethod event-handler ::add-extra-replay-source
+  [{:keys [extra-replay-name extra-replay-path]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (update :extra-replay-sources conj {:replay-source-name extra-replay-name
+                                              :file (io/file extra-replay-path)})
+          (dissoc :extra-replay-name :extra-replay-path)))))
+
+(def settings-window-keys
+  [:extra-input-name :extra-input-path :extra-replay-sources :extra-replay-name :extra-replay-path
+   :extra-replay-sources :show-settings-window])
+
+(defn settings-window
+  [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
+           extra-replay-path extra-replay-sources show-settings-window]}]
+  {:fx/type :stage
+   :showing show-settings-window
+   :title (str u/app-name " Settings")
+   :icons icons
+   :on-close-request (fn [^javafx.stage.WindowEvent e]
+                       (swap! *state assoc :show-settings-window false)
+                       (.consume e))
+   :width 800
+   :height 600
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :scroll-pane
+     :fit-to-width true
+     :content
+     {:fx/type :v-box
+      :style {:-fx-font-size 16}
+      :children
+      [{:fx/type :label
+        :text " Import Sources"
+        :style {:-fx-font-size 24}}
+       {:fx/type :v-box
+        :children
+        (map
+          (fn [{:keys [builtin file import-source-name]}]
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :button
+               :on-action {:event/type ::delete-extra-import-source
+                           :file file}
+               :disable (boolean builtin)
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-delete:16:white"}}
+              {:fx/type :v-box
+               :children
+               [{:fx/type :label
+                 :text (str " " import-source-name)}
+                {:fx/type :label
+                 :text (str " " (fs/canonical-path file))
+                 :style {:-fx-font-size 14}}]}]})
+          (import-sources extra-import-sources))}
+       {:fx/type :h-box
+        :alignment :center-left
+        :children
+        [{:fx/type :button
+          :text ""
+          :disable (or (string/blank? extra-import-name)
+                       (string/blank? extra-import-path))
+          :on-action {:event/type ::add-extra-import-source
+                      :extra-import-path extra-import-path
+                      :extra-import-name extra-import-name}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal "mdi-plus:16:white"}}
+         {:fx/type :label
+          :text " Name: "}
+         {:fx/type :text-field
+          :text (str extra-import-name)
+          :on-text-changed {:event/type ::assoc
+                            :key :extra-import-name}}
+         {:fx/type :label
+          :text " Path: "}
+         {:fx/type :text-field
+          :text (str extra-import-path)
+          :on-text-changed {:event/type ::assoc
+                            :key :extra-import-path}}]}
+       {:fx/type :label
+        :text " Replay Sources"
+        :style {:-fx-font-size 24}}
+       {:fx/type :v-box
+        :children
+        (map
+          (fn [{:keys [builtin file replay-source-name]}]
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :button
+               :on-action {:event/type ::delete-extra-replay-source
+                           :file file}
+               :disable (boolean builtin)
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-delete:16:white"}}
+              {:fx/type :v-box
+               :children
+               [{:fx/type :label
+                 :text (str " " replay-source-name)}
+                {:fx/type :label
+                 :text (str " " (fs/canonical-path file))
+                 :style {:-fx-font-size 14}}]}]})
+          (replay-sources extra-replay-sources))}
+       {:fx/type :h-box
+        :alignment :center-left
+        :children
+        [
+         {:fx/type :button
+          :disable (or (string/blank? extra-replay-name)
+                       (string/blank? extra-replay-path))
+          :on-action {:event/type ::add-extra-replay-source
+                      :extra-replay-path extra-replay-path
+                      :extra-replay-name extra-replay-name}
+          :text ""
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal "mdi-plus:16:white"}}
+         {:fx/type :label
+          :text " Name: "}
+         {:fx/type :text-field
+          :text (str extra-replay-name)
+          :on-text-changed {:event/type ::assoc
+                            :key :extra-replay-name}}
+         {:fx/type :label
+          :text " Path: "}
+         {:fx/type :text-field
+          :text (str extra-replay-path)
+          :on-text-changed {:event/type ::assoc
+                            :key :extra-replay-path}}]}]}}}})
 
 (def bind-keycodes
   {"CTRL" KeyCode/CONTROL
@@ -2220,7 +2417,8 @@
                   (filter #(string/includes? (string/lower-case %) filter-lc))
                   (sort String/CASE_INSENSITIVE_ORDER))]
          [{:fx/type :combo-box
-           :value (str map-name)
+           :prompt-text " < pick a map > "
+           :value map-name
            :items filtered-map-names
            :disable (boolean disable)
            :on-value-changed on-value-changed
@@ -2234,13 +2432,13 @@
            :on-key-pressed {:event/type ::maps-key-pressed}
            :on-hidden {:event/type ::maps-hidden}
            :tooltip {:fx/type :tooltip
-                     ;:show-delay [10 :ms]
+                     :show-delay [10 :ms]
                      :text (or map-input-prefix "Choose map")}}]))
      [{:fx/type :button
        :text ""
        :tooltip
        {:fx/type :tooltip
-        ;:show-delay [10 :ms]
+        :show-delay [10 :ms]
         :style {:-fx-font-size 14}
         :text "Show maps window"}
        :on-action {:event/type ::show-maps-window
@@ -2252,7 +2450,7 @@
        :props
        {:tooltip
         {:fx/type :tooltip
-         ;:show-delay [10 :ms]
+         :show-delay [10 :ms]
          :text "Open maps directory"}}
        :desc
        {:fx/type :button
@@ -2266,7 +2464,7 @@
          :props
          {:tooltip
           {:fx/type :tooltip
-           ;:show-delay [10 :ms]
+           :show-delay [10 :ms]
            :text "Random map"}}
          :desc
          {:fx/type :button
@@ -2282,7 +2480,7 @@
        :props
        {:tooltip
         {:fx/type :tooltip
-         ;:show-delay [10 :ms]
+         :show-delay [10 :ms]
          :text "Reload maps"}}
        :desc
        {:fx/type :button
@@ -2332,287 +2530,301 @@
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
            use-springlobby-modname]
     :as state}]
-  {:fx/type :v-box
-   :alignment :top-left
-   :children
-   [{:fx/type :flow-pane
-     :alignment :center-left
-     :style {:-fx-font-size 16}
+  (let [games (filter :is-game mods)]
+    {:fx/type :v-box
+     :alignment :top-left
      :children
-     [{:fx/type :label
-       :text " Resources: "}
-      {:fx/type fx.ext.node/with-tooltip-props
-       :props
-       {:tooltip
-        {:fx/type :tooltip
-         ;:show-delay [10 :ms]
-         :text "Import local resources from SpringLobby and Beyond All Reason"}}
-       :desc
-       {:fx/type :button
-        :text "import"
-        :on-action {:event/type ::assoc
-                    :key :show-importer}
-        :graphic
-        {:fx/type font-icon/lifecycle
-         :icon-literal (str "mdi-file-import:16:white")}}}
-      {:fx/type fx.ext.node/with-tooltip-props
-       :props
-       {:tooltip
-        {:fx/type :tooltip
-         ;:show-delay [10 :ms]
-         :text "Download resources from various websites using http"}}
-       :desc
-       {:fx/type :button
-        :text "http"
-        :on-action {:event/type ::assoc
-                    :key :show-downloader}
-        :graphic
-        {:fx/type font-icon/lifecycle
-         :icon-literal (str "mdi-download:16:white")}}}
-      {:fx/type fx.ext.node/with-tooltip-props
-       :props
-       {:tooltip
-        {:fx/type :tooltip
-         ;:show-delay [10 :ms]
-         :text "Download resources with the Rapid tool"}}
-       :desc
-       {:fx/type :button
-        :text "rapid"
-        :on-action {:event/type ::assoc
-                    :key :show-rapid-downloader}
-        :graphic
-        {:fx/type font-icon/lifecycle
-         :icon-literal (str "mdi-download:16:white")}}}
-      {:fx/type :h-box
+     [{:fx/type :flow-pane
        :alignment :center-left
+       :style {:-fx-font-size 16}
        :children
-       (concat
-         [{:fx/type :label
-           :text " Engine: "}]
-         (if (empty? engines)
-           [{:fx/type :label
-             :text "No engines "}]
-           (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
-                 filtered-engines (->> engines
-                                       (map :engine-version)
-                                       (filter some?)
-                                       (filter #(string/includes? (string/lower-case %) filter-lc))
-                                       sort)]
-             [{:fx/type :combo-box
-               :value (str engine-version)
-               :items filtered-engines
-               ;:disable (boolean battle)
-               :on-value-changed {:event/type ::version-change}
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [engine]
-                  {:text (if (string/blank? engine)
-                           "< choose an engine >"
-                           engine)})}
-               :on-key-pressed {:event/type ::engines-key-pressed}
-               :on-hidden {:event/type ::engines-hidden}
-               :tooltip {:fx/type :tooltip
-                         ;:show-delay [10 :ms]
-                         :text (or engine-filter "Choose engine")}}]))
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             ;:show-delay [10 :ms]
-             :text "Open engine directory"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::desktop-browse-dir
-                        :file (io/file (fs/isolation-dir) "engine")}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-folder:16:white"}}}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             ;:show-delay [10 :ms]
-             :text "Reload engines"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::reconcile-engines}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh:16:white"}}}])}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       (concat
-         [{:fx/type :label
-           :alignment :center-left
-           :text " Game: "}]
-         (if (empty? mods)
-           [{:fx/type :label
-             :text "No games "}]
-           (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
-                 filtered-mods (->> mods
-                                    (map :mod-name)
-                                    (filter string?)
-                                    (filter #(string/includes? (string/lower-case %) filter-lc))
-                                    (sort version/version-compare))]
-             [{:fx/type :combo-box
-               :value mod-name
-               :items filtered-mods
-               ;:disable (boolean battle)
-               :on-value-changed {:event/type ::mod-change}
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [mod-name]
-                  {:text (if (string/blank? mod-name)
-                           "< choose a game >"
-                           mod-name)})}
-               :on-key-pressed {:event/type ::mods-key-pressed}
-               :on-hidden {:event/type ::mods-hidden}
-               :tooltip {:fx/type :tooltip
-                         ;:show-delay [10 :ms]
-                         :text (or mod-filter "Choose game")}}]))
-         [{:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             ;:show-delay [10 :ms]
-             :text "Open games directory"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::desktop-browse-dir
-                        :file (io/file (fs/isolation-dir) "games")}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-folder:16:white"}}}
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type :tooltip
-             ;:show-delay [10 :ms]
-             :text "Reload games"}}
-           :desc
-           {:fx/type :button
-            :on-action {:event/type ::reload-mods}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh:16:white"}}}])}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :label
+       [
+        {:fx/type :button
+         :text "Settings"
+         :tooltip
+         {:fx/type :tooltip
+          :show-delay [10 :ms]
+          :style {:-fx-font-size 14}
+          :text "Show settings window"}
+         :on-action {:event/type ::toggle
+                     :key :show-settings-window}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-settings:16:white"}}
+        {:fx/type :label
+         :text " Resources: "}
+        {:fx/type fx.ext.node/with-tooltip-props
+         :props
+         {:tooltip
+          {:fx/type :tooltip
+           :show-delay [10 :ms]
+           :text "Import local resources from SpringLobby and Beyond All Reason"}}
+         :desc
+         {:fx/type :button
+          :text "import"
+          :on-action {:event/type ::assoc
+                      :key :show-importer}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal (str "mdi-file-import:16:white")}}}
+        {:fx/type fx.ext.node/with-tooltip-props
+         :props
+         {:tooltip
+          {:fx/type :tooltip
+           :show-delay [10 :ms]
+           :text "Download resources from various websites using http"}}
+         :desc
+         {:fx/type :button
+          :text "http"
+          :on-action {:event/type ::assoc
+                      :key :show-downloader}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal (str "mdi-download:16:white")}}}
+        {:fx/type fx.ext.node/with-tooltip-props
+         :props
+         {:tooltip
+          {:fx/type :tooltip
+           :show-delay [10 :ms]
+           :text "Download resources with the Rapid tool"}}
+         :desc
+         {:fx/type :button
+          :text "rapid"
+          :on-action {:event/type ::assoc
+                      :key :show-rapid-downloader}
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal (str "mdi-download:16:white")}}}
+        {:fx/type :h-box
          :alignment :center-left
-         :text " Map: "}
-        {:fx/type map-list
-         :map-name map-name
-         :maps maps
-         :map-input-prefix map-input-prefix
-         :on-value-changed {:event/type ::map-change}}]}]}
-    {:fx/type :h-box
-     :style {:-fx-font-size 16}
-     :alignment :center-left
-     :children
-     (concat
-       (when (and accepted client (not battle))
-         (let [host-battle-state
-               (-> state
-                   (clojure.set/rename-keys {:battle-title :title})
-                   (select-keys [:battle-password :title :engine-version
-                                 :mod-name :map-name])
-                   (assoc :mod-hash -1
-                          :map-hash -1))
-               host-battle-action (merge
-                                    {:event/type ::host-battle
-                                     :host-battle-state host-battle-state}
-                                    (select-keys state [:client :scripttags :use-springlobby-modname]))]
-           [{:fx/type :button
-             :text "Host Battle"
-             :disable (boolean
-                        (or (string/blank? engine-version)
-                            (string/blank? map-name)
-                            (string/blank? mod-name)
-                            (string/blank? battle-title)))
-             :on-action host-battle-action}
-            {:fx/type :label
-             :text " Battle Name: "}
-            {:fx/type :text-field
-             :text (str battle-title)
-             :prompt-text "Battle Title"
-             :on-action host-battle-action
-             :on-text-changed {:event/type ::battle-title-change}}
-            {:fx/type :label
-             :text " Battle Password: "}
-            {:fx/type :text-field
-             :text (str battle-password)
-             :prompt-text "Battle Password"
-             :on-action host-battle-action
-             :on-text-changed {:event/type ::battle-password-change}}
+         :children
+         (concat
+           [{:fx/type :label
+             :text " Engine: "}]
+           (if (empty? engines)
+             [{:fx/type :label
+               :text "No engines "}]
+             (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
+                   filtered-engines (->> engines
+                                         (map :engine-version)
+                                         (filter some?)
+                                         (filter #(string/includes? (string/lower-case %) filter-lc))
+                                         sort)]
+               [{:fx/type :combo-box
+                 :prompt-text " < pick an engine > "
+                 :value engine-version
+                 :items filtered-engines
+                 :on-value-changed {:event/type ::version-change}
+                 :cell-factory
+                 {:fx/cell-type :list-cell
+                  :describe
+                  (fn [engine]
+                    {:text (if (string/blank? engine)
+                             "< choose an engine >"
+                             engine)})}
+                 :on-key-pressed {:event/type ::engines-key-pressed}
+                 :on-hidden {:event/type ::engines-hidden}
+                 :tooltip {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text (or engine-filter "Choose engine")}}]))
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Open engine directory"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::desktop-browse-dir
+                          :file (io/file (fs/isolation-dir) "engine")}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-folder:16:white"}}}
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
               {:fx/type :tooltip
-               ;:show-delay [10 :ms]
-               :style {:-fx-font-size 14}
-               :text "If using git, set version to $VERSION so SpringLobby is happier"}}
+               :show-delay [10 :ms]
+               :text "Reload engines"}}
              :desc
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :check-box
-                :selected (boolean use-springlobby-modname)
-                :h-box/margin 8
-                :on-selected-changed {:event/type ::use-springlobby-modname-change}}
-               {:fx/type :label
-                :text "Use SpringLobby Game Name"}]}}])))}
-    {:fx/type :h-box
-     :alignment :center-left
-     :style {:-fx-font-size 16}
-     :children
-     (concat
-       (when battle
-         [{:fx/type :button
-           :text "Leave Battle"
-           :on-action {:event/type ::leave-battle
-                       :client client}}
-          {:fx/type :pane
-           :h-box/margin 8}
-          (if pop-out-battle
-            {:fx/type :button
-             :text "Pop In Battle "
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-window-maximize:16:white"}
-             :on-action {:event/type ::dissoc
-                         :key :pop-out-battle}}
-            {:fx/type :button
-             :text "Pop Out Battle "
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-open-in-new:16:white"}
-             :on-action {:event/type ::assoc
-                         :key :pop-out-battle
-                         :value true}})])
-       (when (and (not battle) selected-battle (-> battles (get selected-battle)))
-         (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
-           (concat
+             {:fx/type :button
+              :on-action {:event/type ::reconcile-engines}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-refresh:16:white"}}}])}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         (concat
+           [{:fx/type :label
+             :alignment :center-left
+             :text " Game: "}]
+           (if (empty? games)
+             [{:fx/type :label
+               :text "No games "}]
+             (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
+                   filtered-games (->> games
+                                       (map :mod-name)
+                                       (filter string?)
+                                       (filter #(string/includes? (string/lower-case %) filter-lc))
+                                       (sort version/version-compare))]
+               [{:fx/type :combo-box
+                 :prompt-text " < pick a game > "
+                 :value mod-name
+                 :items filtered-games
+                 :on-value-changed {:event/type ::mod-change}
+                 :cell-factory
+                 {:fx/cell-type :list-cell
+                  :describe
+                  (fn [mod-name]
+                    {:text (if (string/blank? mod-name)
+                             "< choose a game >"
+                             mod-name)})}
+                 :on-key-pressed {:event/type ::mods-key-pressed}
+                 :on-hidden {:event/type ::mods-hidden}
+                 :tooltip {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text (or mod-filter "Choose game")}}]))
+           [{:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Open games directory"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::desktop-browse-dir
+                          :file (io/file (fs/isolation-dir) "games")}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-folder:16:white"}}}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Reload games"}}
+             :desc
+             {:fx/type :button
+              :on-action {:event/type ::reload-mods}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-refresh:16:white"}}}])}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center-left
+           :text " Map: "}
+          {:fx/type map-list
+           :map-name map-name
+           :maps maps
+           :map-input-prefix map-input-prefix
+           :on-value-changed {:event/type ::map-change}}]}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 16}
+       :alignment :center-left
+       :children
+       (concat
+         (when (and accepted client (not battle))
+           (let [host-battle-state
+                 (-> state
+                     (clojure.set/rename-keys {:battle-title :title})
+                     (select-keys [:battle-password :title :engine-version
+                                   :mod-name :map-name])
+                     (assoc :mod-hash -1
+                            :map-hash -1))
+                 host-battle-action (merge
+                                      {:event/type ::host-battle
+                                       :host-battle-state host-battle-state}
+                                      (select-keys state [:client :scripttags :use-springlobby-modname]))]
              [{:fx/type :button
-               :text "Join Battle"
-               :disable (boolean (and needs-password (string/blank? battle-password)))
-               :on-action {:event/type ::join-battle
-                           :battle-password battle-password
-                           :client client
-                           :selected-battle selected-battle
-                           :battle-passworded
-                           (= "1" (-> battles (get selected-battle) :battle-passworded))}}] ; TODO
-             (when needs-password
-               [{:fx/type :label
-                 :text " Battle Password: "}
-                {:fx/type :text-field
-                 :text (str battle-password)
-                 :prompt-text "Battle Password"
-                 :on-action {:event/type ::host-battle}
-                 :on-text-changed {:event/type ::battle-password-change}}])))))}]})
+               :text "Host Battle"
+               :disable (boolean
+                          (or (string/blank? engine-version)
+                              (string/blank? map-name)
+                              (string/blank? mod-name)
+                              (string/blank? battle-title)))
+               :on-action host-battle-action}
+              {:fx/type :label
+               :text " Battle Name: "}
+              {:fx/type :text-field
+               :text (str battle-title)
+               :prompt-text "Battle Title"
+               :on-action host-battle-action
+               :on-text-changed {:event/type ::battle-title-change}}
+              {:fx/type :label
+               :text " Battle Password: "}
+              {:fx/type :text-field
+               :text (str battle-password)
+               :prompt-text "Battle Password"
+               :on-action host-battle-action
+               :on-text-changed {:event/type ::battle-password-change}}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :style {:-fx-font-size 14}
+                 :text "If using git, set version to $VERSION so SpringLobby is happier"}}
+               :desc
+               {:fx/type :h-box
+                :alignment :center-left
+                :children
+                [{:fx/type :check-box
+                  :selected (boolean use-springlobby-modname)
+                  :h-box/margin 8
+                  :on-selected-changed {:event/type ::use-springlobby-modname-change}}
+                 {:fx/type :label
+                  :text "Use SpringLobby Game Name"}]}}])))}
+      {:fx/type :h-box
+       :alignment :center-left
+       :style {:-fx-font-size 16}
+       :children
+       (concat
+         (when battle
+           [{:fx/type :button
+             :text "Leave Battle"
+             :on-action {:event/type ::leave-battle
+                         :client client}}
+            {:fx/type :pane
+             :h-box/margin 8}
+            (if pop-out-battle
+              {:fx/type :button
+               :text "Pop In Battle "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-window-maximize:16:white"}
+               :on-action {:event/type ::dissoc
+                           :key :pop-out-battle}}
+              {:fx/type :button
+               :text "Pop Out Battle "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-open-in-new:16:white"}
+               :on-action {:event/type ::assoc
+                           :key :pop-out-battle
+                           :value true}})])
+         (when (and (not battle) selected-battle (-> battles (get selected-battle)))
+           (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
+             (concat
+               [{:fx/type :button
+                 :text "Join Battle"
+                 :disable (boolean (and needs-password (string/blank? battle-password)))
+                 :on-action {:event/type ::join-battle
+                             :battle-password battle-password
+                             :client client
+                             :selected-battle selected-battle
+                             :battle-passworded
+                             (= "1" (-> battles (get selected-battle) :battle-passworded))}}] ; TODO
+               (when needs-password
+                 [{:fx/type :label
+                   :text " Battle Password: "}
+                  {:fx/type :text-field
+                   :text (str battle-password)
+                   :prompt-text "Battle Password"
+                   :on-action {:event/type ::host-battle}
+                   :on-text-changed {:event/type ::battle-password-change}}])))))}]}))
 
 
 (defmethod event-handler ::battle-password-change
@@ -2997,7 +3209,7 @@
                :on-action refresh-action
                :tooltip
                {:fx/type :tooltip
-                ;:show-delay [10 :ms]
+                :show-delay [10 :ms]
                 :style {:-fx-font-size 14}
                 :text "Force refresh this resource"}
                :h-box/margin 4
@@ -3013,7 +3225,7 @@
                :on-action delete-action
                :tooltip
                {:fx/type :tooltip
-                ;:show-delay [10 :ms]
+                :show-delay [10 :ms]
                 :style {:-fx-font-size 14}
                 :text "Delete this resource"}
                :h-box/margin 4
@@ -3029,7 +3241,7 @@
                :on-action browse-action
                :tooltip
                {:fx/type :tooltip
-                ;:show-delay [10 :ms]
+                :show-delay [10 :ms]
                 :style {:-fx-font-size 14}
                 :text "Browse this resource"}
                :h-box/margin 4
@@ -3051,7 +3263,7 @@
               (when tooltip
                 {:tooltip
                  {:fx/type :tooltip
-                  ;:show-delay [10 :ms]
+                  :show-delay [10 :ms]
                   :style {:-fx-font-size 14}
                   :text tooltip}})
               :desc
@@ -4036,6 +4248,7 @@
                  [{:fx/type :label
                    :text " Replay: "}
                   {:fx/type :combo-box
+                   :prompt-text " < host a replay > "
                    :style {:-fx-max-width 300}
                    :value (-> scripttags :game :demofile)
                    :on-value-changed {:event/type ::assoc-in
@@ -4089,8 +4302,7 @@
                     map-file (:file battle-map-details)]
                 {:fx/type resource-sync-pane
                  :h-box/margin 8
-                 :resource "Map" ;battle-map ; (str "map (" battle-map ")")
-                 ;:delete-action {:event/type ::delete-map}
+                 :resource "Map"
                  :browse-action {:event/type ::desktop-browse-dir
                                  :file (or map-file (fs/maps-dir))}
                  :refresh-action {:event/type ::force-update-battle-map}
@@ -4168,8 +4380,7 @@
                     canonical-path (fs/canonical-path mod-file)]
                 {:fx/type resource-sync-pane
                  :h-box/margin 8
-                 :resource "Game" ;battle-modname ; (str "game (" battle-modname ")")
-                 ;:delete-action {:event/type ::delete-mod}
+                 :resource "Game"
                  :browse-action {:event/type ::desktop-browse-dir
                                  :file (or mod-file (fs/mods-dir))}
                  :refresh-action {:event/type ::force-update-battle-mod}
@@ -4288,10 +4499,7 @@
                                              (:mod-name battle-mod-details))})])))))})
               {:fx/type resource-sync-pane
                :h-box/margin 8
-               :resource "Engine" ; engine-version ; (str "engine (" engine-version ")")
-               ;:delete-action {:event/type ::delete-engine
-               ;                :engines engines
-               ;                :engine-version engine-version
+               :resource "Engine"
                :refresh-action {:event/type ::force-update-battle-engine}
                :refresh-in-progress update-engines
                :browse-action {:event/type ::desktop-browse-dir
@@ -4399,7 +4607,7 @@
                  :props
                  {:tooltip
                   {:fx/type :tooltip
-                   ;:show-delay [10 :ms]
+                   :show-delay [10 :ms]
                    :style {:-fx-font-size 12}
                    :text (cond
                            am-host "You are the host, start battle for everyone"
@@ -4469,7 +4677,7 @@
                     :props
                     {:tooltip
                      {:fx/type :tooltip
-                      ;:show-delay [10 :ms]
+                      :show-delay [10 :ms]
                       :text (str (:name i) "\n\n" (:desc i))}}
                     :desc
                     (merge
@@ -4498,7 +4706,7 @@
                          :props
                          {:tooltip
                           {:fx/type :tooltip
-                           ;:show-delay [10 :ms]
+                           :show-delay [10 :ms]
                            :text (str (:name i) "\n\n" (:desc i))}}
                          :desc
                          {:fx/type :check-box
@@ -4516,7 +4724,7 @@
                          :props
                          {:tooltip
                           {:fx/type :tooltip
-                           ;:show-delay [10 :ms]
+                           :show-delay [10 :ms]
                            :text (str (:name i) "\n\n" (:desc i))}}
                          :desc
                          {:fx/type :text-field
@@ -4537,7 +4745,7 @@
                          :props
                          {:tooltip
                           {:fx/type :tooltip
-                           ;:show-delay [10 :ms]
+                           :show-delay [10 :ms]
                            :text (str (:name i) "\n\n" (:desc i))}}
                          :desc
                          {:fx/type :combo-box
@@ -4824,7 +5032,7 @@
         (deref
           (event-handler
             {:event/type ::rapid-download
-             :rapid-id "byar:test" ; TODO how else to init rapid without download...
+             :rapid-id "i18n:test" ; TODO how else to init rapid without download...
              :engine-file (:file engine-details)})))
       (log/warn "No engine details to do rapid init"))
     (log/info "Updating rapid versions in" root)
@@ -5216,17 +5424,21 @@
   (swap! *state update-in (drop-last path) dissoc (last path)))
 
 (defmethod event-handler ::scan-imports
-  [_e]
-  (doseq [import-source import-sources]
+  [{:keys [sources]}]
+  (doseq [import-source sources]
     (add-task! *state (merge
                         {::task-type ::scan-imports}
                         import-source))))
 
+(def import-window-keys
+  [:copying :extra-import-sources :file-cache :import-filter :import-source-name :import-type
+   :importables-by-path :show-importer :show-stale :tasks])
 
 (defn import-window
-  [{:keys [copying file-cache import-filter import-type import-source-name importables-by-path
+  [{:keys [copying extra-import-sources file-cache import-filter import-type import-source-name importables-by-path
            show-importer show-stale tasks]}]
-  (let [import-source (->> import-sources
+  (let [import-sources (import-sources extra-import-sources)
+        import-source (->> import-sources
                            (filter (comp #{import-source-name} :import-source-name))
                            first)
         now (u/curr-millis)
@@ -5279,7 +5491,8 @@
        [{:fx/type :button
          :style {:-fx-font-size 16}
          :text "Refresh All Imports"
-         :on-action {:event/type ::scan-imports}}
+         :on-action {:event/type ::scan-imports
+                     :import-sources import-sources}}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
@@ -5291,20 +5504,20 @@
              :value import-source
              :items import-sources
              :button-cell import-source-cell
-             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :prompt-text " < pick a source > "
              :cell-factory
              {:fx/cell-type :list-cell
               :describe import-source-cell}
              :on-value-changed {:event/type ::import-source-change}
              :tooltip {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Choose import source"}}]
            (when import-source
              [{:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear source filter"}}
                :desc
                {:fx/type :button
@@ -5317,7 +5530,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Open import source directory"}}
                :desc
                {:fx/type :button
@@ -5340,7 +5553,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :style {:-fx-font-size 14}
                  :text "Hide importables not discovered in the last polling cycle, default 24h"}}
                :desc
@@ -5371,7 +5584,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear filter"}}
                :desc
                {:fx/type :button
@@ -5386,21 +5599,21 @@
              :value import-type
              :items resource-types
              :button-cell import-type-cell
-             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :prompt-text " < pick a type > "
              :cell-factory
              {:fx/cell-type :list-cell
               :describe import-type-cell}
              :on-value-changed {:event/type ::assoc
                                 :key :import-type}
              :tooltip {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Choose import type"}}]
            (when import-type
              [{:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear type filter"}}
                :desc
                {:fx/type :button
@@ -5476,7 +5689,7 @@
                     :disable in-progress
                     :tooltip
                     {:fx/type :tooltip
-                     ;:show-delay [10 :ms]
+                     :show-delay [10 :ms]
                      :text (str "Copy to " dest-path)}
                     :on-action {:event/type ::add-task
                                 :task
@@ -5563,20 +5776,20 @@
              :value download-source
              :items download-sources
              :button-cell download-source-cell
-             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :prompt-text " < pick a source > "
              :cell-factory
              {:fx/cell-type :list-cell
               :describe download-source-cell}
              :on-value-changed {:event/type ::download-source-change}
              :tooltip {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Choose download source"}}]
            (when download-source
              [{:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear source filter"}}
                :desc
                {:fx/type :button
@@ -5589,7 +5802,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Open download source url"}}
                :desc
                {:fx/type :button
@@ -5619,7 +5832,7 @@
              :props
              {:tooltip
               {:fx/type :tooltip
-               ;:show-delay [10 :ms]
+               :show-delay [10 :ms]
                :style {:-fx-font-size 14}
                :text "Hide downloadables not discovered in the last polling cycle, default 24h"}}
              :desc
@@ -5650,7 +5863,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear filter"}}
                :desc
                {:fx/type :button
@@ -5665,21 +5878,21 @@
              :value download-type
              :items resource-types
              :button-cell import-type-cell
-             ;:placeholder {:import-source-name " < pick a source > "} TODO figure out placeholders
+             :prompt-text " < pick a type > "
              :cell-factory
              {:fx/cell-type :list-cell
               :describe import-type-cell}
              :on-value-changed {:event/type ::assoc
                                 :key :download-type}
              :tooltip {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Choose download type"}}]
            (when download-type
              [{:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear type filter"}}
                :desc
                {:fx/type :button
@@ -5753,7 +5966,7 @@
                    {:fx/type :button
                     :tooltip
                     {:fx/type :tooltip
-                     ;:show-delay [10 :ms]
+                     :show-delay [10 :ms]
                      :text (str "Download to " dest-path)}
                     :on-action {:event/type ::http-downloadable
                                 :downloadable downloadable}
@@ -5771,7 +5984,7 @@
                    {:fx/type :button
                     :tooltip
                     {:fx/type :tooltip
-                     ;:show-delay [10 :ms]
+                     :show-delay [10 :ms]
                      :text (str "Extract to " extract-file)}
                     :on-action
                     {:event/type ::extract-7z
@@ -5864,7 +6077,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear rapid repo filter"}}
                :desc
                {:fx/type :button
@@ -5885,7 +6098,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear filter"}}
                :desc
                {:fx/type :button
@@ -5964,7 +6177,7 @@
            :props
            {:tooltip
             {:fx/type :tooltip
-             ;:show-delay [10 :ms]
+             :show-delay [10 :ms]
              :text "Open rapid packages directory"}}
            :desc
            {:fx/type :button
@@ -6215,7 +6428,7 @@
                  :props
                  {:tooltip
                   {:fx/type :tooltip
-                   ;:show-delay [10 :ms]
+                   :show-delay [10 :ms]
                    :text "Clear filter"}}
                  :desc
                  {:fx/type :button
@@ -6251,7 +6464,7 @@
                      :props
                      {:tooltip
                       {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Clear type"}}
                      :desc
                      {:fx/type :button
@@ -6276,7 +6489,7 @@
                      :props
                      {:tooltip
                       {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Clear min players"}}
                      :desc
                      {:fx/type :button
@@ -6311,7 +6524,7 @@
                      :props
                      {:tooltip
                       {:fx/type :tooltip
-                       ;:show-delay [10 :ms]
+                       :show-delay [10 :ms]
                        :text "Clear max players"}}
                      :desc
                      {:fx/type :button
@@ -6365,7 +6578,7 @@
                    (when replays-window-details
                      [{:fx/type :table-column
                        :text "Source"
-                       :cell-value-factory #(-> % :source fs/filename)
+                       :cell-value-factory :source-name
                        :cell-factory
                        {:fx/cell-type :table-cell
                         :describe
@@ -6803,7 +7016,7 @@
                :props
                {:tooltip
                 {:fx/type :tooltip
-                 ;:show-delay [10 :ms]
+                 :show-delay [10 :ms]
                  :text "Clear filter"}}
                :desc
                {:fx/type :button
@@ -7074,7 +7287,7 @@
 (defn root-view
   [{{:keys [agreement battle client last-failed-message password pop-out-battle
             show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
-            show-servers-window show-uikeys-window standalone tasks username verification-code]
+            show-servers-window show-settings-window show-uikeys-window standalone tasks username verification-code]
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)]
@@ -7184,9 +7397,7 @@
        (when show-importer
          [(merge
             {:fx/type import-window}
-            (select-keys state
-              [:copying :file-cache :import-filter :import-source-name :import-type
-               :importables-by-path :show-importer :show-stale :tasks]))])
+            (select-keys state import-window-keys))])
        (when show-maps
          [(merge
             {:fx/type maps-window}
@@ -7209,9 +7420,11 @@
        (when show-register-window
          [(merge
             {:fx/type register-window}
-            (select-keys state
-              [:email :password :password-confirm :register-response :server :servers :show-register-window
-               :username]))])
+            (select-keys state register-window-keys))])
+       (when show-settings-window
+         [(merge
+            {:fx/type settings-window}
+            (select-keys state settings-window-keys))])
        (when show-uikeys-window
          [(merge
             {:fx/type uikeys-window}

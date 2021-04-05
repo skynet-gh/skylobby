@@ -283,9 +283,9 @@
 
 (defn replay-files
   ([]
-   (replay-files (isolation-dir)))
-  ([root]
-   (->> (replays-dir root)
+   (replay-files (replays-dir (isolation-dir))))
+  ([dir]
+   (->> dir
         list-files
         (filter is-file?)
         (filter (comp #(string/ends-with? % ".sdfz") filename)))))
