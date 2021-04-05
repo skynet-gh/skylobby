@@ -4,5 +4,4 @@
 --main-class "clojure.main"
 --arguments -m
 --arguments "spring-lobby"
---icon "resources/icon.ico"
 --vendor "skynet"
