@@ -255,13 +255,18 @@
 
 (defmethod handler/handle "UPDATEBATTLEINFO" [_c state m]
   (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
-    (swap! state update-in [:battles battle-id]
-           assoc
-           :battle-id battle-id
-           :battle-spectators battle-spectators
-           :battle-locked battle-locked
-           :battle-maphash battle-maphash
-           :battle-map battle-map)))
+    (swap! state
+      (fn [state]
+        (cond-> state
+                true
+                (update-in [:battles battle-id] assoc
+                  :battle-id battle-id
+                  :battle-spectators battle-spectators
+                  :battle-locked battle-locked
+                  :battle-maphash battle-maphash
+                  :battle-map battle-map)
+                (= (-> state :battle :battle-id) battle-id)
+                (assoc :battle-map-details nil))))))
 
 
 (defn ping-loop [state-atom c]

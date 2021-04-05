@@ -11,13 +11,14 @@
     [cljfx.mutator :as fx.mutator]
     [cljfx.prop :as fx.prop]
     clojure.data
-    clojure.core.async
+    [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
     [clojure.set]
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
+    [crypto.random]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -337,11 +338,13 @@
             (when (and (or (not= old-battle-id new-battle-id)
                            (not= old-battle-map new-battle-map))
                        (and (not (string/blank? new-battle-map))
-                            (not (:battle-map-details new-state))
-                            (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)))
-              (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
-              (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
-                (swap! *state assoc :battle-map-details map-details))))
+                            (not (seq (:battle-map-details new-state)))))
+              (if (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)
+                (do
+                  (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
+                  (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
+                    (swap! *state assoc :battle-map-details map-details)))
+                (swap! *state assoc :battle-map-details {}))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
@@ -845,6 +848,11 @@
    (force-update-battle-mod *state))
   ([state-atom]
    (log/info "Force updating battle mod")
+   (swap! *state
+     (fn [state]
+       (if (seq (:battle-mod-details state))
+         state
+         (assoc state :battle-mod-details nil))))
    (reconcile-mods state-atom)
    (let [{:keys [battle battles mods]} @state-atom
          battle-id (:battle-id battle)
@@ -971,6 +979,11 @@
    (force-update-battle-map *state))
   ([state-atom]
    (log/info "Force updating battle map")
+   (swap! *state
+     (fn [state]
+       (if (seq (:battle-map-details state))
+         state
+         (assoc state :battle-map-details nil))))
    (reconcile-maps state-atom)
    (let [{:keys [battle battles maps]} @state-atom
          battle-id (:battle-id battle)
@@ -1204,9 +1217,11 @@
   [{:keys [username]}]
   (swap! *state
     (fn [state]
-      (-> state
-          (assoc-in [:my-channels (str "@" username)] {})
-          (assoc :selected-tab-main "chat")))))
+      (let [channel-name (str "@" username)]
+        (-> state
+            (assoc-in [:my-channels channel-name] {})
+            (assoc :selected-tab-main "chat")
+            (assoc :selected-tab-channel channel-name))))))
 
 (defmethod event-handler ::direct-message
   [{:keys [client message username]}]
@@ -2094,7 +2109,8 @@
         (send-message client
           (str "JOINBATTLE " selected-battle
                (when battle-passworded
-                 (str " " battle-password))))
+                 (str " " battle-password))
+               " " (crypto.random/hex 16)))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -2240,19 +2256,27 @@
 
 (defmethod event-handler ::desktop-browse-dir
   [{:keys [file]}]
-  (if (fs/wsl-or-windows?)
-    (let [runtime (Runtime/getRuntime) ; TODO hacky?
-          command ["explorer.exe" (fs/wslpath file)]
-          ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-      (log/info "Running" (pr-str command))
-      (.exec runtime cmdarray nil nil))
-    (let [desktop (Desktop/getDesktop)]
-      (.browseFileDirectory desktop file))))
+  (future
+    (try
+      (if (fs/wsl-or-windows?)
+        (let [runtime (Runtime/getRuntime) ; TODO hacky?
+              command ["explorer.exe" (fs/wslpath file)]
+              ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+          (log/info "Running" (pr-str command))
+          (.exec runtime cmdarray nil nil))
+        (let [desktop (Desktop/getDesktop)]
+          (.browseFileDirectory desktop file)))
+      (catch Exception e
+        (log/error e "Error browsing file" file)))))
 
 (defmethod event-handler ::desktop-browse-url
   [{:keys [url]}]
-  (let [desktop (Desktop/getDesktop)]
-    (.browse desktop (java.net.URI. url))))
+  (future
+    (try
+      (let [desktop (Desktop/getDesktop)]
+        (.browse desktop (java.net.URI. url)))
+      (catch Exception e
+        (log/error e "Error browsing url" url)))))
 
 (defn battles-buttons
   [{:keys [accepted battle battles battle-password battle-title client engine-version mod-name map-name maps
@@ -2652,9 +2676,12 @@
   (swap! *state assoc :bot-version event))
 
 
-(defmethod event-handler ::start-battle [_e]
+(defmethod event-handler ::start-battle [{:keys [battle-status channel-name client]}]
   (future
     (try
+      (when-not (:mode battle-status)
+        (send-message client (str "SAY " channel-name " !joinas spec"))
+        (async/<!! (async/timeout 1000)))
       (spring/start-game @*state) ; TODO remove  deref
       (catch Exception e
         (log/error e "Error starting battle")))))
@@ -2888,7 +2915,7 @@
       :-fx-background-color error-red}})
 
 (defn resource-sync-pane
-  [{:keys [browse-action delete-action issues refresh-action resource]}]
+  [{:keys [browse-action delete-action issues refresh-action refresh-in-progress resource]}]
   (let [worst-severity (reduce
                          (fn [worst {:keys [severity]}]
                            (max worst severity))
@@ -2917,6 +2944,7 @@
              :h-box/hgrow :always}]
            (when refresh-action
              [{:fx/type :button
+               :disable (boolean refresh-in-progress)
                :on-action refresh-action
                :tooltip
                {:fx/type :tooltip
@@ -3276,6 +3304,20 @@
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (or players [])
+   :row-factory
+   {:fx/cell-type :table-row
+    :describe (fn [{:keys [owner] :as id}]
+                {
+                 :context-menu
+                 {:fx/type :context-menu
+                  :items
+                  (concat []
+                    (when (and (not owner) (not= username (:username id)))
+                      [
+                       {:fx/type :menu-item
+                        :text "Message"
+                        :on-action {:event/type ::join-direct-message
+                                    :username (:username id)}}]))}})}
    :columns
    [{:fx/type :table-column
      :text "Nickname"
@@ -3743,7 +3785,7 @@
                                   (java-time/instant timestamp-millis)
                                   time-zone-id))))
 
-(defn channel-view [{:keys [channels client message-draft channel-name]}]
+(defn channel-view [{:keys [channel-name channels client hide-users message-draft message-key]}]
   (let [channel-details (get channels channel-name)
         users (:users channel-details)
         text (->> channel-details
@@ -3778,23 +3820,38 @@
              :on-action {:event/type ::send-message
                          :channel-name channel-name
                          :client client
-                         :message message-draft}}
+                         :message message-draft
+                         :message-key message-key}}
             {:fx/type :text-field
              :h-box/hgrow :always
              :text (str message-draft)
              :on-text-changed {:event/type ::assoc
-                               :key :message-draft}
+                               :key message-key}
              :on-action {:event/type ::send-message
                          :channel-name channel-name
                          :client client
-                         :message message-draft}}]}]}]
-       (when-not (string/starts-with? channel-name "@")
+                         :message message-draft
+                         :message-key message-key}}]}]}]
+       (when (and (not hide-users)
+                  (not (string/starts-with? channel-name "@")))
          [{:fx/type :table-view
            :column-resize-policy :constrained ; TODO auto resize
            :items (->> users
                        keys
                        (sort String/CASE_INSENSITIVE_ORDER)
                        vec)
+           :row-factory
+           {:fx/cell-type :table-row
+            :describe (fn [i]
+                        {
+                         :context-menu
+                         {:fx/type :context-menu
+                          :items
+                          [
+                           {:fx/type :menu-item
+                            :text "Message"
+                            :on-action {:event/type ::join-direct-message
+                                        :username i}}]}})}
            :columns
            [{:fx/type :table-column
              :text "Username"
@@ -3808,15 +3865,15 @@
    :bot-username :bot-version :channels :cleaning :client :copying :current-tasks :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
-   :map-input-prefix :maps :message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :update-maps :update-mods :username :users])
+   :map-input-prefix :maps :battle-message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
+   :rapid-download :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            channels client
            copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
-           http-download importables-by-path map-input-prefix maps message-draft minimap-type parsed-replays-by-path
-           rapid-data-by-version rapid-download update-maps update-mods users username]
+           http-download importables-by-path map-input-prefix maps battle-message-draft minimap-type parsed-replays-by-path
+           rapid-data-by-version rapid-download update-engines update-maps update-mods users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -3988,11 +4045,13 @@
                  :browse-action {:event/type ::desktop-browse-dir
                                  :file (or map-file (fs/maps-dir))}
                  :refresh-action {:event/type ::force-update-battle-map}
+                 :refresh-in-progress update-maps
                  :issues
                  (concat
                    (let [severity (cond
-                                    map-loading -1
-                                    no-map-details 2
+                                    no-map-details
+                                    (if (or map-loading update-maps)
+                                      -1 2)
                                     :else 0)]
                      [{:severity severity
                        :text "info"
@@ -4065,11 +4124,13 @@
                  :browse-action {:event/type ::desktop-browse-dir
                                  :file (or mod-file (fs/mods-dir))}
                  :refresh-action {:event/type ::force-update-battle-mod}
+                 :refresh-in-progress update-mods
                  :issues
                  (concat
                    (let [severity (cond
-                                    mod-loading -1
-                                    no-mod-details 2
+                                    no-mod-details
+                                    (if (or mod-loading update-mods)
+                                      -1 2)
                                     :else 0)]
                      [{:severity severity
                        :text "info"
@@ -4183,12 +4244,15 @@
                ;                :engines engines
                ;                :engine-version engine-version
                :refresh-action {:event/type ::force-update-battle-engine}
+               :refresh-in-progress update-engines
                :browse-action {:event/type ::desktop-browse-dir
                                :file (or engine-file
                                          (fs/engines-dir))}
                :issues
                (concat
-                 (let [severity (if engine-details 0 2)]
+                 (let [severity (if engine-details
+                                  0
+                                  (if update-engines -1 2))]
                    [{:severity severity
                      :text "info"
                      :human-text (str "Spring " engine-version)
@@ -4260,6 +4324,8 @@
                           :task
                           {::task-type ::import
                            :importable importable}})}])))}]}
+            {:fx/type :pane
+             :v-box/vgrow :always}
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
@@ -4275,7 +4341,9 @@
                                          :client client
                                          :username username})}
                 {:fx/type :label
-                 :text " Ready"}
+                 :text (if (:mode battle-status)
+                         " Ready"
+                         " Auto Launch")}
                 {:fx/type :pane
                  :h-box/hgrow :always}
                 {:fx/type fx.ext.node/with-tooltip-props
@@ -4296,13 +4364,18 @@
                   :disable (boolean (or (and (not am-host)
                                              (not host-ingame))
                                         iam-ingame))
-                  :on-action {:event/type ::start-battle}}}])}]}
+                  :on-action {:event/type ::start-battle
+                              :battle-status battle-status
+                              :channel-name channel-name
+                              :client client}}}])}]}
           {:fx/type channel-view
            :h-box/hgrow :always
+           :channel-name channel-name
            :channels channels
            :client client
-           :message-draft message-draft
-           :channel-name channel-name}
+           :hide-users true
+           :message-draft battle-message-draft
+           :message-key :battle-message-draft}
           #_
           {:fx/type :v-box
            :alignment :top-left
@@ -6736,10 +6809,10 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
-(defmethod event-handler ::send-message [{:keys [channel-name client message]}]
+(defmethod event-handler ::send-message [{:keys [channel-name client message message-key]}]
   (future
     (try
-      (swap! *state dissoc :message-draft)
+      (swap! *state dissoc message-key)
       (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
         (if-let [[_all message] (re-find #"^/me (.*)$" message)]
           (if private-message
@@ -6770,7 +6843,7 @@
      :props
      (merge
        {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}}
-       (when-not (fs/linux?)
+       (when (< selected-index (count my-channel-names))
          {:selected-index selected-index}))
      :desc
      {:fx/type :tab-pane
@@ -6847,7 +6920,7 @@
      :props
      (merge
        {:on-selected-item-changed {:event/type ::selected-item-changed-main-tabs}}
-       (when-not (fs/linux?)
+       (when (< selected-index (count main-tab-ids))
          {:selected-index selected-index}))
      :desc
      {:fx/type :tab-pane

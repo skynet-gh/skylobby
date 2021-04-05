@@ -107,7 +107,8 @@
                 hostip-override)
       :hostport (:battle-port battle)
       :ishost 0
-      :myplayername (:myplayername game)}}))
+      :myplayername (:myplayername game)
+      :mypasswd (:script-password battle)}}))
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."

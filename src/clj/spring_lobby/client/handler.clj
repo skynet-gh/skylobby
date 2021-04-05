@@ -18,7 +18,7 @@
 
 
 (def default-battle-status
-  {:ready false
+  {:ready true
    :ally 0
    :handicap 0
    :mode 0
@@ -129,14 +129,15 @@
         prev-status (-> prev-state :users (get username) :client-status)
         my-status (-> prev-state :users (get (:username prev-state)) :client-status)
         battle-detail (-> battles (get (:battle-id battle)))]
+    (log/debug username decoded-status)
     (cond
-      (not (:ingame decoded-status)) (log/info "Not in game" username decoded-status)
-      (= (:ingame prev-status) (:ingame decoded-status))
-      (log/info "Not a game status change" username prev-status decoded-status)
-      (= username (:username prev-state)) (log/info "Ignoring own game start")
-      (:ingame my-status) (log/info "Already in game")
+      (not (:ingame decoded-status)) (log/debug "Not in game")
+      (= (:ingame prev-status) (:ingame decoded-status)) (log/debug "Not a game status change")
+      (= username (:username prev-state)) (log/debug "Ignoring own game start")
+      (:ingame my-status) (log/debug "Already in game")
       (not battle) (log/debug "Not in a battle")
-      (not= (:host-username battle-detail) username) (log/info "Not the host game start")
+      (not (-> battle :users (get username) :battle-status :ready)) (log/debug "Not ready")
+      (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
       (do
         (log/info "Starting game to join host" username)
@@ -239,6 +240,7 @@
               conj {:text message
                     :timestamp now
                     :username username})
+            (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channels channel-name))))))
 
@@ -266,18 +268,21 @@
                     :timestamp now
                     :username username
                     :ex true})
+            (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channels channel-name))))))
 
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
-  (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
+  (let [[_all battle-id username _ script-password] (re-find #"\w+ (\w+) ([^\s]+)( (.+))?" m)]
     (swap! state-atom
       (fn [state]
         (let [initial-status {}
               next-state (assoc-in state [:battles battle-id :users username] initial-status)]
-          (if (= battle-id (-> next-state :battle :battle-id))
-            (assoc-in next-state [:battle :users username] initial-status)
-            next-state))))))
+          (cond-> next-state
+                  (= battle-id (-> next-state :battle :battle-id))
+                  (assoc-in [:battle :users username] initial-status)
+                  script-password
+                  (assoc-in [:battle :script-password] script-password)))))))
 
 (defmethod handle "LEFT" [_c state-atom m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
