@@ -65,6 +65,16 @@
 (def stylesheets
   [(str (io/resource "dark.css"))])
 
+(def icons
+  [(str (io/resource "icon16.png"))
+   (str (io/resource "icon32.png"))
+   (str (io/resource "icon64.png"))
+   (str (io/resource "icon128.png"))
+   (str (io/resource "icon256.png"))
+   (str (io/resource "icon512.png"))
+   (str (io/resource "icon1024.png"))])
+
+
 (def main-window-width 1920)
 (def main-window-height 1200)
 
@@ -1120,6 +1130,18 @@
                 (filter :battle-title)
                 (sort-by :battle-title String/CASE_INSENSITIVE_ORDER)
                 vec)
+    :row-factory
+    {:fx/cell-type :table-row
+     :describe (fn [i]
+                 {:tooltip
+                  {:fx/type :tooltip
+                   :style {:-fx-font-size 16}
+                   :show-delay [10 :ms]
+                   :text (->> i
+                              :users
+                              keys
+                              (string/join "\n")
+                              (str "Players:\n\n"))}})}
     :columns
     [{:fx/type :table-column
       :text "Battle Name"
@@ -1227,82 +1249,106 @@
   [{:keys [client message username]}]
   (send-message client (str "SAYPRIVATE " username " " message)))
 
-(defn users-table [{:keys [users]}]
-  {:fx/type :table-view
-   :style {:-fx-font-size 15}
-   :column-resize-policy :constrained ; TODO auto resize
-   :items (->> users
-               vals
-               (filter :username)
-               (sort-by :username String/CASE_INSENSITIVE_ORDER)
-               vec)
-   :row-factory
-   {:fx/cell-type :table-row
-    :describe (fn [i]
-                {
-                 :context-menu
-                 {:fx/type :context-menu
-                  :items
-                  [
-                   {:fx/type :menu-item
-                    :text "Message"
-                    :on-action {:event/type ::join-direct-message
-                                :username (:username i)}}]}})}
-   :columns
-   [{:fx/type :table-column
-     :text "Username"
-     :cell-value-factory :username
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [username]
-        {:text (str username)})}}
-    {:fx/type :table-column
-     :sortable false
-     :text "Status"
-     :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame])
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [status]
-        {:text ""
-         :graphic
-         {:fx/type :h-box
-          :children
-          (concat
-            [{:fx/type font-icon/lifecycle
-              :icon-literal
-              (str
-                "mdi-"
-                (cond
-                  (:bot status) "robot"
-                  (:access status) "account-key"
-                  :else "account")
-                ":16:white")}]
-            (when (:ingame status)
+(def users-table-keys [:battles :client :users])
+
+(defn users-table [{:keys [battles client users]}]
+  (let [battles-by-users (->> battles
+                              vals
+                              (mapcat
+                                (fn [battle]
+                                  (map
+                                    (fn [[username _status]]
+                                      [username battle])
+                                    (:users battle))))
+                              (into {}))]
+    {:fx/type :table-view
+     :style {:-fx-font-size 15}
+     :column-resize-policy :constrained ; TODO auto resize
+     :items (->> users
+                 vals
+                 (filter :username)
+                 (sort-by :username String/CASE_INSENSITIVE_ORDER)
+                 vec)
+     :row-factory
+     {:fx/cell-type :table-row
+      :describe (fn [i]
+                  (let [battle (get battles-by-users (:username i))]
+                    (merge
+                      {:context-menu
+                       {:fx/type :context-menu
+                        :items
+                        (concat
+                          [{:fx/type :menu-item
+                            :text "Message"
+                            :on-action {:event/type ::join-direct-message
+                                        :username (:username i)}}]
+                          (when battle
+                            [{:fx/type :menu-item
+                              :text "Join Battle"
+                              :on-action {:event/type ::join-battle
+                                          :client client
+                                          :selected-battle (:battle-id battle)}}]))}}
+                      (when battle
+                        {:tooltip
+                         {:fx/type :tooltip
+                          :style {:-fx-font-size 16}
+                          :show-delay [10 :ms]
+                          :text (str "Battle: " (:battle-title battle))}}))))}
+     :columns
+     [{:fx/type :table-column
+       :text "Username"
+       :cell-value-factory :username
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [username]
+          {:text (str username)})}}
+      {:fx/type :table-column
+       :sortable false
+       :text "Status"
+       :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame])
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [status]
+          {:text ""
+           :graphic
+           {:fx/type :h-box
+            :children
+            (concat
               [{:fx/type font-icon/lifecycle
-                :icon-literal "mdi-sword:16:white"}])
-            (when (:away status)
-              [{:fx/type font-icon/lifecycle
-                :icon-literal "mdi-sleep:16:white"}]))}})}}
-    {:fx/type :table-column
-     :text "Country"
-     :cell-value-factory :country
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [country] {:text (str country)})}}
-    {:fx/type :table-column
-     :text "Rank"
-     :cell-value-factory (comp :rank :client-status)
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [rank] {:text (str rank)})}}
-    {:fx/type :table-column
-     :text "Lobby Client"
-     :cell-value-factory :user-agent
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [user-agent] {:text (str user-agent)})}}]})
+                :icon-literal
+                (str
+                  "mdi-"
+                  (cond
+                    (:bot status) "robot"
+                    (:access status) "account-key"
+                    :else "account")
+                  ":16:white")}]
+              (when (:ingame status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sword:16:white"}])
+              (when (:away status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sleep:16:white"}]))}})}}
+      {:fx/type :table-column
+       :text "Country"
+       :cell-value-factory :country
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [country] {:text (str country)})}}
+      {:fx/type :table-column
+       :text "Rank"
+       :cell-value-factory (comp :rank :client-status)
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [rank] {:text (str rank)})}}
+      {:fx/type :table-column
+       :text "Lobby Client"
+       :cell-value-factory :user-agent
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [user-agent] {:text (str user-agent)})}}]}))
 
 
 (defmethod event-handler ::join-channel [{:keys [channel-name client]}]
@@ -1682,6 +1728,7 @@
     {:fx/type :stage
      :showing show-servers-window
      :title (str u/app-name " Servers")
+     :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-servers-window false)
                          (.consume e))
@@ -1791,6 +1838,7 @@
   {:fx/type :stage
    :showing show-register-window
    :title (str u/app-name " Register")
+   :icons icons
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-register-window false)
                        (.consume e))
@@ -1933,6 +1981,7 @@
     {:fx/type :stage
      :showing show-uikeys-window
      :title (str u/app-name " UI Keys Editor")
+     :icons icons
      :on-close-request (fn [^Event e]
                          (swap! *state assoc :show-uikeys-window false)
                          (.consume e))
@@ -5215,6 +5264,7 @@
     {:fx/type :stage
      :showing show-importer
      :title (str u/app-name " Importer")
+     :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-importer false)
                          (.consume e))
@@ -5490,6 +5540,7 @@
     {:fx/type :stage
      :showing show-downloader
      :title (str u/app-name " Downloader")
+     :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-downloader false)
                          (.consume e))
@@ -5768,6 +5819,7 @@
     {:fx/type :stage
      :showing show-rapid-downloader
      :title (str u/app-name " Rapid Downloader")
+     :icons icons
      :on-close-request (fn [^WindowEvent e]
                          (swap! *state assoc :show-rapid-downloader false)
                          (.consume e))
@@ -6131,6 +6183,7 @@
     {:fx/type :stage
      :showing show-replays
      :title (str u/app-name " Replays")
+     :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-replays false)
                          (.consume e))
@@ -6721,6 +6774,7 @@
     {:fx/type :stage
      :showing show-maps
      :title (str u/app-name " Maps")
+     :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-maps false)
                          (.consume e))
@@ -6913,9 +6967,10 @@
                     :children
                     [{:fx/type :label
                       :text (str "Users (" (count users) ")")}
-                     {:fx/type users-table
-                      :v-box/vgrow :always
-                      :users users}]}]
+                     (merge
+                       {:fx/type users-table
+                        :v-box/vgrow :always}
+                       (select-keys state users-table-keys))]}]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
      (merge
@@ -7028,7 +7083,8 @@
      (concat
        [{:fx/type :stage
          :showing true
-         :title "skylobby"
+         :title (str "skylobby " (u/app-version))
+         :icons icons
          :x 100
          :y 100
          :width (min main-window-width width)
@@ -7107,6 +7163,7 @@
          [{:fx/type :stage
            :showing pop-out-battle
            :title (str u/app-name " Battle")
+           :icons icons
            :on-close-request {:event/type ::dissoc
                               :key :pop-out-battle}
            :width (min battle-window-width width)

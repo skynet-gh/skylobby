@@ -25,13 +25,13 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-linux.jar
           asset_content_type: application/java-archive
-      - run: jpackage @jpackage/common @jpackage/linux
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/linux
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ env.CI_REPOSITORY_NAME }}_1.0-1_amd64.deb
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_amd64.deb
           asset_content_type: application/vnd.debian.binary-package
   build-dmg:
@@ -54,13 +54,13 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-mac.jar
           asset_content_type: application/java-archive
-      - run: jpackage @jpackage/common @jpackage/mac
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/mac
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-1.0.dmg
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_content_type: application/x-apple-diskimage
   build-exe:
@@ -81,12 +81,12 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-windows.jar
           asset_content_type: application/java-archive
-      - run: jpackage @jpackage/common @jpackage/windows
+      - run: jpackage --type msi --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/windows
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-1.0.exe
-          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
+          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
+          asset_content_type: application/x-msi

@@ -1,6 +1,8 @@
 --input dist
---main-jar skylobby.jar
+--main-jar "skylobby.jar"
 --name "skylobby"
---main-class clojure.main
+--main-class "clojure.main"
 --arguments -m
---arguments spring-lobby
+--arguments "spring-lobby"
+--icon "resources/icon.ico"
+--vendor "skynet"

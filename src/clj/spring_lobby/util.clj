@@ -3,11 +3,14 @@
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    [taoensso.timbre :as timbre]
+    [spring-lobby.git :as git]
+    [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
+    (java.net URL)
     (java.net URLDecoder)
     (java.nio.charset StandardCharsets)
+    (java.util.jar Manifest)
     (org.apache.commons.io FileUtils)))
 
 
@@ -15,6 +18,41 @@
 
 
 (def app-name "skylobby")
+
+
+(defn manifest-attributes [url]
+  (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
+      URL. .openStream Manifest. .getMainAttributes))
+      ;(.getValue "Build-Number")))
+
+; https://stackoverflow.com/a/16431226/984393
+(defn manifest-version []
+  (try
+    (when-let [clazz (Class/forName "spring_lobby")]
+      (log/debug "Discovered class" clazz)
+      (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
+        (log/debug "Discovered location" loc)
+        (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
+            URL. .openStream Manifest. .getMainAttributes
+            (.getValue "Build-Number"))))
+    (catch Exception e
+      (log/debug e "Unable to read version from manifest"))))
+
+(defn short-git-commit [git-commit-id]
+  (when git-commit-id
+    (subs git-commit-id 0 7)))
+
+(defn app-version []
+  (or (manifest-version)
+      (try
+        (slurp (io/resource (str app-name ".version")))
+        (catch Exception e
+          (log/debug e "Error getting version from file")))
+      (try
+        (str "git:" (short-git-commit (git/tag-or-latest-id (io/file "."))))
+        (catch Exception e
+          (log/debug e "Error getting git version")))
+      "UNKNOWN"))
 
 
 ; https://stackoverflow.com/a/17328219/984393
@@ -71,7 +109,7 @@
 
 (defn log-to-file [log-path]
   (println "Setting up log to" log-path)
-  (timbre/merge-config!
+  (log/merge-config!
     {:min-level :info
      :appenders
      {:rotor (rotor/rotor-appender

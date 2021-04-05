@@ -4,24 +4,19 @@
     [byte-streams]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
-    [clojure.java.io :as io]
     [gloss.core :as gloss]
     [gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
-    [spring-lobby.git :as git]
-    [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.net URL)
     (java.nio ByteBuffer)
     (java.security MessageDigest)
     (java.util Base64)
-    (java.util.jar Manifest)
     (manifold.stream SplicedStream)))
 
 
@@ -34,37 +29,10 @@
 (def default-ssl false) ; TODO
 
 
-(defn manifest-attributes [url]
-  (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
-      URL. .openStream Manifest. .getMainAttributes))
-      ;(.getValue "Build-Number")))
-
-; https://stackoverflow.com/a/16431226/984393
-(defn manifest-version []
-  (try
-    (when-let [clazz (Class/forName "spring_lobby")]
-      (log/debug "Discovered class" clazz)
-      (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
-        (log/debug "Discovered location" loc)
-        (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
-            URL. .openStream Manifest. .getMainAttributes
-            (.getValue "Build-Number"))))
-    (catch Exception e
-      (log/warn e "Unable to read version from manifest"))))
-
 (defn agent-string []
   (str u/app-name
        "-"
-       (or (manifest-version)
-           (try
-             (spring/short-git-commit (git/tag-or-latest-id (io/file ".")))
-             (catch Exception e
-               (log/warn e "Error getting git version")))
-           (try
-             (slurp (io/resource u/app-name ".version"))
-             (catch Exception e
-               (log/warn e "Error getting version from file")))
-           "UNKNOWN")))
+       (u/app-version)))
 
 
 (def default-port 8200)
