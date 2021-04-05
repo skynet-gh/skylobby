@@ -145,7 +145,7 @@
 
 (def config-keys
   [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version
-   :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players
+   :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins
    :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
    :rapid-repo :replays-watched :replays-window-details :scripttags :server :servers :uikeys :username])
 
@@ -1014,7 +1014,7 @@
             (java-time/instant)
             (java-time/duration 1 :minutes))
           (fn [_chimestamp]
-            (when-let [{:keys [client]} @state-atom]
+            (when-let [client (:client @state-atom)]
               (log/info "Updating channel list")
               (send-message client "CHANNELS")))
           {:error-handler
@@ -1438,17 +1438,20 @@
 
 (defn server-cell
   [[server-url server-data]]
-  {:text (when server-url
-           (str server-url (when-let [a (:alias server-data)] (str " (" a ")"))))})
+  (let [server-alias (:alias server-data)]
+    {:text (if server-alias
+             (str server-alias " (" server-url ")")
+             (str server-url))}))
 
-(defn server-combo-box [{:keys [server servers]}]
+(defn server-combo-box [{:keys [disable on-value-changed server servers]}]
   {:fx/type :combo-box
+   :disable (boolean disable)
    :value server
-   :items (or (seq servers) [])
+   :items (->> servers
+               (sort-by (juxt (comp :alias second) first)))
    :prompt-text "< choose a server >"
-   :on-value-changed {:event/type ::assoc
-                      :key :server}
    :button-cell server-cell
+   :on-value-changed on-value-changed
    :cell-factory
    {:fx/cell-type :list-cell
     :describe server-cell}})
@@ -1463,6 +1466,20 @@
       (Thread/sleep 100)
       (swap! *state assoc (:key e) v))))
 
+(defmethod event-handler ::on-change-server
+  [{:fx/keys [event]}]
+  (swap! *state
+    (fn [state]
+      (let [server-url (first event)
+            {:keys [username password]} (-> state :logins (get server-url))]
+        (-> state
+            (assoc :server event)
+            (assoc :username username)
+            (assoc :password password))))))
+
+(def client-buttons-keys
+  [:accepted :client :client-deferred :username :password :login-error :server-url :servers :server
+   :show-register-popup])
 
 (defn client-buttons
   [{:keys [accepted client client-deferred username password login-error server servers]}]
@@ -1502,21 +1519,47 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal "mdi-close-octagon:16:white"}}])
-     [{:fx/type :label
+     [
+      {:fx/type :label
+       :alignment :center
+       :text " Server: "}
+      (assoc
+        {:fx/type server-combo-box}
+        :disable (or client client-deferred)
+        :server server
+        :servers servers
+        :on-value-changed {:event/type ::on-change-server})
+      {:fx/type :button
+       :text ""
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :style {:-fx-font-size 14}
+        :text "Show servers window"}
+       :on-action {:event/type ::toggle
+                   :key :show-servers-window}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-plus:16:white"}}
+      {:fx/type :label
        :alignment :center
        :text " Login: "}
       {:fx/type :text-field
        :text username
        :prompt-text "Username"
        :disable (boolean (or client client-deferred))
-       :on-text-changed {:event/type ::username-change}}
-      {:fx/type :password-field
-       :text password
-       :prompt-text "Password"
-       :disable (boolean (or client client-deferred))
-       :on-text-changed {:event/type ::password-change}}
-      {:fx/type :button
+       :on-text-changed {:event/type ::username-change
+                         :server-url (first server)}}]
+     (when-not (or client client-deferred)
+       [{:fx/type :password-field
+         :text password
+         :prompt-text "Password"
+         :style {:-fx-pref-width 300}
+         :on-text-changed {:event/type ::password-change
+                           :server-url (first server)}}])
+     [{:fx/type :button
        :text "Register"
+       :disable (boolean (or client client-deferred))
        :tooltip
        {:fx/type :tooltip
         :show-delay [10 :ms]
@@ -1527,22 +1570,6 @@
        :graphic
        {:fx/type font-icon/lifecycle
         :icon-literal "mdi-account-plus:16:white"}}
-      (assoc
-        {:fx/type server-combo-box}
-        :server server
-        :servers servers)
-      {:fx/type :button
-       :text "Add Server"
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show server add window"}
-       :on-action {:event/type ::toggle
-                   :key :show-servers-window}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-plus:16:white"}}
       {:fx/type :v-box
        :h-box/hgrow :always
        :alignment :center
@@ -1596,6 +1623,14 @@
       (catch Exception e
         (log/error e "Error confirming agreement")))))
 
+(defmethod event-handler ::edit-server
+  [{:keys [server-data]}]
+  (swap! *state assoc
+         :server-host (:host server-data)
+         :server-port (:port server-data)
+         :server-alias (:alias server-data)
+         :server-ssl (:ssl server-data)))
+
 (defmethod event-handler ::update-server
   [{:keys [server-url server-data]}]
   (swap! *state update-in [:servers server-url] merge server-data))
@@ -1619,10 +1654,14 @@
    :on-created focus-when-on-scene!
    :desc desc})
 
+(def servers-window-keys
+  [:server-alias :server-edit :server-host :server-port :servers :show-servers-window])
 
 (defn servers-window
-  [{:keys [show-servers-window server-host server-port server-alias servers]}]
-  (let [port (if (string/blank? server-port) default-server-port server-port)
+  [{:keys [server-alias server-edit server-host server-port server-ssl servers show-servers-window]}]
+  (let [url (first server-edit)
+        port (if (string/blank? (str server-port))
+               default-server-port (str server-port))
         server-url (str server-host ":" port)]
     {:fx/type :stage
      :showing show-servers-window
@@ -1630,61 +1669,106 @@
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-servers-window false)
                          (.consume e))
-     :width 400
-     :height 300
+     :width 560
+     :height 320
      :scene
      {:fx/type :scene
       :stylesheets stylesheets
       :root
-      {:fx/type ext-focused-by-default
-       :desc
-       {:fx/type :v-box
-        :style {:-fx-font-size 16}
-        :children
-        [
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [{:fx/type :label
-            :alignment :center
-            :text " Host: "}
-           {:fx/type :text-field
-            :text server-host
-            :on-text-changed {:event/type ::assoc
-                              :key :server-host}}]}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [{:fx/type :label
-            :alignment :center
-            :text " Port: "}
-           {:fx/type :text-field
-            :text server-port
-            :prompt-text "8200"
-            :on-text-changed {:event/type ::assoc
-                              :key :server-port}}]}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [{:fx/type :label
-            :alignment :center
-            :text " Alias: "}
-           {:fx/type :text-field
-            :text server-alias
-            :on-text-changed {:event/type ::assoc
-                              :key :server-alias}}]}
-         {:fx/type :button
-          :text (str
-                  (if (contains? servers server-url) "Update" "Add")
-                  " server")
-          :style {:-fx-font-size 20}
-          :disable (string/blank? server-host)
-          :on-action {:event/type ::update-server
-                      :server-url server-url
-                      :server-data
-                      {:port port
-                       :host server-host
-                       :alias server-alias}}}]}}}}))
+      {:fx/type :v-box
+       :style {:-fx-font-size 16}
+       :children
+       [{:fx/type :h-box
+         :alignment :center-left
+         :children
+         (concat
+           [{:fx/type :label
+             :alignment :center
+             :text " Servers: "}
+            (assoc
+              {:fx/type server-combo-box}
+              :server server-edit
+              :servers servers
+              :on-value-changed {:event/type ::assoc
+                                 :key :server-edit})]
+           (when server-edit
+             [{:fx/type :button
+               :alignment :center
+               :on-action {:event/type ::edit-server
+                           :server-data (second server-edit)}
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-pencil:16:white"}}
+              {:fx/type :button
+               :alignment :center
+               :on-action {:event/type ::dissoc-in
+                           :path [:servers url]}
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-delete:16:white"}}]))}
+        {:fx/type :pane
+         :v-box/vgrow :always}
+        {:fx/type :label
+         :text "New server:"}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Host: "}
+          {:fx/type :text-field
+           :h-box/hgrow :always
+           :text server-host
+           :on-text-changed {:event/type ::assoc
+                             :key :server-host}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Port: "}
+          {:fx/type :text-field
+           :text (str server-port)
+           :prompt-text "8200"
+           :on-text-changed {:event/type ::assoc
+                             :key :server-port}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " Alias: "}
+          {:fx/type :text-field
+           :h-box/hgrow :always
+           :text server-alias
+           :on-text-changed {:event/type ::assoc
+                             :key :server-alias}}]}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :alignment :center
+           :text " SSL: "}
+          {:fx/type :check-box
+           :h-box/hgrow :always
+           :selected (boolean server-ssl)
+           :on-selected-changed {:event/type ::assoc
+                                 :key :server-ssl}}]}
+        {:fx/type :button
+         :text (str
+                 (if (contains? servers server-url) "Update" "Add")
+                 " server")
+         :style {:-fx-font-size 20}
+         :disable (string/blank? server-host)
+         :on-action {:event/type ::update-server
+                     :server-url server-url
+                     :server-data
+                     {:port port
+                      :host server-host
+                      :alias server-alias
+                      :ssl (boolean server-ssl)}}}]}}}))
 
 (defn register-window
   [{:keys [email password password-confirm register-response server servers show-register-window username]}]
@@ -1715,7 +1799,8 @@
          :text " Username: "}
         {:fx/type :text-field
          :text username
-         :on-text-changed {:event/type ::username-change}}]}
+         :on-text-changed {:event/type ::username-change
+                           :server-url (first server)}}]}
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -1723,7 +1808,8 @@
          :text " Password: "}
         {:fx/type :password-field
          :text password
-         :on-text-changed {:event/type ::password-change}}]}
+         :on-text-changed {:event/type ::password-change
+                           :server-url (first server)}}]}
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -1930,12 +2016,20 @@
 
 
 (defmethod event-handler ::username-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :username event))
+  [{:fx/keys [event] :keys [server-url]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :username event)
+          (assoc-in [:logins server-url :username] event)))))
 
 (defmethod event-handler ::password-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :password event))
+  [{:fx/keys [event] :keys [server-url]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :password event)
+          (assoc-in [:logins server-url :password] event)))))
 
 (defmethod event-handler ::server-url-change
   [{:fx/keys [event]}]
@@ -6877,9 +6971,7 @@
            (concat
              [(merge
                 {:fx/type client-buttons}
-                (select-keys state
-                  [:accepted :client :client-deferred :username :password :login-error
-                   :server-url :servers :server :show-register-popup]))]
+                (select-keys state client-buttons-keys))]
              (when agreement
                [{:fx/type :label
                  :style {:-fx-font-size 20}
@@ -6982,8 +7074,7 @@
        (when show-servers-window
          [(merge
             {:fx/type servers-window}
-            (select-keys state
-              [:server-host :server-port :server-alias :servers :show-servers-window]))])
+            (select-keys state servers-window-keys))])
        (when show-register-window
          [(merge
             {:fx/type register-window}
