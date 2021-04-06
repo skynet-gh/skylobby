@@ -2354,9 +2354,10 @@
       (if selected-battle
         (send-message client
           (str "JOINBATTLE " selected-battle
-               (when battle-passworded
-                 (str " " battle-password))
-               " " (crypto.random/hex 16)))
+               (if battle-passworded
+                 (str " " battle-password)
+                 (str " *"))
+               " " (crypto.random/hex 6)))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))

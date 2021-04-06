@@ -26,6 +26,11 @@
 (def ^:dynamic handler handler/handle) ; for overriding in dev
 
 
+; https://github.com/spring/uberserver/blob/e63fee427136e5bafc1b20c8c984a5c348bc6624/protocol/Protocol.py#L190
+(def compflags "sp b t u cl lu")
+  ; ^ found at springfightclub, was "sp u"
+
+
 (def default-ssl false) ; TODO
 
 
@@ -225,16 +230,19 @@
   (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
     (swap! state
       (fn [state]
-        (cond-> state
-                true
-                (update-in [:battles battle-id] assoc
-                  :battle-id battle-id
-                  :battle-spectators battle-spectators
-                  :battle-locked battle-locked
-                  :battle-maphash battle-maphash
-                  :battle-map battle-map)
-                (= (-> state :battle :battle-id) battle-id)
-                (assoc :battle-map-details nil))))))
+        (let [my-battle-id (-> state :battle :battle-id)
+              old-battle-map (-> state (get :battles) :battle-map)]
+          (cond-> state
+                  true
+                  (update-in [:battles battle-id] assoc
+                    :battle-id battle-id
+                    :battle-spectators battle-spectators
+                    :battle-locked battle-locked
+                    :battle-maphash battle-maphash
+                    :battle-map battle-map)
+                  (and (= my-battle-id battle-id)
+                       (not= old-battle-map battle-map))
+                  (assoc :battle-map-details nil)))))))
 
 
 (defn ping-loop [state-atom c]
@@ -287,11 +295,9 @@
    (login client "*" username password))
   ([client local-addr username password]
    (let [pw-md5-base64 (base64-md5 password)
-         git-ref "b6e84c6023cbffac"
-         user-id (rand-int Integer/MAX_VALUE)
-         compat-flags "sp b t u cl lu" ; found at springfightclub, was "sp u"
+         user-id 0 ; (rand-int Integer/MAX_VALUE)
          msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                  " " (agent-string) "\t" user-id " " git-ref "\t" compat-flags)]
+                  " " (agent-string) "\t" user-id "\t" compflags)]
      (message/send-message client msg))))
 
 

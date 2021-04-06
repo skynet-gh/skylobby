@@ -45,13 +45,13 @@
 (defn app-version []
   (or (manifest-version)
       (try
-        (slurp (io/resource (str app-name ".version")))
-        (catch Exception e
-          (log/debug e "Error getting version from file")))
-      (try
         (str "git:" (short-git-commit (git/tag-or-latest-id (io/file "."))))
         (catch Exception e
           (log/debug e "Error getting git version")))
+      (try
+        (slurp (io/resource (str app-name ".version")))
+        (catch Exception e
+          (log/debug e "Error getting version from file")))
       "UNKNOWN"))
 
 
