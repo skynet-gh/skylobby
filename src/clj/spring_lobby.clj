@@ -65,6 +65,11 @@
 (def stylesheets
   [(str (io/resource "dark.css"))])
 
+(def monospace-font-family
+  (if (fs/windows?)
+    "Consolas"
+    "monospace"))
+
 (def icons
   [(str (io/resource "icon16.png"))
    (str (io/resource "icon32.png"))
@@ -1145,13 +1150,6 @@
    :desc
    {:fx/type :table-view
     :style {:-fx-font-size 15}
-    :on-mouse-clicked {:event/type ::on-mouse-clicked-battles-row
-                       :battle battle
-                       :battle-password battle-password
-                       :client client
-                       :selected-battle selected-battle
-                       :battle-passworded
-                       (= "1" (-> battles (get selected-battle) :battle-passworded))} ; TODO
     :column-resize-policy :constrained ; TODO auto resize
     :items (->> battles
                 vals
@@ -1161,7 +1159,14 @@
     :row-factory
     {:fx/cell-type :table-row
      :describe (fn [i]
-                 {:tooltip
+                 {:on-mouse-clicked
+                  {:event/type ::on-mouse-clicked-battles-row
+                   :battle battle
+                   :battle-password battle-password
+                   :client client
+                   :selected-battle selected-battle
+                   :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
+                  :tooltip
                   {:fx/type :tooltip
                    :style {:-fx-font-size 16}
                    :show-delay [10 :ms]
@@ -4074,7 +4079,7 @@
            {:fx/type :text-area
             :editable false
             :wrap-text true
-            :style {:-fx-font-family "monospace"}}}
+            :style {:-fx-font-family monospace-font-family}}}
           {:fx/type :h-box
            :children
            [{:fx/type :button
@@ -4645,7 +4650,7 @@
             {:fx/type :text-area
              :editable false
              :text (str (slurp (io/resource "uikeys.txt")))
-             :style {:-fx-font-family "monospace"}
+             :style {:-fx-font-family monospace-font-family}
              :v-box/vgrow :always}]}
           #_
           {:fx/type :v-box
@@ -4766,7 +4771,7 @@
             {:fx/type :text-area
              :editable false
              :text (str (string/replace (spring/battle-script-txt state) #"\t" "  "))
-             :style {:-fx-font-family "monospace"}
+             :style {:-fx-font-family monospace-font-family}
              :v-box/vgrow :always}]}]}]}
       {:fx/type :v-box
        :alignment :top-left
@@ -6149,7 +6154,7 @@
               (let [download (get rapid-download (:id i))]
                 (merge
                   {:text (str (:message download))
-                   :style {:-fx-font-family "monospace"}}
+                   :style {:-fx-font-family monospace-font-family}}
                   (cond
                     (sdp-hashes (:hash i))
                     {:graphic
@@ -7082,14 +7087,16 @@
   (future
     (try
       (swap! *state dissoc message-key)
-      (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
-        (if-let [[_all message] (re-find #"^/me (.*)$" message)]
-          (if private-message
-            (send-message client (str "SAYPRIVATEEX " username " " message))
-            (send-message client (str "SAYEX " channel-name " " message)))
-          (if private-message
-            (send-message client (str "SAYPRIVATE " username " " message))
-            (send-message client (str "SAY " channel-name " " message)))))
+      (if-not (string/blank? message)
+        (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
+          (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+            (if private-message
+              (send-message client (str "SAYPRIVATEEX " username " " message))
+              (send-message client (str "SAYEX " channel-name " " message)))
+            (if private-message
+              (send-message client (str "SAYPRIVATE " username " " message))
+              (send-message client (str "SAY " channel-name " " message)))))
+        (log/info "Skipping empty message" (str "'" message "'") "to" channel-name))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
@@ -7134,6 +7141,7 @@
             :channels channels
             :client client
             :message-draft message-draft
+            :message-key :message-draft
             :channel-name channel-name}})
         my-channel-names)}}))
 
@@ -7269,7 +7277,7 @@
            {:fx/type :text-area
             :editable false
             :wrap-text true
-            :style {:-fx-font-family "monospace"}}}
+            :style {:-fx-font-family monospace-font-family}}}
           {:fx/type :h-box
            :children
            [{:fx/type :button
