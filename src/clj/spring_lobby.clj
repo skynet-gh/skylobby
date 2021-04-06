@@ -524,7 +524,7 @@
   (boolean (:exists (file-status file-cache f))))
 
 
-(defn import-sources [extra-input-sources]
+(defn import-sources [extra-import-sources]
   (concat
     [{:import-source-name "Spring"
       :file (fs/spring-root)
@@ -532,7 +532,7 @@
      {:import-source-name "Beyond All Reason"
       :file (fs/bar-root)
       :builtin true}]
-    extra-input-sources))
+    extra-import-sources))
 
 
 (defn could-be-this-engine?
@@ -1747,9 +1747,9 @@
 
 
 (defmethod event-handler ::delete-extra-import-source [{:keys [file]}]
-  (swap! *state update :extra-input-sources
-    (fn [extra-input-sources]
-      (remove (comp #{(fs/canonical-path file)} fs/canonical-path :file) extra-input-sources))))
+  (swap! *state update :extra-import-sources
+    (fn [extra-import-sources]
+      (remove (comp #{(fs/canonical-path file)} fs/canonical-path :file) extra-import-sources))))
 
 (defmethod event-handler ::delete-extra-replay-source [{:keys [file]}]
   (swap! *state update :extra-replay-sources
@@ -1967,9 +1967,9 @@
   (swap! *state
     (fn [state]
       (-> state
-          (update :extra-input-sources conj {:import-source-name extra-import-name
-                                             :file (io/file extra-import-path)})
-          (dissoc :extra-input-name :extra-input-path)))))
+          (update :extra-import-sources conj {:import-source-name extra-import-name
+                                              :file (io/file extra-import-path)})
+          (dissoc :extra-import-name :extra-import-path)))))
 
 (defmethod event-handler ::add-extra-replay-source
   [{:keys [extra-replay-name extra-replay-path]}]
@@ -1981,7 +1981,7 @@
           (dissoc :extra-replay-name :extra-replay-path)))))
 
 (def settings-window-keys
-  [:extra-input-name :extra-input-path :extra-replay-sources :extra-replay-name :extra-replay-path
+  [:extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
    :extra-replay-sources :show-settings-window])
 
 (defn settings-window
