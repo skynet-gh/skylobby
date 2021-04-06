@@ -389,18 +389,21 @@
             (when (and (or (not= old-battle-id new-battle-id)
                            (not= old-battle-mod new-battle-mod))
                        (and (not (string/blank? new-battle-mod))
-                            (not (:battle-mod-details new-state))
-                            (->> new-state :mods (filter filter-fn) first)))
-              (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-              (let [mod-details (or
-                                  (some->> new-state
-                                           :mods
-                                           (filter filter-fn)
-                                           first
-                                           :file
-                                           read-mod-data)
-                                  {})]
-                (swap! *state assoc :battle-mod-details mod-details))))
+                            (not (seq (:battle-mod-details new-state)))))
+              (if (->> new-state :mods (filter filter-fn) first)
+                (do
+                  (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
+                  (let [mod-details (or (some->> new-state
+                                                 :mods
+                                                 (filter filter-fn)
+                                                 first
+                                                 :file
+                                                 read-mod-data)
+                                        {})]
+                    (swap! *state assoc :battle-mod-details mod-details)))
+                (do
+                  (log/info "Battle mod not found, setting empty details for" new-battle-mod "was" old-battle-mod)
+                  (swap! *state assoc :battle-mod-details {})))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :fix-missing-resource
@@ -5153,15 +5156,13 @@
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (.waitFor process)
-          (swap! *state assoc-in [:rapid-download rapid-id :running] false)
           (add-task! *state {::task-type ::update-rapid-packages})))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
-        (reconcile-mods *state)))))
-        ;(add-task! *state {::task-type ::update-rapid})))))
+        (force-update-battle-mod *state)))))
 
 
 ; https://github.com/dakrone/clj-http/pull/220/files
