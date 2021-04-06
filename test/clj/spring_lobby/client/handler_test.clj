@@ -41,8 +41,10 @@
           "2218"
           " SPADS v0.12.18"
           "SPADS v0.12.18"]
-         (rest (handler/parse-adduser "ADDUSER [teh]host20 HU 2218 SPADS v0.12.18")))))
-(is (= ["skynet"
-        "??"
-        "8"]
-       (rest (handler/parse-adduser "ADDUSER skynet ?? 8"))))
+         (rest (handler/parse-adduser "ADDUSER [teh]host20 HU 2218 SPADS v0.12.18"))))
+  (is (= ["skynet"
+          "??"
+          "8"
+          nil
+          nil]
+         (rest (handler/parse-adduser "ADDUSER skynet ?? 8")))))

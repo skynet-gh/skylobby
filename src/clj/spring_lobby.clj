@@ -43,13 +43,13 @@
   (:import
     (java.awt Desktop)
     (java.time LocalDateTime)
-    (java.util TimeZone)
+    (java.util List TimeZone)
     (javafx.application Platform)
     (javafx.beans.value ChangeListener)
     (javafx.embed.swing SwingFXUtils)
     (javafx.event Event)
     (javafx.scene Node)
-    (javafx.scene.control TextArea)
+    (javafx.scene.control Tab TextArea)
     (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
@@ -130,14 +130,20 @@
     (let [config-file (fs/config-file edn-filename)]
       (log/info "Slurping config edn from" config-file)
       (when (fs/exists? config-file)
-        (->> config-file slurp (edn/read-string {:readers custom-readers}))))
+        (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
+          (if (map? data)
+            data
+            (do
+              (log/warn "Config file data from" edn-filename "is not a map")
+              {})))))
     (catch Exception e
       (log/warn e "Exception loading app edn file" edn-filename)
       (try
         (log/info "Copying bad config file for debug")
         (fs/copy (fs/config-file edn-filename) (fs/config-file (str edn-filename ".debug")))
         (catch Exception e
-          (log/warn e "Exception copying bad edn file" edn-filename))))))
+          (log/warn e "Exception copying bad edn file" edn-filename)))
+      {})))
 
 
 (def priority-overrides
@@ -169,7 +175,7 @@
    :extra-import-sources :extra-replay-sources
    :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins
    :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
-   :rapid-repo :replays-watched :replays-window-details :scripttags :server :servers :uikeys :username])
+   :rapid-repo :replays-watched :replays-window-details :server :servers :uikeys :username])
 
 
 (defn select-config [state]
@@ -233,7 +239,8 @@
     (apply
       merge
       (doall
-        (map (comp slurp-config-edn :filename) state-to-edn)))
+        (map
+          (comp slurp-config-edn :filename) state-to-edn)))
     (slurp-config-edn "parsed-replays.edn")
     {:file-events (initial-file-events)
      :tasks (initial-tasks)}))
@@ -3394,7 +3401,7 @@
                              dec
                              inc)
                  next-index (mod
-                              (direction (.indexOf ^java.util.List minimap-types minimap-type))
+                              (direction (.indexOf ^List minimap-types minimap-type))
                               (count minimap-types))
                  next-type (get minimap-types next-index)]
              (assoc state :minimap-type next-type)))))
@@ -6358,18 +6365,18 @@
 
 (def replays-window-keys
   [:copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
-   :filter-replay-type :http-download :maps :mods :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :filter-replay-type :http-download :maps :mods :on-close-request :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :settings-button
    :show-replays :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
   [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-type http-download maps mods parsed-replays-by-path rapid-data-by-version rapid-download
+           filter-replay-type http-download maps mods on-close-request parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file
-           show-replays tasks update-engines update-maps update-mods]}]
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file settings-button
+           show-replays tasks title update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
                             vals
@@ -6453,11 +6460,14 @@
         time-zone-id (.toZoneId (TimeZone/getDefault))]
     {:fx/type :stage
      :showing (boolean show-replays)
-     :title (str u/app-name " Replays")
+     :title (or title (str u/app-name " Replays"))
      :icons icons
-     :on-close-request (fn [^javafx.stage.WindowEvent e]
-                         (swap! *state assoc :show-replays false)
-                         (.consume e))
+     :on-close-request
+     (or
+       on-close-request
+       (fn [^javafx.stage.WindowEvent e]
+         (swap! *state assoc :show-replays false)
+         (.consume e)))
      :width (min replays-window-width width)
      :height (min replays-window-height height)
      :scene
@@ -6505,8 +6515,8 @@
                  :selected (boolean replays-filter-specs)
                  :h-box/margin 8
                  :on-selected-changed {:event/type ::assoc
-                                       :key :replays-filter-specs}}]}]
-             [{:fx/type :h-box
+                                       :key :replays-filter-specs}}]}
+              {:fx/type :h-box
                :alignment :center-left
                :children
                (concat
@@ -6611,7 +6621,17 @@
                  :disable refreshing
                  :graphic
                  {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-refresh:16:white"}})])}
+                  :icon-literal "mdi-refresh:16:white"}})]
+            (when settings-button
+              [{:fx/type :pane
+                :h-box/hgrow :always}
+               {:fx/type :button
+                :text "Settings"
+                :on-action {:event/type ::toggle
+                            :key :show-settings-window}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-settings:16:white"}}]))}
           (if parsed-replays
             (if (empty? parsed-replays)
               {:fx/type :label
@@ -7179,7 +7199,7 @@
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
 
-(defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [event]}]
+(defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-tab-channel (.getId event)))
 
 (def my-channels-view-keys
@@ -7191,7 +7211,7 @@
                               (remove u/battle-channel-name?)
                               (into []))
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
-                         (.indexOf my-channel-names selected-tab-channel)
+                         (.indexOf ^List my-channel-names selected-tab-channel)
                          0)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
@@ -7224,7 +7244,7 @@
         my-channel-names)}}))
 
 
-(defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [event]}]
+(defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-tab-main (.getId event)))
 
 (defmethod event-handler ::send-console [{:keys [client message]}]
@@ -7251,7 +7271,7 @@
            selected-tab-main users]
     :as state}]
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
-                         (.indexOf main-tab-ids selected-tab-main)
+                         (.indexOf ^List main-tab-ids selected-tab-main)
                          0)
         time-zone-id (.toZoneId (TimeZone/getDefault))
         console-text (string/join "\n"

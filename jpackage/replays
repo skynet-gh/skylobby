@@ -1,0 +1,7 @@
+--input dist
+--main-jar "skyreplays.jar"
+--name "skyreplays"
+--main-class "clojure.main"
+--arguments -m
+--arguments "spring-lobby.replays"
+--vendor "skynet"

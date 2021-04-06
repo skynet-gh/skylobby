@@ -25,7 +25,7 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-linux.jar
           asset_content_type: application/java-archive
-      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/linux
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,6 +33,24 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/skyreplays.jar
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}-linux.jar
+          asset_content_type: application/java-archive
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/linux
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./skyreplays_${{ env.CI_REF_NAME }}-1_amd64.deb
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}_amd64.deb
           asset_content_type: application/vnd.debian.binary-package
   build-dmg:
     runs-on: macOS-10.15
@@ -54,7 +72,7 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-mac.jar
           asset_content_type: application/java-archive
-      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/mac
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/mac
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,6 +80,24 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
+          asset_content_type: application/x-apple-diskimage
+      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/skyreplays.jar
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}-mac.jar
+          asset_content_type: application/java-archive
+      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/mac
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.dmg
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}.dmg
           asset_content_type: application/x-apple-diskimage
   build-exe:
     runs-on: windows-2019
@@ -81,7 +117,7 @@ jobs:
           asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-windows.jar
           asset_content_type: application/java-archive
-      - run: jpackage --type msi --app-version ${{ env.CI_REF_NAME }} @jpackage/common @jpackage/windows
+      - run: jpackage --type msi --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/windows
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,4 +125,22 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
+          asset_content_type: application/x-msi
+      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/skyreplays.jar
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}-windows.jar
+          asset_content_type: application/java-archive
+      - run: jpackage --type msi --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/windows
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.msi
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}.msi
           asset_content_type: application/x-msi

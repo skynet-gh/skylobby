@@ -1,6 +1,7 @@
 (ns uberjar
   (:require
     [clojure.java.io :as io]
+    [clojure.tools.cli :as cli]
     [clojure.tools.cli.api :as deps]
     [clojure.data.xml :as xml]
     [hf.depstar.uberjar]
@@ -47,8 +48,8 @@
   (println "Spitting version resource file")
   (spit (io/file "resources" (str u/app-name ".version")) (version)))
 
-(defn uberjar []
-  (hf.depstar.uberjar/run* uberjar-opts))
+(defn uberjar [options]
+  (hf.depstar.uberjar/run* options))
 
 (defn fix-manifest []
   (println "Fixing version in jar manifest")
@@ -68,11 +69,19 @@
        :out out
        :err err})))
 
-(defn -main [& _args]
-  (pom)
-  (fix-pom-version)
-  (spit-version-resource)
-  (uberjar)
-  (fix-manifest)
-  (println "\nSuccessfully built jar, exiting\n")
-  (Platform/exit))
+
+(def cli-options
+  [[nil "--main-class MAIN" "Main class"
+    :default "spring-lobby"]
+   [nil "--jar JAR" "Jar filename"
+    :default (str "dist/" u/app-name ".jar")]])
+
+(defn -main [& args]
+  (let [{:keys [options]} (cli/parse-opts args cli-options)]
+    (pom)
+    (fix-pom-version)
+    (spit-version-resource)
+    (uberjar (merge uberjar-opts options))
+    (fix-manifest)
+    (println "\nSuccessfully built jar, exiting\n")
+    (Platform/exit)))
