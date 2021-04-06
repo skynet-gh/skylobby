@@ -2951,13 +2951,16 @@
   (swap! *state assoc :bot-version event))
 
 
-(defmethod event-handler ::start-battle [{:keys [battle-status channel-name client]}]
+(defmethod event-handler ::start-battle
+  [{:keys [am-host am-spec battle-status channel-name client host-ingame]}]
   (future
     (try
       (when-not (:mode battle-status)
         (send-message client (str "SAY " channel-name " !joinas spec"))
         (async/<!! (async/timeout 1000)))
-      (spring/start-game @*state) ; TODO remove  deref
+      (if (or am-host am-spec host-ingame)
+        (spring/start-game @*state) ; TODO remove deref
+        (send-message client (str "SAY " channel-name " !cv start")))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
@@ -4180,6 +4183,9 @@
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         engine-version (:battle-version battle-details)
         engine-details (spring/engine-details engines engine-version)
+        in-sync (boolean (and (seq battle-map-details)
+                              (seq battle-mod-details)
+                              (seq engine-details)))
         engine-file (:file engine-details)
         bots (fs/bots engine-file)
         bots (concat bots
@@ -4627,7 +4633,8 @@
              :children
              (let [{:keys [battle-status] :as me} (-> battle :users (get username))
                    iam-ingame (-> users (get username) :client-status :ingame)
-                   host-ingame (-> host-user :client-status :ingame)]
+                   host-ingame (-> host-user :client-status :ingame)
+                   am-spec (not (:mode battle-status))]
                [{:fx/type :check-box
                  :selected (-> battle-status :ready boolean)
                  :style {:-fx-padding "10px"}
@@ -4636,9 +4643,7 @@
                                          :client client
                                          :username username})}
                 {:fx/type :label
-                 :text (if (:mode battle-status)
-                         " Ready"
-                         " Auto Launch")}
+                 :text (if am-spec " Auto Launch" " Ready")}
                 {:fx/type :pane
                  :h-box/hgrow :always}
                 {:fx/type fx.ext.node/with-tooltip-props
@@ -4650,19 +4655,24 @@
                    :text (cond
                            am-host "You are the host, start battle for everyone"
                            host-ingame "Join game in progress"
-                           :else (str "Waiting for host " host-username "to start game"))}}
+                           :else (str "Call vote to start game"))}}
                  :desc
                  {:fx/type :button
                   :text (if iam-ingame
                           "Game started"
-                          (str (if am-host "Start" "Join") " Game"))
-                  :disable (boolean (or (and (not am-host)
-                                             (not host-ingame))
+                          (str (if (or host-ingame am-spec)
+                                 "Join" "Start")
+                               " Game"))
+                  :disable (boolean (or (not in-sync)
+                                        (and (not host-ingame) am-spec)
                                         iam-ingame))
                   :on-action {:event/type ::start-battle
+                              :am-host am-host
+                              :am-spec am-spec
                               :battle-status battle-status
                               :channel-name channel-name
-                              :client client}}}])}]}
+                              :client client
+                              :host-ingame host-ingame}}}])}]}
           {:fx/type channel-view
            :h-box/hgrow :always
            :channel-name channel-name

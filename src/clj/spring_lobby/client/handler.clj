@@ -1,6 +1,7 @@
 (ns spring-lobby.client.handler
   (:require
     byte-streams
+    [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
@@ -121,6 +122,25 @@
 (defn parse-client-status [m]
   (re-find #"\w+ ([^\s]+) (\w+)" m))
 
+(defn start-game-if-synced
+  [{:keys [battle battles engines maps mods] :as state}]
+  (let [battle-detail (-> battles (get (:battle-id battle)))
+        {:keys [battle-map battle-modname battle-version]} battle-detail
+        has-engine (->> engines (filter (comp #{battle-version} :engine-version)) first)
+        has-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
+        has-map (->> maps (filter (comp #{battle-map} :map-name)) first)]
+    (if (and has-engine has-mod has-map)
+      (do
+        (log/info "Starting game to join host")
+        (spring/start-game state))
+      (log/info
+        (str "Missing engine, mod, or map\n"
+             (with-out-str
+               (pprint
+                 {:engine has-engine
+                  :mod has-mod
+                  :map has-map})))))))
+
 (defmethod handle "CLIENTSTATUS" [_c state-atom m]
   (let [[_all username client-status] (parse-client-status m)
         decoded-status (decode-client-status client-status)
@@ -140,9 +160,7 @@
       (not (-> battle :users (get my-username) :battle-status :ready)) (log/debug "Not ready")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
-      (do
-        (log/info "Starting game to join host" username)
-        (spring/start-game prev-state)))))
+      (start-game-if-synced prev-state))))
 
 (defmethod handle "CLIENTBATTLESTATUS" [_c state m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
