@@ -127,16 +127,17 @@
         [prev-state _curr-state] (swap-vals! state-atom assoc-in [:users username :client-status] decoded-status)
         {:keys [battle battles]} prev-state
         prev-status (-> prev-state :users (get username) :client-status)
-        my-status (-> prev-state :users (get (:username prev-state)) :client-status)
+        my-username (:username prev-state)
+        my-status (-> prev-state :users (get my-username) :client-status)
         battle-detail (-> battles (get (:battle-id battle)))]
     (log/debug username decoded-status)
     (cond
       (not (:ingame decoded-status)) (log/debug "Not in game")
       (= (:ingame prev-status) (:ingame decoded-status)) (log/debug "Not a game status change")
-      (= username (:username prev-state)) (log/debug "Ignoring own game start")
+      (= username my-username) (log/debug "Ignoring own game start")
       (:ingame my-status) (log/debug "Already in game")
       (not battle) (log/debug "Not in a battle")
-      (not (-> battle :users (get username) :battle-status :ready)) (log/debug "Not ready")
+      (not (-> battle :users (get my-username) :battle-status :ready)) (log/debug "Not ready")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
       (do
