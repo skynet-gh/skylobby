@@ -6279,6 +6279,7 @@
   [{:keys [body]}]
   (let [skills (some->> body :script-data :game
                         (filter (comp #(string/starts-with? % "player") name first))
+                        (filter (comp #{0 "0"} :spectator second))
                         (map (comp :skill second))
                         (map parse-skill)
                         (filter some?))]
