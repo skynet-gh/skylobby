@@ -3626,38 +3626,33 @@
      :cell-factory
      {:fx/cell-type :table-cell
       :describe
-      (fn [i]
-        (let [status (merge
-                       (select-keys (:client-status (:user i)) [:bot])
-                       (select-keys (:battle-status i) [:ready])
-                       {:host (= (:username i) host-username)})]
-          (cond
-            (:bot status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-robot:16:white"}}
-            (:ready status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account-check:16:white"}}
-            (:host status)
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account-key:16:white"}}
-            :else
-            {:text ""
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-account:16:white"}})))}}
-    {:fx/type :table-column
-     :text "Ingame"
-     :cell-value-factory (comp :ingame :client-status :user)
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [ingame] {:text (str ingame)})}}
+      (fn [{:keys [battle-status user username]}]
+        (let [client-status (:client-status user)
+              am-host (= username host-username)]
+          {:text ""
+           :graphic
+           {:fx/type :h-box
+            :children
+            (concat
+              [(cond
+                 (:bot client-status)
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-robot:16:white"}
+                 (:ready battle-status)
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-account-check:16:white"}
+                 am-host
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-account-key:16:white"}
+                 :else
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-account:16:white"})]
+              (when (:ingame client-status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sword:16:white"}])
+              (when (:away client-status)
+                [{:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-sleep:16:white"}]))}}))}}
     {:fx/type :table-column
      :text "Spectator"
      :cell-value-factory identity
