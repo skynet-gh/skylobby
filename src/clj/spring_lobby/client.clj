@@ -231,7 +231,9 @@
     (swap! state
       (fn [state]
         (let [my-battle-id (-> state :battle :battle-id)
-              old-battle-map (-> state (get :battles) :battle-map)]
+              old-battle-map (-> state (get :battles) (get battle-id) :battle-map)
+              my-battle (= my-battle-id battle-id)
+              map-changed (not= old-battle-map battle-map)]
           (cond-> state
                   true
                   (update-in [:battles battle-id] assoc
@@ -240,8 +242,7 @@
                     :battle-locked battle-locked
                     :battle-maphash battle-maphash
                     :battle-map battle-map)
-                  (and (= my-battle-id battle-id)
-                       (not= old-battle-map battle-map))
+                  (and my-battle map-changed)
                   (assoc :battle-map-details nil)))))))
 
 

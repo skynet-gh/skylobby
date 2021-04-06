@@ -132,7 +132,12 @@
       (when (fs/exists? config-file)
         (->> config-file slurp (edn/read-string {:readers custom-readers}))))
     (catch Exception e
-      (log/warn e "Exception loading app edn file" edn-filename))))
+      (log/warn e "Exception loading app edn file" edn-filename)
+      (try
+        (log/info "Copying bad config file for debug")
+        (fs/copy (fs/config-file edn-filename) (fs/config-file (str edn-filename ".debug")))
+        (catch Exception e
+          (log/warn e "Exception copying bad edn file" edn-filename))))))
 
 
 (def priority-overrides
@@ -365,7 +370,9 @@
                   (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
                   (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
                     (swap! *state assoc :battle-map-details map-details)))
-                (swap! *state assoc :battle-map-details {}))))
+                (do
+                  (log/info "Battle map not found, setting empty details for" new-battle-map "was" old-battle-map)
+                  (swap! *state assoc :battle-map-details {})))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
@@ -428,6 +435,11 @@
 
 
 (defmulti task-handler ::task-type)
+
+(defmethod task-handler ::fn
+  [{:keys [description function]}]
+  (log/info "Running function task" description)
+  (function))
 
 (defmethod task-handler ::update-mod
   [{:keys [file]}]
@@ -1542,8 +1554,9 @@
   {:fx/type :combo-box
    :disable (boolean disable)
    :value server
-   :items (->> servers
-               (sort-by (juxt (comp :alias second) first)))
+   :items (or (->> servers
+                   (sort-by (juxt (comp :alias second) first)))
+              [])
    :prompt-text "< choose a server >"
    :button-cell server-cell
    :on-value-changed on-value-changed
@@ -1642,12 +1655,13 @@
       {:fx/type :text-field
        :text username
        :prompt-text "Username"
-       :disable (boolean (or client client-deferred))
+       :disable (boolean (or client client-deferred (not server)))
        :on-text-changed {:event/type ::username-change
                          :server-url (first server)}}]
      (when-not (or client client-deferred)
        [{:fx/type :password-field
          :text password
+         :disable (boolean (not server))
          :prompt-text "Password"
          :style {:-fx-pref-width 300}
          :on-text-changed {:event/type ::password-change
@@ -1682,7 +1696,7 @@
         :show-delay [10 :ms]
         :style {:-fx-font-size 14}
         :text "Show replays window"}
-       :on-action {:event/type ::assoc
+       :on-action {:event/type ::toggle
                    :key :show-replays}
        :graphic
        {:fx/type font-icon/lifecycle
@@ -1772,7 +1786,7 @@
                default-server-port (str server-port))
         server-url (str server-host ":" port)]
     {:fx/type :stage
-     :showing show-servers-window
+     :showing (boolean show-servers-window)
      :title (str u/app-name " Servers")
      :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -1887,7 +1901,7 @@
 (defn register-window
   [{:keys [email password password-confirm register-response server servers show-register-window username]}]
   {:fx/type :stage
-   :showing show-register-window
+   :showing (boolean show-register-window)
    :title (str u/app-name " Register")
    :icons icons
    :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -1906,7 +1920,8 @@
       (assoc
         {:fx/type server-combo-box}
         :server server
-        :servers servers)
+        :servers servers
+        :on-value-changed {:event/type ::on-change-server})
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -1993,7 +2008,7 @@
   [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
            extra-replay-path extra-replay-sources show-settings-window]}]
   {:fx/type :stage
-   :showing show-settings-window
+   :showing (boolean show-settings-window)
    :title (str u/app-name " Settings")
    :icons icons
    :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -2181,7 +2196,7 @@
                               (sort-by :bind-key))
         uikeys-overrides (or uikeys {})]
     {:fx/type :stage
-     :showing show-uikeys-window
+     :showing (boolean show-uikeys-window)
      :title (str u/app-name " UI Keys Editor")
      :icons icons
      :on-close-request (fn [^Event e]
@@ -2215,7 +2230,7 @@
          :desc
          {:fx/type :table-view
           :column-resize-policy :constrained
-          :items filtered-uikeys
+          :items (or (seq filtered-uikeys) [])
           :on-key-pressed {:event/type ::uikeys-pressed
                            :selected-uikeys-action selected-uikeys-action}
           :columns
@@ -2382,9 +2397,14 @@
 
 (defmethod event-handler ::show-maps-window
   [{:keys [on-change-map]}]
-  (swap! *state assoc
-         :show-maps true
-         :on-change-map on-change-map))
+  (let [v true
+        inv (not v)]
+    (swap! *state assoc
+           :show-maps inv
+           :on-change-map on-change-map)
+    (future
+      (Thread/sleep 100)
+      (swap! *state assoc :show-maps v))))
 
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
@@ -2442,11 +2462,6 @@
                      :text (or map-input-prefix "Choose map")}}]))
      [{:fx/type :button
        :text ""
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show maps window"}
        :on-action {:event/type ::show-maps-window
                    :on-change-map on-value-changed}
        :graphic
@@ -2547,11 +2562,6 @@
        [
         {:fx/type :button
          :text "Settings"
-         :tooltip
-         {:fx/type :tooltip
-          :show-delay [10 :ms]
-          :style {:-fx-font-size 14}
-          :text "Show settings window"}
          :on-action {:event/type ::toggle
                      :key :show-settings-window}
          :graphic
@@ -2559,48 +2569,27 @@
           :icon-literal "mdi-settings:16:white"}}
         {:fx/type :label
          :text " Resources: "}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Import local resources from SpringLobby and Beyond All Reason"}}
-         :desc
-         {:fx/type :button
-          :text "import"
-          :on-action {:event/type ::assoc
-                      :key :show-importer}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-file-import:16:white")}}}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Download resources from various websites using http"}}
-         :desc
-         {:fx/type :button
-          :text "http"
-          :on-action {:event/type ::assoc
-                      :key :show-downloader}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-download:16:white")}}}
-        {:fx/type fx.ext.node/with-tooltip-props
-         :props
-         {:tooltip
-          {:fx/type :tooltip
-           :show-delay [10 :ms]
-           :text "Download resources with the Rapid tool"}}
-         :desc
-         {:fx/type :button
-          :text "rapid"
-          :on-action {:event/type ::assoc
-                      :key :show-rapid-downloader}
-          :graphic
-          {:fx/type font-icon/lifecycle
-           :icon-literal (str "mdi-download:16:white")}}}
+        {:fx/type :button
+         :text "Import"
+         :on-action {:event/type ::toggle
+                     :key :show-importer}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-file-import:16:white")}}
+        {:fx/type :button
+         :text "HTTP"
+         :on-action {:event/type ::toggle
+                     :key :show-downloader}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-download:16:white")}}
+        {:fx/type :button
+         :text "Rapid"
+         :on-action {:event/type ::toggle
+                     :key :show-rapid-downloader}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-download:16:white")}}
         {:fx/type :h-box
          :alignment :center-left
          :children
@@ -2883,6 +2872,19 @@
         (swap! *state assoc :battle-map-details nil))
       (catch Exception e
         (log/error e "Error changing battle map")))))
+
+(defmethod event-handler ::suggest-battle-map
+  [{:fx/keys [event] :keys [battle-status channel-name client map-name]}]
+  (future
+    (try
+      (cond
+        (string/blank? channel-name) (log/warn "No channel to suggest battle map")
+        (not (:mode battle-status)) (log/info "Cannot suggest battle map as spectator")
+        :else
+        (let [map-name (or map-name event)]
+          (send-message client (str "SAY " channel-name " !map " map-name))))
+      (catch Exception e
+        (log/error e "Error suggesting map")))))
 
 (defmethod event-handler ::kick-battle
   [{:keys [bot-name client username]}]
@@ -3322,7 +3324,7 @@
       ::map (when filename (io/file (fs/map-file filename)))
       nil)))
 
-(defmethod task-handler ::import [{:keys [importable]}]
+(defn import-resource [importable]
   (let [{:keys [resource-file]} importable
         source resource-file
         dest (resource-dest importable)]
@@ -3345,6 +3347,9 @@
         (update-copying dest {:status false})
         (update-file-cache! source)
         (update-file-cache! dest))))) ; TODO atomic?
+
+(defmethod task-handler ::import [{:keys [importable]}]
+  (import-resource importable))
 
 (defmethod event-handler ::git-mod
   [{:keys [battle-mod-git-ref file]}]
@@ -4430,14 +4435,17 @@
                              {:event/type ::http-downloadable
                               :downloadable downloadable})}])
                        (let [rapid-id (:id (get rapid-data-by-version battle-modname))
-                             in-progress (-> rapid-download (get rapid-id) :running)]
+                             rapid-download (get rapid-download rapid-id)
+                             in-progress (:running rapid-download)]
                          [{:severity 2
                            :text "rapid"
                            :human-text (if rapid-id
                                          (if engine-file
-                                           (str "Download rapid " rapid-id)
+                                           (if in-progress
+                                             (str (download-progress rapid-download))
+                                             (str "Download rapid " rapid-id))
                                            "Needs engine first to download with rapid")
-                                         "No rapid download")
+                                         "No rapid download, update rapid")
                            :tooltip (if rapid-id
                                       (if engine-file
                                         (str "Use rapid downloader to get resource id " rapid-id
@@ -4446,10 +4454,12 @@
                                       (str "No rapid download found for" battle-modname))
                            :in-progress in-progress
                            :action
-                           (when (and rapid-id engine-file)
+                           (if (and rapid-id engine-file)
                              {:event/type ::rapid-download
                               :rapid-id rapid-id
-                              :engine-file engine-file})}])
+                              :engine-file engine-file}
+                             {:event/type ::add-task
+                              :task {::task-type ::update-rapid}})}])
                        (let [importable (some->> importables-by-path
                                                  vals
                                                  (filter (comp #{::mod} :resource-type))
@@ -4807,14 +4817,21 @@
           {:fx/type :h-box
            :style {:-fx-max-width minimap-size}
            :children
-           [{:fx/type map-list
-             :disable (not am-host)
-             :map-name battle-map
-             :maps maps
-             :map-input-prefix map-input-prefix
-             :on-value-changed {:event/type ::battle-map-change
-                                :client client
-                                :maps maps}}]}
+           (let [{:keys [battle-status]} (-> battle :users (get username))]
+             [{:fx/type map-list
+               :disable (not (:mode battle-status))
+               :map-name battle-map
+               :maps maps
+               :map-input-prefix map-input-prefix
+               :on-value-changed
+               (if am-host
+                 {:event/type ::battle-map-change
+                  :client client
+                  :maps maps}
+                 {:event/type ::suggest-battle-map
+                  :battle-status battle-status
+                  :channel-name channel-name
+                  :client client})}])}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -5247,9 +5264,7 @@
         (update-file-cache! dest)
         (log/info "Finished downloading" url "to" dest)))))
 
-
-(defmethod event-handler ::http-downloadable
-  [{:keys [downloadable]}]
+(defn download-http-resource [downloadable]
   (log/info "Request to download" downloadable)
   (future
     (deref
@@ -5262,6 +5277,10 @@
       ::mod (force-update-battle-mod *state)
       ::engine (reconcile-engines *state)
       nil)))
+
+(defmethod event-handler ::http-downloadable
+  [{:keys [downloadable]}]
+  (download-http-resource downloadable))
 
 
 (defmethod event-handler ::extract-7z
@@ -5328,7 +5347,7 @@
         importables-by-path (->> importables
                                  (map (juxt (comp fs/canonical-path :resource-file) identity))
                                  (into {}))]
-    (log/info "Found imports" (frequencies (map :resource-type importables)))
+    (log/info "Found imports" (frequencies (map :resource-type importables)) "from" import-source-name)
     (swap! *state update :importables-by-path
            (fn [old]
              (->> old
@@ -5343,10 +5362,13 @@
 
 
 
+(def springfiles-maps-download-source
+  {:download-source-name "SpringFiles Maps"
+   :url http/springfiles-maps-url
+   :resources-fn http/html-downloadables})
+
 (def download-sources
-  [{:download-source-name "SpringFiles Maps"
-    :url http/springfiles-maps-url
-    :resources-fn http/html-downloadables}
+  [springfiles-maps-download-source
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
     :resources-fn http/html-downloadables}
@@ -5371,7 +5393,8 @@
 (def downloadable-update-cooldown
   (* 1000 60 60 24)) ; 1 day ?
 
-(defmethod task-handler ::update-downloadables
+
+(defn update-download-source
   [{:keys [force resources-fn url download-source-name] :as source}]
   (log/info "Getting resources for possible download from" download-source-name "at" url)
   (let [now (u/curr-millis)
@@ -5395,6 +5418,10 @@
                         (merge downloadables-by-url))))
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
+
+(defmethod task-handler ::update-downloadables
+  [source]
+  (update-download-source source))
 
 
 (defmethod event-handler ::import-source-change
@@ -5480,7 +5507,7 @@
                           set)
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
-     :showing show-importer
+     :showing (boolean show-importer)
      :title (str u/app-name " Importer")
      :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -5498,7 +5525,7 @@
          :style {:-fx-font-size 16}
          :text "Refresh All Imports"
          :on-action {:event/type ::scan-imports
-                     :import-sources import-sources}}
+                     :sources import-sources}}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
@@ -5757,7 +5784,7 @@
                                        true))))
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
-     :showing show-downloader
+     :showing (boolean show-downloader)
      :title (str u/app-name " Downloader")
      :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -6009,34 +6036,31 @@
            rapid-packages sdp-files show-rapid-downloader]}]
   (let [sdp-files (or sdp-files [])
         sdp-hashes (set (map rapid/sdp-hash sdp-files))
-        sorted-engine-versions (or (->> engines
-                                        (map :engine-version)
-                                        sort
-                                        seq)
-                                   [])
-        filtered-rapid-versions (or (->> rapid-versions
-                                         (filter
-                                           (fn [{:keys [id]}]
-                                             (if rapid-repo
-                                               (string/starts-with? id (str rapid-repo ":"))
-                                               true)))
-                                         (filter
-                                           (fn [{:keys [version] :as i}]
-                                             (if-not (string/blank? rapid-filter)
-                                               (or
-                                                 (string/includes?
-                                                   (string/lower-case version)
-                                                   (string/lower-case rapid-filter))
-                                                 (string/includes?
-                                                   (:hash i)
-                                                   (string/lower-case rapid-filter)))
-                                               true))))
-                                    [])
+        sorted-engine-versions (->> engines
+                                    (map :engine-version)
+                                    sort)
+        filtered-rapid-versions (->> rapid-versions
+                                     (filter
+                                       (fn [{:keys [id]}]
+                                         (if rapid-repo
+                                           (string/starts-with? id (str rapid-repo ":"))
+                                           true)))
+                                     (filter
+                                       (fn [{:keys [version] :as i}]
+                                         (if-not (string/blank? rapid-filter)
+                                           (or
+                                             (string/includes?
+                                               (string/lower-case version)
+                                               (string/lower-case rapid-filter))
+                                             (string/includes?
+                                               (:hash i)
+                                               (string/lower-case rapid-filter)))
+                                           true))))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         engine-file (:file (get engines-by-version engine-version))
         {:keys [width height]} (screen-bounds)]
     {:fx/type :stage
-     :showing show-rapid-downloader
+     :showing (boolean show-rapid-downloader)
      :title (str u/app-name " Rapid Downloader")
      :icons icons
      :on-close-request (fn [^WindowEvent e]
@@ -6058,7 +6082,8 @@
            :text " Engine for pr-downloader: "}
           {:fx/type :combo-box
            :value (str engine-version)
-           :items sorted-engine-versions
+           :items (or (seq sorted-engine-versions)
+                      [])
            :on-value-changed {:event/type ::version-change}}
           {:fx/type :button
            :text " Refresh "
@@ -6076,7 +6101,8 @@
              :text " Filter Repo: "}
             {:fx/type :combo-box
              :value (str rapid-repo)
-             :items (or rapid-repos [])
+             :items (or (seq rapid-repos)
+                        [])
              :on-value-changed {:event/type ::rapid-repo-change}}]
            (when rapid-repo
              [{:fx/type fx.ext.node/with-tooltip-props
@@ -6115,7 +6141,8 @@
                  :icon-literal "mdi-close:16:white"}}}]))}
         {:fx/type :table-view
          :column-resize-policy :constrained ; TODO auto resize
-         :items filtered-rapid-versions
+         :items (or (seq filtered-rapid-versions)
+                    [])
          :columns
          [{:fx/type :table-column
            :sortable false
@@ -6194,7 +6221,8 @@
              :icon-literal "mdi-folder:16:white"}}}]}
         {:fx/type :table-view
          :column-resize-policy :constrained ; TODO auto resize
-         :items rapid-packages
+         :items (or (seq rapid-packages)
+                    [])
          :columns
          [{:fx/type :table-column
            :text "Filename"
@@ -6236,30 +6264,35 @@
 
 
 (defmethod event-handler ::select-replay
-  [{:keys [maps mods] :fx/keys [event]}]
+  [{:keys [maps mods selected] :fx/keys [event]}]
   (future
-    (swap! *state assoc
-           :replay-map-details nil
-           :replay-mod-details nil
-           :selected-replay-file (:file event))
-    (future
-      (try
-        (let [map-name (-> event :body :script-data :game :mapname)
-              map-details (or (read-map-data maps map-name) {})]
-          (swap! *state assoc :replay-map-details map-details))
-        (catch Exception e
-          (log/error e "Error loading replay map details"))))
-    (future
-      (try
-        (let [mod-name (-> event :body :script-data :game :gametype)]
-          (when-let [mod-file (some->> mods
-                                       (filter (comp #{mod-name} :mod-name))
-                                       first
-                                       :file)]
-            (let [mod-details (or (read-mod-data mod-file) {})]
-              (swap! *state assoc :replay-mod-details mod-details))))
-        (catch Exception e
-          (log/error e "Error loading replay mod details"))))))
+    (let [selected (or selected event)
+          game (-> selected :body :script-data :game)]
+      (log/info "Handling replay selected" selected)
+      (swap! *state assoc
+             :replay-map-details nil
+             :replay-mod-details nil
+             :selected-replay-file (:file selected))
+      (deref
+        (future
+          (try
+            (let [map-name (:mapname game)
+                  map-details (or (read-map-data maps map-name) {})]
+              (swap! *state assoc :replay-map-details map-details))
+            (catch Exception e
+              (log/error e "Error loading replay map details")))))
+      (deref
+        (future
+          (try
+            (let [mod-name (:gametype game)]
+              (when-let [mod-file (some->> mods
+                                           (filter (comp #{mod-name} :mod-name))
+                                           first
+                                           :file)]
+                (let [mod-details (or (read-mod-data mod-file) {})]
+                  (swap! *state assoc :replay-mod-details mod-details))))
+            (catch Exception e
+              (log/error e "Error loading replay mod details"))))))))
 
 
 (defn sanitize-replay-filter [s]
@@ -6401,7 +6434,7 @@
         {:keys [width height]} (screen-bounds)
         time-zone-id (.toZoneId (TimeZone/getDefault))]
     {:fx/type :stage
-     :showing show-replays
+     :showing (boolean show-replays)
      :title (str u/app-name " Replays")
      :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -6855,11 +6888,24 @@
                                 :text (if in-progress
                                         " Importing..."
                                         " Import map")
+                                :tooltip
+                                {:fx/type :tooltip
+                                 :show-delay [10 :ms]
+                                 :text (str (:resource-file map-importable))}
                                 :disable in-progress
-                                :on-action {:event/type ::add-task
-                                            :task
-                                            {::task-type ::import
-                                             :importable map-importable}}
+                                :on-action
+                                {:event/type ::add-task
+                                 :task
+                                 {::task-type ::fn
+                                  :description "import map and update selected replay"
+                                  :function
+                                  (fn []
+                                    (import-resource map-importable)
+                                    (let [data (select-keys @*state [:maps :mods])]
+                                      (event-handler
+                                        (merge data
+                                          {:event/type ::select-replay
+                                           :selected selected-replay}))))}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-content-copy:16:white"}})
@@ -6871,8 +6917,19 @@
                                         (str (download-progress download))
                                         " Download map")
                                 :disable (boolean running)
-                                :on-action {:event/type ::http-downloadable
-                                            :downloadable map-downloadable}
+                                :on-action
+                                {:event/type ::add-task
+                                 :task
+                                 {::task-type ::fn
+                                  :description "download map and update selected replay"
+                                  :function
+                                  (fn []
+                                    (deref (download-http-resource map-downloadable))
+                                    (let [data (select-keys @*state [:maps :mods])]
+                                      (event-handler
+                                        (merge data
+                                          {:event/type ::select-replay
+                                           :selected selected-replay}))))}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-download:16:white"}})
@@ -6891,8 +6948,17 @@
                               {:fx/type font-icon/lifecycle
                                :icon-literal "mdi-refresh:16:white"}}
                              (not matching-map)
-                             {:fx/type :label
-                              :text " No map"})}))}}])}}})
+                             {:fx/type :button
+                              :text " No map, update downloads"
+                              :on-action
+                              {:event/type ::add-task
+                               :task
+                               {::task-type ::fn
+                                :description "update downloadables"
+                                :function
+                                (fn []
+                                  (update-download-source
+                                    (assoc springfiles-maps-download-source :force true)))}}})}))}}])}}})
            {:fx/type :label
             :style {:-fx-font-size 24}
             :text " Loading replays..."})]
@@ -6992,7 +7058,7 @@
   [{:keys [filter-maps-name maps on-change-map show-maps]}]
   (let [{:keys [width height]} (screen-bounds)]
     {:fx/type :stage
-     :showing show-maps
+     :showing (boolean show-maps)
      :title (str u/app-name " Maps")
      :icons icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
@@ -7296,150 +7362,138 @@
 
 (defn root-view
   [{{:keys [agreement battle client last-failed-message password pop-out-battle
-            show-downloader show-importer show-maps show-rapid-downloader show-register-window show-replays
-            show-servers-window show-settings-window show-uikeys-window standalone tasks username verification-code]
+            standalone tasks username verification-code]
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)]
     {:fx/type fx/ext-many
      :desc
-     (concat
-       [{:fx/type :stage
-         :showing true
-         :title (str "skylobby " (u/app-version))
-         :icons icons
-         :x 100
-         :y 100
-         :width (min main-window-width width)
-         :height (min main-window-height height)
-         :on-close-request (partial main-window-on-close-request client standalone)
-         :scene
-         {:fx/type :scene
-          :stylesheets stylesheets
-          :root
-          {:fx/type :v-box
-           :style {:-fx-font-size 14}
-           :alignment :top-left
-           :children
-           (concat
-             [(merge
-                {:fx/type client-buttons}
-                (select-keys state client-buttons-keys))]
-             (when agreement
-               [{:fx/type :label
-                 :style {:-fx-font-size 20}
-                 :text " Server agreement: "}
-                {:fx/type :text-area
-                 :editable false
-                 :text (str agreement)}
-                {:fx/type :h-box
-                 :style {:-fx-font-size 20}
-                 :children
-                 [{:fx/type :text-field
-                   :prompt-text "Email Verification Code"
-                   :on-action {:event/type ::assoc
-                               :key :verification-code}}
-                  {:fx/type :button
-                   :text "Confirm"
-                   :on-action {:event/type ::confirm-agreement
-                               :client client
-                               :password password
-                               :username username
-                               :verification-code verification-code}}]}])
-             [(merge
-                {:fx/type main-tab-view
-                 :v-box/vgrow :always}
-                (select-keys state
-                  (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
-              (merge
-                {:fx/type battles-buttons}
-                (select-keys state
-                  [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
-                   :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-                   :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
-             (when battle
-               (if (:battle-id battle)
-                 (when (not pop-out-battle)
-                   [(merge
-                      {:fx/type battle-view}
-                      (select-keys state battle-view-keys))])
-                 [{:fx/type :h-box
-                   :alignment :top-left
-                   :children
-                   [{:fx/type :v-box
-                     :h-box/hgrow :always
-                     :children
-                     [{:fx/type :label
-                       :style {:-fx-font-size 20}
-                       :text "Waiting for server to open battle..."}]}]}]))
-             [{:fx/type :h-box
-               :alignment :center-left
+     [{:fx/type :stage
+       :showing true
+       :title (str "skylobby " (u/app-version))
+       :icons icons
+       :x 100
+       :y 100
+       :width (min main-window-width width)
+       :height (min main-window-height height)
+       :on-close-request (partial main-window-on-close-request client standalone)
+       :scene
+       {:fx/type :scene
+        :stylesheets stylesheets
+        :root
+        {:fx/type :v-box
+         :style {:-fx-font-size 14}
+         :alignment :top-left
+         :children
+         (concat
+           [(merge
+              {:fx/type client-buttons}
+              (select-keys state client-buttons-keys))]
+           (when agreement
+             [{:fx/type :label
+               :style {:-fx-font-size 20}
+               :text " Server agreement: "}
+              {:fx/type :text-area
+               :editable false
+               :text (str agreement)}
+              {:fx/type :h-box
+               :style {:-fx-font-size 20}
                :children
-               [{:fx/type :label
-                 :text (str last-failed-message)
-                 :style {:-fx-text-fill "#FF0000"}}
-                {:fx/type :pane
-                 :h-box/hgrow :always}
-                {:fx/type :label
-                 :text (str (count (seq tasks)) " tasks")}]}])}}}]
-       (when (and battle pop-out-battle)
-         [{:fx/type :stage
-           :showing pop-out-battle
-           :title (str u/app-name " Battle")
-           :icons icons
-           :on-close-request {:event/type ::dissoc
-                              :key :pop-out-battle}
-           :width (min battle-window-width width)
-           :height (min battle-window-height height)
-           :scene
-           {:fx/type :scene
-            :stylesheets stylesheets
-            :root
+               [{:fx/type :text-field
+                 :prompt-text "Email Verification Code"
+                 :on-action {:event/type ::assoc
+                             :key :verification-code}}
+                {:fx/type :button
+                 :text "Confirm"
+                 :on-action {:event/type ::confirm-agreement
+                             :client client
+                             :password password
+                             :username username
+                             :verification-code verification-code}}]}])
+           [(merge
+              {:fx/type main-tab-view
+               :v-box/vgrow :always}
+              (select-keys state
+                (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
             (merge
-              {:fx/type battle-view}
-              (select-keys state battle-view-keys))}}])
-       (when show-downloader
-         [(merge
-            {:fx/type download-window}
-            (select-keys state
-              [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
-               :http-download :show-downloader :show-stale]))])
-       (when show-importer
-         [(merge
-            {:fx/type import-window}
-            (select-keys state import-window-keys))])
-       (when show-maps
-         [(merge
-            {:fx/type maps-window}
-            (select-keys state
-              [:filter-maps-name :maps :on-change-map :show-maps]))])
-       (when show-rapid-downloader
-         [(merge
-            {:fx/type rapid-download-window}
-            (select-keys state
-              [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
-               :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader]))])
-       (when show-replays
-         [(merge
-            {:fx/type replays-window}
-            (select-keys state replays-window-keys))])
-       (when show-servers-window
-         [(merge
-            {:fx/type servers-window}
-            (select-keys state servers-window-keys))])
-       (when show-register-window
-         [(merge
-            {:fx/type register-window}
-            (select-keys state register-window-keys))])
-       (when show-settings-window
-         [(merge
-            {:fx/type settings-window}
-            (select-keys state settings-window-keys))])
-       (when show-uikeys-window
-         [(merge
-            {:fx/type uikeys-window}
-            (select-keys state
-              [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]))}))
+              {:fx/type battles-buttons}
+              (select-keys state
+                [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
+                 :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
+                 :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
+           (when battle
+             (if (:battle-id battle)
+               (when (not pop-out-battle)
+                 [(merge
+                    {:fx/type battle-view}
+                    (select-keys state battle-view-keys))])
+               [{:fx/type :h-box
+                 :alignment :top-left
+                 :children
+                 [{:fx/type :v-box
+                   :h-box/hgrow :always
+                   :children
+                   [{:fx/type :label
+                     :style {:-fx-font-size 20}
+                     :text "Waiting for server to open battle..."}]}]}]))
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text (str last-failed-message)
+               :style {:-fx-text-fill "#FF0000"}}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :label
+               :text (str (count (seq tasks)) " tasks")}]}])}}}
+      {:fx/type :stage
+       :showing (boolean (and battle pop-out-battle))
+       :title (str u/app-name " Battle")
+       :icons icons
+       :on-close-request {:event/type ::dissoc
+                          :key :pop-out-battle}
+       :width (min battle-window-width width)
+       :height (min battle-window-height height)
+       :scene
+       {:fx/type :scene
+        :stylesheets stylesheets
+        :root
+        (merge
+          {:fx/type battle-view}
+          (select-keys state battle-view-keys))}}
+      (merge
+        {:fx/type download-window}
+        (select-keys state
+          [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
+           :http-download :show-downloader :show-stale]))
+      (merge
+        {:fx/type import-window}
+        (select-keys state import-window-keys))
+      (merge
+        {:fx/type maps-window}
+        (select-keys state
+          [:filter-maps-name :maps :on-change-map :show-maps]))
+      (merge
+        {:fx/type rapid-download-window}
+        (select-keys state
+          [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
+           :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader]))
+      (merge
+        {:fx/type replays-window}
+        (select-keys state replays-window-keys))
+      (merge
+        {:fx/type servers-window}
+        (select-keys state servers-window-keys))
+      (merge
+        {:fx/type register-window}
+        (select-keys state register-window-keys))
+      (merge
+        {:fx/type settings-window}
+        (select-keys state settings-window-keys))
+      (merge
+        {:fx/type uikeys-window}
+        (select-keys state
+          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]}))
 
 
 (defn init
