@@ -10,6 +10,34 @@ Notable changes
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.2.0]
+
+- Add standalone replays packages
+- Add !cv start when playing but not host
+- Sort battle players list same as replays
+- Fix chat messages
+- Fix script password in JOINBATTLE
+- Fix game launching when not ready or resources missing
+- Fix battle map change detection
+- Fix windows changing order when opened/closed
+- Fix replays window skill including spectators
+
+### [0.1.7]
+
+- Add script password handling
+- Improve installer with version so upgrade works
+- Add app icon
+- Save login per server
+- Add settings window with custom import and replay paths
+- Fix tab switch on new chat
+- Fix springfightclub compatibility by adding more comp flags
+- Fix some issues with battle resources not refreshing
+- Change windows installer to .msi
+
+### [0.1.6]
+
+- Fix npe on Linux due to JavaFX TabPane selection model differences
+
 ### [0.1.5]
 
 - Add direct messaging
