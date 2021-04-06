@@ -204,7 +204,7 @@
       (string/includes? os-name "Windows")
       (io/file user-home "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
       :else
-      (io/file user-home ".spring"))))
+      (io/file user-home ".spring")))) ; ? mac
 
 (defn spring-root
   "Returns the root directory for Spring"
@@ -221,7 +221,21 @@
       (string/includes? os-name "Windows")
       (io/file user-home "Documents" "My Games" "Spring")
       :else
-      (io/file user-home ".spring"))))
+      (io/file user-home ".spring")))) ; ? mac
+
+(defn zerok-root
+  "Returns the root directory for Zero-K"
+  ^File []
+  (let [{:keys [os-name user-home] :as sys-data} (get-sys-data)]
+    (cond
+      (string/includes? os-name "Linux")
+      (if (wsl? sys-data)
+        (io/file "/mnt" "c" "Program Files (x86)" "Steam" "steamapps" "common" "Zero-K") ; not always
+        (io/file user-home ".local" "share" "Steam" "steamapps" "common" "Zero-K")) ; ?
+      (string/includes? os-name "Windows")
+      (io/file "C:\\" "Program Files (x86)" "Steam" "steamapps" "common" "Zero-K") ; not always
+      :else
+      (io/file user-home ".local" "share" "Steam" "steamapps" "common" "Zero-K")))) ; ? mac
 
 (defn springlobby-root
   "Returns the root directory for Spring"
@@ -439,13 +453,26 @@
   ([root]
    (io/file root "engine")))
 
+(defn spring-engine-dir? [dir]
+  (and (is-directory? dir)
+       (is-file? (io/file dir (spring-executable)))
+       (is-file? (io/file dir (spring-headless-executable)))))
+
 (defn engine-dirs
   ([]
    (engine-dirs (isolation-dir)))
   ([root]
-   (->> (list-files (io/file root "engine"))
-        seq
-        (filter is-directory?))))
+   (let [engines-folder (->> (list-files (io/file root "engine"))
+                             seq
+                             (filter is-directory?))]
+     (concat
+       (mapcat
+         (fn [dir]
+           (->> (list-files dir)
+                seq
+                (filter spring-engine-dir?)))
+         engines-folder)
+       (filter spring-engine-dir? engines-folder)))))
 
 (defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]

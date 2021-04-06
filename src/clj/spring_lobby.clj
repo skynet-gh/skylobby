@@ -551,6 +551,9 @@
       :builtin true}
      {:import-source-name "Beyond All Reason"
       :file (fs/bar-root)
+      :builtin true}
+     {:import-source-name "Zero-K"
+      :file (fs/zerok-root)
       :builtin true}]
     extra-import-sources))
 
@@ -3574,255 +3577,276 @@
     false
     true))
 
+(defn parse-skill [skill]
+  (cond
+    (number? skill)
+    skill
+    (string? skill)
+    (let [[_all n] (re-find #"~?#?([\d]+)#?" skill)]
+      (try
+        (Double/parseDouble n)
+        (catch Exception e
+          (log/warn e "Error parsing skill" skill))))
+    :else nil))
+
 (defn battle-players-table
   [{:keys [am-host client host-username players scripttags sides username]}]
-  {:fx/type :table-view
-   :column-resize-policy :constrained ; TODO auto resize
-   :items (or players [])
-   :row-factory
-   {:fx/cell-type :table-row
-    :describe (fn [{:keys [owner] :as id}]
-                {
-                 :context-menu
-                 {:fx/type :context-menu
-                  :items
-                  (concat []
-                    (when (and (not owner) (not= username (:username id)))
-                      [
-                       {:fx/type :menu-item
-                        :text "Message"
-                        :on-action {:event/type ::join-direct-message
-                                    :username (:username id)}}]))}})}
-   :columns
-   [{:fx/type :table-column
-     :text "Nickname"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [{:keys [owner] :as id}]
-        (merge
-          {:text (nickname id)}
-          (when (and username
-                     (not= username (:username id))
-                     (or am-host
-                         (= owner username)))
-            {:graphic
-             {:fx/type :button
-              :on-action
-              (merge
-                {:event/type ::kick-battle
-                 :client client}
-                (select-keys id [:bot-name :username]))
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-account-remove:16:white"}}})))}}
-    {:fx/type :table-column
-     :text "Country"
-     :cell-value-factory (comp :country :user)
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [country] {:text (str country)})}}
-    {:fx/type :table-column
-     :text "Status"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [{:keys [battle-status user username]}]
-        (let [client-status (:client-status user)
-              am-host (= username host-username)]
+  (let [players-with-skill (map
+                             (fn [{:keys [skill username] :as player}]
+                               (let [username-kw (when username (keyword (string/lower-case username)))
+                                     tags (some-> scripttags :game :players (get username-kw))
+                                     uncertainty (or (try (u/to-number (:skilluncertainty tags))
+                                                          (catch Exception e
+                                                            (log/debug e "Error parsing skill uncertainty")))
+                                                     3)]
+                                 (assoc player
+                                        :skill (or skill (:skill tags))
+                                        :skilluncertainty uncertainty)))
+                             players)]
+    {:fx/type :table-view
+     :column-resize-policy :constrained ; TODO auto resize
+     :items (->> players-with-skill
+                 (sort-by
+                   (juxt
+                     (comp not :mode :battle-status)
+                     (comp :ally :battle-status)
+                     (comp (fnil - 0) parse-skill :skill))))
+     :row-factory
+     {:fx/cell-type :table-row
+      :describe (fn [{:keys [owner] :as id}]
+                  {
+                   :context-menu
+                   {:fx/type :context-menu
+                    :items
+                    (concat []
+                      (when (and (not owner) (not= username (:username id)))
+                        [
+                         {:fx/type :menu-item
+                          :text "Message"
+                          :on-action {:event/type ::join-direct-message
+                                      :username (:username id)}}]))}})}
+     :columns
+     [{:fx/type :table-column
+       :text "Nickname"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [{:keys [owner] :as id}]
+          (merge
+            {:text (nickname id)}
+            (when (and username
+                       (not= username (:username id))
+                       (or am-host
+                           (= owner username)))
+              {:graphic
+               {:fx/type :button
+                :on-action
+                (merge
+                  {:event/type ::kick-battle
+                   :client client}
+                  (select-keys id [:bot-name :username]))
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-account-remove:16:white"}}})))}}
+      {:fx/type :table-column
+       :text "Country"
+       :cell-value-factory (comp :country :user)
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [country] {:text (str country)})}}
+      {:fx/type :table-column
+       :text "Status"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [{:keys [battle-status user username]}]
+          (let [client-status (:client-status user)
+                am-host (= username host-username)]
+            {:text ""
+             :graphic
+             {:fx/type :h-box
+              :children
+              (concat
+                [(cond
+                   (:bot client-status)
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-robot:16:white"}
+                   (:ready battle-status)
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-account-check:16:white"}
+                   am-host
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-account-key:16:white"}
+                   :else
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-account:16:white"})]
+                (when (:ingame client-status)
+                  [{:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-sword:16:white"}])
+                (when (:away client-status)
+                  [{:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-sleep:16:white"}]))}}))}}
+      {:fx/type :table-column
+       :text "Spectator"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
           {:text ""
            :graphic
-           {:fx/type :h-box
-            :children
-            (concat
-              [(cond
-                 (:bot client-status)
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-robot:16:white"}
-                 (:ready battle-status)
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-account-check:16:white"}
-                 am-host
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-account-key:16:white"}
-                 :else
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-account:16:white"})]
-              (when (:ingame client-status)
-                [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sword:16:white"}])
-              (when (:away client-status)
-                [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sleep:16:white"}]))}}))}}
-    {:fx/type :table-column
-     :text "Spectator"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :check-box
-           :selected (not (:mode (:battle-status i)))
-           :on-selected-changed {:event/type ::battle-spectate-change
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :check-box
+             :selected (not (:mode (:battle-status i)))
+             :on-selected-changed {:event/type ::battle-spectate-change
+                                   :client client
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
+                                   :id i}
+             :disable (or (not username)
+                          (not (or (and am-host (:mode (:battle-status i)))
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Faction"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :combo-box
+             :value (->> i :battle-status :side (get sides) str)
+             :on-value-changed {:event/type ::battle-side-changed
+                                :client client
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :sides sides}
+             :items (->> sides seq (sort-by first) (map second))
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Rank"
+       :cell-value-factory (comp :rank :client-status :user)
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe (fn [rank] {:text (str rank)})}}
+      {:fx/type :table-column
+       :text "TrueSkill"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [{:keys [skill skilluncertainty]}]
+          {:text
+           (str skill
+                " "
+                (when (number? skilluncertainty)
+                  (apply str (repeat skilluncertainty "?"))))})}}
+      {:fx/type :table-column
+       :text "Color"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [{:keys [team-color] :as i}]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :color-picker
+             :value (fix-color team-color)
+             :on-action {:event/type ::battle-color-action
+                         :client client
+                         :is-me (= (:username i) username)
+                         :is-bot (-> i :user :client-status :bot)
+                         :id i}
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Team"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :combo-box
+             :value (str (:id (:battle-status i)))
+             :on-value-changed {:event/type ::battle-team-changed
+                                :client client
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i}
+             :items (map str (take 16 (iterate inc 0)))
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Ally"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :combo-box
+             :value (str (:ally (:battle-status i)))
+             :on-value-changed {:event/type ::battle-ally-changed
+                                :client client
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i}
+             :items (map str (take 16 (iterate inc 0)))
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Bonus"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :text-field
+             :disable (not am-host)
+             :text-formatter
+             {:fx/type :text-formatter
+              :value-converter :integer
+              :value (int (or (:handicap (:battle-status i)) 0))
+              :on-value-changed {:event/type ::battle-handicap-change
                                  :client client
-                                 :is-me (= (:username i) username)
                                  :is-bot (-> i :user :client-status :bot)
-                                 :id i}
-           :disable (or (not username)
-                        (not (or (and am-host (:mode (:battle-status i)))
-                                 (= (:username i) username)
-                                 (= (:owner i) username))))}}})}}
-    {:fx/type :table-column
-     :text "Faction"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :combo-box
-           :value (->> i :battle-status :side (get sides) str)
-           :on-value-changed {:event/type ::battle-side-changed
-                              :client client
-                              :is-me (= (:username i) username)
-                              :is-bot (-> i :user :client-status :bot)
-                              :id i
-                              :sides sides}
-           :items (->> sides seq (sort-by first) (map second))
-           :disable (or (not username)
-                        (not (or am-host
-                                 (= (:username i) username)
-                                 (= (:owner i) username))))}}})}}
-    {:fx/type :table-column
-     :text "Rank"
-     :cell-value-factory (comp :rank :client-status :user)
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [rank] {:text (str rank)})}}
-    {:fx/type :table-column
-     :text "TrueSkill"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        (when-let [username (:username i)]
-          (let [username-kw (keyword (string/lower-case username))
-                tags (some-> scripttags :game :players (get username-kw))
-                uncertainty (or (try (u/to-number (:skilluncertainty tags))
-                                     (catch Exception e
-                                       (log/debug e "Error parsing skill uncertainty")))
-                                3)
-                ts (or (:skill i)
-                       (str
-                         (:skill tags)
-                         " "
-                         (apply str (repeat uncertainty "?"))))]
-            {:text (str ts)})))}}
-    {:fx/type :table-column
-     :text "Color"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [{:keys [team-color] :as i}]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :color-picker
-           :value (fix-color team-color)
-           :on-action {:event/type ::battle-color-action
-                       :client client
-                       :is-me (= (:username i) username)
-                       :is-bot (-> i :user :client-status :bot)
-                       :id i}
-           :disable (or (not username)
-                        (not (or am-host
-                                 (= (:username i) username)
-                                 (= (:owner i) username))))}}})}}
-    {:fx/type :table-column
-     :text "Team"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :combo-box
-           :value (str (:id (:battle-status i)))
-           :on-value-changed {:event/type ::battle-team-changed
-                              :client client
-                              :is-me (= (:username i) username)
-                              :is-bot (-> i :user :client-status :bot)
-                              :id i}
-           :items (map str (take 16 (iterate inc 0)))
-           :disable (or (not username)
-                        (not (or am-host
-                                 (= (:username i) username)
-                                 (= (:owner i) username))))}}})}}
-    {:fx/type :table-column
-     :text "Ally"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :combo-box
-           :value (str (:ally (:battle-status i)))
-           :on-value-changed {:event/type ::battle-ally-changed
-                              :client client
-                              :is-me (= (:username i) username)
-                              :is-bot (-> i :user :client-status :bot)
-                              :id i}
-           :items (map str (take 16 (iterate inc 0)))
-           :disable (or (not username)
-                        (not (or am-host
-                                 (= (:username i) username)
-                                 (= (:owner i) username))))}}})}}
-    {:fx/type :table-column
-     :text "Bonus"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text ""
-         :graphic
-         {:fx/type ext-recreate-on-key-changed
-          :key (nickname i)
-          :desc
-          {:fx/type :text-field
-           :disable (not am-host)
-           :text-formatter
-           {:fx/type :text-formatter
-            :value-converter :integer
-            :value (int (or (:handicap (:battle-status i)) 0))
-            :on-value-changed {:event/type ::battle-handicap-change
-                               :client client
-                               :is-bot (-> i :user :client-status :bot)
-                               :id i}}}}})}}]})
+                                 :id i}}}}})}}]}))
 
 (defmethod event-handler ::hostip-changed
   [{:fx/keys [event]}]
@@ -5453,7 +5477,7 @@
   (swap! *state update-in (drop-last path) dissoc (last path)))
 
 (defmethod event-handler ::scan-imports
-  [{:keys [sources]}]
+  [{:keys [sources] :or {sources (import-sources (:extra-import-sources @*state))}}]
   (doseq [import-source sources]
     (add-task! *state (merge
                         {::task-type ::scan-imports}
@@ -6298,18 +6322,6 @@
   [{:keys [player-counts]}]
   (reduce (fnil + 0) 0 player-counts))
 
-(defn parse-skill [skill]
-  (cond
-    (number? skill)
-    skill
-    (string? skill)
-    (let [[_all n] (re-find #"~?([\d]+)" skill)]
-      (try
-        (Double/parseDouble n)
-        (catch Exception e
-          (log/warn e "Error parsing skill" skill))))
-    :else nil))
-
 (defn replay-skills
   [{:keys [body]}]
   (let [skills (some->> body :script-data :game
@@ -6847,7 +6859,7 @@
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-content-copy:16:white"}})
-                             (and (not matching-mod) mod-rapid)
+                             (and (not matching-mod) mod-rapid matching-engine)
                              {:fx/type :button
                               :text (str " Download game")
                               :on-action {:event/type ::rapid-download
@@ -6991,13 +7003,7 @@
                                                 :handicap handicap
                                                 :side (get side-id-by-name side)
                                                 :ally allyteam}
-                                               :team-color team-color)))))
-                              (sort-by
-                                (juxt
-                                  (comp :mode :battle-status)
-                                  (comp :ally :battle-status)
-                                  (comp parse-skill :skill)))
-                              reverse)
+                                               :team-color team-color))))))
                  bots (->> game
                            (filter (comp #(string/starts-with? % "ai") name first))
                            (map
