@@ -311,7 +311,7 @@
       (re-find #"/\." path-str)
       (re-find #"\\\." path-str)))
 
-(defn start-game [{:keys [client engines spring-isolation-dir] :as state}]
+(defn start-game [{:keys [client engines ^java.io.File spring-isolation-dir] :as state}]
   (try
     (log/info "Starting game")
     (client/send-message client "MYSTATUS 1")
@@ -362,7 +362,7 @@
       (log/error e "Error starting game")
       (client/send-message client "MYSTATUS 0"))))
 
-(defn watch-replay [{:keys [engine-version engines replay-file spring-isolation-dir]}]
+(defn watch-replay [{:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
   (try
     (log/info "Watching replay" replay-file)
     (let [engine-dir (some->> engines

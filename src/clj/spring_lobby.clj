@@ -65,6 +65,9 @@
 
 (declare reconcile-engines reconcile-maps reconcile-mods)
 
+
+(def app-version (u/app-version))
+
 (def stylesheets
   [(str (io/resource "dark.css"))])
 
@@ -515,21 +518,24 @@
   ([state-atom worker-id min-priority]
    (let [[before _after] (swap-vals! state-atom
                            (fn [{:keys [tasks] :as state}]
-                             (let [next-tasks (if-not (empty? tasks)
-                                                (let [{::keys [task-priority]} (peek tasks)]
-                                                  (if (<= min-priority (or task-priority default-task-priority))
-                                                    (pop tasks)
-                                                    tasks)
-                                                  (pop tasks))
-                                                tasks)
-                                   task (peek-task min-priority tasks)]
-                               (-> state
-                                   (assoc :tasks next-tasks)
-                                   (assoc-in [:current-tasks worker-id] task)))))
+                             (if (empty? tasks)
+                               state ; don't update unnecessarily
+                               (let [next-tasks (if-not (empty? tasks)
+                                                  (let [{::keys [task-priority]} (peek tasks)]
+                                                    (if (<= min-priority (or task-priority default-task-priority))
+                                                      (pop tasks)
+                                                      tasks)
+                                                    (pop tasks))
+                                                  tasks)
+                                     task (peek-task min-priority tasks)]
+                                 (-> state
+                                     (assoc :tasks next-tasks)
+                                     (assoc-in [:current-tasks worker-id] task))))))
          tasks (:tasks before)
          task (peek-task min-priority tasks)]
      (task-handler task)
-     (swap! state-atom update :current-tasks dissoc worker-id)
+     (when task
+       (swap! state-atom update :current-tasks assoc worker-id nil))
      task)))
 
 (defn tasks-chimer-fn
@@ -1199,8 +1205,6 @@
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
   (future
     (when (< 1 (.getClickCount event))
-      (when (:battle e)
-        @(event-handler (merge e {:event/type ::leave-battle})))
       @(event-handler (merge e {:event/type ::join-battle})))))
 
 
@@ -1347,6 +1351,13 @@
   [{:keys [client message username]}]
   (send-message client (str "SAYPRIVATE " username " " message)))
 
+(defmethod event-handler ::on-mouse-clicked-users-row
+  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
+  (future
+    (when (< 1 (.getClickCount event))
+      (when (:username e)
+        (event-handler (merge e {:event/type ::join-direct-message}))))))
+
 (def users-table-keys [:battles :client :users])
 
 (defn users-table [{:keys [battles client users]}]
@@ -1372,7 +1383,10 @@
       :describe (fn [i]
                   (let [battle (get battles-by-users (:username i))]
                     (merge
-                      {:context-menu
+                      {:on-mouse-clicked
+                       {:event/type ::on-mouse-clicked-users-row
+                        :username (:username i)}
+                       :context-menu
                        {:fx/type :context-menu
                         :items
                         (concat
@@ -2476,7 +2490,7 @@
     (try
       (if selected-battle
         (do
-          (send-message client "LEAVEBATTLE")
+          @(event-handler (merge e {:event/type ::leave-battle}))
           (async/<!! (async/timeout 500))
           (send-message client
             (str "JOINBATTLE " selected-battle
@@ -5161,7 +5175,8 @@
 (defmethod task-handler ::update-rapid
   [_e]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
+  (let [before (u/curr-millis)
+        {:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
@@ -5178,8 +5193,7 @@
              :engine-file (:file engine-details)})))
       (log/warn "No engine details to do rapid init"))
     (log/info "Updating rapid versions in" spring-isolation-dir)
-    (let [before (u/curr-millis)
-          rapid-repos (rapid/repos spring-isolation-dir)
+    (let [rapid-repos (rapid/repos spring-isolation-dir)
           _ (log/info "Found" (count rapid-repos) "rapid repos")
           rapid-versions (->> rapid-repos
                               (mapcat (partial rapid/versions spring-isolation-dir))
@@ -7232,7 +7246,7 @@
 (def my-channels-view-keys
   [:channels :client :message-draft :my-channels :selected-tab-channel])
 
-(defn focus-text-field [tab]
+(defn focus-text-field [^Tab tab]
   (when-let [content (.getContent tab)]
     (let [text-field (-> content (.lookupAll "#channel-text-field") first)]
       (log/info "Found text field" (.getId text-field))
@@ -7428,6 +7442,76 @@
                          :client client
                          :message console-message-draft}}]}]}}]}}))
 
+(def tasks-window-keys
+  [:current-tasks :show-tasks-window :tasks])
+
+(defn tasks-window [{:keys [current-tasks show-tasks-window tasks]}]
+  {:fx/type :stage
+   :showing (boolean show-tasks-window)
+   :title (str u/app-name " Tasks")
+   :icons icons
+   :on-close-request (fn [^Event e]
+                       (swap! *state assoc :show-tasks-window false)
+                       (.consume e))
+   :width 1200
+   :height 1000
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :v-box
+     :style {:-fx-font-size 16}
+     :children
+     [{:fx/type :label
+       :text "Workers"
+       :style {:-fx-font-size 24}}
+      {:fx/type :v-box
+       :alignment :center-left
+       :children
+       (map
+         (fn [[k v]]
+           {:fx/type :h-box
+            :children
+            [{:fx/type :label
+              :style {:-fx-font-size 20}
+              :text (str " Priority " k ": ")}
+             {:fx/type :label
+              :text (str " " v)}]})
+         current-tasks)}
+      {:fx/type :label
+       :text "Task Queue"
+       :style {:-fx-font-size 24}}
+      {:fx/type :table-view
+       :v-box/vgrow :always
+       :column-resize-policy :constrained
+       :items (or (seq tasks) [])
+       :columns
+       [
+        {:fx/type :table-column
+         :text "Type"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (::task-type i))})}}
+        {:fx/type :table-column
+         :text "Priority"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (or (::task-priority i) default-task-priority))})}}
+        {:fx/type :table-column
+         :text "Keys"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (keys i))})}}]}]}}})
+
 (defn root-view
   [{{:keys [agreement battle client last-failed-message password pop-out-battle
             standalone tasks username verification-code]
@@ -7438,7 +7522,7 @@
      :desc
      [{:fx/type :stage
        :showing true
-       :title (str "skylobby " (u/app-version))
+       :title (str "skylobby " app-version)
        :icons icons
        :x 100
        :y 100
@@ -7509,8 +7593,10 @@
                :style {:-fx-text-fill "#FF0000"}}
               {:fx/type :pane
                :h-box/hgrow :always}
-              {:fx/type :label
-               :text (str (count (seq tasks)) " tasks")}]}])}}}
+              {:fx/type :button
+               :text (str (count (seq tasks)) " tasks")
+               :on-action {:event/type ::toggle
+                           :key :show-tasks-window}}]}])}}}
       {:fx/type :stage
        :showing (boolean (and battle pop-out-battle))
        :title (str u/app-name " Battle")
@@ -7554,7 +7640,10 @@
       (merge
         {:fx/type uikeys-window}
         (select-keys state
-          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]}))
+          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))
+      (merge
+        {:fx/type tasks-window}
+        (select-keys state tasks-window-keys))]}))
 
 
 (defn init
