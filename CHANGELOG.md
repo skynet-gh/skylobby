@@ -10,6 +10,10 @@ Notable changes
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.2.1]
+
+- Add setting to change Spring directory
+
 ### [0.2.0]
 
 - Add standalone replays packages

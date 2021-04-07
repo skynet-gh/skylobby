@@ -311,23 +311,22 @@
       (re-find #"/\." path-str)
       (re-find #"\\\." path-str)))
 
-(defn start-game [{:keys [client engines] :as state}]
+(defn start-game [{:keys [client engines spring-isolation-dir] :as state}]
   (try
     (log/info "Starting game")
     (client/send-message client "MYSTATUS 1")
     (let [{:keys [battle-version]} (battle-details state)
           script-txt (battle-script-txt state)
-          isolation-dir (fs/isolation-dir)
           engine-dir (some->> engines
                               (filter (comp #{battle-version} :engine-version))
                               first
                               :file)
           engine-file (io/file engine-dir (fs/spring-executable))
           _ (log/info "Engine executable" engine-file)
-          script-file (io/file (fs/app-root) "spring" "script.txt") ; TODO match isolation?
+          script-file (io/file spring-isolation-dir "script.txt")
           script-file-param (fs/wslpath script-file)
           isolation-dir-param (fs/wslpath engine-dir)
-          write-dir-param (fs/wslpath isolation-dir)]
+          write-dir-param (fs/wslpath spring-isolation-dir)]
       (spit script-file script-txt)
       (log/info "Wrote script to" script-file)
       (let [command [(fs/canonical-path engine-file)
@@ -338,7 +337,7 @@
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp (fs/envp)
-              process (.exec runtime cmdarray envp isolation-dir)]
+              process (.exec runtime cmdarray envp spring-isolation-dir)]
           (client/send-message client "MYSTATUS 1")
           (async/thread
             (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
@@ -363,11 +362,10 @@
       (log/error e "Error starting game")
       (client/send-message client "MYSTATUS 0"))))
 
-(defn watch-replay [{:keys [engine-version engines replay-file]}]
+(defn watch-replay [{:keys [engine-version engines replay-file spring-isolation-dir]}]
   (try
     (log/info "Watching replay" replay-file)
-    (let [isolation-dir (fs/isolation-dir)
-          engine-dir (some->> engines
+    (let [engine-dir (some->> engines
                               (filter (comp #{engine-version} :engine-version))
                               first
                               :file)
@@ -375,7 +373,7 @@
           _ (log/info "Engine executable" engine-file)
           replay-file-param (fs/wslpath replay-file)
           isolation-dir-param (fs/wslpath engine-dir)
-          write-dir-param (fs/wslpath isolation-dir)
+          write-dir-param (fs/wslpath spring-isolation-dir)
           command [(fs/canonical-path engine-file)
                    "--isolation-dir" isolation-dir-param
                    "--write-dir" write-dir-param
@@ -384,7 +382,7 @@
       (log/info "Running '" command "'")
       (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
             ^"[Ljava.lang.String;" envp (fs/envp)
-            process (.exec runtime cmdarray envp isolation-dir)]
+            process (.exec runtime cmdarray envp spring-isolation-dir)]
         (async/thread
           (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
             (loop []
