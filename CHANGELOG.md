@@ -4,11 +4,13 @@ Notable changes
 
 ### TODO - future
 
-- Ring sound
-- Add ability to configure directory, in order to just work in BAR or Spring
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.1]
+
+- Add ring handler and sound effect
 
 ### [0.2.1]
 
