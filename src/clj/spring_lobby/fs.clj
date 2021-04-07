@@ -197,10 +197,7 @@
       (string/includes? os-name "Linux")
       (if (wsl? sys-data)
         (io/file "/mnt" "c" "Users" user-name "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
-        (let [snap-dir (io/file user-home "snap" "springlobby-nsg" "common" ".spring")]
-          (if (.exists snap-dir)
-            snap-dir
-            (io/file user-home ".spring"))))
+        (io/file user-home "Documents" "Beyond All Reason")) ; appimage, but others?
       (string/includes? os-name "Windows")
       (io/file user-home "AppData" "Local" "Programs" "Beyond-All-Reason" "data")
       :else

@@ -65,6 +65,9 @@
 
 (declare reconcile-engines reconcile-maps reconcile-mods)
 
+
+(def app-version (u/app-version))
+
 (def stylesheets
   [(str (io/resource "dark.css"))])
 
@@ -515,21 +518,24 @@
   ([state-atom worker-id min-priority]
    (let [[before _after] (swap-vals! state-atom
                            (fn [{:keys [tasks] :as state}]
-                             (let [next-tasks (if-not (empty? tasks)
-                                                (let [{::keys [task-priority]} (peek tasks)]
-                                                  (if (<= min-priority (or task-priority default-task-priority))
-                                                    (pop tasks)
-                                                    tasks)
-                                                  (pop tasks))
-                                                tasks)
-                                   task (peek-task min-priority tasks)]
-                               (-> state
-                                   (assoc :tasks next-tasks)
-                                   (assoc-in [:current-tasks worker-id] task)))))
+                             (if (empty? tasks)
+                               state ; don't update unnecessarily
+                               (let [next-tasks (if-not (empty? tasks)
+                                                  (let [{::keys [task-priority]} (peek tasks)]
+                                                    (if (<= min-priority (or task-priority default-task-priority))
+                                                      (pop tasks)
+                                                      tasks)
+                                                    (pop tasks))
+                                                  tasks)
+                                     task (peek-task min-priority tasks)]
+                                 (-> state
+                                     (assoc :tasks next-tasks)
+                                     (assoc-in [:current-tasks worker-id] task))))))
          tasks (:tasks before)
          task (peek-task min-priority tasks)]
      (task-handler task)
-     (swap! state-atom update :current-tasks dissoc worker-id)
+     (when task
+       (swap! state-atom update :current-tasks assoc worker-id nil))
      task)))
 
 (defn tasks-chimer-fn
@@ -1199,8 +1205,6 @@
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
   (future
     (when (< 1 (.getClickCount event))
-      (when (:battle e)
-        @(event-handler (merge e {:event/type ::leave-battle})))
       @(event-handler (merge e {:event/type ::join-battle})))))
 
 
@@ -1218,8 +1222,8 @@
     :items (->> battles
                 vals
                 (filter :battle-title)
-                (sort-by :battle-title String/CASE_INSENSITIVE_ORDER)
-                vec)
+                (sort-by (juxt (comp count :users) :battle-spectators))
+                reverse)
     :row-factory
     {:fx/cell-type :table-row
      :describe (fn [i]
@@ -1237,6 +1241,7 @@
                    :text (->> i
                               :users
                               keys
+                              (sort String/CASE_INSENSITIVE_ORDER)
                               (string/join "\n")
                               (str "Players:\n\n"))}
                   :context-menu
@@ -1290,6 +1295,7 @@
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [country] {:text (str country)})}}
+     #_
      {:fx/type :table-column
       :text "Rank"
       :cell-value-factory :battle-rank
@@ -1297,17 +1303,21 @@
       {:fx/cell-type :table-cell
        :describe (fn [battle-rank] {:text (str battle-rank)})}}
      {:fx/type :table-column
-      :text "Players"
-      :cell-value-factory (comp count :users)
+      :text "Players (Specs)"
+      :cell-value-factory (juxt (comp count :users) :battle-spectators)
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [user-count] {:text (str user-count)})}}
+       :describe
+       (fn [[user-count spec-count]]
+         {:text (str user-count " (" spec-count ")")})}}
+     #_
      {:fx/type :table-column
       :text "Max"
       :cell-value-factory :battle-maxplayers
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-maxplayers] {:text (str battle-maxplayers)})}}
+     #_
      {:fx/type :table-column
       :text "Spectators"
       :cell-value-factory :battle-spectators
@@ -1326,6 +1336,7 @@
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-map] {:text (str battle-map)})}}
+     #_
      {:fx/type :table-column
       :text "Engine"
       :cell-value-factory #(str (:battle-engine %) " " (:battle-version %))
@@ -1346,6 +1357,13 @@
 (defmethod event-handler ::direct-message
   [{:keys [client message username]}]
   (send-message client (str "SAYPRIVATE " username " " message)))
+
+(defmethod event-handler ::on-mouse-clicked-users-row
+  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
+  (future
+    (when (< 1 (.getClickCount event))
+      (when (:username e)
+        (event-handler (merge e {:event/type ::join-direct-message}))))))
 
 (def users-table-keys [:battles :client :users])
 
@@ -1372,7 +1390,10 @@
       :describe (fn [i]
                   (let [battle (get battles-by-users (:username i))]
                     (merge
-                      {:context-menu
+                      {:on-mouse-clicked
+                       {:event/type ::on-mouse-clicked-users-row
+                        :username (:username i)}
+                       :context-menu
                        {:fx/type :context-menu
                         :items
                         (concat
@@ -2476,7 +2497,7 @@
     (try
       (if selected-battle
         (do
-          (send-message client "LEAVEBATTLE")
+          @(event-handler (merge e {:event/type ::leave-battle}))
           (async/<!! (async/timeout 500))
           (send-message client
             (str "JOINBATTLE " selected-battle
@@ -3772,11 +3793,88 @@
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-account-remove:16:white"}}})))}}
       {:fx/type :table-column
-       :text "Country"
-       :cell-value-factory (comp :country :user)
+       :text "TrueSkill"
+       :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
-        :describe (fn [country] {:text (str country)})}}
+        :describe
+        (fn [{:keys [skill skilluncertainty]}]
+          {:text
+           (str skill
+                " "
+                (when (number? skilluncertainty)
+                  (apply str (repeat skilluncertainty "?"))))})}}
+      {:fx/type :table-column
+       :text "Ally"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :combo-box
+             :value (str (:ally (:battle-status i)))
+             :on-value-changed {:event/type ::battle-ally-changed
+                                :client client
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i}
+             :items (map str (take 16 (iterate inc 0)))
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Team"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :combo-box
+             :value (str (:id (:battle-status i)))
+             :on-value-changed {:event/type ::battle-team-changed
+                                :client client
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i}
+             :items (map str (take 16 (iterate inc 0)))
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
+      {:fx/type :table-column
+       :text "Color"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [{:keys [team-color] :as i}]
+          {:text ""
+           :graphic
+           {:fx/type ext-recreate-on-key-changed
+            :key (nickname i)
+            :desc
+            {:fx/type :color-picker
+             :value (fix-color team-color)
+             :on-action {:event/type ::battle-color-action
+                         :client client
+                         :is-me (= (:username i) username)
+                         :is-bot (-> i :user :client-status :bot)
+                         :id i}
+             :disable (or (not username)
+                          (not (or am-host
+                                   (= (:username i) username)
+                                   (= (:owner i) username))))}}})}}
       {:fx/type :table-column
        :text "Status"
        :cell-value-factory identity
@@ -3858,95 +3956,20 @@
                           (not (or am-host
                                    (= (:username i) username)
                                    (= (:owner i) username))))}}})}}
+      #_
       {:fx/type :table-column
+       :editable false
        :text "Rank"
-       :cell-value-factory (comp :rank :client-status :user)
+       :cell-value-factory (comp u/to-number :rank :client-status :user)
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [rank] {:text (str rank)})}}
       {:fx/type :table-column
-       :text "TrueSkill"
-       :cell-value-factory identity
+       :text "Country"
+       :cell-value-factory (comp :country :user)
        :cell-factory
        {:fx/cell-type :table-cell
-        :describe
-        (fn [{:keys [skill skilluncertainty]}]
-          {:text
-           (str skill
-                " "
-                (when (number? skilluncertainty)
-                  (apply str (repeat skilluncertainty "?"))))})}}
-      {:fx/type :table-column
-       :text "Color"
-       :cell-value-factory identity
-       :cell-factory
-       {:fx/cell-type :table-cell
-        :describe
-        (fn [{:keys [team-color] :as i}]
-          {:text ""
-           :graphic
-           {:fx/type ext-recreate-on-key-changed
-            :key (nickname i)
-            :desc
-            {:fx/type :color-picker
-             :value (fix-color team-color)
-             :on-action {:event/type ::battle-color-action
-                         :client client
-                         :is-me (= (:username i) username)
-                         :is-bot (-> i :user :client-status :bot)
-                         :id i}
-             :disable (or (not username)
-                          (not (or am-host
-                                   (= (:username i) username)
-                                   (= (:owner i) username))))}}})}}
-      {:fx/type :table-column
-       :text "Team"
-       :cell-value-factory identity
-       :cell-factory
-       {:fx/cell-type :table-cell
-        :describe
-        (fn [i]
-          {:text ""
-           :graphic
-           {:fx/type ext-recreate-on-key-changed
-            :key (nickname i)
-            :desc
-            {:fx/type :combo-box
-             :value (str (:id (:battle-status i)))
-             :on-value-changed {:event/type ::battle-team-changed
-                                :client client
-                                :is-me (= (:username i) username)
-                                :is-bot (-> i :user :client-status :bot)
-                                :id i}
-             :items (map str (take 16 (iterate inc 0)))
-             :disable (or (not username)
-                          (not (or am-host
-                                   (= (:username i) username)
-                                   (= (:owner i) username))))}}})}}
-      {:fx/type :table-column
-       :text "Ally"
-       :cell-value-factory identity
-       :cell-factory
-       {:fx/cell-type :table-cell
-        :describe
-        (fn [i]
-          {:text ""
-           :graphic
-           {:fx/type ext-recreate-on-key-changed
-            :key (nickname i)
-            :desc
-            {:fx/type :combo-box
-             :value (str (:ally (:battle-status i)))
-             :on-value-changed {:event/type ::battle-ally-changed
-                                :client client
-                                :is-me (= (:username i) username)
-                                :is-bot (-> i :user :client-status :bot)
-                                :id i}
-             :items (map str (take 16 (iterate inc 0)))
-             :disable (or (not username)
-                          (not (or am-host
-                                   (= (:username i) username)
-                                   (= (:owner i) username))))}}})}}
+        :describe (fn [country] {:text (str country)})}}
       {:fx/type :table-column
        :text "Bonus"
        :cell-value-factory identity
@@ -4231,6 +4254,7 @@
                          :message message-draft
                          :message-key message-key}}
             {:fx/type :text-field
+             :id "channel-text-field"
              :h-box/hgrow :always
              :text (str message-draft)
              :on-text-changed {:event/type ::assoc
@@ -4274,14 +4298,14 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :battle-message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :spring-isolation-dir :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :spring-isolation-dir :tasks :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            channels client
-           copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
+           copying current-tasks downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
            http-download importables-by-path map-input-prefix maps battle-message-draft minimap-type parsed-replays-by-path
-           rapid-data-by-version rapid-download spring-isolation-dir update-engines update-maps update-mods users username]
+           rapid-data-by-version rapid-download rapid-update spring-isolation-dir tasks update-engines update-maps update-mods users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -4311,7 +4335,16 @@
                                bot-name))
         bot-name (some #{bot-name} bot-names)
         bot-version (some #{bot-version} bot-versions)
-        sides (spring/mod-sides battle-mod-details)]
+        sides (spring/mod-sides battle-mod-details)
+        all-tasks (concat tasks (vals current-tasks))
+        extract-tasks (->> all-tasks
+                           (filter (comp #{::extract-7z} ::task-type))
+                           (map (comp fs/canonical-path :file))
+                           set)
+        import-tasks (->> all-tasks
+                          (filter (comp #{::import} ::task-type))
+                          (map (comp fs/canonical-path :resource-file :importable))
+                          set)]
     {:fx/type :h-box
      :style {:-fx-font-size 15}
      :alignment :top-left
@@ -4481,16 +4514,19 @@
                                                  (filter (partial could-be-this-map? battle-map))
                                                  first)
                              resource-file (:resource-file importable)
-                             canonical-path (fs/canonical-path resource-file)]
+                             resource-path (fs/canonical-path resource-file)
+                             in-progress (boolean
+                                           (or (-> copying (get resource-path) :status boolean)
+                                               (contains? import-tasks resource-path)))]
                          [{:severity 2
                            :text "import"
                            :human-text (if importable
                                          (str "Import from " (:import-source-name importable))
                                          "No import found")
                            :tooltip (if importable
-                                      (str "Copy map archive from " canonical-path)
+                                      (str "Copy map archive from " resource-path)
                                       (str "No local import found for map " battle-map))
-                           :in-progress (-> copying (get canonical-path) :status)
+                           :in-progress in-progress
                            :action
                            (when (and importable
                                       (not (file-exists? file-cache (resource-dest importable))))
@@ -4549,7 +4585,7 @@
                               :downloadable downloadable})}])
                        (let [rapid-id (:id (get rapid-data-by-version battle-modname))
                              rapid-download (get rapid-download rapid-id)
-                             in-progress (:running rapid-download)]
+                             in-progress (or (:running rapid-download) rapid-update)]
                          [{:severity 2
                            :text "rapid"
                            :human-text (if rapid-id
@@ -4558,7 +4594,9 @@
                                              (str (download-progress rapid-download))
                                              (str "Download rapid " rapid-id))
                                            "Needs engine first to download with rapid")
-                                         "No rapid download, update rapid")
+                                         (if in-progress
+                                           "Rapid updating..."
+                                           "No rapid download, update rapid"))
                            :tooltip (if rapid-id
                                       (if engine-file
                                         (str "Use rapid downloader to get resource id " rapid-id
@@ -4673,7 +4711,7 @@
                          :tooltip (if in-progress
                                     (str "Downloading " (download-progress download))
                                     (if dest-exists
-                                      (str "Downloaded to " (fs/canonical-path dest))
+                                      (str "Downloaded to " dest-path)
                                       (str "Download " url)))
                          :in-progress in-progress
                          :action (when (and downloadable (not dest-exists))
@@ -4682,7 +4720,8 @@
                        (when dest-exists
                          [{:severity 2
                            :text "extract"
-                           :in-progress (get extracting dest-path)
+                           :in-progress (or (get extracting dest-path)
+                                            (contains? extract-tasks dest-path))
                            :human-text "Extract engine archive"
                            :tooltip (str "Click to extract " dest-path)
                            :action {:event/type ::extract-7z
@@ -4769,6 +4808,7 @@
            :message-draft battle-message-draft
            :message-key :battle-message-draft}]}]}
       {:fx/type :tab-pane
+       :style {:-fx-min-height (+ minimap-size 130)}
        :tabs
        [{:fx/type :tab
          :graphic {:fx/type :label
@@ -4777,7 +4817,6 @@
          :content
          {:fx/type :v-box
           :alignment :top-left
-          :style {:-fx-min-height (+ minimap-size 120)}
           :children
           [{:fx/type minimap-pane
             :am-host am-host
@@ -5145,7 +5184,8 @@
 (defmethod task-handler ::update-rapid
   [_e]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
+  (let [before (u/curr-millis)
+        {:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
@@ -5162,8 +5202,7 @@
              :engine-file (:file engine-details)})))
       (log/warn "No engine details to do rapid init"))
     (log/info "Updating rapid versions in" spring-isolation-dir)
-    (let [before (u/curr-millis)
-          rapid-repos (rapid/repos spring-isolation-dir)
+    (let [rapid-repos (rapid/repos spring-isolation-dir)
           _ (log/info "Found" (count rapid-repos) "rapid repos")
           rapid-versions (->> rapid-repos
                               (mapcat (partial rapid/versions spring-isolation-dir))
@@ -6888,7 +6927,6 @@
                                    resource-path (fs/canonical-path resource-file)
                                    in-progress (boolean
                                                  (or (-> copying (get resource-path) :status boolean)
-                                                     (-> copying (get resource-path) :status boolean)
                                                      (contains? import-tasks resource-path)))]
                                {:fx/type :button
                                 :text (if in-progress
@@ -6933,7 +6971,6 @@
                                    resource-path (fs/canonical-path resource-file)
                                    in-progress (boolean
                                                  (or (-> copying (get resource-path) :status boolean)
-                                                     (-> copying (get resource-path) :status boolean)
                                                      (contains? import-tasks resource-path)))]
                                {:fx/type :button
                                 :text (if in-progress
@@ -7218,43 +7255,52 @@
 (def my-channels-view-keys
   [:channels :client :message-draft :my-channels :selected-tab-channel])
 
+(defn focus-text-field [^Tab tab]
+  (when-let [content (.getContent tab)]
+    (let [text-field (-> content (.lookupAll "#channel-text-field") first)]
+      (log/info "Found text field" (.getId text-field))
+      (Platform/runLater
+        (fn []
+          (.requestFocus text-field))))))
+
 (defn my-channels-view [{:keys [channels client message-draft my-channels selected-tab-channel]}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
-                              (into []))
+                              sort)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^List my-channel-names selected-tab-channel)
                          0)]
-    {:fx/type fx.ext.tab-pane/with-selection-props
-     :props
-     (merge
-       {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}}
-       (when (< selected-index (count my-channel-names))
-         {:selected-index selected-index}))
-     :desc
-     {:fx/type :tab-pane
-      :on-tabs-changed {:event/type ::my-channels-tab-action}
-      :style {:-fx-font-size 16}
-      :tabs
-      (map
-        (fn [channel-name]
-          {:fx/type :tab
-           :graphic {:fx/type :label
-                     :text (str channel-name)}
-           :id channel-name
-           :closable (not (u/battle-channel-name? channel-name))
-           :on-close-request {:event/type ::leave-channel
-                              :channel-name channel-name
-                              :client client}
-           :content
-           {:fx/type channel-view
-            :channels channels
-            :client client
-            :message-draft message-draft
-            :message-key :message-draft
-            :channel-name channel-name}})
-        my-channel-names)}}))
+    (if (seq my-channel-names)
+      {:fx/type fx.ext.tab-pane/with-selection-props
+       :props
+       {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}
+        :selected-index selected-index}
+       :desc
+       {:fx/type :tab-pane
+        :on-tabs-changed {:event/type ::my-channels-tab-action}
+        :style {:-fx-font-size 16}
+        :tabs
+        (map
+          (fn [channel-name]
+            {:fx/type :tab
+             :graphic {:fx/type :label
+                       :text (str channel-name)}
+             :id channel-name
+             :closable (not (u/battle-channel-name? channel-name))
+             :on-close-request {:event/type ::leave-channel
+                                :channel-name channel-name
+                                :client client}
+             :on-selection-changed (fn [ev] (focus-text-field (.getTarget ev)))
+             :content
+             {:fx/type channel-view
+              :channels channels
+              :client client
+              :message-draft message-draft
+              :message-key :message-draft
+              :channel-name channel-name}})
+          my-channel-names)}}
+      {:fx/type :pane})))
 
 
 (defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
@@ -7405,6 +7451,76 @@
                          :client client
                          :message console-message-draft}}]}]}}]}}))
 
+(def tasks-window-keys
+  [:current-tasks :show-tasks-window :tasks])
+
+(defn tasks-window [{:keys [current-tasks show-tasks-window tasks]}]
+  {:fx/type :stage
+   :showing (boolean show-tasks-window)
+   :title (str u/app-name " Tasks")
+   :icons icons
+   :on-close-request (fn [^Event e]
+                       (swap! *state assoc :show-tasks-window false)
+                       (.consume e))
+   :width 1200
+   :height 1000
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :v-box
+     :style {:-fx-font-size 16}
+     :children
+     [{:fx/type :label
+       :text "Workers"
+       :style {:-fx-font-size 24}}
+      {:fx/type :v-box
+       :alignment :center-left
+       :children
+       (map
+         (fn [[k v]]
+           {:fx/type :h-box
+            :children
+            [{:fx/type :label
+              :style {:-fx-font-size 20}
+              :text (str " Priority " k ": ")}
+             {:fx/type :label
+              :text (str " " v)}]})
+         current-tasks)}
+      {:fx/type :label
+       :text "Task Queue"
+       :style {:-fx-font-size 24}}
+      {:fx/type :table-view
+       :v-box/vgrow :always
+       :column-resize-policy :constrained
+       :items (or (seq tasks) [])
+       :columns
+       [
+        {:fx/type :table-column
+         :text "Type"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (::task-type i))})}}
+        {:fx/type :table-column
+         :text "Priority"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (or (::task-priority i) default-task-priority))})}}
+        {:fx/type :table-column
+         :text "Keys"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (str (keys i))})}}]}]}}})
+
 (defn root-view
   [{{:keys [agreement battle client last-failed-message password pop-out-battle
             standalone tasks username verification-code]
@@ -7415,7 +7531,7 @@
      :desc
      [{:fx/type :stage
        :showing true
-       :title (str "skylobby " (u/app-version))
+       :title (str "skylobby " app-version)
        :icons icons
        :x 100
        :y 100
@@ -7486,8 +7602,10 @@
                :style {:-fx-text-fill "#FF0000"}}
               {:fx/type :pane
                :h-box/hgrow :always}
-              {:fx/type :label
-               :text (str (count (seq tasks)) " tasks")}]}])}}}
+              {:fx/type :button
+               :text (str (count (seq tasks)) " tasks")
+               :on-action {:event/type ::toggle
+                           :key :show-tasks-window}}]}])}}}
       {:fx/type :stage
        :showing (boolean (and battle pop-out-battle))
        :title (str u/app-name " Battle")
@@ -7531,7 +7649,10 @@
       (merge
         {:fx/type uikeys-window}
         (select-keys state
-          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))]}))
+          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))
+      (merge
+        {:fx/type tasks-window}
+        (select-keys state tasks-window-keys))]}))
 
 
 (defn init
