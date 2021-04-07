@@ -604,10 +604,13 @@
   [engine-version {:keys [resource-filename resource-name]}]
   (or (= engine-version resource-name)
       (when (and engine-version resource-filename)
-        (or (= engine-version resource-filename)
-            (= (http/engine-archive engine-version)
-               resource-filename)
-            (= (http/bar-engine-filename engine-version) resource-filename)))))
+        (let [lce (string/lower-case engine-version)
+              lcf (string/lower-case resource-filename)]
+          (or (= engine-version resource-filename)
+              (= lce lcf)
+              (= (http/engine-archive engine-version)
+                 resource-filename)
+              (= (http/bar-engine-filename engine-version) resource-filename))))))
 
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
@@ -1235,7 +1238,15 @@
                               :users
                               keys
                               (string/join "\n")
-                              (str "Players:\n\n"))}})}
+                              (str "Players:\n\n"))}
+                  :context-menu
+                  {:fx/type :context-menu
+                   :items
+                   [{:fx/type :menu-item
+                     :text "Join Battle"
+                     :on-action {:event/type ::join-battle
+                                 :client client
+                                 :selected-battle (:battle-id i)}}]}})}
     :columns
     [{:fx/type :table-column
       :text "Battle Name"
@@ -2464,12 +2475,15 @@
   (future
     (try
       (if selected-battle
-        (send-message client
-          (str "JOINBATTLE " selected-battle
-               (if battle-passworded
-                 (str " " battle-password)
-                 (str " *"))
-               " " (crypto.random/hex 6)))
+        (do
+          (send-message client "LEAVEBATTLE")
+          (async/<!! (async/timeout 500))
+          (send-message client
+            (str "JOINBATTLE " selected-battle
+                 (if battle-passworded
+                   (str " " battle-password)
+                   (str " *"))
+                 " " (crypto.random/hex 6))))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -3686,8 +3700,13 @@
           (log/warn e "Error parsing skill" skill))))
     :else nil))
 
+(defmethod event-handler ::ring
+  [{:keys [channel-name client username]}]
+  (when channel-name
+    (send-message client (str "SAY " channel-name " !ring " username))))
+
 (defn battle-players-table
-  [{:keys [am-host client host-username players scripttags sides username]}]
+  [{:keys [am-host channel-name client host-username players scripttags sides username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -3716,12 +3735,18 @@
                    {:fx/type :context-menu
                     :items
                     (concat []
-                      (when (and (not owner) (not= username (:username id)))
+                      (when (and (not owner)) ;(not= username (:username id)))
                         [
                          {:fx/type :menu-item
                           :text "Message"
                           :on-action {:event/type ::join-direct-message
-                                      :username (:username id)}}]))}})}
+                                      :username (:username id)}}])
+                      [{:fx/type :menu-item
+                        :text "Ring"
+                        :on-action {:event/type ::ring
+                                    :client client
+                                    :channel-name channel-name
+                                    :username (:username id)}}])}})}
      :columns
      [{:fx/type :table-column
        :text "Nickname"
@@ -4296,14 +4321,15 @@
        :children
        [{:fx/type battle-players-table
          :v-box/vgrow :always
-         :client client
          :am-host am-host
+         :battle-modname battle-modname
+         :channel-name channel-name
+         :client client
          :host-username host-username
          :players (battle-players-and-bots state)
+         :scripttags scripttags
          :sides sides
-         :username username
-         :battle-modname battle-modname
-         :scripttags scripttags}
+         :username username}
         {:fx/type :h-box
          :children
          [
@@ -4625,7 +4651,7 @@
                    (let [downloadable (->> downloadables-by-url
                                            vals
                                            (filter (comp #{::engine} :resource-type))
-                                           (filter (comp (partial could-be-this-engine? engine-version) :resource-filename))
+                                           (filter (partial could-be-this-engine? engine-version))
                                            first)
                          url (:download-url downloadable)
                          download (get http-download url)

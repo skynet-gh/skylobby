@@ -7,6 +7,7 @@
     [gloss.io :as gio]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
+    [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
@@ -464,3 +465,7 @@
     (swap! state-atom update-in [:battle :scripttags :game allyteam-kw]
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
+
+(defmethod handle "RING" [_client _state-atom m]
+  (let [[_all _username] (re-find #"\w+ ([^\s]+)" m)]
+    (sound/play-ring)))
