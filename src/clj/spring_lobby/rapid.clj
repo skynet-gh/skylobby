@@ -162,26 +162,18 @@
        (io/file "rapid" "packages.springrts.com" "versions.gz")
        (rapid-versions))))
 
-#_
-(def package-by-hash
-  (or
-    (try
-      (->> (package-versions)
-           (map (juxt :hash identity))
-           (into {}))
-      (catch Exception e
-        (log/error e "Error loading Rapid package versions")))
-    {}))
-
 
 (defn versions
   ([repo]
    (versions repo (fs/isolation-dir)))
-  ([repo root]
+  ([root repo]
    (log/debug "Loading rapid versions for repo" repo)
-   (-> root
-       (io/file "rapid" "repos.springrts.com" repo "versions.gz")
-       (rapid-versions))))
+   (try
+     (-> root
+         (io/file "rapid" "repos.springrts.com" repo "versions.gz")
+         (rapid-versions))
+     (catch Exception e
+       (log/error e "Error loading rapid versions")))))
 
 
 (defn- try-inner-lua

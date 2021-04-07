@@ -42,6 +42,7 @@
     [version-clj.core :as version])
   (:import
     (java.awt Desktop)
+    (java.io File)
     (java.time LocalDateTime)
     (java.util List TimeZone)
     (javafx.application Platform)
@@ -61,6 +62,8 @@
 
 (set! *warn-on-reflection* true)
 
+
+(declare reconcile-engines reconcile-maps reconcile-mods)
 
 (def stylesheets
   [(str (io/resource "dark.css"))])
@@ -119,7 +122,7 @@
   {'spring-lobby/java.io.File #'spring-lobby/read-file-tag})
 
 ; https://stackoverflow.com/a/23592006/984393
-(defmethod print-method java.io.File [f ^java.io.Writer w]
+(defmethod print-method File [f ^java.io.Writer w]
   (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
 
 
@@ -147,14 +150,15 @@
 
 
 (def priority-overrides
-  {::update-downloadables 2
-   ::scan-imports 2
-   ::update-engine 4
-   ::update-map 4
-   ::update-mod 4
-   ::import 5
-   ::http-downloadable 5
-   ::rapid-downloadable 5})
+  {::reconcile-engines 1
+   ::reconcile-mods 2
+   ::reconcile-maps 3
+   ::import 3
+   ::http-downloadable 3
+   ::rapid-downloadable 3
+   ::update-rapid-packages 4
+   ::update-downloadables 5
+   ::scan-imports 5})
 
 (def default-task-priority 3)
 
@@ -175,7 +179,7 @@
    :extra-import-sources :extra-replay-sources
    :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins
    :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
-   :rapid-repo :replays-watched :replays-window-details :server :servers :uikeys :username])
+   :rapid-repo :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys :username])
 
 
 (defn select-config [state]
@@ -235,7 +239,8 @@
 
 (defn initial-state []
   (merge
-    {:servers default-servers}
+    {:spring-isolation-dir (fs/isolation-dir)
+     :servers default-servers}
     (apply
       merge
       (doall
@@ -352,6 +357,14 @@
 (defmulti event-handler :event/type)
 
 
+(defn add-task! [state-atom task]
+  (if task
+    (do
+      (log/info "Adding task" (pr-str task))
+      (swap! state-atom update :tasks conj task))
+    (log/warn "Attempt to add nil task" task)))
+
+
 (defn add-watchers
   "Adds all *state watchers."
   [state-atom]
@@ -441,7 +454,36 @@
                          mod-fix (assoc :mod-name mod-fix)
                          map-fix (assoc :map-name map-fix))))))
           (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher")))))))
+            (log/error e "Error in :battle-map-details state watcher"))))))
+  (add-watch state-atom :fix-spring-isolation-dir
+    (fn [_k _ref _old-state new-state]
+      (future
+        (try
+          (let [{:keys [spring-isolation-dir]} new-state]
+            (when-not (and spring-isolation-dir
+                           (instance? File spring-isolation-dir))
+              (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
+              (swap! state-atom assoc :spring-isolation-dir (fs/isolation-dir))))
+          (catch Exception e
+            (log/error e "Error in :fix-spring-isolation-dir state watcher"))))))
+  (add-watch state-atom :spring-isolation-dir-changed
+    (fn [_k _ref old-state new-state]
+      (future
+        (try
+          (let [{:keys [spring-isolation-dir]} new-state]
+            (when (and spring-isolation-dir
+                       (instance? File spring-isolation-dir)
+                       (not= (fs/canonical-path spring-isolation-dir)
+                             (fs/canonical-path (:spring-isolation-dir old-state))))
+              (log/info "Spring isolation dir changed to" spring-isolation-dir "updating resources")
+              (reconcile-engines *state)
+              (reconcile-mods *state)
+              (reconcile-maps *state)
+              (event-handler {:event/type ::scan-imports})
+              (add-task! *state {::task-type ::update-rapid})
+              (add-task! *state {::task-type ::refresh-replays})))
+          (catch Exception e
+            (log/error e "Error in :spring-isolation-dir-changed state watcher")))))))
 
 
 (defmulti task-handler ::task-type)
@@ -510,14 +552,6 @@
 
 (defn handle-all-tasks! [state-atom]
   (while (handle-task! :repl state-atom)))
-
-
-(defn add-task! [state-atom task]
-  (if task
-    (do
-      (log/info "Adding task" (pr-str task))
-      (swap! state-atom update :tasks conj task))
-    (log/warn "Attempt to add nil task" task)))
 
 
 (defn update-file-cache!
@@ -636,7 +670,7 @@
      :player-counts team-counts}))
 
 
-(defn replay-sources [extra-replay-sources]
+(defn replay-sources [{:keys [extra-replay-sources]}]
   (concat
     [{:replay-source-name "skylobby"
       :file (fs/replays-dir (fs/isolation-dir))
@@ -654,14 +688,14 @@
   [state-atom]
   (log/info "Refreshing replays")
   (let [before (u/curr-millis)
-        {:keys [extra-replay-sources parsed-replays-by-path]} @state-atom
+        {:keys [parsed-replays-by-path] :as state} @state-atom
         existing-paths (set (keys parsed-replays-by-path))
         all-files (mapcat
                     (fn [{:keys [file replay-source-name]}]
                       (map
                         (juxt (constantly replay-source-name) identity)
                         (fs/replay-files file)))
-                    (replay-sources extra-replay-sources))
+                    (replay-sources state))
         todo (->> all-files
                   (remove (comp existing-paths fs/canonical-path second))
                   (sort-by (comp fs/filename second))
@@ -784,8 +818,9 @@
    (log/info "Reconciling engines")
    (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
-         engine-dirs (fs/engine-dirs)
-         known-canonical-paths (->> state-atom deref :engines
+         {:keys [spring-isolation-dir] :as state} @state-atom
+         engine-dirs (fs/engine-dirs spring-isolation-dir)
+         known-canonical-paths (->> state :engines
                                     (map (comp fs/canonical-path :file))
                                     (filter some?)
                                     set)
@@ -796,7 +831,7 @@
                            (->> known-canonical-paths
                                 (remove (comp fs/exists io/file)))
                            (->> known-canonical-paths
-                                (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))
+                                (remove (comp (partial fs/descendant? spring-isolation-dir) io/file)))))
          to-remove (set
                      (concat missing-files
                              (remove canonical-path-set known-canonical-paths)))]
@@ -871,12 +906,12 @@
   (log/info "Reconciling mods")
   (remove-all-duplicate-mods state-atom)
   (let [before (u/curr-millis)
-        mods (->> state-atom deref :mods)
+        {:keys [mods spring-isolation-dir]} @state-atom
         {:keys [rapid archive directory]} (group-by ::fs/source mods)
         known-file-paths (set (map (comp fs/canonical-path :file) (concat archive directory)))
         known-rapid-paths (set (map (comp fs/canonical-path :file) rapid))
-        mod-files (fs/mod-files)
-        sdp-files (rapid/sdp-files)
+        mod-files (fs/mod-files spring-isolation-dir)
+        sdp-files (rapid/sdp-files spring-isolation-dir)
         _ (log/info "Found" (count mod-files) "files and"
                     (count sdp-files) "rapid archives to scan for mods")
         to-add-file (set
@@ -890,7 +925,7 @@
                           (->> all-paths
                                (remove (comp fs/exists io/file)))
                           (->> all-paths
-                               (remove (comp (partial fs/descendant? (fs/isolation-dir)) io/file)))))]
+                               (remove (comp (partial fs/descendant? spring-isolation-dir) io/file)))))]
     (apply update-file-cache! all-paths)
     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
@@ -999,8 +1034,9 @@
   (swap! state-atom assoc :update-maps true)
   (log/info "Reconciling maps")
   (let [before (u/curr-millis)
-        map-files (fs/map-files)
-        known-files (->> state-atom deref :maps (map :file) set)
+        {:keys [spring-isolation-dir] :as state} @state-atom
+        map-files (fs/map-files spring-isolation-dir)
+        known-files (->> state :maps (map :file) set)
         known-paths (->> known-files (map fs/canonical-path) set)
         todo (remove (comp known-paths fs/canonical-path) map-files)
         this-round (take 5 todo)
@@ -1011,7 +1047,7 @@
                                (remove fs/exists)
                                (map fs/canonical-path))
                           (->> known-files
-                               (remove (partial fs/descendant? (fs/isolation-dir)))
+                               (remove (partial fs/descendant? spring-isolation-dir))
                                (map fs/canonical-path))))]
     (apply update-file-cache! map-files)
     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
@@ -1267,13 +1303,6 @@
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-spectators] {:text (str battle-spectators)})}}
-     #_
-     {:fx/type :table-column
-      :text "Running"
-      :cell-value-factory #(->> % :host-username (get users) :client-status :ingame)
-      :cell-factory
-      {:fx/cell-type :table-cell
-       :describe (fn [running] {:text (str running)})}}
      {:fx/type :table-column
       :text "Game"
       :cell-value-factory :battle-modname
@@ -1453,13 +1482,6 @@
      :cell-factory
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (str (:user-count i))})}}
-    #_
-    {:fx/type :table-column
-     :text "Topic"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (str (:topic i))})}}
     {:fx/type :table-column
      :text "Actions"
      :cell-value-factory identity
@@ -2013,13 +2035,31 @@
                                               :file (io/file extra-replay-path)})
           (dissoc :extra-replay-name :extra-replay-path)))))
 
+(defmethod event-handler ::save-spring-isolation-dir [_e]
+  (future
+    (try
+      (swap! *state
+        (fn [{:keys [spring-isolation-dir-draft] :as state}]
+          (let [f (io/file spring-isolation-dir-draft)
+                isolation-dir (if (fs/exists? f)
+                                f
+                                (fs/isolation-dir))]
+            (-> state
+                (assoc :spring-isolation-dir isolation-dir)
+                (dissoc :spring-isolation-dir-draft)))))
+      (catch Exception e
+        (log/error e "Error setting spring isolation dir")
+        (swap! *state dissoc :spring-isolation-dir-draft)))))
+
 (def settings-window-keys
   [:extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
-   :extra-replay-sources :show-settings-window])
+   :extra-replay-sources :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window
   [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path extra-replay-sources show-settings-window]}]
+           extra-replay-path show-settings-window spring-isolation-dir
+           spring-isolation-dir-draft]
+    :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
    :title (str u/app-name " Settings")
@@ -2028,7 +2068,7 @@
                        (swap! *state assoc :show-settings-window false)
                        (.consume e))
    :width 800
-   :height 600
+   :height 800
    :scene
    {:fx/type :scene
     :stylesheets stylesheets
@@ -2039,7 +2079,46 @@
      {:fx/type :v-box
       :style {:-fx-font-size 16}
       :children
-      [{:fx/type :label
+      [
+       {:fx/type :label
+        :text " Spring Isolation Dir"
+        :style {:-fx-font-size 24}}
+       {:fx/type :label
+        :text (str (fs/canonical-path spring-isolation-dir))}
+       {:fx/type :h-box
+        :alignment :center-left
+        :children
+        [{:fx/type :button
+          :on-action {:event/type ::save-spring-isolation-dir}
+          :disable (string/blank? spring-isolation-dir-draft)
+          :text ""
+          :graphic
+          {:fx/type font-icon/lifecycle
+           :icon-literal "mdi-content-save:16:white"}}
+         {:fx/type :text-field
+          :text (str spring-isolation-dir-draft)
+          :style {:-fx-min-width 600}
+          :on-text-changed {:event/type ::assoc
+                            :key :spring-isolation-dir-draft}}]}
+       {:fx/type :h-box
+        :alignment :center-left
+        :children
+        [{:fx/type :button
+          :on-action {:event/type ::assoc
+                      :key :spring-isolation-dir
+                      :value (fs/isolation-dir)}
+          :text "Default"}
+         {:fx/type :button
+          :on-action {:event/type ::assoc
+                      :key :spring-isolation-dir
+                      :value (fs/bar-root)}
+          :text "Beyond All Reason"}
+         {:fx/type :button
+          :on-action {:event/type ::assoc
+                      :key :spring-isolation-dir
+                      :value (fs/spring-root)}
+          :text "Spring"}]}
+       {:fx/type :label
         :text " Import Sources"
         :style {:-fx-font-size 24}}
        {:fx/type :v-box
@@ -2115,7 +2194,7 @@
                 {:fx/type :label
                  :text (str " " (fs/canonical-path file))
                  :style {:-fx-font-size 14}}]}]})
-          (replay-sources extra-replay-sources))}
+          (replay-sources state))}
        {:fx/type :h-box
         :alignment :center-left
         :children
@@ -2441,7 +2520,7 @@
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
 (defn map-list
-  [{:keys [disable map-name maps on-value-changed map-input-prefix]}]
+  [{:keys [disable map-name maps on-value-changed map-input-prefix spring-isolation-dir]}]
   {:fx/type :h-box
    :alignment :center-left
    :children
@@ -2489,7 +2568,7 @@
        :desc
        {:fx/type :button
         :on-action {:event/type ::desktop-browse-dir
-                    :file (io/file (fs/isolation-dir) "maps")}
+                    :file (io/file spring-isolation-dir "maps")}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal "mdi-folder:16:white"}}}]
@@ -2559,10 +2638,16 @@
       (catch Exception e
         (log/error e "Error browsing url" url)))))
 
+
+(def battles-buttons-keys
+  [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
+   :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
+   :pop-out-battle :scripttags :selected-battle :spring-isolation-dir :use-springlobby-modname])
+
 (defn battles-buttons
   [{:keys [accepted battle battles battle-password battle-title client engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
-           use-springlobby-modname]
+           spring-isolation-dir use-springlobby-modname]
     :as state}]
   (let [games (filter :is-game mods)]
     {:fx/type :v-box
@@ -2644,7 +2729,7 @@
              :desc
              {:fx/type :button
               :on-action {:event/type ::desktop-browse-dir
-                          :file (io/file (fs/isolation-dir) "engine")}
+                          :file (io/file spring-isolation-dir "engine")}
               :graphic
               {:fx/type font-icon/lifecycle
                :icon-literal "mdi-folder:16:white"}}}
@@ -2702,7 +2787,7 @@
              :desc
              {:fx/type :button
               :on-action {:event/type ::desktop-browse-dir
-                          :file (io/file (fs/isolation-dir) "games")}
+                          :file (io/file spring-isolation-dir "games")}
               :graphic
               {:fx/type font-icon/lifecycle
                :icon-literal "mdi-folder:16:white"}}}
@@ -2728,7 +2813,8 @@
            :map-name map-name
            :maps maps
            :map-input-prefix map-input-prefix
-           :on-value-changed {:event/type ::map-change}}]}]}
+           :on-value-changed {:event/type ::map-change}
+           :spring-isolation-dir spring-isolation-dir}]}]}
       {:fx/type :h-box
        :style {:-fx-font-size 16}
        :alignment :center-left
@@ -3410,8 +3496,9 @@
   (swap! *state assoc-in [:git-clone repo-url :status] true)
   (future
     (try
-      (let [[_all dir] (re-find #"/([^/]+)\.git" repo-url)]
-        (git/clone-repo repo-url (io/file (fs/isolation-dir) "games" dir)
+      (let [[_all dir] (re-find #"/([^/]+)\.git" repo-url)
+            {:keys [spring-isolation-dir]} @*state] ; TODO remvoe deref
+        (git/clone-repo repo-url (io/file spring-isolation-dir "games" dir)
           {:on-begin-task (fn [title total-work]
                             (let [m (str title " " total-work)]
                               (swap! *state assoc-in [:git-clone repo-url :message] m)))}))
@@ -3916,14 +4003,6 @@
       (reconcile-engines *state))
     (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
 
-(defmethod event-handler ::nuke-data-dir
-  [_e]
-  (future
-    (try
-      (log/info "Nuking data dir!" (fs/isolation-dir))
-      (raynes-fs/delete-dir (fs/isolation-dir))
-      (catch Exception e
-        (log/error e "Error nuking data dir")))))
 
 (defn git-repo-url [battle-modname]
   (cond
@@ -4170,14 +4249,14 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :battle-message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :spring-isolation-dir :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            channels client
            copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
            http-download importables-by-path map-input-prefix maps battle-message-draft minimap-type parsed-replays-by-path
-           rapid-data-by-version rapid-download update-engines update-maps update-mods users username]
+           rapid-data-by-version rapid-download spring-isolation-dir update-engines update-maps update-mods users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -4311,33 +4390,6 @@
                    :graphic
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-close:16:white"}}]))}
-            #_
-            {:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text " Isolation: "}
-              {:fx/type :combo-box
-               :value (name (or isolation-type :engine))
-               :items (map name [:engine :shared])
-               :on-value-changed {:event/type ::isolation-type-change}}]}
-            #_
-            {:fx/type :h-box
-             :children
-             [{:fx/type :button
-               :style (merge
-                        (get severity-styles 2)
-                        {:-fx-font-size 24})
-               :h-box/margin 16
-               :tooltip
-               {:fx/type :tooltip
-                :show-delay [10 :ms]
-                :style {:-fx-font-size 16}
-                :text "Nuke data directory"}
-               :on-action {:event/type ::nuke-data-dir}
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-nuke:32:white"}}]}
             {:fx/type :flow-pane
              :vgap 5
              :hgap 5
@@ -4489,12 +4541,14 @@
                                       (str "No rapid download found for" battle-modname))
                            :in-progress in-progress
                            :action
-                           (if (and rapid-id engine-file)
-                             {:event/type ::rapid-download
-                              :rapid-id rapid-id
-                              :engine-file engine-file}
-                             {:event/type ::add-task
-                              :task {::task-type ::update-rapid}})}])
+                           (if engine-file
+                             (if (and rapid-id engine-file)
+                               {:event/type ::rapid-download
+                                :rapid-id rapid-id
+                                :engine-file engine-file}
+                               {:event/type ::add-task
+                                :task {::task-type ::update-rapid}})
+                             nil)}])
                        (let [importable (some->> importables-by-path
                                                  vals
                                                  (filter (comp #{::mod} :resource-type))
@@ -4607,7 +4661,7 @@
                            :tooltip (str "Click to extract " dest-path)
                            :action {:event/type ::extract-7z
                                     :file dest
-                                    :dest (io/file (fs/isolation-dir) "engine" (:resource-filename downloadable))}}]))))
+                                    :dest (io/file spring-isolation-dir "engine" (:resource-filename downloadable))}}]))))
                  (when-not engine-details
                    (let [importable (some->> importables-by-path
                                              vals
@@ -4688,20 +4742,6 @@
            :hide-users true
            :message-draft battle-message-draft
            :message-key :battle-message-draft}
-          #_
-          {:fx/type :v-box
-           :alignment :top-left
-           :children
-           [{:fx/type :button
-             :text "uikeys.txt"
-             :on-action {:event/type ::assoc
-                         :key :show-uikeys-window}}
-            {:fx/type :text-area
-             :editable false
-             :text (str (slurp (io/resource "uikeys.txt")))
-             :style {:-fx-font-family monospace-font-family}
-             :v-box/vgrow :always}]}
-          #_
           {:fx/type :v-box
            :alignment :top-left
            :h-box/hgrow :always
@@ -4810,18 +4850,7 @@
                                              :modoption-key (:key i)}
                           :items (or (map (comp :key second) (:items i))
                                      [])}}}}
-                      {:text (str (:def i))})))}}]}]}
-          #_
-          {:fx/type :v-box
-           :alignment :top-left
-           :children
-           [{:fx/type :label
-             :text "script.txt preview"}
-            {:fx/type :text-area
-             :editable false
-             :text (str (string/replace (spring/battle-script-txt state) #"\t" "  "))
-             :style {:-fx-font-family monospace-font-family}
-             :v-box/vgrow :always}]}]}]}
+                      {:text (str (:def i))})))}}]}]}]}]}
       {:fx/type :v-box
        :alignment :top-left
        :style {:-fx-min-height (+ minimap-size 120)}
@@ -4862,6 +4891,7 @@
                :map-name battle-map
                :maps maps
                :map-input-prefix map-input-prefix
+               :spring-isolation-dir spring-isolation-dir
                :on-value-changed
                (if am-host
                  {:event/type ::battle-map-change
@@ -5080,14 +5110,13 @@
 (defmethod task-handler ::update-rapid
   [_e]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [engine-version engines]} @*state ; TODO remove deref
+  (let [{:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
                          (->> engines
                               (filter (comp fs/canonical-path :file))
-                              first))
-        root (fs/isolation-dir)]
+                              first))]
     (if (and engine-details (:file engine-details))
       (do
         (log/info "Initializing rapid by calling download")
@@ -5097,12 +5126,12 @@
              :rapid-id "i18n:test" ; TODO how else to init rapid without download...
              :engine-file (:file engine-details)})))
       (log/warn "No engine details to do rapid init"))
-    (log/info "Updating rapid versions in" root)
+    (log/info "Updating rapid versions in" spring-isolation-dir)
     (let [before (u/curr-millis)
-          rapid-repos (rapid/repos root)
+          rapid-repos (rapid/repos spring-isolation-dir)
           _ (log/info "Found" (count rapid-repos) "rapid repos")
           rapid-versions (->> rapid-repos
-                              (mapcat rapid/versions)
+                              (mapcat (partial rapid/versions spring-isolation-dir))
                               (filter :version)
                               (sort-by :version version/version-compare)
                               reverse)
@@ -5125,8 +5154,8 @@
 (defmethod task-handler ::update-rapid-packages
   [_e]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-data-by-hash]} @*state
-        sdp-files (doall (rapid/sdp-files))
+  (let [{:keys [rapid-data-by-hash spring-isolation-dir]} @*state
+        sdp-files (doall (rapid/sdp-files spring-isolation-dir))
         packages (->> sdp-files
                       (filter some?)
                       (map
@@ -5165,7 +5194,7 @@
   (future
     (try
       (let [pr-downloader-file (io/file engine-file (fs/executable "pr-downloader"))
-            root (fs/isolation-dir) ; TODO always?
+            ^File root (:spring-isolation-dir @*state) ; TODO remvoe deref
             command [(fs/canonical-path pr-downloader-file)
                      "--filesystem-writepath" (fs/wslpath root)
                      "--rapid-download" rapid-id]
@@ -5391,12 +5420,7 @@
                   (remove (comp #{import-source-name} :import-source-name second))
                   (into {})
                   (merge importables-by-path))))
-    importables-by-path
-    #_
-    (doseq [importable (filter (comp #{::engine} :resource-type) importables)]
-      (add-task! *state {::task-type ::update-importable
-                         :importable importable}))))
-
+    importables-by-path))
 
 
 (def springfiles-maps-download-source
@@ -5406,6 +5430,10 @@
 
 (def download-sources
   [springfiles-maps-download-source
+   {:download-source-name "BAR GitHub spring"
+    :url http/bar-spring-releases-url
+    :browse-url "https://github.com/beyond-all-reason/spring/releases"
+    :resources-fn http/get-github-release-engine-downloadables}
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
     :resources-fn http/html-downloadables}
@@ -5420,11 +5448,7 @@
     :resources-fn http/get-springlauncher-downloadables}
    {:download-source-name "SpringRTS buildbot"
     :url http/springrts-buildbot-root
-    :resources-fn http/crawl-springrts-engine-downloadables}
-   {:download-source-name "BAR GitHub spring"
-    :url http/bar-spring-releases-url
-    :browse-url "https://github.com/beyond-all-reason/spring/releases"
-    :resources-fn http/get-github-release-engine-downloadables}])
+    :resources-fn http/crawl-springrts-engine-downloadables}])
 
 
 (def downloadable-update-cooldown
@@ -5617,26 +5641,7 @@
                                         import-source)}
                :graphic
                {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-refresh:16:white"}}
-              #_
-              {:fx/type fx.ext.node/with-tooltip-props
-               :props
-               {:tooltip
-                {:fx/type :tooltip
-                 :show-delay [10 :ms]
-                 :style {:-fx-font-size 14}
-                 :text "Hide importables not discovered in the last polling cycle, default 24h"}}
-               :desc
-               {:fx/type :h-box
-                :alignment :center-left
-                :children
-                [{:fx/type :check-box
-                  :selected (boolean show-stale)
-                  :h-box/margin 8
-                  :on-selected-changed {:event/type ::assoc
-                                        :key :show-stale}}
-                 {:fx/type :label
-                  :text "Show stale artifacts"}]}}]))}
+                :icon-literal "mdi-refresh:16:white"}}]))}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
@@ -5699,16 +5704,7 @@
          :v-box/vgrow :always
          :items importables
          :columns
-         [#_
-          {:fx/type :table-column
-           :text "Last Seen Ago"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe (fn [{:keys [resource-updated]}]
-                          (when resource-updated
-                            {:text (str (humanize/duration (- now resource-updated)))}))}}
-          {:fx/type :table-column
+         [{:fx/type :table-column
            :text "Source"
            :cell-value-factory identity
            :cell-factory
@@ -5786,9 +5782,13 @@
                          :force force}
                         download-source))))
 
+(def download-window-keys
+  [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
+   :http-download :show-downloader :show-stale :spring-isolation-dir])
+
 (defn download-window
   [{:keys [download-filter download-type download-source-name downloadables-by-url file-cache
-           http-download show-downloader show-stale]}]
+           http-download show-downloader show-stale spring-isolation-dir]}]
   (let [download-source (->> download-sources
                              (filter (comp #{download-source-name} :download-source-name))
                              first)
@@ -5896,26 +5896,7 @@
                 :force true})
              :graphic
              {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-refresh:16:white"}}
-            #_
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
-               :style {:-fx-font-size 14}
-               :text "Hide downloadables not discovered in the last polling cycle, default 24h"}}
-             :desc
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :check-box
-                :selected (boolean show-stale)
-                :h-box/margin 8
-                :on-selected-changed {:event/type ::assoc
-                                      :key :show-stale}}
-               {:fx/type :label
-                :text "Show stale artifacts"}]}}])}
+              :icon-literal "mdi-refresh:16:white"}}])}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 16}
@@ -5978,16 +5959,7 @@
          :v-box/vgrow :always
          :items downloadables
          :columns
-         [#_
-          {:fx/type :table-column
-           :text "Last Seen Ago"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe (fn [{:keys [resource-updated]}]
-                          (when resource-updated
-                            {:text (str (humanize/duration (- now resource-updated)))}))}}
-          {:fx/type :table-column
+         [{:fx/type :table-column
            :text "Source"
            :cell-value-factory :download-source-name
            :cell-factory
@@ -6024,7 +5996,7 @@
                     download (get http-download download-url)
                     in-progress (:running download)
                     extract-file (when dest-file
-                                   (io/file (fs/isolation-dir) "engine" (fs/filename dest-file)))]
+                                   (io/file spring-isolation-dir "engine" (fs/filename dest-file)))]
                 {:text ""
                  :graphic
                  (cond
@@ -6068,9 +6040,13 @@
                     :icon-literal "mdi-check:16:white"})}))}}]}]}}}))
 
 
+(def rapid-download-window-keys
+  [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
+   :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader :spring-isolation-dir])
+
 (defn rapid-download-window
   [{:keys [engine-version engines rapid-download rapid-filter rapid-repo rapid-repos rapid-versions
-           rapid-packages sdp-files show-rapid-downloader]}]
+           rapid-packages sdp-files show-rapid-downloader spring-isolation-dir]}]
   (let [sdp-files (or sdp-files [])
         sdp-hashes (set (map rapid/sdp-hash sdp-files))
         sorted-engine-versions (->> engines
@@ -6252,7 +6228,7 @@
            :desc
            {:fx/type :button
             :on-action {:event/type ::desktop-browse-dir
-                        :file (io/file (fs/isolation-dir) "packages")}
+                        :file (io/file spring-isolation-dir "packages")}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-folder:16:white"}}}]}
@@ -6287,7 +6263,7 @@
 
 
 (defmethod event-handler ::watch-replay
-  [{:keys [engine-version engines replay]}]
+  [{:keys [engine-version engines replay spring-isolation-dir]}]
   (future
     (try
       (let [replay-file (:file replay)]
@@ -6295,7 +6271,8 @@
         (spring/watch-replay
           {:engine-version engine-version
            :engines engines
-           :replay-file replay-file}))
+           :replay-file replay-file
+           :spring-isolation-dir spring-isolation-dir}))
       (catch Exception e
         (log/error e "Error watching replay" replay)))))
 
@@ -6369,14 +6346,14 @@
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :settings-button
-   :show-replays :tasks :update-engines :update-maps :update-mods])
+   :show-replays :spring-isolation-dir :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
   [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
            filter-replay-type http-download maps mods on-close-request parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file settings-button
-           show-replays tasks title update-engines update-maps update-mods]}]
+           show-replays spring-isolation-dir tasks title update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
                             vals
@@ -6821,7 +6798,8 @@
                               {:event/type ::watch-replay
                                :engines engines
                                :engine-version engine-version
-                               :replay i}
+                               :replay i
+                               :spring-isolation-dir spring-isolation-dir}
                               :graphic
                               {:fx/type font-icon/lifecycle
                                :icon-literal "mdi-movie:16:white"}}
@@ -6832,7 +6810,7 @@
                              (and (not matching-engine) engine-downloadable)
                              (let [source (resource-dest engine-downloadable)]
                                (if (file-exists? file-cache source)
-                                 (let [dest (io/file (fs/isolation-dir) "engine"
+                                 (let [dest (io/file spring-isolation-dir "engine"
                                                      (fs/without-extension
                                                        (:resource-filename engine-downloadable)))
                                        in-progress (boolean
@@ -7449,10 +7427,7 @@
                 (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
             (merge
               {:fx/type battles-buttons}
-              (select-keys state
-                [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
-                 :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-                 :pop-out-battle :scripttags :selected-battle :use-springlobby-modname]))]
+              (select-keys state battles-buttons-keys))]
            (when battle
              (if (:battle-id battle)
                (when (not pop-out-battle)
@@ -7495,9 +7470,7 @@
           (select-keys state battle-view-keys))}}
       (merge
         {:fx/type download-window}
-        (select-keys state
-          [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
-           :http-download :show-downloader :show-stale]))
+        (select-keys state download-window-keys))
       (merge
         {:fx/type import-window}
         (select-keys state import-window-keys))
@@ -7507,9 +7480,7 @@
           [:filter-maps-name :maps :on-change-map :show-maps]))
       (merge
         {:fx/type rapid-download-window}
-        (select-keys state
-          [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
-           :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader]))
+        (select-keys state rapid-download-window-keys))
       (merge
         {:fx/type replays-window}
         (select-keys state replays-window-keys))

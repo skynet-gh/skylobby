@@ -10,17 +10,6 @@
   (:gen-class))
 
 
-(defn initial-state []
-  (merge
-    {}
-    (apply
-      merge
-      (doall
-        (map (comp spring-lobby/slurp-config-edn :filename) spring-lobby/state-to-edn)))
-    (spring-lobby/slurp-config-edn "parsed-replays.edn")
-    {:tasks (spring-lobby/initial-tasks)
-     :show-replays true}))
-
 (defn replays-on-close-request
   [e]
   (log/debug "Replays window close request" e)
@@ -56,7 +45,7 @@
       (log/info "Finished 7Zip init"))
     (let [before-state (u/curr-millis)
           _ (log/info "Loading initial state")
-          state (assoc (initial-state) :standalone true)]
+          state (assoc (spring-lobby/initial-state) :show-replays true :standalone true)]
       (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
       (reset! spring-lobby/*state state))
     (log/info "Creating renderer")
