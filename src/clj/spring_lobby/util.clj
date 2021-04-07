@@ -39,8 +39,8 @@
       (log/debug e "Unable to read version from manifest"))))
 
 (defn short-git-commit [git-commit-id]
-  (when git-commit-id
-    (subs git-commit-id 0 7)))
+  (when-not (string/blank? git-commit-id)
+    (subs git-commit-id 0 (min 7 (count git-commit-id)))))
 
 (defn app-version []
   (or (manifest-version)
