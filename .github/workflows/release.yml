@@ -128,7 +128,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_content_type: application/x-msi
-      - run: del \q dist
+      - run: rm -r dist
       - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
       - uses: actions/upload-release-asset@v1.0.2
         env:
