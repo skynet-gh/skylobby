@@ -4,11 +4,19 @@ Notable changes
 
 ### TODO - future
 
+- Use rich text for chat windows, fix scrolling
+- Improve table column sizing
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
-### [0.2.1]
+### [0.2.3]
+
+- Simplify and reorder battles and players tables
+- Fix BAR location on Linux
+- Fix hitching due to task workers doing unneeded writes
+
+### [0.2.2]
 
 - Add ring handler and sound effect
 
