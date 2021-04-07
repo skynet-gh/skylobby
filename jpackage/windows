@@ -1,2 +1,3 @@
 --win-menu
+--type "msi"
 --icon "resources/icon.ico"

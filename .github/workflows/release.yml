@@ -34,6 +34,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_amd64.deb
           asset_content_type: application/vnd.debian.binary-package
+      - run: rm -r dist
       - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
       - uses: actions/upload-release-asset@v1.0.2
         env:
@@ -81,6 +82,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_content_type: application/x-apple-diskimage
+      - run: rm -r dist
       - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
       - uses: actions/upload-release-asset@v1.0.2
         env:
@@ -126,6 +128,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_content_type: application/x-msi
+      - run: del \q dist
       - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
       - uses: actions/upload-release-asset@v1.0.2
         env:
