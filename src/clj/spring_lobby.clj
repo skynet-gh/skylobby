@@ -4231,6 +4231,7 @@
                          :message message-draft
                          :message-key message-key}}
             {:fx/type :text-field
+             :id "channel-text-field"
              :h-box/hgrow :always
              :text (str message-draft)
              :on-text-changed {:event/type ::assoc
@@ -4274,14 +4275,14 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
    :map-input-prefix :maps :battle-message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :spring-isolation-dir :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :spring-isolation-dir :tasks :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
            channels client
-           copying downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
+           copying current-tasks downloadables-by-url drag-allyteam drag-team engines extracting file-cache gitting
            http-download importables-by-path map-input-prefix maps battle-message-draft minimap-type parsed-replays-by-path
-           rapid-data-by-version rapid-download spring-isolation-dir update-engines update-maps update-mods users username]
+           rapid-data-by-version rapid-download rapid-update spring-isolation-dir tasks update-engines update-maps update-mods users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
         host-user (get users host-username)
@@ -4311,7 +4312,16 @@
                                bot-name))
         bot-name (some #{bot-name} bot-names)
         bot-version (some #{bot-version} bot-versions)
-        sides (spring/mod-sides battle-mod-details)]
+        sides (spring/mod-sides battle-mod-details)
+        all-tasks (concat tasks (vals current-tasks))
+        extract-tasks (->> all-tasks
+                           (filter (comp #{::extract-7z} ::task-type))
+                           (map (comp fs/canonical-path :file))
+                           set)
+        import-tasks (->> all-tasks
+                          (filter (comp #{::import} ::task-type))
+                          (map (comp fs/canonical-path :resource-file :importable))
+                          set)]
     {:fx/type :h-box
      :style {:-fx-font-size 15}
      :alignment :top-left
@@ -4481,16 +4491,19 @@
                                                  (filter (partial could-be-this-map? battle-map))
                                                  first)
                              resource-file (:resource-file importable)
-                             canonical-path (fs/canonical-path resource-file)]
+                             resource-path (fs/canonical-path resource-file)
+                             in-progress (boolean
+                                           (or (-> copying (get resource-path) :status boolean)
+                                               (contains? import-tasks resource-path)))]
                          [{:severity 2
                            :text "import"
                            :human-text (if importable
                                          (str "Import from " (:import-source-name importable))
                                          "No import found")
                            :tooltip (if importable
-                                      (str "Copy map archive from " canonical-path)
+                                      (str "Copy map archive from " resource-path)
                                       (str "No local import found for map " battle-map))
-                           :in-progress (-> copying (get canonical-path) :status)
+                           :in-progress in-progress
                            :action
                            (when (and importable
                                       (not (file-exists? file-cache (resource-dest importable))))
@@ -4549,7 +4562,7 @@
                               :downloadable downloadable})}])
                        (let [rapid-id (:id (get rapid-data-by-version battle-modname))
                              rapid-download (get rapid-download rapid-id)
-                             in-progress (:running rapid-download)]
+                             in-progress (or (:running rapid-download) rapid-update)]
                          [{:severity 2
                            :text "rapid"
                            :human-text (if rapid-id
@@ -4558,7 +4571,9 @@
                                              (str (download-progress rapid-download))
                                              (str "Download rapid " rapid-id))
                                            "Needs engine first to download with rapid")
-                                         "No rapid download, update rapid")
+                                         (if in-progress
+                                           "Rapid updating..."
+                                           "No rapid download, update rapid"))
                            :tooltip (if rapid-id
                                       (if engine-file
                                         (str "Use rapid downloader to get resource id " rapid-id
@@ -4673,7 +4688,7 @@
                          :tooltip (if in-progress
                                     (str "Downloading " (download-progress download))
                                     (if dest-exists
-                                      (str "Downloaded to " (fs/canonical-path dest))
+                                      (str "Downloaded to " dest-path)
                                       (str "Download " url)))
                          :in-progress in-progress
                          :action (when (and downloadable (not dest-exists))
@@ -4682,7 +4697,8 @@
                        (when dest-exists
                          [{:severity 2
                            :text "extract"
-                           :in-progress (get extracting dest-path)
+                           :in-progress (or (get extracting dest-path)
+                                            (contains? extract-tasks dest-path))
                            :human-text "Extract engine archive"
                            :tooltip (str "Click to extract " dest-path)
                            :action {:event/type ::extract-7z
@@ -4769,6 +4785,7 @@
            :message-draft battle-message-draft
            :message-key :battle-message-draft}]}]}
       {:fx/type :tab-pane
+       :style {:-fx-min-height (+ minimap-size 130)}
        :tabs
        [{:fx/type :tab
          :graphic {:fx/type :label
@@ -4777,7 +4794,6 @@
          :content
          {:fx/type :v-box
           :alignment :top-left
-          :style {:-fx-min-height (+ minimap-size 120)}
           :children
           [{:fx/type minimap-pane
             :am-host am-host
@@ -6888,7 +6904,6 @@
                                    resource-path (fs/canonical-path resource-file)
                                    in-progress (boolean
                                                  (or (-> copying (get resource-path) :status boolean)
-                                                     (-> copying (get resource-path) :status boolean)
                                                      (contains? import-tasks resource-path)))]
                                {:fx/type :button
                                 :text (if in-progress
@@ -6933,7 +6948,6 @@
                                    resource-path (fs/canonical-path resource-file)
                                    in-progress (boolean
                                                  (or (-> copying (get resource-path) :status boolean)
-                                                     (-> copying (get resource-path) :status boolean)
                                                      (contains? import-tasks resource-path)))]
                                {:fx/type :button
                                 :text (if in-progress
@@ -7218,43 +7232,52 @@
 (def my-channels-view-keys
   [:channels :client :message-draft :my-channels :selected-tab-channel])
 
+(defn focus-text-field [tab]
+  (when-let [content (.getContent tab)]
+    (let [text-field (-> content (.lookupAll "#channel-text-field") first)]
+      (log/info "Found text field" (.getId text-field))
+      (Platform/runLater
+        (fn []
+          (.requestFocus text-field))))))
+
 (defn my-channels-view [{:keys [channels client message-draft my-channels selected-tab-channel]}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
-                              (into []))
+                              sort)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^List my-channel-names selected-tab-channel)
                          0)]
-    {:fx/type fx.ext.tab-pane/with-selection-props
-     :props
-     (merge
-       {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}}
-       (when (< selected-index (count my-channel-names))
-         {:selected-index selected-index}))
-     :desc
-     {:fx/type :tab-pane
-      :on-tabs-changed {:event/type ::my-channels-tab-action}
-      :style {:-fx-font-size 16}
-      :tabs
-      (map
-        (fn [channel-name]
-          {:fx/type :tab
-           :graphic {:fx/type :label
-                     :text (str channel-name)}
-           :id channel-name
-           :closable (not (u/battle-channel-name? channel-name))
-           :on-close-request {:event/type ::leave-channel
-                              :channel-name channel-name
-                              :client client}
-           :content
-           {:fx/type channel-view
-            :channels channels
-            :client client
-            :message-draft message-draft
-            :message-key :message-draft
-            :channel-name channel-name}})
-        my-channel-names)}}))
+    (if (seq my-channel-names)
+      {:fx/type fx.ext.tab-pane/with-selection-props
+       :props
+       {:on-selected-item-changed {:event/type ::selected-item-changed-channel-tabs}
+        :selected-index selected-index}
+       :desc
+       {:fx/type :tab-pane
+        :on-tabs-changed {:event/type ::my-channels-tab-action}
+        :style {:-fx-font-size 16}
+        :tabs
+        (map
+          (fn [channel-name]
+            {:fx/type :tab
+             :graphic {:fx/type :label
+                       :text (str channel-name)}
+             :id channel-name
+             :closable (not (u/battle-channel-name? channel-name))
+             :on-close-request {:event/type ::leave-channel
+                                :channel-name channel-name
+                                :client client}
+             :on-selection-changed (fn [ev] (focus-text-field (.getTarget ev)))
+             :content
+             {:fx/type channel-view
+              :channels channels
+              :client client
+              :message-draft message-draft
+              :message-key :message-draft
+              :channel-name channel-name}})
+          my-channel-names)}}
+      {:fx/type :pane})))
 
 
 (defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
