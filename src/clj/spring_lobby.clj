@@ -2983,10 +2983,6 @@
   (swap! *state assoc :use-springlobby-modname event))
 
 
-(defmethod event-handler ::minimap-type-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :minimap-type event))
-
 (defmethod event-handler ::version-change
   [{:fx/keys [event]}]
   (swap! *state assoc :engine-version event))
@@ -3531,17 +3527,18 @@
   ["minimap" "metalmap" "heightmap"])
 
 (defmethod event-handler ::minimap-scroll
-  [{:fx/keys [^ScrollEvent event]}]
+  [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]
   (swap! *state
-         (fn [{:keys [minimap-type] :as state}]
-           (let [direction (if (pos? (.getDeltaY event))
+         (fn [state]
+           (let [minimap-type (get state minimap-type-key)
+                 direction (if (pos? (.getDeltaY event))
                              dec
                              inc)
                  next-index (mod
                               (direction (.indexOf ^List minimap-types minimap-type))
                               (count minimap-types))
                  next-type (get minimap-types next-index)]
-             (assoc state :minimap-type next-type)))))
+             (assoc state minimap-type-key next-type)))))
 
 (defn git-clone-mod [repo-url]
   (swap! *state assoc-in [:git-clone repo-url :status] true)
@@ -4090,7 +4087,7 @@
 
 
 (defn minimap-pane
-  [{:keys [am-host battle-details drag-team drag-allyteam map-details map-name minimap-type scripttags]}]
+  [{:keys [am-host battle-details drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
@@ -4105,7 +4102,8 @@
                           :startpostype
                           spring/startpostype-name)]
     {:fx/type :stack-pane
-     :on-scroll {:event/type ::minimap-scroll}
+     :on-scroll {:event/type ::minimap-scroll
+                 :minimap-type-key minimap-type-key}
      :style
      {:-fx-min-width minimap-size
       :-fx-max-width minimap-size
@@ -4896,6 +4894,7 @@
             :map-name battle-map
             :map-details battle-map-details
             :minimap-type minimap-type
+            :minimap-type-key :minimap-type
             :scripttags scripttags}
            {:fx/type :v-box
             :children
@@ -4914,7 +4913,8 @@
                {:fx/type :combo-box
                 :value minimap-type
                 :items minimap-types
-                :on-value-changed {:event/type ::minimap-type-change}}]}
+                :on-value-changed {:event/type ::assoc
+                                   :key ::minimap-type}}]}
              {:fx/type :h-box
               :style {:-fx-max-width minimap-size}
               :children
@@ -6489,19 +6489,20 @@
   (when (seq coll)
     (reduce max 0 coll)))
 
+
 (def replays-window-keys
   [:copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
    :filter-replay-type :http-download :maps :mods :on-close-request :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :settings-button
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :settings-button
    :show-replays :spring-isolation-dir :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
   [{:keys [copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
            filter-replay-type http-download maps mods on-close-request parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file settings-button
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file settings-button
            show-replays spring-isolation-dir tasks title update-engines update-maps update-mods]}]
   (let [
         parsed-replays (->> parsed-replays-by-path
@@ -7210,10 +7211,32 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-movie:24:white"}}]))}
-                {:fx/type minimap-pane
-                 :map-name mapname
-                 :map-details replay-map-details
-                 :scripttags script-data}]}])))}}}))
+                {:fx/type :v-box
+                 :children
+                 [
+                  {:fx/type minimap-pane
+                   :map-name mapname
+                   :map-details replay-map-details
+                   :minimap-type replay-minimap-type
+                   :minimap-type-key :replay-minimap-type
+                   :scripttags script-data}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   [{:fx/type :label
+                     :text (str " Size: "
+                                (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
+                                  (str
+                                    (when map-width (quot map-width 64))
+                                    " x "
+                                    (when map-height (quot map-height 64)))))}
+                    {:fx/type :pane
+                     :h-box/hgrow :always}
+                    {:fx/type :combo-box
+                     :value replay-minimap-type
+                     :items minimap-types
+                     :on-value-changed {:event/type ::assoc
+                                        :key :replay-minimap-type}}]}]}]}])))}}}))
 
 (defn maps-window
   [{:keys [filter-maps-name maps on-change-map show-maps]}]

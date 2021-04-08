@@ -23,6 +23,7 @@ Notable changes and todo list.
 - Fix chat channels sharing draft message
 - Add check box to disable chat and console auto scroll
 - Add color for some status icons
+- Add map size, metalmap, and heightmap to replays window
 - Stop uploading build jars to release, installers only
 
 ### [0.2.6]
