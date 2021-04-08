@@ -52,61 +52,49 @@
      :items (b/decode (b/repeated sdp-line) gz)}))
 
 (defn sdp-file
-  ([sdp-filename]
-   (sdp-file (fs/isolation-dir) sdp-filename))
-  ([root sdp-filename]
-   (when sdp-filename
-     (io/file root "packages" sdp-filename))))
+  [root sdp-filename]
+  (when sdp-filename
+    (io/file root "packages" sdp-filename)))
 
 (defn sdp-files
-  ([]
-   (sdp-files (fs/isolation-dir)))
-  ([root]
-   (log/debug "Loading sdp file names from" root)
-   (let [packages-root (io/file root "packages")]
-     (or
-       (when (.exists packages-root)
-         (seq (.listFiles packages-root)))
-       []))))
+  [root]
+  (log/debug "Loading sdp file names from" root)
+  (let [packages-root (io/file root "packages")]
+    (or
+      (when (.exists packages-root)
+        (seq (.listFiles packages-root)))
+      [])))
 
 (defn file-in-pool
-  ([md5]
-   (file-in-pool (fs/isolation-dir) md5))
-  ([root md5]
-   (let [pool-dir (subs md5 0 2)
-         pool-file (str (subs md5 2) ".gz")]
-     (io/file root "pool" pool-dir pool-file))))
+  [root md5]
+  (let [pool-dir (subs md5 0 2)
+        pool-file (str (subs md5 2) ".gz")]
+    (io/file root "pool" pool-dir pool-file)))
 
 (defn slurp-from-pool
-  ([md5]
-   (slurp-from-pool (fs/isolation-dir) md5))
-  ([root md5]
-   (let [f (file-in-pool root md5)]
-     (with-open [is (io/input-stream f)
-                 gz (GZIPInputStream. is)]
-       (slurp gz)))))
+  [root md5]
+  (let [f (file-in-pool root md5)]
+    (with-open [is (io/input-stream f)
+                gz (GZIPInputStream. is)]
+      (slurp gz))))
 
 (defn slurp-bytes-from-pool
-  ([md5]
-   (slurp-bytes-from-pool (fs/isolation-dir) md5))
-  ([root md5]
-   (let [f (file-in-pool root md5)]
-     (with-open [is (io/input-stream f)
-                 gz (GZIPInputStream. is)]
-       (u/slurp-bytes gz)))))
+  [root md5]
+  (let [f (file-in-pool root md5)]
+    (with-open [is (io/input-stream f)
+                gz (GZIPInputStream. is)]
+      (u/slurp-bytes gz))))
 
 (defn inner
-  ([decoded-sdp inner-filename]
-   (inner (fs/isolation-dir) decoded-sdp inner-filename))
-  ([root decoded-sdp inner-filename]
-   (if-let [inner-details (->> decoded-sdp
-                               :items
-                               (filter (comp #{inner-filename} :filename))
-                               first)]
-     (assoc inner-details :content-bytes (slurp-bytes-from-pool root (:md5 inner-details)))
-     (log/warn "No such inner rapid file"
-               (pr-str {:package-file (:file decoded-sdp)
-                        :inner-filename inner-filename})))))
+  [root decoded-sdp inner-filename]
+  (if-let [inner-details (->> decoded-sdp
+                              :items
+                              (filter (comp #{inner-filename} :filename))
+                              first)]
+    (assoc inner-details :content-bytes (slurp-bytes-from-pool root (:md5 inner-details)))
+    (log/warn "No such inner rapid file"
+              (pr-str {:package-file (:file decoded-sdp)
+                       :inner-filename inner-filename}))))
 
 (defn root-from-sdp
   "Returns the spring root for the given sdp file."
@@ -130,14 +118,12 @@
 
 
 (defn repos
-  ([]
-   (repos (fs/isolation-dir)))
-  ([root]
-   (log/debug "Loading rapid repo names")
-   (->> (fs/list-files (io/file root "rapid" "repos.springrts.com"))
-        seq
-        (filter fs/is-directory?)
-        (map fs/filename))))
+  [root]
+  (log/debug "Loading rapid repo names")
+  (->> (fs/list-files (io/file root "rapid" "repos.springrts.com"))
+       seq
+       (filter fs/is-directory?)
+       (map fs/filename)))
 
 (defn rapid-versions [f]
   (with-open [is (io/input-stream f)
@@ -155,25 +141,21 @@
 
 
 (defn package-versions
-  ([]
-   (package-versions (fs/isolation-dir)))
-  ([root]
-   (-> root
-       (io/file "rapid" "packages.springrts.com" "versions.gz")
-       (rapid-versions))))
+  [root]
+  (-> root
+      (io/file "rapid" "packages.springrts.com" "versions.gz")
+      (rapid-versions)))
 
 
 (defn versions
-  ([repo]
-   (versions repo (fs/isolation-dir)))
-  ([root repo]
-   (log/debug "Loading rapid versions for repo" repo)
-   (try
-     (-> root
-         (io/file "rapid" "repos.springrts.com" repo "versions.gz")
-         (rapid-versions))
-     (catch Exception e
-       (log/error e "Error loading rapid versions")))))
+  [root repo]
+  (log/debug "Loading rapid versions for repo" repo)
+  (try
+    (-> root
+        (io/file "rapid" "repos.springrts.com" repo "versions.gz")
+        (rapid-versions))
+    (catch Exception e
+      (log/error e "Error loading rapid versions"))))
 
 
 (defn- try-inner-lua
@@ -214,12 +196,6 @@
             :luaai (try-inner-lua f "luaai.lua")
             :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
                           (try-inner-script f "gamedata/sidedata.tdf"))}))))))
-
-(defn mods []
-  (some->> (sdp-files)
-           (map read-sdp-mod)
-           (filter :modinfo)
-           doall))
 
 (defn copy-package [source-sdp-file dest-spring-root]
   (log/info "Copying rapid package from" source-sdp-file "into" dest-spring-root)

@@ -242,7 +242,7 @@
 
 (defn initial-state []
   (merge
-    {:spring-isolation-dir (fs/isolation-dir)
+    {:spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
       merge
@@ -466,7 +466,7 @@
             (when-not (and spring-isolation-dir
                            (instance? File spring-isolation-dir))
               (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-              (swap! state-atom assoc :spring-isolation-dir (fs/isolation-dir))))
+              (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
           (catch Exception e
             (log/error e "Error in :fix-spring-isolation-dir state watcher"))))))
   (add-watch state-atom :spring-isolation-dir-changed
@@ -682,7 +682,7 @@
 (defn replay-sources [{:keys [extra-replay-sources]}]
   (concat
     [{:replay-source-name "skylobby"
-      :file (fs/replays-dir (fs/isolation-dir))
+      :file (fs/replays-dir (fs/default-isolation-dir))
       :builtin true}
      {:replay-source-name "Beyond All Reason"
       :file (fs/replays-dir (fs/bar-root))
@@ -2084,7 +2084,7 @@
           (let [f (io/file spring-isolation-dir-draft)
                 isolation-dir (if (fs/exists? f)
                                 f
-                                (fs/isolation-dir))]
+                                (fs/default-isolation-dir))]
             (-> state
                 (assoc :spring-isolation-dir isolation-dir)
                 (dissoc :spring-isolation-dir-draft)))))
@@ -2147,7 +2147,7 @@
         [{:fx/type :button
           :on-action {:event/type ::assoc
                       :key :spring-isolation-dir
-                      :value (fs/isolation-dir)}
+                      :value (fs/default-isolation-dir)}
           :text "Default"}
          {:fx/type :button
           :on-action {:event/type ::assoc
@@ -4313,7 +4313,7 @@
      :h-box/margin 8
      :resource "Map"
      :browse-action {:event/type ::desktop-browse-dir
-                     :file (or map-file (fs/maps-dir))}
+                     :file (or map-file (fs/maps-dir spring-isolation-dir))}
      :refresh-action {:event/type ::force-update-battle-map}
      :refresh-in-progress update-maps
      :issues
@@ -4398,7 +4398,7 @@
      :h-box/margin 8
      :resource "Game"
      :browse-action {:event/type ::desktop-browse-dir
-                     :file (or mod-file (fs/mods-dir))}
+                     :file (or mod-file (fs/mods-dir spring-isolation-dir))}
      :refresh-action {:event/type ::force-update-battle-mod}
      :refresh-in-progress update-mods
      :issues
