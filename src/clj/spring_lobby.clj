@@ -178,11 +178,12 @@
 
 
 (def config-keys
-  [:battle-title :battle-password :bot-name :bot-username :bot-version :engine-version
-   :extra-import-sources :extra-replay-sources
-   :filter-replay :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins
-   :map-name :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color
-   :rapid-repo :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys :username])
+  [:battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
+   :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
+   :mod-name :minimap-type :my-channels :password :pop-out-battle :preferred-color :rapid-repo
+   :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys
+   :username])
 
 
 (defn select-config [state]
@@ -4235,7 +4236,7 @@
                                   (java-time/instant timestamp-millis)
                                   time-zone-id))))
 
-(defn channel-view [{:keys [channel-name channels client hide-users message-draft message-key]}]
+(defn channel-view [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft]}]
   (let [channel-details (get channels channel-name)
         users (:users channel-details)
         text (->> channel-details
@@ -4257,7 +4258,7 @@
          :children
          [{:fx/type with-scroll-text-prop
            :v-box/vgrow :always
-           :props {:scroll-text [text true]}
+           :props {:scroll-text [text chat-auto-scroll]}
            :desc
            {:fx/type :text-area
             :editable false
@@ -4270,19 +4271,34 @@
              :on-action {:event/type ::send-message
                          :channel-name channel-name
                          :client client
-                         :message message-draft
-                         :message-key message-key}}
+                         :message message-draft}}
             {:fx/type :text-field
              :id "channel-text-field"
              :h-box/hgrow :always
              :text (str message-draft)
-             :on-text-changed {:event/type ::assoc
-                               :key message-key}
+             :on-text-changed {:event/type ::assoc-in
+                               :path [:message-drafts channel-name]}
              :on-action {:event/type ::send-message
                          :channel-name channel-name
                          :client client
-                         :message message-draft
-                         :message-key message-key}}]}]}]
+                         :message message-draft}}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Auto scroll"}}
+             :desc
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-autorenew:20:white"}
+               {:fx/type :check-box
+                :selected (boolean chat-auto-scroll)
+                :on-selected-changed {:event/type ::assoc
+                                      :key :chat-auto-scroll}}]}}]}]}]
        (when (and (not hide-users)
                   (not (string/starts-with? channel-name "@")))
          [{:fx/type :table-view
@@ -4626,17 +4642,17 @@
 
 (def battle-view-keys
   [:archiving :battles :battle :battle-map-details :battle-mod-details :bot-name
-   :bot-username :bot-version :channels :cleaning :client :copying :current-tasks :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
+   :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client :copying :current-tasks :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type
-   :map-input-prefix :maps :battle-message-draft :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
+   :map-input-prefix :maps :message-drafts :minimap-type :mods :parsed-replays-by-path :rapid-data-by-version
    :rapid-download :rapid-update :spring-isolation-dir :tasks :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [battle battles battle-map-details battle-mod-details bot-name bot-username bot-version
-           channels client
+           channels chat-auto-scroll client
            current-tasks drag-allyteam drag-team engines
-           map-input-prefix maps battle-message-draft minimap-type parsed-replays-by-path
+           map-input-prefix maps message-drafts minimap-type parsed-replays-by-path
            spring-isolation-dir tasks users username]
     :as state}]
   (let [{:keys [host-username battle-map battle-modname channel-name]} (get battles (:battle-id battle))
@@ -4857,10 +4873,10 @@
            :h-box/hgrow :always
            :channel-name channel-name
            :channels channels
+           :chat-auto-scroll chat-auto-scroll
            :client client
            :hide-users true
-           :message-draft battle-message-draft
-           :message-key :battle-message-draft}]}]}
+           :message-draft (get message-drafts channel-name)}]}]}
       {:fx/type :tab-pane
        :style {:-fx-min-height (+ minimap-size 130)}
        :tabs
@@ -7294,10 +7310,10 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
-(defmethod event-handler ::send-message [{:keys [channel-name client message message-key]}]
+(defmethod event-handler ::send-message [{:keys [channel-name client message]}]
   (future
     (try
-      (swap! *state dissoc message-key)
+      (swap! *state update :message-drafts dissoc channel-name)
       (if-not (string/blank? message)
         (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
           (if-let [[_all message] (re-find #"^/me (.*)$" message)]
@@ -7315,9 +7331,6 @@
 (defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-tab-channel (.getId event)))
 
-(def my-channels-view-keys
-  [:channels :client :message-draft :my-channels :selected-tab-channel])
-
 (defn focus-text-field [^Tab tab]
   (when-let [content (.getContent tab)]
     (let [^Node text-field (-> content (.lookupAll "#channel-text-field") first)]
@@ -7326,7 +7339,11 @@
         (fn []
           (.requestFocus text-field))))))
 
-(defn my-channels-view [{:keys [channels client message-draft my-channels selected-tab-channel]}]
+(def my-channels-view-keys
+  [:channels :chat-auto-scroll :client :message-drafts :my-channels :selected-tab-channel])
+
+(defn my-channels-view
+  [{:keys [channels chat-auto-scroll client message-drafts my-channels selected-tab-channel]}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
@@ -7357,11 +7374,11 @@
              :on-selection-changed (fn [^Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type channel-view
+              :channel-name channel-name
               :channels channels
+              :chat-auto-scroll chat-auto-scroll
               :client client
-              :message-draft message-draft
-              :message-key :message-draft
-              :channel-name channel-name}})
+              :message-draft (get message-drafts channel-name)}})
           my-channel-names)}}
       {:fx/type :pane})))
 
@@ -7378,6 +7395,12 @@
       (catch Exception e
         (log/error e "Error sending message" message "to server")))))
 
+(defmethod event-handler ::debug [{:fx/keys [event]}]
+  #p (type event)
+  (log/info (type event))
+  #p (.getEventType event)
+  (log/info (.getEventType event)))
+
 (def channels-table-keys
   [:channels :client :my-channels])
 
@@ -7385,11 +7408,11 @@
   ["battles" "chat" "console"])
 
 (def main-tab-view-keys
-  [:battles :client :channels :console-log :console-message-draft :join-channel-name
+  [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
    :selected-tab-main :users])
 
 (defn main-tab-view
-  [{:keys [battles client channels console-log console-message-draft join-channel-name
+  [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
            selected-tab-main users]
     :as state}]
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
@@ -7492,13 +7515,14 @@
          :children
          [{:fx/type with-scroll-text-prop
            :v-box/vgrow :always
-           :props {:scroll-text [console-text true]}
+           :props {:scroll-text [console-text console-auto-scroll]}
            :desc
            {:fx/type :text-area
             :editable false
             :wrap-text true
             :style {:-fx-font-family monospace-font-family}}}
           {:fx/type :h-box
+           :alignment :center-left
            :children
            [{:fx/type :button
              :text "Send"
@@ -7512,7 +7536,24 @@
                                :key :console-message-draft}
              :on-action {:event/type ::send-console
                          :client client
-                         :message console-message-draft}}]}]}}]}}))
+                         :message console-message-draft}}
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type :tooltip
+               :show-delay [10 :ms]
+               :text "Auto scroll"}}
+             :desc
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-autorenew:20:white"}
+               {:fx/type :check-box
+                :selected (boolean console-auto-scroll)
+                :on-selected-changed {:event/type ::assoc
+                                      :key :console-auto-scroll}}]}}]}]}}]}}))
 
 (def tasks-window-keys
   [:current-tasks :show-tasks-window :tasks])
