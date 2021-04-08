@@ -17,14 +17,14 @@ jobs:
         with:
           cli: '1.10.3.822'
       - run: clojure -M:uberjar:headless
-        #      - uses: actions/upload-release-asset@v1.0.2
-        #        env:
-        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        #        with:
-        #          upload_url: ${{ github.event.release.upload_url }}
-        #          asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
-        #          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-linux.jar
-        #          asset_content_type: application/java-archive
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
+          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-linux.jar
+          asset_content_type: application/java-archive
       - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
       - uses: actions/upload-release-asset@v1.0.2
         env:
@@ -36,14 +36,14 @@ jobs:
           asset_content_type: application/vnd.debian.binary-package
       - run: rm dist/*
       - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
-        #      - uses: actions/upload-release-asset@v1.0.2
-        #        env:
-        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        #        with:
-        #          upload_url: ${{ github.event.release.upload_url }}
-        #          asset_path: ./dist/skyreplays.jar
-        #          asset_name: skyreplays-${{ env.CI_REF_NAME }}-linux.jar
-        #          asset_content_type: application/java-archive
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/skyreplays.jar
+          asset_name: skyreplays-${{ env.CI_REF_NAME }}-linux.jar
+          asset_content_type: application/java-archive
       - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/linux
       - uses: actions/upload-release-asset@v1.0.2
         env:
