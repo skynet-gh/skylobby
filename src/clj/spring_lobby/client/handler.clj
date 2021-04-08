@@ -239,16 +239,13 @@
                           :username username
                           :ex true}))))))
 
-(defn user-channel [username]
-  (str "@" username))
-
 (defmethod handle "SAYPRIVATE" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         now (u/curr-millis)]
     (swap! state-atom
       (fn [state]
         (-> state
-            (update-in [:channels (user-channel username) :messages]
+            (update-in [:channels (u/user-channel username) :messages]
               (fn [messages]
                 (take u/max-messages
                   (conj messages {:text message
@@ -258,7 +255,7 @@
 (defmethod handle "SAIDPRIVATE" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         now (u/curr-millis)
-        channel-name (user-channel username)]
+        channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
         (-> state
@@ -278,7 +275,7 @@
     (swap! state-atom
       (fn [state]
         (-> state
-            (update-in [:channels (user-channel username) :messages]
+            (update-in [:channels (u/user-channel username) :messages]
               (fn [messages]
                 (take u/max-messages
                   (conj messages {:text message
@@ -289,7 +286,7 @@
 (defmethod handle "SAIDPRIVATEEX" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         now (u/curr-millis)
-        channel-name (user-channel username)]
+        channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
         (-> state
@@ -478,6 +475,11 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [_client _state-atom m]
-  (let [[_all _username] (re-find #"\w+ ([^\s]+)" m)]
-    (sound/play-ring)))
+(defmethod handle "RING" [_client state-atom m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
+        me (:username @state-atom)]
+    (if (= username me)
+      (do
+        (log/info "Playing ring sound for me")
+        (sound/play-ring))
+      (log/info "Not playing ring for other player"))))

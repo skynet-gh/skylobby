@@ -3773,7 +3773,7 @@
                    {:fx/type :context-menu
                     :items
                     (concat []
-                      (when (and (not owner)) ;(not= username (:username id)))
+                      (when (and (not owner))
                         [
                          {:fx/type :menu-item
                           :text "Message"
@@ -3784,7 +3784,14 @@
                         :on-action {:event/type ::ring
                                     :client client
                                     :channel-name channel-name
-                                    :username (:username id)}}])}})}
+                                    :username (:username id)}}]
+                      (when (string/includes? host-username "cluster")
+                        [{:fx/type :menu-item
+                          :text "!whois"
+                          :on-action {:event/type ::send-message
+                                      :client client
+                                      :channel-name (u/user-channel host-username)
+                                      :message (str "!whois " (:username id))}}]))}})}
      :columns
      [{:fx/type :table-column
        :text "Nickname"

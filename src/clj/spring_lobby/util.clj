@@ -145,3 +145,6 @@
 (defn battle-channel-name? [channel-name]
   (and channel-name
        (string/starts-with? channel-name "__battle__")))
+
+(defn user-channel [username]
+  (str "@" username))
