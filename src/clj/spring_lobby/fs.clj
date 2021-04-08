@@ -90,6 +90,12 @@
   (when-not (exists? f)
     (make-dirs (parent-file f))))
 
+(defn set-executable
+  ([f]
+   (set-executable f true))
+  ([f executable]
+   (when (is-file? f)
+     (.setExecutable f executable))))
 
 (defn os-name []
   (System/getProperty "os.name"))
@@ -188,6 +194,17 @@
 (defn spring-headless-executable []
   (executable "spring-headless"))
 
+(defn pr-downloader-executable []
+  (executable "pr-downloader"))
+
+
+(defn pr-downloader-file [engine-dir]
+  (some
+    #(when (and (is-file? %)
+                (exists? %))
+       %)
+    [(io/file engine-dir (pr-downloader-executable))
+     (io/file engine-dir "bin" (pr-downloader-executable))]))
 
 (defn bar-root
   "Returns the root directory for BAR"
@@ -280,36 +297,30 @@
   []
   (io/file (app-root) "download"))
 
-(defn isolation-dir
-  "Returns the isolation dir for spring in this app."
+(defn default-isolation-dir
+  "Returns the default isolation dir for spring in this app."
   ^File
   []
   (io/file (app-root) "spring"))
 
 (defn replays-dir
-  ([]
-   (replays-dir (isolation-dir)))
-  ([root]
-   (io/file root "demos")))
+  [root]
+  (io/file root "demos"))
 
 (defn replay-files
-  ([]
-   (replay-files (replays-dir (isolation-dir))))
-  ([dir]
-   (->> dir
-        list-files
-        (filter is-file?)
-        (filter (comp #(string/ends-with? % ".sdfz") filename)))))
+  [dir]
+  (->> dir
+       list-files
+       (filter is-file?)
+       (filter (comp #(string/ends-with? % ".sdfz") filename))))
 
 (defn map-files
-  ([]
-   (map-files (isolation-dir)))
-  ([root]
-   (->> (io/file root "maps")
-        file-seq
-        (filter is-file?)
-        (filter #(or (string/ends-with? (filename %) ".sd7")
-                     (string/ends-with? (filename %) ".sdz"))))))
+  [root]
+  (->> (io/file root "maps")
+       file-seq
+       (filter is-file?)
+       (filter #(or (string/ends-with? (filename %) ".sd7")
+                    (string/ends-with? (filename %) ".sdz")))))
 
 (defn- extract-7z
   ([^File f]
@@ -433,7 +444,7 @@
 
 (defn sync-version [engine-dir]
   (let [engine-exe (io/file engine-dir (spring-headless-executable))
-        _ (.setExecutable engine-exe true)
+        _ (set-executable engine-exe)
         command [(canonical-path engine-exe) "--sync-version"]
         ^"[Ljava.lang.String;" cmdarray (into-array String command)
         runtime (Runtime/getRuntime)
@@ -445,10 +456,8 @@
 
 
 (defn engines-dir
-  ([]
-   (engines-dir (isolation-dir)))
-  ([root]
-   (io/file root "engine")))
+  [root]
+  (io/file root "engine"))
 
 (defn spring-engine-dir? [dir]
   (and (is-directory? dir)
@@ -456,20 +465,18 @@
        (is-file? (io/file dir (spring-headless-executable)))))
 
 (defn engine-dirs
-  ([]
-   (engine-dirs (isolation-dir)))
-  ([root]
-   (let [engines-folder (->> (list-files (io/file root "engine"))
-                             seq
-                             (filter is-directory?))]
-     (concat
-       (mapcat
-         (fn [dir]
-           (->> (list-files dir)
-                seq
-                (filter spring-engine-dir?)))
-         engines-folder)
-       (filter spring-engine-dir? engines-folder)))))
+  [root]
+  (let [engines-folder (->> (list-files (io/file root "engine"))
+                            seq
+                            (filter is-directory?))]
+    (concat
+      (mapcat
+        (fn [dir]
+          (->> (list-files dir)
+               seq
+               (filter spring-engine-dir?)))
+        engines-folder)
+      (filter spring-engine-dir? engines-folder))))
 
 (defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]
@@ -487,23 +494,17 @@
 
 
 (defn mods-dir
-  ([]
-   (mods-dir (isolation-dir)))
-  ([root]
-   (io/file root "games")))
+  [root]
+  (io/file root "games"))
 
 (defn mod-file
-  ([mod-filename]
-   (mod-file (isolation-dir) mod-filename))
-  ([root mod-filename]
-   (when mod-filename
-     (io/file (mods-dir root) mod-filename))))
+  [root mod-filename]
+  (when mod-filename
+    (io/file (mods-dir root) mod-filename)))
 
 (defn mod-files
-  ([]
-   (mod-files (isolation-dir)))
-  ([root]
-   (seq (list-files (io/file root "games")))))
+  [root]
+  (seq (list-files (io/file root "games"))))
 
 (defn read-mod-zip-file
   ([^java.io.File file]
@@ -583,17 +584,13 @@
       ".sd7")))
 
 (defn maps-dir
-  ([]
-   (maps-dir (isolation-dir)))
-  ([root]
-   (io/file root "maps")))
+  [root]
+  (io/file root "maps"))
 
 (defn map-file
-  ([map-filename]
-   (map-file (isolation-dir) map-filename))
-  ([root map-filename]
-   (when map-filename
-     (io/file (maps-dir root) map-filename))))
+  [root map-filename]
+  (when map-filename
+    (io/file (maps-dir root) map-filename)))
 
 (defn spring-config-line [lines field]
   (nth

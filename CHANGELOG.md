@@ -1,14 +1,38 @@
 # Changelog
 
-Notable changes
+Notable changes and todo list.
 
 ### TODO - future
 
 - Use rich text for chat windows, fix scrolling
+- Auto update check
 - Improve table column sizing
+- Download replays from various websites
+- Multiple server connections, merged view
+- Singleplayer options, skirmish vs bots, scenarios
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.7]
+
+- Fix spring isolation dir config ignored in some places
+- Fix engine executables not being set to executable (Linux)
+- Fix pr-downloader location in some older engines
+- Fix register confirm agreement not using verification code
+- Fix chat channels sharing draft message
+- Add check box to disable chat and console auto scroll
+- Add color for some status icons
+- Add map size, metalmap, and heightmap to replays window
+- Stop uploading build jars to release, installers only
+
+### [0.2.6]
+
+- Initial public release
+
+### [0.2.4 and 0.2.5]
+
+- Fix Windows packaging
 
 ### [0.2.3]
 

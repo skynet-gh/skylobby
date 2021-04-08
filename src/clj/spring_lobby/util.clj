@@ -20,6 +20,9 @@
 (def app-name "skylobby")
 
 
+(def max-messages 200) ; for chat and console
+
+
 (defn manifest-attributes [url]
   (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
       URL. .openStream Manifest. .getMainAttributes))
@@ -142,3 +145,6 @@
 (defn battle-channel-name? [channel-name]
   (and channel-name
        (string/starts-with? channel-name "__battle__")))
+
+(defn user-channel [username]
+  (str "@" username))
