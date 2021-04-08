@@ -5,7 +5,11 @@ Notable changes
 ### TODO - future
 
 - Use rich text for chat windows, fix scrolling
+- Auto update check
 - Improve table column sizing
+- Download replays from various websites
+- Multiple server connections, merged view
+- Singleplayer options, skirmish vs bots, scenarios
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes

@@ -7257,7 +7257,7 @@
 
 (defn focus-text-field [^Tab tab]
   (when-let [content (.getContent tab)]
-    (let [text-field (-> content (.lookupAll "#channel-text-field") first)]
+    (let [^Node text-field (-> content (.lookupAll "#channel-text-field") first)]
       (log/info "Found text field" (.getId text-field))
       (Platform/runLater
         (fn []
@@ -7291,7 +7291,7 @@
              :on-close-request {:event/type ::leave-channel
                                 :channel-name channel-name
                                 :client client}
-             :on-selection-changed (fn [ev] (focus-text-field (.getTarget ev)))
+             :on-selection-changed (fn [^Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type channel-view
               :channels channels
