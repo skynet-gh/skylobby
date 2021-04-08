@@ -90,6 +90,12 @@
   (when-not (exists? f)
     (make-dirs (parent-file f))))
 
+(defn set-executable
+  ([f]
+   (set-executable f true))
+  ([f executable]
+   (when (is-file? f)
+     (.setExecutable f executable))))
 
 (defn os-name []
   (System/getProperty "os.name"))
@@ -188,6 +194,17 @@
 (defn spring-headless-executable []
   (executable "spring-headless"))
 
+(defn pr-downloader-executable []
+  (executable "pr-downloader"))
+
+
+(defn pr-downloader-file [engine-dir]
+  (some
+    #(when (and (is-file? %)
+                (exists? %))
+       %)
+    [(io/file engine-dir (pr-downloader-executable))
+     (io/file engine-dir "bin" (pr-downloader-executable))]))
 
 (defn bar-root
   "Returns the root directory for BAR"
@@ -433,7 +450,7 @@
 
 (defn sync-version [engine-dir]
   (let [engine-exe (io/file engine-dir (spring-headless-executable))
-        _ (.setExecutable engine-exe true)
+        _ (set-executable engine-exe)
         command [(canonical-path engine-exe) "--sync-version"]
         ^"[Ljava.lang.String;" cmdarray (into-array String command)
         runtime (Runtime/getRuntime)

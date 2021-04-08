@@ -4465,7 +4465,8 @@
                  (if (and rapid-id engine-file)
                    {:event/type ::rapid-download
                     :rapid-id rapid-id
-                    :engine-file engine-file}
+                    :engine-file engine-file
+                    :spring-isolation-dir spring-isolation-dir}
                    {:event/type ::add-task
                     :task {::task-type ::update-rapid}})
                  nil)}])
@@ -5242,7 +5243,8 @@
           (event-handler
             {:event/type ::rapid-download
              :rapid-id "i18n:test" ; TODO how else to init rapid without download...
-             :engine-file (:file engine-details)})))
+             :engine-file (:file engine-details)
+             :spring-isolation-dir spring-isolation-dir})))
       (log/warn "No engine details to do rapid init"))
     (log/info "Updating rapid versions in" spring-isolation-dir)
     (let [rapid-repos (rapid/repos spring-isolation-dir)
@@ -5305,13 +5307,14 @@
 
 
 (defmethod event-handler ::rapid-download
-  [{:keys [engine-file rapid-id]}]
+  [{:keys [engine-file rapid-id spring-isolation-dir]}]
   (swap! *state assoc-in [:rapid-download rapid-id] {:running true
                                                      :message "Preparing to run pr-downloader"})
   (future
     (try
-      (let [pr-downloader-file (io/file engine-file (fs/executable "pr-downloader"))
-            ^File root (:spring-isolation-dir @*state) ; TODO remvoe deref
+      (let [root spring-isolation-dir
+            pr-downloader-file (fs/pr-downloader-file engine-file)
+            _ (fs/set-executable pr-downloader-file)
             command [(fs/canonical-path pr-downloader-file)
                      "--filesystem-writepath" (fs/wslpath root)
                      "--rapid-download" rapid-id]
@@ -6327,8 +6330,9 @@
                     {:graphic
                      {:fx/type :button
                       :on-action {:event/type ::rapid-download
+                                  :engine-file engine-file
                                   :rapid-id (:id i)
-                                  :engine-file engine-file}
+                                  :spring-isolation-dir spring-isolation-dir}
                       :graphic
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-download:16:white"}}}))))}}]}
@@ -6991,8 +6995,9 @@
                              {:fx/type :button
                               :text (str " Download game")
                               :on-action {:event/type ::rapid-download
+                                          :engine-file (:file matching-engine)
                                           :rapid-id (:id mod-rapid)
-                                          :engine-file (:file matching-engine)}
+                                          :spring-isolation-dir spring-isolation-dir}
                               :graphic
                               {:fx/type font-icon/lifecycle
                                :icon-literal "mdi-download:16:white"}}
