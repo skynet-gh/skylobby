@@ -20,6 +20,9 @@
 (def app-name "skylobby")
 
 
+(def max-messages 200) ; for chat and console
+
+
 (defn manifest-attributes [url]
   (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
       URL. .openStream Manifest. .getMainAttributes))

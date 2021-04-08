@@ -222,18 +222,22 @@
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
         now (u/curr-millis)]
     (swap! state-atom update-in [:channels channel-name :messages]
-           conj {:text message
-                 :timestamp now
-                 :username username})))
+      (fn [messages]
+        (take u/max-messages
+          (conj messages {:text message
+                          :timestamp now
+                          :username username}))))))
 
 (defmethod handle "SAIDEX" [_c state-atom m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
         now (u/curr-millis)]
     (swap! state-atom update-in [:channels channel-name :messages]
-           conj {:text message
-                 :timestamp now
-                 :username username
-                 :ex true})))
+      (fn [messages]
+        (take u/max-messages
+          (conj messages {:text message
+                          :timestamp now
+                          :username username
+                          :ex true}))))))
 
 (defn user-channel [username]
   (str "@" username))
@@ -245,9 +249,11 @@
       (fn [state]
         (-> state
             (update-in [:channels (user-channel username) :messages]
-              conj {:text message
-                    :timestamp now
-                    :username (:username state)}))))))
+              (fn [messages]
+                (take u/max-messages
+                  (conj messages {:text message
+                                  :timestamp now
+                                  :username (:username state)})))))))))
 
 (defmethod handle "SAIDPRIVATE" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
@@ -257,9 +263,11 @@
       (fn [state]
         (-> state
             (update-in [:channels channel-name :messages]
-              conj {:text message
-                    :timestamp now
-                    :username username})
+              (fn [messages]
+                (take u/max-messages
+                  (conj messages {:text message
+                                  :timestamp now
+                                  :username username}))))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channels channel-name))))))
@@ -271,10 +279,12 @@
       (fn [state]
         (-> state
             (update-in [:channels (user-channel username) :messages]
-              conj {:text message
-                    :timestamp now
-                    :username (:username state)
-                    :ex true}))))))
+              (fn [messages]
+                (take u/max-messages
+                  (conj messages {:text message
+                                  :timestamp now
+                                  :username (:username state)
+                                  :ex true})))))))))
 
 (defmethod handle "SAIDPRIVATEEX" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
@@ -284,10 +294,12 @@
       (fn [state]
         (-> state
             (update-in [:channels channel-name :messages]
-              conj {:text message
-                    :timestamp now
-                    :username username
-                    :ex true})
+              (fn [messages]
+                (take u/max-messages
+                  (conj messages {:text message
+                                  :timestamp now
+                                  :username username
+                                  :ex true}))))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channels channel-name))))))
