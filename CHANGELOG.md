@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes
+Notable changes and todo list.
 
 ### TODO - future
 
@@ -13,6 +13,22 @@ Notable changes
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.7]
+
+- Fix spring isolation dir config ignored in some places
+- Fix engine executables not being set to executable (Linux)
+- Fix pr-downloader location in some older engines
+- Fix register confirm agreement not using verification code
+- Stop uploading build jars to release, installers only
+
+### [0.2.6]
+
+- Initial public release
+
+### [0.2.4 and 0.2.5]
+
+- Fix Windows packaging
 
 ### [0.2.3]
 
