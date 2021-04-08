@@ -20,6 +20,9 @@ Notable changes and todo list.
 - Fix engine executables not being set to executable (Linux)
 - Fix pr-downloader location in some older engines
 - Fix register confirm agreement not using verification code
+- Fix chat channels sharing draft message
+- Add check box to disable chat and console auto scroll
+- Add color for some status icons
 - Stop uploading build jars to release, installers only
 
 ### [0.2.6]

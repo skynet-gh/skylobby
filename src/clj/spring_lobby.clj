@@ -1278,17 +1278,17 @@
            {:text ""
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-lock:16:white"}}
+             :icon-literal "mdi-lock:16:yellow"}}
            (->> status :host-username (get users) :client-status :ingame)
            {:text ""
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-sword:16:white"}}
+             :icon-literal "mdi-sword:16:red"}}
            :else
            {:text ""
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-checkbox-blank-circle-outline:16:white"}}))}}
+             :icon-literal "mdi-checkbox-blank-circle-outline:16:green"}}))}}
      {:fx/type :table-column
       :text "Country"
       :cell-value-factory #(:country (get users (:host-username %)))
@@ -1443,13 +1443,17 @@
                     (:bot status) "robot"
                     (:access status) "account-key"
                     :else "account")
-                  ":16:white")}]
+                  ":16:"
+                  (cond
+                    (:bot status) "grey"
+                    (:access status) "orange"
+                    :else "white"))}]
               (when (:ingame status)
                 [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sword:16:white"}])
+                  :icon-literal "mdi-sword:16:red"}])
               (when (:away status)
                 [{:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sleep:16:white"}]))}})}}
+                  :icon-literal "mdi-sleep:16:grey"}]))}})}}
       {:fx/type :table-column
        :text "Country"
        :cell-value-factory :country
@@ -3757,6 +3761,7 @@
                  (sort-by
                    (juxt
                      (comp not :mode :battle-status)
+                     (comp :bot :client-status :user)
                      (comp :ally :battle-status)
                      (comp (fnil - 0) parse-skill :skill))))
      :row-factory
@@ -3903,22 +3908,25 @@
                 [(cond
                    (:bot client-status)
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-robot:16:white"}
+                    :icon-literal "mdi-robot:16:grey"}
+                   (not (:mode battle-status))
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-magnify:16:white"}
                    (:ready battle-status)
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account-check:16:white"}
+                    :icon-literal "mdi-account-check:16:green"}
                    am-host
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account-key:16:white"}
+                    :icon-literal "mdi-account-key:16:orange"}
                    :else
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-account:16:white"})]
                 (when (:ingame client-status)
                   [{:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-sword:16:white"}])
+                    :icon-literal "mdi-sword:16:red"}])
                 (when (:away client-status)
                   [{:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-sleep:16:white"}]))}}))}}
+                    :icon-literal "mdi-sleep:16:grey"}]))}}))}}
       {:fx/type :table-column
        :text "Spectator"
        :cell-value-factory identity
