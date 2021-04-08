@@ -1741,7 +1741,7 @@
         :show-delay [10 :ms]
         :style {:-fx-font-size 14}
         :text "Show server registration window"}
-       :on-action {:event/type ::assoc
+       :on-action {:event/type ::toggle
                    :key :show-register-window}
        :graphic
        {:fx/type font-icon/lifecycle
@@ -1776,6 +1776,7 @@
       (let [server-url (first server)
             client-deferred (client/client server-url) ; TODO catch connect errors somehow
             client @client-deferred]
+        (swap! *state dissoc :password-confirm)
         (send-message client
           (str "REGISTER " username " " (client/base64-md5 password) " " email))
         (loop []
@@ -1794,7 +1795,7 @@
     (try
       (send-message client
         (str "CONFIRMAGREEMENT " verification-code))
-      (swap! *state dissoc :agreement)
+      (swap! *state dissoc :agreement :verification-code)
       (client/login client username password)
       (catch Exception e
         (log/error e "Error confirming agreement")))))
@@ -1974,8 +1975,8 @@
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-register-window false)
                        (.consume e))
-   :width 400
-   :height 300
+   :width 500
+   :height 400
    :scene
    {:fx/type :scene
     :stylesheets stylesheets
@@ -2025,8 +2026,16 @@
          :text email
          :on-text-changed {:event/type ::assoc
                            :key :email}}]}
+      {:fx/type :pane
+       :v-box/vgrow :always}
       {:fx/type :label
        :text (str register-response)}
+      {:fx/type :label
+       :style {:-fx-text-fill "red"}
+       :text (str (when (and (not (string/blank? password))
+                             (not (string/blank? password-confirm))
+                             (not= password password-confirm))
+                    "Passwords do not match"))}
       {:fx/type :button
        :text "Register"
        :style {:-fx-font-size 20}
@@ -7562,8 +7571,9 @@
                :children
                [{:fx/type :text-field
                  :prompt-text "Email Verification Code"
-                 :on-action {:event/type ::assoc
-                             :key :verification-code}}
+                 :text verification-code
+                 :on-text-changed {:event/type ::assoc
+                                   :key :verification-code}}
                 {:fx/type :button
                  :text "Confirm"
                  :on-action {:event/type ::confirm-agreement
