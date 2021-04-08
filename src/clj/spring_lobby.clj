@@ -1304,7 +1304,7 @@
        :describe (fn [battle-rank] {:text (str battle-rank)})}}
      {:fx/type :table-column
       :text "Players (Specs)"
-      :cell-value-factory (juxt (comp count :users) :battle-spectators)
+      :cell-value-factory (juxt (comp count :users) #(or (:battle-spectators %) 0))
       :cell-factory
       {:fx/cell-type :table-cell
        :describe
@@ -3343,7 +3343,8 @@
                :-fx-border-color "#666666"
                :-fx-border-radius 3
                :-fx-border-style "solid"
-               :-fx-border-width 1})
+               :-fx-border-width 1
+               :-fx-pref-width 400})
      :children
      (concat
        [{:fx/type :h-box
@@ -4440,17 +4441,18 @@
                   :downloadable downloadable
                   :spring-isolation-dir spring-isolation-dir})}])
            (let [rapid-id (:id (get rapid-data-by-version battle-modname))
-                 rapid-download (get rapid-download rapid-id)
-                 in-progress (or (:running rapid-download) rapid-update)]
+                 {:keys [running] :as rapid-download} (get rapid-download rapid-id)]
              [{:severity 2
                :text "rapid"
                :human-text (if rapid-id
                              (if engine-file
-                               (if in-progress
-                                 (str (download-progress rapid-download))
+                               (cond
+                                 rapid-update "Rapid updating..."
+                                 running (str (download-progress rapid-download))
+                                 :else
                                  (str "Download rapid " rapid-id))
                                "Needs engine first to download with rapid")
-                             (if in-progress
+                             (if rapid-update
                                "Rapid updating..."
                                "No rapid download, update rapid"))
                :tooltip (if rapid-id
@@ -4459,7 +4461,7 @@
                                  " using engine " (:engine-version engine-details))
                             "Rapid requires an engine to work, get engine first")
                           (str "No rapid download found for" battle-modname))
-               :in-progress in-progress
+               :in-progress (or running rapid-update)
                :action
                (if engine-file
                  (if (and rapid-id engine-file)
@@ -4567,7 +4569,7 @@
                              (if dest-exists
                                (str "Downloaded " (fs/filename dest))
                                (str "Download from " (:download-source-name downloadable)))
-                             (str "No download for " engine-version)))
+                             "No download found"))
              :tooltip (if in-progress
                         (str "Downloading " (download-progress download))
                         (if dest-exists
