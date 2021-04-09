@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=SkyLobby
+Exec=skylobby
+Icon=skylobby
+Terminal=false
+Categories=Game
