@@ -3,5 +3,6 @@ Type=Application
 Name=SkyLobby
 Exec=skylobby
 Icon=skylobby
+Comment=A Spring RTS lobby and replay viewer
 Terminal=false
 Categories=Game
