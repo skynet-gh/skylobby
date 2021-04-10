@@ -476,11 +476,7 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [_client state-atom m]
-  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        me (:username @state-atom)]
-    (if (= username me)
-      (do
-        (log/info "Playing ring sound for me")
-        (sound/play-ring))
-      (log/info "Not playing ring for other player"))))
+(defmethod handle "RING" [_client _state-atom m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
+    (log/info "Playing ring sound from" username)
+    (sound/play-ring)))

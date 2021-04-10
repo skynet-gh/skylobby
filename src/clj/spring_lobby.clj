@@ -64,10 +64,14 @@
 (set! *warn-on-reflection* true)
 
 
-(declare reconcile-engines reconcile-maps reconcile-mods)
+(declare
+  could-be-this-engine? could-be-this-map? could-be-this-mod? file-exists? import-sources
+  reconcile-engines reconcile-maps reconcile-mods resource-dest)
 
 
 (def app-version (u/app-version))
+
+(def wait-before-init-tasks-ms 10000)
 
 (def stylesheets
   [(str (io/resource "dark.css"))])
@@ -154,17 +158,17 @@
 
 
 (def priority-overrides
-  {::reconcile-engines 1
-   ::reconcile-mods 2
+  {::reconcile-engines 5
+   ::reconcile-mods 4
    ::reconcile-maps 3
-   ::import 3
-   ::http-downloadable 3
-   ::rapid-downloadable 3
-   ::update-rapid-packages 4
-   ::update-downloadables 5
-   ::scan-imports 5})
+   ::import 2
+   ::http-downloadable 2
+   ::rapid-downloadable 2
+   ::update-rapid-packages 1
+   ::update-downloadables 1
+   ::scan-imports 1})
 
-(def default-task-priority 3)
+(def default-task-priority 2)
 
 (defn task-priority [{::keys [task-priority task-type]}]
   (or task-priority
@@ -372,6 +376,15 @@
       (swap! state-atom update :tasks conj task))
     (log/warn "Attempt to add nil task" task)))
 
+(defn add-tasks! [state-atom tasks-to-add]
+  (log/info "Adding tasks" (pr-str tasks-to-add))
+  (swap! state-atom update :tasks
+    (fn [tasks]
+      (apply conj tasks tasks-to-add))))
+
+(defn same-resource-file? [resource1 resource2]
+  (= (:resource-file resource1)
+     (:resource-file resource2)))
 
 (defn add-watchers
   "Adds all *state watchers."
@@ -380,128 +393,283 @@
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :fix-missing-resource)
+  (remove-watch state-atom :fix-spring-isolation-dir)
+  (remove-watch state-atom :spring-isolation-dir-changed)
+  (remove-watch state-atom :auto-get-resources)
   (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
-      (future
-        (try
-          (let [old-battle-id (-> old-state :battle :battle-id)
-                new-battle-id (-> new-state :battle :battle-id)
-                old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
-                new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)
-                battle-map-details (:battle-map-details new-state)
-                map-changed (not= new-battle-map (:map-name battle-map-details))]
-            (when (and (or (not= old-battle-id new-battle-id)
-                           (not= old-battle-map new-battle-map))
-                       (and (not (string/blank? new-battle-map))
-                            (or (not (seq battle-map-details))
-                                map-changed)))
-              (when map-changed
-                (swap! *state assoc :battle-map-details nil))
-              (if (->> new-state :maps (filter (comp #{new-battle-map} :map-name)) first)
-                (do
-                  (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
-                  (let [map-details (or (read-map-data (:maps new-state) new-battle-map) {})]
-                    (swap! *state assoc :battle-map-details map-details)))
-                (do
-                  (log/info "Battle map not found, setting empty details for" new-battle-map "was" old-battle-map)
-                  (swap! *state assoc :battle-map-details {})))))
-          (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher"))))))
+      (try
+        (let [old-battle-id (-> old-state :battle :battle-id)
+              new-battle-id (-> new-state :battle :battle-id)
+              old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
+              new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)
+              battle-map-details (:battle-map-details new-state)
+              map-changed (not= new-battle-map (:map-name battle-map-details))
+              old-maps (:maps old-state)
+              new-maps (:maps new-state)]
+          (when (or (and (or (not= old-battle-id new-battle-id)
+                             (not= old-battle-map new-battle-map))
+                         (and (not (string/blank? new-battle-map))
+                              (or (not (seq battle-map-details))
+                                  map-changed)))
+                    (and
+                      (or (not (some (comp #{new-battle-map} :map-name) old-maps)))
+                      (some (comp #{new-battle-map} :map-name) new-maps)))
+            (if (->> new-maps (filter (comp #{new-battle-map} :map-name)) first)
+              (do
+                (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
+                (future
+                  (let [map-details (or (read-map-data new-maps new-battle-map) {})]
+                    (swap! *state assoc :battle-map-details map-details))))
+              (do
+                (log/info "Battle map not found, setting empty details for" new-battle-map "was" old-battle-map)
+                (swap! *state assoc :battle-map-details {})))))
+        (catch Exception e
+          (log/error e "Error in :battle-map-details state watcher")))))
   (add-watch state-atom :battle-mod-details
     (fn [_k _ref old-state new-state]
-      (future
-        (try
-          (let [old-battle-id (-> old-state :battle :battle-id)
-                new-battle-id (-> new-state :battle :battle-id)
-                old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
-                new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
-                new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
-                mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
-                filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
-                battle-mod-details (:battle-mod-details new-state)
-                mod-changed (not= new-battle-mod (:mod-name battle-mod-details))]
-            (when (and (or (not= old-battle-id new-battle-id)
-                           (not= old-battle-mod new-battle-mod))
-                       (and (not (string/blank? new-battle-mod))
-                            (or (not (seq battle-mod-details))
-                                mod-changed)))
-              (when mod-changed
-                (swap! *state assoc :battle-mod-details nil))
-              (if (->> new-state :mods (filter filter-fn) first)
-                (do
-                  (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-                  (let [mod-details (or (some->> new-state
-                                                 :mods
+      (try
+        (let [old-battle-id (-> old-state :battle :battle-id)
+              new-battle-id (-> new-state :battle :battle-id)
+              old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
+              new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
+              new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
+              mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
+              filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+              battle-mod-details (:battle-mod-details new-state)
+              mod-changed (not= new-battle-mod (:mod-name battle-mod-details))
+              old-mods (:mods old-state)
+              new-mods (:mods new-state)]
+          (when (or (and (or (not= old-battle-id new-battle-id)
+                             (not= old-battle-mod new-battle-mod))
+                         (and (not (string/blank? new-battle-mod))
+                              (or (not (seq battle-mod-details))
+                                  mod-changed)))
+                    (and
+                      (or (not (some (comp #{new-battle-mod} :mod-name) old-mods)))
+                      (some (comp #{new-battle-mod} :mod-name) new-mods)))
+            (if (->> new-mods (filter filter-fn) first)
+              (do
+                (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
+                (future
+                  (let [mod-details (or (some->> new-mods
                                                  (filter filter-fn)
                                                  first
                                                  :file
                                                  read-mod-data)
                                         {})]
-                    (swap! *state assoc :battle-mod-details mod-details)))
-                (do
-                  (log/info "Battle mod not found, setting empty details for" new-battle-mod "was" old-battle-mod)
-                  (swap! *state assoc :battle-mod-details {})))))
-          (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher"))))))
+                    (swap! *state assoc :battle-mod-details mod-details))))
+              (do
+                (log/info "Battle mod not found, setting empty details for" new-battle-mod "was" old-battle-mod)
+                (swap! *state assoc :battle-mod-details {})))))
+        (catch Exception e
+          (log/error e "Error in :battle-mod-details state watcher")))))
   (add-watch state-atom :fix-missing-resource
     (fn [_k _ref _old-state new-state]
-      (future
-        (try
-          (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
-                engine-fix (when engine-version
-                             (when-not (->> engines
-                                            (filter (comp #{engine-version} :engine-version))
-                                            first)
-                               (-> engines first :engine-version)))
-                mod-fix (when mod-name
-                          (when-not (->> mods
-                                         (filter (comp #{mod-name} :mod-name))
-                                         first)
-                            (-> mods first :mod-name)))
-                map-fix (when map-name
-                          (when-not (->> maps
-                                         (filter (comp #{map-name} :map-name))
-                                         first)
-                            (-> maps first :map-name)))]
-            (when (or engine-fix mod-fix map-fix)
-              (swap! state-atom
-                     (fn [state]
-                       (cond-> state
-                         engine-fix (assoc :engine-version engine-fix)
-                         mod-fix (assoc :mod-name mod-fix)
-                         map-fix (assoc :map-name map-fix))))))
-          (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher"))))))
+      (try
+        (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
+              engine-fix (when engine-version
+                           (when-not (->> engines
+                                          (filter (comp #{engine-version} :engine-version))
+                                          first)
+                             (-> engines first :engine-version)))
+              mod-fix (when mod-name
+                        (when-not (->> mods
+                                       (filter (comp #{mod-name} :mod-name))
+                                       first)
+                          (-> mods first :mod-name)))
+              map-fix (when map-name
+                        (when-not (->> maps
+                                       (filter (comp #{map-name} :map-name))
+                                       first)
+                          (-> maps first :map-name)))]
+          (when (or engine-fix mod-fix map-fix)
+            (swap! state-atom
+                   (fn [state]
+                     (cond-> state
+                       engine-fix (assoc :engine-version engine-fix)
+                       mod-fix (assoc :mod-name mod-fix)
+                       map-fix (assoc :map-name map-fix))))))
+        (catch Exception e
+          (log/error e "Error in :battle-map-details state watcher")))))
   (add-watch state-atom :fix-spring-isolation-dir
     (fn [_k _ref _old-state new-state]
-      (future
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when-not (and spring-isolation-dir
-                           (instance? File spring-isolation-dir))
-              (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-              (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
-          (catch Exception e
-            (log/error e "Error in :fix-spring-isolation-dir state watcher"))))))
+      (try
+        (let [{:keys [spring-isolation-dir]} new-state]
+          (when-not (and spring-isolation-dir
+                         (instance? File spring-isolation-dir))
+            (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
+            (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
+        (catch Exception e
+          (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
   (add-watch state-atom :spring-isolation-dir-changed
     (fn [_k _ref old-state new-state]
-      (future
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when (and spring-isolation-dir
-                       (instance? File spring-isolation-dir)
-                       (not= (fs/canonical-path spring-isolation-dir)
-                             (fs/canonical-path (:spring-isolation-dir old-state))))
-              (log/info "Spring isolation dir changed to" spring-isolation-dir "updating resources")
-              (reconcile-engines *state)
-              (reconcile-mods *state)
-              (reconcile-maps *state)
-              (event-handler {:event/type ::scan-imports})
-              (add-task! *state {::task-type ::update-rapid})
-              (add-task! *state {::task-type ::refresh-replays})))
-          (catch Exception e
-            (log/error e "Error in :spring-isolation-dir-changed state watcher")))))))
+      (try
+        (let [{:keys [spring-isolation-dir]} new-state]
+          (when (and spring-isolation-dir
+                     (instance? File spring-isolation-dir)
+                     (not= (fs/canonical-path spring-isolation-dir)
+                           (fs/canonical-path (:spring-isolation-dir old-state))))
+            (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
+                      "to" spring-isolation-dir "updating resources")
+            (swap! *state
+              (fn [{:keys [extra-import-sources] :as state}]
+                (-> state
+                    (dissoc :engines :maps :mods :battle-map-details :battle-mod-details)
+                    (update :tasks
+                      (fn [tasks]
+                        (conj tasks
+                          {::task-type ::reconcile-engines}
+                          {::task-type ::reconcile-mods}
+                          {::task-type ::reconcile-maps}
+                          {::task-type ::scan-imports
+                           :sources (import-sources extra-import-sources)}
+                          {::task-type ::update-rapid}
+                          {::task-type ::refresh-replays}))))))))
+        (catch Exception e
+          (log/error e "Error in :spring-isolation-dir-changed state watcher")))))
+  (add-watch state-atom :auto-get-resources
+    (fn [_k _ref old-state new-state]
+      (try
+        (when (and (:auto-get-resources new-state) (:spring-isolation-dir new-state))
+          (let [{:keys [battle battles current-tasks downloadables-by-url engines file-cache importables-by-path maps mods rapid-data-by-version spring-isolation-dir tasks]} new-state
+                old-battle-details (-> old-state :battles (get (-> old-state :battle :battle-id)))
+                {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
+                rapid-data (get rapid-data-by-version battle-modname)
+                rapid-id (:id rapid-data)
+                all-tasks (concat tasks (vals current-tasks))
+                rapid-task (->> all-tasks
+                                (filter (comp #{::rapid-download} ::task-type))
+                                (filter (comp #{rapid-id} :rapid-id))
+                                first)
+                engine-file (-> engines first :file)
+                importables (vals importables-by-path)
+                map-importable (some->> importables
+                                        (filter (comp #{::map} :resource-type))
+                                        (filter (partial could-be-this-map? battle-map))
+                                        first)
+                map-import-task (->> all-tasks
+                                     (filter (comp #{::import} ::task-type))
+                                     (filter (comp (partial same-resource-file? map-importable) :importable))
+                                     first)
+                no-map (->> maps
+                            (filter (comp #{battle-map} :map-name))
+                            first
+                            not)
+                downloadables (vals downloadables-by-url)
+                map-downloadable (->> downloadables
+                                      (filter (comp #{::map} :resource-type))
+                                      (filter (partial could-be-this-map? battle-map))
+                                      first)
+                map-download-task (->> all-tasks
+                                       (filter (comp #{::http-downloadable} ::task-type))
+                                       (filter (comp (partial same-resource-file? map-downloadable) :downloadable))
+                                       first)
+                engine-details (spring/engine-details engines battle-version)
+                engine-importable (some->> importables
+                                           (filter (comp #{::engine} :resource-type))
+                                           (filter (partial could-be-this-engine? battle-version))
+                                           first)
+                engine-import-task (->> all-tasks
+                                        (filter (comp #{::import} ::task-type))
+                                        (filter (comp (partial same-resource-file? engine-importable) :importable))
+                                        first)
+                engine-downloadable (->> downloadables
+                                         (filter (comp #{::engine} :resource-type))
+                                         (filter (partial could-be-this-engine? battle-version))
+                                         first)
+                engine-download-task (->> all-tasks
+                                          (filter (comp #{::http-downloadable} ::task-type))
+                                          (filter (comp (partial same-resource-file? engine-downloadable) :downloadable))
+                                          first)
+                mod-downloadable (->> downloadables
+                                      (filter (comp #{::mod} :resource-type))
+                                      (filter (partial could-be-this-mod? battle-modname))
+                                      first)
+                mod-download-task (->> all-tasks
+                                       (filter (comp #{::http-downloadable} ::task-type))
+                                       (filter (comp (partial same-resource-file? mod-downloadable) :downloadable))
+                                       first)
+                no-mod (->> mods
+                            (filter (comp #{battle-modname} :mod-name))
+                            first
+                            not)
+                tasks [(when
+                         (and (= battle-version (:battle-version old-battle-details))
+                              (not engine-details))
+                         (cond
+                           (and engine-importable
+                                (not engine-import-task)
+                                (not (file-exists? file-cache (resource-dest spring-isolation-dir engine-importable))))
+                           (do
+                             (log/info "Adding task to auto import engine" engine-importable)
+                             {::task-type ::import
+                              :importable engine-importable
+                              :spring-isolation-dir spring-isolation-dir})
+                           (and (not engine-importable)
+                                engine-downloadable
+                                (not engine-download-task)
+                                (not (file-exists? file-cache (resource-dest spring-isolation-dir engine-downloadable))))
+                           (do
+                             (log/info "Adding task to auto download engine" engine-downloadable)
+                             {::task-type ::http-downloadable
+                              :downloadable engine-downloadable
+                              :spring-isolation-dir spring-isolation-dir})
+                           :else
+                           nil))
+                       (when
+                         (and (= battle-map (:battle-map old-battle-details))
+                              no-map)
+                         (cond
+                           (and map-importable
+                                (not map-import-task)
+                                (not (file-exists? file-cache (resource-dest spring-isolation-dir map-importable))))
+                           (do
+                             (log/info "Adding task to auto import map" map-importable)
+                             {::task-type ::import
+                              :importable map-importable
+                              :spring-isolation-dir spring-isolation-dir})
+                           (and (not map-importable)
+                                map-downloadable
+                                (not map-download-task)
+                                (not (file-exists? file-cache (resource-dest spring-isolation-dir map-downloadable))))
+                           (do
+                             (log/info "Adding task to auto download map" map-downloadable)
+                             {::task-type ::http-downloadable
+                              :downloadable map-downloadable
+                              :spring-isolation-dir spring-isolation-dir})
+                           :else
+                           nil))
+                       (when
+                         (and (= battle-modname (:battle-modname old-battle-details))
+                              no-mod)
+                         (cond
+                           (and rapid-id
+                                (not rapid-task)
+                                engine-file
+                                (not (file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))))
+                           (do
+                             (log/info "Adding task to auto download rapid" rapid-id)
+                             {::task-type ::rapid-download
+                              :engine-file engine-file
+                              :rapid-id rapid-id
+                              :spring-isolation-dir spring-isolation-dir})
+                           (and (not rapid-id)
+                                mod-downloadable
+                                (not mod-download-task)
+                                (not (file-exists? file-cache (resource-dest spring-isolation-dir mod-downloadable))))
+                           (do
+                             (log/info "Adding task to auto download mod" mod-downloadable)
+                             {::task-type ::http-downloadable
+                              :downloadable mod-downloadable
+                              :spring-isolation-dir spring-isolation-dir})
+                           :else
+                           nil))]]
+           (when-let [tasks (seq (filter some? tasks))]
+             (add-tasks! *state tasks))))
+        (catch Exception e
+          (log/error e "Error in :auto-get-resources state watcher"))))))
 
 
 (defmulti task-handler ::task-type)
@@ -623,15 +791,16 @@
 (defn could-be-this-engine?
   "Returns true if this resource might be the engine with the given name, by magic, false otherwise."
   [engine-version {:keys [resource-filename resource-name]}]
-  (or (= engine-version resource-name)
-      (when (and engine-version resource-filename)
-        (let [lce (string/lower-case engine-version)
-              lcf (string/lower-case resource-filename)]
-          (or (= engine-version resource-filename)
-              (= lce lcf)
-              (= (http/engine-archive engine-version)
-                 resource-filename)
-              (= (http/bar-engine-filename engine-version) resource-filename))))))
+  (and engine-version
+       (or (= engine-version resource-name)
+           (when resource-filename
+             (let [lce (string/lower-case engine-version)
+                   lcf (string/lower-case resource-filename)]
+               (or (= engine-version resource-filename)
+                   (= lce lcf)
+                   (= (http/engine-archive engine-version)
+                      resource-filename)
+                   (= (http/bar-engine-filename engine-version) resource-filename)))))))
 
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
@@ -643,10 +812,11 @@
 (defn could-be-this-mod?
   "Returns true if this resource might be the mod with the given name, by magic, false otherwise."
   [mod-name {:keys [resource-filename resource-name]}]
-  (or (= mod-name resource-name)
-      (when (and mod-name resource-filename)
-        (= (normalize-mod mod-name)
-           (normalize-mod resource-filename)))))
+  (and mod-name
+       (or (= mod-name resource-name)
+           (when (and mod-name resource-filename)
+             (= (normalize-mod mod-name)
+                (normalize-mod resource-filename))))))
 
 (defn normalize-map [map-name-or-filename]
   (some-> map-name-or-filename
@@ -658,10 +828,11 @@
 (defn could-be-this-map?
   "Returns true if this resource might be the map with the given name, by magic, false otherwise."
   [map-name {:keys [resource-filename resource-name]}]
-  (or (= map-name resource-name)
-      (when (and map-name resource-filename)
-        (= (normalize-map map-name)
-           (normalize-map resource-filename)))))
+  (and map-name
+       (or (= map-name resource-name)
+           (when (and map-name resource-filename)
+             (= (normalize-map map-name)
+                (normalize-map resource-filename))))))
 
 (defn replay-type-and-players [parsed-replay]
   (let [allyteams (->> parsed-replay
@@ -716,9 +887,11 @@
         existing-paths (set (keys parsed-replays-by-path))
         all-files (mapcat
                     (fn [{:keys [file replay-source-name]}]
-                      (map
-                        (juxt (constantly replay-source-name) identity)
-                        (fs/replay-files file)))
+                      (let [files (fs/replay-files file)]
+                        (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
+                        (map
+                          (juxt (constantly replay-source-name) identity)
+                          files)))
                     (replay-sources state))
         todo (->> all-files
                   (remove (comp existing-paths fs/canonical-path second))
@@ -843,6 +1016,7 @@
    (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
+         _ (log/info "Updating engines in" spring-isolation-dir)
          engine-dirs (fs/engine-dirs spring-isolation-dir)
          known-canonical-paths (->> state :engines
                                     (map (comp fs/canonical-path :file))
@@ -931,6 +1105,7 @@
   (remove-all-duplicate-mods state-atom)
   (let [before (u/curr-millis)
         {:keys [mods spring-isolation-dir]} @state-atom
+         _ (log/info "Updating mods in" spring-isolation-dir)
         {:keys [rapid archive directory]} (group-by ::fs/source mods)
         known-file-paths (set (map (comp fs/canonical-path :file) (concat archive directory)))
         known-rapid-paths (set (map (comp fs/canonical-path :file) rapid))
@@ -1058,12 +1233,16 @@
   (swap! state-atom assoc :update-maps true)
   (log/info "Reconciling maps")
   (let [before (u/curr-millis)
-        {:keys [spring-isolation-dir] :as state} @state-atom
+        {:keys [battle battles spring-isolation-dir] :as state} @state-atom
+        _ (log/info "Updating maps in" spring-isolation-dir)
+        battle-map (-> battles (get (:battle-id battle)) :battle-map)
         map-files (fs/map-files spring-isolation-dir)
         known-files (->> state :maps (map :file) set)
         known-paths (->> known-files (map fs/canonical-path) set)
         todo (remove (comp known-paths fs/canonical-path) map-files)
-        this-round (take 5 todo)
+        priorities (filterv (comp (partial could-be-this-map? battle-map) (fn [f] {:resource-filename (fs/filename f)})) todo)
+        _ (log/info "Prioritizing map files for battle" (pr-str priorities))
+        this-round (concat priorities (take 5 todo))
         next-round (drop 5 todo)
         missing-paths (set
                         (concat
@@ -3580,6 +3759,7 @@
         (rapid/copy-package source (fs/parent-file (fs/parent-file dest)))
         (fs/copy source dest))
       (log/info "Finished importing" importable "from" source "to" dest)
+      #_
       (case (:resource-type importable)
         ::map (force-update-battle-map *state)
         ::mod (force-update-battle-mod *state)
@@ -3591,7 +3771,12 @@
         (update-copying source {:status false})
         (update-copying dest {:status false})
         (update-file-cache! source)
-        (update-file-cache! dest))))) ; TODO atomic?
+        (update-file-cache! dest) ; TODO atomic?
+        (case (:resource-type importable)
+          ::map (reconcile-maps *state)
+          ::mod (reconcile-mods *state)
+          ::engine (reconcile-engines *state)
+          nil)))))
 
 (defmethod task-handler ::import [e]
   (import-resource e))
@@ -3607,7 +3792,8 @@
           (git/fetch file)
           (git/reset-hard file battle-mod-git-ref)
           (reconcile-mods *state)
-          (force-update-battle-mod *state)
+          ;(force-update-battle-mod *state)
+          (reconcile-mods *state)
           (catch Exception e
             (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
           (finally
@@ -4485,12 +4671,15 @@
      :resource "Map"
      :browse-action {:event/type ::desktop-browse-dir
                      :file (or map-file (fs/maps-dir spring-isolation-dir))}
-     :refresh-action {:event/type ::force-update-battle-map}
+     :refresh-action {:event/type ::add-task
+                      :task {::task-type ::reconcile-maps}}
      :refresh-in-progress update-maps
      :issues
      (concat
        (let [severity (cond
                         no-map-details
+                        2
+                        #_
                         (if (or map-loading update-maps)
                           -1 2)
                         :else 0)]
@@ -4560,7 +4749,7 @@
                    :importable importable
                    :spring-isolation-dir spring-isolation-dir}})}]))))}))
 
-(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file gitting http-download importables-by-path rapid-data-by-version rapid-download rapid-update spring-isolation-dir update-mods]}]
+(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path rapid-data-by-version rapid-download rapid-update spring-isolation-dir update-mods]}]
   (let [mod-loading (not battle-mod-details)
         no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
@@ -4570,7 +4759,8 @@
      :resource "Game"
      :browse-action {:event/type ::desktop-browse-dir
                      :file (or mod-file (fs/mods-dir spring-isolation-dir))}
-     :refresh-action {:event/type ::force-update-battle-mod}
+     :refresh-action {:event/type ::add-task
+                      :task {::task-type ::reconcile-mods}}
      :refresh-in-progress update-mods
      :issues
      (concat
@@ -4585,7 +4775,7 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (str "Game '" battle-modname "' not found locally"))}])
-       (when (and no-mod-details (not mod-loading) (not update-mods))
+       (when no-mod-details ;(and no-mod-details (not mod-loading) (not update-mods))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals
@@ -4612,7 +4802,8 @@
                   :downloadable downloadable
                   :spring-isolation-dir spring-isolation-dir})}])
            (let [rapid-id (:id (get rapid-data-by-version battle-modname))
-                 {:keys [running] :as rapid-download} (get rapid-download rapid-id)]
+                 {:keys [running] :as rapid-download} (get rapid-download rapid-id)
+                 package-exists (not (file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-download)))))]
              [{:severity 2
                :text "rapid"
                :human-text (if rapid-id
@@ -4620,6 +4811,7 @@
                                (cond
                                  rapid-update "Rapid updating..."
                                  running (str (download-progress rapid-download))
+                                 package-exists (str "Rapid downloaded, reading package")
                                  :else
                                  (str "Download rapid " rapid-id))
                                "Needs engine first to download with rapid")
@@ -4632,14 +4824,16 @@
                                  " using engine " (:engine-version engine-details))
                             "Rapid requires an engine to work, get engine first")
                           (str "No rapid download found for" battle-modname))
-               :in-progress (or running rapid-update)
+               :in-progress (or running rapid-update package-exists)
                :action
                (if engine-file
                  (if (and rapid-id engine-file)
-                   {:event/type ::rapid-download
-                    :rapid-id rapid-id
-                    :engine-file engine-file
-                    :spring-isolation-dir spring-isolation-dir}
+                   {:event/type ::add-task
+                    :task
+                    {::task-type ::rapid-download
+                     :rapid-id rapid-id
+                     :engine-file engine-file
+                     :spring-isolation-dir spring-isolation-dir}}
                    {:event/type ::add-task
                     :task {::task-type ::update-rapid}})
                  nil)}])
@@ -4702,7 +4896,8 @@
   {:fx/type resource-sync-pane
    :h-box/margin 8
    :resource "Engine"
-   :refresh-action {:event/type ::force-update-battle-engine}
+   :refresh-action {:event/type ::add-task
+                    :task {::task-type ::reconcile-engines}}
    :refresh-in-progress update-engines
    :browse-action {:event/type ::desktop-browse-dir
                    :file (or engine-file
@@ -4789,7 +4984,7 @@
 
 
 (def battle-view-keys
-  [:archiving :battles :battle :battle-map-details :battle-mod-details :battle-players-color-allyteam :bot-name
+  [:archiving :auto-get-resources :battles :battle :battle-map-details :battle-mod-details :battle-players-color-allyteam :bot-name
    :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client :copying :current-tasks :downloadables-by-url :downloads :drag-allyteam :drag-team :engine-filter :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
@@ -4797,7 +4992,7 @@
    :rapid-download :rapid-update :spring-isolation-dir :tasks :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
-  [{:keys [battle battles battle-map-details battle-mod-details battle-players-color-allyteam bot-name bot-username bot-version
+  [{:keys [auto-get-resources battle battles battle-map-details battle-mod-details battle-players-color-allyteam bot-name bot-username bot-version
            channels chat-auto-scroll client
            current-tasks drag-allyteam drag-team engine-filter engines map-filter
            map-input-prefix maps message-drafts minimap-type mod-filter mods parsed-replays-by-path
@@ -4865,7 +5060,7 @@
          :alignment :center-left
          :children
          [{:fx/type :check-box
-           :selected battle-players-color-allyteam
+           :selected (boolean battle-players-color-allyteam)
            :on-selected-changed {:event/type ::assoc
                                  :key :battle-players-color-allyteam}}
           {:fx/type :label
@@ -4925,14 +5120,12 @@
             {:fx/type :h-box
              :alignment :center-left
              :children
-             (concat []
-               (when false
-                 [{:fx/type :label
-                   :text " Host IP: "}
-                  {:fx/type :text-field
-                   :text (-> battle :scripttags :game :hostip str)
-                   :prompt-text " <override> "
-                   :on-text-changed {:event/type ::hostip-changed}}]))}
+             [{:fx/type :check-box
+               :selected (boolean auto-get-resources)
+               :on-selected-changed {:event/type ::assoc
+                                     :key :auto-get-resources}}
+              {:fx/type :label
+               :text " Auto import or download resources"}]}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -4998,7 +5191,7 @@
                    :battle-modname battle-modname
                    :engine-details engine-details
                    :engine-file engine-file}
-                  (select-keys state [:battle-mod-details :copying :downloadables-by-url :gitting :http-download :importables-by-path :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
+                  (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
                 (merge
                   {:fx/type battle-map-sync-pane
                    :battle-map battle-map
@@ -5575,7 +5768,11 @@
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
-        (force-update-battle-mod *state)))))
+        (reconcile-mods *state)))))
+
+(defmethod task-handler ::rapid-download
+  [task]
+  @(event-handler (assoc task :event/type ::rapid-download)))
 
 
 ; https://github.com/dakrone/clj-http/pull/220/files
@@ -5682,14 +5879,20 @@
          :dest (resource-dest spring-isolation-dir downloadable)
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
-      ::map (force-update-battle-map *state)
-      ::mod (force-update-battle-mod *state)
+      ::map (reconcile-maps *state)
+      ;::map (force-update-battle-map *state)
+      ::mod (reconcile-mods *state)
+      ;::mod (force-update-battle-mod *state)
       ::engine (reconcile-engines *state)
       nil)))
 
 (defmethod event-handler ::http-downloadable
   [e]
   (download-http-resource e))
+
+(defmethod task-handler ::http-downloadable
+  [task]
+  @(event-handler (assoc task :event/type ::http-downloadable)))
 
 
 (defmethod event-handler ::extract-7z
@@ -5709,7 +5912,7 @@
 
 (defmethod task-handler ::extract-7z
   [task]
-  (event-handler (assoc task :event/type ::extract-7z)))
+  @(event-handler (assoc task :event/type ::extract-7z)))
 
 
 (def resource-types
@@ -5866,6 +6069,9 @@
     (add-task! *state (merge
                         {::task-type ::scan-imports}
                         import-source))))
+
+(defmethod task-handler ::scan-all-imports [task]
+  (event-handler (assoc task ::task-type ::scan-imports)))
 
 (def import-window-keys
   [:copying :extra-import-sources :file-cache :import-filter :import-source-name :import-type
@@ -6354,9 +6560,10 @@
                     {:fx/type :tooltip
                      :show-delay [10 :ms]
                      :text (str "Download to " dest-path)}
-                    :on-action {:event/type ::http-downloadable
-                                :downloadable downloadable
-                                :spring-isolation-dir spring-isolation-dir}
+                    :on-action {:event/type ::add-task
+                                :task {::task-type ::http-downloadable
+                                       :downloadable downloadable
+                                       :spring-isolation-dir spring-isolation-dir}}
                     :graphic
                     {:fx/type font-icon/lifecycle
                      :icon-literal "mdi-download:16:white"}}
@@ -6552,10 +6759,12 @@
                     :else
                     {:graphic
                      {:fx/type :button
-                      :on-action {:event/type ::rapid-download
-                                  :engine-file engine-file
-                                  :rapid-id (:id i)
-                                  :spring-isolation-dir spring-isolation-dir}
+                      :on-action {:event/type ::add-task
+                                  :task
+                                  {::task-type ::rapid-download
+                                   :engine-file engine-file
+                                   :rapid-id (:id i)
+                                   :spring-isolation-dir spring-isolation-dir}}
                       :graphic
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-download:16:white"}}}))))}}]}
@@ -7182,9 +7391,10 @@
                                             (str (download-progress download))
                                             " Download engine")
                                     :disable (boolean running)
-                                    :on-action {:event/type ::http-downloadable
-                                                :downloadable engine-downloadable
-                                                :spring-isolation-dir spring-isolation-dir}
+                                    :on-action {:event/type ::add-task
+                                                :task {::task-type ::http-downloadable
+                                                       :downloadable engine-downloadable
+                                                       :spring-isolation-dir spring-isolation-dir}}
                                     :graphic
                                     {:fx/type font-icon/lifecycle
                                      :icon-literal "mdi-download:16:white"}})))
@@ -7218,10 +7428,12 @@
                              (and (not matching-mod) mod-rapid matching-engine)
                              {:fx/type :button
                               :text (str " Download game")
-                              :on-action {:event/type ::rapid-download
-                                          :engine-file (:file matching-engine)
-                                          :rapid-id (:id mod-rapid)
-                                          :spring-isolation-dir spring-isolation-dir}
+                              :on-action {:event/type ::add-task
+                                          :task
+                                          {::task-type ::rapid-download
+                                           :engine-file (:file matching-engine)
+                                           :rapid-id (:id mod-rapid)
+                                           :spring-isolation-dir spring-isolation-dir}}
                               :graphic
                               {:fx/type font-icon/lifecycle
                                :icon-literal "mdi-download:16:white"}}
@@ -7233,9 +7445,10 @@
                                         (str (download-progress download))
                                         " Download game")
                                 :disable (boolean running)
-                                :on-action {:event/type ::http-downloadable
-                                            :downloadable mod-downloadable
-                                            :spring-isolation-dir spring-isolation-dir}
+                                :on-action {:event/type ::add-task
+                                            :task {::task-type ::http-downloadable
+                                                   :downloadable mod-downloadable
+                                                   :spring-isolation-dir spring-isolation-dir}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-download:16:white"}})
@@ -7401,7 +7614,7 @@
                      :alignment :center-left
                      :children
                      [{:fx/type :check-box
-                       :selected battle-players-color-allyteam
+                       :selected (boolean battle-players-color-allyteam)
                        :on-selected-changed {:event/type ::assoc
                                              :key :battle-players-color-allyteam}}
                       {:fx/type :label
@@ -7817,7 +8030,7 @@
               :style {:-fx-font-size 20}
               :text (str " Priority " k ": ")}
              {:fx/type :label
-              :text (str " " v)}]})
+              :text (str (::task-type v))}]})
          current-tasks)}
       {:fx/type :label
        :text "Task Queue"
@@ -7991,9 +8204,10 @@
 (defn init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
+  (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        force-update-chimer (force-update-chimer-fn state-atom)
+        ;force-update-chimer (force-update-chimer-fn state-atom)
         update-channels-chimer (update-channels-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
@@ -8005,8 +8219,14 @@
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
     {:chimers [low-tasks-chimer high-tasks-chimer
-               force-update-chimer update-channels-chimer]}))
+               ;force-update-chimer
+               update-channels-chimer]}))
 
+(defn init-async [state-atom]
+  (future
+    (log/info "Sleeping to let JavaFX start")
+    (async/<!! (async/timeout wait-before-init-tasks-ms))
+    (init state-atom)))
 
 (defn -main [& _args]
   (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
@@ -8032,6 +8252,5 @@
               :opts {:fx.opt/map-event-handler event-handler})]
       (log/info "Mounting renderer")
       (fx/mount-renderer *state r))
-    (log/info "Initializing periodic jobs, async")
-    (future (init *state))
+    (init-async *state)
     (log/info "Main finished in" (- (u/curr-millis) before) "ms")))
