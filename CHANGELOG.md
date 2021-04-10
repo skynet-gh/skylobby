@@ -13,6 +13,13 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.2.10]
+
+- Improve main window layout at small sizes
+- Improve battle resource sync panes and auto download
+- Improve replay map and mod detail updating
+- Add license file
+
 ### [0.2.9]
 
 - Add singleplayer battle

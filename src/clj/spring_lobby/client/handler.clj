@@ -431,7 +431,15 @@
     (swap! state-atom assoc :compflags compflags)))
 
 (defmethod handle "FAILED" [_client state m]
-  (swap! state assoc :last-failed-message m))
+  (try
+    (let [[_all reason] (re-find #"\w+ (.*)" m)
+          [_all msg _command] (re-find #"msg=(.*)\tcmd=(.*)" reason)]
+      (if (= "not in battle" msg)
+        (log/info "Ignoring failed message for 'not in battle'")
+        (swap! state assoc :last-failed-message m)))
+    (catch Exception e
+      (log/error e "Error parsing failed message")
+      (swap! state assoc :last-failed-message m))))
 
 (defmethod handle "JOINBATTLEFAILED" [_client state-atom m]
   (swap! state-atom
