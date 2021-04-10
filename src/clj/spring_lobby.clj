@@ -183,7 +183,7 @@
 
 
 (def config-keys
-  [:battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
+  [:auto-get-resources :battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
@@ -1370,11 +1370,6 @@
   (refresh-replay-resources *state))
 
 
-(defmethod task-handler ::update-map
-  [{:keys [_file]}]
-  (reconcile-maps *state)) ; TODO specific map
-
-
 (defmethod event-handler ::reconcile-engines [_e]
   (future
     (try
@@ -1737,7 +1732,6 @@
                           :client client}}))})}}]})
 
 (defn update-disconnected! [state-atom]
-  ;(log/debug (ex-info "stacktrace" {}) "Updating state after disconnect")
   (log/info "Updating state after disconnect")
   (let [[{:keys [client ping-loop print-loop]} _new-state]
         (swap-vals! state-atom
@@ -2734,7 +2728,6 @@
                                                        :host-username username})
                    (assoc :battle {:battle-id :singleplayer ; TODO dedupe
                                    :scripttags {:game {:startpostype 0}}
-                                   :singleplayer true
                                    :users {username {:battle-status handler/default-battle-status}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -3643,7 +3636,11 @@
                  {:fx/type font-icon/lifecycle
                   :icon-literal
                   (str "mdi-"
-                       (if (zero? severity) "check" "exclamation")
+                       (if (zero? severity)
+                         "check"
+                         (if (= -1 severity)
+                           "sync"
+                           "exclamation"))
                        ":16:"
                        (if (= 1 worst-severity) "black" "white"))}}
                 {:fx/type :v-box
@@ -3721,8 +3718,6 @@
         (try
           (git/fetch file)
           (git/reset-hard file battle-mod-git-ref)
-          (reconcile-mods *state)
-          ;(force-update-battle-mod *state)
           (reconcile-mods *state)
           (catch Exception e
             (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
@@ -4598,9 +4593,10 @@
 
 (defn battle-map-sync-pane
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
-           import-tasks importables-by-path spring-isolation-dir update-maps]}]
-  (let [map-loading (not battle-map-details)
-        no-map-details (not (seq battle-map-details))]
+           import-tasks importables-by-path maps spring-isolation-dir update-maps]}]
+  (let [
+        no-map-details (not (seq battle-map-details))
+        map-exists (some (comp #{battle-map} :map-name) maps)]
     {:fx/type resource-sync-pane
      :h-box/margin 8
      :resource "Map"
@@ -4613,9 +4609,7 @@
      (concat
        (let [severity (cond
                         no-map-details
-                        2
-                        #_
-                        (if (or map-loading update-maps)
+                        (if map-exists
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -4624,7 +4618,7 @@
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file battle-map-details))
                       (str "Map '" battle-map "' not found locally"))}])
-       (when (and no-map-details (not map-loading) (not update-maps))
+       (when (and no-map-details (not map-exists))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals
@@ -4636,7 +4630,7 @@
                  in-progress (:running download)
                  dest (resource-dest spring-isolation-dir downloadable)
                  dest-exists (file-exists? file-cache dest)
-                 severity (if no-map-details 2 0)]
+                 severity (if dest-exists -1 2)]
              [{:severity severity
                :text "download"
                :human-text (if in-progress
@@ -4665,8 +4659,10 @@
                  resource-path (fs/canonical-path resource-file)
                  in-progress (boolean
                                (or (-> copying (get resource-path) :status boolean)
-                                   (contains? import-tasks resource-path)))]
-             [{:severity 2
+                                   (contains? import-tasks resource-path)))
+                 dest (resource-dest spring-isolation-dir importable)
+                 dest-exists (file-exists? file-cache dest)]
+             [{:severity (if dest-exists -1 2)
                :text "import"
                :human-text (if importable
                              (str "Import from " (:import-source-name importable))
@@ -4684,11 +4680,11 @@
                    :importable importable
                    :spring-isolation-dir spring-isolation-dir}})}]))))}))
 
-(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path rapid-data-by-version rapid-download rapid-update spring-isolation-dir update-mods]}]
-  (let [mod-loading (not battle-mod-details)
-        no-mod-details (not (seq battle-mod-details))
+(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir update-mods]}]
+  (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
-        canonical-path (fs/canonical-path mod-file)]
+        canonical-path (fs/canonical-path mod-file)
+        mod-exists (some (comp #{battle-modname} :mod-name) mods)]
     {:fx/type resource-sync-pane
      :h-box/margin 8
      :resource "Game"
@@ -4701,7 +4697,7 @@
      (concat
        (let [severity (cond
                         no-mod-details
-                        (if (or mod-loading update-mods)
+                        (if mod-exists
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -4710,7 +4706,7 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (str "Game '" battle-modname "' not found locally"))}])
-       (when no-mod-details ;(and no-mod-details (not mod-loading) (not update-mods))
+       (when (and no-mod-details (not mod-exists))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals
@@ -4719,8 +4715,9 @@
                                    first)
                  download-url (:download-url downloadable)
                  in-progress (-> http-download (get download-url) :running)
-                 {:keys [download-source-name download-url]} downloadable]
-             [{:severity (if no-mod-details 2 0)
+                 {:keys [download-source-name download-url]} downloadable
+                 file-exists (file-exists? file-cache (resource-dest spring-isolation-dir downloadable))]
+             [{:severity (if file-exists -1 2)
                :text "download"
                :human-text (if no-mod-details
                              (if downloadable
@@ -4736,10 +4733,11 @@
                  {:event/type ::http-downloadable
                   :downloadable downloadable
                   :spring-isolation-dir spring-isolation-dir})}])
-           (let [rapid-id (:id (get rapid-data-by-version battle-modname))
+           (let [rapid-data (get rapid-data-by-version battle-modname)
+                 rapid-id (:id rapid-data)
                  {:keys [running] :as rapid-download} (get rapid-download rapid-id)
-                 package-exists (file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-download))))]
-             [{:severity 2
+                 package-exists (file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))]
+             [{:severity (if package-exists -1 2)
                :text "rapid"
                :human-text (if rapid-id
                              (if engine-file
@@ -4781,8 +4779,10 @@
                                      (filter (comp #{::mod} :resource-type))
                                      (filter (partial could-be-this-mod? battle-modname))
                                      first)
-                 resource-file (:resource-file importable)]
-             [{:severity 2
+                 resource-file (:resource-file importable)
+                 dest (resource-dest spring-isolation-dir importable)
+                 dest-exists (file-exists? file-cache dest)]
+             [{:severity (if dest-exists -1 2)
                :text "import"
                :human-text (if importable
                              (str "Import from " (:import-source-name importable))
@@ -4864,7 +4864,11 @@
              dest (resource-dest spring-isolation-dir downloadable)
              dest-path (fs/canonical-path dest)
              dest-exists (file-exists? file-cache dest)
-             severity (if dest-exists 0 2)]
+             severity (if dest-exists -1 2)
+             resource-filename (:resource-filename downloadable)
+             extract-target (when (and spring-isolation-dir resource-filename)
+                              (io/file spring-isolation-dir "engine" (fs/without-extension resource-filename)))
+             extract-exists (file-exists? file-cache extract-target)]
          (concat
            [{:severity severity
              :text "download"
@@ -4886,7 +4890,7 @@
                         :downloadable downloadable
                         :spring-isolation-dir spring-isolation-dir})}]
            (when dest-exists
-             [{:severity 2
+             [{:severity (if extract-exists -1 2)
                :text "extract"
                :in-progress (or (get extracting dest-path)
                                 (contains? extract-tasks dest-path))
@@ -4894,7 +4898,7 @@
                :tooltip (str "Click to extract " dest-path)
                :action {:event/type ::extract-7z
                         :file dest
-                        :dest (io/file spring-isolation-dir "engine" (:resource-filename downloadable))}}]))))
+                        :dest extract-target}}]))))
      (when-not engine-details
        (let [importable (some->> importables-by-path
                                  vals
@@ -4902,8 +4906,10 @@
                                  (filter (partial could-be-this-engine? engine-version))
                                  first)
              {:keys [import-source-name resource-file]} importable
-             resource-path (fs/canonical-path resource-file)]
-         [{:severity 2
+             resource-path (fs/canonical-path resource-file)
+             dest (resource-dest spring-isolation-dir importable)
+             dest-exists (file-exists? file-cache dest)]
+         [{:severity (if dest-exists -1 2)
            :text "import"
            :human-text (if importable
                          (str "Import from " import-source-name)
@@ -4937,8 +4943,9 @@
            map-input-prefix maps message-drafts minimap-type mod-filter mods parsed-replays-by-path
            spring-isolation-dir tasks users username]
     :as state}]
-  (let [{:keys [scripttags singleplayer]} battle
-        {:keys [battle-map battle-modname channel-name host-username]} (get battles (:battle-id battle))
+  (let [{:keys [battle-id scripttags]} battle
+        singleplayer (= :singleplayer battle-id)
+        {:keys [battle-map battle-modname channel-name host-username]} (get battles battle-id)
         host-user (get users host-username)
         am-host (= username host-username)
         startpostype (->> scripttags
@@ -5140,12 +5147,12 @@
                       :battle-modname battle-modname
                       :engine-details engine-details
                       :engine-file engine-file}
-                     (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
+                     (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
                    (merge
                      {:fx/type battle-map-sync-pane
                       :battle-map battle-map
                       :import-tasks import-tasks}
-                     (select-keys state [:battle-map-details :copying :downloadables-by-url :file-cache :http-download :importables-by-path :spring-isolation-dir :update-maps]))])}]}}
+                     (select-keys state [:battle-map-details :copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :update-maps]))])}]}}
             {:fx/type :pane
              :v-box/vgrow :always}
             {:fx/type :h-box
@@ -5207,7 +5214,6 @@
            :hide-users true
            :message-draft (get message-drafts channel-name)}]}]}
       {:fx/type :tab-pane
-       ;:style {:-fx-pref-height (+ minimap-size 164)}
        :tabs
        [{:fx/type :tab
          :graphic {:fx/type :label
@@ -5699,7 +5705,7 @@
                                                      :message "Preparing to run pr-downloader"})
   (future
     (try
-      (let [root spring-isolation-dir
+      (let [^File root spring-isolation-dir
             pr-downloader-file (fs/pr-downloader-file engine-file)
             _ (fs/set-executable pr-downloader-file)
             command [(fs/canonical-path pr-downloader-file)
@@ -5733,13 +5739,14 @@
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (.waitFor process)
-          (add-task! *state {::task-type ::update-rapid-packages})))
+          (apply update-file-cache! (rapid/sdp-files spring-isolation-dir))
+          (add-tasks! *state [{::task-type ::update-rapid-packages}
+                              {::task-type ::reconcile-mods}])))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
-        (swap! *state assoc-in [:rapid-download rapid-id :running] false)
-        (reconcile-mods *state)))))
+        (swap! *state assoc-in [:rapid-download rapid-id :running] false)))))
 
 (defmethod task-handler ::rapid-download
   [task]
@@ -5851,9 +5858,7 @@
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
       ::map (reconcile-maps *state)
-      ;::map (force-update-battle-map *state)
       ::mod (reconcile-mods *state)
-      ;::mod (force-update-battle-mod *state)
       ::engine (reconcile-engines *state)
       nil)))
 
@@ -8100,7 +8105,7 @@
               {:fx/type battles-buttons}
               (select-keys state battles-buttons-keys))]
            (when battle
-             (if (or (:battle-id battle) (:singleplayer battle))
+             (if (:battle-id battle)
                (when (not pop-out-battle)
                  [(merge
                     {:fx/type battle-view}
@@ -8181,7 +8186,6 @@
   (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        ;force-update-chimer (force-update-chimer-fn state-atom)
         update-channels-chimer (update-channels-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
@@ -8192,9 +8196,7 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
-    {:chimers [low-tasks-chimer high-tasks-chimer
-               ;force-update-chimer
-               update-channels-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer]}))
 
 (defn init-async [state-atom]
   (future

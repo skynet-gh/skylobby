@@ -97,7 +97,7 @@
 (defn set-executable
   ([f]
    (set-executable f true))
-  ([f executable]
+  ([^File f executable]
    (when (is-file? f)
      (.setExecutable f executable))))
 
