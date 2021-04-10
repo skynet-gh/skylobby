@@ -1391,12 +1391,12 @@
                  vec)
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [i]
-                  (let [battle (get battles-by-users (:username i))]
+      :describe (fn [{:keys [username]}]
+                  (let [{:keys [battle-id battle-title] :as battle} (get battles-by-users username)]
                     (merge
                       {:on-mouse-clicked
                        {:event/type ::on-mouse-clicked-users-row
-                        :username (:username i)}
+                        :username username}
                        :context-menu
                        {:fx/type :context-menu
                         :items
@@ -1404,19 +1404,32 @@
                           [{:fx/type :menu-item
                             :text "Message"
                             :on-action {:event/type ::join-direct-message
-                                        :username (:username i)}}]
+                                        :username username}}]
                           (when battle
                             [{:fx/type :menu-item
                               :text "Join Battle"
                               :on-action {:event/type ::join-battle
                                           :client client
-                                          :selected-battle (:battle-id battle)}}]))}}
+                                          :selected-battle battle-id}}])
+                          (when (= "SLDB" username)
+                            [{:fx/type :menu-item
+                              :text "!help"
+                              :on-action {:event/type ::send-message
+                                          :client client
+                                          :channel-name (u/user-channel username)
+                                          :message "!help"}}
+                             {:fx/type :menu-item
+                              :text "!ranking"
+                              :on-action {:event/type ::send-message
+                                          :client client
+                                          :channel-name (u/user-channel username)
+                                          :message "!ranking"}}]))}}
                       (when battle
                         {:tooltip
                          {:fx/type :tooltip
                           :style {:-fx-font-size 16}
                           :show-delay [10 :ms]
-                          :text (str "Battle: " (:battle-title battle))}}))))}
+                          :text (str "Battle: " battle-title)}}))))}
      :columns
      [{:fx/type :table-column
        :text "Username"
@@ -3767,7 +3780,7 @@
                      (comp (fnil - 0) parse-skill :skill))))
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [{:keys [owner] :as id}]
+      :describe (fn [{:keys [owner username]}]
                   {
                    :context-menu
                    {:fx/type :context-menu
@@ -3778,20 +3791,40 @@
                          {:fx/type :menu-item
                           :text "Message"
                           :on-action {:event/type ::join-direct-message
-                                      :username (:username id)}}])
+                                      :username username}}])
                       [{:fx/type :menu-item
                         :text "Ring"
                         :on-action {:event/type ::ring
                                     :client client
                                     :channel-name channel-name
-                                    :username (:username id)}}]
+                                    :username username}}]
+                      (when (and (= host-username username)
+                                 (string/includes? host-username "cluster"))
+                        [{:fx/type :menu-item
+                          :text "!help"
+                          :on-action {:event/type ::send-message
+                                      :client client
+                                      :channel-name (u/user-channel host-username)
+                                      :message "!help"}}
+                         {:fx/type :menu-item
+                          :text "!status battle"
+                          :on-action {:event/type ::send-message
+                                      :client client
+                                      :channel-name (u/user-channel host-username)
+                                      :message "!status battle"}}
+                         {:fx/type :menu-item
+                          :text "!status game"
+                          :on-action {:event/type ::send-message
+                                      :client client
+                                      :channel-name (u/user-channel host-username)
+                                      :message "!status game"}}])
                       (when (string/includes? host-username "cluster")
                         [{:fx/type :menu-item
                           :text "!whois"
                           :on-action {:event/type ::send-message
                                       :client client
                                       :channel-name (u/user-channel host-username)
-                                      :message (str "!whois " (:username id))}}]))}})}
+                                      :message (str "!whois " username)}}]))}})}
      :columns
      [{:fx/type :table-column
        :text "Nickname"
