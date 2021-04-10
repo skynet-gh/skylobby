@@ -743,6 +743,20 @@
   (while (handle-task! :repl state-atom)))
 
 
+(defn file-cache-data [f]
+  (if f
+    {:canonical-path (fs/canonical-path f)
+     :exists (fs/exists f)
+     :is-directory (fs/is-directory? f)
+     :last-modified (fs/last-modified f)}
+    (log/warn (ex-info "stacktrace" {}) "Attempt to update file cache for nil file")))
+
+(defn file-cache-by-path [statuses]
+  (->> statuses
+       (filter some?)
+       (map (juxt :canonical-path identity))
+       (into {})))
+
 (defn update-file-cache!
   "Updates the file cache in state for this file. This is so that we don't need to do IO in render,
   and any updates to file statuses here can now cause UI redraws, which is good."
@@ -751,15 +765,8 @@
                    (let [f (if (string? f)
                              (io/file f)
                              f)]
-                     (if f
-                       {:canonical-path (fs/canonical-path f)
-                        :exists (fs/exists f)
-                        :is-directory (fs/is-directory? f)}
-                       (log/warn "Attempt to update file cache for nil file"))))
-        status-by-path (->> statuses
-                            (filter some?)
-                            (map (juxt :canonical-path identity))
-                            (into {}))]
+                     (file-cache-data f)))
+        status-by-path (file-cache-by-path statuses)]
     (swap! *state update :file-cache merge status-by-path)
     status-by-path))
 
@@ -5645,7 +5652,7 @@
   [_e]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
-        {:keys [engine-version engines spring-isolation-dir]} @*state ; TODO remove deref
+        {:keys [engine-version engines file-cache spring-isolation-dir]} @*state ; TODO remove deref
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
@@ -5665,8 +5672,18 @@
     (log/info "Updating rapid versions in" spring-isolation-dir)
     (let [rapid-repos (rapid/repos spring-isolation-dir)
           _ (log/info "Found" (count rapid-repos) "rapid repos")
-          rapid-versions (->> rapid-repos
-                              (mapcat (partial rapid/versions spring-isolation-dir))
+          rapid-repo-files (map (partial rapid/version-file spring-isolation-dir) rapid-repos)
+          new-files (->> rapid-repo-files
+                         (map file-cache-data)
+                         file-cache-by-path)
+          rapid-versions (->> rapid-repo-files
+                              (filter
+                                (fn [f]
+                                  (let [path (fs/canonical-path f)
+                                        prev-time (or (-> file-cache (get path) :last-modified) 0)
+                                        curr-time (or (-> new-files (get path) :last-modified) Long/MAX_VALUE)]
+                                    (< prev-time curr-time))))
+                              (mapcat rapid/rapid-versions)
                               (filter :version)
                               (sort-by :version version/version-compare)
                               reverse)
@@ -5677,12 +5694,15 @@
           rapid-data-by-version (->> rapid-versions
                                      (map (juxt :version identity))
                                      (into {}))]
-      (swap! *state assoc
-             :rapid-repos rapid-repos
-             :rapid-data-by-hash rapid-data-by-hash
-             :rapid-data-by-version rapid-data-by-version
-             :rapid-versions rapid-versions
-             :rapid-update true)
+      (swap! *state
+        (fn [state]
+          (-> state
+              (assoc :rapid-repos rapid-repos)
+              (update :rapid-data-by-hash merge rapid-data-by-hash)
+              (update :rapid-data-by-version merge rapid-data-by-version)
+              (update :rapid-versions (fn [old-versions]
+                                        (set (concat old-versions rapid-versions))))
+              (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms")
       (add-task! *state {::task-type ::update-rapid-packages}))))
 
