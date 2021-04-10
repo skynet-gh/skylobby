@@ -392,6 +392,7 @@
   (remove-watch state-atom :state-to-edn)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
+  (remove-watch state-atom :replay-map-and-mod-details)
   (remove-watch state-atom :fix-missing-resource)
   (remove-watch state-atom :fix-spring-isolation-dir)
   (remove-watch state-atom :spring-isolation-dir-changed)
@@ -463,6 +464,85 @@
               (do
                 (log/info "Battle mod not found, setting empty details for" new-battle-mod "was" old-battle-mod)
                 (swap! *state assoc :battle-mod-details {})))))
+        (catch Exception e
+          (log/error e "Error in :battle-mod-details state watcher")))))
+  (add-watch state-atom :replay-map-and-mod-details
+    (fn [_k _ref old-state new-state]
+      (try
+        (let [old-selected-replay-file (:selected-replay-file old-state)
+              {:keys [parsed-replays-by-path selected-replay-file]} new-state
+
+              old-replay-path (fs/canonical-path old-selected-replay-file)
+              new-replay-path (fs/canonical-path selected-replay-file)
+
+              old-replay (get parsed-replays-by-path old-replay-path)
+              new-replay (get parsed-replays-by-path new-replay-path)
+
+              old-game (-> old-replay :body :script-data :game)
+              old-mod (:gametype old-game)
+              old-map (:mapname old-game)
+
+              new-game (-> new-replay :body :script-data :game)
+              new-mod (:gametype new-game)
+              new-map (:mapname new-game)
+
+              map-details (:replay-map-details new-state)
+              mod-details (:replay-mod-details new-state)
+
+              map-changed (not= new-map (:map-name map-details))
+              mod-changed (not= new-mod (:mod-name mod-details))
+
+              old-maps (:maps old-state)
+              new-maps (:maps new-state)
+
+              old-mods (:mods old-state)
+              new-mods (:mods new-state)
+
+              new-mod-sans-git (mod-name-sans-git new-mod)
+              mod-name-set (set [new-mod new-mod-sans-git])
+              filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+
+              map-exists (some (comp #{new-map} :map-name) new-maps)
+              mod-exists (some filter-fn new-mods)]
+          (when (or (and (or (not= old-replay-path new-replay-path)
+                             (not= old-mod new-mod))
+                         (and (not (string/blank? new-mod))
+                              (or (not (seq mod-details))
+                                  mod-changed)))
+                    (and
+                      (or (not (some filter-fn old-mods)))
+                      mod-exists))
+            (if mod-exists
+              (do
+                (log/info "Updating replay mod details for" new-mod "was" old-mod)
+                (future
+                  (let [mod-details (or (some->> new-mods
+                                                 (filter filter-fn)
+                                                 first
+                                                 :file
+                                                 read-mod-data)
+                                        {})]
+                    (swap! *state assoc :replay-mod-details mod-details))))
+              (future
+                (log/info "Replay mod not found, setting empty details for" new-mod "was" old-mod)
+                (swap! *state assoc :replay-mod-details {}))))
+          (when (or (and (or (not= old-replay-path new-replay-path)
+                             (not= old-map new-map))
+                         (and (not (string/blank? new-map))
+                              (or (not (seq map-details))
+                                  map-changed)))
+                    (and
+                      (or (not (some (comp #{new-map} :map-name) old-maps)))
+                      map-exists))
+            (if map-exists
+              (do
+                (log/info "Updating replay map details for" new-map "was" old-map)
+                (future
+                  (let [map-details (or (read-map-data new-maps new-map) {})]
+                    (swap! *state assoc :replay-map-details map-details))))
+              (future
+                (log/info "Replay map not found, setting empty details for" new-map "was" old-map)
+                (swap! *state assoc :replay-map-details {})))))
         (catch Exception e
           (log/error e "Error in :battle-mod-details state watcher")))))
   (add-watch state-atom :fix-missing-resource
@@ -6809,35 +6889,9 @@
 
 
 (defmethod event-handler ::select-replay
-  [{:keys [maps mods selected] :fx/keys [event]}]
+  [{:fx/keys [event]}]
   (future
-    (let [selected (or selected event)
-          game (-> selected :body :script-data :game)]
-      (log/info "Handling replay selected" selected)
-      (swap! *state assoc
-             :replay-map-details nil
-             :replay-mod-details nil
-             :selected-replay-file (:file selected))
-      (deref
-        (future
-          (try
-            (let [map-name (:mapname game)
-                  map-details (or (read-map-data maps map-name) {})]
-              (swap! *state assoc :replay-map-details map-details))
-            (catch Exception e
-              (log/error e "Error loading replay map details")))))
-      (deref
-        (future
-          (try
-            (let [mod-name (:gametype game)]
-              (when-let [mod-file (some->> mods
-                                           (filter (comp #{mod-name} :mod-name))
-                                           first
-                                           :file)]
-                (let [mod-details (or (read-mod-data mod-file) {})]
-                  (swap! *state assoc :replay-mod-details mod-details))))
-            (catch Exception e
-              (log/error e "Error loading replay mod details"))))))))
+    (swap! *state assoc :selected-replay-file (:file event))))
 
 
 (defn sanitize-replay-filter [s]
@@ -7149,9 +7203,7 @@
               {:fx/type fx.ext.table-view/with-selection-props
                :v-box/vgrow :always
                :props {:selection-mode :single
-                       :on-selected-item-changed {:event/type ::select-replay
-                                                  :maps maps
-                                                  :mods mods}
+                       :on-selected-item-changed {:event/type ::select-replay}
                        :selected-item selected-replay}
                :desc
                {:fx/type ext-recreate-on-key-changed
@@ -7450,17 +7502,9 @@
                                 :on-action
                                 {:event/type ::add-task
                                  :task
-                                 {::task-type ::fn
-                                  :description "import map and update selected replay"
-                                  :function
-                                  (fn []
-                                    (import-resource {:importable map-importable
-                                                      :spring-isolation-dir spring-isolation-dir})
-                                    (let [data (select-keys @*state [:maps :mods])]
-                                      (event-handler
-                                        (merge data
-                                          {:event/type ::select-replay
-                                           :selected selected-replay}))))}}
+                                 {::task-type ::import
+                                  :importable map-importable
+                                  :spring-isolation-dir spring-isolation-dir}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-content-copy:16:white"}})
@@ -7475,17 +7519,9 @@
                                 :on-action
                                 {:event/type ::add-task
                                  :task
-                                 {::task-type ::fn
-                                  :description "download map and update selected replay"
-                                  :function
-                                  (fn []
-                                    (deref (download-http-resource {:downloadable map-downloadable
-                                                                    :spring-isolation-dir spring-isolation-dir}))
-                                    (let [data (select-keys @*state [:maps :mods])]
-                                      (event-handler
-                                        (merge data
-                                          {:event/type ::select-replay
-                                           :selected selected-replay}))))}}
+                                 {::task-type ::http-downloadable
+                                  :downloadable map-downloadable
+                                  :spring-isolation-dir spring-isolation-dir}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-download:16:white"}})
@@ -7582,6 +7618,7 @@
                  :children
                  (concat
                    [{:fx/type battle-players-table
+                     :v-box/vgrow :always
                      :am-host false
                      :battle-modname gametype
                      :battle-players-color-allyteam battle-players-color-allyteam
