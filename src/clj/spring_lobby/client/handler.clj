@@ -188,14 +188,15 @@
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
     (swap! state-atom
       (fn [state]
-        (update-in
-          (cond
-            (= username (:username state)) (dissoc state :battle)
-            (when-let [battle (:battle state)]
-              (= battle-id (:battle-id battle)))
-            (update-in state [:battle :users] dissoc username)
-            :else state)
-          [:battles battle-id :users] dissoc username)))))
+        (let [this-battle (when-let [battle (:battle state)]
+                            (= battle-id (:battle-id battle)))
+              is-me (= username (:username state))]
+          (update-in
+            (cond
+              (and this-battle is-me) (dissoc state :battle)
+              this-battle (update-in state [:battle :users] dissoc username)
+              :else state)
+            [:battles battle-id :users] dissoc username))))))
 
 (defmethod handle "JOIN" [_c state-atom m]
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
@@ -475,11 +476,7 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [_client state-atom m]
-  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        me (:username @state-atom)]
-    (if (= username me)
-      (do
-        (log/info "Playing ring sound for me")
-        (sound/play-ring))
-      (log/info "Not playing ring for other player"))))
+(defmethod handle "RING" [_client _state-atom m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
+    (log/info "Playing ring sound from" username)
+    (sound/play-ring)))

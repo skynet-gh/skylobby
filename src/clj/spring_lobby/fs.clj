@@ -65,6 +65,10 @@
   (when f
     (.isFile f)))
 
+(defn last-modified [^File f]
+  (when f
+    (.lastModified f)))
+
 (defn parent-file ^File [^File f]
   (when f
     (.getParentFile f)))

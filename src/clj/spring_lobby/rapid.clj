@@ -147,6 +147,10 @@
       (rapid-versions)))
 
 
+(defn version-file
+  [root repo]
+  (io/file root "rapid" "repos.springrts.com" repo "versions.gz"))
+
 (defn versions
   [root repo]
   (log/debug "Loading rapid versions for repo" repo)

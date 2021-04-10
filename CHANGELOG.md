@@ -9,10 +9,22 @@ Notable changes and todo list.
 - Improve table column sizing
 - Download replays from various websites
 - Multiple server connections, merged view
-- Singleplayer options, skirmish vs bots, scenarios
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.9]
+
+- Add singleplayer battle
+- Add option to auto download battle resources
+- Improve performance when changing spring isolation dir
+- Improve startup performance by delaying jobs
+- Cache rapid file scan based on last modified
+- Tweak jvm args for performance
+
+### [0.2.8]
+
+- Add back Linux jar building
 
 ### [0.2.7]
 

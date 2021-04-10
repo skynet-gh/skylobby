@@ -57,6 +57,5 @@
               :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
       (log/info "Mounting renderer")
       (fx/mount-renderer spring-lobby/*state r))
-    (log/info "Initializing periodic jobs, async")
-    (future (spring-lobby/init spring-lobby/*state))
+    (spring-lobby/init-async spring-lobby/*state)
     (log/info "Main finished in" (- (u/curr-millis) before) "ms")))
