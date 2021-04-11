@@ -249,10 +249,19 @@
   ["minimap" "metalmap" "heightmap"])
 
 
+(defn dummy-matchmaking-queues []
+  (->> (iterate inc 1) ; TODO queues from server
+       (take 8)
+       (map (fn [i] (str i "v" i)))
+       (concat ["ffa"])
+       (map (juxt identity (constantly {})))
+       (into {})))
+
 (defn initial-state []
   (merge
     {:auto-get-resources true
      :battle-players-color-allyteam true
+     :matchmaking-queues (dummy-matchmaking-queues)
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
@@ -3114,12 +3123,12 @@
 (def battles-buttons-keys
   [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
    :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-   :pop-out-battle :scripttags :selected-battle :spring-isolation-dir :use-springlobby-modname])
+   :pop-out-battle :scripttags :selected-battle :server :spring-isolation-dir :use-springlobby-modname])
 
 (defn battles-buttons
   [{:keys [accepted battle battles battle-password battle-title client engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
-           spring-isolation-dir use-springlobby-modname]
+           server spring-isolation-dir use-springlobby-modname]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -3282,7 +3291,12 @@
        [{:fx/type :button
          :text "Singleplayer Battle"
          :on-action {:event/type ::start-singleplayer-battle
-                     :client client}}])}]})
+                     :client client}}]
+       (when (= "bar.teifion.co.uk:8200" (first server))
+         [{:fx/type :button
+           :text "Matchmaking"
+           :on-action {:event/type ::toggle
+                       :key :show-matchmaking-window}}]))}]})
 
 
 (defmethod event-handler ::battle-password-change
@@ -8122,6 +8136,100 @@
           (fn [i]
             {:text (str (keys i))})}}]}]}}})
 
+(def matchmaking-window-keys
+  [:client :matchmaking-queues :show-matchmaking-window])
+
+(defn matchmaking-window [{:keys [client matchmaking-queues show-matchmaking-window]}]
+  {:fx/type :stage
+   :showing (boolean show-matchmaking-window)
+   :title (str u/app-name " Matchmaking")
+   :icons icons
+   :on-close-request (fn [^Event e]
+                       (swap! *state assoc :show-matchmaking-window false)
+                       (.consume e))
+   :width 600
+   :height 700
+   :scene
+   {:fx/type :scene
+    :stylesheets stylesheets
+    :root
+    {:fx/type :v-box
+     :style {:-fx-font-size 16}
+     :children
+     [{:fx/type :button
+       :text "List All Queues"
+       :on-action (fn [_e] (send-message client "c.matchmaking.list_all_queues"))}
+      {:fx/type :button
+       :text "List My Queues"
+       :on-action (fn [_e] (send-message client "c.matchmaking.list_my_queues"))}
+      {:fx/type :button
+       :text "Leave All Queues"
+       :on-action (fn [_e] (send-message client "c.matchmaking.leave_all_queues"))}
+      {:fx/type :label
+       :text "Queues"
+       :style {:-fx-font-size 24}}
+      {:fx/type :table-view
+       :v-box/vgrow :always
+       :style {:-fx-font-size 16}
+       :column-resize-policy :constrained ; TODO auto resize
+       :items (or (sort-by first matchmaking-queues)
+                  [])
+       :columns
+       [{:fx/type :table-column
+         :text "Queue"
+         :cell-value-factory first
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe (fn [queue-name] {:text (str queue-name)})}}
+        {:fx/type :table-column
+         :text "Current Search Time"
+         :cell-value-factory (comp :current-search-time second)
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe (fn [current-search-time] {:text (str current-search-time)})}}
+        {:fx/type :table-column
+         :text "Current Size"
+         :cell-value-factory (comp :current-size second)
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe (fn [current-size] {:text (str current-size)})}}
+        {:fx/type :table-column
+         :text "Actions"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [[queue-name {:keys [am-in ready-check]}]]
+            {:text ""
+             :graphic
+             {:fx/type :h-box
+              :children
+              (concat
+                [{:fx/type :button
+                  :text (cond
+                          ready-check "Ready"
+                          am-in "Leave"
+                          :else "Join")
+                  :on-action
+                  (fn [_e]
+                    (send-message client
+                      (if ready-check
+                        "c.matchmaking.ready"
+                        (str
+                          (if am-in
+                            "c.matchmaking.leave_queue"
+                            "c.matchmaking.join_queue")
+                          " " queue-name)))
+                    (when ready-check
+                      (swap! *state assoc-in [:matchmaking-queues queue-name :ready-check] false)))}]
+                (when ready-check
+                  [{:fx/type :button
+                    :text "Decline"
+                    :on-action
+                    (fn [_e]
+                      (send-message client "c.matchmaking.decline")
+                      (swap! *state assoc-in [:matchmaking-queues queue-name :ready-check] false))}]))}})}}]}]}}})
+
 (defn root-view
   [{{:keys [agreement battle client last-failed-message password pop-out-battle
             standalone tasks username verification-code]
@@ -8239,6 +8347,9 @@
       (merge
         {:fx/type replays-window}
         (select-keys state replays-window-keys))
+      (merge
+        {:fx/type matchmaking-window}
+        (select-keys state matchmaking-window-keys))
       (merge
         {:fx/type servers-window}
         (select-keys state servers-window-keys))
