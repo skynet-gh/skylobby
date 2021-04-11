@@ -51,7 +51,7 @@
     (javafx.embed.swing SwingFXUtils)
     (javafx.event Event)
     (javafx.scene Node)
-    (javafx.scene.control Tab TextArea)
+    (javafx.scene.control ScrollPane Tab TextArea)
     (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
@@ -1834,7 +1834,8 @@
           (fn [state]
             (-> state
                 (dissoc :accepted
-                        :battle :battles :channels :client :client-deferred :last-failed-message
+                        :battle :battles ;:channels
+                        :client :client-deferred :last-failed-message
                         :ping-loop :print-loop :users)
                 (update :my-channels
                   (fn [my-channels]
@@ -2049,11 +2050,6 @@
        :h-box/hgrow :always}
       {:fx/type :button
        :text "Replays"
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show replays window"}
        :on-action {:event/type ::toggle
                    :key :show-replays}
        :graphic
@@ -3709,7 +3705,6 @@
      :children
      (concat
        [{:fx/type :label
-         ;:h-box/margin 4
          :text (str resource
                     (if (zero? worst-severity) " synced"
                       " status:"))
@@ -3720,7 +3715,6 @@
                  display-text (or human-text
                                   (str text " " resource))]
              {:fx/type fx.ext.node/with-tooltip-props
-              ;:v-box/margin 2
               :props
               (when tooltip
                 {:tooltip
@@ -4082,7 +4076,6 @@
                                         :skilluncertainty uncertainty)))
                              players)]
     {:fx/type :table-view
-     ;:v-box/vgrow :always
      :column-resize-policy :constrained ; TODO auto resize
      :items (->> players-with-skill
                  (sort-by
@@ -4470,12 +4463,10 @@
      :on-scroll {:event/type ::minimap-scroll
                  :minimap-type-key minimap-type-key}
      :style
-     {;:-fx-min-width minimap-size
-      ;:-fx-max-width minimap-size
-      ;:-fx-min-height minimap-size
-      ;:-fx-max-height minimap-size
-      :-fx-pref-width minimap-size
-      :-fx-pref-height minimap-size}
+     {:-fx-min-width minimap-size
+      :-fx-max-width minimap-size
+      :-fx-min-height minimap-size
+      :-fx-max-height minimap-size}
      :children
      (concat
        (if minimap-image
@@ -4590,8 +4581,23 @@
                            (.setText txt)
                            (some-> .getParent .layout)
                            (.setScrollTop scroll-pos)))))
-                  fx.lifecycle/scalar
-                  :default ["" 0])}))
+                   fx.lifecycle/scalar
+                   :default ["" 0])}))
+
+(def with-scroll-text-flow-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:auto-scroll (fx.prop/make
+                   (fx.mutator/setter
+                     (fn [^ScrollPane scroll-pane [_texts auto-scroll]]
+                       (let [scroll-pos (if auto-scroll
+                                          ##Inf
+                                          (.getVvalue scroll-pane))]
+                         (doto scroll-pane
+                           (some-> .getParent .layout)
+                           (.setVvalue scroll-pos)))))
+                   fx.lifecycle/scalar
+                   :default [[] 0])}))
 
 (defn format-hours
   ([timestamp-millis]
@@ -4601,9 +4607,32 @@
                                   (java-time/instant timestamp-millis)
                                   time-zone-id))))
 
+; https://www.mirc.com/colors.html
+(def irc-colors
+  {"00" "rgb(255,255,255)"
+   "01" "rgb(0,0,0)"
+   "02" "rgb(0,0,127)"
+   "03" "rgb(0,147,0)"
+   "04" "rgb(255,0,0)"
+   "05" "rgb(127,0,0)"
+   "06" "rgb(156,0,156)"
+   "07" "rgb(252,127,0)"
+   "08" "rgb(255,255,0)"
+   "09" "rgb(0,252,0)"
+   "10" "rgb(0,147,147)"
+   "11" "rgb(0,255,255)"
+   "12" "rgb(0,0,252)"
+   "13" "rgb(255,0,255)"
+   "14" "rgb(127,127,127)"
+   "15" "rgb(210,210,210)"})
+
 (defn channel-view [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft]}]
   (let [channel-details (get channels channel-name)
         users (:users channel-details)
+        messages (->> channel-details
+                      :messages
+                      reverse)
+        last-message-index (dec (count messages))
         text (->> channel-details
                   :messages
                   reverse
@@ -4614,21 +4643,78 @@
                         (if ex
                           (str "* " username " " text)
                           (str username ": " text)))))
-                  (string/join "\n"))]
+                  (string/join "\n"))
+        texts (->> messages
+                   (map-indexed vector)
+                   (mapcat
+                     (fn [[i {:keys [ex text timestamp username]}]]
+                       (concat
+                         [{:fx/type :text
+                           :text (str "[" (format-hours timestamp) "] ")
+                           :fill :grey}
+                          {:fx/type :text
+                           :text
+                           (str
+                             (if ex
+                               (str "* " username " " text)
+                               (str username ": ")))
+                           :fill (if ex :cyan :royalblue)}]
+                         (when-not ex
+                           (map
+                             (fn [[_all _ irc-color-code text-segment]]
+                               {:fx/type :text
+                                :text (str text-segment)
+                                :fill (get irc-colors irc-color-code :white)})
+                             (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))
+                         (when-not (= i last-message-index)
+                           [{:fx/type :text
+                             :text "\n"}])))))]
     {:fx/type :h-box
      :children
      (concat
        [{:fx/type :v-box
          :h-box/hgrow :always
+         :style {:-fx-font-size 16}
          :children
-         [{:fx/type with-scroll-text-prop
-           :v-box/vgrow :always
-           :props {:scroll-text [text chat-auto-scroll]}
-           :desc
-           {:fx/type :text-area
-            :editable false
-            :wrap-text true
-            :style {:-fx-font-family monospace-font-family}}}
+         [
+          (if (:select-mode channel-details)
+            {:fx/type with-scroll-text-prop
+             :v-box/vgrow :always
+             :props {:scroll-text [text chat-auto-scroll]}
+             :desc
+             {:fx/type :text-area
+              :editable false
+              :wrap-text true
+              :style {:-fx-font-family monospace-font-family}
+              :context-menu
+              {:fx/type :context-menu
+               :items
+               [{:fx/type :menu-item
+                 :text "Color mode"
+                 :on-action {:event/type ::assoc-in
+                             :path [:channels channel-name :select-mode]
+                             :value false}}]}}}
+            {:fx/type with-scroll-text-flow-prop
+             :v-box/vgrow :always
+             :props {:auto-scroll [texts chat-auto-scroll]}
+             :desc
+             {:fx/type :scroll-pane
+              :style {:-fx-min-width 200
+                      :-fx-pref-width 200}
+              :fit-to-width true
+              :context-menu
+              {:fx/type :context-menu
+               :items
+               [{:fx/type :menu-item
+                 :text "Select mode"
+                 :on-action {:event/type ::assoc-in
+                             :path [:channels channel-name :select-mode]
+                             :value true}}]}
+              :content
+              {:fx/type :text-flow
+               :on-scroll (fn [e] (some-> e .getTarget .getParent .requestFocus))
+               :style {:-fx-font-family monospace-font-family}
+               :children texts}}})
           {:fx/type :h-box
            :children
            [{:fx/type :button
@@ -5340,6 +5426,7 @@
          :content
          {:fx/type :scroll-pane
           :style {:-fx-min-width (+ minimap-size 20)
+                  :-fx-pref-width (+ minimap-size 20)
                   :-fx-pref-height (+ minimap-size 164)}
           :fit-to-width true
           :hbar-policy :never
@@ -6146,8 +6233,8 @@
   (swap! *state assoc (:key e) (or (:value e) event)))
 
 (defmethod event-handler ::assoc-in
-  [{:fx/keys [event] :keys [path]}]
-  (swap! *state assoc-in path event))
+  [{:fx/keys [event] :keys [path value] :or {value event}}]
+  (swap! *state assoc-in path value))
 
 (defmethod event-handler ::dissoc
   [e]
