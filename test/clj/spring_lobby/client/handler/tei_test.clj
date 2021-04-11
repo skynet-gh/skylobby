@@ -38,7 +38,7 @@
                         "2v2" {:am-in true}
                         "3v3" {:am-in true}
                         "ffa" {:am-in false}}})]
-      (handler/handle nil state "s.matchmaking.queue_info 2v2 12345 987")
+      (handler/handle nil state "s.matchmaking.queue_info 2v2\t12345\t987")
       (is (= {:matchmaking-queues
               {"1v1" {:am-in false}
                "2v2" {:am-in true

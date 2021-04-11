@@ -42,7 +42,7 @@
     [taoensso.timbre :as log]
     [version-clj.core :as version])
   (:import
-    (java.awt Desktop)
+    (java.awt Desktop Desktop$Action)
     (java.io File)
     (java.time LocalDateTime)
     (java.util List TimeZone)
@@ -51,7 +51,7 @@
     (javafx.embed.swing SwingFXUtils)
     (javafx.event Event)
     (javafx.scene Node)
-    (javafx.scene.control Tab TextArea)
+    (javafx.scene.control ScrollPane Tab TextArea)
     (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)
@@ -66,7 +66,7 @@
 
 (declare
   could-be-this-engine? could-be-this-map? could-be-this-mod? file-exists? import-sources
-  reconcile-engines reconcile-maps reconcile-mods resource-dest)
+  reconcile-engines reconcile-maps reconcile-mods resource-dest warn-yellow)
 
 
 (def app-version (u/app-version))
@@ -1446,6 +1446,39 @@
              true)})]
     (fn [] (.close chimer))))
 
+(def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
+(def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
+
+(defn check-app-update [state-atom]
+  (let [versions
+        (->> (clj-http/get app-update-url {:as :auto})
+             :body
+             (map :tag_name)
+             (sort version/version-compare)
+             reverse)
+        latest-version (first versions)
+        current-version (u/manifest-version)]
+    (if (and latest-version current-version (not= latest-version current-version))
+      (do
+        (log/info "New version available:" latest-version "currently" current-version)
+        (swap! state-atom assoc :app-update-available {:current current-version
+                                                       :latest latest-version}))
+      (log/info "No update available, or not running a jar. Latest:" latest-version "current" current-version))))
+
+(defn check-app-update-chimer-fn [state-atom]
+  (log/info "Starting channels update chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
+            (java-time/duration 1 :hours))
+          (fn [_chimestamp]
+            (check-app-update state-atom))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error force updating resources")
+             true)})]
+    (fn [] (.close chimer))))
 
 (defmethod task-handler ::reconcile-engines [_]
   (reconcile-engines *state))
@@ -1834,7 +1867,8 @@
           (fn [state]
             (-> state
                 (dissoc :accepted
-                        :battle :battles :channels :client :client-deferred :last-failed-message
+                        :battle :battles ;:channels
+                        :client :client-deferred :last-failed-message
                         :ping-loop :print-loop :users)
                 (update :my-channels
                   (fn [my-channels]
@@ -1944,11 +1978,11 @@
             (assoc :password password))))))
 
 (def client-buttons-keys
-  [:accepted :client :client-deferred :username :password :login-error :server-url :servers :server
+  [:accepted :app-update-available :client :client-deferred :username :password :login-error :server-url :servers :server
    :show-register-popup])
 
 (defn client-buttons
-  [{:keys [accepted client client-deferred username password login-error server servers]}]
+  [{:keys [accepted app-update-available client client-deferred username password login-error server servers]}]
   {:fx/type :h-box
    :alignment :center-left
    :style {:-fx-font-size 16}
@@ -2046,14 +2080,29 @@
          :style {:-fx-text-fill "#FF0000"
                  :-fx-max-width "360px"}}]}
       {:fx/type :pane
-       :h-box/hgrow :always}
-      {:fx/type :button
+       :h-box/hgrow :always}]
+     (when-let [{:keys [latest]} app-update-available]
+       (let [color "gold"]
+         [{:fx/type :button
+           :text (str "Update to " latest)
+           :on-action {:event/type ::desktop-browse-url
+                       :url app-update-browseurl}
+           :style {:-fx-base color
+                   :-fx-background color}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-open-in-new:16:black"}}
+          {:fx/type :button
+           :text ""
+           :on-action {:event/type ::dissoc
+                       :key :app-update-available}
+           :style {:-fx-base color
+                   :-fx-background color}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-close:16:black"}}]))
+     [{:fx/type :button
        :text "Replays"
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show replays window"}
        :on-action {:event/type ::toggle
                    :key :show-replays}
        :graphic
@@ -3115,7 +3164,15 @@
   (future
     (try
       (let [desktop (Desktop/getDesktop)]
-        (.browse desktop (java.net.URI. url)))
+        (if (.isSupported desktop Desktop$Action/BROWSE)
+          (.browse desktop (java.net.URI. url))
+          (when (fs/linux?)
+            (when (fs/linux?)
+              (let [runtime (Runtime/getRuntime)
+                    command ["xdg-open" url] ; https://stackoverflow.com/a/5116553/984393
+                    ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+                (log/info "Running" (pr-str command))
+                (.exec runtime cmdarray nil nil))))))
       (catch Exception e
         (log/error e "Error browsing url" url)))))
 
@@ -3709,7 +3766,6 @@
      :children
      (concat
        [{:fx/type :label
-         ;:h-box/margin 4
          :text (str resource
                     (if (zero? worst-severity) " synced"
                       " status:"))
@@ -3720,7 +3776,6 @@
                  display-text (or human-text
                                   (str text " " resource))]
              {:fx/type fx.ext.node/with-tooltip-props
-              ;:v-box/margin 2
               :props
               (when tooltip
                 {:tooltip
@@ -4054,14 +4109,14 @@
     (send-message client (str "SAY " channel-name " !ring " username))))
 
 (def allyteam-colors
-  {0 "red"
-   1 "blue"
-   2 "yellow"
-   3 "purple"
-   4 "orange"
-   5 "green"
-   6 "pink"
-   7 "cyan"})
+  {0 "crimson"
+   1 "royalblue"
+   2 "goldenrod"
+   3 "darkseagreen"
+   4 "brown"
+   5 "pink"
+   6 "darkturquoise"
+   7 "darkorange"})
 
 (defn battle-players-table
   [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
@@ -4082,7 +4137,6 @@
                                         :skilluncertainty uncertainty)))
                              players)]
     {:fx/type :table-view
-     ;:v-box/vgrow :always
      :column-resize-policy :constrained ; TODO auto resize
      :items (->> players-with-skill
                  (sort-by
@@ -4151,26 +4205,31 @@
        {:fx/cell-type :table-cell
         :describe
         (fn [{:keys [owner] :as id}]
-          (merge
-            {:text (nickname id)
-             :style {:-fx-text-fill (if (and battle-players-color-allyteam (-> id :battle-status :mode))
-                                      (get allyteam-colors (-> id :battle-status :ally) "white")
-                                      "white")}}
-            (when (and username
-                       (not= username (:username id))
-                       (or am-host
-                           (= owner username)))
-              {:graphic
-               {:fx/type :button
-                :on-action
-                (merge
-                  {:event/type ::kick-battle
-                   :client client
-                   :singleplayer singleplayer}
-                  (select-keys id [:bot-name :username]))
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-account-remove:16:white"}}})))}}
+          (let [not-spec (-> id :battle-status :mode)]
+            (merge
+              {:text (nickname id)
+               :style
+               (merge
+                 {:-fx-text-fill (if (and battle-players-color-allyteam not-spec)
+                                     (get allyteam-colors (-> id :battle-status :ally) "white")
+                                     "white")}
+                 (when not-spec
+                   {:-fx-font-weight "bold"}))}
+              (when (and username
+                         (not= username (:username id))
+                         (or am-host
+                             (= owner username)))
+                {:graphic
+                 {:fx/type :button
+                  :on-action
+                  (merge
+                    {:event/type ::kick-battle
+                     :client client
+                     :singleplayer singleplayer}
+                    (select-keys id [:bot-name :username]))
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-account-remove:16:white"}}}))))}}
       {:fx/type :table-column
        :text "TrueSkill"
        :cell-value-factory identity
@@ -4470,12 +4529,10 @@
      :on-scroll {:event/type ::minimap-scroll
                  :minimap-type-key minimap-type-key}
      :style
-     {;:-fx-min-width minimap-size
-      ;:-fx-max-width minimap-size
-      ;:-fx-min-height minimap-size
-      ;:-fx-max-height minimap-size
-      :-fx-pref-width minimap-size
-      :-fx-pref-height minimap-size}
+     {:-fx-min-width minimap-size
+      :-fx-max-width minimap-size
+      :-fx-min-height minimap-size
+      :-fx-max-height minimap-size}
      :children
      (concat
        (if minimap-image
@@ -4590,8 +4647,23 @@
                            (.setText txt)
                            (some-> .getParent .layout)
                            (.setScrollTop scroll-pos)))))
-                  fx.lifecycle/scalar
-                  :default ["" 0])}))
+                   fx.lifecycle/scalar
+                   :default ["" 0])}))
+
+(def with-scroll-text-flow-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:auto-scroll (fx.prop/make
+                   (fx.mutator/setter
+                     (fn [^ScrollPane scroll-pane [_texts auto-scroll]]
+                       (let [scroll-pos (if auto-scroll
+                                          ##Inf
+                                          (.getVvalue scroll-pane))]
+                         (doto scroll-pane
+                           (some-> .getParent .layout)
+                           (.setVvalue scroll-pos)))))
+                   fx.lifecycle/scalar
+                   :default [[] 0])}))
 
 (defn format-hours
   ([timestamp-millis]
@@ -4601,9 +4673,32 @@
                                   (java-time/instant timestamp-millis)
                                   time-zone-id))))
 
+; https://www.mirc.com/colors.html
+(def irc-colors
+  {"00" "rgb(255,255,255)"
+   "01" "rgb(0,0,0)"
+   "02" "rgb(0,0,127)"
+   "03" "rgb(0,147,0)"
+   "04" "rgb(255,0,0)"
+   "05" "rgb(127,0,0)"
+   "06" "rgb(156,0,156)"
+   "07" "rgb(252,127,0)"
+   "08" "rgb(255,255,0)"
+   "09" "rgb(0,252,0)"
+   "10" "rgb(0,147,147)"
+   "11" "rgb(0,255,255)"
+   "12" "rgb(0,0,252)"
+   "13" "rgb(255,0,255)"
+   "14" "rgb(127,127,127)"
+   "15" "rgb(210,210,210)"})
+
 (defn channel-view [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft]}]
   (let [channel-details (get channels channel-name)
         users (:users channel-details)
+        messages (->> channel-details
+                      :messages
+                      reverse)
+        last-message-index (dec (count messages))
         text (->> channel-details
                   :messages
                   reverse
@@ -4614,21 +4709,78 @@
                         (if ex
                           (str "* " username " " text)
                           (str username ": " text)))))
-                  (string/join "\n"))]
+                  (string/join "\n"))
+        texts (->> messages
+                   (map-indexed vector)
+                   (mapcat
+                     (fn [[i {:keys [ex text timestamp username]}]]
+                       (concat
+                         [{:fx/type :text
+                           :text (str "[" (format-hours timestamp) "] ")
+                           :fill :grey}
+                          {:fx/type :text
+                           :text
+                           (str
+                             (if ex
+                               (str "* " username " " text)
+                               (str username ": ")))
+                           :fill (if ex :cyan :royalblue)}]
+                         (when-not ex
+                           (map
+                             (fn [[_all _ irc-color-code text-segment]]
+                               {:fx/type :text
+                                :text (str text-segment)
+                                :fill (get irc-colors irc-color-code :white)})
+                             (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))
+                         (when-not (= i last-message-index)
+                           [{:fx/type :text
+                             :text "\n"}])))))]
     {:fx/type :h-box
      :children
      (concat
        [{:fx/type :v-box
          :h-box/hgrow :always
+         :style {:-fx-font-size 16}
          :children
-         [{:fx/type with-scroll-text-prop
-           :v-box/vgrow :always
-           :props {:scroll-text [text chat-auto-scroll]}
-           :desc
-           {:fx/type :text-area
-            :editable false
-            :wrap-text true
-            :style {:-fx-font-family monospace-font-family}}}
+         [
+          (if (:select-mode channel-details)
+            {:fx/type with-scroll-text-prop
+             :v-box/vgrow :always
+             :props {:scroll-text [text chat-auto-scroll]}
+             :desc
+             {:fx/type :text-area
+              :editable false
+              :wrap-text true
+              :style {:-fx-font-family monospace-font-family}
+              :context-menu
+              {:fx/type :context-menu
+               :items
+               [{:fx/type :menu-item
+                 :text "Color mode"
+                 :on-action {:event/type ::assoc-in
+                             :path [:channels channel-name :select-mode]
+                             :value false}}]}}}
+            {:fx/type with-scroll-text-flow-prop
+             :v-box/vgrow :always
+             :props {:auto-scroll [texts chat-auto-scroll]}
+             :desc
+             {:fx/type :scroll-pane
+              :style {:-fx-min-width 200
+                      :-fx-pref-width 200}
+              :fit-to-width true
+              :context-menu
+              {:fx/type :context-menu
+               :items
+               [{:fx/type :menu-item
+                 :text "Select mode"
+                 :on-action {:event/type ::assoc-in
+                             :path [:channels channel-name :select-mode]
+                             :value true}}]}
+              :content
+              {:fx/type :text-flow
+               :on-scroll (fn [e] (some-> e .getTarget .getParent .requestFocus))
+               :style {:-fx-font-family monospace-font-family}
+               :children texts}}})
           {:fx/type :h-box
            :children
            [{:fx/type :button
@@ -5340,6 +5492,7 @@
          :content
          {:fx/type :scroll-pane
           :style {:-fx-min-width (+ minimap-size 20)
+                  :-fx-pref-width (+ minimap-size 20)
                   :-fx-pref-height (+ minimap-size 164)}
           :fit-to-width true
           :hbar-policy :never
@@ -6092,7 +6245,7 @@
 
 
 (def downloadable-update-cooldown
-  (* 1000 60 60 24)) ; 1 day ?
+  (* 1000 60 60 24)) ; 1 day
 
 
 (defn update-download-source
@@ -6146,8 +6299,8 @@
   (swap! *state assoc (:key e) (or (:value e) event)))
 
 (defmethod event-handler ::assoc-in
-  [{:fx/keys [event] :keys [path]}]
-  (swap! *state assoc-in path event))
+  [{:fx/keys [event] :keys [path value] :or {value event}}]
+  (swap! *state assoc-in path value))
 
 (defmethod event-handler ::dissoc
   [e]
@@ -8374,7 +8527,8 @@
   (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        update-channels-chimer (update-channels-chimer-fn state-atom)]
+        update-channels-chimer (update-channels-chimer-fn state-atom)
+        check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -8384,7 +8538,7 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
-    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer check-app-update-chimer]}))
 
 (defn init-async [state-atom]
   (future

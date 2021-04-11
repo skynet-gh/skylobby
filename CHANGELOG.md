@@ -4,14 +4,18 @@ Notable changes and todo list.
 
 ### TODO - future
 
-- Use rich text for chat windows, fix scrolling
-- Auto update check
-- Improve table column sizing
 - Download replays from various websites
+- Improve table column sizing
 - Multiple server connections, merged view
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.12]
+
+- Add color mode to chat channels
+- Improve coloring in battles table, bold players
+- Add skylobby update check
 
 ### [0.2.11]
 
