@@ -4053,10 +4053,13 @@
   [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
            scripttags sides singleplayer username]}]
   (let [players-with-skill (map
-                             (fn [{:keys [skill username] :as player}]
+                             (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
                                      tags (some-> scripttags :game :players (get username-kw))
-                                     uncertainty (or (try (u/to-number (:skilluncertainty tags))
+                                     uncertainty (or (try (u/to-number skilluncertainty)
+                                                          (catch Exception e
+                                                            (log/debug e "Error parsing skill uncertainty")))
+                                                     (try (u/to-number (:skilluncertainty tags))
                                                           (catch Exception e
                                                             (log/debug e "Error parsing skill uncertainty")))
                                                      3)]
@@ -5031,7 +5034,12 @@
         singleplayer (= :singleplayer battle-id)
         {:keys [battle-map battle-modname channel-name host-username]} (get battles battle-id)
         host-user (get users host-username)
+        me (-> battle :users (get username))
+        my-battle-status (:battle-status me)
         am-host (= username host-username)
+        am-ingame (-> users (get username) :client-status :ingame)
+        am-spec (-> me :battle-status :mode not)
+        host-ingame (-> host-user :client-status :ingame)
         startpostype (->> scripttags
                           :game
                           :startpostype
@@ -5065,7 +5073,15 @@
         import-tasks (->> all-tasks
                           (filter (comp #{::import} ::task-type))
                           (map (comp fs/canonical-path :resource-file :importable))
-                          set)]
+                          set)
+        players (battle-players-and-bots state)
+        team-counts (->> players
+                         (map :battle-status)
+                         (filter :mode)
+                         (map :ally)
+                         frequencies
+                         vals
+                         sort)]
     {:fx/type :h-box
      :style {:-fx-font-size 15}
      :alignment :top-left
@@ -5081,7 +5097,7 @@
          :channel-name channel-name
          :client client
          :host-username host-username
-         :players (battle-players-and-bots state)
+         :players players
          :scripttags scripttags
          :sides sides
          :singleplayer singleplayer
@@ -5100,195 +5116,199 @@
              :content
              {:fx/type :v-box
               :children
-              [
-               {:fx/type :h-box
-                :alignment :center-left
-                :children
-                [{:fx/type :check-box
-                  :selected (boolean battle-players-color-allyteam)
-                  :on-selected-changed {:event/type ::assoc
-                                        :key :battle-players-color-allyteam}}
-                 {:fx/type :label
-                  :text " Color player name by allyteam"}]}
-               {:fx/type :flow-pane
-                :children
-                [{:fx/type :button
-                  :text "Add Bot"
-                  :disable (or (string/blank? bot-username)
-                               (string/blank? bot-name)
-                               (string/blank? bot-version))
-                  :on-action {:event/type ::add-bot
-                              :battle battle
-                              :bot-username bot-username
-                              :bot-name bot-name
-                              :bot-version bot-version
-                              :client client
-                              :singleplayer singleplayer
-                              :username username}}
-                 {:fx/type :h-box
-                  :alignment :center-left
-                  :children
+              (concat
+                (when (< 1 (count team-counts))
                   [{:fx/type :label
-                    :text " Bot Name: "}
-                   {:fx/type :text-field
-                    :prompt-text "Bot Name"
-                    :text (str bot-username)
-                    :on-text-changed {:event/type ::change-bot-username}}]}
-                 {:fx/type :h-box
+                    :style {:-fx-font-size 20}
+                    :text (str " " (string/join "v" team-counts))}])
+                [{:fx/type :h-box
                   :alignment :center-left
                   :children
-                  [
+                  [{:fx/type :check-box
+                    :selected (boolean battle-players-color-allyteam)
+                    :on-selected-changed {:event/type ::assoc
+                                          :key :battle-players-color-allyteam}}
                    {:fx/type :label
-                    :text " AI: "}
-                   {:fx/type :combo-box
-                    :value bot-name
-                    :disable (empty? bot-names)
-                    :on-value-changed {:event/type ::change-bot-name
-                                       :bots bots}
-                    :items bot-names}]}
-                 {:fx/type :h-box
-                  :alignment :center-left
-                  :children
-                  [
-                   {:fx/type :label
-                    :text " Version: "}
-                   {:fx/type :combo-box
-                    :value bot-version
-                    :disable (string/blank? bot-name)
-                    :on-value-changed {:event/type ::change-bot-version}
-                    :items (or bot-versions [])}]}]}
-               {:fx/type :h-box
-                :alignment :center-left
-                :children
-                [{:fx/type :check-box
-                  :selected (boolean auto-get-resources)
-                  :on-selected-changed {:event/type ::assoc
-                                        :key :auto-get-resources}}
-                 {:fx/type :label
-                  :text " Auto import or download resources"}]}
-               {:fx/type :h-box
-                :alignment :center-left
-                :children
-                (concat
-                  (when (and am-host (not singleplayer))
-                    [{:fx/type :label
-                      :text " Replay: "}
-                     {:fx/type :combo-box
-                      :prompt-text " < host a replay > "
-                      :style {:-fx-max-width 300}
-                      :value (-> scripttags :game :demofile)
-                      :on-value-changed {:event/type ::assoc-in
-                                         :path [:battle :scripttags :game :demofile]}
-                      :items (->> parsed-replays-by-path
-                                  (sort-by (comp :filename second))
-                                  reverse
-                                  (mapv first))
-                      :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
-                  (when (-> scripttags :game :demofile)
+                    :text " Color player name by allyteam"}]}]
+                (when (or singleplayer (not am-spec))
+                  [{:fx/type :flow-pane
+                    :children
                     [{:fx/type :button
-                      :on-action {:event/type ::dissoc-in
-                                  :path [:battle :scripttags :game :demofile]}
-                      :graphic
-                      {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-close:16:white"}}]))}
-               {:fx/type :flow-pane
-                :vgap 5
-                :hgap 5
-                :padding 5
-                :children
-                (if singleplayer
-                  [{:fx/type engine-list
-                    :engine-filter engine-filter
-                    :engine-version engine-version
-                    :engines engines
-                    :on-value-changed {:event/type ::assoc-in
-                                       :path [:battles :singleplayer :battle-version]}
-                    :spring-isolation-dir spring-isolation-dir}
-                   {:fx/type game-list
-                    :mod-filter mod-filter
-                    :mod-name battle-modname
-                    :mods mods
-                    :on-value-changed {:event/type ::assoc-in
-                                       :path [:battles :singleplayer :battle-modname]}
-                    :spring-isolation-dir spring-isolation-dir}
-                   {:fx/type map-list
-                    :map-filter map-filter
-                    :map-name battle-map
-                    :maps maps
-                    :on-value-changed {:event/type ::assoc-in
-                                       :path [:battles :singleplayer :battle-map]}
-                    :spring-isolation-dir spring-isolation-dir}]
-                  [
-                   (merge
-                     {:fx/type battle-engine-sync-pane
-                      :engine-details engine-details
-                      :engine-file engine-file
+                      :text "Add Bot"
+                      :disable (or (and am-spec (not singleplayer))
+                                   (string/blank? bot-username)
+                                   (string/blank? bot-name)
+                                   (string/blank? bot-version))
+                      :on-action {:event/type ::add-bot
+                                  :battle battle
+                                  :bot-username bot-username
+                                  :bot-name bot-name
+                                  :bot-version bot-version
+                                  :client client
+                                  :singleplayer singleplayer
+                                  :username username}}
+                     #_
+                     {:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      [{:fx/type :label
+                        :text " Bot Name: "}
+                       {:fx/type :text-field
+                        :prompt-text "Bot Name"
+                        :text (str bot-username)
+                        :on-text-changed {:event/type ::change-bot-username}}]}
+                     {:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      [
+                       {:fx/type :label
+                        :text " AI: "}
+                       {:fx/type :combo-box
+                        :value bot-name
+                        :disable (empty? bot-names)
+                        :on-value-changed {:event/type ::change-bot-name
+                                           :bots bots}
+                        :items bot-names}]}
+                     {:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      [
+                       #_
+                       {:fx/type :label
+                        :text " Version: "}
+                       {:fx/type :combo-box
+                        :value bot-version
+                        :disable (string/blank? bot-name)
+                        :on-value-changed {:event/type ::change-bot-version}
+                        :items (or bot-versions [])}]}]}])
+                [{:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean auto-get-resources)
+                    :on-selected-changed {:event/type ::assoc
+                                          :key :auto-get-resources}}
+                   {:fx/type :label
+                    :text " Auto import or download resources"}]}
+                 {:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  (concat
+                    (when (and am-host (not singleplayer))
+                      [{:fx/type :label
+                        :text " Replay: "}
+                       {:fx/type :combo-box
+                        :prompt-text " < host a replay > "
+                        :style {:-fx-max-width 300}
+                        :value (-> scripttags :game :demofile)
+                        :on-value-changed {:event/type ::assoc-in
+                                           :path [:battle :scripttags :game :demofile]}
+                        :items (->> parsed-replays-by-path
+                                    (sort-by (comp :filename second))
+                                    reverse
+                                    (mapv first))
+                        :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
+                    (when (-> scripttags :game :demofile)
+                      [{:fx/type :button
+                        :on-action {:event/type ::dissoc-in
+                                    :path [:battle :scripttags :game :demofile]}
+                        :graphic
+                        {:fx/type font-icon/lifecycle
+                         :icon-literal "mdi-close:16:white"}}]))}
+                 {:fx/type :flow-pane
+                  :vgap 5
+                  :hgap 5
+                  :padding 5
+                  :children
+                  (if singleplayer
+                    [{:fx/type engine-list
+                      :engine-filter engine-filter
                       :engine-version engine-version
-                      :extract-tasks extract-tasks}
-                     (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :update-engines]))
-                   (merge
-                     {:fx/type battle-mod-sync-pane
-                      :battle-modname battle-modname
-                      :engine-details engine-details
-                      :engine-file engine-file}
-                     (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
-                   (merge
-                     {:fx/type battle-map-sync-pane
-                      :battle-map battle-map
-                      :import-tasks import-tasks}
-                     (select-keys state [:battle-map-details :copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :update-maps]))])}]}}
+                      :engines engines
+                      :on-value-changed {:event/type ::assoc-in
+                                         :path [:battles :singleplayer :battle-version]}
+                      :spring-isolation-dir spring-isolation-dir}
+                     {:fx/type game-list
+                      :mod-filter mod-filter
+                      :mod-name battle-modname
+                      :mods mods
+                      :on-value-changed {:event/type ::assoc-in
+                                         :path [:battles :singleplayer :battle-modname]}
+                      :spring-isolation-dir spring-isolation-dir}
+                     {:fx/type map-list
+                      :map-filter map-filter
+                      :map-name battle-map
+                      :maps maps
+                      :on-value-changed {:event/type ::assoc-in
+                                         :path [:battles :singleplayer :battle-map]}
+                      :spring-isolation-dir spring-isolation-dir}]
+                    [
+                     (merge
+                       {:fx/type battle-engine-sync-pane
+                        :engine-details engine-details
+                        :engine-file engine-file
+                        :engine-version engine-version
+                        :extract-tasks extract-tasks}
+                       (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :update-engines]))
+                     (merge
+                       {:fx/type battle-mod-sync-pane
+                        :battle-modname battle-modname
+                        :engine-details engine-details
+                        :engine-file engine-file}
+                       (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
+                     (merge
+                       {:fx/type battle-map-sync-pane
+                        :battle-map battle-map
+                        :import-tasks import-tasks}
+                       (select-keys state [:battle-map-details :copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :update-maps]))])}])}}
             {:fx/type :pane
              :v-box/vgrow :always}
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
              :children
-             (let [{:keys [battle-status] :as me} (-> battle :users (get username))
-                   iam-ingame (-> users (get username) :client-status :ingame)
-                   host-ingame (-> host-user :client-status :ingame)
-                   am-spec (not (:mode battle-status))]
-               [{:fx/type :check-box
-                 :selected (-> battle-status :ready boolean)
-                 :style {:-fx-padding "10px"}
-                 :on-selected-changed (merge me
-                                        {:event/type ::battle-ready-change
-                                         :client (when-not singleplayer client)
-                                         :username username})}
-                {:fx/type :label
-                 :text (if am-spec " Auto Launch" " Ready")}
-                {:fx/type :pane
-                 :h-box/hgrow :always}
-                {:fx/type fx.ext.node/with-tooltip-props
-                 :props
-                 {:tooltip
-                  {:fx/type :tooltip
-                   :show-delay [10 :ms]
-                   :style {:-fx-font-size 12}
-                   :text (cond
-                           am-host "You are the host, start the game"
-                           host-ingame "Join game in progress"
-                           :else (str "Call vote to start the game"))}}
-                 :desc
-                 {:fx/type :button
-                  :text (cond
-                          iam-ingame
-                          "Game running"
-                          (and am-spec (not host-ingame) (not singleplayer))
-                          "Game not running"
-                          :else
-                          (str (if (and (not singleplayer) (or host-ingame am-spec))
-                                 "Join" "Start")
-                               " Game"))
-                  :disable (boolean (or (not in-sync)
-                                        (and (not host-ingame) (and (not singleplayer) am-spec))
-                                        (and (not am-spec) iam-ingame)))
-                  :on-action {:event/type ::start-battle
-                              :am-host am-host
-                              :am-spec am-spec
-                              :battle-status battle-status
-                              :channel-name channel-name
-                              :client client
-                              :host-ingame host-ingame}}}])}]}
+             [{:fx/type :check-box
+               :selected (-> my-battle-status :ready boolean)
+               :style {:-fx-padding "10px"}
+               :on-selected-changed (merge me
+                                      {:event/type ::battle-ready-change
+                                       :client (when-not singleplayer client)
+                                       :username username})}
+              {:fx/type :label
+               :text (if am-spec " Auto Launch" " Ready")}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :style {:-fx-font-size 12}
+                 :text (cond
+                         am-host "You are the host, start the game"
+                         host-ingame "Join game in progress"
+                         :else (str "Call vote to start the game"))}}
+               :desc
+               {:fx/type :button
+                :text (cond
+                        am-ingame
+                        "Game running"
+                        (and am-spec (not host-ingame) (not singleplayer))
+                        "Game not running"
+                        :else
+                        (str (if (and (not singleplayer) (or host-ingame am-spec))
+                               "Join" "Start")
+                             " Game"))
+                :disable (boolean (or (not in-sync)
+                                      (and (not host-ingame) (and (not singleplayer) am-spec))
+                                      (and (not am-spec) am-ingame)))
+                :on-action {:event/type ::start-battle
+                            :am-host am-host
+                            :am-spec am-spec
+                            :battle-status my-battle-status
+                            :channel-name channel-name
+                            :client client
+                            :host-ingame host-ingame}}}]}]}
           {:fx/type channel-view
            :h-box/hgrow :always
            :channel-name channel-name
