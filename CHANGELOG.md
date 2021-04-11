@@ -13,6 +13,14 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.2.11]
+
+- Make auto download battle resources default
+- Fix skill uncertainty in replays view
+- Fix triple click on battle joining then leaving
+- Add display of player counts in battle (e.g. 2v2)
+- Add support for teiserver matchmaking
+
 ### [0.2.10]
 
 - Improve main window layout at small sizes

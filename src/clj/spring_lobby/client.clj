@@ -10,6 +10,7 @@
     [manifold.stream :as s]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
+    spring-lobby.client.handler.tei
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
