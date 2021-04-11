@@ -4048,14 +4048,14 @@
     (send-message client (str "SAY " channel-name " !ring " username))))
 
 (def allyteam-colors
-  {0 "red"
-   1 "blue"
-   2 "yellow"
-   3 "purple"
-   4 "orange"
-   5 "green"
-   6 "pink"
-   7 "cyan"})
+  {0 "crimson"
+   1 "royalblue"
+   2 "goldenrod"
+   3 "darkseagreen"
+   4 "brown"
+   5 "pink"
+   6 "darkturquoise"
+   7 "darkorange"})
 
 (defn battle-players-table
   [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
@@ -4144,26 +4144,31 @@
        {:fx/cell-type :table-cell
         :describe
         (fn [{:keys [owner] :as id}]
-          (merge
-            {:text (nickname id)
-             :style {:-fx-text-fill (if (and battle-players-color-allyteam (-> id :battle-status :mode))
-                                      (get allyteam-colors (-> id :battle-status :ally) "white")
-                                      "white")}}
-            (when (and username
-                       (not= username (:username id))
-                       (or am-host
-                           (= owner username)))
-              {:graphic
-               {:fx/type :button
-                :on-action
-                (merge
-                  {:event/type ::kick-battle
-                   :client client
-                   :singleplayer singleplayer}
-                  (select-keys id [:bot-name :username]))
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-account-remove:16:white"}}})))}}
+          (let [not-spec (-> id :battle-status :mode)]
+            (merge
+              {:text (nickname id)
+               :style
+               (merge
+                 {:-fx-text-fill (if (and battle-players-color-allyteam not-spec)
+                                     (get allyteam-colors (-> id :battle-status :ally) "white")
+                                     "white")}
+                 (when not-spec
+                   {:-fx-font-weight "bold"}))}
+              (when (and username
+                         (not= username (:username id))
+                         (or am-host
+                             (= owner username)))
+                {:graphic
+                 {:fx/type :button
+                  :on-action
+                  (merge
+                    {:event/type ::kick-battle
+                     :client client
+                     :singleplayer singleplayer}
+                    (select-keys id [:bot-name :username]))
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-account-remove:16:white"}}}))))}}
       {:fx/type :table-column
        :text "TrueSkill"
        :cell-value-factory identity
