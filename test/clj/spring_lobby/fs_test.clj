@@ -9,108 +9,120 @@
 
 
 (deftest spring-root
-  (testing "Windows Subsystem for Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version "blahblah Microsoft"
-                                     :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/Documents/My Games/Spring")
-             (fs/absolute-path
-               (fs/spring-root))))))
-  (testing "Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version ""
-                                     :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.spring")
-             (fs/absolute-path
-               (fs/spring-root))))))
-  (testing "Windows"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "somethingWindowssomething"
-                                     :os-version "10.0"
-                                     :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/Documents/My Games/Spring")
-             (fs/absolute-path
-               (fs/spring-root)))))))
+  (if (fs/windows?)
+    (testing "Windows paths"
+      (testing "Windows"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "somethingWindowssomething"
+                                         :os-version "10.0"
+                                         :user-home "C:\\Users\\me3"})]
+          (is (= (str "C:\\Users\\me3\\Documents\\My Games\\Spring")
+                 (fs/absolute-path
+                   (fs/spring-root)))))))
+    (testing "Unix paths"
+      (testing "Windows Subsystem for Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version "blahblah Microsoft"
+                                         :user-name "me"})]
+          (is (= (str "/mnt/c/Users/me/Documents/My Games/Spring")
+                 (fs/absolute-path
+                   (fs/spring-root))))))
+      (testing "Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version ""
+                                         :user-home "/home/me2"})]
+          (is (= (str "/home/me2/.spring")
+                 (fs/absolute-path
+                   (fs/spring-root)))))))))
 
 (deftest springlobby-root
-  (testing "Windows Subsystem for Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version "blahblah Microsoft"
-                                     :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/AppData/Roaming/springlobby")
-             (fs/absolute-path
-               (fs/springlobby-root))))))
-  (testing "Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version ""
-                                     :user-home "/home/me2"})]
-      (is (= (str "/home/me2/snap/springlobby-nsg/common/.springlobby")
-             (fs/absolute-path
-               (fs/springlobby-root))))))
-  (testing "Windows"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "somethingWindowssomething"
-                                     :os-version "10.0"
-                                     :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/AppData/Roaming/springlobby")
-             (fs/absolute-path
-               (fs/springlobby-root)))))))
+  (if (fs/windows?)
+    (testing "Windows paths"
+      (testing "Windows"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "somethingWindowssomething"
+                                         :os-version "10.0"
+                                         :user-home "C:\\Users\\me3"})]
+          (is (= (str "C:\\Users\\me3\\AppData\\Roaming\\springlobby")
+                 (fs/absolute-path
+                   (fs/springlobby-root)))))))
+    (testing "Unix paths"
+      (testing "Windows Subsystem for Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version "blahblah Microsoft"
+                                         :user-name "me"})]
+          (is (= (str "/mnt/c/Users/me/AppData/Roaming/springlobby")
+                 (fs/absolute-path
+                   (fs/springlobby-root))))))
+      (testing "Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version ""
+                                         :user-home "/home/me2"})]
+          (is (= (str "/home/me2/snap/springlobby-nsg/common/.springlobby")
+                 (fs/absolute-path
+                   (fs/springlobby-root)))))))))
 
 (deftest app-root
-  (testing "Windows Subsystem for Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version "blahblah Microsoft"
-                                     :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/.skylobby")
-             (fs/absolute-path
-               (fs/app-root))))))
-  (testing "Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version ""
-                                     :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.skylobby")
-             (fs/absolute-path
-               (fs/app-root))))))
-  (testing "Windows"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "somethingWindowssomething"
-                                     :os-version "10.0"
-                                     :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/.skylobby")
-             (fs/absolute-path
-               (fs/app-root)))))))
+  (if (fs/windows?)
+    (testing "Windows paths"
+      (testing "Windows"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "somethingWindowssomething"
+                                         :os-version "10.0"
+                                         :user-home "C:\\Users\\me3"})]
+          (is (= (str "C:\\Users\\me3\\.skylobby")
+                 (fs/absolute-path
+                   (fs/app-root)))))))
+    (testing "Unix paths"
+      (testing "Windows Subsystem for Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version "blahblah Microsoft"
+                                         :user-name "me"})]
+          (is (= (str "/mnt/c/Users/me/.skylobby")
+                 (fs/absolute-path
+                   (fs/app-root))))))
+      (testing "Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version ""
+                                         :user-home "/home/me2"})]
+          (is (= (str "/home/me2/.skylobby")
+                 (fs/absolute-path
+                   (fs/app-root)))))))))
 
 (deftest config-root
-  (testing "Windows Subsystem for Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version "blahblah Microsoft"
-                                     :user-name "me"})]
-      (is (= (str "/mnt/c/Users/me/.skylobby/wsl")
-             (fs/absolute-path
-               (fs/config-root))))))
-  (testing "Linux"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "Linux"
-                                     :os-version ""
-                                     :user-home "/home/me2"})]
-      (is (= (str "/home/me2/.skylobby")
-             (fs/absolute-path
-               (fs/config-root))))))
-  (testing "Windows"
-    (with-redefs [fs/get-sys-data (constantly
-                                    {:os-name "somethingWindowssomething"
-                                     :os-version "10.0"
-                                     :user-home "/C:/Users/me3"})]
-      (is (= (str "/C:/Users/me3/.skylobby")
-             (fs/absolute-path
-               (fs/config-root)))))))
+  (if (fs/windows?)
+    (testing "Windows paths"
+      (testing "Windows"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "somethingWindowssomething"
+                                         :os-version "10.0"
+                                         :user-home "C:\\Users\\me3"})]
+          (is (= (str "C:\\Users\\me3\\.skylobby")
+                 (fs/absolute-path
+                   (fs/config-root)))))))
+    (testing "Windows paths"
+      (testing "Windows Subsystem for Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version "blahblah Microsoft"
+                                         :user-name "me"})]
+          (is (= (str "/mnt/c/Users/me/.skylobby/wsl")
+                 (fs/absolute-path
+                   (fs/config-root))))))
+      (testing "Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version ""
+                                         :user-home "/home/me2"})]
+          (is (= (str "/home/me2/.skylobby")
+                 (fs/absolute-path
+                   (fs/config-root)))))))))
 
 (deftest sync-version-to-engine-version
   (is (= "103.0"
