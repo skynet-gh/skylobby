@@ -245,10 +245,15 @@
     :port 8200
     :alias "Beyond All Reason"}})
 
+(def minimap-types
+  ["minimap" "metalmap" "heightmap"])
+
 
 (defn initial-state []
   (merge
-    {:spring-isolation-dir (fs/default-isolation-dir)
+    {:auto-get-resources true
+     :battle-players-color-allyteam true
+     :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
       merge
@@ -257,7 +262,9 @@
           (comp slurp-config-edn :filename) state-to-edn)))
     (slurp-config-edn "parsed-replays.edn")
     {:file-events (initial-file-events)
-     :tasks (initial-tasks)}))
+     :tasks (initial-tasks)
+     :minimap-type (first minimap-types)
+     :replay-minimap-type (first minimap-types)}))
 
 
 (def ^:dynamic *state (atom {}))
@@ -1480,7 +1487,7 @@
 (defmethod event-handler ::on-mouse-clicked-battles-row
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
   (future
-    (when (< 1 (.getClickCount event))
+    (when (= 2 (.getClickCount event))
       @(event-handler (merge e {:event/type ::join-battle})))))
 
 
@@ -3809,9 +3816,6 @@
   (when engine-version
     (io/file (fs/spring-root) "engine" (http/engine-archive engine-version))))
 
-
-(def minimap-types
-  ["minimap" "metalmap" "heightmap"])
 
 (defmethod event-handler ::minimap-scroll
   [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]
@@ -6891,7 +6895,16 @@
 (defmethod event-handler ::select-replay
   [{:fx/keys [event]}]
   (future
-    (swap! *state assoc :selected-replay-file (:file event))))
+    (let [replay-game (-> event :body :script-data :game)]
+      (swap! *state
+        (fn [state]
+          (cond-> state
+            true
+            (assoc :selected-replay-file (:file event))
+            (not= (:gametype replay-game) (:mod-name (:replay-mod-details state)))
+            (assoc :replay-mod-details nil)
+            (not= (:mapname replay-game) (:map-name (:replay-map-details state)))
+            (assoc :replay-map-details nil)))))))
 
 
 (defn sanitize-replay-filter [s]
@@ -7634,17 +7647,24 @@
                       {:fx/type :label
                        :text " Color player name by allyteam"}]}]
                    (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-                     [{:fx/type :button
-                       :style {:-fx-font-size 24}
-                       :text " Watch"
-                       :on-action
-                       {:event/type ::watch-replay
-                        :engines engines
-                        :engine-version selected-engine-version
-                        :replay selected-replay}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-movie:24:white"}}]))}
+                     (let [watch-button {:fx/type :button
+                                         :style {:-fx-font-size 24}
+                                         :text " Watch"
+                                         :on-action
+                                         {:event/type ::watch-replay
+                                          :engines engines
+                                          :engine-version selected-engine-version
+                                          :replay selected-replay
+                                          :spring-isolation-dir spring-isolation-dir}
+                                         :graphic
+                                         {:fx/type font-icon/lifecycle
+                                          :icon-literal "mdi-movie:24:white"}}]
+                       [{:fx/type :h-box
+                         :children
+                         [watch-button
+                          {:fx/type :pane
+                           :h-box/hgrow :always}
+                          watch-button]}])))}
                 {:fx/type :v-box
                  :children
                  [
