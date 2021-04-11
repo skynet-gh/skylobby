@@ -42,7 +42,7 @@
     [taoensso.timbre :as log]
     [version-clj.core :as version])
   (:import
-    (java.awt Desktop)
+    (java.awt Desktop Desktop$Action)
     (java.io File)
     (java.time LocalDateTime)
     (java.util List TimeZone)
@@ -66,7 +66,7 @@
 
 (declare
   could-be-this-engine? could-be-this-map? could-be-this-mod? file-exists? import-sources
-  reconcile-engines reconcile-maps reconcile-mods resource-dest)
+  reconcile-engines reconcile-maps reconcile-mods resource-dest warn-yellow)
 
 
 (def app-version (u/app-version))
@@ -1446,6 +1446,39 @@
              true)})]
     (fn [] (.close chimer))))
 
+(def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
+(def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
+
+(defn check-app-update [state-atom]
+  (let [versions
+        (->> (clj-http/get app-update-url {:as :auto})
+             :body
+             (map :tag_name)
+             (sort version/version-compare)
+             reverse)
+        latest-version (first versions)
+        current-version (u/manifest-version)]
+    (if (and latest-version current-version (not= latest-version current-version))
+      (do
+        (log/info "New version available:" latest-version "currently" current-version)
+        (swap! state-atom assoc :app-update-available {:current current-version
+                                                       :latest latest-version}))
+      (log/info "No update available, or not running a jar. Latest:" latest-version "current" current-version))))
+
+(defn check-app-update-chimer-fn [state-atom]
+  (log/info "Starting channels update chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
+            (java-time/duration 1 :hours))
+          (fn [_chimestamp]
+            (check-app-update state-atom))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error force updating resources")
+             true)})]
+    (fn [] (.close chimer))))
 
 (defmethod task-handler ::reconcile-engines [_]
   (reconcile-engines *state))
@@ -1945,11 +1978,11 @@
             (assoc :password password))))))
 
 (def client-buttons-keys
-  [:accepted :client :client-deferred :username :password :login-error :server-url :servers :server
+  [:accepted :app-update-available :client :client-deferred :username :password :login-error :server-url :servers :server
    :show-register-popup])
 
 (defn client-buttons
-  [{:keys [accepted client client-deferred username password login-error server servers]}]
+  [{:keys [accepted app-update-available client client-deferred username password login-error server servers]}]
   {:fx/type :h-box
    :alignment :center-left
    :style {:-fx-font-size 16}
@@ -2047,8 +2080,28 @@
          :style {:-fx-text-fill "#FF0000"
                  :-fx-max-width "360px"}}]}
       {:fx/type :pane
-       :h-box/hgrow :always}
-      {:fx/type :button
+       :h-box/hgrow :always}]
+     (when-let [{:keys [latest]} app-update-available]
+       (let [color "gold"]
+         [{:fx/type :button
+           :text (str "Update to " latest)
+           :on-action {:event/type ::desktop-browse-url
+                       :url app-update-browseurl}
+           :style {:-fx-base color
+                   :-fx-background color}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-open-in-new:16:black"}}
+          {:fx/type :button
+           :text ""
+           :on-action {:event/type ::dissoc
+                       :key :app-update-available}
+           :style {:-fx-base color
+                   :-fx-background color}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-close:16:black"}}]))
+     [{:fx/type :button
        :text "Replays"
        :on-action {:event/type ::toggle
                    :key :show-replays}
@@ -3111,7 +3164,15 @@
   (future
     (try
       (let [desktop (Desktop/getDesktop)]
-        (.browse desktop (java.net.URI. url)))
+        (if (.isSupported desktop Desktop$Action/BROWSE)
+          (.browse desktop (java.net.URI. url))
+          (when (fs/linux?)
+            (when (fs/linux?)
+              (let [runtime (Runtime/getRuntime)
+                    command ["xdg-open" url] ; https://stackoverflow.com/a/5116553/984393
+                    ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+                (log/info "Running" (pr-str command))
+                (.exec runtime cmdarray nil nil))))))
       (catch Exception e
         (log/error e "Error browsing url" url)))))
 
@@ -6184,7 +6245,7 @@
 
 
 (def downloadable-update-cooldown
-  (* 1000 60 60 24)) ; 1 day ?
+  (* 1000 60 60 24)) ; 1 day
 
 
 (defn update-download-source
@@ -8466,7 +8527,8 @@
   (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        update-channels-chimer (update-channels-chimer-fn state-atom)]
+        update-channels-chimer (update-channels-chimer-fn state-atom)
+        check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -8476,7 +8538,7 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
-    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer check-app-update-chimer]}))
 
 (defn init-async [state-atom]
   (future
