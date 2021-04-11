@@ -9,7 +9,7 @@
 
 (defmethod handler/handle "s.matchmaking.full_queue_list" [_client state m]
   (let [[_all queues-str] (re-find #"[^\s]+ (.*)" m)
-        queue-names (set (string/split queues-str #"\s+"))]
+        queue-names (set (string/split queues-str #"\t"))]
     (swap! state update :matchmaking-queues
            (fn [matchmaking-queues]
              (into {}
@@ -19,7 +19,7 @@
 
 (defmethod handler/handle "s.matchmaking.your_queue_list" [_client state m]
   (let [[_all queues-str] (re-find #"[^\s]+ (.*)" m)
-        queue-names (set (string/split queues-str #"\s+"))]
+        queue-names (set (string/split queues-str #"\t"))]
     (swap! state update :matchmaking-queues
            (fn [matchmaking-queues]
              (->> matchmaking-queues
@@ -30,7 +30,7 @@
 
 (defmethod handler/handle "s.matchmaking.queue_info" [_client state m]
   (let [[_all queue-info] (re-find #"[^\s]+ (.*)" m)
-        [queue-name search-time size] (string/split queue-info #"\s+")]
+        [queue-name search-time size] (string/split queue-info #"\t")]
     (swap! state update-in [:matchmaking-queues queue-name]
            assoc
            :current-search-time (u/to-number search-time)

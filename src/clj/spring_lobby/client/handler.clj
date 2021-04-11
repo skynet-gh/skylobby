@@ -268,7 +268,7 @@
                                   :username username}))))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
-            (assoc :selected-tab-channels channel-name))))))
+            (assoc :selected-tab-channel channel-name))))))
 
 (defmethod handle "SAYPRIVATEEX" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
@@ -300,7 +300,7 @@
                                   :ex true}))))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
-            (assoc :selected-tab-channels channel-name))))))
+            (assoc :selected-tab-channel channel-name))))))
 
 (defmethod handle "JOINEDBATTLE" [_c state-atom m]
   (let [[_all battle-id username _ script-password] (re-find #"\w+ (\w+) ([^\s]+)( (.+))?" m)]
