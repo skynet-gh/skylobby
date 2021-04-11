@@ -5,4 +5,4 @@
 --arguments -m
 --arguments "spring-lobby"
 --vendor "skynet"
---java-options "-server -Xms128m -Xmx1g -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
+--java-options "-server -Xms128m -Xmx1g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
