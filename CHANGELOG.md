@@ -4,12 +4,21 @@ Notable changes and todo list.
 
 ### TODO - future
 
-- Download replays from various websites
+- Add .sdd map handling
 - Improve table column sizing
+- Allow both singleplayer and multiplayer battles
 - Multiple server connections, merged view
 - Add support for TLS communication to the server
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.2.13]
+
+- Greatly improved performance
+- Add download of BAR replays
+- Add workaround for BAR sidedata change
+- Download resources from springfiles by search
+- Update matchmaking to new protocol.
 
 ### [0.2.12]
 
