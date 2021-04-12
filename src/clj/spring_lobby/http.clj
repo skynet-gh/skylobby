@@ -33,6 +33,9 @@
 (def bar-spring-releases-url
   "https://api.github.com/repos/beyond-all-reason/spring/releases")
 
+(def bar-replays-api-url
+  "https://bar-rts.com/api/replays/")
+
 
 (defn- by-tag [element tag]
   (->> element
@@ -375,3 +378,22 @@
                 :resource-date created-at
                 :download-source-name download-source-name
                 :resource-updated now}))))))
+
+
+(defn get-bar-replays
+  [{:keys [page]}]
+  (->> (http/get bar-replays-api-url
+         (merge
+           {:as :auto}
+           (when page
+             {:query-params {:page page}})))
+       :body
+       :data))
+
+(defn bar-replay-download-url [filename-or-id]
+  (str bar-replays-api-url filename-or-id))
+
+(defn get-bar-replay-details
+  [{:keys [id]}]
+  (:body
+    (http/get (bar-replay-download-url id) {:as :auto})))

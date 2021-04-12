@@ -55,6 +55,48 @@
       (catch Exception e
         (println "error stopping chimer" chimer e)))))
 
+(defn view [state]
+  (try
+    (require 'spring-lobby)
+    (let [new-view (var-get (find-var 'spring-lobby/root-view))]
+      (when (not (identical? old-view new-view))
+        (alter-var-root #'old-view (constantly new-view))))
+    (catch Exception _e
+      (println "compile error, using old view")))
+  (try
+    (old-view state)
+    (catch Exception _e
+      (println "exception in old view, probably unbound fn, fix asap"))))
+
+(defn event-handler [event]
+  (try
+    (require 'spring-lobby)
+    (let [new-handler (var-get (find-var 'spring-lobby/event-handler))]
+      (when (not (identical? old-handler new-handler))
+        (alter-var-root #'old-handler (constantly new-handler))))
+    (catch Exception _e
+      (println "compile error, using old event handler")))
+  (try
+    (old-handler event)
+    (catch Exception e
+      (println "exception in old event handler" e))))
+
+(defn create-renderer []
+  (let [r (fx/create-renderer
+            :middleware (fx/wrap-map-desc
+                          (fn [state]
+                            {:fx/type view
+                             :state state}))
+            :opts {:fx.opt/map-event-handler event-handler}
+            :error-handler (fn [t]
+                             (println "Error occurred! Unmounting renderer for safety")
+                             (println t)
+                             (.printStackTrace t)
+                             (fx/unmount-renderer *state renderer)
+                             (alter-var-root #'renderer (constantly nil))))]
+    (alter-var-root #'renderer (constantly r)))
+  (fx/mount-renderer *state renderer))
+
 (defn rerender []
   (try
     (println "Stopping old chimers")
@@ -73,7 +115,9 @@
           (catch Exception e
             (println "error rendering" e)
             (throw e))))
-      (println "No renderer"))
+      (do
+        (println "No renderer, creating new one")
+        (create-renderer)))
     (try
       (let [init-fn (var-get (find-var 'spring-lobby/init))]
         (reset! init-state (init-fn *state)))
@@ -108,33 +152,6 @@
             (catch Exception e
               (println e)))))))
   context)
-
-
-(defn view [state]
-  (try
-    (require 'spring-lobby)
-    (let [new-view (var-get (find-var 'spring-lobby/root-view))]
-      (when (not (identical? old-view new-view))
-        (alter-var-root #'old-view (constantly new-view))))
-    (catch Exception _e
-      (println "compile error, using old view")))
-  (try
-    (old-view state)
-    (catch Exception _e
-      (println "exception in old view, probably unbound fn, fix asap"))))
-
-(defn event-handler [event]
-  (try
-    (require 'spring-lobby)
-    (let [new-handler (var-get (find-var 'spring-lobby/event-handler))]
-      (when (not (identical? old-handler new-handler))
-        (alter-var-root #'old-handler (constantly new-handler))))
-    (catch Exception _e
-      (println "compile error, using old event handler")))
-  (try
-    (old-handler event)
-    (catch Exception e
-      (println "exception in old event handler" e))))
 
 
 (defn client-handler [client state message]
@@ -175,16 +192,9 @@
     (require 'spring-lobby.client)
     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
-    (let [init-fn (var-get (find-var 'spring-lobby/init))
-          r (fx/create-renderer
-              :middleware (fx/wrap-map-desc
-                            (fn [state]
-                              {:fx/type view
-                               :state state}))
-              :opts {:fx.opt/map-event-handler event-handler})]
+    (let [init-fn (var-get (find-var 'spring-lobby/init))]
       (reset! init-state (init-fn *state))
-      (alter-var-root #'renderer (constantly r)))
-    (fx/mount-renderer *state renderer)
+      (create-renderer))
     (catch Exception e
       (println e)
       (throw e))))

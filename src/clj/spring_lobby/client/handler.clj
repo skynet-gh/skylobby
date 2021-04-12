@@ -220,84 +220,51 @@
                     (mapcat (fn [client] [client {}]) clients))))))
 
 (defmethod handle "SAID" [_c state-atom m]
-  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
-        now (u/curr-millis)]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:channels channel-name :messages]
-      (fn [messages]
-        (take u/max-messages
-          (conj messages {:text message
-                          :timestamp now
-                          :username username}))))))
+      (u/update-chat-messages-fn username message))))
 
 (defmethod handle "SAIDEX" [_c state-atom m]
-  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
-        now (u/curr-millis)]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:channels channel-name :messages]
-      (fn [messages]
-        (take u/max-messages
-          (conj messages {:text message
-                          :timestamp now
-                          :username username
-                          :ex true}))))))
+      (u/update-chat-messages-fn username message true))))
 
 (defmethod handle "SAYPRIVATE" [_c state-atom m]
-  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        now (u/curr-millis)]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
     (swap! state-atom
       (fn [state]
         (-> state
             (update-in [:channels (u/user-channel username) :messages]
-              (fn [messages]
-                (take u/max-messages
-                  (conj messages {:text message
-                                  :timestamp now
-                                  :username (:username state)})))))))))
+              (u/update-chat-messages-fn (:username state) message)))))))
 
 (defmethod handle "SAIDPRIVATE" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        now (u/curr-millis)
         channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
         (-> state
             (update-in [:channels channel-name :messages]
-              (fn [messages]
-                (take u/max-messages
-                  (conj messages {:text message
-                                  :timestamp now
-                                  :username username}))))
+              (u/update-chat-messages-fn username message))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channel channel-name))))))
 
 (defmethod handle "SAYPRIVATEEX" [_c state-atom m]
-  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        now (u/curr-millis)]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
     (swap! state-atom
       (fn [state]
         (-> state
             (update-in [:channels (u/user-channel username) :messages]
-              (fn [messages]
-                (take u/max-messages
-                  (conj messages {:text message
-                                  :timestamp now
-                                  :username (:username state)
-                                  :ex true})))))))))
+              (u/update-chat-messages-fn (:username state) message true)))))))
 
 (defmethod handle "SAIDPRIVATEEX" [_c state-atom m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        now (u/curr-millis)
         channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
         (-> state
             (update-in [:channels channel-name :messages]
-              (fn [messages]
-                (take u/max-messages
-                  (conj messages {:text message
-                                  :timestamp now
-                                  :username username
-                                  :ex true}))))
+              (u/update-chat-messages-fn username message true))
             (assoc-in [:my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channel channel-name))))))

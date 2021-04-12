@@ -257,6 +257,7 @@
         (loop []
           (async/<!! (async/timeout 30000))
           (when (message/send-message c "PING")
+            (u/update-console-log state-atom :client "PING")
             (when-not (Thread/interrupted)
               (recur))))
         (log/info "ping loop ended")
@@ -277,12 +278,7 @@
             (when-let [m @d]
               (log/info "<" (str "'" m "'"))
               (try
-                (swap! state-atom update :console-log
-                  (fn [console-log]
-                    (take u/max-messages
-                      (conj console-log {:timestamp (u/curr-millis)
-                                         :source :server
-                                         :message m}))))
+                (u/update-console-log state-atom :server m)
                 (handler c state-atom m)
                 (catch Exception e
                   (log/error e "Error handling message")))

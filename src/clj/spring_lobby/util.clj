@@ -8,7 +8,7 @@
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
     (java.net URL)
-    (java.net URLDecoder)
+    (java.net URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.util.jar Manifest)
     (org.apache.commons.io FileUtils)))
@@ -148,3 +148,37 @@
 
 (defn user-channel [username]
   (str "@" username))
+
+
+(defn postprocess-byar-units-en [language-units-en]
+  (->> language-units-en
+       :en
+       :units
+       :factions
+       (map-indexed
+         (fn [i [_k v]]
+           [(str i) {:name v}]))
+       (into {})))
+
+; https://github.com/cemerick/url/blob/master/src/cemerick/url.cljx
+(defn url-encode
+  [string]
+  (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
+
+
+(defn update-console-log [state-atom source message]
+  (swap! state-atom update :console-log
+    (fn [console-log]
+      (conj console-log {:timestamp (curr-millis)
+                         :source source
+                         :message message}))))
+
+(defn update-chat-messages-fn
+  ([username message]
+   (update-chat-messages-fn username message false))
+  ([username message ex]
+   (fn [messages]
+     (conj messages {:text message
+                     :timestamp (curr-millis)
+                     :username username
+                     :ex ex}))))
