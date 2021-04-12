@@ -20,6 +20,8 @@
 
 (def minimap-size 1024)
 
+(def minimap-display-size 512)
+
 ; https://springrts.com/wiki/Mapdev:SMF_format
 
 (def map-header
@@ -171,6 +173,32 @@
         (partition 2 (seq bs))))))
 
 
+(defn scale-minimap-image [minimap-width minimap-height minimap-image]
+  (when minimap-image
+    (let [^sun.awt.image.ToolkitImage scaled
+          (.getScaledInstance ^java.awt.Image minimap-image
+            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
+          _ (.getWidth scaled)
+          _ (.getHeight scaled)]
+      (.getBufferedImage scaled))))
+
+(defn minimap-dimensions [map-smf-header]
+  (let [{:keys [map-width map-height]} map-smf-header]
+    (when (and map-width)
+      (let [ratio-x (/ minimap-display-size map-width)
+            ratio-y (/ minimap-display-size map-height)
+            min-ratio (min ratio-x ratio-y)
+            normal-x (/ ratio-x min-ratio)
+            normal-y (/ ratio-y min-ratio)
+            invert-x (/ min-ratio ratio-x)
+            invert-y (/ min-ratio ratio-y)
+            convert-x (if (< ratio-y ratio-x) invert-x normal-x)
+            convert-y (if (< ratio-x ratio-y) invert-y normal-y)
+            minimap-width (* minimap-display-size convert-x)
+            minimap-height (* minimap-display-size convert-y)]
+        {:minimap-width (or minimap-width minimap-display-size)
+         :minimap-height (or minimap-height minimap-display-size)}))))
+
 (defn decode-map
   [input-stream]
   (let [all-bytes (u/slurp-bytes input-stream)
@@ -180,12 +208,14 @@
         metalmap-length (* (quot map-width 2) (quot map-height 2))
         ^"[B" heightmap-bytes (decode-heightmap (subbytes all-bytes heightmap-offset heightmap-length))
         minimap-bytes (subbytes all-bytes minimap-offset minimap-length)
-        metalmap-bytes (subbytes all-bytes metalmap-offset metalmap-length)]
+        metalmap-bytes (subbytes all-bytes metalmap-offset metalmap-length)
+        minimap-image (decompress-minimap minimap-bytes)
+        {:keys [minimap-width minimap-height]} (minimap-dimensions header)]
     {:header header
      :body
-     {;:heightmap-bytes heightmap-bytes
-      :heightmap-image (heightmap-image map-width map-height heightmap-bytes)
-      ;:minimap-bytes minimap-bytes
-      :minimap-image (decompress-minimap minimap-bytes)
-      ;:metalmap-bytes metalmap-bytes
+     {:heightmap-image (heightmap-image map-width map-height heightmap-bytes)
+      :minimap-height minimap-height
+      :minimap-image minimap-image
+      :minimap-image-scaled (scale-minimap-image minimap-width minimap-height minimap-image)
+      :minimap-width minimap-width
       :metalmap-image (metalmap-image map-width map-height metalmap-bytes)}}))

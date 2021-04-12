@@ -19,6 +19,7 @@
     [clojure.string :as string]
     [com.evocomputing.colors :as colors]
     [crypto.random]
+    [diehard.core :as dh]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -31,6 +32,7 @@
     [spring-lobby.client.message :as message]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
+    [spring-lobby.fs.smf :as smf]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.git :as git]
     [spring-lobby.http :as http]
@@ -65,13 +67,15 @@
 
 
 (declare
-  could-be-this-engine? could-be-this-map? could-be-this-mod? file-exists? import-sources
+  could-be-this-engine? could-be-this-map? could-be-this-mod? file-exists? import-sources limit-download-status
   reconcile-engines reconcile-maps reconcile-mods resource-dest warn-yellow)
 
 
 (def app-version (u/app-version))
 
 (def wait-before-init-tasks-ms 10000)
+
+(dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
 
 (def stylesheets
   [(str (io/resource "dark.css"))])
@@ -333,7 +337,8 @@
                                  (filter (comp #{map-name} :map-name))
                                  first
                                  :file)]
-        (fs/read-map-data map-file)
+        (let [map-data (fs/read-map-data map-file)]
+          map-data)
         (log/warn "No file found for map" log-map-name)))))
 
 
@@ -412,6 +417,7 @@
   "Adds all *state watchers."
   [state-atom]
   (remove-watch state-atom :state-to-edn)
+  (remove-watch state-atom :debug)
   (remove-watch state-atom :battle-map-details)
   (remove-watch state-atom :battle-mod-details)
   (remove-watch state-atom :replay-map-and-mod-details)
@@ -420,6 +426,16 @@
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
   (add-watch-state-to-edn state-atom)
+  #_
+  (add-watch state-atom :debug
+    (fn [_k _ref old-state new-state]
+      (try
+        (when (not= old-state new-state)
+          (let [[old-only new-only] (clojure.data/diff old-state new-state)]
+            #p (keys old-only)
+            #p (keys new-only)))
+        (catch Exception e
+          (log/error e "Error in debug")))))
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (try
@@ -1282,39 +1298,6 @@
      mod-details)))
 
 
-(defn scale-minimap-image [minimap-width minimap-height minimap-image]
-  (when minimap-image
-    (let [^sun.awt.image.ToolkitImage scaled
-          (.getScaledInstance ^java.awt.Image minimap-image
-            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
-          _ (.getWidth scaled)
-          _ (.getHeight scaled)]
-      (.getBufferedImage scaled))))
-
-(defn minimap-dimensions [map-smf-header]
-  (let [{:keys [map-width map-height]} map-smf-header]
-    (when (and map-width)
-      (let [ratio-x (/ minimap-size map-width)
-            ratio-y (/ minimap-size map-height)
-            min-ratio (min ratio-x ratio-y)
-            normal-x (/ ratio-x min-ratio)
-            normal-y (/ ratio-y min-ratio)
-            invert-x (/ min-ratio ratio-x)
-            invert-y (/ min-ratio ratio-y)
-            convert-x (if (< ratio-y ratio-x) invert-x normal-x)
-            convert-y (if (< ratio-x ratio-y) invert-y normal-y)
-            minimap-width (* minimap-size convert-x)
-            minimap-height (* minimap-size convert-y)]
-        {:minimap-width minimap-width
-         :minimap-height minimap-height}))))
-
-
-(defn scaled-minimap-image [{:keys [header minimap-image]}]
-  (when minimap-image
-    (let [{:keys [minimap-width minimap-height] :or {minimap-width minimap-size
-                                                     minimap-height minimap-size}} (minimap-dimensions header)]
-      (scale-minimap-image minimap-width minimap-height minimap-image))))
-
 (defn update-cached-minimaps
   ([maps]
    (update-cached-minimaps maps nil))
@@ -1332,8 +1315,8 @@
          (do
            (log/info "Caching minimap for" map-file)
            (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
-             (when-let [minimap-image (scaled-minimap-image smf)]
-               (fs/write-image-png minimap-image (fs/minimap-image-cache-file map-name)))))
+             (when-let [minimap-image-scaled (:minimap-image-scaled smf)]
+               (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
          (log/error "Map is missing file" (:map-name map-details)))))))
 
 (defn reconcile-maps
@@ -4520,14 +4503,14 @@
 (defn minimap-pane
   [{:keys [am-host battle-details drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags]}]
   (let [{:keys [smf]} map-details
-        {:keys [minimap-width minimap-height] :or {minimap-width minimap-size minimap-height minimap-size}} (minimap-dimensions (:header smf))
+        {:keys [minimap-height minimap-width] :or {minimap-height smf/minimap-size minimap-width smf/minimap-size}} smf
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
                         "heightmap" (:heightmap-image smf)
                         ; else
-                        (scale-minimap-image minimap-width minimap-height (:minimap-image smf)))
+                        (:minimap-image-scaled smf))
         startpostype (->> scripttags
                           :game
                           :startpostype
@@ -6096,8 +6079,7 @@
 
 (defmethod event-handler ::http-download
   [{:keys [dest url]}]
-  (swap! *state assoc-in [:http-download url] {:running true
-                                               :message "Preparing to download..."})
+  (swap! *state assoc-in [:http-download url] {:running true})
   (log/info "Request to download" url "to" dest)
   (future
     (try
@@ -6123,16 +6105,17 @@
                   (when (pos? size)
                     (.write output buffer 0 size)
                     (when counter
-                      (let [current (.getByteCount counter)
-                            msg (with-out-str
-                                  (print-progress-bar
-                                    current
-                                    length))]
-                        (swap! *state update-in [:http-download url]
-                               merge
-                               {:current current
-                                :total length
-                                :message msg}))) ; TODO is message really required?
+                      (try
+                        (dh/with-rate-limiter {:ratelimiter limit-download-status
+                                               :max-wait-ms 0}
+                          (let [current (.getByteCount counter)]
+                            (swap! *state update-in [:http-download url]
+                                   merge
+                                   {:current current
+                                    :total length})))
+                        (catch Exception e
+                          (when-not (:throttled (ex-data e))
+                            (log/warn e "Error updating download status")))))
                     (recur))))))))
       (catch Exception e
         (log/error e "Error downloading" url "to" dest)
@@ -6645,8 +6628,8 @@
   [{:keys [download-filter download-type download-source-name downloadables-by-url file-cache
            http-download show-downloader show-stale spring-isolation-dir]}]
   (let [download-source (->> download-sources
-                             (filter (comp #{download-source-name} :download-source-name))
-                             first)
+                         (filter (comp #{download-source-name} :download-source-name))
+                         first)
         now (u/curr-millis)
         downloadables (->> (or (vals downloadables-by-url) [])
                            (filter :resource-type)
@@ -8692,7 +8675,8 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
-    {:chimers [low-tasks-chimer high-tasks-chimer update-channels-chimer check-app-update-chimer]}))
+    {:chimers [low-tasks-chimer high-tasks-chimer
+               update-channels-chimer check-app-update-chimer]}))
 
 (defn init-async [state-atom]
   (future
