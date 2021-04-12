@@ -169,18 +169,16 @@
 (defn update-console-log [state-atom source message]
   (swap! state-atom update :console-log
     (fn [console-log]
-      (take max-messages
-        (conj console-log {:timestamp (curr-millis)
-                           :source source
-                           :message message})))))
+      (conj console-log {:timestamp (curr-millis)
+                         :source source
+                         :message message}))))
 
 (defn update-chat-messages-fn
   ([username message]
    (update-chat-messages-fn username message false))
   ([username message ex]
    (fn [messages]
-     (take max-messages
-       (conj messages {:text message
-                       :timestamp (curr-millis)
-                       :username username
-                       :ex ex})))))
+     (conj messages {:text message
+                     :timestamp (curr-millis)
+                     :username username
+                     :ex ex}))))
