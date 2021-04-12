@@ -8,7 +8,7 @@
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
     (java.net URL)
-    (java.net URLDecoder)
+    (java.net URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.util.jar Manifest)
     (org.apache.commons.io FileUtils)))
@@ -159,3 +159,8 @@
          (fn [i [_k v]]
            [(str i) {:name v}]))
        (into {})))
+
+; https://github.com/cemerick/url/blob/master/src/cemerick/url.cljx
+(defn url-encode
+  [string]
+  (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))

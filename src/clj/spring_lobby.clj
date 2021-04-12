@@ -4940,7 +4940,7 @@
                    :importable importable
                    :spring-isolation-dir spring-isolation-dir}})}]))))}))
 
-(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir update-mods]}]
+(defn battle-mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir springfiles-urls update-mods]}]
   (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
         canonical-path (fs/canonical-path mod-file)
@@ -4976,23 +4976,39 @@
                  download-url (:download-url downloadable)
                  in-progress (-> http-download (get download-url) :running)
                  {:keys [download-source-name download-url]} downloadable
-                 file-exists (file-exists? file-cache (resource-dest spring-isolation-dir downloadable))]
-             [{:severity (if file-exists -1 2)
-               :text "download"
-               :human-text (if no-mod-details
-                             (if downloadable
-                               (str "Download from " download-source-name)
-                               (str "No download for " battle-modname))
-                             (:mod-name battle-mod-details))
-               :in-progress in-progress
-               :tooltip (if downloadable
-                          (str "Download from " download-source-name " at " download-url)
-                          (str "No http download found for " battle-modname))
-               :action
-               (when downloadable
-                 {:event/type ::http-downloadable
-                  :downloadable downloadable
-                  :spring-isolation-dir spring-isolation-dir})}])
+                 file-exists (file-exists? file-cache (resource-dest spring-isolation-dir downloadable))
+                 springfiles-url (get springfiles-urls battle-modname)
+                 springfiles-download (get http-download springfiles-url)
+                 springfiles-in-progress (:running springfiles-download)]
+             (if downloadable
+               [{:severity (if file-exists -1 2)
+                 :text "download"
+                 :human-text (if no-mod-details
+                               (if downloadable
+                                 (str "Download from " download-source-name)
+                                 (str "No download for " battle-modname))
+                               (:mod-name battle-mod-details))
+                 :in-progress in-progress
+                 :tooltip (if downloadable
+                            (str "Download from " download-source-name " at " download-url)
+                            (str "No http download found for " battle-modname))
+                 :action
+                 (when downloadable
+                   {:event/type ::http-downloadable
+                    :downloadable downloadable
+                    :spring-isolation-dir spring-isolation-dir})}]
+               [{:severity 2
+                 :text "download"
+                 :human-text (if springfiles-in-progress
+                               (download-progress springfiles-download)
+                               "Download from springfiles")
+                 :in-progress springfiles-in-progress
+                 :action
+                 {:event/type ::add-task
+                  :task
+                  {::task-type ::download-springfiles
+                   :springname battle-modname
+                   :spring-isolation-dir spring-isolation-dir}}}]))
            (let [rapid-data (get rapid-data-by-version battle-modname)
                  rapid-id (:id rapid-data)
                  {:keys [running] :as rapid-download} (get rapid-download rapid-id)
@@ -5194,7 +5210,7 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
    :map-input-prefix :maps :message-drafts :minimap-type :mod-filter :mods :parsed-replays-by-path :rapid-data-by-version
-   :rapid-download :rapid-update :spring-isolation-dir :tasks :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :tasks :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-map-details battle-mod-details battle-players-color-allyteam bot-name bot-username bot-version
@@ -5428,7 +5444,7 @@
                         :battle-modname battle-modname
                         :engine-details engine-details
                         :engine-file engine-file}
-                       (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :update-mods]))
+                       (select-keys state [:battle-mod-details :copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :update-mods]))
                      (merge
                        {:fx/type battle-map-sync-pane
                         :battle-map battle-map
@@ -6160,6 +6176,28 @@
                        :resource-type ::replay}
         :spring-isolation-dir spring-isolation-dir})
     (add-task! *state {::task-type ::refresh-replays})))
+
+(defmethod task-handler ::download-springfiles
+  [{:keys [springname spring-isolation-dir]}]
+  (log/info "Searching springfiles for" springname)
+  (let [result (->> (clj-http/get "https://api.springfiles.com/json.php"
+                      {:query-params {:springname springname}
+                       :as :json})
+                    :body
+                    first)]
+    (if result
+      (if-let [mirror (-> result :mirrors first)]
+        (do
+          (swap! *state assoc-in [:springfiles-urls springname] mirror)
+          (log/info "Found details for" springname "on springfiles" result)
+          @(download-http-resource
+             {:downloadable {:download-url mirror
+                             :resource-filename (:filename result)
+                             :resource-type ::mod} ; TODO other types?
+              :spring-isolation-dir spring-isolation-dir})
+          (add-task! *state {::task-type ::reconcile-mods}))
+        (log/info "No mirror to download" springname "on springfiles" result))
+      (log/info "No result for" springname "on springfiles"))))
 
 
 (defmethod event-handler ::extract-7z
