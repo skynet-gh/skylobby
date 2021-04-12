@@ -199,7 +199,9 @@
             :engineoptions (try-inner-lua f "engineoptions.lua")
             :luaai (try-inner-lua f "luaai.lua")
             :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
-                          (try-inner-script f "gamedata/sidedata.tdf"))}))))))
+                          (try-inner-script f "gamedata/sidedata.tdf")
+                          (u/postprocess-byar-units-en
+                            (try-inner-lua f "language/units_en.lua")))}))))))
 
 (defn copy-package [source-sdp-file dest-spring-root]
   (log/info "Copying rapid package from" source-sdp-file "into" dest-spring-root)

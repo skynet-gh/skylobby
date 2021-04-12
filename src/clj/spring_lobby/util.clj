@@ -148,3 +148,14 @@
 
 (defn user-channel [username]
   (str "@" username))
+
+
+(defn postprocess-byar-units-en [language-units-en]
+  (->> language-units-en
+       :en
+       :units
+       :factions
+       (map-indexed
+         (fn [i [_k v]]
+           [(str i) {:name v}]))
+       (into {})))

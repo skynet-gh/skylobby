@@ -521,7 +521,13 @@
                              (when-let [slurped (slurp-zip-entry zf entries filename)]
                                (lua/read-modinfo slurped))
                              (catch Exception e
-                               (log/warn e "Error loading" filename "from" file))))]
+                               (log/warn e "Error loading" filename "from" file))))
+           try-entry-script (fn [filename]
+                              (try
+                                (when-let [slurped (slurp-zip-entry zf entries filename)]
+                                  (spring-script/parse-script slurped))
+                                (catch Exception e
+                                  (log/warn e "Error loading" filename "from" file))))]
        (merge
          {:file file
           :modinfo (try-entry-lua "modinfo.lua")
@@ -531,7 +537,9 @@
             :engineoptions (try-entry-lua "engineoptions.lua")
             :luaai (try-entry-lua "luaai.lua")
             :sidedata (or (try-entry-lua "gamedata/sidedata.lua")
-                          (try-entry-lua "gamedata/sidedata.tdf"))}))))))
+                          (try-entry-script "gamedata/sidedata.tdf")
+                          (u/postprocess-byar-units-en
+                            (try-entry-lua "language/units_en.lua")))}))))))
 
 (defn read-mod-directory
   ([^java.io.File file]
