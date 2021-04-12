@@ -290,12 +290,7 @@
 
 
 (defn send-message [client message]
-  (swap! *state update :console-log
-    (fn [console-log]
-      (take u/max-messages
-        (conj console-log {:timestamp (u/curr-millis)
-                           :source :client
-                           :message message}))))
+  (u/update-console-log *state :client message)
   (message/send-message client message))
 
 (defn spit-app-edn
