@@ -211,6 +211,10 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
+(defn select-replays [state]
+  (select-keys state
+    [:bar-replays-page :online-bar-replays]))
+
 (def state-to-edn
   [{:select-fn select-config
     :filename "config.edn"
@@ -227,7 +231,9 @@
    {:select-fn select-importables
     :filename "importables.edn"}
    {:select-fn select-downloadables
-    :filename "downloadables.edn"}])
+    :filename "downloadables.edn"}
+   {:select-fn select-replays
+    :filename "replays.edn"}])
 
 (def default-server-port 8200)
 
@@ -486,13 +492,16 @@
     (fn [_k _ref old-state new-state]
       (try
         (let [old-selected-replay-file (:selected-replay-file old-state)
-              {:keys [parsed-replays-by-path selected-replay-file]} new-state
+              old-replay-id (:selected-replay-id old-state)
+              {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id]} new-state
 
               old-replay-path (fs/canonical-path old-selected-replay-file)
               new-replay-path (fs/canonical-path selected-replay-file)
 
-              old-replay (get parsed-replays-by-path old-replay-path)
-              new-replay (get parsed-replays-by-path new-replay-path)
+              old-replay (or (get parsed-replays-by-path old-replay-path)
+                             (get online-bar-replays old-replay-id))
+              new-replay (or (get parsed-replays-by-path new-replay-path)
+                             (get online-bar-replays selected-replay-id))
 
               old-game (-> old-replay :body :script-data :game)
               old-mod (:gametype old-game)
@@ -937,35 +946,32 @@
              (= (normalize-map map-name)
                 (normalize-map resource-filename))))))
 
+(defn replay-game-type [allyteam-counts]
+  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
+        num-allyteams (count allyteam-counts)]
+    (cond
+      (= 2 num-allyteams)
+      (if one-per-allyteam?
+        :duel
+        :team)
+      (< 2 num-allyteams)
+      (if one-per-allyteam?
+        :ffa
+        :teamffa)
+      :else
+      :invalid)))
+
 (defn replay-type-and-players [parsed-replay]
-  (let [allyteams (->> parsed-replay
-                       :body
-                       :script-data
-                       :game
-                       (filter (comp #(string/starts-with? % "allyteam") name first)))
-        num-allyteams (count allyteams)
-        teams (->> parsed-replay
+  (let [teams (->> parsed-replay
                    :body
                    :script-data
                    :game
                    (filter (comp #(string/starts-with? % "team") name first)))
         teams-by-allyteam (->> teams
                                (group-by (comp keyword (partial str "allyteam") :allyteam second)))
-        team-counts (sort (map (comp count second) teams-by-allyteam))
-        one-per-team? (= #{1} (set team-counts))
-        game-type (cond
-                    (= 2 num-allyteams)
-                    (if one-per-team?
-                      :duel
-                      :team)
-                    (< 2 num-allyteams)
-                    (if one-per-team?
-                      :ffa
-                      :teamffa)
-                    :else
-                    :invalid)]
-    {:game-type game-type
-     :player-counts team-counts}))
+        allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
+    {:game-type (replay-game-type allyteam-counts)
+     :player-counts allyteam-counts}))
 
 
 (defn replay-sources [{:keys [extra-replay-sources]}]
@@ -3836,6 +3842,7 @@
                 (rapid/sdp-file root filename)
                 (fs/mod-file root filename)))
       ::map (when filename (io/file (fs/map-file root filename)))
+      ::replay (when filename (io/file (fs/replays-dir root) filename))
       nil)))
 
 (defn import-resource [{:keys [importable spring-isolation-dir]}]
@@ -6141,6 +6148,19 @@
   [task]
   @(event-handler (assoc task :event/type ::http-downloadable)))
 
+(defmethod task-handler ::download-bar-replay
+  [{:keys [id spring-isolation-dir]}]
+  (log/info "Downloading replay id" id)
+  (let [{:keys [fileName]} (http/get-bar-replay-details {:id id})]
+    (log/info "Downloaded replay details for id" id ":" fileName)
+    (swap! *state assoc-in [:online-bar-replays id :filename] fileName)
+    @(download-http-resource
+       {:downloadable {:download-url (http/bar-replay-download-url fileName)
+                       :resource-filename fileName
+                       :resource-type ::replay}
+        :spring-isolation-dir spring-isolation-dir})
+    (add-task! *state {::task-type ::refresh-replays})))
+
 
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
@@ -7088,9 +7108,15 @@
           (cond-> state
             true
             (assoc :selected-replay-file (:file event))
-            (not= (:gametype replay-game) (:mod-name (:replay-mod-details state)))
+            (:id event)
+            (assoc :selected-replay-id (:id event))
+            (or (not (:gametype replay-game))
+                (not= (:gametype replay-game)
+                      (:mod-name (:replay-mod-details state))))
             (assoc :replay-mod-details nil)
-            (not= (:mapname replay-game) (:map-name (:replay-map-details state)))
+            (or (not (:gametype replay-game))
+                (not= (:mapname replay-game)
+                      (:map-name (:replay-map-details state))))
             (assoc :replay-map-details nil)))))))
 
 
@@ -7125,29 +7151,74 @@
   (when (seq coll)
     (reduce max 0 coll)))
 
+(defmethod task-handler ::download-bar-replays [{:keys [page]}]
+  (let [new-bar-replays (->> (http/get-bar-replays {:page page})
+                             (map
+                               (fn [r]
+                                 (let [player-counts (->> r
+                                                          :AllyTeams
+                                                          (map
+                                                            (fn [allyteam]
+                                                              (count (mapcat allyteam [:Players :AIs])))))
+                                       players (->> r
+                                                    :AllyTeams
+                                                    (mapcat
+                                                      (fn [allyteam]
+                                                        (map
+                                                          (fn [player]
+                                                            [(str "player" (:playerId player))
+                                                             {:ally (:allyTeamId allyteam)
+                                                              :username (:name player)}])
+                                                          (:Players allyteam))))
+                                                    (into {}))]
+                                   (-> r
+                                       (assoc :source-name "BAR Online")
+                                       (assoc :body {:script-data {:game (merge (:hostSettings r) players)}})
+                                       (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime r))) 1000)})
+                                       (assoc :player-counts player-counts)
+                                       (assoc :game-type (replay-game-type player-counts)))))))]
+    (swap! *state
+      (fn [state]
+        (-> state
+            (assoc :bar-replays-page page)
+            (update :online-bar-replays
+              (fn [online-bar-replays]
+                (into {}
+                  (concat
+                    online-bar-replays
+                    (map (juxt :id identity) new-bar-replays))))))))))
+
 
 (def replays-window-keys
-  [:battle-players-color-allyteam :copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
-   :filter-replay-type :http-download :maps :mods :on-close-request :parsed-replays-by-path :rapid-data-by-version :rapid-download
+  [:bar-replays-page :battle-players-color-allyteam :copying :current-tasks :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
+   :filter-replay-type :http-download :maps :mods :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :settings-button
+   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
    :show-replays :spring-isolation-dir :tasks :update-engines :update-maps :update-mods])
 
 (defn replays-window
-  [{:keys [battle-players-color-allyteam copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-type http-download maps mods on-close-request parsed-replays-by-path rapid-data-by-version rapid-download
+  [{:keys [bar-replays-page battle-players-color-allyteam copying current-tasks engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
+           filter-replay-type http-download maps mods on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file settings-button
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id settings-button
            show-replays spring-isolation-dir tasks title update-engines update-maps update-mods]}]
-  (let [
-        parsed-replays (->> parsed-replays-by-path
-                            vals
-                            (sort-by (comp str :unix-time :header))
-                            reverse
-                            doall)
-        replay-types (set (map :game-type parsed-replays))
-        num-players (->> parsed-replays
+  (let [local-filenames (->> parsed-replays-by-path
+                             vals
+                             (map :filename)
+                             (filter some?)
+                             set)
+        online-only-replays (->> online-bar-replays
+                                 vals
+                                 (remove (comp local-filenames :filename)))
+        all-replays (->> parsed-replays-by-path
+                         vals
+                         (concat online-only-replays)
+                         (sort-by (comp str :unix-time :header))
+                         reverse
+                         doall)
+        replay-types (set (map :game-type all-replays))
+        num-players (->> all-replays
                          (map replay-player-count)
                          set
                          sort)
@@ -7157,7 +7228,7 @@
         includes-term? (fn [s term]
                          (let [lc (string/lower-case (or s ""))]
                            (string/includes? lc term)))
-        replays (->> parsed-replays
+        replays (->> all-replays
                      (filter
                        (fn [replay]
                          (if filter-replay-type
@@ -7200,7 +7271,8 @@
                                                         (map (comp sanitize-replay-filter :name second)))]
                                    (some #(includes-term? % term) players))))
                              filter-terms)))))
-        selected-replay (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
+        selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
+                            (get online-bar-replays selected-replay-id))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         mods-by-version (into {} (map (juxt :mod-name identity) mods))
         maps-by-version (into {} (map (juxt :map-name identity) maps))
@@ -7219,6 +7291,11 @@
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
         refresh-tasks (filter (comp #{::refresh-replays} ::task-type) all-tasks)
+        index-downloads-tasks (filter (comp #{::download-bar-replays} ::task-type) all-tasks)
+        download-tasks (->> all-tasks
+                            (filter (comp #{::download-bar-replay} ::task-type))
+                            (map :id)
+                            set)
         {:keys [width height]} (screen-bounds)
         time-zone-id (.toZoneId (TimeZone/getDefault))]
     {:fx/type :stage
@@ -7385,6 +7462,26 @@
                  :graphic
                  {:fx/type font-icon/lifecycle
                   :icon-literal "mdi-refresh:16:white"}})]
+            (let [downloading (boolean (seq index-downloads-tasks))
+                  next-page ((fnil inc 0) (u/to-number bar-replays-page))]
+              [{:fx/type :button
+                :text (if downloading
+                        " Getting Online BAR Replays... "
+                        " Get Online BAR Replays")
+                :on-action {:event/type ::add-task
+                            :task {::task-type ::download-bar-replays
+                                   :page next-page}}
+                :disable downloading
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-download:16:white"}}
+               {:fx/type :label
+                :text " Page: "}
+               {:fx/type :text-field
+                :text (str bar-replays-page)
+                :style {:-fx-max-width 56}
+                :on-text-changed {:event/type ::assoc
+                                  :key :bar-replays-page}}])
             (when settings-button
               [{:fx/type :pane
                 :h-box/hgrow :always}
@@ -7395,8 +7492,8 @@
                 :graphic
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-settings:16:white"}}]))}
-          (if parsed-replays
-            (if (empty? parsed-replays)
+          (if all-replays
+            (if (empty? all-replays)
               {:fx/type :label
                :style {:-fx-font-size 24}
                :text " No replays"}
@@ -7575,6 +7672,25 @@
                           {:text ""
                            :graphic
                            (cond
+                             (:id i) ; BAR online replay
+                             (let [fileName (:fileName i)
+                                   download-url (when fileName (http/bar-replay-download-url fileName))
+                                   {:keys [running] :as download} (get http-download download-url)
+                                   in-progress (or running
+                                                   (contains? download-tasks (:id i)))]
+                               {:fx/type :button
+                                :text
+                                (if in-progress
+                                  (str (download-progress download))
+                                  " Download replay")
+                                :disable (boolean in-progress)
+                                :on-action {:event/type ::add-task
+                                            :task {::task-type ::download-bar-replay
+                                                   :id (:id i)
+                                                   :spring-isolation-dir spring-isolation-dir}}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-download:16:white"}})
                              (and matching-engine matching-mod matching-map)
                              {:fx/type :button
                               :text " Watch"
