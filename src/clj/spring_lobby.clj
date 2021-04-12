@@ -264,7 +264,7 @@
        (take 8)
        (map (fn [i] (str i "v" i)))
        (concat ["ffa"])
-       (map (juxt identity (constantly {})))
+       (map-indexed (fn [i n] [i {:queue-name n}]))
        (into {})))
 
 (defn initial-state []
@@ -8515,7 +8515,7 @@
          :columns
          [{:fx/type :table-column
            :text "Queue"
-           :cell-value-factory first
+           :cell-value-factory (comp :queue-name second)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe (fn [queue-name] {:text (str queue-name)})}}
@@ -8537,7 +8537,7 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [[queue-name {:keys [am-in ready-check]}]]
+            (fn [[queue-id {:keys [am-in ready-check]}]]
               {:text ""
                :graphic
                {:fx/type :h-box
@@ -8557,16 +8557,16 @@
                             (if am-in
                               "c.matchmaking.leave_queue"
                               "c.matchmaking.join_queue")
-                            " " queue-name)))
+                            " " queue-id)))
                       (when ready-check
-                        (swap! *state assoc-in [:matchmaking-queues queue-name :ready-check] false)))}]
+                        (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false)))}]
                   (when ready-check
                     [{:fx/type :button
                       :text "Decline"
                       :on-action
                       (fn [_e]
                         (send-message client "c.matchmaking.decline")
-                        (swap! *state assoc-in [:matchmaking-queues queue-name :ready-check] false))}]))}})}}]}]}
+                        (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))}]))}})}}]}]}
       {:fx/type :pane})}})
 
 (defn root-view
