@@ -7253,23 +7253,28 @@
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
                              (map process-bar-replay))]
-    (swap! *state
-      (fn [state]
-        (-> state
-            (assoc :bar-replays-page page)
-            (update :online-bar-replays
-              (fn [online-bar-replays]
-                (u/deep-merge
-                  online-bar-replays
-                  (into {}
-                    (map
-                      (juxt :id identity)
-                      new-bar-replays))))))))))
+    (log/info "Got" (count new-bar-replays) "BAR replays from page" page)
+    (let [[before after] (swap-vals! *state
+                           (fn [state]
+                             (-> state
+                                 (assoc :bar-replays-page ((fnil inc 0) (int (u/to-number page))))
+                                 (update :online-bar-replays
+                                   (fn [online-bar-replays]
+                                     (u/deep-merge
+                                       online-bar-replays
+                                       (into {}
+                                         (map
+                                           (juxt :id identity)
+                                           new-bar-replays))))))))
+          new-count (- (count (:online-bar-replays after))
+                       (count (:online-bar-replays before)))]
+      (log/info "Got" new-count "new online replays")
+      (swap! *state assoc :new-online-replays-count new-count))))
 
 
 (def replays-window-keys
   [:bar-replays-page :battle-players-color-allyteam :copying :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
-   :filter-replay-type :http-download :maps :mods :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :filter-replay-type :http-download :maps :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
@@ -7277,7 +7282,7 @@
 
 (defn replays-window
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-type http-download maps mods on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
+           filter-replay-type http-download maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id settings-button
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
@@ -7538,14 +7543,14 @@
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-refresh:16:white"}})]
               (let [downloading (boolean (seq index-downloads-tasks))
-                    next-page ((fnil inc 0) (u/to-number bar-replays-page))]
+                    page (u/to-number bar-replays-page)]
                 [{:fx/type :button
                   :text (if downloading
                           " Getting Online BAR Replays... "
                           " Get Online BAR Replays")
                   :on-action {:event/type ::add-task
                               :task {::task-type ::download-bar-replays
-                                     :page next-page}}
+                                     :page page}}
                   :disable downloading
                   :graphic
                   {:fx/type font-icon/lifecycle
@@ -7553,10 +7558,13 @@
                  {:fx/type :label
                   :text " Page: "}
                  {:fx/type :text-field
-                  :text (str bar-replays-page)
+                  :text (str page)
                   :style {:-fx-max-width 56}
                   :on-text-changed {:event/type ::assoc
-                                    :key :bar-replays-page}}])
+                                    :key :bar-replays-page}}
+                 {:fx/type :label
+                  :text (str (when new-online-replays-count
+                               (str " Got " new-online-replays-count " new")))}])
               (when settings-button
                 [{:fx/type :pane
                   :h-box/hgrow :always}
