@@ -7211,42 +7211,60 @@
   (when (seq coll)
     (reduce max 0 coll)))
 
+(defn process-bar-replay [replay]
+  (let [player-counts (->> replay
+                           :AllyTeams
+                           (map
+                             (fn [allyteam]
+                               (count (mapcat allyteam [:Players :AIs])))))
+        teams (->> replay
+                   :AllyTeams
+                   (mapcat
+                     (fn [allyteam]
+                       (map
+                         (fn [player]
+                           [(str "team" (:playerId player))
+                            {:team (:playerId player)
+                             :allyteam (:allyTeamId allyteam)}])
+                         (:Players allyteam)))))
+        players (->> replay
+                     :AllyTeams
+                     (mapcat
+                       (fn [allyteam]
+                         (map
+                           (fn [{:keys [playerId] :as player}]
+                             [(str "player" playerId)
+                              {:team playerId
+                               :username (:name player)}])
+                           (:Players allyteam)))))
+        spectators (->> replay
+                        :Spectators
+                        (map (fn [{:keys [playerId] :as spec}]
+                               [(str "player" playerId)
+                                {:username (:name spec)
+                                 :spectator 1}])))]
+    (-> replay
+        (assoc :source-name "BAR Online")
+        (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
+        (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
+        (assoc :player-counts player-counts)
+        (assoc :game-type (replay-game-type player-counts)))))
+
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
-                             (map
-                               (fn [r]
-                                 (let [player-counts (->> r
-                                                          :AllyTeams
-                                                          (map
-                                                            (fn [allyteam]
-                                                              (count (mapcat allyteam [:Players :AIs])))))
-                                       players (->> r
-                                                    :AllyTeams
-                                                    (mapcat
-                                                      (fn [allyteam]
-                                                        (map
-                                                          (fn [player]
-                                                            [(str "player" (:playerId player))
-                                                             {:ally (:allyTeamId allyteam)
-                                                              :username (:name player)}])
-                                                          (:Players allyteam))))
-                                                    (into {}))]
-                                   (-> r
-                                       (assoc :source-name "BAR Online")
-                                       (assoc :body {:script-data {:game (merge (:hostSettings r) players)}})
-                                       (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime r))) 1000)})
-                                       (assoc :player-counts player-counts)
-                                       (assoc :game-type (replay-game-type player-counts)))))))]
+                             (map process-bar-replay))]
     (swap! *state
       (fn [state]
         (-> state
             (assoc :bar-replays-page page)
             (update :online-bar-replays
               (fn [online-bar-replays]
-                (into {}
-                  (concat
-                    online-bar-replays
-                    (map (juxt :id identity) new-bar-replays))))))))))
+                (u/deep-merge
+                  online-bar-replays
+                  (into {}
+                    (map
+                      (juxt :id identity)
+                      new-bar-replays))))))))))
 
 
 (def replays-window-keys
@@ -8575,10 +8593,8 @@
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)
-        all-tasks (concat tasks (vals current-tasks))
-        tasks-by-type (->> all-tasks
-                           (map (juxt ::task-type identity))
-                           (into {}))]
+        all-tasks (filter some? (concat tasks (vals current-tasks)))
+        tasks-by-type (group-by ::task-type all-tasks)]
     {:fx/type fx/ext-many
      :desc
      [{:fx/type :stage
@@ -8694,7 +8710,8 @@
         {:fx/type rapid-download-window}
         (select-keys state rapid-download-window-keys))
       (merge
-        {:fx/type replays-window}
+        {:fx/type replays-window
+         :tasks-by-type tasks-by-type}
         (select-keys state replays-window-keys))
       (merge
         {:fx/type matchmaking-window}
