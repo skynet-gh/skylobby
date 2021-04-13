@@ -7300,7 +7300,7 @@
 
 
 (def replays-window-keys
-  [:bar-replays-page :battle-players-color-allyteam :copying :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
+  [:bar-replays-page :battle-players-color-allyteam :copying :engines :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill :filter-replay-source
    :filter-replay-type :http-download :maps :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
@@ -7308,7 +7308,7 @@
    :show-replays :spring-isolation-dir :update-engines :update-maps :update-mods])
 
 (defn replays-window
-  [{:keys [bar-replays-page battle-players-color-allyteam copying engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
+  [{:keys [bar-replays-page battle-players-color-allyteam copying engines extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
            filter-replay-type http-download maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
@@ -7339,6 +7339,11 @@
                          (let [lc (string/lower-case (or s ""))]
                            (string/includes? lc term)))
         replays (->> all-replays
+                     (filter
+                       (fn [replay]
+                         (if filter-replay-source
+                           (= filter-replay-source (:source-name replay))
+                           true)))
                      (filter
                        (fn [replay]
                          (if filter-replay-type
@@ -7403,7 +7408,8 @@
                             (map :id)
                             set)
         {:keys [width height]} (screen-bounds)
-        time-zone-id (.toZoneId (TimeZone/getDefault))]
+        time-zone-id (.toZoneId (TimeZone/getDefault))
+        sources (replay-sources {:extra-replay-sources extra-replay-sources})]
     {:fx/type :stage
      :showing (boolean show-replays)
      :title (or title (str u/app-name " Replays"))
@@ -7426,181 +7432,211 @@
          :children
          (concat
            [{:fx/type :h-box
-             :alignment :center-left
+             :alignment :top-left
              :style {:-fx-font-size 16}
              :children
-             (concat
-               [{:fx/type :label
-                 :text " Filter: "}
-                {:fx/type :text-field
-                 :style {:-fx-min-width 500}
-                 :text (str filter-replay)
-                 :prompt-text "Filter by filename, engine, map, game, player"
-                 :on-text-changed {:event/type ::assoc
-                                   :key :filter-replay}}]
-               (when-not (string/blank? filter-replay)
-                 [{:fx/type fx.ext.node/with-tooltip-props
-                   :props
-                   {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
-                     :text "Clear filter"}}
-                   :desc
-                   {:fx/type :button
-                    :on-action {:event/type ::dissoc
-                                :key :filter-replay}
+             [
+              {:fx/type :flow-pane
+               :h-box/hgrow :always
+               :style {:-fx-pref-width 200}
+               :children
+               (concat
+                 [{:fx/type :label
+                   :text " Filter: "}
+                  {:fx/type :text-field
+                   :style {:-fx-min-width 400}
+                   :text (str filter-replay)
+                   :prompt-text "Filter by filename, engine, map, game, player"
+                   :on-text-changed {:event/type ::assoc
+                                     :key :filter-replay}}]
+                 (when-not (string/blank? filter-replay)
+                   [{:fx/type fx.ext.node/with-tooltip-props
+                     :props
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :text "Clear filter"}}
+                     :desc
+                     {:fx/type :button
+                      :on-action {:event/type ::dissoc
+                                  :key :filter-replay}
+                      :graphic
+                      {:fx/type font-icon/lifecycle
+                       :icon-literal "mdi-close:16:white"}}}])
+                 [{:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   [
+                    {:fx/type :label
+                     :text " Filter specs:"}
+                    {:fx/type :check-box
+                     :selected (boolean replays-filter-specs)
+                     :h-box/margin 8
+                     :on-selected-changed {:event/type ::assoc
+                                           :key :replays-filter-specs}}]}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text " Source: "}
+                      {:fx/type :combo-box
+                       :value filter-replay-source
+                       :on-value-changed {:event/type ::assoc
+                                          :key :filter-replay-source}
+                       :items (concat [nil] (sort (map :replay-source-name sources)))}]
+                     (when filter-replay-source
+                       [{:fx/type fx.ext.node/with-tooltip-props
+                         :props
+                         {:tooltip
+                          {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text "Clear source"}}
+                         :desc
+                         {:fx/type :button
+                          :on-action {:event/type ::dissoc
+                                      :key :filter-replay-source}
+                          :graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-close:16:white"}}}]))}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text " Type: "}
+                      {:fx/type :combo-box
+                       :value filter-replay-type
+                       :on-value-changed {:event/type ::assoc
+                                          :key :filter-replay-type}
+                       :items (concat [nil] replay-types)}]
+                     (when filter-replay-type
+                       [{:fx/type fx.ext.node/with-tooltip-props
+                         :props
+                         {:tooltip
+                          {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text "Clear type"}}
+                         :desc
+                         {:fx/type :button
+                          :on-action {:event/type ::dissoc
+                                      :key :filter-replay-type}
+                          :graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-close:16:white"}}}]))}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text " Min Players: "}
+                      {:fx/type :combo-box
+                       :value filter-replay-min-players
+                       :on-value-changed {:event/type ::assoc
+                                          :key :filter-replay-min-players}
+                       :items (concat [nil] num-players)}]
+                     (when filter-replay-min-players
+                       [{:fx/type fx.ext.node/with-tooltip-props
+                         :props
+                         {:tooltip
+                          {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text "Clear min players"}}
+                         :desc
+                         {:fx/type :button
+                          :on-action {:event/type ::dissoc
+                                      :key :filter-replay-min-players}
+                          :graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-close:16:white"}}}]))}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text " Max Players: "}
+                      {:fx/type :combo-box
+                       :value filter-replay-max-players
+                       :on-value-changed {:event/type ::assoc
+                                          :key :filter-replay-max-players}
+                       :items (concat [nil] num-players)}]
+                     [{:fx/type :label
+                       :text " Min Avg Skill: "}
+                      {:fx/type :text-field
+                       :style {:-fx-max-width 60}
+                       :text-formatter
+                       {:fx/type :text-formatter
+                        :value-converter :integer
+                        :value (int (or filter-replay-min-skill 0))
+                        :on-value-changed {:event/type ::assoc
+                                           :key :filter-replay-min-skill}}}]
+                     (when filter-replay-max-players
+                       [{:fx/type fx.ext.node/with-tooltip-props
+                         :props
+                         {:tooltip
+                          {:fx/type :tooltip
+                           :show-delay [10 :ms]
+                           :text "Clear max players"}}
+                         :desc
+                         {:fx/type :button
+                          :on-action {:event/type ::dissoc
+                                      :key :filter-replay-max-players}
+                          :graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-close:16:white"}}}]))}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   [{:fx/type :check-box
+                     :selected (boolean replays-window-details)
+                     :h-box/margin 8
+                     :on-selected-changed {:event/type ::assoc
+                                           :key :replays-window-details}}
+                    {:fx/type :label
+                     :text "Detailed table "}]}
+                  (let [refreshing (boolean (seq refresh-tasks))]
+                    {:fx/type :button
+                     :text (if refreshing
+                             " Refreshing... "
+                             " Refresh ")
+                     :on-action {:event/type ::add-task
+                                 :task {::task-type ::refresh-replays}}
+                     :disable refreshing
+                     :graphic
+                     {:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-refresh:16:white"}})]
+                (let [downloading (boolean (seq index-downloads-tasks))
+                      page (u/to-number bar-replays-page)]
+                  [{:fx/type :button
+                    :text (if downloading
+                            " Getting Online BAR Replays... "
+                            " Get Online BAR Replays")
+                    :on-action {:event/type ::add-task
+                                :task {::task-type ::download-bar-replays
+                                       :page page}}
+                    :disable downloading
                     :graphic
                     {:fx/type font-icon/lifecycle
-                     :icon-literal "mdi-close:16:white"}}}])
-               [{:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type :label
-                   :text " Filter specs:"}
-                  {:fx/type :check-box
-                   :selected (boolean replays-filter-specs)
-                   :h-box/margin 8
-                   :on-selected-changed {:event/type ::assoc
-                                         :key :replays-filter-specs}}]}
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 (concat
-                   [{:fx/type :label
-                     :text " Type: "}
-                    {:fx/type :combo-box
-                     :value filter-replay-type
-                     :on-value-changed {:event/type ::assoc
-                                        :key :filter-replay-type}
-                     :items (concat [nil] replay-types)}]
-                   (when filter-replay-type
-                     [{:fx/type fx.ext.node/with-tooltip-props
-                       :props
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text "Clear type"}}
-                       :desc
-                       {:fx/type :button
-                        :on-action {:event/type ::dissoc
-                                    :key :filter-replay-type}
-                        :graphic
-                        {:fx/type font-icon/lifecycle
-                         :icon-literal "mdi-close:16:white"}}}]))}
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 (concat
-                   [{:fx/type :label
-                     :text " Min Players: "}
-                    {:fx/type :combo-box
-                     :value filter-replay-min-players
-                     :on-value-changed {:event/type ::assoc
-                                        :key :filter-replay-min-players}
-                     :items (concat [nil] num-players)}]
-                   (when filter-replay-min-players
-                     [{:fx/type fx.ext.node/with-tooltip-props
-                       :props
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text "Clear min players"}}
-                       :desc
-                       {:fx/type :button
-                        :on-action {:event/type ::dissoc
-                                    :key :filter-replay-min-players}
-                        :graphic
-                        {:fx/type font-icon/lifecycle
-                         :icon-literal "mdi-close:16:white"}}}]))}
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 (concat
-                   [{:fx/type :label
-                     :text " Max Players: "}
-                    {:fx/type :combo-box
-                     :value filter-replay-max-players
-                     :on-value-changed {:event/type ::assoc
-                                        :key :filter-replay-max-players}
-                     :items (concat [nil] num-players)}]
-                   [{:fx/type :label
-                     :text " Min Avg Skill: "}
-                    {:fx/type :text-field
-                     :style {:-fx-max-width 60}
-                     :text-formatter
-                     {:fx/type :text-formatter
-                      :value-converter :integer
-                      :value (int (or filter-replay-min-skill 0))
-                      :on-value-changed {:event/type ::assoc
-                                         :key :filter-replay-min-skill}}}]
-                   (when filter-replay-max-players
-                     [{:fx/type fx.ext.node/with-tooltip-props
-                       :props
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text "Clear max players"}}
-                       :desc
-                       {:fx/type :button
-                        :on-action {:event/type ::dissoc
-                                    :key :filter-replay-max-players}
-                        :graphic
-                        {:fx/type font-icon/lifecycle
-                         :icon-literal "mdi-close:16:white"}}}]))}
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [{:fx/type :check-box
-                   :selected (boolean replays-window-details)
-                   :h-box/margin 8
-                   :on-selected-changed {:event/type ::assoc
-                                         :key :replays-window-details}}
-                  {:fx/type :label
-                   :text "Detailed table "}]}
-                (let [refreshing (boolean (seq refresh-tasks))]
-                  {:fx/type :button
-                   :text (if refreshing
-                           " Refreshing... "
-                           " Refresh ")
-                   :on-action {:event/type ::add-task
-                               :task {::task-type ::refresh-replays}}
-                   :disable refreshing
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-refresh:16:white"}})]
-              (let [downloading (boolean (seq index-downloads-tasks))
-                    page (u/to-number bar-replays-page)]
-                [{:fx/type :button
-                  :text (if downloading
-                          " Getting Online BAR Replays... "
-                          " Get Online BAR Replays")
-                  :on-action {:event/type ::add-task
-                              :task {::task-type ::download-bar-replays
-                                     :page page}}
-                  :disable downloading
-                  :graphic
-                  {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-download:16:white"}}
-                 {:fx/type :label
-                  :text " Page: "}
-                 {:fx/type :text-field
-                  :text (str page)
-                  :style {:-fx-max-width 56}
-                  :on-text-changed {:event/type ::assoc
-                                    :key :bar-replays-page}}
-                 {:fx/type :label
-                  :text (str (when new-online-replays-count
-                               (str " Got " new-online-replays-count " new")))}])
-              [{:fx/type :pane
-                :h-box/hgrow :always}
-               {:fx/type :button
-                :text "Settings"
-                :on-action {:event/type ::toggle
-                            :key :show-settings-window}
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-settings:16:white"}}])}
+                     :icon-literal "mdi-download:16:white"}}
+                   {:fx/type :label
+                    :text " Page: "}
+                   {:fx/type :text-field
+                    :text (str page)
+                    :style {:-fx-max-width 56}
+                    :on-text-changed {:event/type ::assoc
+                                      :key :bar-replays-page}}
+                   {:fx/type :label
+                    :text (str (when new-online-replays-count
+                                 (str " Got " new-online-replays-count " new")))}]))}
+              {:fx/type :pane
+               :h-box/hgrow :sometimes}
+              {:fx/type :button
+               :text "Settings"
+               :on-action {:event/type ::toggle
+                           :key :show-settings-window}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-settings:16:white"}}]}
             (if all-replays
               (if (empty? all-replays)
                 {:fx/type :label

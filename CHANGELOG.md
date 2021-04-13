@@ -12,6 +12,15 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.2.15]
+
+- Add filtering by replay source
+
+### [0.2.14]
+
+- Improve feedback for downloading replays
+- Add recursive replay sources
+
 ### [0.2.13]
 
 - Greatly improved performance
