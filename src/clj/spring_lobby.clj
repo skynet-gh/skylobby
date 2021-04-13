@@ -1035,8 +1035,8 @@
         {:keys [parsed-replays-by-path] :as state} @state-atom
         existing-paths (set (keys parsed-replays-by-path))
         all-files (mapcat
-                    (fn [{:keys [file replay-source-name]}]
-                      (let [files (fs/replay-files file)]
+                    (fn [{:keys [file recursive replay-source-name]}]
+                      (let [files (fs/replay-files file {:recursive recursive})]
                         (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
                         (map
                           (juxt (constantly replay-source-name) identity)
@@ -1708,7 +1708,7 @@
                  vec)
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [{:keys [username]}]
+      :describe (fn [{:keys [user-id username]}]
                   (let [{:keys [battle-id battle-title] :as battle} (get battles-by-users username)]
                     (merge
                       {:on-mouse-clicked
@@ -1740,7 +1740,9 @@
                               :on-action {:event/type ::send-message
                                           :client client
                                           :channel-name (u/user-channel username)
-                                          :message "!ranking"}}]))}}
+                                          :message "!ranking"}}])
+                          [{:fx/type :menu-item
+                            :text (str "User ID: " user-id)}])}}
                       (when battle
                         {:tooltip
                          {:fx/type :tooltip
@@ -2115,6 +2117,13 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close:16:black"}}]))
      [{:fx/type :button
+       :text "Settings"
+       :on-action {:event/type ::toggle
+                   :key :show-settings-window}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-settings:16:white"}}
+      {:fx/type :button
        :text "Replays"
        :on-action {:event/type ::toggle
                    :key :show-replays}
@@ -2425,13 +2434,14 @@
           (dissoc :extra-import-name :extra-import-path)))))
 
 (defmethod event-handler ::add-extra-replay-source
-  [{:keys [extra-replay-name extra-replay-path]}]
+  [{:keys [extra-replay-name extra-replay-path extra-replay-recursive]}]
   (swap! *state
     (fn [state]
       (-> state
           (update :extra-replay-sources conj {:replay-source-name extra-replay-name
-                                              :file (io/file extra-replay-path)})
-          (dissoc :extra-replay-name :extra-replay-path)))))
+                                              :file (io/file extra-replay-path)
+                                              :recursive extra-replay-recursive})
+          (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
 
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future
@@ -2451,11 +2461,12 @@
 
 (def settings-window-keys
   [:extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
+   :extra-replay-recursive
    :extra-replay-sources :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window
   [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path show-settings-window spring-isolation-dir
+           extra-replay-path extra-replay-recursive show-settings-window spring-isolation-dir
            spring-isolation-dir-draft]
     :as state}]
   {:fx/type :stage
@@ -2574,7 +2585,7 @@
          {:fx/type :v-box
           :children
           (map
-            (fn [{:keys [builtin file replay-source-name]}]
+            (fn [{:keys [builtin file recursive replay-source-name]}]
               {:fx/type :h-box
                :alignment :center-left
                :children
@@ -2588,8 +2599,16 @@
                   :icon-literal "mdi-delete:16:white"}}
                 {:fx/type :v-box
                  :children
-                 [{:fx/type :label
-                   :text (str " " replay-source-name)}
+                 [{:fx/type :h-box
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text (str " " replay-source-name)
+                       :style {:-fx-font-size 18}}]
+                     (when recursive
+                       [{:fx/type :label
+                         :text " (recursive)"
+                         :style {:-fx-text-fill :red}}]))}
                   {:fx/type :label
                    :text (str " " (fs/canonical-path file))
                    :style {:-fx-font-size 14}}]}]})
@@ -2603,7 +2622,8 @@
                          (string/blank? extra-replay-path))
             :on-action {:event/type ::add-extra-replay-source
                         :extra-replay-path extra-replay-path
-                        :extra-replay-name extra-replay-name}
+                        :extra-replay-name extra-replay-name
+                        :extra-replay-recursive extra-replay-recursive}
             :text ""
             :graphic
             {:fx/type font-icon/lifecycle
@@ -2619,7 +2639,13 @@
            {:fx/type :text-field
             :text (str extra-replay-path)
             :on-text-changed {:event/type ::assoc
-                              :key :extra-replay-path}}]}]}}
+                              :key :extra-replay-path}}
+           {:fx/type :label
+            :text " Recursive: "}
+           {:fx/type :check-box
+            :selected (boolean extra-replay-recursive)
+            :on-selected-changed {:event/type ::assoc
+                                  :key :extra-replay-recursive}}]}]}}
      {:fx/type :pane})}})
 
 (def bind-keycodes
@@ -4175,7 +4201,7 @@
              :-fx-pref-height 200}
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [{:keys [owner username]}]
+      :describe (fn [{:keys [owner username user]}]
                   {
                    :context-menu
                    {:fx/type :context-menu
@@ -4195,7 +4221,7 @@
                                     :username username}}]
                       (when (and host-username
                                  (= host-username username)
-                                 (string/includes? host-username "cluster"))
+                                 (-> user :client-status :bot))
                         [{:fx/type :menu-item
                           :text "!help"
                           :on-action {:event/type ::send-message
@@ -4214,14 +4240,15 @@
                                       :client client
                                       :channel-name (u/user-channel host-username)
                                       :message "!status game"}}])
-                      #_
-                      (when (string/includes? host-username "cluster")
+                      (when (-> user :client-status :bot)
                         [{:fx/type :menu-item
                           :text "!whois"
                           :on-action {:event/type ::send-message
                                       :client client
                                       :channel-name (u/user-channel host-username)
-                                      :message (str "!whois " username)}}]))}})}
+                                      :message (str "!whois " username)}}])
+                      [{:fx/type :menu-item
+                        :text (str "User ID: " (-> user :user-id))}])}})}
      :columns
      [{:fx/type :table-column
        :text "Nickname"
@@ -7211,47 +7238,70 @@
   (when (seq coll)
     (reduce max 0 coll)))
 
+(defn process-bar-replay [replay]
+  (let [player-counts (->> replay
+                           :AllyTeams
+                           (map
+                             (fn [allyteam]
+                               (count (mapcat allyteam [:Players :AIs])))))
+        teams (->> replay
+                   :AllyTeams
+                   (mapcat
+                     (fn [allyteam]
+                       (map
+                         (fn [player]
+                           [(str "team" (:playerId player))
+                            {:team (:playerId player)
+                             :allyteam (:allyTeamId allyteam)}])
+                         (:Players allyteam)))))
+        players (->> replay
+                     :AllyTeams
+                     (mapcat
+                       (fn [allyteam]
+                         (map
+                           (fn [{:keys [playerId] :as player}]
+                             [(str "player" playerId)
+                              {:team playerId
+                               :username (:name player)}])
+                           (:Players allyteam)))))
+        spectators (->> replay
+                        :Spectators
+                        (map (fn [{:keys [playerId] :as spec}]
+                               [(str "player" playerId)
+                                {:username (:name spec)
+                                 :spectator 1}])))]
+    (-> replay
+        (assoc :source-name "BAR Online")
+        (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
+        (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
+        (assoc :player-counts player-counts)
+        (assoc :game-type (replay-game-type player-counts)))))
+
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
-                             (map
-                               (fn [r]
-                                 (let [player-counts (->> r
-                                                          :AllyTeams
-                                                          (map
-                                                            (fn [allyteam]
-                                                              (count (mapcat allyteam [:Players :AIs])))))
-                                       players (->> r
-                                                    :AllyTeams
-                                                    (mapcat
-                                                      (fn [allyteam]
-                                                        (map
-                                                          (fn [player]
-                                                            [(str "player" (:playerId player))
-                                                             {:ally (:allyTeamId allyteam)
-                                                              :username (:name player)}])
-                                                          (:Players allyteam))))
-                                                    (into {}))]
-                                   (-> r
-                                       (assoc :source-name "BAR Online")
-                                       (assoc :body {:script-data {:game (merge (:hostSettings r) players)}})
-                                       (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime r))) 1000)})
-                                       (assoc :player-counts player-counts)
-                                       (assoc :game-type (replay-game-type player-counts)))))))]
-    (swap! *state
-      (fn [state]
-        (-> state
-            (assoc :bar-replays-page page)
-            (update :online-bar-replays
-              (fn [online-bar-replays]
-                (into {}
-                  (concat
-                    online-bar-replays
-                    (map (juxt :id identity) new-bar-replays))))))))))
+                             (map process-bar-replay))]
+    (log/info "Got" (count new-bar-replays) "BAR replays from page" page)
+    (let [[before after] (swap-vals! *state
+                           (fn [state]
+                             (-> state
+                                 (assoc :bar-replays-page ((fnil inc 0) (int (u/to-number page))))
+                                 (update :online-bar-replays
+                                   (fn [online-bar-replays]
+                                     (u/deep-merge
+                                       online-bar-replays
+                                       (into {}
+                                         (map
+                                           (juxt :id identity)
+                                           new-bar-replays))))))))
+          new-count (- (count (:online-bar-replays after))
+                       (count (:online-bar-replays before)))]
+      (log/info "Got" new-count "new online replays")
+      (swap! *state assoc :new-online-replays-count new-count))))
 
 
 (def replays-window-keys
   [:bar-replays-page :battle-players-color-allyteam :copying :engines :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
-   :filter-replay-type :http-download :maps :mods :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :filter-replay-type :http-download :maps :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
@@ -7259,9 +7309,9 @@
 
 (defn replays-window
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-type http-download maps mods on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
+           filter-replay-type http-download maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id settings-button
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
   (let [local-filenames (->> parsed-replays-by-path
                              vals
@@ -7520,14 +7570,14 @@
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-refresh:16:white"}})]
               (let [downloading (boolean (seq index-downloads-tasks))
-                    next-page ((fnil inc 0) (u/to-number bar-replays-page))]
+                    page (u/to-number bar-replays-page)]
                 [{:fx/type :button
                   :text (if downloading
                           " Getting Online BAR Replays... "
                           " Get Online BAR Replays")
                   :on-action {:event/type ::add-task
                               :task {::task-type ::download-bar-replays
-                                     :page next-page}}
+                                     :page page}}
                   :disable downloading
                   :graphic
                   {:fx/type font-icon/lifecycle
@@ -7535,20 +7585,22 @@
                  {:fx/type :label
                   :text " Page: "}
                  {:fx/type :text-field
-                  :text (str bar-replays-page)
+                  :text (str page)
                   :style {:-fx-max-width 56}
                   :on-text-changed {:event/type ::assoc
-                                    :key :bar-replays-page}}])
-              (when settings-button
-                [{:fx/type :pane
-                  :h-box/hgrow :always}
-                 {:fx/type :button
-                  :text "Settings"
-                  :on-action {:event/type ::toggle
-                              :key :show-settings-window}
-                  :graphic
-                  {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-settings:16:white"}}]))}
+                                    :key :bar-replays-page}}
+                 {:fx/type :label
+                  :text (str (when new-online-replays-count
+                               (str " Got " new-online-replays-count " new")))}])
+              [{:fx/type :pane
+                :h-box/hgrow :always}
+               {:fx/type :button
+                :text "Settings"
+                :on-action {:event/type ::toggle
+                            :key :show-settings-window}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-settings:16:white"}}])}
             (if all-replays
               (if (empty? all-replays)
                 {:fx/type :label
@@ -8575,10 +8627,8 @@
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)
-        all-tasks (concat tasks (vals current-tasks))
-        tasks-by-type (->> all-tasks
-                           (map (juxt ::task-type identity))
-                           (into {}))]
+        all-tasks (filter some? (concat tasks (vals current-tasks)))
+        tasks-by-type (group-by ::task-type all-tasks)]
     {:fx/type fx/ext-many
      :desc
      [{:fx/type :stage
@@ -8694,7 +8744,8 @@
         {:fx/type rapid-download-window}
         (select-keys state rapid-download-window-keys))
       (merge
-        {:fx/type replays-window}
+        {:fx/type replays-window
+         :tasks-by-type tasks-by-type}
         (select-keys state replays-window-keys))
       (merge
         {:fx/type matchmaking-window}
