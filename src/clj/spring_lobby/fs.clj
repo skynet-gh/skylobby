@@ -312,11 +312,23 @@
   (io/file root "demos"))
 
 (defn replay-files
-  [dir]
-  (->> dir
-       list-files
-       (filter is-file?)
-       (filter (comp #(string/ends-with? % ".sdfz") filename))))
+  ([dir]
+   (replay-files dir nil))
+  ([dir {:keys [recursive]}]
+   (let [files
+         (->> dir
+              list-files
+              (filter is-file?)
+              (filter (comp #(string/ends-with? % ".sdfz") filename)))]
+     (if recursive
+       (let [subdirs (->> dir
+                          list-files
+                          (filter is-directory?))]
+         (concat
+           files
+           (mapcat #(replay-files % {:recursive true})
+                   subdirs)))
+       files))))
 
 (defn map-files
   [root]

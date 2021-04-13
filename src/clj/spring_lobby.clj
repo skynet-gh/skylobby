@@ -1035,8 +1035,8 @@
         {:keys [parsed-replays-by-path] :as state} @state-atom
         existing-paths (set (keys parsed-replays-by-path))
         all-files (mapcat
-                    (fn [{:keys [file replay-source-name]}]
-                      (let [files (fs/replay-files file)]
+                    (fn [{:keys [file recursive replay-source-name]}]
+                      (let [files (fs/replay-files file {:recursive recursive})]
                         (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
                         (map
                           (juxt (constantly replay-source-name) identity)
@@ -2425,13 +2425,14 @@
           (dissoc :extra-import-name :extra-import-path)))))
 
 (defmethod event-handler ::add-extra-replay-source
-  [{:keys [extra-replay-name extra-replay-path]}]
+  [{:keys [extra-replay-name extra-replay-path extra-replay-recursive]}]
   (swap! *state
     (fn [state]
       (-> state
           (update :extra-replay-sources conj {:replay-source-name extra-replay-name
-                                              :file (io/file extra-replay-path)})
-          (dissoc :extra-replay-name :extra-replay-path)))))
+                                              :file (io/file extra-replay-path)
+                                              :recursive extra-replay-recursive})
+          (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
 
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future
@@ -2451,11 +2452,12 @@
 
 (def settings-window-keys
   [:extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
+   :extra-replay-recursive
    :extra-replay-sources :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window
   [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path show-settings-window spring-isolation-dir
+           extra-replay-path extra-replay-recursive show-settings-window spring-isolation-dir
            spring-isolation-dir-draft]
     :as state}]
   {:fx/type :stage
@@ -2574,7 +2576,7 @@
          {:fx/type :v-box
           :children
           (map
-            (fn [{:keys [builtin file replay-source-name]}]
+            (fn [{:keys [builtin file recursive replay-source-name]}]
               {:fx/type :h-box
                :alignment :center-left
                :children
@@ -2588,8 +2590,16 @@
                   :icon-literal "mdi-delete:16:white"}}
                 {:fx/type :v-box
                  :children
-                 [{:fx/type :label
-                   :text (str " " replay-source-name)}
+                 [{:fx/type :h-box
+                   :children
+                   (concat
+                     [{:fx/type :label
+                       :text (str " " replay-source-name)
+                       :style {:-fx-font-size 18}}]
+                     (when recursive
+                       [{:fx/type :label
+                         :text " (recursive)"
+                         :style {:-fx-text-fill :red}}]))}
                   {:fx/type :label
                    :text (str " " (fs/canonical-path file))
                    :style {:-fx-font-size 14}}]}]})
@@ -2603,7 +2613,8 @@
                          (string/blank? extra-replay-path))
             :on-action {:event/type ::add-extra-replay-source
                         :extra-replay-path extra-replay-path
-                        :extra-replay-name extra-replay-name}
+                        :extra-replay-name extra-replay-name
+                        :extra-replay-recursive extra-replay-recursive}
             :text ""
             :graphic
             {:fx/type font-icon/lifecycle
@@ -2619,7 +2630,13 @@
            {:fx/type :text-field
             :text (str extra-replay-path)
             :on-text-changed {:event/type ::assoc
-                              :key :extra-replay-path}}]}]}}
+                              :key :extra-replay-path}}
+           {:fx/type :label
+            :text " Recursive: "}
+           {:fx/type :check-box
+            :selected (boolean extra-replay-recursive)
+            :on-selected-changed {:event/type ::assoc
+                                  :key :extra-replay-recursive}}]}]}}
      {:fx/type :pane})}})
 
 (def bind-keycodes
@@ -7284,7 +7301,7 @@
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
            filter-replay-type http-download maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id settings-button
+           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
   (let [local-filenames (->> parsed-replays-by-path
                              vals
@@ -7565,16 +7582,15 @@
                  {:fx/type :label
                   :text (str (when new-online-replays-count
                                (str " Got " new-online-replays-count " new")))}])
-              (when settings-button
-                [{:fx/type :pane
-                  :h-box/hgrow :always}
-                 {:fx/type :button
-                  :text "Settings"
-                  :on-action {:event/type ::toggle
-                              :key :show-settings-window}
-                  :graphic
-                  {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-settings:16:white"}}]))}
+              [{:fx/type :pane
+                :h-box/hgrow :always}
+               {:fx/type :button
+                :text "Settings"
+                :on-action {:event/type ::toggle
+                            :key :show-settings-window}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-settings:16:white"}}])}
             (if all-replays
               (if (empty? all-replays)
                 {:fx/type :label
