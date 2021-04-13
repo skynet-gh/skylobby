@@ -1708,7 +1708,7 @@
                  vec)
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [{:keys [username]}]
+      :describe (fn [{:keys [user-id username]}]
                   (let [{:keys [battle-id battle-title] :as battle} (get battles-by-users username)]
                     (merge
                       {:on-mouse-clicked
@@ -1740,7 +1740,9 @@
                               :on-action {:event/type ::send-message
                                           :client client
                                           :channel-name (u/user-channel username)
-                                          :message "!ranking"}}]))}}
+                                          :message "!ranking"}}])
+                          [{:fx/type :menu-item
+                            :text (str "User ID: " user-id)}])}}
                       (when battle
                         {:tooltip
                          {:fx/type :tooltip
@@ -2115,6 +2117,13 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close:16:black"}}]))
      [{:fx/type :button
+       :text "Settings"
+       :on-action {:event/type ::toggle
+                   :key :show-settings-window}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-settings:16:white"}}
+      {:fx/type :button
        :text "Replays"
        :on-action {:event/type ::toggle
                    :key :show-replays}
@@ -4192,7 +4201,7 @@
              :-fx-pref-height 200}
      :row-factory
      {:fx/cell-type :table-row
-      :describe (fn [{:keys [owner username]}]
+      :describe (fn [{:keys [owner username user]}]
                   {
                    :context-menu
                    {:fx/type :context-menu
@@ -4212,7 +4221,7 @@
                                     :username username}}]
                       (when (and host-username
                                  (= host-username username)
-                                 (string/includes? host-username "cluster"))
+                                 (-> user :client-status :bot))
                         [{:fx/type :menu-item
                           :text "!help"
                           :on-action {:event/type ::send-message
@@ -4231,14 +4240,15 @@
                                       :client client
                                       :channel-name (u/user-channel host-username)
                                       :message "!status game"}}])
-                      #_
-                      (when (string/includes? host-username "cluster")
+                      (when (-> user :client-status :bot)
                         [{:fx/type :menu-item
                           :text "!whois"
                           :on-action {:event/type ::send-message
                                       :client client
                                       :channel-name (u/user-channel host-username)
-                                      :message (str "!whois " username)}}]))}})}
+                                      :message (str "!whois " username)}}])
+                      [{:fx/type :menu-item
+                        :text (str "User ID: " (-> user :user-id))}])}})}
      :columns
      [{:fx/type :table-column
        :text "Nickname"
