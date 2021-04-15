@@ -981,3 +981,14 @@
 (defn write-image-png [^java.awt.image.RenderedImage image ^File dest]
   (log/debug "Writing image to" dest)
   (ImageIO/write image "png" dest))
+
+
+(defn file-status [file-cache f]
+  (when f
+    (let [path (if (string? f)
+                 f
+                 (canonical-path f))]
+      (get file-cache path))))
+
+(defn file-exists? [file-cache f]
+  (boolean (:exists (file-status file-cache f))))
