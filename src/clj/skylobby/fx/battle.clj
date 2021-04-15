@@ -361,7 +361,8 @@
              :map-details battle-map-details
              :minimap-type minimap-type
              :minimap-type-key :minimap-type
-             :scripttags scripttags}
+             :scripttags scripttags
+             :singleplayer singleplayer}
             {:fx/type :v-box
              :children
              [{:fx/type :h-box
@@ -419,7 +420,8 @@
                    :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
                                       :am-host am-host
                                       :channel-name channel-name
-                                      :client client}}]
+                                      :client client
+                                      :singleplayer singleplayer}}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"

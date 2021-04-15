@@ -1509,6 +1509,7 @@
                    [{:fx/type :menu-item
                      :text "Join Battle"
                      :on-action {:event/type ::join-battle
+                                 :battle battle
                                  :client client
                                  :selected-battle (:battle-id i)}}]}})}
     :columns
@@ -1647,6 +1648,7 @@
                             [{:fx/type :menu-item
                               :text "Join Battle"
                               :on-action {:event/type ::join-battle
+                                          :battle battle
                                           :client client
                                           :selected-battle battle-id}}])
                           (when (= "SLDB" username)
@@ -2787,34 +2789,35 @@
   (future
     (try
       (send-message client "LEAVEBATTLE")
-      (swap! *state dissoc :battle)
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
 
-(defmethod event-handler ::join-battle [{:keys [battle-password battle-passworded client selected-battle] :as e}]
+(defmethod event-handler ::join-battle
+  [{:keys [battle battle-password battle-passworded client selected-battle] :as e}]
   (future
     (try
+      (when battle
+        @(event-handler (merge e {:event/type ::leave-battle}))
+        (async/<!! (async/timeout 500)))
       (if selected-battle
-        (do
-          @(event-handler (merge e {:event/type ::leave-battle}))
-          (async/<!! (async/timeout 500))
-          (send-message client
-            (str "JOINBATTLE " selected-battle
-                 (if battle-passworded
-                   (str " " battle-password)
-                   (str " *"))
-                 " " (crypto.random/hex 6))))
+        (send-message client
+          (str "JOINBATTLE " selected-battle
+               (if battle-passworded
+                 (str " " battle-password)
+                 (str " *"))
+               " " (crypto.random/hex 6)))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
 (defmethod event-handler ::start-singleplayer-battle
-  [e]
+  [{:keys [battle] :as e}]
   (future
     (try
-      @(event-handler (merge e {:event/type ::leave-battle}))
-      (async/<!! (async/timeout 500))
+      (when battle
+        @(event-handler (merge e {:event/type ::leave-battle}))
+        (async/<!! (async/timeout 500)))
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
@@ -3157,7 +3160,7 @@
         (log/error e "Error dragging minimap")))))
 
 (defmethod event-handler ::minimap-mouse-released
-  [{:keys [am-host client minimap-width minimap-height map-details] :as e}]
+  [{:keys [am-host client minimap-width minimap-height map-details singleplayer] :as e}]
   (future
     (try
       (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
@@ -3186,7 +3189,14 @@
                 top (/ t (* 1.0 minimap-height))
                 right (/ r (* 1.0 minimap-width))
                 bottom (/ b (* 1.0 minimap-height))]
-            (if client
+            (if singleplayer
+              (swap! *state update-in [:battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+                     (fn [allyteam]
+                       (assoc allyteam
+                              :startrectleft left
+                              :startrecttop top
+                              :startrectright right
+                              :startrectbottom bottom)))
               (if am-host
                 (send-message client
                   (str "ADDSTARTRECT " allyteam-id " "
@@ -3203,14 +3213,7 @@
                               (int (* 200 top)) " "
                               (int (* 200 right)) " "
                               (int (* 200 bottom)) " "
-                              (inc allyteam-id)))))
-              (swap! *state update-in [:battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
-                     (fn [allyteam]
-                       (assoc allyteam
-                              :startrectleft left
-                              :startrecttop top
-                              :startrectright right
-                              :startrectbottom bottom)))))))
+                              (inc allyteam-id)))))))))
       (catch Exception e
         (log/error e "Error releasing minimap")))))
 
@@ -3559,10 +3562,10 @@
 
 
 (defmethod event-handler ::battle-startpostype-change
-  [{:fx/keys [event] :keys [am-host client] :as e}]
+  [{:fx/keys [event] :keys [am-host client singleplayer] :as e}]
   (let [startpostype (get spring/startpostypes-by-name event)]
     (if am-host
-      (do
+      (if singleplayer
         (swap! *state
                (fn [state]
                  (-> state

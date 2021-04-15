@@ -409,11 +409,13 @@
       (swap! state assoc :last-failed-message m))))
 
 (defmethod handle "JOINBATTLEFAILED" [_client state-atom m]
-  (swap! state-atom
-         (fn [state]
-           (-> state
-               (dissoc :battle)
-               (assoc :last-failed-message m)))))
+  (let [state (swap! state-atom
+                     (fn [state]
+                       (-> state
+                           (dissoc :battle)
+                           (assoc :last-failed-message m))))]
+    (when (= m "JOINBATTLEFAILED You are already in a battle")
+      (message/send-message (:client state) "LEAVEBATTLE"))))
 
 
 (defmethod handle "CHANNEL" [_client state-atom m]
