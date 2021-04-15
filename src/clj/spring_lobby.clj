@@ -3,15 +3,11 @@
     [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.api :as fx]
-    [cljfx.component :as fx.component]
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [cljfx.ext.table-view :as fx.ext.table-view]
-    [cljfx.lifecycle :as fx.lifecycle]
-    [cljfx.mutator :as fx.mutator]
-    [cljfx.prop :as fx.prop]
-    clojure.data
     [clojure.core.async :as async]
+    [clojure.core.cache :as cache]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
@@ -29,6 +25,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
     [skylobby.fx.channel :as fx.channel]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed with-scroll-text-prop]]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.resource :as resource]
@@ -56,7 +53,7 @@
     (javafx.application Platform)
     (javafx.event Event)
     (javafx.scene Node)
-    (javafx.scene.control ScrollPane Tab TextArea)
+    (javafx.scene.control Tab)
     (javafx.scene.input KeyCode KeyEvent ScrollEvent)
     (javafx.stage Screen WindowEvent)
     (manifold.stream SplicedStream)
@@ -123,7 +120,7 @@
 ;(def map-browse-image-size 98)
 ;(def map-browse-box-height 160)
 (def map-browse-image-size 162)
-(def map-browse-box-height 200)
+(def map-browse-box-height 224)
 
 
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
@@ -284,14 +281,16 @@
     {:file-events (initial-file-events)
      :tasks (initial-tasks)
      :minimap-type (first minimap-types)
-     :replay-minimap-type (first minimap-types)}))
+     :replay-minimap-type (first minimap-types)
+     :map-details (cache/fifo-cache-factory {})
+     :mod-details (cache/fifo-cache-factory {})}))
 
 
 (def ^:dynamic *state (atom {}))
 
 
 (defn- send-message [client message]
-  (u/update-console-log *state :client message)
+  (u/update-console-log *state :client client message)
   (message/send-message client message))
 
 (defn- spit-app-edn
@@ -412,24 +411,20 @@
     (fn [tasks]
       (apply conj tasks tasks-to-add))))
 
-(defn- same-resource-file? [resource1 resource2]
-  (= (:resource-file resource1)
-     (:resource-file resource2)))
-
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
     state
-    [:battle :battle-map-details :maps]))
+    [:battle :by-server :map-details :maps]))
 
 (defn- battle-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:battle :battle-mod-details :mods]))
+    [:battle :by-server :mod-details :mods]))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:maps :mods :online-bar-replays :parsed-replays-by-path :replay-map-details :replay-mod-details
+    [:map-details :maps :mod-details :mods :online-bar-replays :parsed-replays-by-path
      :selected-replay-file :selected-replay-id]))
 
 (defn- fix-resource-relevant-keys [state]
@@ -440,7 +435,158 @@
 (defn- auto-get-resources-relevant-keys [state]
   (select-keys
     state
-    [:battle :downloadables-by-url :engines :importables-by-path :maps :mods :rapid-data-by-version]))
+    [:by-server :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path :maps :mods
+     :rapid-data-by-version :spring-isolation-dir :tasks]))
+
+(defn- auto-get-resources-server-relevant-keys [state]
+  (select-keys
+    state
+    [:battle :battles]))
+
+
+(defn server-auto-resources [_old-state new-state old-server new-server]
+  (when (not= (auto-get-resources-server-relevant-keys old-server)
+              (auto-get-resources-server-relevant-keys new-server))
+    (try
+      (when (and (:auto-get-resources new-state) (:spring-isolation-dir new-state))
+        (let [{:keys [current-tasks downloadables-by-url engines file-cache importables-by-path
+                      maps mods rapid-data-by-version spring-isolation-dir tasks]} new-state
+              {:keys [battle battles]} new-server
+              old-battle-details (-> old-server :battles (get (-> old-server :battle :battle-id)))
+              {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
+              rapid-data (get rapid-data-by-version battle-modname)
+              rapid-id (:id rapid-data)
+              all-tasks (concat tasks (vals current-tasks))
+              rapid-task (->> all-tasks
+                              (filter (comp #{::rapid-download} ::task-type))
+                              (filter (comp #{rapid-id} :rapid-id))
+                              first)
+              engine-file (-> engines first :file)
+              importables (vals importables-by-path)
+              map-importable (some->> importables
+                                      (filter (comp #{::map} :resource-type))
+                                      (filter (partial resource/could-be-this-map? battle-map))
+                                      first)
+              map-import-task (->> all-tasks
+                                   (filter (comp #{::import} ::task-type))
+                                   (filter (comp (partial resource/same-resource-file? map-importable) :importable))
+                                   first)
+              no-map (->> maps
+                          (filter (comp #{battle-map} :map-name))
+                          first
+                          not)
+              downloadables (vals downloadables-by-url)
+              map-downloadable (->> downloadables
+                                    (filter (comp #{::map} :resource-type))
+                                    (filter (partial resource/could-be-this-map? battle-map))
+                                    first)
+              map-download-task (->> all-tasks
+                                     (filter (comp #{::http-downloadable} ::task-type))
+                                     (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
+                                     first)
+              engine-details (spring/engine-details engines battle-version)
+              engine-importable (some->> importables
+                                         (filter (comp #{::engine} :resource-type))
+                                         (filter (partial resource/could-be-this-engine? battle-version))
+                                         first)
+              engine-import-task (->> all-tasks
+                                      (filter (comp #{::import} ::task-type))
+                                      (filter (comp (partial resource/same-resource-file? engine-importable) :importable))
+                                      first)
+              engine-downloadable (->> downloadables
+                                       (filter (comp #{::engine} :resource-type))
+                                       (filter (partial resource/could-be-this-engine? battle-version))
+                                       first)
+              engine-download-task (->> all-tasks
+                                        (filter (comp #{::http-downloadable} ::task-type))
+                                        (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
+                                        first)
+              mod-downloadable (->> downloadables
+                                    (filter (comp #{::mod} :resource-type))
+                                    (filter (partial resource/could-be-this-mod? battle-modname))
+                                    first)
+              mod-download-task (->> all-tasks
+                                     (filter (comp #{::http-downloadable} ::task-type))
+                                     (filter (comp (partial resource/same-resource-filename? mod-downloadable) :downloadable))
+                                     first)
+              no-mod (->> mods
+                          (filter (comp #{battle-modname} :mod-name))
+                          first
+                          not)
+              tasks [(when
+                       (and (= battle-version (:battle-version old-battle-details))
+                            (not engine-details))
+                       (cond
+                         (and engine-importable
+                              (not engine-import-task)
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-importable))))
+                         (do
+                           (log/info "Adding task to auto import engine" engine-importable)
+                           {::task-type ::import
+                            :importable engine-importable
+                            :spring-isolation-dir spring-isolation-dir})
+                         (and (not engine-importable)
+                              engine-downloadable
+                              (not engine-download-task)
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-downloadable))))
+                         (do
+                           (log/info "Adding task to auto download engine" engine-downloadable)
+                           {::task-type ::http-downloadable
+                            :downloadable engine-downloadable
+                            :spring-isolation-dir spring-isolation-dir})
+                         :else
+                         nil))
+                     (when
+                       (and (= battle-map (:battle-map old-battle-details))
+                            no-map)
+                       (cond
+                         (and map-importable
+                              (not map-import-task)
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-importable))))
+                         (do
+                           (log/info "Adding task to auto import map" map-importable)
+                           {::task-type ::import
+                            :importable map-importable
+                            :spring-isolation-dir spring-isolation-dir})
+                         (and (not map-importable)
+                              map-downloadable
+                              (not map-download-task)
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-downloadable))))
+                         (do
+                           (log/info "Adding task to auto download map" map-downloadable)
+                           {::task-type ::http-downloadable
+                            :downloadable map-downloadable
+                            :spring-isolation-dir spring-isolation-dir})
+                         :else
+                         nil))
+                     (when
+                       (and (= battle-modname (:battle-modname old-battle-details))
+                            no-mod)
+                       (cond
+                         (and rapid-id
+                              (not rapid-task)
+                              engine-file
+                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))))
+                         (do
+                           (log/info "Adding task to auto download rapid" rapid-id)
+                           {::task-type ::rapid-download
+                            :engine-file engine-file
+                            :rapid-id rapid-id
+                            :spring-isolation-dir spring-isolation-dir})
+                         (and (not rapid-id)
+                              mod-downloadable
+                              (not mod-download-task)
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir mod-downloadable))))
+                         (do
+                           (log/info "Adding task to auto download mod" mod-downloadable)
+                           {::task-type ::http-downloadable
+                            :downloadable mod-downloadable
+                            :spring-isolation-dir spring-isolation-dir})
+                         :else
+                         nil))]]
+         (filter some? tasks)))
+      (catch Exception e
+        (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
 
 
 (defn- add-watchers
@@ -461,31 +607,34 @@
       (when (not= (battle-map-details-relevant-keys old-state)
                   (battle-map-details-relevant-keys new-state))
         (try
-          (let [old-battle-id (-> old-state :battle :battle-id)
-                new-battle-id (-> new-state :battle :battle-id)
-                old-battle-map (-> old-state :battles (get old-battle-id) :battle-map)
-                new-battle-map (-> new-state :battles (get new-battle-id) :battle-map)
-                battle-map-details (:battle-map-details new-state)
-                map-changed (not= new-battle-map (:map-name battle-map-details))
-                old-maps (:maps old-state)
-                new-maps (:maps new-state)]
-            (when (or (and (or (not= old-battle-id new-battle-id)
-                               (not= old-battle-map new-battle-map))
-                           (and (not (string/blank? new-battle-map))
-                                (or (not (seq battle-map-details))
-                                    map-changed)))
-                      (and
-                        (or (not (some (comp #{new-battle-map} :map-name) old-maps)))
-                        (some (comp #{new-battle-map} :map-name) new-maps)))
-              (if (->> new-maps (filter (comp #{new-battle-map} :map-name)) first)
-                (do
-                  (log/info "Updating battle map details for" new-battle-map "was" old-battle-map)
-                  (future
-                    (let [map-details (or (read-map-data new-maps new-battle-map) {})]
-                      (swap! *state assoc :battle-map-details map-details))))
-                (do
-                  (log/info "Battle map not found, setting empty details for" new-battle-map "was" old-battle-map)
-                  (swap! *state assoc :battle-map-details {})))))
+          (doseq [[server-url new-server] (-> new-state :by-server seq)]
+            (let [old-server (-> old-state :by-server (get server-url))
+                  old-battle-id (-> old-server :battle :battle-id)
+                  new-battle-id (-> new-server :battle :battle-id)
+                  old-map (-> old-server :battles (get old-battle-id) :battle-map)
+                  new-map (-> new-server :battles (get new-battle-id) :battle-map)
+                  map-details (-> new-state :map-details (get new-map))
+                  map-changed (not= new-map (:map-name map-details))
+                  old-maps (:maps old-state)
+                  new-maps (:maps new-state)
+                  map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)]
+              (when (or (and (or (not= old-battle-id new-battle-id)
+                                 (not= old-map new-map))
+                             (and (not (string/blank? new-map))
+                                  (or (not (seq map-details))
+                                      map-changed)))
+                        (and
+                          (or (not (some (comp #{new-map} :map-name) old-maps)))
+                          map-exists))
+                (future
+                  (if map-exists
+                    (do
+                      (log/info "Updating battle map details for" new-map "was" old-map)
+                      (let [map-details (or (read-map-data new-maps new-map) {})]
+                        (swap! *state update :map-details cache/miss new-map map-details)))
+                    (do
+                      (log/info "Battle map not found, setting empty details for" new-map "was" old-map)
+                      (swap! *state update :map-details cache/miss new-map {})))))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
@@ -493,39 +642,42 @@
       (when (not= (battle-mod-details-relevant-keys old-state)
                   (battle-mod-details-relevant-keys new-state))
         (try
-          (let [old-battle-id (-> old-state :battle :battle-id)
-                new-battle-id (-> new-state :battle :battle-id)
-                old-battle-mod (-> old-state :battles (get old-battle-id) :battle-modname)
-                new-battle-mod (-> new-state :battles (get new-battle-id) :battle-modname)
-                new-battle-mod-sans-git (mod-name-sans-git new-battle-mod)
-                mod-name-set (set [new-battle-mod new-battle-mod-sans-git])
-                filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
-                battle-mod-details (:battle-mod-details new-state)
-                mod-changed (not= new-battle-mod (:mod-name battle-mod-details))
-                old-mods (:mods old-state)
-                new-mods (:mods new-state)]
-            (when (or (and (or (not= old-battle-id new-battle-id)
-                               (not= old-battle-mod new-battle-mod))
-                           (and (not (string/blank? new-battle-mod))
-                                (or (not (seq battle-mod-details))
-                                    mod-changed)))
-                      (and
-                        (or (not (some (comp #{new-battle-mod} :mod-name) old-mods)))
-                        (some (comp #{new-battle-mod} :mod-name) new-mods)))
-              (if (->> new-mods (filter filter-fn) first)
-                (do
-                  (log/info "Updating battle mod details for" new-battle-mod "was" old-battle-mod)
-                  (future
-                    (let [mod-details (or (some->> new-mods
-                                                   (filter filter-fn)
-                                                   first
-                                                   :file
-                                                   read-mod-data)
-                                          {})]
-                      (swap! *state assoc :battle-mod-details mod-details))))
-                (do
-                  (log/info "Battle mod not found, setting empty details for" new-battle-mod "was" old-battle-mod)
-                  (swap! *state assoc :battle-mod-details {})))))
+          (doseq [[server-url new-server] (-> new-state :by-server seq)]
+            (let [old-server (-> old-state :by-server (get server-url))
+                  old-battle-id (-> old-server :battle :battle-id)
+                  new-battle-id (-> new-server :battle :battle-id)
+                  old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
+                  new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
+                  new-mod-sans-git (mod-name-sans-git new-mod)
+                  mod-name-set (set [new-mod new-mod-sans-git])
+                  filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+                  mod-details (-> new-state :mod-details (get new-mod))
+                  mod-changed (not= new-mod (:mod-name mod-details))
+                  old-mods (:mods old-state)
+                  new-mods (:mods new-state)
+                  mod-exists (->> new-mods (filter filter-fn) first)]
+              (when (or (and (or (not= old-battle-id new-battle-id)
+                                 (not= old-mod new-mod))
+                             (and (not (string/blank? new-mod))
+                                  (or (not (seq mod-details))
+                                      mod-changed)))
+                        (and
+                          (or (not (some (comp #{new-mod} :mod-name) old-mods)))
+                          mod-exists))
+                (future
+                  (if mod-exists
+                    (do
+                      (log/info "Updating battle mod details for" new-mod "was" old-mod)
+                      (let [mod-details (or (some->> new-mods
+                                                     (filter filter-fn)
+                                                     first
+                                                     :file
+                                                     read-mod-data)
+                                            {})]
+                        (swap! *state update :mod-details cache/miss new-mod mod-details)))
+                    (do
+                      (log/info "Battle mod not found, setting empty details for" new-mod "was" old-mod)
+                      (swap! *state update :mod-details cache/miss new-mod {})))))))
           (catch Exception e
             (log/error e "Error in :battle-mod-details state watcher"))))))
   (add-watch state-atom :replay-map-and-mod-details
@@ -553,8 +705,8 @@
                 new-mod (:gametype new-game)
                 new-map (:mapname new-game)
 
-                map-details (:replay-map-details new-state)
-                mod-details (:replay-mod-details new-state)
+                map-details (-> new-state :map-details (get new-map))
+                mod-details (-> new-state :mod-details (get new-mod))
 
                 map-changed (not= new-map (:map-name map-details))
                 mod-changed (not= new-mod (:mod-name mod-details))
@@ -589,10 +741,10 @@
                                                    :file
                                                    read-mod-data)
                                           {})]
-                      (swap! *state assoc :replay-mod-details mod-details))))
+                      (swap! *state update :mod-details cache/miss new-mod mod-details))))
                 (future
                   (log/info "Replay mod not found, setting empty details for" new-mod "was" old-mod)
-                  (swap! *state assoc :replay-mod-details {}))))
+                  (swap! *state update :mod-details cache/miss new-mod {}))))
             (when (or (and (or (not= old-replay-path new-replay-path)
                                (not= old-map new-map))
                            (and (not (string/blank? new-map))
@@ -606,10 +758,10 @@
                   (log/info "Updating replay map details for" new-map "was" old-map)
                   (future
                     (let [map-details (or (read-map-data new-maps new-map) {})]
-                      (swap! *state assoc :replay-map-details map-details))))
+                      (swap! *state update :map-details cache/miss new-map map-details))))
                 (future
                   (log/info "Replay map not found, setting empty details for" new-map "was" old-map)
-                  (swap! *state assoc :replay-map-details {})))))
+                  (swap! *state update :map-details cache/miss new-map {})))))
           (catch Exception e
             (log/error e "Error in :battle-mod-details state watcher"))))))
   (add-watch state-atom :fix-missing-resource
@@ -623,11 +775,12 @@
                                             (filter (comp #{engine-version} :engine-version))
                                             first)
                                (-> engines first :engine-version)))
+                games (filter :is-game mods)
                 mod-fix (when mod-name
-                          (when-not (->> mods
+                          (when-not (->> games
                                          (filter (comp #{mod-name} :mod-name))
                                          first)
-                            (-> mods first :mod-name)))
+                            (-> games first :mod-name)))
                 map-fix (when map-name
                           (when-not (->> maps
                                          (filter (comp #{map-name} :map-name))
@@ -685,142 +838,16 @@
       (when (not= (auto-get-resources-relevant-keys old-state)
                   (auto-get-resources-relevant-keys new-state))
         (try
-          (when (and (:auto-get-resources new-state) (:spring-isolation-dir new-state))
-            (let [{:keys [battle battles current-tasks downloadables-by-url engines file-cache importables-by-path maps mods rapid-data-by-version spring-isolation-dir tasks]} new-state
-                  old-battle-details (-> old-state :battles (get (-> old-state :battle :battle-id)))
-                  {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
-                  rapid-data (get rapid-data-by-version battle-modname)
-                  rapid-id (:id rapid-data)
-                  all-tasks (concat tasks (vals current-tasks))
-                  rapid-task (->> all-tasks
-                                  (filter (comp #{::rapid-download} ::task-type))
-                                  (filter (comp #{rapid-id} :rapid-id))
-                                  first)
-                  engine-file (-> engines first :file)
-                  importables (vals importables-by-path)
-                  map-importable (some->> importables
-                                          (filter (comp #{::map} :resource-type))
-                                          (filter (partial resource/could-be-this-map? battle-map))
-                                          first)
-                  map-import-task (->> all-tasks
-                                       (filter (comp #{::import} ::task-type))
-                                       (filter (comp (partial same-resource-file? map-importable) :importable))
-                                       first)
-                  no-map (->> maps
-                              (filter (comp #{battle-map} :map-name))
-                              first
-                              not)
-                  downloadables (vals downloadables-by-url)
-                  map-downloadable (->> downloadables
-                                        (filter (comp #{::map} :resource-type))
-                                        (filter (partial resource/could-be-this-map? battle-map))
-                                        first)
-                  map-download-task (->> all-tasks
-                                         (filter (comp #{::http-downloadable} ::task-type))
-                                         (filter (comp (partial same-resource-file? map-downloadable) :downloadable))
-                                         first)
-                  engine-details (spring/engine-details engines battle-version)
-                  engine-importable (some->> importables
-                                             (filter (comp #{::engine} :resource-type))
-                                             (filter (partial resource/could-be-this-engine? battle-version))
-                                             first)
-                  engine-import-task (->> all-tasks
-                                          (filter (comp #{::import} ::task-type))
-                                          (filter (comp (partial same-resource-file? engine-importable) :importable))
-                                          first)
-                  engine-downloadable (->> downloadables
-                                           (filter (comp #{::engine} :resource-type))
-                                           (filter (partial resource/could-be-this-engine? battle-version))
-                                           first)
-                  engine-download-task (->> all-tasks
-                                            (filter (comp #{::http-downloadable} ::task-type))
-                                            (filter (comp (partial same-resource-file? engine-downloadable) :downloadable))
-                                            first)
-                  mod-downloadable (->> downloadables
-                                        (filter (comp #{::mod} :resource-type))
-                                        (filter (partial resource/could-be-this-mod? battle-modname))
-                                        first)
-                  mod-download-task (->> all-tasks
-                                         (filter (comp #{::http-downloadable} ::task-type))
-                                         (filter (comp (partial same-resource-file? mod-downloadable) :downloadable))
-                                         first)
-                  no-mod (->> mods
-                              (filter (comp #{battle-modname} :mod-name))
-                              first
-                              not)
-                  tasks [(when
-                           (and (= battle-version (:battle-version old-battle-details))
-                                (not engine-details))
-                           (cond
-                             (and engine-importable
-                                  (not engine-import-task)
-                                  (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-importable))))
-                             (do
-                               (log/info "Adding task to auto import engine" engine-importable)
-                               {::task-type ::import
-                                :importable engine-importable
-                                :spring-isolation-dir spring-isolation-dir})
-                             (and (not engine-importable)
-                                  engine-downloadable
-                                  (not engine-download-task)
-                                  (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-downloadable))))
-                             (do
-                               (log/info "Adding task to auto download engine" engine-downloadable)
-                               {::task-type ::http-downloadable
-                                :downloadable engine-downloadable
-                                :spring-isolation-dir spring-isolation-dir})
-                             :else
-                             nil))
-                         (when
-                           (and (= battle-map (:battle-map old-battle-details))
-                                no-map)
-                           (cond
-                             (and map-importable
-                                  (not map-import-task)
-                                  (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-importable))))
-                             (do
-                               (log/info "Adding task to auto import map" map-importable)
-                               {::task-type ::import
-                                :importable map-importable
-                                :spring-isolation-dir spring-isolation-dir})
-                             (and (not map-importable)
-                                  map-downloadable
-                                  (not map-download-task)
-                                  (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-downloadable))))
-                             (do
-                               (log/info "Adding task to auto download map" map-downloadable)
-                               {::task-type ::http-downloadable
-                                :downloadable map-downloadable
-                                :spring-isolation-dir spring-isolation-dir})
-                             :else
-                             nil))
-                         (when
-                           (and (= battle-modname (:battle-modname old-battle-details))
-                                no-mod)
-                           (cond
-                             (and rapid-id
-                                  (not rapid-task)
-                                  engine-file
-                                  (not (fs/file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))))
-                             (do
-                               (log/info "Adding task to auto download rapid" rapid-id)
-                               {::task-type ::rapid-download
-                                :engine-file engine-file
-                                :rapid-id rapid-id
-                                :spring-isolation-dir spring-isolation-dir})
-                             (and (not rapid-id)
-                                  mod-downloadable
-                                  (not mod-download-task)
-                                  (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir mod-downloadable))))
-                             (do
-                               (log/info "Adding task to auto download mod" mod-downloadable)
-                               {::task-type ::http-downloadable
-                                :downloadable mod-downloadable
-                                :spring-isolation-dir spring-isolation-dir})
-                             :else
-                             nil))]]
-             (when-let [tasks (seq (filter some? tasks))]
-               (add-tasks! *state tasks))))
+          (when-let [tasks (->> new-state
+                                :by-server
+                                (mapcat
+                                  (fn [[server-url  new-server]]
+                                    (let [old-server (-> old-state :by-server (get server-url))]
+                                      (server-auto-resources old-state new-state old-server new-server))))
+                                (filter some?)
+                                seq)]
+            (log/info "Adding" (count tasks) "to auto get resources")
+            (add-tasks! *state tasks))
           (catch Exception e
             (log/error e "Error in :auto-get-resources state watcher")))))))
 
@@ -1350,6 +1377,7 @@
      map-details)))
 
 
+#_
 (defn- update-channels-chimer-fn [state-atom]
   (log/info "Starting channels update chimer")
   (let [chimer
@@ -1798,65 +1826,72 @@
                           :channel-name channel-name
                           :client client}}))})}}]})
 
-(defn- update-disconnected! [state-atom]
-  (log/info "Updating state after disconnect")
-  (let [[{:keys [client ping-loop print-loop]} _new-state]
-        (swap-vals! state-atom
-          (fn [state]
-            (-> state
-                (dissoc :accepted
-                        :battle :battles
-                        :client :client-deferred :compflags :last-failed-message
-                        :ping-loop :print-loop :users)
-                (update :my-channels
-                  (fn [my-channels]
-                    (->> my-channels
-                         (remove (comp u/battle-channel-name? first))
-                         (into {})))))))]
-    (when client
-      (client/disconnect client))
-    (when ping-loop
-      (future-cancel ping-loop))
-    (when print-loop
-      (future-cancel print-loop)))
+(defn- update-disconnected!
+  [state-atom server-url]
+  (log/info "Disconnecting from" server-url)
+  (let [[old-state _new-state] (swap-vals! state-atom update :by-server dissoc server-url)
+        {:keys [client ping-loop print-loop]} (-> old-state :by-server (get server-url))]
+    (if client
+      (client/disconnect client)
+      (log/warn (ex-info "stacktrace" {:server-url server-url}) "No client to disconnect!"))
+    (if ping-loop
+      (future-cancel ping-loop)
+      (log/warn (ex-info "stacktrace" {:server-url server-url}) "No ping loop to cancel!"))
+    (if print-loop
+      (future-cancel print-loop)
+      (log/warn (ex-info "stacktrace" {:server-url server-url}) "No print loop to cancel!")))
   nil)
 
 (defmethod event-handler ::print-state [_e]
   (pprint *state))
 
 
-(defmethod event-handler ::disconnect [_e]
-  (update-disconnected! *state))
+(defmethod event-handler ::disconnect [{:keys [server]}]
+  (let [server-url (first server)]
+    (if server-url
+      (update-disconnected! *state server-url)
+      (log/error
+        (ex-info "stacktrace" {:server server})
+        "No server URL to disconnect from"))))
 
-(defn- connect [state-atom client-deferred]
+(defn- connect
+  [state-atom client-deferred server-url]
   (future
     (try
       (let [^SplicedStream client @client-deferred]
         (s/on-closed client
           (fn []
             (log/info "client closed")
-            (update-disconnected! *state)))
+            (update-disconnected! *state server-url)))
         (s/on-drained client
           (fn []
             (log/info "client drained")
-            (update-disconnected! *state)))
+            (update-disconnected! *state server-url)))
         (if (s/closed? client)
           (log/warn "client was closed on create")
           (do
-            (swap! state-atom assoc :client client :login-error nil)
-            (client/connect state-atom client))))
+            (swap! state-atom update-in [:by-server server-url]
+                   assoc :client client :login-error nil)
+            (client/connect state-atom server-url))))
       (catch Exception e
         (log/error e "Connect error")
-        (swap! state-atom assoc :login-error (str (.getMessage e)))
-        (update-disconnected! *state)))
+        (swap! state-atom assoc-in [:by-server server-url :login-error] (str (.getMessage e)))
+        (update-disconnected! *state server-url)))
     nil))
 
-(defmethod event-handler ::connect [{:keys [server-url]}]
+(defmethod event-handler ::connect [{:keys [server]}]
   (future
     (try
-      (let [client-deferred (client/client server-url)] ; TODO catch connect errors somehow
-        (swap! *state assoc :client-deferred client-deferred)
-        (connect *state client-deferred))
+      (let [server-url (first server)
+            client-deferred (client/client server-url)] ; TODO catch connect errors somehow
+        (swap! *state
+               (fn [state]
+                 (-> state
+                     (assoc :selected-server-tab server-url)
+                     (update-in [:by-server server-url]
+                       assoc :client-deferred client-deferred
+                           :server server))))
+        (connect *state client-deferred server-url))
       (catch Exception e
         (log/error e "Error connecting")))))
 
@@ -1915,15 +1950,12 @@
             (assoc :username username)
             (assoc :password password))))))
 
-(def client-buttons-keys
-  [:accepted :app-update-available :client :client-deferred :username :password :login-error :server-url :servers :server
-   :show-register-popup])
 
-(defn- client-buttons
-  [{:keys [accepted app-update-available client client-deferred username password login-error server servers]}]
+(def connect-button-keys
+  [:accepted :client :client-deferred :server])
+
+(defn connect-button [{:keys [accepted client client-deferred server]}]
   {:fx/type :h-box
-   :alignment :center-left
-   :style {:-fx-font-size 16}
    :children
    (concat
      [{:fx/type :button
@@ -1941,8 +1973,8 @@
                       server
                       (not client)
                       client-deferred)))
-       :on-action (assoc {:event/type (if client ::disconnect ::connect)}
-                         :server-url (first server))}]
+       :on-action {:event/type (if client ::disconnect ::connect)
+                   :server server}}]
      (when (and client-deferred (not client))
        [{:fx/type :button
          :text ""
@@ -1956,103 +1988,7 @@
                      :client client}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-close-octagon:16:white"}}])
-     [
-      {:fx/type :label
-       :alignment :center
-       :text " Server: "}
-      (assoc
-        {:fx/type server-combo-box}
-        :disable (or client client-deferred)
-        :server server
-        :servers servers
-        :on-value-changed {:event/type ::on-change-server})
-      {:fx/type :button
-       :text ""
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show servers window"}
-       :on-action {:event/type ::toggle
-                   :key :show-servers-window}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-plus:16:white"}}
-      {:fx/type :label
-       :alignment :center
-       :text " Login: "}
-      {:fx/type :text-field
-       :text username
-       :prompt-text "Username"
-       :disable (boolean (or client client-deferred (not server)))
-       :on-text-changed {:event/type ::username-change
-                         :server-url (first server)}}]
-     (when-not (or client client-deferred)
-       [{:fx/type :password-field
-         :text password
-         :disable (boolean (not server))
-         :prompt-text "Password"
-         :style {:-fx-pref-width 300}
-         :on-text-changed {:event/type ::password-change
-                           :server-url (first server)}}])
-     [{:fx/type :button
-       :text "Register"
-       :disable (boolean (or client client-deferred))
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :style {:-fx-font-size 14}
-        :text "Show server registration window"}
-       :on-action {:event/type ::toggle
-                   :key :show-register-window}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-account-plus:16:white"}}
-      {:fx/type :v-box
-       :h-box/hgrow :always
-       :alignment :center
-       :children
-       [{:fx/type :label
-         :text (str login-error)
-         :style {:-fx-text-fill "#FF0000"
-                 :-fx-max-width "360px"}}]}
-      {:fx/type :pane
-       :h-box/hgrow :always}]
-     (when-let [{:keys [latest]} app-update-available]
-       (let [color "gold"]
-         [{:fx/type :button
-           :text (str "Update to " latest)
-           :on-action {:event/type ::desktop-browse-url
-                       :url app-update-browseurl}
-           :style {:-fx-base color
-                   :-fx-background color}
-           :graphic
-           {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-open-in-new:16:black"}}
-          {:fx/type :button
-           :text ""
-           :on-action {:event/type ::dissoc
-                       :key :app-update-available}
-           :style {:-fx-base color
-                   :-fx-background color}
-           :graphic
-           {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-close:16:black"}}]))
-     [{:fx/type :button
-       :text "Settings"
-       :on-action {:event/type ::toggle
-                   :key :show-settings-window}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-settings:16:white"}}
-      {:fx/type :button
-       :text "Replays"
-       :on-action {:event/type ::toggle
-                   :key :show-replays}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-open-in-new:16:white"}}])})
+          :icon-literal "mdi-close-octagon:16:white"}}]))})
 
 
 (defmethod event-handler ::register [{:keys [email password server username]}]
@@ -2820,14 +2756,15 @@
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
-                   (assoc-in [:battles :singleplayer] {:battle-version engine-version
-                                                       :battle-map map-name
-                                                       :battle-modname mod-name
-                                                       :host-username username})
-                   (assoc :singleplayer-battle
-                          {:battle-id :singleplayer ; TODO dedupe
-                           :scripttags {:game {:startpostype 0}}
-                           :users {username {:battle-status handler/default-battle-status}}}))))
+                   (assoc-in [:by-server :local :username] username)
+                   (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
+                                                                         :battle-map map-name
+                                                                         :battle-modname mod-name
+                                                                         :host-username username})
+                   (assoc-in [:by-server :local :battle]
+                             {:battle-id :singleplayer ; TODO dedupe
+                              :scripttags {:game {:startpostype 0}}
+                              :users {username {:battle-status handler/default-battle-status}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
@@ -2853,27 +2790,6 @@
     (future
       (Thread/sleep 100)
       (swap! *state assoc :show-maps v))))
-
-
-; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
-(def ext-recreate-on-key-changed
-  "Extension lifecycle that recreates its component when lifecycle's key is changed
-
-  Supported keys:
-  - `:key` (required) - a value that determines if returned component should be recreated
-  - `:desc` (required) - a component description with additional lifecycle semantics"
-  (reify fx.lifecycle/Lifecycle
-    (create [_ {:keys [key desc]} opts]
-      (with-meta {:key key
-                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
-                 {`fx.component/instance #(-> % :child fx.component/instance)}))
-    (advance [this component {:keys [key desc] :as this-desc} opts]
-      (if (= (:key component) key)
-        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
-        (do (fx.lifecycle/delete this component opts)
-            (fx.lifecycle/create this this-desc opts))))
-    (delete [_ component opts]
-      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
 
 (defmethod event-handler ::random-map [{:keys [maps on-value-changed]}]
@@ -2998,10 +2914,10 @@
           (swap! *state
                  (fn [state]
                    (-> state
-                       (update-in [:battles :singleplayer :bots] dissoc bot-name)
-                       (update-in [:singleplayer-battle :bots] dissoc bot-name)
-                       (update-in [:battles :singleplayer :users] dissoc username)
-                       (update-in [:singleplayer-battle :users] dissoc username)))))
+                       (update-in [:by-server :local :battles :singleplayer :bots] dissoc bot-name)
+                       (update-in [:by-server :local :battle :bots] dissoc bot-name)
+                       (update-in [:by-server :local :battles :singleplayer :users] dissoc username)
+                       (update-in [:by-server :local :battle :users] dissoc username)))))
         (if bot-name
           (send-message client (str "REMOVEBOT " bot-name))
           (send-message client (str "KICKFROMBATTLE " username))))
@@ -3046,8 +2962,8 @@
                                      :battle-status status
                                      :owner username}]
                        (-> state
-                           (assoc-in [:battles :singleplayer :bots bot-username] bot-data)
-                           (assoc-in [:singleplayer-battle :bots bot-username] bot-data))))))
+                           (assoc-in [:by-server :local :battles :singleplayer :bots bot-username] bot-data)
+                           (assoc-in [:by-server :local :battle :bots bot-username] bot-data))))))
           (send-message client message)))
       (catch Exception e
         (log/error e "Error adding bot")))))
@@ -3190,7 +3106,7 @@
                 right (/ r (* 1.0 minimap-width))
                 bottom (/ b (* 1.0 minimap-height))]
             (if singleplayer
-              (swap! *state update-in [:singleplayer-battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+              (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
                      (fn [allyteam]
                        (assoc allyteam
                               :startrectleft left
@@ -3320,8 +3236,8 @@
         (swap! *state
                (fn [state]
                  (-> state
-                     (update-in [:battles :singleplayer (if is-bot :bots :users) player-name] merge data)
-                     (update-in [:singleplayer-battle (if is-bot :bots :users) player-name] merge data))))))))
+                     (update-in [:by-server :local :battles :singleplayer (if is-bot :bots :users) player-name] merge data)
+                     (update-in [:by-server :local :battle (if is-bot :bots :users) player-name] merge data))))))))
 
 (defn- update-color [client id {:keys [is-me is-bot] :as opts} color-int]
   (future
@@ -3528,39 +3444,6 @@
     (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
 
 
-; https://github.com/cljfx/cljfx/issues/51#issuecomment-583974585
-(def with-scroll-text-prop
-  (fx.lifecycle/make-ext-with-props
-   fx.lifecycle/dynamic
-   {:scroll-text (fx.prop/make
-                   (fx.mutator/setter
-                     (fn [^TextArea text-area [txt auto-scroll]]
-                       (let [scroll-pos (if auto-scroll
-                                          ##Inf
-                                          (.getScrollTop text-area))]
-                         (doto text-area
-                           (.setText txt)
-                           (some-> .getParent .layout)
-                           (.setScrollTop scroll-pos)))))
-                   fx.lifecycle/scalar
-                   :default ["" 0])}))
-
-(def with-scroll-text-flow-prop
-  (fx.lifecycle/make-ext-with-props
-   fx.lifecycle/dynamic
-   {:auto-scroll (fx.prop/make
-                   (fx.mutator/setter
-                     (fn [^ScrollPane scroll-pane [_texts auto-scroll]]
-                       (let [scroll-pos (if auto-scroll
-                                          ##Inf
-                                          (.getVvalue scroll-pane))]
-                         (doto scroll-pane
-                           (some-> .getParent .layout)
-                           (.setVvalue scroll-pos)))))
-                   fx.lifecycle/scalar
-                   :default [[] 0])}))
-
-
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event] :keys [am-host client singleplayer] :as e}]
   (let [startpostype (get spring/startpostypes-by-name event)]
@@ -3569,8 +3452,8 @@
         (swap! *state
                (fn [state]
                  (-> state
-                     (assoc-in [:scripttags :game :startpostype] startpostype)
-                     (assoc-in [:singleplayer-battle :scripttags :game :startpostype] startpostype))))
+                     (assoc-in [:by-server :local :scripttags :game :startpostype] startpostype)
+                     (assoc-in [:by-server :local :battle :scripttags :game :startpostype] startpostype))))
         (send-message client (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
@@ -3622,8 +3505,8 @@
       (swap! *state
              (fn [state]
                (-> state
-                   (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
-                   (assoc-in [:singleplayer-battle :scripttags :game :modoptions modoption-key] (str event)))))
+                   (assoc-in [:by-server :local :scripttags :game :modoptions modoption-key] (str event))
+                   (assoc-in [:by-server :local :battle :scripttags :game :modoptions modoption-key] (str event)))))
       (if am-host
         (send-message client (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
         (event-handler
@@ -3718,7 +3601,7 @@
         (log/error e "Error updating battle color")))))
 
 (defmethod task-handler ::update-rapid
-  [_e]
+  [e]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [engine-version engines file-cache spring-isolation-dir]} @*state ; TODO remove deref
@@ -3751,7 +3634,9 @@
                                   (let [path (fs/canonical-path f)
                                         prev-time (or (-> file-cache (get path) :last-modified) 0)
                                         curr-time (or (-> new-files (get path) :last-modified) Long/MAX_VALUE)]
-                                    (< prev-time curr-time))))
+                                    (or
+                                      (< prev-time curr-time)
+                                      (:force e)))))
                               (mapcat rapid/rapid-versions)
                               (filter :version)
                               (sort-by :version version/version-compare)
@@ -3760,6 +3645,9 @@
           rapid-data-by-hash (->> rapid-versions
                               (map (juxt :hash identity))
                               (into {}))
+          rapid-data-by-id (->> rapid-versions
+                                (map (juxt :id identity))
+                                (into {}))
           rapid-data-by-version (->> rapid-versions
                                      (map (juxt :version identity))
                                      (into {}))]
@@ -3768,6 +3656,7 @@
           (-> state
               (assoc :rapid-repos rapid-repos)
               (update :rapid-data-by-hash merge rapid-data-by-hash)
+              (update :rapid-data-by-id merge rapid-data-by-id)
               (update :rapid-data-by-version merge rapid-data-by-version)
               (update :rapid-versions (fn [old-versions]
                                         (set (concat old-versions rapid-versions))))
@@ -3981,6 +3870,18 @@
 (defmethod task-handler ::http-downloadable
   [task]
   @(event-handler (assoc task :event/type ::http-downloadable)))
+
+(defmethod task-handler ::download-and-extract
+  [{:keys [downloadable spring-isolation-dir] :as task}]
+  @(event-handler (assoc task :event/type ::http-downloadable))
+  (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
+        extract-file (when download-file
+                       (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
+    @(event-handler
+       (assoc task
+              :event/type ::extract-7z
+              :file download-file
+              :dest extract-file))))
 
 (defmethod task-handler ::download-bar-replay
   [{:keys [id spring-isolation-dir]}]
@@ -4963,22 +4864,11 @@
 (defmethod event-handler ::select-replay
   [{:fx/keys [event]}]
   (future
-    (let [replay-game (-> event :body :script-data :game)]
-      (swap! *state
-        (fn [state]
-          (cond-> state
-            true
-            (assoc :selected-replay-file (:file event))
-            (:id event)
-            (assoc :selected-replay-id (:id event))
-            (or (not (:gametype replay-game))
-                (not= (:gametype replay-game)
-                      (:mod-name (:replay-mod-details state))))
-            (assoc :replay-mod-details nil)
-            (or (not (:gametype replay-game))
-                (not= (:mapname replay-game)
-                      (:map-name (:replay-map-details state))))
-            (assoc :replay-map-details nil)))))))
+    (swap! *state
+      (fn [state]
+        (cond-> state
+          true (assoc :selected-replay-file (:file event))
+          (:id event) (assoc :selected-replay-id (:id event)))))))
 
 
 (defn- sanitize-replay-filter [s]
@@ -5075,7 +4965,7 @@
 
 (def replays-window-keys
   [:bar-replays-page :battle-players-color-allyteam :copying :engines :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill :filter-replay-source
-   :filter-replay-type :http-download :maps :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :filter-replay-type :http-download :map-details :maps :mod-details :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
@@ -5083,9 +4973,9 @@
 
 (defn replays-window
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
-           filter-replay-type http-download maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
+           filter-replay-type http-download map-details maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-map-details replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
+           replay-imports-by-map replay-imports-by-mod replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
   (let [local-filenames (->> parsed-replays-by-path
                              vals
@@ -5892,7 +5782,7 @@
                    [
                     {:fx/type fx.minimap/minimap-pane
                      :map-name mapname
-                     :map-details replay-map-details
+                     :map-details (get map-details mapname)
                      :minimap-type replay-minimap-type
                      :minimap-type-key :replay-minimap-type
                      :scripttags script-data}
@@ -5901,7 +5791,7 @@
                      :children
                      [{:fx/type :label
                        :text (str " Size: "
-                                  (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
+                                  (when-let [{:keys [map-width map-height]} (-> map-details (get mapname) :smf :header)]
                                     (str
                                       (when map-width (quot map-width 64))
                                       " x "
@@ -5978,10 +5868,30 @@
                   :-fx-max-height map-browse-box-height}
                  :on-action {:event/type ::map-window-action
                              :on-change-map (assoc on-change-map :map-name map-name :value map-name)}
+                 :tooltip
+                 {:fx/type :tooltip
+                  :text (str map-name)
+                  :show-delay [10 :ms]
+                  :style {:-fx-font-size 20}
+                  :content-display :top
+                  :graphic
+                  {:fx/type :image-view
+                   :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
+                           :background-loading true}
+                   :preserve-ratio true
+                   :style
+                   {:-fx-min-width minimap-size
+                    :-fx-max-width minimap-size
+                    :-fx-min-height minimap-size
+                    :-fx-max-height minimap-size}}}
                  :graphic
                  {:fx/type :v-box
+                  :alignment :center
                   :children
-                  [{:fx/type :image-view
+                  [
+                   {:fx/type :pane
+                    :v-box/vgrow :always}
+                   {:fx/type :image-view
                     :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
                             :background-loading true}
                     :fit-width map-browse-image-size
@@ -6002,15 +5912,17 @@
         {:fx/type :pane})}}))
 
 (defn- main-window-on-close-request
-  [client standalone e]
+  [clients standalone e]
   (log/debug "Main window close request" e)
   (when standalone
-    (loop []
-      (if (and client (not (s/closed? client)))
-        (do
-          (client/disconnect client)
-          (recur))
-        (System/exit 0)))))
+    (loop [clients clients]
+      (let [client (first clients)]
+        (if (and client (not (s/closed? client)))
+          (do
+            (client/disconnect client)
+            (recur clients))
+          (recur (rest clients)))))
+    (System/exit 0)))
 
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
@@ -6104,6 +6016,129 @@
       (catch Exception e
         (log/error e "Error sending message" message "to server")))))
 
+
+(def welcome-view-keys
+  [:by-server :map-details :mod-details :password :server :servers :tasks-by-type :username])
+
+(defn welcome-view
+  [{:keys [by-server client client-deferred password server servers tasks-by-type username]
+    :as state}]
+  {:fx/type :v-box
+   :alignment :center
+   :style {:-fx-font-size 20}
+   :children
+   (concat
+     [{:fx/type :pane
+       :v-box/vgrow :always}
+      {:fx/type :h-box
+       :alignment :center
+       :children
+       [
+        {:fx/type :v-box
+         :alignment :center-left
+         :children
+         (concat
+           [
+            {:fx/type :button
+             :text "Singleplayer Battle"
+             :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
+            {:fx/type :button
+             :text "Watch Replays"
+             :on-action {:event/type ::toggle
+                         :key :show-replays}}
+            {:fx/type :button
+             :text "Settings"
+             :on-action {:event/type ::toggle
+                         :key :show-settings-window}}
+            {:fx/type :label
+             :text "Join a Multiplayer Server:"}
+            {:fx/type :h-box
+             :children
+             [
+              {:fx/type server-combo-box
+               ;:disable (or client client-deferred)
+               :server server
+               :servers servers
+               :on-value-changed {:event/type ::on-change-server}}
+              {:fx/type :button
+               :text ""
+               :on-action {:event/type ::toggle
+                           :key :show-servers-window}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-plus:16:white"}}]}]
+           (if-not (or client client-deferred)
+             [{:fx/type :button
+               :text "Register"
+               :on-action {:event/type ::toggle
+                           :key :show-register-window}}]
+             [{:fx/type :label
+               :text (str " " (-> by-server (get (first server)) :login-error))
+               :style {:-fx-text-fill "#FF0000"
+                       :-fx-max-width "360px"}}])
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "Username: "}
+              {:fx/type :text-field
+               :text username
+               :prompt-text "Username"
+               :style {:-fx-pref-width 300
+                       :-fx-max-width 300}
+               :disable (boolean (or client client-deferred (not server)))
+               :on-text-changed {:event/type ::username-change
+                                 :server-url (first server)}}]}]
+           (if-not (or client client-deferred)
+             [
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :text "Password: "}
+                {:fx/type :password-field
+                 :text password
+                 :disable (boolean (not server))
+                 :prompt-text "Password"
+                 :style {:-fx-pref-width 300}
+                 :on-text-changed {:event/type ::password-change
+                                   :server-url (first server)}}]}]
+             [{:fx/type :label
+               :style {:-fx-font-size 16}
+               :text "Logged in"}
+              {:fx/type :button
+               :text "Go to server tab"
+               :on-action (fn [_]
+                            (swap! *state assoc :selected-server-tab (first server)))}])
+           [(merge
+              {:fx/type connect-button}
+              (select-keys state connect-button-keys))])}]}]
+     [{:fx/type :pane
+       :v-box/vgrow :always}]
+     (when (-> by-server :local :battle :battle-id)
+       [{:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :button
+           :text "Close Singleplayer Battle"
+           :on-action {:event/type :spring-lobby/dissoc-in
+                       :path [:by-server :local :battle]}}]}
+        (merge
+          {:fx/type fx.battle/battle-view}
+          (select-keys state fx.battle/battle-view-keys)
+          (:local by-server))])
+     [{:fx/type :h-box
+       :alignment :center-left
+       :style {:-fx-font-size 14}
+       :children
+       [{:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :button
+         :text (str (count tasks-by-type) " tasks")
+         :on-action {:event/type ::toggle
+                     :key :show-tasks-window}}]}])})
+
+
 (def channels-table-keys
   [:channels :client :my-channels])
 
@@ -6112,8 +6147,10 @@
 (def main-tab-id-set (set main-tab-ids))
 
 (def main-tab-view-keys
-  [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
-   :selected-tab-main :users])
+  (concat
+    welcome-view-keys
+    [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
+     :selected-tab-main :users]))
 
 (defn- main-tab-view
   [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
@@ -6142,13 +6179,14 @@
               :-fx-min-height 200
               :-fx-pref-height 300}
       :tabs
-      [{:fx/type :tab
+      [
+       {:fx/type :tab
         :graphic {:fx/type :label
                   :text "Battles"}
         :closable false
         :id "battles"
         :content
-        (if (= 0 selected-index)
+        (if (= selected-tab-main "battles")
           {:fx/type :split-pane
            :divider-positions [0.80]
            :items
@@ -6169,7 +6207,7 @@
         :closable false
         :id "chat"
         :content
-        (if (= 1 selected-index)
+        (if (= selected-tab-main "chat")
           {:fx/type :split-pane
            :divider-positions [0.70 0.9]
            :items
@@ -6210,7 +6248,7 @@
         :closable false
         :id "console"
         :content
-        (if (= 2 selected-index)
+        (if (= selected-tab-main "console")
           (let [time-zone-id (.toZoneId (TimeZone/getDefault))
                 console-text (string/join "\n"
                                (map
@@ -6435,15 +6473,145 @@
                         (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))}]))}})}}]}]}
       {:fx/type :pane})}})
 
+
+(defn server-tab
+  [{:keys [agreement battle client last-failed-message password pop-out-battle selected-tab-main singleplayer-battle
+           tasks-by-type username verification-code]
+    :as state}]
+  {:fx/type :v-box
+   :style {:-fx-font-size 14}
+   :alignment :top-left
+   :children
+   (concat
+     (when agreement
+       [{:fx/type :label
+         :style {:-fx-font-size 20}
+         :text " Server agreement: "}
+        {:fx/type :text-area
+         :editable false
+         :text (str agreement)}
+        {:fx/type :h-box
+         :style {:-fx-font-size 20}
+         :children
+         [{:fx/type :text-field
+           :prompt-text "Email Verification Code"
+           :text verification-code
+           :on-text-changed {:event/type ::assoc
+                             :key :verification-code}}
+          {:fx/type :button
+           :text "Confirm"
+           :on-action {:event/type ::confirm-agreement
+                       :client client
+                       :password password
+                       :username username
+                       :verification-code verification-code}}]}])
+     [(merge
+        {:fx/type main-tab-view
+         :v-box/vgrow :always
+         :selected-tab-main selected-tab-main}
+        (select-keys state
+          (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
+      (merge
+        {:fx/type fx.battles-buttons/battles-buttons-view}
+        (select-keys state fx.battles-buttons/battles-buttons-keys))]
+     (when (or battle singleplayer-battle)
+       (if (or (:battle-id battle) singleplayer-battle)
+         (when (not pop-out-battle)
+           [(merge
+              {:fx/type fx.battle/battle-view
+               :tasks-by-type tasks-by-type}
+              (select-keys state fx.battle/battle-view-keys))])
+         [{:fx/type :h-box
+           :alignment :top-left
+           :children
+           [{:fx/type :v-box
+             :h-box/hgrow :always
+             :children
+             [{:fx/type :label
+               :style {:-fx-font-size 20}
+               :text "Waiting for server to open battle..."}]}]}]))
+     [{:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :label
+         :text (str last-failed-message)
+         :style {:-fx-text-fill "#FF0000"}}
+        {:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :button
+         :text (str (count tasks-by-type) " tasks")
+         :on-action {:event/type ::toggle
+                     :key :show-tasks-window}}]}])})
+
+(defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
+  (swap! *state assoc :selected-server-tab (.getId event)))
+
+(defn main-window [{:keys [by-server server selected-server-tab] :as state}]
+  (let [no-local (dissoc by-server :local)
+        tab-ids (concat ["local"] (map first no-local))
+        tab-id-set (set tab-ids)
+        selected-index (or (when (contains? tab-id-set selected-server-tab)
+                             (.indexOf ^List tab-ids selected-server-tab))
+                           0)]
+    {:fx/type :v-box
+     :style {:-fx-font-size 14}
+     :alignment :top-left
+     :children
+     [
+      {:fx/type fx.ext.tab-pane/with-selection-props
+       :v-box/vgrow :always
+       :props
+       (merge
+         {:on-selected-item-changed {:event/type ::selected-item-changed-server-tabs}
+          :selected-index selected-index})
+       :desc
+       {:fx/type :tab-pane
+        :tabs
+        (concat
+          [{:fx/type :tab
+            :id "local"
+            :closable false
+            :graphic {:fx/type :label
+                      :text "local"
+                      :style {:-fx-font-size 18}}
+            :content
+            (merge
+              {:fx/type welcome-view
+               :v-box/vgrow :always}
+              (select-keys state (concat welcome-view-keys fx.battle/battle-view-keys))
+              (-> by-server
+                  (get (first server))
+                  (select-keys [:accepted :client :client-deferred])))}]
+          (map
+            (fn [[address server-data]]
+              {:fx/type :tab
+               :id (str address)
+               :graphic {:fx/type :label
+                         :text (str address)
+                         :style {:-fx-font-size 18}}
+               :on-close-request {:event/type ::disconnect
+                                  :server (:server server-data)}
+               :content
+               (merge
+                 {:fx/type server-tab}
+                 (select-keys state
+                   (concat
+                     welcome-view-keys
+                     fx.battle/battle-view-keys
+                     [:map-details :mod-details :pop-out-battle :selected-battle :selected-tab-main]))
+                 server-data)})
+            (dissoc by-server :local)))}}]}))
+
+
 (defn- root-view
-  [{{:keys [agreement battle client current-tasks last-failed-message password pop-out-battle
-            selected-tab-main singleplayer-battle standalone tasks username verification-code]
+  [{{:keys [by-server current-tasks pop-out-battle selected-server-tab selected-tab-main standalone tasks]
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)
         all-tasks (filter some? (concat tasks (vals current-tasks)))
         tasks-by-type (group-by ::task-type all-tasks)
-        selected-tab-main (get main-tab-ids selected-tab-main (first main-tab-ids))]
+        selected-tab-main (get main-tab-id-set selected-tab-main (first main-tab-ids))
+        all-clients (->> by-server vals (map :client) (filter some?))]
     {:fx/type fx/ext-many
      :desc
      [{:fx/type :stage
@@ -6454,80 +6622,17 @@
        :y 100
        :width (min main-window-width width)
        :height (min main-window-height height)
-       :on-close-request (partial main-window-on-close-request client standalone)
+       :on-close-request (partial main-window-on-close-request all-clients standalone)
        :scene
        {:fx/type :scene
         :stylesheets stylesheets
-        :root
-        {:fx/type :v-box
-         :style {:-fx-font-size 14}
-         :alignment :top-left
-         :children
-         (concat
-           [(merge
-              {:fx/type client-buttons}
-              (select-keys state client-buttons-keys))]
-           (when agreement
-             [{:fx/type :label
-               :style {:-fx-font-size 20}
-               :text " Server agreement: "}
-              {:fx/type :text-area
-               :editable false
-               :text (str agreement)}
-              {:fx/type :h-box
-               :style {:-fx-font-size 20}
-               :children
-               [{:fx/type :text-field
-                 :prompt-text "Email Verification Code"
-                 :text verification-code
-                 :on-text-changed {:event/type ::assoc
-                                   :key :verification-code}}
-                {:fx/type :button
-                 :text "Confirm"
-                 :on-action {:event/type ::confirm-agreement
-                             :client client
-                             :password password
-                             :username username
-                             :verification-code verification-code}}]}])
-           [(merge
-              {:fx/type main-tab-view
-               :v-box/vgrow :always
-               :selected-tab-main selected-tab-main}
-              (select-keys state
-                (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
-            (merge
-              {:fx/type fx.battles-buttons/battles-buttons-view}
-              (select-keys state fx.battles-buttons/battles-buttons-keys))]
-           (when (or battle singleplayer-battle)
-             (if (or (:battle-id battle) singleplayer-battle)
-               (when (not pop-out-battle)
-                 [(merge
-                    {:fx/type fx.battle/multi-battle-view
-                     :tasks-by-type tasks-by-type}
-                    (select-keys state fx.battle/multi-battle-view-keys))])
-               [{:fx/type :h-box
-                 :alignment :top-left
-                 :children
-                 [{:fx/type :v-box
-                   :h-box/hgrow :always
-                   :children
-                   [{:fx/type :label
-                     :style {:-fx-font-size 20}
-                     :text "Waiting for server to open battle..."}]}]}]))
-           [{:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text (str last-failed-message)
-               :style {:-fx-text-fill "#FF0000"}}
-              {:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type :button
-               :text (str (count (seq tasks)) " tasks")
-               :on-action {:event/type ::toggle
-                           :key :show-tasks-window}}]}])}}}
-      (let [show-battle-window (boolean (and pop-out-battle
-                                             (or battle singleplayer-battle)))]
+        :root (merge
+                {:fx/type main-window}
+                state
+                {:selected-tab-main selected-tab-main
+                 :tasks-by-type tasks-by-type})}}
+      (let [battle (-> by-server (get selected-server-tab) :battle)
+            show-battle-window (boolean (and pop-out-battle battle))]
         {:fx/type :stage
          :showing show-battle-window
          :title (str u/app-name " Battle")
@@ -6542,9 +6647,10 @@
           :root
           (if show-battle-window
             (merge
-              {:fx/type fx.battle/multi-battle-view
+              {:fx/type fx.battle/battle-view
                :tasks-by-type tasks-by-type}
-              (select-keys state fx.battle/multi-battle-view-keys))
+              (select-keys state fx.battle/battle-view-keys)
+              (get by-server selected-server-tab))
             {:fx/type :pane})}})
       (merge
         {:fx/type download-window}
@@ -6591,7 +6697,7 @@
   (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        update-channels-chimer (update-channels-chimer-fn state-atom)
+        ;update-channels-chimer (update-channels-chimer-fn state-atom)
         check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
@@ -6603,7 +6709,8 @@
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
     {:chimers [low-tasks-chimer high-tasks-chimer
-               update-channels-chimer check-app-update-chimer]}))
+               ;update-channels-chimer
+               check-app-update-chimer]}))
 
 (defn init-async [state-atom]
   (future

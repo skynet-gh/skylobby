@@ -179,12 +179,23 @@
   (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
 
 
-(defn update-console-log [state-atom source message]
-  (swap! state-atom update :console-log
-    (fn [console-log]
-      (conj console-log {:timestamp (curr-millis)
-                         :source source
-                         :message message}))))
+(defn update-console-log [state-atom source client message]
+  (swap! state-atom
+    (fn [state]
+      (let [server-url (->> state  ; TODO fix hack
+                            :by-server
+                            (filter #(identical? (-> % second :client) client))
+                            first
+                            first)]
+        (if server-url
+          (update-in state [:by-server server-url :console-log]
+            (fn [console-log]
+              (conj console-log {:timestamp (curr-millis)
+                                 :source source
+                                 :message message})))
+          (do
+            (log/warn "No server-url found for message:" message)
+            state))))))
 
 (defn update-chat-messages-fn
   ([username message]

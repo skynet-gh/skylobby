@@ -154,8 +154,9 @@
   context)
 
 
-(defn client-handler [client state message]
+(defn client-handler [state-atom server-url message]
   (try
+    (require 'spring-lobby.client)
     (require 'spring-lobby.client.handler)
     (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
       (when (not (identical? old-client-handler new-handler))
@@ -163,7 +164,7 @@
     (catch Exception _e
       (println "compile error, using old client handler")))
   (try
-    (old-client-handler client state message)
+    (old-client-handler state-atom server-url message)
     (catch Exception _e
       (println "exception in old client, probably unbound fn, fix asap"))))
 
@@ -190,6 +191,7 @@
     (alter-var-root #'old-view (constantly (var-get (find-var 'spring-lobby/root-view))))
     (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))
     (require 'spring-lobby.client)
+    (require 'spring-lobby.client.handler)
     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (let [init-fn (var-get (find-var 'spring-lobby/init))]

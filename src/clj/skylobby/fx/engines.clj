@@ -3,11 +3,18 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    [spring-lobby.fx.font-icon :as font-icon]))
+    [skylobby.resource :as resource]
+    [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.util :as u]))
+
+
+(def known-engine-versions
+  ["104.0.1-1828-g1f481b7 BAR"])
 
 
 (defn engines-view
-  [{:keys [engine-filter engine-version engines on-value-changed spring-isolation-dir]}]
+  [{:keys [downloadables-by-url engine-filter engine-version engines http-download on-value-changed
+           spring-isolation-dir suggest tasks-by-type]}]
   {:fx/type :h-box
    :alignment :center-left
    :children
@@ -15,30 +22,54 @@
      [{:fx/type :label
        :text " Engine: "}]
      (if (empty? engines)
-       [{:fx/type :label
-         :text "No engines "}]
-       (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
-             filtered-engines (->> engines
-                                   (map :engine-version)
-                                   (filter some?)
-                                   (filter #(string/includes? (string/lower-case %) filter-lc))
-                                   sort)]
-         [{:fx/type :combo-box
-           :prompt-text " < pick an engine > "
-           :value engine-version
-           :items filtered-engines
-           :on-value-changed (or on-value-changed
-                                 {:event/type :spring-lobby/assoc
-                                  :key :engine-version})
-           :cell-factory
-           {:fx/cell-type :list-cell
-            :describe
-            (fn [engine]
-              {:text (if (string/blank? engine)
-                       "< choose an engine >"
-                       engine)})}
-           :on-key-pressed {:event/type :spring-lobby/engines-key-pressed}
-           :on-hidden {:event/type :spring-lobby/engines-hidden}}]))
+       (if suggest
+         (let [downloadables (vals downloadables-by-url)]
+           (mapv
+             (fn [engine-version]
+               (let [downloadable (->> downloadables
+                                       (filter (partial resource/could-be-this-engine? engine-version))
+                                       first)
+                     download (get http-download (:download-url downloadable))
+                     running (:running download)
+                     task (->> (get tasks-by-type :spring-lobby/download-and-extract)
+                               (filter (comp (partial resource/same-resource-filename? downloadable) :downloadable))
+                               seq)]
+                 {:fx/type :button
+                  :text (cond
+                          running (u/download-progress download)
+                          task "Queued..."
+                          :else
+                          (str "Get " engine-version))
+                  :disable (boolean (or (not downloadable) running task))
+                  :on-action {:event/type :spring-lobby/add-task
+                              :task {:spring-lobby/task-type :spring-lobby/download-and-extract
+                                     :downloadable downloadable
+                                     :spring-isolation-dir spring-isolation-dir}}}))
+             known-engine-versions))
+        [{:fx/type :label
+          :text " No engines "}])
+      (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
+            filtered-engines (->> engines
+                                  (map :engine-version)
+                                  (filter some?)
+                                  (filter #(string/includes? (string/lower-case %) filter-lc))
+                                  sort)]
+        [{:fx/type :combo-box
+          :prompt-text " < pick an engine > "
+          :value engine-version
+          :items filtered-engines
+          :on-value-changed (or on-value-changed
+                                {:event/type :spring-lobby/assoc
+                                 :key :engine-version})
+          :cell-factory
+          {:fx/cell-type :list-cell
+           :describe
+           (fn [engine]
+             {:text (if (string/blank? engine)
+                      "< choose an engine >"
+                      engine)})}
+          :on-key-pressed {:event/type :spring-lobby/engines-key-pressed}
+          :on-hidden {:event/type :spring-lobby/engines-hidden}}]))
      [{:fx/type fx.ext.node/with-tooltip-props
        :props
        {:tooltip

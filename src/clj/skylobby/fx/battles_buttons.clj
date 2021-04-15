@@ -1,6 +1,5 @@
 (ns skylobby.fx.battles-buttons
   (:require
-    [cljfx.ext.node :as fx.ext.node]
     clojure.set
     [clojure.string :as string]
     [skylobby.fx.engines :refer [engines-view]]
@@ -19,8 +18,8 @@
 
 (defn battles-buttons-view
   [{:keys [accepted battle battles battle-password battle-title client compflags engine-version mod-name map-name maps
-           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle singleplayer-battle
-           spring-isolation-dir use-springlobby-modname]
+           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
+           spring-isolation-dir]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -37,6 +36,13 @@
        :graphic
        {:fx/type font-icon/lifecycle
         :icon-literal "mdi-settings:16:white"}}
+      {:fx/type :button
+       :text "Replays"
+       :on-action {:event/type :toggle
+                   :key :show-replays}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-open-in-new:16:white"}}
       {:fx/type :label
        :text " Resources: "}
       {:fx/type :button
@@ -115,6 +121,7 @@
              :prompt-text "Battle Password"
              :on-action host-battle-action
              :on-text-changed {:event/type :spring-lobby/battle-password-change}}
+            #_
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
@@ -180,14 +187,6 @@
                  :prompt-text "Battle Password"
                  :on-action {:event/type :spring-lobby/host-battle}
                  :on-text-changed {:event/type :spring-lobby/battle-password-change}}]))))
-       (if-not singleplayer-battle
-         [{:fx/type :button
-           :text "Open Singleplayer Battle"
-           :on-action {:event/type :spring-lobby/start-singleplayer-battle}}]
-         [{:fx/type :button
-           :text "Close Singleplayer Battle"
-           :on-action {:event/type :spring-lobby/dissoc
-                       :key :singleplayer-battle}}])
        (when (contains? (set compflags) matchmaking-compflag)
          [{:fx/type :button
            :text "Matchmaking"

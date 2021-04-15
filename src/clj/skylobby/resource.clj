@@ -75,3 +75,13 @@
            (when (and mod-name resource-filename)
              (= (normalize-mod mod-name)
                 (normalize-mod resource-filename))))))
+
+(defn same-resource-file? [resource1 resource2]
+  (and (:resource-file resource1)
+       (= (:resource-file resource1)
+          (:resource-file resource2))))
+
+(defn same-resource-filename? [resource1 resource2]
+  (and (:resource-filename resource1)
+       (= (:resource-filename resource1)
+          (:resource-filename resource2))))

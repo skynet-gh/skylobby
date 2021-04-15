@@ -3,11 +3,22 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    [spring-lobby.fx.font-icon :as font-icon]))
+    [skylobby.resource :as resource]
+    [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.util :as u]))
+
+
+(def known-maps
+  ["Altair_Crossing_V4"
+   "Avalanche 3.4"
+   "Nuclear Winter Bar 1.2"
+   "Quicksilver Remake 1.24"
+   "Red Comet Remake 1.8"])
 
 
 (defn maps-view
-  [{:keys [disable map-name maps on-value-changed map-input-prefix spring-isolation-dir]}]
+  [{:keys [disable downloadables-by-url http-download map-name maps on-value-changed
+           map-input-prefix spring-isolation-dir suggest tasks-by-type]}]
   {:fx/type :h-box
    :alignment :center-left
    :children
@@ -16,8 +27,34 @@
        :alignment :center-left
        :text " Map: "}]
      (if (empty? maps)
-       [{:fx/type :label
-         :text "No maps "}]
+       (if suggest
+         (let [downloadables (vals downloadables-by-url)]
+           [{:fx/type :flow-pane
+             :children
+             (map
+               (fn [map-name]
+                 (let [downloadable (->> downloadables
+                                         (filter (partial resource/could-be-this-map? map-name))
+                                         first)
+                       download (get http-download (:download-url downloadable))
+                       running (:running download)
+                       task (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                 (filter (comp (partial resource/same-resource-filename? downloadable) :downloadable))
+                                 seq)]
+                   {:fx/type :button
+                    :text (cond
+                            running (u/download-progress download)
+                            task "Qeueued..."
+                            :else
+                            (str "Get " map-name))
+                    :disable (boolean (or (not downloadable) running task))
+                    :on-action {:event/type :spring-lobby/add-task
+                                :task {:spring-lobby/task-type :spring-lobby/http-downloadable
+                                       :downloadable downloadable
+                                       :spring-isolation-dir spring-isolation-dir}}}))
+               known-maps)}])
+         [{:fx/type :label
+           :text " No maps"}])
        (let [filter-lc (if map-input-prefix (string/lower-case map-input-prefix) "")
              filtered-map-names
              (->> maps
