@@ -1,8 +1,10 @@
 (ns spring-lobby.util
   (:require
+    [com.evocomputing.colors :as colors]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    java-time
     [spring-lobby.git :as git]
     [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
@@ -10,7 +12,10 @@
     (java.net URL)
     (java.net URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
+    (java.time LocalDateTime)
+    (java.util TimeZone)
     (java.util.jar Manifest)
+    (javafx.scene.paint Color)
     (org.apache.commons.io FileUtils)))
 
 
@@ -21,6 +26,12 @@
 
 
 (def max-messages 200) ; for chat and console
+
+(def minimap-size 512) ; display size in UI
+(def start-pos-r 10.0) ; start position radius
+
+(def minimap-types
+  ["minimap" "metalmap" "heightmap"])
 
 
 (defn manifest-attributes [url]
@@ -74,6 +85,8 @@
   (cond
     (number? string-or-number)
     string-or-number
+    (boolean? string-or-number)
+    (if string-or-number 1 0)
     (string? string-or-number)
     (edn/read-string string-or-number)
     :else
@@ -166,12 +179,23 @@
   (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
 
 
-(defn update-console-log [state-atom source message]
-  (swap! state-atom update :console-log
-    (fn [console-log]
-      (conj console-log {:timestamp (curr-millis)
-                         :source source
-                         :message message}))))
+(defn update-console-log [state-atom source client message]
+  (swap! state-atom
+    (fn [state]
+      (let [server-url (->> state  ; TODO fix hack
+                            :by-server
+                            (filter #(identical? (-> % second :client) client))
+                            first
+                            first)]
+        (if server-url
+          (update-in state [:by-server server-url :console-log]
+            (fn [console-log]
+              (conj console-log {:timestamp (curr-millis)
+                                 :source source
+                                 :message message})))
+          (do
+            (log/warn "No server-url found for message:" message)
+            state))))))
 
 (defn update-chat-messages-fn
   ([username message]
@@ -182,3 +206,58 @@
                      :timestamp (curr-millis)
                      :username username
                      :ex ex}))))
+
+(defn parse-skill [skill]
+  (cond
+    (number? skill)
+    skill
+    (string? skill)
+    (let [[_all n] (re-find #"~?#?([\d]+)#?" skill)]
+      (try
+        (Double/parseDouble n)
+        (catch Exception e
+          (log/warn e "Error parsing skill" skill))))
+    :else nil))
+
+(defn nickname [{:keys [ai-name bot-name owner username]}]
+  (if bot-name
+    (str bot-name " (" ai-name ", " owner ")")
+    (str username)))
+
+(defn spring-color-to-javafx
+  "Returns the rgb int color represention for the given Spring bgr int color."
+  [spring-color]
+  (let [spring-color-int (if spring-color (to-number spring-color) 0)
+        [r g b _a] (:rgba (colors/create-color spring-color-int))
+        reversed (colors/create-color
+                   {:r b
+                    :g g
+                    :b r})]
+    (Color/web (format "#%06x" (colors/rgb-int reversed)))))
+
+(defn download-progress
+  [{:keys [current total]}]
+  (if (and current total)
+    (str (format-bytes current)
+         " / "
+         (format-bytes total))
+    "Downloading..."))
+
+(defn- parse-mod-name-git [mod-name]
+  (or (re-find #"(.+)\s([0-9a-f]+)$" mod-name)
+      (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)
+      (re-find #"(.+)\s(\$VERSION)$" mod-name)))
+
+(defn mod-git-ref
+  "Returns the git ref from the given mod name, or nil if it does not parse."
+  [mod-name]
+  (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
+    git))
+
+(defn format-hours
+  ([timestamp-millis]
+   (format-hours (.toZoneId (TimeZone/getDefault)) timestamp-millis))
+  ([time-zone-id timestamp-millis]
+   (java-time/format "HH:mm:ss" (LocalDateTime/ofInstant
+                                  (java-time/instant timestamp-millis)
+                                  time-zone-id))))

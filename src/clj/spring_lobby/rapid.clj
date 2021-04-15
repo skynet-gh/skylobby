@@ -126,18 +126,21 @@
        (map fs/filename)))
 
 (defn rapid-versions [f]
-  (with-open [is (io/input-stream f)
-              gz (GZIPInputStream. is)]
-    (->> gz
-         slurp
-         (string/split-lines)
-         (map
-           (fn [line]
-             (let [[id commit detail version] (string/split line #",")]
-               {:id id
-                :hash commit
-                :detail detail
-                :version version}))))))
+  (try
+    (with-open [is (io/input-stream f)
+                gz (GZIPInputStream. is)]
+      (->> gz
+           slurp
+           (string/split-lines)
+           (map
+             (fn [line]
+               (let [[id commit detail version] (string/split line #",")]
+                 {:id id
+                  :hash commit
+                  :detail detail
+                  :version version})))))
+    (catch Exception e
+      (log/error e "Error reading rapid versions from" f))))
 
 
 (defn package-versions

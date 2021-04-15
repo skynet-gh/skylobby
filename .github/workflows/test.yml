@@ -15,8 +15,7 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  test:
     # The type of runner that the job will run on
     runs-on: ubuntu-20.04
 
@@ -32,3 +31,21 @@ jobs:
           cli: '1.10.3.822'
 
       - run: clojure -M:test:headless:runner
+
+  coverage:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-20.04
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # https://github.com/marketplace/actions/setup-clojure
+      - uses: actions/checkout@v2
+      - uses: DeLaGuardo/setup-graalvm@4.0
+        with:
+          graalvm-version: '19.3.4.java11'
+      - uses: DeLaGuardo/setup-clojure@3.2
+        with:
+          cli: '1.10.3.822'
+
+      - run: clojure -M:coverage:headless
+      - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json

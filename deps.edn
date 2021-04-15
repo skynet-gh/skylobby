@@ -28,6 +28,7 @@
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+  org.clojure/core.cache {:mvn/version "1.0.207"}
   org.clojure/clojure {:mvn/version "1.10.3"}
   org.clojure/core.async {:mvn/version "1.3.610"}
   org.clojure/spec.alpha {:mvn/version "0.2.194"}
@@ -47,9 +48,9 @@
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.25.9"}
-    cider/orchard {:mvn/version "0.6.5"}
-    clj-commons/pomegranate {:mvn/version "1.2.0"}
+   {cider/cider-nrepl {:mvn/version "0.25.11"}
+    cider/orchard {:mvn/version "0.7.0"}
+    clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "0.1.37"}
@@ -66,9 +67,9 @@
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.25.9"}
-    cider/orchard {:mvn/version "0.6.5"}
-    clj-commons/pomegranate {:mvn/version "1.2.0"}
+   {cider/cider-nrepl {:mvn/version "0.25.11"}
+    cider/orchard {:mvn/version "0.7.0"}
+    clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "0.1.37"}
@@ -105,6 +106,11 @@
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["test/clj"]}
+  ; https://github.com/kiramclean/morphy/blob/main/deps.edn
+  :coverage
+  {:extra-paths ["test/clj"]
+   :extra-deps {cloverage/cloverage {:mvn/version "1.2.2"}}
+   :main-opts ["-m" "cloverage.coverage" "-p" "src/clj" "-s" "test/clj" "--codecov"]}
   ; https://github.com/cljfx/cljfx/blob/9a3c696d6f18828d35e4d1f4d71e8104b7a85576/deps.edn#L27-L28
   :headless
   {:jvm-opts ["-Dtestfx.robot=glass" "-Dglass.platform=Monocle" "-Dmonocle.platform=Headless" "-Dprism.order=sw"]

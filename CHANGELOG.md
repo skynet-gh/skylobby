@@ -4,13 +4,23 @@ Notable changes and todo list.
 
 ### TODO - future
 
-- Add .sdd map handling
+- Save and restore named settings, per server or per game
+- Merged view of multiple servers
+- Configure Spring directory per server or per game
 - Improve table column sizing
-- Allow both singleplayer and multiplayer battles
-- Multiple server connections, merged view
+- File pickers for path configs
 - Add support for TLS communication to the server
+- Chat URL highlighting, text selection
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.3.0]
+
+- Add ability to connec to multiple servers simultaneously
+- Add local battle separate from multiplayer
+- Improve map and game caching
+- Add .sdd map handling
+- Add test coverage
 
 ### [0.2.15]
 
