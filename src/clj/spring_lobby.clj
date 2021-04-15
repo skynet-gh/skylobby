@@ -1355,12 +1355,25 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/instant)
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
-            (when-let [client (:client @state-atom)]
-              (log/info "Updating channel list")
-              (send-message client "CHANNELS")))
+            (log/info "Truncating message logs")
+            (let [state (swap! state-atom
+                          (fn [state]
+                            (-> state
+                                (update :console-log (partial take u/max-messages))
+                                (update :channels
+                                  (fn [channels]
+                                    (reduce-kv
+                                      (fn [m k v]
+                                        (assoc m k (update v :messages (partial take u/max-messages))))
+                                      {}
+                                      channels))))))]
+
+              (when-let [client (:client state)]
+                (log/info "Updating channel list")
+                (send-message client "CHANNELS"))))
           {:error-handler
            (fn [e]
              (log/error e "Error force updating resources")
