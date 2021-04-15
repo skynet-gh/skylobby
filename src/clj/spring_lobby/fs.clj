@@ -333,10 +333,16 @@
 (defn map-files
   [root]
   (->> (io/file root "maps")
-       file-seq
-       (filter is-file?)
-       (filter #(or (string/ends-with? (filename %) ".sd7")
-                    (string/ends-with? (filename %) ".sdz")))))
+       list-files
+       (filter
+         (some-fn
+           (every-pred
+             is-file?
+             #(or (string/ends-with? (filename %) ".sd7")
+                  (string/ends-with? (filename %) ".sdz")))
+           (every-pred
+             is-directory?
+             #(string/ends-with? (filename %) ".sdd"))))))
 
 (defn- extract-7z
   ([^File f]
@@ -813,8 +819,45 @@
                {:smd (assoc smd ::source path)}))))))))
 
 
-#_
-(time (read-7z-map-fast (map-file "altored_divide_bar_remake_1.5.sd7")))
+(defn read-smf-file
+  ([smf-file]
+   (read-smf-file smf-file nil))
+  ([smf-file {:keys [header-only]}]
+   (let [smf-path (canonical-path smf-file)]
+     (if header-only
+       (let [header (smf/decode-map-header (io/input-stream smf-file))]
+         {:map-name (map-name smf-path)
+          :smf (merge
+                 {::source smf-path
+                  :header header})})
+       (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-file))]
+         {:map-name (map-name smf-path)
+          ; TODO extract only what's needed
+          :smf (merge
+                 {::source smf-path
+                  :header header}
+                 body)})))))
+
+(defn read-map-directory
+  ([file]
+   ([file nil]))
+  ([file opts]
+   (let [all-files (file-seq file)]
+     (merge
+       (when-let [smf-file (->> all-files
+                                (filter (comp #(string/ends-with? % ".smf") string/lower-case filename))
+                                first)]
+         (read-smf-file smf-file opts))
+       (when-let [mapinfo-file (->> all-files
+                                    (filter (comp #{"mapinfo.lua"} string/lower-case filename))
+                                    first)]
+         (parse-mapinfo file (slurp (io/input-stream mapinfo-file)) (canonical-path mapinfo-file)))
+       (when-let [smd-file (->> all-files
+                                (filter (comp #(string/ends-with? % ".smd") string/lower-case filename))
+                                first)]
+         (let [smd (when-let [map-data (slurp (io/input-stream smd-file))]
+                     (spring-script/parse-script map-data))]
+           {:smd (assoc smd ::source (canonical-path smd-file))}))))))
 
 
 (defn read-map-data
@@ -827,10 +870,12 @@
        (merge
          {:file file}
          (cond
-           (string/ends-with? filename ".sdz")
+           (and (is-file? file) (string/ends-with? filename ".sdz"))
            (read-zip-map file opts)
-           (string/ends-with? filename ".sd7")
+           (and (is-file? file) (string/ends-with? filename ".sd7"))
            (read-7z-map-fast file opts)
+           (and (is-directory? file) (string/ends-with? filename ".sdd"))
+           (read-map-directory file opts)
            :else
            nil))
        (catch Exception e
