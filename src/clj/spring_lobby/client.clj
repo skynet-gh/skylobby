@@ -282,8 +282,8 @@
                 (when-let [m @d]
                   (log/info (str "[" server-url "]") "<" (str "'" m "'"))
                   (try
-                    (u/update-console-log state-atom :server client m)
                     (handler state-atom server-url m)
+                    (u/update-console-log state-atom :server client m)
                     (catch Exception e
                       (log/error e "Error handling message")))
                   (when-not (Thread/interrupted)
