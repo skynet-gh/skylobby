@@ -133,11 +133,12 @@
              {:fx/type :v-box
               :children
               (concat
-                (when (< 1 (count team-counts))
-                  [{:fx/type :label
-                    :style {:-fx-font-size 20}
-                    :text (str " " (string/join "v" team-counts))}])
-                [{:fx/type :h-box
+                [{:fx/type :label
+                  :style {:-fx-font-size 20}
+                  :text (str " "
+                             (when (< 1 (count team-counts))
+                               (string/join "v" team-counts)))}
+                 {:fx/type :h-box
                   :alignment :center-left
                   :children
                   [{:fx/type :check-box

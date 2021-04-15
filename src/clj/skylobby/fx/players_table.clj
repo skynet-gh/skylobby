@@ -11,11 +11,15 @@
   {0 "crimson"
    1 "royalblue"
    2 "goldenrod"
-   3 "darkseagreen"
-   4 "brown"
-   5 "pink"
-   6 "darkturquoise"
-   7 "darkorange"})
+   3 "limegreen"
+   4 "deeppink"
+   5 "darkturquoise"
+   6 "darkorange"
+   7 "forestgreen"
+   8 "brown"
+   9 "teal"
+   10 "purple"
+   11 "goldenrod"})
 
 (defn players-table
   [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
