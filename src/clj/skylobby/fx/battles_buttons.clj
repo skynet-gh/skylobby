@@ -9,15 +9,18 @@
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
+(def matchmaking-compflag "matchmaking")
+
+
 (def battles-buttons-keys
-  [:accepted :battle :battle-password :battle-title :battles :client :engines :engine-filter
+  [:accepted :battle :battle-password :battle-title :battles :client :compflags :engines :engine-filter
    :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-   :pop-out-battle :scripttags :selected-battle :server :spring-isolation-dir :use-springlobby-modname])
+   :pop-out-battle :scripttags :selected-battle :spring-isolation-dir :use-springlobby-modname])
 
 (defn battles-buttons-view
-  [{:keys [accepted battle battles battle-password battle-title client engine-version mod-name map-name maps
+  [{:keys [accepted battle battles battle-password battle-title client compflags engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
-           server spring-isolation-dir use-springlobby-modname]
+           spring-isolation-dir use-springlobby-modname]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -181,7 +184,7 @@
          :text "Singleplayer Battle"
          :on-action {:event/type :spring-lobby/start-singleplayer-battle
                      :client client}}]
-       (when (= "bar.teifion.co.uk:8200" (first server))
+       (when (contains? (set compflags) matchmaking-compflag)
          [{:fx/type :button
            :text "Matchmaking"
            :on-action {:event/type :spring-lobby/toggle

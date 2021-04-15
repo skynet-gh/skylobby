@@ -1790,8 +1790,8 @@
           (fn [state]
             (-> state
                 (dissoc :accepted
-                        :battle :battles ;:channels
-                        :client :client-deferred :last-failed-message
+                        :battle :battles
+                        :client :client-deferred :compflags :last-failed-message
                         :ping-loop :print-loop :users)
                 (update :my-channels
                   (fn [my-channels]
