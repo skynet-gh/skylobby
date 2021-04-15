@@ -105,6 +105,11 @@
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["test/clj"]}
+  ; https://github.com/kiramclean/morphy/blob/main/deps.edn
+  :coverage
+  {:extra-paths ["test/clj"]
+   :extra-deps {cloverage/cloverage {:mvn/version "1.2.2"}}
+   :main-opts ["-m" "cloverage.coverage" "-p" "src/clj" "-s" "test/clj" "--codecov"]}
   ; https://github.com/cljfx/cljfx/blob/9a3c696d6f18828d35e4d1f4d71e8104b7a85576/deps.edn#L27-L28
   :headless
   {:jvm-opts ["-Dtestfx.robot=glass" "-Dglass.platform=Monocle" "-Dmonocle.platform=Headless" "-Dprism.order=sw"]
