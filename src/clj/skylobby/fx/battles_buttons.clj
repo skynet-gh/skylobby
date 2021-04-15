@@ -15,11 +15,11 @@
 (def battles-buttons-keys
   [:accepted :battle :battle-password :battle-title :battles :client :compflags :engines :engine-filter
    :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-   :pop-out-battle :scripttags :selected-battle :spring-isolation-dir :use-springlobby-modname])
+   :pop-out-battle :scripttags :selected-battle :singleplayer-battle :spring-isolation-dir :use-springlobby-modname])
 
 (defn battles-buttons-view
   [{:keys [accepted battle battles battle-password battle-title client compflags engine-version mod-name map-name maps
-           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
+           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle singleplayer-battle
            spring-isolation-dir use-springlobby-modname]
     :as state}]
   {:fx/type :v-box
@@ -180,10 +180,14 @@
                  :prompt-text "Battle Password"
                  :on-action {:event/type :spring-lobby/host-battle}
                  :on-text-changed {:event/type :spring-lobby/battle-password-change}}]))))
-       [{:fx/type :button
-         :text "Singleplayer Battle"
-         :on-action {:event/type :spring-lobby/start-singleplayer-battle
-                     :client client}}]
+       (if-not singleplayer-battle
+         [{:fx/type :button
+           :text "Open Singleplayer Battle"
+           :on-action {:event/type :spring-lobby/start-singleplayer-battle}}]
+         [{:fx/type :button
+           :text "Close Singleplayer Battle"
+           :on-action {:event/type :spring-lobby/dissoc
+                       :key :singleplayer-battle}}])
        (when (contains? (set compflags) matchmaking-compflag)
          [{:fx/type :button
            :text "Matchmaking"

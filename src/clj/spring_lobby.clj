@@ -2801,23 +2801,22 @@
         @(event-handler (merge e {:event/type ::leave-battle}))
         (async/<!! (async/timeout 500)))
       (if selected-battle
-        (send-message client
-          (str "JOINBATTLE " selected-battle
-               (if battle-passworded
-                 (str " " battle-password)
-                 (str " *"))
-               " " (crypto.random/hex 6)))
+        (do
+          (swap! *state dissoc :selected-battle)
+          (send-message client
+            (str "JOINBATTLE " selected-battle
+                 (if battle-passworded
+                   (str " " battle-password)
+                   (str " *"))
+                 " " (crypto.random/hex 6))))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
 (defmethod event-handler ::start-singleplayer-battle
-  [{:keys [battle] :as e}]
+  [_e]
   (future
     (try
-      (when battle
-        @(event-handler (merge e {:event/type ::leave-battle}))
-        (async/<!! (async/timeout 500)))
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
@@ -2825,9 +2824,10 @@
                                                        :battle-map map-name
                                                        :battle-modname mod-name
                                                        :host-username username})
-                   (assoc :battle {:battle-id :singleplayer ; TODO dedupe
-                                   :scripttags {:game {:startpostype 0}}
-                                   :users {username {:battle-status handler/default-battle-status}}}))))
+                   (assoc :singleplayer-battle
+                          {:battle-id :singleplayer ; TODO dedupe
+                           :scripttags {:game {:startpostype 0}}
+                           :users {username {:battle-status handler/default-battle-status}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
@@ -2999,9 +2999,9 @@
                  (fn [state]
                    (-> state
                        (update-in [:battles :singleplayer :bots] dissoc bot-name)
-                       (update-in [:battle :bots] dissoc bot-name)
+                       (update-in [:singleplayer-battle :bots] dissoc bot-name)
                        (update-in [:battles :singleplayer :users] dissoc username)
-                       (update-in [:battle :users] dissoc username)))))
+                       (update-in [:singleplayer-battle :users] dissoc username)))))
         (if bot-name
           (send-message client (str "REMOVEBOT " bot-name))
           (send-message client (str "KICKFROMBATTLE " username))))
@@ -3047,7 +3047,7 @@
                                      :owner username}]
                        (-> state
                            (assoc-in [:battles :singleplayer :bots bot-username] bot-data)
-                           (assoc-in [:battle :bots bot-username] bot-data))))))
+                           (assoc-in [:singleplayer-battle :bots bot-username] bot-data))))))
           (send-message client message)))
       (catch Exception e
         (log/error e "Error adding bot")))))
@@ -3071,14 +3071,14 @@
 
 
 (defmethod event-handler ::start-battle
-  [{:keys [am-host am-spec battle-status channel-name client host-ingame]}]
+  [{:keys [am-host am-spec battle-status channel-name client host-ingame] :as state}]
   (future
     (try
       (when-not (:mode battle-status)
         (send-message client (str "SAY " channel-name " !joinas spec"))
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
-        (spring/start-game @*state) ; TODO remove deref
+        (spring/start-game state)
         (send-message client (str "SAY " channel-name " !cv start")))
       (catch Exception e
         (log/error e "Error starting battle")))))
@@ -3190,7 +3190,7 @@
                 right (/ r (* 1.0 minimap-width))
                 bottom (/ b (* 1.0 minimap-height))]
             (if singleplayer
-              (swap! *state update-in [:battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+              (swap! *state update-in [:singleplayer-battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
                      (fn [allyteam]
                        (assoc allyteam
                               :startrectleft left
@@ -3321,7 +3321,7 @@
                (fn [state]
                  (-> state
                      (update-in [:battles :singleplayer (if is-bot :bots :users) player-name] merge data)
-                     (update-in [:battle (if is-bot :bots :users) player-name] merge data))))))))
+                     (update-in [:singleplayer-battle (if is-bot :bots :users) player-name] merge data))))))))
 
 (defn- update-color [client id {:keys [is-me is-bot] :as opts} color-int]
   (future
@@ -3570,7 +3570,7 @@
                (fn [state]
                  (-> state
                      (assoc-in [:scripttags :game :startpostype] startpostype)
-                     (assoc-in [:battle :scripttags :game :startpostype] startpostype))))
+                     (assoc-in [:singleplayer-battle :scripttags :game :startpostype] startpostype))))
         (send-message client (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
@@ -3623,7 +3623,7 @@
              (fn [state]
                (-> state
                    (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
-                   (assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event)))))
+                   (assoc-in [:singleplayer-battle :scripttags :game :modoptions modoption-key] (str event)))))
       (if am-host
         (send-message client (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
         (event-handler
@@ -6437,7 +6437,7 @@
 
 (defn- root-view
   [{{:keys [agreement battle client current-tasks last-failed-message password pop-out-battle
-            selected-tab-main standalone tasks username verification-code]
+            selected-tab-main singleplayer-battle standalone tasks username verification-code]
      :as state}
     :state}]
   (let [{:keys [width height]} (screen-bounds)
@@ -6498,13 +6498,13 @@
             (merge
               {:fx/type fx.battles-buttons/battles-buttons-view}
               (select-keys state fx.battles-buttons/battles-buttons-keys))]
-           (when battle
-             (if (:battle-id battle)
+           (when (or battle singleplayer-battle)
+             (if (or (:battle-id battle) singleplayer-battle)
                (when (not pop-out-battle)
                  [(merge
-                    {:fx/type fx.battle/battle-view
+                    {:fx/type fx.battle/multi-battle-view
                      :tasks-by-type tasks-by-type}
-                    (select-keys state fx.battle/battle-view-keys))])
+                    (select-keys state fx.battle/multi-battle-view-keys))])
                [{:fx/type :h-box
                  :alignment :top-left
                  :children
@@ -6526,7 +6526,8 @@
                :text (str (count (seq tasks)) " tasks")
                :on-action {:event/type ::toggle
                            :key :show-tasks-window}}]}])}}}
-      (let [show-battle-window (boolean (and battle pop-out-battle))]
+      (let [show-battle-window (boolean (and pop-out-battle
+                                             (or battle singleplayer-battle)))]
         {:fx/type :stage
          :showing show-battle-window
          :title (str u/app-name " Battle")
@@ -6541,9 +6542,9 @@
           :root
           (if show-battle-window
             (merge
-              {:fx/type fx.battle/battle-view
+              {:fx/type fx.battle/multi-battle-view
                :tasks-by-type tasks-by-type}
-              (select-keys state fx.battle/battle-view-keys))
+              (select-keys state fx.battle/multi-battle-view-keys))
             {:fx/type :pane})}})
       (merge
         {:fx/type download-window}

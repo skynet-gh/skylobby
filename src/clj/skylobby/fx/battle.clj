@@ -307,7 +307,7 @@
                :desc
                {:fx/type :button
                 :text (cond
-                        am-ingame
+                        (and am-ingame (not singleplayer))
                         "Game running"
                         (and am-spec (not host-ingame) (not singleplayer))
                         "Game not running"
@@ -315,16 +315,20 @@
                         (str (if (and (not singleplayer) (or host-ingame am-spec))
                                "Join" "Start")
                              " Game"))
-                :disable (boolean (or (not in-sync)
-                                      (and (not host-ingame) (and (not singleplayer) am-spec))
-                                      (and (not am-spec) am-ingame)))
-                :on-action {:event/type :spring-lobby/start-battle
-                            :am-host am-host
-                            :am-spec am-spec
-                            :battle-status my-battle-status
-                            :channel-name channel-name
-                            :client client
-                            :host-ingame host-ingame}}}]}]}
+                :disable (boolean (and (not singleplayer)
+                                       (not in-sync)
+                                       (or (and (not host-ingame) am-spec)
+                                           (and (not am-spec) am-ingame))))
+                :on-action
+                (merge
+                  {:event/type :spring-lobby/start-battle}
+                  state
+                  {:am-host am-host
+                   :am-spec am-spec
+                   :battle-status my-battle-status
+                   :channel-name channel-name
+                   :client client
+                   :host-ingame host-ingame})}}]}]}
           {:fx/type channel-view
            :h-box/hgrow :always
            :channel-name channel-name
@@ -387,7 +391,7 @@
                :children
                (let [{:keys [battle-status]} (-> battle :users (get username))]
                  [{:fx/type maps-view
-                   :disable am-spec
+                   :disable (and (not singleplayer) am-spec)
                    :map-name battle-map
                    :maps maps
                    :map-input-prefix map-input-prefix
@@ -416,7 +420,7 @@
                   {:fx/type :combo-box
                    :value startpostype
                    :items (map str (vals spring/startpostypes))
-                   :disable am-spec
+                   :disable (and (not singleplayer) am-spec)
                    :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
                                       :am-host am-host
                                       :channel-name channel-name
@@ -425,12 +429,12 @@
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
-                     :disable am-spec
+                     :disable (and (not singleplayer) am-spec)
                      :on-action {:event/type :spring-lobby/reset-start-positions}}])
                  (when (= "Choose in game" startpostype)
                    [{:fx/type :button
                      :text "Clear boxes"
-                     :disable am-spec
+                     :disable (and (not singleplayer) am-spec)
                      :on-action {:event/type :spring-lobby/clear-start-boxes}}]))}
               {:fx/type :label
                :text (str "")}
@@ -443,35 +447,35 @@
                      :text "FFA"
                      :on-action {:event/type :spring-lobby/battle-teams-ffa
                                  :battle battle
-                                 :client client
+                                 :client (when-not singleplayer client)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "2 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-2
                                  :battle battle
-                                 :client client
+                                 :client (when-not singleplayer client)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "3 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-3
                                  :battle battle
-                                 :client client
+                                 :client (when-not singleplayer client)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "4 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-4
                                  :battle battle
-                                 :client client
+                                 :client (when-not singleplayer client)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "Humans vs Bots"
                      :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
                                  :battle battle
-                                 :client client
+                                 :client (when-not singleplayer client)
                                  :users users
                                  :username username}}]))}]}]}}}
         {:fx/type :tab
@@ -547,7 +551,7 @@
                                                :client client
                                                :modoption-key (:key i)
                                                :singleplayer singleplayer}
-                         :disable am-spec}}}}
+                         :disable (and (not singleplayer) am-spec)}}}}
                      "number"
                      {:text ""
                       :graphic
@@ -562,7 +566,7 @@
                           :text (str (:name i) "\n\n" (:desc i))}}
                         :desc
                         {:fx/type :text-field
-                         :disable am-spec
+                         :disable (and (not singleplayer) am-spec)
                          :text-formatter
                          {:fx/type :text-formatter
                           :value-converter :number
@@ -587,7 +591,7 @@
                           :text (str (:name i) "\n\n" (:desc i))}}
                         :desc
                         {:fx/type :combo-box
-                         :disable am-spec
+                         :disable (and (not singleplayer) am-spec)
                          :value (or v (:def i))
                          :on-value-changed {:event/type :spring-lobby/modoption-change
                                             :am-host am-host
@@ -597,3 +601,46 @@
                          :items (or (map (comp :key second) (:items i))
                                     [])}}}}
                      {:text (str (:def i))})))}}]}]}}]}]}))
+
+
+(def multi-battle-view-keys
+  (concat
+    battle-view-keys
+    [:singleplayer-battle :singleplayer-battle-map-details :singleplayer-battle-mod-details]))
+
+(defn multi-battle-view
+  [{:keys [battle client singleplayer-battle singleplayer-battle-map-details singleplayer-battle-mod-details]
+    :as state}]
+  (if (and battle singleplayer-battle)
+    {:fx/type :tab-pane
+     :style {:-fx-font-size 16}
+     :tabs
+     [{:fx/type :tab
+       :on-close-request {:event/type :spring-lobby/leave-battle
+                          :client client}
+       :graphic {:fx/type :label
+                 :text "Multiplayer"}
+       :content
+       (merge
+         {:fx/type battle-view}
+         state)}
+      {:fx/type :tab
+       :on-close-request {:event/type :spring-lobby/dissoc
+                          :key :singleplayer-battle}
+       :graphic {:fx/type :label
+                 :text "Singleplayer"}
+       :content
+       (merge
+         {:fx/type battle-view}
+         state
+         {:battle singleplayer-battle
+          :battle-map-details singleplayer-battle-map-details
+          :battle-mod-details singleplayer-battle-mod-details})}]}
+    (merge
+      {:fx/type battle-view}
+      state
+      (if battle
+        {:battle battle}
+        {:battle singleplayer-battle
+         :battle-map-details singleplayer-battle-map-details
+         :battle-mod-details singleplayer-battle-mod-details}))))
