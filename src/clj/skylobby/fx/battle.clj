@@ -352,8 +352,9 @@
            :alignment :top-left
            :children
            [{:fx/type minimap-pane
-             :am-host am-host
+             :am-spec am-spec
              :battle-details battle-details
+             :client client
              :drag-allyteam drag-allyteam
              :drag-team drag-team
              :map-name battle-map
@@ -385,7 +386,7 @@
                :children
                (let [{:keys [battle-status]} (-> battle :users (get username))]
                  [{:fx/type maps-view
-                   :disable (not (:mode battle-status))
+                   :disable am-spec
                    :map-name battle-map
                    :maps maps
                    :map-input-prefix map-input-prefix
@@ -414,17 +415,20 @@
                   {:fx/type :combo-box
                    :value startpostype
                    :items (map str (vals spring/startpostypes))
-                   :disable (not am-host)
-                   :on-value-changed {:event/type :spring-lobby/battle-startpostype-change}}]
+                   :disable am-spec
+                   :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
+                                      :am-host am-host
+                                      :channel-name channel-name
+                                      :client client}}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
-                     :disable (not am-host)
+                     :disable am-spec
                      :on-action {:event/type :spring-lobby/reset-start-positions}}])
                  (when (= "Choose in game" startpostype)
                    [{:fx/type :button
                      :text "Clear boxes"
-                     :disable (not am-host)
+                     :disable am-spec
                      :on-action {:event/type :spring-lobby/clear-start-boxes}}]))}
               {:fx/type :label
                :text (str "")}

@@ -3144,11 +3144,10 @@
         (log/error e "Error dragging minimap")))))
 
 (defmethod event-handler ::minimap-mouse-released
-  [{:keys [minimap-width minimap-height map-details]}]
+  [{:keys [am-host client minimap-width minimap-height map-details] :as e}]
   (future
     (try
-      (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)
-            client (:client before)]
+      (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
         (when-let [{:keys [team x y]} (:drag-team before)]
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
                 x (int (* (/ x minimap-width) map-width spring/map-multiplier))
@@ -3175,12 +3174,23 @@
                 right (/ r (* 1.0 minimap-width))
                 bottom (/ b (* 1.0 minimap-height))]
             (if client
-              (send-message client
-                (str "ADDSTARTRECT " allyteam-id " "
-                     (int (* 200 left)) " "
-                     (int (* 200 top)) " "
-                     (int (* 200 right)) " "
-                     (int (* 200 bottom))))
+              (if am-host
+                (send-message client
+                  (str "ADDSTARTRECT " allyteam-id " "
+                       (int (* 200 left)) " "
+                       (int (* 200 top)) " "
+                       (int (* 200 right)) " "
+                       (int (* 200 bottom))))
+                (event-handler
+                  (assoc e
+                         :event/type ::send-message
+                         :message
+                         (str "!addBox "
+                              (int (* 200 left)) " "
+                              (int (* 200 top)) " "
+                              (int (* 200 right)) " "
+                              (int (* 200 bottom)) " "
+                              (inc allyteam-id)))))
               (swap! *state update-in [:battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
                      (fn [allyteam]
                        (assoc allyteam
@@ -3536,14 +3546,20 @@
 
 
 (defmethod event-handler ::battle-startpostype-change
-  [{:fx/keys [event]}]
-  (let [startpostype (get spring/startpostypes-by-name event)
-        state (swap! *state
-                     (fn [state]
-                       (-> state
-                           (assoc-in [:scripttags :game :startpostype] startpostype)
-                           (assoc-in [:battle :scripttags :game :startpostype] startpostype))))]
-    (send-message (:client state) (str "SETSCRIPTTAGS game/startpostype=" startpostype))))
+  [{:fx/keys [event] :keys [am-host client] :as e}]
+  (let [startpostype (get spring/startpostypes-by-name event)]
+    (if am-host
+      (do
+        (swap! *state
+               (fn [state]
+                 (-> state
+                     (assoc-in [:scripttags :game :startpostype] startpostype)
+                     (assoc-in [:battle :scripttags :game :startpostype] startpostype))))
+        (send-message client (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
+      (event-handler
+        (assoc e
+               :event/type ::send-message
+               :message (str "!bSet startpostype " startpostype))))))
 
 (defmethod event-handler ::reset-start-positions
   [_e]
