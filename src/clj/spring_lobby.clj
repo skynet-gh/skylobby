@@ -1770,10 +1770,10 @@
         (log/error e "Error joining channel" channel-name)))))
 
 (defmethod event-handler ::leave-channel
-  [{:keys [channel-name client] :fx/keys [^Event event]}]
+  [{:keys [channel-name client server-url] :fx/keys [^Event event]}]
   (future
     (try
-      (swap! *state update :my-channels dissoc channel-name)
+      (swap! *state update-in [:by-server server-url :my-channels] dissoc channel-name)
       (when-not (string/starts-with? channel-name "@")
         (send-message client (str "LEAVE " channel-name)))
       (catch Exception e
@@ -5961,10 +5961,11 @@
           (.requestFocus text-field))))))
 
 (def my-channels-view-keys
-  [:channels :chat-auto-scroll :client :message-drafts :my-channels :selected-tab-channel])
+  [:channels :chat-auto-scroll :client :message-drafts :my-channels :selected-tab-channel :server])
 
 (defn- my-channels-view
-  [{:keys [channels chat-auto-scroll client message-drafts my-channels selected-tab-channel]}]
+  [{:keys [channels chat-auto-scroll client message-drafts my-channels selected-tab-channel
+           server]}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
@@ -5991,7 +5992,8 @@
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type ::leave-channel
                                 :channel-name channel-name
-                                :client client}
+                                :client client
+                                :server-url (first server)}
              :on-selection-changed (fn [^Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type fx.channel/channel-view
@@ -6150,7 +6152,7 @@
   (concat
     welcome-view-keys
     [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
-     :selected-tab-main :users]))
+     :selected-tab-main :server :users]))
 
 (defn- main-tab-view
   [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
