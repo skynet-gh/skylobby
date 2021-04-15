@@ -3598,15 +3598,22 @@
       (send-message client (str "REMOVESTARTRECT " allyteam-id)))))
 
 (defmethod event-handler ::modoption-change
-  [{:keys [modoption-key singleplayer] :fx/keys [event]}]
-  (let [value (str event)
-        state (swap! *state
-                     (fn [state]
-                       (-> state
-                           (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
-                           (assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event)))))]
-    (when-not singleplayer
-      (send-message (:client state) (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value)))))
+  [{:keys [am-host client modoption-key modoption-type singleplayer] :fx/keys [event] :as e}]
+  (let [value (if (= "list" modoption-type)
+                (str event)
+                (u/to-number event))]
+    (if singleplayer
+      (swap! *state
+             (fn [state]
+               (-> state
+                   (assoc-in [:scripttags :game :modoptions modoption-key] (str event))
+                   (assoc-in [:battle :scripttags :game :modoptions modoption-key] (str event)))))
+      (if am-host
+        (send-message client (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
+        (event-handler
+          (assoc e
+                 :event/type ::send-message
+                 :message (str "!bSet " (name modoption-key) " " value)))))))
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status client team-color] :as id}]

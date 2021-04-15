@@ -540,9 +540,12 @@
                         {:fx/type :check-box
                          :selected (u/to-bool (or v (:def i)))
                          :on-selected-changed {:event/type :spring-lobby/modoption-change
+                                               :am-host am-host
+                                               :channel-name channel-name
+                                               :client client
                                                :modoption-key (:key i)
                                                :singleplayer singleplayer}
-                         :disable (not am-host)}}}}
+                         :disable am-spec}}}}
                      "number"
                      {:text ""
                       :graphic
@@ -557,13 +560,17 @@
                           :text (str (:name i) "\n\n" (:desc i))}}
                         :desc
                         {:fx/type :text-field
-                         :disable (not am-host)
+                         :disable am-spec
                          :text-formatter
                          {:fx/type :text-formatter
                           :value-converter :number
                           :value (u/to-number (or v (:def i)))
                           :on-value-changed {:event/type :spring-lobby/modoption-change
-                                             :modoption-key (:key i)}}}}}}
+                                             :am-host am-host
+                                             :channel-name channel-name
+                                             :client client
+                                             :modoption-key (:key i)
+                                             :modoption-type (:type i)}}}}}}
                      "list"
                      {:text ""
                       :graphic
@@ -578,9 +585,12 @@
                           :text (str (:name i) "\n\n" (:desc i))}}
                         :desc
                         {:fx/type :combo-box
-                         :disable (not am-host)
+                         :disable am-spec
                          :value (or v (:def i))
                          :on-value-changed {:event/type :spring-lobby/modoption-change
+                                            :am-host am-host
+                                            :channel-name channel-name
+                                            :client client
                                             :modoption-key (:key i)}
                          :items (or (map (comp :key second) (:items i))
                                     [])}}}}
