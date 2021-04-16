@@ -290,8 +290,8 @@
 
 
 (defn- send-message [client message]
-  (u/update-console-log *state :client client message)
-  (message/send-message client message))
+  (message/send-message client message)
+  (u/update-console-log *state :client client message))
 
 (defn- spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
@@ -1377,9 +1377,8 @@
      map-details)))
 
 
-#_
-(defn- update-channels-chimer-fn [state-atom]
-  (log/info "Starting channels update chimer")
+(defn- truncate-messages-chimer-fn [state-atom]
+  (log/info "Starting message truncate chimer")
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
@@ -1387,21 +1386,23 @@
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
             (log/info "Truncating message logs")
-            (let [state (swap! state-atom
-                          (fn [state]
-                            (-> state
-                                (update :console-log (partial take u/max-messages))
-                                (update :channels
-                                  (fn [channels]
-                                    (reduce-kv
-                                      (fn [m k v]
-                                        (assoc m k (update v :messages (partial take u/max-messages))))
-                                      {}
-                                      channels))))))]
+            (swap! state-atom update :by-server
+              (fn [by-server]
+                (reduce-kv
+                  (fn [m k v]
+                    (assoc m k
+                      (-> v
+                          (update :console-log (partial take u/max-messages))
+                          (update :channels
+                            (fn [channels]
+                              (reduce-kv
+                                (fn [m k v]
+                                  (assoc m k (update v :messages (partial take u/max-messages))))
+                                {}
+                                channels))))))
+                  {}
+                  by-server))))
 
-              (when-let [client (:client state)]
-                (log/info "Updating channel list")
-                (send-message client "CHANNELS"))))
           {:error-handler
            (fn [e]
              (log/error e "Error force updating resources")
@@ -1770,10 +1771,10 @@
         (log/error e "Error joining channel" channel-name)))))
 
 (defmethod event-handler ::leave-channel
-  [{:keys [channel-name client] :fx/keys [^Event event]}]
+  [{:keys [channel-name client server-url] :fx/keys [^Event event]}]
   (future
     (try
-      (swap! *state update :my-channels dissoc channel-name)
+      (swap! *state update-in [:by-server server-url :my-channels] dissoc channel-name)
       (when-not (string/starts-with? channel-name "@")
         (send-message client (str "LEAVE " channel-name)))
       (catch Exception e
@@ -3998,8 +3999,14 @@
    :url http/springfiles-maps-url
    :resources-fn http/html-downloadables})
 
+(def hakora-maps-download-source
+  {:download-source-name "Hakora Maps"
+   :url "http://www.hakora.xyz/files/springrts/maps"
+   :resources-fn http/html-downloadables})
+
 (def download-sources
   [springfiles-maps-download-source
+   hakora-maps-download-source
    {:download-source-name "BAR GitHub spring"
     :url http/bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"
@@ -4025,13 +4032,13 @@
   (* 1000 60 60 24)) ; 1 day
 
 
-(defn- update-download-source
-  [{:keys [force resources-fn url download-source-name] :as source}]
+(defn update-download-source
+  [{:keys [resources-fn url download-source-name] :as source}]
   (log/info "Getting resources for possible download from" download-source-name "at" url)
   (let [now (u/curr-millis)
         last-updated (or (-> *state deref :downloadables-last-updated (get url)) 0)] ; TODO remove deref
     (if (or (< downloadable-update-cooldown (- now last-updated))
-            force)
+            (:force source))
       (do
         (log/info "Updating downloadables from" url)
         (swap! *state assoc-in [:downloadables-last-updated url] now)
@@ -4043,10 +4050,11 @@
                     (frequencies (map :resource-type downloadables)))
           (swap! *state update :downloadables-by-url
                  (fn [old]
-                   (->> old
-                        (remove (comp #{download-source-name} :download-source-name second))
-                        (into {})
-                        (merge downloadables-by-url))))
+                   (merge
+                     (->> old
+                          (remove (comp #{download-source-name} :download-source-name second))
+                          (into {}))
+                     downloadables-by-url)))
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
 
@@ -4529,11 +4537,13 @@
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-close:16:white"}}}]))}
           {:fx/type :label
-           :text (str (count downloadables) " artifacts")}
+           :text (str (count downloadables) " artifacts")
+           :style {:-fx-font-size 14}}
           {:fx/type :table-view
            :column-resize-policy :constrained ; TODO auto resize
            :v-box/vgrow :always
            :items downloadables
+           :style {:-fx-font-size 16}
            :columns
            [{:fx/type :table-column
              :text "Source"
@@ -4681,7 +4691,8 @@
             {:fx/type :button
              :text " Refresh "
              :on-action {:event/type ::add-task
-                         :task {::task-type ::update-rapid}}
+                         :task {::task-type ::update-rapid
+                                :force true}}
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-refresh:16:white"}}]}
@@ -4736,6 +4747,7 @@
            :column-resize-policy :constrained ; TODO auto resize
            :items (or (seq filtered-rapid-versions)
                       [])
+           :style {:-fx-font-size 16}
            :columns
            [{:fx/type :table-column
              :sortable false
@@ -4798,9 +4810,9 @@
                          :icon-literal "mdi-download:16:white"}}}))))}}]}
           {:fx/type :h-box
            :alignment :center-left
+           :style {:-fx-font-size 16}
            :children
            [{:fx/type :label
-             :style {:-fx-font-size 16}
              :text " Packages"}
             {:fx/type fx.ext.node/with-tooltip-props
              :props
@@ -4819,6 +4831,7 @@
            :column-resize-policy :constrained ; TODO auto resize
            :items (or (seq rapid-packages)
                       [])
+           :style {:-fx-font-size 16}
            :columns
            [{:fx/type :table-column
              :text "Filename"
@@ -5660,7 +5673,8 @@
                                         " Update rapid")
                                 :disable (boolean rapid-update)
                                 :on-action {:event/type ::add-task
-                                            :task {::task-type ::update-rapid}}
+                                            :task {::task-type ::update-rapid
+                                                   :force true}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-refresh:16:white"}}
@@ -5961,10 +5975,11 @@
           (.requestFocus text-field))))))
 
 (def my-channels-view-keys
-  [:channels :chat-auto-scroll :client :message-drafts :my-channels :selected-tab-channel])
+  [:channels :chat-auto-scroll :client :message-drafts :my-channels :selected-tab-channel :server])
 
 (defn- my-channels-view
-  [{:keys [channels chat-auto-scroll client message-drafts my-channels selected-tab-channel]}]
+  [{:keys [channels chat-auto-scroll client message-drafts my-channels selected-tab-channel
+           server]}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
@@ -5991,7 +6006,8 @@
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type ::leave-channel
                                 :channel-name channel-name
-                                :client client}
+                                :client client
+                                :server-url (first server)}
              :on-selection-changed (fn [^Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type fx.channel/channel-view
@@ -6150,7 +6166,7 @@
   (concat
     welcome-view-keys
     [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
-     :selected-tab-main :users]))
+     :selected-tab-main :server :users]))
 
 (defn- main-tab-view
   [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
@@ -6697,7 +6713,7 @@
   (log/info "Initializing periodic jobs")
   (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
         high-tasks-chimer (tasks-chimer-fn state-atom 3)
-        ;update-channels-chimer (update-channels-chimer-fn state-atom)
+        truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
         check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
@@ -6709,7 +6725,7 @@
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
     {:chimers [low-tasks-chimer high-tasks-chimer
-               ;update-channels-chimer
+               truncate-messages-chimer
                check-app-update-chimer]}))
 
 (defn init-async [state-atom]

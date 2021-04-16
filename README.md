@@ -1,4 +1,4 @@
-# skylobby [![test](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml/badge.svg)](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml)
+# skylobby [![test](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml/badge.svg)](https://github.com/skynet-gh/skylobby/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/skynet-gh/skylobby/branch/master/graph/badge.svg?token=CXO1YGKX5W)](https://codecov.io/gh/skynet-gh/skylobby)
 
 A [Spring RTS](https://springrts.com/) lobby for [uberserver](https://github.com/spring/uberserver).
 

@@ -38,7 +38,7 @@
         :icon-literal "mdi-settings:16:white"}}
       {:fx/type :button
        :text "Replays"
-       :on-action {:event/type :toggle
+       :on-action {:event/type :spring-lobby/toggle
                    :key :show-replays}
        :graphic
        {:fx/type font-icon/lifecycle
