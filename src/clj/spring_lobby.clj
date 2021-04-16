@@ -188,7 +188,7 @@
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
-   :mod-name :password :pop-out-battle :preferred-color :rapid-repo
+   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys
    :username])
 
@@ -1618,12 +1618,12 @@
        :describe (fn [engine] {:text (str engine)})}}]}})
 
 (defmethod event-handler ::join-direct-message
-  [{:keys [username]}]
+  [{:keys [server-url username]}]
   (swap! *state
     (fn [state]
       (let [channel-name (str "@" username)]
         (-> state
-            (assoc-in [:my-channels channel-name] {})
+            (assoc-in [:by-server server-url :my-channels channel-name] {})
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channel channel-name))))))
 
@@ -1638,9 +1638,9 @@
       (when (:username e)
         (event-handler (merge e {:event/type ::join-direct-message}))))))
 
-(def users-table-keys [:battles :client :users])
+(def users-table-keys [:battles :client :server-url :users])
 
-(defn- users-table [{:keys [battles client users]}]
+(defn- users-table [{:keys [battles client server-url users]}]
   (let [battles-by-users (->> battles
                               vals
                               (mapcat
@@ -1673,6 +1673,7 @@
                           [{:fx/type :menu-item
                             :text "Message"
                             :on-action {:event/type ::join-direct-message
+                                        :server-url server-url
                                         :username username}}]
                           (when battle
                             [{:fx/type :menu-item
@@ -1763,10 +1764,14 @@
         :describe (fn [user-agent] {:text (str user-agent)})}}]}))
 
 
-(defmethod event-handler ::join-channel [{:keys [channel-name client]}]
+(defmethod event-handler ::join-channel [{:keys [channel-name client server-url]}]
   (future
     (try
-      (swap! *state dissoc :join-channel-name)
+      (swap! *state
+        (fn [state]
+          (-> state
+              (assoc-in [:by-server server-url :join-channel-name] "")
+              (assoc-in [:my-channels server-url channel-name] {}))))
       (send-message client (str "JOIN " channel-name))
       (catch Exception e
         (log/error e "Error joining channel" channel-name)))))
@@ -1775,7 +1780,11 @@
   [{:keys [channel-name client server-url] :fx/keys [^Event event]}]
   (future
     (try
-      (swap! *state update-in [:by-server server-url :my-channels] dissoc channel-name)
+      (swap! *state
+        (fn [state]
+          (-> state
+              (update-in [:by-server server-url :my-channels] dissoc channel-name)
+              (update-in [:my-channels server-url] dissoc channel-name))))
       (when-not (string/starts-with? channel-name "@")
         (send-message client (str "LEAVE " channel-name)))
       (catch Exception e
@@ -1788,7 +1797,7 @@
        (remove (comp string/blank? :channel-name))
        (remove (comp u/battle-channel-name? :channel-name))))
 
-(defn- channels-table [{:keys [channels client my-channels]}]
+(defn- channels-table [{:keys [channels client my-channels server-url]}]
   {:fx/type :table-view
    :column-resize-policy :constrained ; TODO auto resize
    :items (->> (vals channels)
@@ -1826,7 +1835,8 @@
              {:text "Join"
               :on-action {:event/type ::join-channel
                           :channel-name channel-name
-                          :client client}}))})}}]})
+                          :client client
+                          :server-url server-url}}))})}}]})
 
 (defn- update-disconnected!
   [state-atom server-url]
@@ -6051,10 +6061,10 @@
 
 
 (def welcome-view-keys
-  [:by-server :map-details :mod-details :password :server :servers :tasks-by-type :username])
+  [:app-update-available :by-server :map-details :mod-details :password :server :servers :tasks-by-type :username])
 
 (defn welcome-view
-  [{:keys [by-server client client-deferred password server servers tasks-by-type username]
+  [{:keys [app-update-available by-server client client-deferred password server servers tasks-by-type username]
     :as state}]
   {:fx/type :v-box
    :alignment :center
@@ -6071,6 +6081,30 @@
          :alignment :center-left
          :children
          (concat
+           (when-let [{:keys [latest]} app-update-available]
+             (let [color "gold"]
+               [{:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [
+                  {:fx/type :button
+                   :text (str "Update to " latest)
+                   :on-action {:event/type ::desktop-browse-url
+                               :url app-update-browseurl}
+                   :style {:-fx-base color
+                           :-fx-background color}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-open-in-new:30:black"}}
+                  {:fx/type :button
+                   :text ""
+                   :on-action {:event/type ::dissoc
+                               :key :app-update-available}
+                   :style {:-fx-base color
+                           :-fx-background color}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-close:30:black"}}]}]))
            [
             {:fx/type :button
              :text "Singleplayer Battle"
@@ -6099,7 +6133,7 @@
                            :key :show-servers-window}
                :graphic
                {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-plus:16:white"}}]}]
+                :icon-literal "mdi-plus:30:white"}}]}]
            (if-not (or client client-deferred)
              [{:fx/type :button
                :text "Register"
@@ -6183,6 +6217,7 @@
   (concat
     welcome-view-keys
     [:battles :client :channels :console-auto-scroll :console-log :console-message-draft :join-channel-name
+     :selected-tab-channel
      :selected-tab-main :server :users]))
 
 (defn- main-tab-view
@@ -6192,15 +6227,16 @@
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^List main-tab-ids selected-tab-main)
                          0)
+        server-url (first server)
         users-view {:fx/type :v-box
                     :children
                     [{:fx/type :label
                       :text (str "Users (" (count users) ")")}
                      (merge
                        {:fx/type users-table
-                        :v-box/vgrow :always}
-                       (select-keys state users-table-keys))]}
-        server-url (first server)]
+                        :v-box/vgrow :always
+                        :server-url server-url}
+                       (select-keys state users-table-keys))]}]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
      (merge
@@ -6220,125 +6256,126 @@
         :closable false
         :id "battles"
         :content
-        (if (= selected-tab-main "battles")
-          {:fx/type :split-pane
-           :divider-positions [0.80]
-           :items
-           [
-            {:fx/type :v-box
-             :children
-             [{:fx/type :label
-               :text (str "Battles (" (count battles) ")")}
-              (merge
-                {:fx/type battles-table
-                 :v-box/vgrow :always}
-                (select-keys state battles-table-keys))]}
-            users-view]}
-          {:fx/type :pane})}
+        {:fx/type :split-pane
+         :divider-positions [0.80]
+         :items
+         [
+          {:fx/type :v-box
+           :children
+           [{:fx/type :label
+             :text (str "Battles (" (count battles) ")")}
+            (merge
+              {:fx/type battles-table
+               :v-box/vgrow :always}
+              (select-keys state battles-table-keys))]}
+          users-view]}}
        {:fx/type :tab
         :graphic {:fx/type :label
                   :text "Chat"}
         :closable false
         :id "chat"
         :content
-        (if (= selected-tab-main "chat")
-          {:fx/type :split-pane
-           :divider-positions [0.70 0.9]
-           :items
-           [(merge
-              {:fx/type my-channels-view}
-              (select-keys state my-channels-view-keys))
-            users-view
-            {:fx/type :v-box
+        {:fx/type :split-pane
+         :divider-positions [0.70 0.9]
+         :items
+         [(merge
+            {:fx/type my-channels-view}
+            (select-keys state my-channels-view-keys)
+            {:fx/type my-channels-view})
+          users-view
+          {:fx/type :v-box
+           :children
+           [{:fx/type :label
+             :text (str "Channels (" (->> channels vals non-battle-channels count) ")")}
+            (merge
+              {:fx/type channels-table
+               :v-box/vgrow :always
+               :server-url server-url}
+              (select-keys state channels-table-keys))
+            {:fx/type :h-box
+             :alignment :center-left
              :children
-             [{:fx/type :label
-               :text (str "Channels (" (->> channels vals non-battle-channels count) ")")}
-              (merge
-                {:fx/type channels-table
-                 :v-box/vgrow :always}
-                (select-keys state channels-table-keys))
-              {:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :label
-                 :text " Custom Channel: "}
-                {:fx/type :text-field
-                 :text join-channel-name
-                 :prompt-text "Name"
-                 :on-text-changed {:event/type ::assoc
-                                   :key :join-channel-name}
-                 :on-action {:event/type ::join-channel
-                             :channel-name join-channel-name
-                             :client client}}
-                {:fx/type :button
-                 :text "Join"
-                 :on-action {:event/type ::join-channel
-                             :channel-name join-channel-name
-                             :client client}}]}]}]}
-          {:fx/type :pane})}
+             [
+              {:fx/type :button
+               :text ""
+               :on-action {:event/type ::join-channel
+                           :channel-name join-channel-name
+                           :client client
+                           :server-url server-url}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-plus:20:white"}}
+              {:fx/type :text-field
+               :text join-channel-name
+               :prompt-text "New Channel"
+               :on-text-changed {:event/type ::assoc-in
+                                 :path [:by-server server-url :join-channel-name]}
+               :on-action {:event/type ::join-channel
+                           :channel-name join-channel-name
+                           :client client
+                           :server-url server-url}}]}]}]}}
        {:fx/type :tab
         :graphic {:fx/type :label
                   :text "Console"}
         :closable false
         :id "console"
         :content
-        (if (= selected-tab-main "console")
-          (let [time-zone-id (.toZoneId (TimeZone/getDefault))
-                console-text (string/join "\n"
-                               (map
-                                 (fn [{:keys [message source timestamp]}]
-                                   (str (u/format-hours time-zone-id timestamp)
-                                        (case source
-                                          :server " < "
-                                          :client " > "
-                                          " ")
-                                        message))
-                                 (reverse console-log)))]
-            {:fx/type :v-box
+        (let [time-zone-id (.toZoneId (TimeZone/getDefault))
+              console-text (string/join "\n"
+                             (map
+                               (fn [{:keys [message source timestamp]}]
+                                 (str (u/format-hours time-zone-id timestamp)
+                                      (case source
+                                        :server " < "
+                                        :client " > "
+                                        " ")
+                                      message))
+                               (reverse console-log)))]
+          {:fx/type :v-box
+           :children
+           [{:fx/type with-scroll-text-prop
+             :v-box/vgrow :always
+             :props {:scroll-text [console-text console-auto-scroll]}
+             :desc
+             {:fx/type :text-area
+              :editable false
+              :wrap-text true
+              :style {:-fx-font-family monospace-font-family}}}
+            {:fx/type :h-box
+             :alignment :center-left
              :children
-             [{:fx/type with-scroll-text-prop
-               :v-box/vgrow :always
-               :props {:scroll-text [console-text console-auto-scroll]}
+             [{:fx/type :button
+               :text "Send"
+               :on-action {:event/type ::send-console
+                           :client client
+                           :message console-message-draft
+                           :server-url server-url}}
+              {:fx/type :text-field
+               :h-box/hgrow :always
+               :text (str console-message-draft)
+               :on-text-changed {:event/type ::assoc-in
+                                 :path [:by-server server-url :console-message-draft]}
+               :on-action {:event/type ::send-console
+                           :client client
+                           :message console-message-draft
+                           :server-url server-url}}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Auto scroll"}}
                :desc
-               {:fx/type :text-area
-                :editable false
-                :wrap-text true
-                :style {:-fx-font-family monospace-font-family}}}
-              {:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :button
-                 :text "Send"
-                 :on-action {:event/type ::send-console
-                             :client client
-                             :message console-message-draft
-                             :server-url server-url}}
-                {:fx/type :text-field
-                 :h-box/hgrow :always
-                 :text (str console-message-draft)
-                 :on-text-changed {:event/type ::assoc-in
-                                   :path [:by-server server-url :console-message-draft]}
-                 :on-action {:event/type ::send-console
-                             :client client
-                             :message console-message-draft}}
-                {:fx/type fx.ext.node/with-tooltip-props
-                 :props
-                 {:tooltip
-                  {:fx/type :tooltip
-                   :show-delay [10 :ms]
-                   :text "Auto scroll"}}
-                 :desc
-                 {:fx/type :h-box
-                  :alignment :center-left
-                  :children
-                  [
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-autorenew:20:white"}
-                   {:fx/type :check-box
-                    :selected (boolean console-auto-scroll)
-                    :on-selected-changed {:event/type ::assoc
-                                          :key :console-auto-scroll}}]}}]}]})
-          {:fx/type :pane})}]}}))
+               {:fx/type :h-box
+                :alignment :center-left
+                :children
+                [
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-autorenew:20:white"}
+                 {:fx/type :check-box
+                  :selected (boolean console-auto-scroll)
+                  :on-selected-changed {:event/type ::assoc
+                                        :key :console-auto-scroll}}]}}]}]})}]}}))
 
 (def tasks-window-keys
   [:current-tasks :show-tasks-window :tasks])
@@ -6511,7 +6548,7 @@
 
 (defn server-tab
   [{:keys [agreement battle client console-auto-scroll last-failed-message password pop-out-battle
-           selected-tab-main singleplayer-battle
+           selected-tab-channel selected-tab-main singleplayer-battle
            tasks-by-type username verification-code]
     :as state}]
   {:fx/type :v-box
@@ -6545,6 +6582,7 @@
         {:fx/type main-tab-view
          :v-box/vgrow :always
          :console-auto-scroll console-auto-scroll
+         :selected-tab-channel selected-tab-channel
          :selected-tab-main selected-tab-main}
         (select-keys state
           (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
@@ -6583,8 +6621,13 @@
 (defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-server-tab (.getId event)))
 
-(defn main-window [{:keys [by-server server selected-server-tab] :as state}]
-  (let [no-local (dissoc by-server :local)
+(defn valid-servers [by-server]
+  (->> (dissoc by-server :local)
+       (remove (comp string/blank? first))))
+
+(defn main-window
+  [{:keys [by-server server selected-server-tab selected-tab-channel selected-tab-main] :as state}]
+  (let [no-local (valid-servers by-server)
         tab-ids (concat ["local"] (map first no-local))
         tab-id-set (set tab-ids)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
@@ -6618,13 +6661,15 @@
               (select-keys state (concat welcome-view-keys fx.battle/battle-view-keys))
               (-> by-server
                   (get (first server))
-                  (select-keys [:accepted :client :client-deferred])))}]
+                  (select-keys [:accepted :client :client-deferred]))
+              {:selected-tab-channel selected-tab-channel
+               :selected-tab-main selected-tab-main})}]
           (map
             (fn [[address server-data]]
               {:fx/type :tab
                :id (str address)
                :graphic {:fx/type :label
-                         :text (str address)
+                         :text (str (-> server-data :server second :alias) " (" address ")")
                          :style {:-fx-font-size 18}}
                :on-close-request {:event/type ::disconnect
                                   :server (:server server-data)}
@@ -6635,10 +6680,11 @@
                    (concat
                      welcome-view-keys
                      fx.battle/battle-view-keys
-                     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle
-                      :selected-tab-main]))
-                 server-data)})
-            (dissoc by-server :local)))}}]}))
+                     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
+                 server-data
+                 {:selected-tab-channel selected-tab-channel
+                  :selected-tab-main selected-tab-main})})
+            (valid-servers by-server)))}}]}))
 
 
 (defn- root-view

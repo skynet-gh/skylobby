@@ -23,7 +23,7 @@
 
 (defn players-table
   [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
-           scripttags sides singleplayer username]}]
+           scripttags server-url sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -64,6 +64,7 @@
                          {:fx/type :menu-item
                           :text "Message"
                           :on-action {:event/type :spring-lobby/join-direct-message
+                                      :server-url server-url
                                       :username username}}])
                       [{:fx/type :menu-item
                         :text "Ring"

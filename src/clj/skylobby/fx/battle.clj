@@ -40,13 +40,13 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
    :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :server :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
            channels chat-auto-scroll client downloadables-by-url
            drag-allyteam drag-team engine-filter engines file-cache http-download map-filter
-           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download
+           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server
            spring-isolation-dir spring-settings tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -116,6 +116,7 @@
          :client (when-not singleplayer client)
          :host-username host-username
          :players players
+         :server-url (first server)
          :scripttags scripttags
          :sides sides
          :singleplayer singleplayer
