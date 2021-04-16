@@ -212,7 +212,7 @@
     (number? skill)
     skill
     (string? skill)
-    (let [[_all n] (re-find #"~?#?([\d]+)#?" skill)]
+    (let [[_all n] (re-find #"~?#?([\d\.]+)#?" skill)]
       (try
         (Double/parseDouble n)
         (catch Exception e

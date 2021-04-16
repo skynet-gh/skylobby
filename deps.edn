@@ -98,11 +98,11 @@
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.829"}}
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :test-once
   {:extra-paths ["test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.829"}}
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["test/clj"]}
