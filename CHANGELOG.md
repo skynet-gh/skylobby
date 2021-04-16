@@ -14,6 +14,11 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.3]
+
+- Fix battle view render error
+- Fix start positions in singleplayer
+
 ### [0.3.2]
 
 - Add basic support for spring settings backup and restore
