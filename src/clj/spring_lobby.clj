@@ -188,7 +188,7 @@
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
-   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
+   :mod-name :password :pop-out-battle :preferred-color :rapid-repo
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys
    :username])
 
@@ -6023,10 +6023,10 @@
 (defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-tab-main (.getId event)))
 
-(defmethod event-handler ::send-console [{:keys [client message]}]
+(defmethod event-handler ::send-console [{:keys [client message server-url]}]
   (future
     (try
-      (swap! *state dissoc :console-message-draft)
+      (swap! *state assoc-in [:by-server server-url :console-message-draft] "")
       (when-not (string/blank? message)
         (send-message client message))
       (catch Exception e
@@ -6170,7 +6170,7 @@
 
 (defn- main-tab-view
   [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
-           selected-tab-main users]
+           selected-tab-main server users]
     :as state}]
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^List main-tab-ids selected-tab-main)
@@ -6182,7 +6182,8 @@
                      (merge
                        {:fx/type users-table
                         :v-box/vgrow :always}
-                       (select-keys state users-table-keys))]}]
+                       (select-keys state users-table-keys))]}
+        server-url (first server)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
      (merge
@@ -6293,12 +6294,13 @@
                  :text "Send"
                  :on-action {:event/type ::send-console
                              :client client
-                             :message console-message-draft}}
+                             :message console-message-draft
+                             :server-url server-url}}
                 {:fx/type :text-field
                  :h-box/hgrow :always
                  :text (str console-message-draft)
-                 :on-text-changed {:event/type ::assoc
-                                   :key :console-message-draft}
+                 :on-text-changed {:event/type ::assoc-in
+                                   :path [:by-server server-url :console-message-draft]}
                  :on-action {:event/type ::send-console
                              :client client
                              :message console-message-draft}}
@@ -6491,7 +6493,8 @@
 
 
 (defn server-tab
-  [{:keys [agreement battle client last-failed-message password pop-out-battle selected-tab-main singleplayer-battle
+  [{:keys [agreement battle client console-auto-scroll last-failed-message password pop-out-battle
+           selected-tab-main singleplayer-battle
            tasks-by-type username verification-code]
     :as state}]
   {:fx/type :v-box
@@ -6524,6 +6527,7 @@
      [(merge
         {:fx/type main-tab-view
          :v-box/vgrow :always
+         :console-auto-scroll console-auto-scroll
          :selected-tab-main selected-tab-main}
         (select-keys state
           (concat main-tab-view-keys battles-table-keys my-channels-view-keys channels-table-keys)))
@@ -6614,7 +6618,8 @@
                    (concat
                      welcome-view-keys
                      fx.battle/battle-view-keys
-                     [:map-details :mod-details :pop-out-battle :selected-battle :selected-tab-main]))
+                     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle
+                      :selected-tab-main]))
                  server-data)})
             (dissoc by-server :local)))}}]}))
 
