@@ -143,7 +143,7 @@
                      "(loading...)")
              :alignment :center}]}])
        [(merge
-          (when-not am-spec
+          (when (or singleplayer (not am-spec))
             {:on-mouse-pressed {:event/type :spring-lobby/minimap-mouse-pressed
                                 :startpostype startpostype
                                 :starting-points starting-points

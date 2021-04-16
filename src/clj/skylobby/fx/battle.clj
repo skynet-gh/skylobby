@@ -745,14 +745,25 @@
              {:fx/type :label
               :text " Restore"
               :style {:-fx-font-size 20}}
-             {:fx/type :label
-              :text (str " From " (fs/spring-settings-root))}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :button
+                :text ""
+                :on-action {:event/type :spring-lobby/spring-settings-refresh}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-refresh:16:white"}}
+               {:fx/type :label
+                :text (str " From " (fs/spring-settings-root))}]}
              {:fx/type :table-view
               :v-box/vgrow :always
               :column-resize-policy :constrained
               :items (or (some->> (fs/spring-settings-root)
                                   fs/list-files ; TODO IO in render
-                                  (filter fs/is-directory?)))
+                                  (filter fs/is-directory?))
+                         [])
               :columns
               [{:fx/type :table-column
                 :text "Directory"
@@ -788,21 +799,20 @@
     [:singleplayer-battle :singleplayer-battle-map-details :singleplayer-battle-mod-details]))
 
 (defn multi-battle-view
-  [{:keys [battle client singleplayer-battle singleplayer-battle-map-details singleplayer-battle-mod-details]
-    :as state}]
-  (if (and battle singleplayer-battle)
+  [{:keys [battle]}]
+  (if (< 1 (count battle))
     {:fx/type :tab-pane
      :style {:-fx-font-size 16}
      :tabs
      [{:fx/type :tab
        :on-close-request {:event/type :spring-lobby/leave-battle
-                          :client client}
+                          :client (:client battle)}
        :graphic {:fx/type :label
                  :text "Multiplayer"}
        :content
        (merge
          {:fx/type battle-view}
-         state)}
+         battle)}
       {:fx/type :tab
        :on-close-request {:event/type :spring-lobby/dissoc
                           :key :singleplayer-battle}
@@ -811,15 +821,7 @@
        :content
        (merge
          {:fx/type battle-view}
-         state
-         {:battle singleplayer-battle
-          :battle-map-details singleplayer-battle-map-details
-          :battle-mod-details singleplayer-battle-mod-details})}]}
+         battle)}]}
     (merge
       {:fx/type battle-view}
-      state
-      (if battle
-        {:battle battle}
-        {:battle singleplayer-battle
-         :battle-map-details singleplayer-battle-map-details
-         :battle-mod-details singleplayer-battle-mod-details}))))
+      battle)))
