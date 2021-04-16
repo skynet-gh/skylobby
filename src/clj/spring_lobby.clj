@@ -5926,16 +5926,9 @@
         {:fx/type :pane})}}))
 
 (defn- main-window-on-close-request
-  [clients standalone e]
+  [standalone e]
   (log/debug "Main window close request" e)
   (when standalone
-    (loop [clients clients]
-      (let [client (first clients)]
-        (if (and client (not (s/closed? client)))
-          (do
-            (client/disconnect client)
-            (recur clients))
-          (recur (rest clients)))))
     (System/exit 0)))
 
 (defmethod event-handler ::my-channels-tab-action [e]
@@ -6631,8 +6624,7 @@
   (let [{:keys [width height]} (screen-bounds)
         all-tasks (filter some? (concat tasks (vals current-tasks)))
         tasks-by-type (group-by ::task-type all-tasks)
-        selected-tab-main (get main-tab-id-set selected-tab-main (first main-tab-ids))
-        all-clients (->> by-server vals (map :client) (filter some?))]
+        selected-tab-main (get main-tab-id-set selected-tab-main (first main-tab-ids))]
     {:fx/type fx/ext-many
      :desc
      [{:fx/type :stage
@@ -6643,7 +6635,7 @@
        :y 100
        :width (min main-window-width width)
        :height (min main-window-height height)
-       :on-close-request (partial main-window-on-close-request all-clients standalone)
+       :on-close-request (partial main-window-on-close-request standalone)
        :scene
        {:fx/type :scene
         :stylesheets stylesheets
