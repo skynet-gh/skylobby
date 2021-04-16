@@ -22,7 +22,7 @@ Notable changes and todo list.
 
 ### [0.3.0]
 
-- Add ability to connec to multiple servers simultaneously
+- Add ability to connect to multiple servers simultaneously
 - Add local battle separate from multiplayer
 - Improve map and game caching
 - Add .sdd map handling
