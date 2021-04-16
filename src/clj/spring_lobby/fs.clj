@@ -40,10 +40,12 @@
       (catch Exception e
         (log/trace e "Error getting canonical path for" f)))))
 
-; TODO always use canonical-path
-(defn absolute-path [^File f]
+(defn file [^File f & args]
   (when f
-    (.getAbsolutePath f)))
+    (try
+      (apply io/file f args)
+      (catch Exception e
+        (log/warn e "Error creating file from" f "and" args)))))
 
 (defn filename ^String [^File f]
   (when f
@@ -295,6 +297,10 @@
 (defn config-file
   [& path]
   (apply io/file (config-root) path))
+
+(defn spring-settings-root
+  []
+  (file (app-root) "spring-settings"))
 
 
 (defn download-dir ^File

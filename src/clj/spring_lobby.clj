@@ -435,7 +435,8 @@
 (defn- auto-get-resources-relevant-keys [state]
   (select-keys
     state
-    [:by-server :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path :maps :mods
+    [:auto-get-resources
+     :by-server :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path :maps :mods
      :rapid-data-by-version :spring-isolation-dir :tasks]))
 
 (defn- auto-get-resources-server-relevant-keys [state]
@@ -3602,10 +3603,12 @@
         (log/error e "Error updating battle color")))))
 
 (defmethod task-handler ::update-rapid
-  [e]
+  [{:keys [engine-version spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
-        {:keys [engine-version engines file-cache spring-isolation-dir]} @*state ; TODO remove deref
+        {:keys [engines file-cache] :as state} @*state ; TODO remove deref
+        engine-version (or engine-version (:engine-version state))
+        spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
@@ -4857,6 +4860,27 @@
               :describe
               (fn [version] {:text (str version)})}}]}]}
        {:fx/type :pane})}}))
+
+
+(defmethod event-handler ::spring-settings-copy
+  [{:keys [confirmed dest-dir file-cache source-dir]}]
+  (future
+    (try
+      (cond
+        (and (not confirmed)
+             (not= (fs/file-exists? file-cache dest-dir)  ; cache is out of date
+                   (fs/exists? dest-dir)))
+        (do
+          (log/warn "File cache was out of date for" dest-dir)
+          (update-file-cache! dest-dir))
+        (and (fs/exists? dest-dir) (not confirmed))  ; fail safe
+        (log/warn "Spring settings backup called to existing dir"
+                  dest-dir "but no confirmation")
+        :else
+        (let [results (spring/copy-spring-settings source-dir dest-dir)]
+          (swap! *state assoc-in [:spring-settings :results (fs/canonical-path source-dir)] results)))
+      (catch Exception e
+        (log/error e "Error copying Spring settings from" source-dir "to" dest-dir)))))
 
 
 (defmethod event-handler ::watch-replay
