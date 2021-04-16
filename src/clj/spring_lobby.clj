@@ -189,7 +189,7 @@
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
-   :replays-watched :replays-window-details :server :servers :spring-isolation-dir :uikeys
+   :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
    :username])
 
 
@@ -3096,18 +3096,21 @@
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
                 x (int (* (/ x minimap-width) map-width spring/map-multiplier))
                 z (int (* (/ y minimap-height) map-height spring/map-multiplier))
-                scripttags {:game
-                            {(keyword (str "team" team))
-                             {:startposx x
-                              :startposy z ; for SpringLobby bug
-                              :startposz z}}}]
+                team-data {:startposx x
+                           :startposy z ; for SpringLobby bug
+                           :startposz z}
+                scripttags {:game {(keyword (str "team" team)) team-data}}]
             (swap! *state
                    (fn [state]
                      (-> state
                          (update :scripttags u/deep-merge scripttags)
                          (update-in [:battle :scripttags] u/deep-merge scripttags))))
-            (send-message client
-              (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))
+            (if singleplayer
+              (swap! *state update-in
+                     [:by-server :local :battle :scripttags :game (keyword (str "team" team))]
+                     merge team-data)
+              (send-message client
+                (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
         (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
           (let [l (min startx endx)
                 t (min starty endy)
@@ -4872,6 +4875,16 @@
        {:fx/type :pane})}}))
 
 
+(defmethod event-handler ::spring-settings-refresh
+  [_e]
+  (future
+    (log/info "Refreshing spring settings backups dir")
+    (try
+      (let [files (fs/list-files (fs/spring-settings-root))]
+        (apply update-file-cache! files))
+      (catch Exception e
+        (log/error e "Error refreshing spring settings backups dir")))))
+
 (defmethod event-handler ::spring-settings-copy
   [{:keys [confirmed dest-dir file-cache source-dir]}]
   (future
@@ -5592,7 +5605,7 @@
                                               " Download engine")
                                       :disable (boolean running)
                                       :on-action {:event/type ::add-task
-                                                  :task {::task-type ::http-downloadable
+                                                  :task {::task-type ::download-and-extract
                                                          :downloadable engine-downloadable
                                                          :spring-isolation-dir spring-isolation-dir}}
                                       :graphic
@@ -6618,6 +6631,12 @@
          :on-action {:event/type ::toggle
                      :key :show-tasks-window}}]}])})
 
+(defn multi-server-tab
+  [state]
+  (merge
+    {:fx/type fx.battle/multi-battle-view-keys}
+    state))
+
 (defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-server-tab (.getId event)))
 
@@ -6627,8 +6646,10 @@
 
 (defn main-window
   [{:keys [by-server server selected-server-tab selected-tab-channel selected-tab-main] :as state}]
-  (let [no-local (valid-servers by-server)
-        tab-ids (concat ["local"] (map first no-local))
+  (let [servers (valid-servers by-server)
+        tab-ids (concat ["local"]
+                        (map first servers)
+                        #_(when (seq servers) ["multi"]))
         tab-id-set (set tab-ids)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
                              (.indexOf ^List tab-ids selected-server-tab))
@@ -6684,7 +6705,19 @@
                  server-data
                  {:selected-tab-channel selected-tab-channel
                   :selected-tab-main selected-tab-main})})
-            (valid-servers by-server)))}}]}))
+            servers)
+          #_
+          (when (seq servers)
+            [{:fx/type :tab
+              :id "multi"
+              :closable false
+              :graphic {:fx/type :label
+                        :text "All Servers"
+                        :style {:-fx-font-size 18}}
+              :content
+              (merge
+                {:fx/type multi-server-tab}
+                (select-keys state [:map-details :mod-details]))}]))}}]}))
 
 
 (defn- root-view
