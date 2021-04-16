@@ -35,24 +35,24 @@ jobs:
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.deb
           asset_content_type: application/vnd.debian.binary-package
       - run: rm dist/*
-      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
-      - uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist/skyreplays.jar
-          asset_name: skyreplays-${{ env.CI_REF_NAME }}-linux.jar
-          asset_content_type: application/java-archive
-      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/linux
-      - uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./skyreplays_${{ env.CI_REF_NAME }}-1_amd64.deb
-          asset_name: skyreplays-${{ env.CI_REF_NAME }}_linux-amd64.deb
-          asset_content_type: application/vnd.debian.binary-package
+        #      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+        #      - uses: actions/upload-release-asset@v1.0.2
+        #        env:
+        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #        with:
+        #          upload_url: ${{ github.event.release.upload_url }}
+        #          asset_path: ./dist/skyreplays.jar
+        #          asset_name: skyreplays-${{ env.CI_REF_NAME }}-linux.jar
+        #          asset_content_type: application/java-archive
+        #      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/linux
+        #      - uses: actions/upload-release-asset@v1.0.2
+        #        env:
+        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #        with:
+        #          upload_url: ${{ github.event.release.upload_url }}
+        #          asset_path: ./skyreplays_${{ env.CI_REF_NAME }}-1_amd64.deb
+        #          asset_name: skyreplays-${{ env.CI_REF_NAME }}_linux-amd64.deb
+        #          asset_content_type: application/vnd.debian.binary-package
   build-dmg:
     runs-on: macOS-10.15
     steps:
@@ -92,15 +92,15 @@ jobs:
         #          asset_path: ./dist/skyreplays.jar
         #          asset_name: skyreplays-${{ env.CI_REF_NAME }}-mac.jar
         #          asset_content_type: application/java-archive
-      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/mac
-      - uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.dmg
-          asset_name: skyreplays-${{ env.CI_REF_NAME }}_mac.dmg
-          asset_content_type: application/x-apple-diskimage
+        #      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/mac
+        #      - uses: actions/upload-release-asset@v1.0.2
+        #        env:
+        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #        with:
+        #          upload_url: ${{ github.event.release.upload_url }}
+        #          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.dmg
+        #          asset_name: skyreplays-${{ env.CI_REF_NAME }}_mac.dmg
+        #          asset_content_type: application/x-apple-diskimage
   build-exe:
     runs-on: windows-2019
     steps:
@@ -138,12 +138,12 @@ jobs:
         #          asset_path: ./dist/skyreplays.jar
         #          asset_name: skyreplays-${{ env.CI_REF_NAME }}-windows.jar
         #          asset_content_type: application/java-archive
-      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/windows
-      - uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.msi
-          asset_name: skyreplays-${{ env.CI_REF_NAME }}_windows.msi
-          asset_content_type: application/x-msi
+        #      - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/replays @jpackage/windows
+        #      - uses: actions/upload-release-asset@v1.0.2
+        #        env:
+        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #        with:
+        #          upload_url: ${{ github.event.release.upload_url }}
+        #          asset_path: ./skyreplays-${{ env.CI_REF_NAME }}.msi
+        #          asset_name: skyreplays-${{ env.CI_REF_NAME }}_windows.msi
+        #          asset_content_type: application/x-msi
