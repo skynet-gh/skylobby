@@ -14,6 +14,12 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.1]
+
+- Fix console not showing
+- Add Hakora site as source for maps
+- Stop building skyreplays release artifacts
+
 ### [0.3.0]
 
 - Add ability to connec to multiple servers simultaneously
