@@ -40,14 +40,14 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
    :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :server :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
            channels chat-auto-scroll client downloadables-by-url
-           drag-allyteam drag-team engine-filter engines http-download map-filter
-           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download
-           spring-isolation-dir tasks-by-type users username]
+           drag-allyteam drag-team engine-filter engines file-cache http-download map-filter
+           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server
+           spring-isolation-dir spring-settings tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
         singleplayer (= :singleplayer battle-id)
@@ -116,6 +116,7 @@
          :client (when-not singleplayer client)
          :host-username host-username
          :players players
+         :server-url (first server)
          :scripttags scripttags
          :sides sides
          :singleplayer singleplayer
@@ -402,6 +403,10 @@
            :hide-users true
            :message-draft (get message-drafts channel-name)}]}]}
       {:fx/type :tab-pane
+       :style {:-fx-min-width (+ u/minimap-size 20)
+               :-fx-pref-width (+ u/minimap-size 20)
+               :-fx-max-width (+ u/minimap-size 20)
+               :-fx-pref-height (+ u/minimap-size 164)}
        :tabs
        [{:fx/type :tab
          :graphic {:fx/type :label
@@ -409,9 +414,6 @@
          :closable false
          :content
          {:fx/type :scroll-pane
-          :style {:-fx-min-width (+ u/minimap-size 20)
-                  :-fx-pref-width (+ u/minimap-size 20)
-                  :-fx-pref-height (+ u/minimap-size 164)}
           :fit-to-width true
           :hbar-policy :never
           :vbar-policy :always
@@ -664,7 +666,120 @@
                                             :modoption-key (:key i)}
                          :items (or (map (comp :key second) (:items i))
                                     [])}}}}
-                     {:text (str (:def i))})))}}]}]}}]}]}))
+                     {:text (str (:def i))})))}}]}]}}
+        {:fx/type :tab
+         :graphic {:fx/type :label
+                   :text "Spring settings"}
+         :closable false
+         :content
+         (let [{:keys [auto-backup backup-name confirmed results]} spring-settings
+               spring-settings-dir (fs/spring-settings-root)
+               dest-dir (when-not (string/blank? backup-name)
+                          (fs/file spring-settings-dir backup-name))]
+           {:fx/type :v-box
+            :children
+            [{:fx/type :label
+              :text (str spring-isolation-dir)}
+             {:fx/type :label
+              :text " Includes springsettings.cfg, LuiUI/Config, and uikeys.txt"}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :check-box
+                :selected (boolean auto-backup)
+                :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:spring-settings :auto-backup]}}
+               {:fx/type :label
+                :text " Auto Backup "}]}
+             {:fx/type :label
+              :wrap-text true
+              :text (str " If enabled, will copy these files into a backup folder in "
+                         spring-settings-dir
+                         " named 'backup-yyyyMMdd-HHmmss' before Spring is run.")}
+             {:fx/type :pane
+              :style {:-fx-margin-top 8
+                      :-fx-margin-bottom 8}}
+             {:fx/type :label
+              :text " Manual Backup: "}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [{:fx/type :label
+                :text " Name: "}
+               {:fx/type :text-field
+                :text (str (:backup-name spring-settings))
+                :on-text-changed {:event/type :spring-lobby/assoc-in
+                                  :path [:spring-settings :backup-name]}}]}
+             {:fx/type :button
+              :text " Backup! "
+              :disable (boolean (or (string/blank? backup-name)
+                                    (and (not confirmed)
+                                         (fs/file-exists? file-cache dest-dir))))
+              :on-action {:event/type :spring-lobby/spring-settings-copy
+                          :confirmed confirmed
+                          :dest-dir dest-dir
+                          :file-cache file-cache
+                          :source-dir spring-isolation-dir}}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [{:fx/type :check-box
+                :selected (boolean confirmed)
+                :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:spring-settings :confirmed]}}
+               {:fx/type :label
+                :text " OVERWRITE EXISTING"}]}
+             {:fx/type :v-box
+              :children
+              (map
+                (fn [[path result]]
+                  {:fx/type :label
+                   :text (str " " path " "
+                              (case result
+                                :copied "was copied"
+                                :does-not-exist "does not exist"
+                                :error "errored"
+                                "unknown"))})
+                (get results (fs/canonical-path spring-isolation-dir)))}
+             {:fx/type :label
+              :text " Restore"
+              :style {:-fx-font-size 20}}
+             {:fx/type :label
+              :text (str " From " (fs/spring-settings-root))}
+             {:fx/type :table-view
+              :v-box/vgrow :always
+              :column-resize-policy :constrained
+              :items (or (some->> (fs/spring-settings-root)
+                                  fs/list-files ; TODO IO in render
+                                  (filter fs/is-directory?)))
+              :columns
+              [{:fx/type :table-column
+                :text "Directory"
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i]
+                   {:text (str (fs/filename i))})}}
+               {:fx/type :table-column
+                :text "Action"
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i]
+                   {:text (when (get results (fs/canonical-path i))
+                            " copied!")
+                    :graphic
+                    {:fx/type :button
+                     :text "Restore"
+                     :on-action
+                     {:event/type :spring-lobby/spring-settings-copy
+                      :confirmed true ; TODO confirm
+                      :dest-dir spring-isolation-dir
+                      :file-cache file-cache
+                      :source-dir i}}})}}]}]})}]}]}))
 
 
 (def multi-battle-view-keys

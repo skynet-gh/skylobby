@@ -28,60 +28,63 @@
      :alignment :center-left
      :style {:-fx-font-size 16}
      :children
-     [
-      {:fx/type :button
-       :text "Settings"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-settings-window}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-settings:16:white"}}
-      {:fx/type :button
-       :text "Replays"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-replays}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-open-in-new:16:white"}}
-      {:fx/type :label
-       :text " Resources: "}
-      {:fx/type :button
-       :text "Import"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-importer}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal (str "mdi-file-import:16:white")}}
-      {:fx/type :button
-       :text "HTTP"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-downloader}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal (str "mdi-download:16:white")}}
-      {:fx/type :button
-       :text "Rapid"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-rapid-downloader}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal (str "mdi-download:16:white")}}
-      {:fx/type engines-view
-       :engine-filter engine-filter
-       :engines engines
-       :engine-version engine-version}
-      {:fx/type mods-view
-       :mod-filter mod-filter
-       :mod-name mod-name
-       :mods mods
-       :spring-isolation-dir spring-isolation-dir}
-      {:fx/type maps-view
-       :map-name map-name
-       :maps maps
-       :map-input-prefix map-input-prefix
-       :on-value-changed {:event/type :spring-lobby/assoc
-                          :key :map-name}
-       :spring-isolation-dir spring-isolation-dir}]}
+     (concat
+       [
+        {:fx/type :button
+         :text "Settings"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-settings-window}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-settings:16:white"}}
+        {:fx/type :button
+         :text "Replays"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-replays}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-open-in-new:16:white"}}
+        {:fx/type :label
+         :text " Resources: "}
+        {:fx/type :button
+         :text "Import"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-importer}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-file-import:16:white")}}
+        {:fx/type :button
+         :text "HTTP"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-downloader}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-download:16:white")}}
+        {:fx/type :button
+         :text "Rapid"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-rapid-downloader}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (str "mdi-download:16:white")}}]
+       (when-not battle
+         [
+          {:fx/type engines-view
+           :engine-filter engine-filter
+           :engines engines
+           :engine-version engine-version}
+          {:fx/type mods-view
+           :mod-filter mod-filter
+           :mod-name mod-name
+           :mods mods
+           :spring-isolation-dir spring-isolation-dir}
+          {:fx/type maps-view
+           :map-name map-name
+           :maps maps
+           :map-input-prefix map-input-prefix
+           :on-value-changed {:event/type :spring-lobby/assoc
+                              :key :map-name}
+           :spring-isolation-dir spring-isolation-dir}]))}
     {:fx/type :h-box
      :style {:-fx-font-size 16}
      :alignment :center-left

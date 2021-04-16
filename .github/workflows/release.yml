@@ -34,7 +34,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.deb
           asset_content_type: application/vnd.debian.binary-package
-      - run: rm dist/*
+        #      - run: rm dist/*
         #      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
         #      - uses: actions/upload-release-asset@v1.0.2
         #        env:
@@ -82,8 +82,8 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_mac.dmg
           asset_content_type: application/x-apple-diskimage
-      - run: rm dist/*
-      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+          #      - run: rm dist/*
+        #      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
         #      - uses: actions/upload-release-asset@v1.0.2
         #        env:
         #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -128,8 +128,8 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_windows.msi
           asset_content_type: application/x-msi
-      - run: rm dist/*
-      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
+        #      - run: rm dist/*
+        #      - run: clojure -M:uberjar:headless --main-class 'spring-lobby.replays' --jar 'dist/skyreplays.jar'
         #      - uses: actions/upload-release-asset@v1.0.2
         #        env:
         #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

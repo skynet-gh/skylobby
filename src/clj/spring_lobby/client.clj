@@ -311,16 +311,16 @@
 (defn connect
   [state-atom server-url]
   (let [state @state-atom
-        {:keys [server password username]} state
-        {:keys [client my-channels]} (-> state :by-server (get server-url))]
+        {:keys [my-channels password username]} state
+        {:keys [client]} (-> state :by-server (get server-url))]
     (print-loop state-atom server-url)
     (message/send-message client "LISTCOMPFLAGS")
     (login client "*" username password)
     (message/send-message client "CHANNELS")
-    (doseq [channel my-channels]
-      (let [[channel-name {channel-server :server}] channel]
-        (when (and (= server channel-server)
-                   (not (u/battle-channel-name? channel-name)))
+    (doseq [channel (get my-channels server-url)]
+      (let [[channel-name _] channel]
+        (when-not (or (u/battle-channel-name? channel-name)
+                      (u/user-channel-name? channel-name))
           (message/send-message client (str "JOIN " channel-name)))))
     (ping-loop state-atom server-url)))
 

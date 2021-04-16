@@ -116,7 +116,10 @@
                    :spring-isolation-dir spring-isolation-dir}}
                  :else
                  {:event/type :spring-lobby/add-task
-                  :task {:spring-lobby/task-type :spring-lobby/update-rapid}})}])
+                  :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                         :engine-version (:engine-version engine-details)
+                         :spring-isolation-dir spring-isolation-dir
+                         :force true}})}])
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/mod} :resource-type))

@@ -311,8 +311,37 @@
       (re-find #"/\." path-str)
       (re-find #"\\\." path-str)))
 
-(defn start-game [{:keys [client engines ^java.io.File spring-isolation-dir] :as state}]
+
+(def spring-settings-paths
+  [["springsettings.cfg"]
+   ["uikeys.txt"]
+   ["LuaUI" "Config"]])
+
+(defn copy-spring-setting [source-dir dest-dir path]
   (try
+    (let [source (apply io/file source-dir path)]
+      (if (fs/exists? source)
+        (do
+          (fs/make-dirs (fs/file dest-dir))
+          (fs/copy source (apply io/file dest-dir path))
+          :copied)
+        :does-not-exist))
+    (catch Exception e
+      (log/warn e "Error copying spring settings" path "from" source-dir "to" dest-dir)
+      :error)))
+
+(defn copy-spring-settings [source-dir dest-dir]
+  (->> spring-settings-paths
+       (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
+       (into {})))
+
+(defn start-game [{:keys [client engines ^java.io.File spring-isolation-dir spring-settings] :as state}]
+  (try
+    (when (:auto-backup spring-settings)
+      (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
+            dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
+        (log/info "Backing up Spring settings to" dest-dir)
+        (copy-spring-settings spring-isolation-dir dest-dir)))
     (log/info "Starting game")
     (client/send-message client "MYSTATUS 1")
     (let [{:keys [battle-version]} (battle-details state)
