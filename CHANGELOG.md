@@ -4,15 +4,22 @@ Notable changes and todo list.
 
 ### TODO - future
 
-- Save and restore named settings, per server or per game
 - Merged view of multiple servers
 - Configure Spring directory per server or per game
 - Improve table column sizing
 - File pickers for path configs
+- Auto switch spring settings per server or per game
 - Add support for TLS communication to the server
 - Chat URL highlighting, text selection
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.3.2]
+
+- Add basic support for spring settings backup and restore
+- Fix console commands
+- Fix chat and channels
+- Fix app close
 
 ### [0.3.1]
 
