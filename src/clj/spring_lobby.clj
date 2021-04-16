@@ -6026,7 +6026,8 @@
                               sort)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^List my-channel-names selected-tab-channel)
-                         0)]
+                         0)
+        server-url (first server)]
     (if (seq my-channel-names)
       {:fx/type fx.ext.tab-pane/with-selection-props
        :props
@@ -6047,7 +6048,7 @@
              :on-close-request {:event/type ::leave-channel
                                 :channel-name channel-name
                                 :client client
-                                :server-url (first server)}
+                                :server-url server-url}
              :on-selection-changed (fn [^Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type fx.channel/channel-view
@@ -6055,7 +6056,8 @@
               :channels channels
               :chat-auto-scroll chat-auto-scroll
               :client client
-              :message-draft (get message-drafts channel-name)}})
+              :message-draft (get message-drafts channel-name)
+              :server-url server-url}})
           my-channel-names)}}
       {:fx/type :pane})))
 

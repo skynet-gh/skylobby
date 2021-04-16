@@ -401,7 +401,8 @@
            :chat-auto-scroll chat-auto-scroll
            :client client
            :hide-users true
-           :message-draft (get message-drafts channel-name)}]}]}
+           :message-draft (get message-drafts channel-name)
+           :server-url (first server)}]}]}
       {:fx/type :tab-pane
        :style {:-fx-min-width (+ u/minimap-size 20)
                :-fx-pref-width (+ u/minimap-size 20)
