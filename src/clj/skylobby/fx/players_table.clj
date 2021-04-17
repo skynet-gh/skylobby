@@ -105,6 +105,9 @@
      :columns
      [{:fx/type :table-column
        :text "Nickname"
+       :resizable true
+       :pref-width 400
+       :min-width 120
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -117,7 +120,8 @@
                (merge
                  {:-fx-text-fill (if (and battle-players-color-allyteam not-spec)
                                      (get allyteam-colors (-> id :battle-status :ally) "white")
-                                     "white")}
+                                     "white")
+                  :-fx-alignment "CENTER"}
                  (when not-spec
                    {:-fx-font-weight "bold"}))}
               (when (and username
@@ -136,7 +140,9 @@
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-account-remove:16:white"}}}))))}}
       {:fx/type :table-column
-       :text "TrueSkill"
+       :text "Skill"
+       :resizable false
+       :pref-width 80
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -149,6 +155,8 @@
                   (apply str (repeat skilluncertainty "?"))))})}}
       {:fx/type :table-column
        :text "Ally"
+       :resizable false
+       :pref-width 80
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -173,6 +181,8 @@
                                    (= (:owner i) username))))}}})}}
       {:fx/type :table-column
        :text "Team"
+       :resizable false
+       :pref-width 80
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -197,6 +207,8 @@
                                    (= (:owner i) username))))}}})}}
       {:fx/type :table-column
        :text "Color"
+       :resizable false
+       :pref-width 120
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -220,6 +232,8 @@
                                    (= (:owner i) username))))}}})}}
       {:fx/type :table-column
        :text "Status"
+       :resizable false
+       :pref-width 56
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -256,6 +270,8 @@
                     :icon-literal "mdi-sleep:16:grey"}]))}}))}}
       {:fx/type :table-column
        :text "Spectator"
+       :resizable false
+       :pref-width 80
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -279,6 +295,8 @@
                                    (= (:owner i) username))))}}})}}
       {:fx/type :table-column
        :text "Faction"
+       :resizable false
+       :pref-width 120
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -312,12 +330,17 @@
         :describe (fn [rank] {:text (str rank)})}}
       {:fx/type :table-column
        :text "Country"
+       :resizable false
+       :pref-width 64
        :cell-value-factory (comp :country :user)
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [country] {:text (str country)})}}
       {:fx/type :table-column
        :text "Bonus"
+       :resizable true
+       :min-width 64
+       :pref-width 64
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell

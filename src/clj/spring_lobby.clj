@@ -1554,12 +1554,15 @@
     [
      {:fx/type :table-column
       :text "Game"
+      :pref-width 200
       :cell-value-factory :battle-modname
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-modname] {:text (str battle-modname)})}}
      {:fx/type :table-column
       :text "Status"
+      :resizable false
+      :pref-width 56
       :cell-value-factory identity
       :cell-factory
       {:fx/cell-type :table-cell
@@ -1584,12 +1587,15 @@
              :icon-literal "mdi-checkbox-blank-circle-outline:16:green"}}))}}
      {:fx/type :table-column
       :text "Map"
+      :pref-width 200
       :cell-value-factory :battle-map
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-map] {:text (str battle-map)})}}
      {:fx/type :table-column
-      :text "Players (Specs)"
+      :text "Play (Spec)"
+      :resizable false
+      :pref-width 100
       :cell-value-factory (juxt (comp count :users) #(or (u/to-number (:battle-spectators %)) 0))
       :cell-factory
       {:fx/cell-type :table-cell
@@ -1601,22 +1607,26 @@
                      " (" spec-count ")")})}}
      {:fx/type :table-column
       :text "Battle Name"
+      :pref-width 100
       :cell-value-factory :battle-title
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [battle-title] {:text (str battle-title)})}}
      {:fx/type :table-column
-      :text "Host"
-      :cell-value-factory :host-username
-      :cell-factory
-      {:fx/cell-type :table-cell
-       :describe (fn [host-username] {:text (str host-username)})}}
-     {:fx/type :table-column
       :text "Country"
+      :resizable false
+      :pref-width 64
       :cell-value-factory #(:country (get users (:host-username %)))
       :cell-factory
       {:fx/cell-type :table-cell
        :describe (fn [country] {:text (str country)})}}
+     {:fx/type :table-column
+      :text "Host"
+      :pref-width 100
+      :cell-value-factory :host-username
+      :cell-factory
+      {:fx/cell-type :table-cell
+       :describe (fn [host-username] {:text (str host-username)})}}
      #_
      {:fx/type :table-column
       :text "Engine"
@@ -1714,6 +1724,8 @@
      :columns
      [{:fx/type :table-column
        :text "Username"
+       :resizable true
+       :pref-width 200
        :cell-value-factory :username
        :cell-factory
        {:fx/cell-type :table-cell
@@ -1723,6 +1735,8 @@
       {:fx/type :table-column
        :sortable false
        :text "Status"
+       :resizable false
+       :pref-width 56
        :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame])
        :cell-factory
        {:fx/cell-type :table-cell
@@ -1754,18 +1768,25 @@
                   :icon-literal "mdi-sleep:16:grey"}]))}})}}
       {:fx/type :table-column
        :text "Country"
+       :resizable false
+       :pref-width 64
        :cell-value-factory :country
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [country] {:text (str country)})}}
+      #_
       {:fx/type :table-column
        :text "Rank"
+       :resizable false
+       :pref-width 64
        :cell-value-factory (comp :rank :client-status)
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [rank] {:text (str rank)})}}
       {:fx/type :table-column
        :text "Lobby Client"
+       :resizable true
+       :pref-width 200
        :cell-value-factory :user-agent
        :cell-factory
        {:fx/cell-type :table-cell
@@ -5235,6 +5256,8 @@
                      (when replays-window-details
                        [{:fx/type :table-column
                          :text "Source"
+                         :resizable true
+                         :pref-width 80
                          :cell-value-factory :source-name
                          :cell-factory
                          {:fx/cell-type :table-cell
@@ -5243,6 +5266,8 @@
                             {:text (str source)})}}
                         {:fx/type :table-column
                          :text "Filename"
+                         :resizable true
+                         :pref-width 450
                          :cell-value-factory #(-> % :file fs/filename)
                          :cell-factory
                          {:fx/cell-type :table-cell
@@ -5252,6 +5277,8 @@
                      [
                       {:fx/type :table-column
                        :text "Map"
+                       :resizable true
+                       :pref-width 200
                        :cell-value-factory #(-> % :body :script-data :game :mapname)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5260,6 +5287,8 @@
                           {:text (str map-name)})}}
                       {:fx/type :table-column
                        :text "Game"
+                       :resizable true
+                       :pref-width 300
                        :cell-value-factory #(-> % :body :script-data :game :gametype)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5268,6 +5297,8 @@
                           {:text (str mod-name)})}}
                       {:fx/type :table-column
                        :text "Timestamp"
+                       :resizable false
+                       :pref-width 160
                        :cell-value-factory #(some-> % :header :unix-time (* 1000))
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5281,6 +5312,8 @@
                             {:text (str ts)}))}}
                       {:fx/type :table-column
                        :text "Type"
+                       :resizable false
+                       :pref-width 56
                        :cell-value-factory #(some-> % :game-type name)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5289,6 +5322,8 @@
                           {:text (str game-type)})}}
                       {:fx/type :table-column
                        :text "Player Counts"
+                       :resizable true
+                       :pref-width 120
                        :cell-value-factory :player-counts
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5297,6 +5332,8 @@
                           {:text (->> player-counts (string/join "v"))})}}
                       {:fx/type :table-column
                        :text "Skill Min"
+                       :resizable false
+                       :pref-width 80
                        :cell-value-factory (comp min-skill replay-skills)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5305,6 +5342,8 @@
                           {:text (str min-skill)})}}
                       {:fx/type :table-column
                        :text "Skill Avg"
+                       :resizable false
+                       :pref-width 80
                        :cell-value-factory (comp average-skill replay-skills)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5313,6 +5352,8 @@
                           {:text (str avg-skill)})}}
                       {:fx/type :table-column
                        :text "Skill Max"
+                       :resizable false
+                       :pref-width 80
                        :cell-value-factory (comp max-skill replay-skills)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5322,6 +5363,8 @@
                      (when replays-window-details
                        [{:fx/type :table-column
                          :text "Engine"
+                         :resizable true
+                         :pref-width 220
                          :cell-value-factory #(-> % :header :engine-version)
                          :cell-factory
                          {:fx/cell-type :table-cell
@@ -5330,6 +5373,8 @@
                             {:text (str engine-version)})}}
                         {:fx/type :table-column
                          :text "Size"
+                         :resizable false
+                         :pref-width 80
                          :cell-value-factory :file-size
                          :cell-factory
                          {:fx/cell-type :table-cell
@@ -5338,6 +5383,8 @@
                             {:text (u/format-bytes file-size)})}}])
                      [{:fx/type :table-column
                        :text "Duration"
+                       :resizable false
+                       :pref-width 80
                        :cell-value-factory #(-> % :header :game-time)
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5354,6 +5401,8 @@
                       {:fx/type :table-column
                        :text "Watched"
                        :sortable false
+                       :resizable false
+                       :pref-width 80
                        :cell-value-factory identity
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5372,6 +5421,8 @@
                       {:fx/type :table-column
                        :text "Watch"
                        :sortable false
+                       :resizable true
+                       :min-width 100
                        :cell-value-factory identity
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5391,6 +5442,7 @@
                                 map-importable (get replay-imports-by-map map-name)
                                 mod-rapid-download (get rapid-download (:id mod-rapid))]
                             {:text ""
+                             :style {:-fx-alignment "CENTER-RIGHT"}
                              :graphic
                              (cond
                                (:id i) ; BAR online replay
@@ -6086,7 +6138,7 @@
      :selected-tab-channel
      :selected-tab-main :server :users]))
 
-(defn- main-tab-view
+(defn main-tab-view
   [{:keys [battles client channels console-auto-scroll console-log console-message-draft join-channel-name
            selected-tab-main server users]
     :as state}]
