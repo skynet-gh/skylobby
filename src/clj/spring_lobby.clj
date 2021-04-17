@@ -22,6 +22,7 @@
     [manifold.stream :as s]
     [me.raynes.fs :as raynes-fs]
     [shams.priority-queue :as pq]
+    [skylobby.fx :as skylobby.fx]
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
     [skylobby.fx.channel :as fx.channel]
@@ -41,7 +42,6 @@
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.spring.uikeys :as uikeys]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [version-clj.core :as version])
@@ -54,7 +54,7 @@
     (javafx.event Event)
     (javafx.scene Node)
     (javafx.scene.control Tab)
-    (javafx.scene.input KeyCode KeyEvent ScrollEvent)
+    (javafx.scene.input KeyCode ScrollEvent)
     (javafx.stage Screen WindowEvent)
     (manifold.stream SplicedStream)
     (org.apache.commons.io.input CountingInputStream))
@@ -72,23 +72,6 @@
 (def wait-before-init-tasks-ms 10000)
 
 (dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
-
-(def stylesheets
-  [(str (io/resource "dark.css"))])
-
-(def monospace-font-family
-  (if (fs/windows?)
-    "Consolas"
-    "monospace"))
-
-(def icons
-  [(str (io/resource "icon16.png"))
-   (str (io/resource "icon32.png"))
-   (str (io/resource "icon64.png"))
-   (str (io/resource "icon128.png"))
-   (str (io/resource "icon256.png"))
-   (str (io/resource "icon512.png"))
-   (str (io/resource "icon1024.png"))])
 
 
 (def main-window-width 1920)
@@ -117,8 +100,6 @@
 (def minimap-size 512)
 
 
-;(def map-browse-image-size 98)
-;(def map-browse-box-height 160)
 (def map-browse-image-size 162)
 (def map-browse-box-height 224)
 
@@ -159,6 +140,30 @@
       {})))
 
 
+; tasks by kind
+
+(def index-tasks
+  #{::reconcile-engines
+    ::reconcile-mods
+    ::reconcile-maps})
+
+(def resource-tasks
+  #{::import
+    ::http-downloadable
+    ::rapid-downloadable
+    ::update-rapid})
+
+(def task-kinds [::index-task ::resource-task ::other-task])
+
+(defn task-kind [{::keys [task-type]}]
+  (cond
+    (contains? index-tasks task-type) ::index-task
+    (contains? resource-tasks task-type) ::resource-task
+    :else ::other-task))
+
+
+; old priority task system
+
 (def priority-overrides
   {::reconcile-engines 5
    ::reconcile-mods 4
@@ -177,11 +182,11 @@
       (get priority-overrides task-type)
       default-task-priority))
 
-(defn- initial-tasks []
-  (pq/priority-queue task-priority :variant :set))
-
 (defn- initial-file-events []
   (clojure.lang.PersistentQueue/EMPTY))
+
+(defn initial-tasks []
+  (pq/priority-queue task-priority :variant :set))
 
 
 (def config-keys
@@ -278,8 +283,10 @@
         (map
           (comp slurp-config-edn :filename) state-to-edn)))
     (slurp-config-edn "parsed-replays.edn")
-    {:file-events (initial-file-events)
-     :tasks (initial-tasks)
+    {:tasks (initial-tasks)
+     :tasks-by-kind {}
+     :current-tasks (->> task-kinds (map (juxt identity (constantly nil))) (into {}))
+     :file-events (initial-file-events)
      :minimap-type (first minimap-types)
      :replay-minimap-type (first minimap-types)
      :map-details (cache/fifo-cache-factory {})
@@ -398,18 +405,29 @@
 (defmulti event-handler :event/type)
 
 
-(defn- add-task! [state-atom task]
+; tasks by kind
+
+(defn add-task! [state-atom task]
   (if task
-    (do
-      (log/info "Adding task" (pr-str task))
-      (swap! state-atom update :tasks conj task))
+    (let [task-kind (task-kind task)]
+      (log/info "Adding task" (pr-str task) "to" task-kind)
+      (swap! state-atom update-in [:tasks-by-kind task-kind]
+        (fn [tasks]
+          (set (conj tasks task)))))
     (log/warn "Attempt to add nil task" task)))
 
-(defn- add-tasks! [state-atom tasks-to-add]
-  (log/info "Adding tasks" (pr-str tasks-to-add))
-  (swap! state-atom update :tasks
-    (fn [tasks]
-      (apply conj tasks tasks-to-add))))
+(defn add-multiple-tasks [tasks-by-kind new-tasks]
+  (reduce-kv
+    (fn [m k new-tasks]
+      (update m k (fn [existing]
+                    (set (concat new-tasks existing)))))
+    tasks-by-kind
+    (group-by task-kind new-tasks)))
+
+(defn- add-tasks! [state-atom new-tasks]
+  (log/info "Adding tasks" (pr-str new-tasks))
+  (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
+
 
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
@@ -822,16 +840,15 @@
                 (fn [{:keys [extra-import-sources] :as state}]
                   (-> state
                       (dissoc :engines :maps :mods :battle-map-details :battle-mod-details)
-                      (update :tasks
-                        (fn [tasks]
-                          (conj tasks
-                            {::task-type ::reconcile-engines}
-                            {::task-type ::reconcile-mods}
-                            {::task-type ::reconcile-maps}
-                            {::task-type ::scan-imports
-                             :sources (import-sources extra-import-sources)}
-                            {::task-type ::update-rapid}
-                            {::task-type ::refresh-replays}))))))))
+                      (update :tasks-by-kind
+                        add-multiple-tasks
+                        [{::task-type ::reconcile-engines}
+                         {::task-type ::reconcile-mods}
+                         {::task-type ::reconcile-maps}
+                         {::task-type ::scan-imports
+                          :sources (import-sources extra-import-sources)}
+                         {::task-type ::update-rapid}
+                         {::task-type ::refresh-replays}]))))))
           (catch Exception e
             (log/error e "Error in :spring-isolation-dir-changed state watcher"))))))
   (add-watch state-atom :auto-get-resources
@@ -869,57 +886,40 @@
     (log/warn "Unknown task type" task)))
 
 
-(defn- peek-task [min-priority tasks]
-  (when-not (empty? tasks)
-    (when-let [{::keys [task-priority] :as task} (peek tasks)]
-      (when (<= min-priority (or task-priority default-task-priority))
-        task))))
-
-; https://www.eidel.io/2019/01/22/thread-safe-queues-clojure/
-(defn- handle-task!
-  ([state-atom worker-id]
-   (handle-task! state-atom worker-id 1))
-  ([state-atom worker-id min-priority]
-   (let [[before _after] (swap-vals! state-atom
-                           (fn [{:keys [tasks] :as state}]
-                             (if (empty? tasks)
+(defn handle-task!
+  ([state-atom task-kind]
+   (let [[_before after] (swap-vals! state-atom
+                           (fn [{:keys [tasks-by-kind] :as state}]
+                             (if (empty? (get tasks-by-kind task-kind))
                                state ; don't update unnecessarily
-                               (let [next-tasks (if-not (empty? tasks)
-                                                  (let [{::keys [task-priority]} (peek tasks)]
-                                                    (if (<= min-priority (or task-priority default-task-priority))
-                                                      (pop tasks)
-                                                      tasks)
-                                                    (pop tasks))
-                                                  tasks)
-                                     task (peek-task min-priority tasks)]
+                               (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
                                  (-> state
-                                     (assoc :tasks next-tasks)
-                                     (assoc-in [:current-tasks worker-id] task))))))
-         tasks (:tasks before)
-         task (peek-task min-priority tasks)]
+                                     (update-in [:tasks-by-kind task-kind]
+                                       (fn [tasks]
+                                         (disj (set tasks) task)))
+                                     (assoc-in [:current-tasks task-kind] task))))))
+         task (-> after :current-tasks (get task-kind))]
      (task-handler task)
      (when task
-       (swap! state-atom update :current-tasks assoc worker-id nil))
+       (swap! state-atom update :current-tasks assoc task-kind nil))
      task)))
 
+
 (defn- tasks-chimer-fn
-  ([state-atom worker-id]
-   (tasks-chimer-fn state-atom worker-id 1))
-  ([state-atom worker-id min-priority]
-   (log/info "Starting tasks chimer")
+  ([state-atom task-kind]
+   (log/info "Starting tasks chimer for" task-kind)
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/instant)
+             (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (handle-task! state-atom worker-id min-priority))
+             (handle-task! state-atom task-kind))
            {:error-handler
             (fn [e]
-              (log/error e "Error handling task")
+              (log/error e "Error handling task of kind" task-kind)
               true)})]
      (fn [] (.close chimer)))))
-
 
 (defn- file-cache-data [f]
   (if f
@@ -2077,7 +2077,7 @@
     {:fx/type :stage
      :showing (boolean show-servers-window)
      :title (str u/app-name " Servers")
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-servers-window false)
                          (.consume e))
@@ -2085,7 +2085,7 @@
      :height 320
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-servers-window
         {:fx/type :v-box
@@ -2194,7 +2194,7 @@
   {:fx/type :stage
    :showing (boolean show-register-window)
    :title (str u/app-name " Register")
-   :icons icons
+   :icons skylobby.fx/icons
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-register-window false)
                        (.consume e))
@@ -2202,7 +2202,7 @@
    :height 400
    :scene
    {:fx/type :scene
-    :stylesheets stylesheets
+    :stylesheets skylobby.fx/stylesheets
     :root
     (if show-register-window
       {:fx/type :v-box
@@ -2331,7 +2331,7 @@
   {:fx/type :stage
    :showing (boolean show-settings-window)
    :title (str u/app-name " Settings")
-   :icons icons
+   :icons skylobby.fx/icons
    :on-close-request (fn [^javafx.stage.WindowEvent e]
                        (swap! *state assoc :show-settings-window false)
                        (.consume e))
@@ -2339,7 +2339,7 @@
    :height 800
    :scene
    {:fx/type :scene
-    :stylesheets stylesheets
+    :stylesheets skylobby.fx/stylesheets
     :root
     (if show-settings-window
       {:fx/type :scroll-pane
@@ -2507,47 +2507,9 @@
                                   :key :extra-replay-recursive}}]}]}}
      {:fx/type :pane})}})
 
-(def bind-keycodes
-  {"CTRL" KeyCode/CONTROL
-   "ESC" KeyCode/ESCAPE
-   "BACKSPACE" KeyCode/BACK_SPACE
-   "." KeyCode/PERIOD
-   "," KeyCode/COMMA
-   "+" KeyCode/PLUS
-   "-" KeyCode/MINUS
-   "=" KeyCode/EQUALS
-   "_" KeyCode/UNDERSCORE
-   ";" KeyCode/SEMICOLON
-   "^" KeyCode/CIRCUMFLEX
-   "`" KeyCode/BACK_QUOTE
-   "[" KeyCode/OPEN_BRACKET
-   "]" KeyCode/CLOSE_BRACKET
-   "/" KeyCode/SLASH
-   "\\" KeyCode/BACK_SLASH
-   "PAGEUP" KeyCode/PAGE_UP
-   "PAGEDOWN" KeyCode/PAGE_DOWN})
 
-(defn- bind-key-to-javafx-keycode [bind-key-piece]
-  (or (KeyCode/getKeyCode bind-key-piece)
-      (get bind-keycodes bind-key-piece)
-      (try (KeyCode/valueOf bind-key-piece)
-           (catch Exception e
-             (log/trace e "Error getting KeyCode for" bind-key-piece)))))
-
-(def keycode-binds
-  (clojure.set/map-invert bind-keycodes))
-
-(defn- key-event-to-uikeys-bind [^KeyEvent key-event]
-  (str
-    (when (.isAltDown key-event)
-      "alt,")
-    (when (.isControlDown key-event)
-      "ctrl,")
-    (when (.isShiftDown key-event)
-      "shift,")
-    (or (get keycode-binds (.getCode key-event))
-        (.getText key-event))))
-
+; TODO uikeys
+#_
 (defmethod event-handler ::uikeys-pressed [{:fx/keys [^KeyEvent event] :keys [selected-uikeys-action]}]
   (if (.isModifierKey (.getCode event))
     (log/debug "Ignoring modifier key event for uikeys")
@@ -2555,128 +2517,10 @@
       (log/info event)
       (swap! *state assoc-in [:uikeys selected-uikeys-action] (key-event-to-uikeys-bind event)))))
 
+#_
 (defmethod event-handler ::uikeys-select
   [{:fx/keys [event]}]
   (swap! *state assoc :selected-uikeys-action (:bind-action event)))
-
-(defn- uikeys-window [{:keys [filter-uikeys-action selected-uikeys-action show-uikeys-window uikeys]}]
-  (let [default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
-                           [])
-        filtered-uikeys (->>  default-uikeys
-                              (filter
-                                (fn [{:keys [bind-action]}]
-                                  (if (string/blank? filter-uikeys-action)
-                                    true
-                                    (string/includes?
-                                      (string/lower-case bind-action)
-                                      (string/lower-case filter-uikeys-action)))))
-                              (sort-by :bind-key))
-        uikeys-overrides (or uikeys {})]
-    {:fx/type :stage
-     :showing (boolean show-uikeys-window)
-     :title (str u/app-name " UI Keys Editor")
-     :icons icons
-     :on-close-request (fn [^Event e]
-                         (swap! *state assoc :show-uikeys-window false)
-                         (.consume e))
-     :width 1200
-     :height 1000
-     :scene
-     {:fx/type :scene
-      :stylesheets stylesheets
-      :root
-      (if show-uikeys-window
-        {:fx/type :v-box
-         :style {:-fx-font-size 14}
-         :children
-         (if show-uikeys-window
-           [{:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text " Filter action: "}
-              {:fx/type :text-field
-               :text (str filter-uikeys-action)
-               :prompt-text "filter"
-               :on-text-changed {:event/type ::assoc
-                                 :key :filter-uikeys-action}}]}
-            {:fx/type fx.ext.table-view/with-selection-props
-             :v-box/vgrow :always
-             :props
-             {:selection-mode :single
-              :on-selected-item-changed
-              {:event/type ::uikeys-select}}
-             :desc
-             {:fx/type :table-view
-              :column-resize-policy :constrained
-              :items (or (seq filtered-uikeys) [])
-              :on-key-pressed {:event/type ::uikeys-pressed
-                               :selected-uikeys-action selected-uikeys-action}
-              :columns
-              [
-               {:fx/type :table-column
-                :text "Action"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (str (:bind-action i))})}}
-               {:fx/type :table-column
-                :text "Bind"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (:bind-key i))})}}
-               {:fx/type :table-column
-                :text "Parsed"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
-               {:fx/type :table-column
-                :text "JavaFX KeyCode"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   (let [bind-key-uc (string/upper-case (:bind-key i))
-                         parsed (uikeys/parse-bind-keys bind-key-uc)
-                         key-codes (map
-                                     (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
-                                     parsed)]
-                     {:text (pr-str key-codes)}))}}
-               {:fx/type :table-column
-                :text "Comment"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [{:keys [bind-comment]}]
-                   (merge
-                     {:text (str bind-comment)}
-                     (when bind-comment
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :style {:-fx-font-size 15}
-                         :text (str bind-comment)}})))}}
-               {:fx/type :table-column
-                :text "Override"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (get uikeys-overrides (:bind-action i)))})}}]}}]
-           {:fx/type :label
-            :text "window hidden"})}
-        {:fx/type :pane})}}))
 
 
 (defmethod event-handler ::username-change
@@ -2758,7 +2602,7 @@
         (async/<!! (async/timeout 500)))
       (if selected-battle
         (do
-          (swap! *state dissoc :selected-battle)
+          (swap! *state assoc :selected-battle nil :battle {})
           (send-message client
             (str "JOINBATTLE " selected-battle
                  (if battle-passworded
@@ -2782,7 +2626,7 @@
                                                                          :battle-modname mod-name
                                                                          :host-username username})
                    (assoc-in [:by-server :local :battle]
-                             {:battle-id :singleplayer ; TODO dedupe
+                             {:battle-id :singleplayer
                               :scripttags {:game {:startpostype 0}}
                               :users {username {:battle-status handler/default-battle-status}}}))))
       (catch Exception e
@@ -2907,7 +2751,6 @@
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
         (send-message client m))
-        ;(swap! *state assoc :battle-map-details nil))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -4135,6 +3978,7 @@
 
 (defn- import-window
   [{:keys [copying extra-import-sources file-cache import-filter import-type import-source-name importables-by-path
+           screen-bounds
            show-importer show-stale spring-isolation-dir tasks-by-type]}]
   (let [import-sources (import-sources extra-import-sources)
         import-source (->> import-sources
@@ -4170,11 +4014,11 @@
         import-tasks (->> (get tasks-by-type ::import)
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
-        {:keys [width height]} (screen-bounds)]
+        {:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-importer)
      :title (str u/app-name " Importer")
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-importer false)
                          (.consume e))
@@ -4182,7 +4026,7 @@
      :height (min download-window-height height)
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-importer
         {:fx/type :v-box
@@ -4395,7 +4239,7 @@
 
 (defn- download-window
   [{:keys [download-filter download-type download-source-name downloadables-by-url file-cache
-           http-download show-downloader show-stale spring-isolation-dir]}]
+           http-download screen-bounds show-downloader show-stale spring-isolation-dir]}]
   (let [download-source (->> download-sources
                          (filter (comp #{download-source-name} :download-source-name))
                          first)
@@ -4426,11 +4270,11 @@
                                      (if download-type
                                        (= download-type resource-type)
                                        true))))
-        {:keys [width height]} (screen-bounds)]
+        {:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-downloader)
      :title (str u/app-name " Downloader")
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-downloader false)
                          (.consume e))
@@ -4438,7 +4282,7 @@
      :height (min download-window-height height)
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-downloader
         {:fx/type :v-box
@@ -4659,7 +4503,7 @@
 
 (defn- rapid-download-window
   [{:keys [engine-version engines rapid-download rapid-filter rapid-repo rapid-repos rapid-versions
-           rapid-packages sdp-files show-rapid-downloader spring-isolation-dir]}]
+           rapid-packages screen-bounds sdp-files show-rapid-downloader spring-isolation-dir]}]
   (let [sdp-files (or sdp-files [])
         sdp-hashes (set (map rapid/sdp-hash sdp-files))
         sorted-engine-versions (->> engines
@@ -4684,11 +4528,11 @@
                                            true))))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         engine-file (:file (get engines-by-version engine-version))
-        {:keys [width height]} (screen-bounds)]
+        {:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-rapid-downloader)
      :title (str u/app-name " Rapid Downloader")
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request (fn [^WindowEvent e]
                          (swap! *state assoc :show-rapid-downloader false)
                          (.consume e))
@@ -4696,7 +4540,7 @@
      :height (min download-window-height height)
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-rapid-downloader
         {:fx/type :v-box
@@ -4810,7 +4654,7 @@
                 (let [download (get rapid-download (:id i))]
                   (merge
                     {:text (str (:message download))
-                     :style {:-fx-font-family monospace-font-family}}
+                     :style {:-fx-font-family skylobby.fx/monospace-font-family}}
                     (cond
                       (sdp-hashes (:hash i))
                       {:graphic
@@ -5043,7 +4887,7 @@
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
            filter-replay-type http-download map-details maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details selected-replay-file selected-replay-id
+           replay-imports-by-map replay-imports-by-mod replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details screen-bounds selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
   (let [local-filenames (->> parsed-replays-by-path
                              vals
@@ -5139,13 +4983,13 @@
         download-tasks (->> (get tasks-by-type ::download-bar-replay)
                             (map :id)
                             set)
-        {:keys [width height]} (screen-bounds)
+        {:keys [width height]} screen-bounds
         time-zone-id (.toZoneId (TimeZone/getDefault))
         sources (replay-sources {:extra-replay-sources extra-replay-sources})]
     {:fx/type :stage
      :showing (boolean show-replays)
      :title (or title (str u/app-name " Replays"))
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request
      (or
        on-close-request
@@ -5156,7 +5000,7 @@
      :height (min replays-window-height height)
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-replays
         {:fx/type :v-box
@@ -5880,7 +5724,7 @@
     {:fx/type :stage
      :showing (boolean show-maps)
      :title (str u/app-name " Maps")
-     :icons icons
+     :icons skylobby.fx/icons
      :on-close-request (fn [^javafx.stage.WindowEvent e]
                          (swap! *state assoc :show-maps false)
                          (.consume e))
@@ -5888,7 +5732,7 @@
      :height (min download-window-height height)
      :scene
      {:fx/type :scene
-      :stylesheets stylesheets
+      :stylesheets skylobby.fx/stylesheets
       :root
       (if show-maps
         {:fx/type :v-box
@@ -6146,7 +5990,6 @@
              :children
              [
               {:fx/type server-combo-box
-               ;:disable (or client client-deferred)
                :server server
                :servers servers
                :on-value-changed {:event/type ::on-change-server}}
@@ -6363,7 +6206,7 @@
              {:fx/type :text-area
               :editable false
               :wrap-text true
-              :style {:-fx-font-family monospace-font-family}}}
+              :style {:-fx-font-family skylobby.fx/monospace-font-family}}}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -6401,76 +6244,87 @@
                                         :key :console-auto-scroll}}]}}]}]})}]}}))
 
 (def tasks-window-keys
-  [:current-tasks :show-tasks-window :tasks])
+  [:current-tasks :show-tasks-window :tasks-by-kind])
 
-(defn- tasks-window [{:keys [current-tasks show-tasks-window tasks]}]
-  {:fx/type :stage
-   :showing (boolean show-tasks-window)
-   :title (str u/app-name " Tasks")
-   :icons icons
-   :on-close-request (fn [^Event e]
-                       (swap! *state assoc :show-tasks-window false)
-                       (.consume e))
-   :width 1200
-   :height 1000
-   :scene
-   {:fx/type :scene
-    :stylesheets stylesheets
-    :root
-    (if show-tasks-window
-      {:fx/type :v-box
-       :style {:-fx-font-size 16}
-       :children
-       [{:fx/type :label
-         :text "Workers"
-         :style {:-fx-font-size 24}}
+(defn tasks-window [{:keys [current-tasks screen-bounds show-tasks-window tasks-by-kind]}]
+  (let [{:keys [width height]} screen-bounds]
+    {:fx/type :stage
+     :showing (boolean show-tasks-window)
+     :title (str u/app-name " Tasks")
+     :icons skylobby.fx/icons
+     :on-close-request (fn [^Event e]
+                         (swap! *state assoc :show-tasks-window false)
+                         (.consume e))
+     :width (min width 1600)
+     :height (min height 1000)
+     :scene
+     {:fx/type :scene
+      :stylesheets skylobby.fx/stylesheets
+      :root
+      (if show-tasks-window
         {:fx/type :v-box
-         :alignment :center-left
+         :style {:-fx-font-size 16}
          :children
-         (map
-           (fn [[k v]]
-             {:fx/type :h-box
-              :children
-              [{:fx/type :label
-                :style {:-fx-font-size 20}
-                :text (str " Priority " k ": ")}
-               {:fx/type :label
-                :text (str (::task-type v))}]})
-           current-tasks)}
-        {:fx/type :label
-         :text "Task Queue"
-         :style {:-fx-font-size 24}}
-        {:fx/type :table-view
-         :v-box/vgrow :always
-         :column-resize-policy :constrained
-         :items (or (seq tasks) [])
-         :columns
-         [
-          {:fx/type :table-column
-           :text "Type"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text (str (::task-type i))})}}
-          {:fx/type :table-column
-           :text "Priority"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text (str (or (::task-priority i) default-task-priority))})}}
-          {:fx/type :table-column
-           :text "Keys"
-           :cell-value-factory identity
-           :cell-factory
-           {:fx/cell-type :table-cell
-            :describe
-            (fn [i]
-              {:text (str (keys i))})}}]}]}
-      {:fx/type :pane})}})
+         [{:fx/type :label
+           :text "Workers"
+           :style {:-fx-font-size 24}}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           (map
+             (fn [[k v]]
+               {:fx/type :v-box
+                :children
+                [{:fx/type :label
+                  :style {:-fx-font-size 20}
+                  :text (str " " k ": ")}
+                 {:fx/type :text-area
+                  :editable false
+                  :wrap-text true
+                  :text (str (with-out-str (pprint v)))}]})
+             current-tasks)}
+          {:fx/type :label
+           :text "Task Queue"
+           :style {:-fx-font-size 24}}
+          {:fx/type :table-view
+           :v-box/vgrow :always
+           :column-resize-policy :constrained
+           :items (or (->> tasks-by-kind
+                           (mapcat second)
+                           seq)
+                      [])
+           :columns
+           [
+            {:fx/type :table-column
+             :text "Kind"
+             :cell-value-factory task-kind
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
+                {:text (str i)})}}
+            {:fx/type :table-column
+             :text "Type"
+             :cell-value-factory ::task-type
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
+                {:text (str i)})}}
+            {:fx/type :table-column
+             :text "Data"
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [i]
+                {:text ""
+                 :graphic
+                 {:fx/type :text-area
+                  :editable false
+                  :wrap-text true
+                  :text (str (with-out-str (pprint i)))}})}}]}]}
+        {:fx/type :pane})}}))
 
 (def matchmaking-window-keys
   [:client :matchmaking-queues :show-matchmaking-window])
@@ -6479,7 +6333,7 @@
   {:fx/type :stage
    :showing (boolean show-matchmaking-window)
    :title (str u/app-name " Matchmaking")
-   :icons icons
+   :icons skylobby.fx/icons
    :on-close-request (fn [^Event e]
                        (swap! *state assoc :show-matchmaking-window false)
                        (.consume e))
@@ -6487,7 +6341,7 @@
    :height 700
    :scene
    {:fx/type :scene
-    :stylesheets stylesheets
+    :stylesheets skylobby.fx/stylesheets
     :root
     (if show-matchmaking-window
       {:fx/type :v-box
@@ -6571,8 +6425,7 @@
 
 (defn server-tab
   [{:keys [agreement battle client console-auto-scroll last-failed-message password pop-out-battle
-           selected-tab-channel selected-tab-main singleplayer-battle
-           tasks-by-type username verification-code]
+           selected-tab-channel selected-tab-main tasks-by-type username verification-code]
     :as state}]
   {:fx/type :v-box
    :style {:-fx-font-size 14}
@@ -6612,8 +6465,8 @@
       (merge
         {:fx/type fx.battles-buttons/battles-buttons-view}
         (select-keys state fx.battles-buttons/battles-buttons-keys))]
-     (when (or battle singleplayer-battle)
-       (if (or (:battle-id battle) singleplayer-battle)
+     (when battle
+       (if (:battle-id battle)
          (when (not pop-out-battle)
            [(merge
               {:fx/type fx.battle/battle-view
@@ -6627,7 +6480,7 @@
              :children
              [{:fx/type :label
                :style {:-fx-font-size 20}
-               :text "Waiting for server to open battle..."}]}]}]))
+               :text "Waiting for battle details from server..."}]}]}]))
      [{:fx/type :h-box
        :alignment :center-left
        :children
@@ -6730,20 +6583,24 @@
                 (select-keys state [:map-details :mod-details]))}]))}}]}))
 
 
-(defn- root-view
-  [{{:keys [by-server current-tasks pop-out-battle selected-server-tab selected-tab-main standalone tasks]
+(defn root-view
+  [{{:keys [by-server current-tasks pop-out-battle selected-server-tab selected-tab-main standalone tasks-by-kind]
      :as state}
     :state}]
-  (let [{:keys [width height]} (screen-bounds)
-        all-tasks (filter some? (concat tasks (vals current-tasks)))
+  (let [{:keys [width height] :as screen-bounds} (screen-bounds)
+        all-tasks (->> tasks-by-kind
+                       (mapcat second)
+                       (concat (vals current-tasks))
+                       (filter some?))
         tasks-by-type (group-by ::task-type all-tasks)
         selected-tab-main (get main-tab-id-set selected-tab-main (first main-tab-ids))]
     {:fx/type fx/ext-many
      :desc
-     [{:fx/type :stage
+     [
+      {:fx/type :stage
        :showing true
        :title (str "skylobby " app-version)
-       :icons icons
+       :icons skylobby.fx/icons
        :x 100
        :y 100
        :width (min main-window-width width)
@@ -6751,7 +6608,7 @@
        :on-close-request (partial main-window-on-close-request standalone)
        :scene
        {:fx/type :scene
-        :stylesheets stylesheets
+        :stylesheets skylobby.fx/stylesheets
         :root (merge
                 {:fx/type main-window}
                 state
@@ -6762,14 +6619,14 @@
         {:fx/type :stage
          :showing show-battle-window
          :title (str u/app-name " Battle")
-         :icons icons
+         :icons skylobby.fx/icons
          :on-close-request {:event/type ::dissoc
                             :key :pop-out-battle}
          :width (min battle-window-width width)
          :height (min battle-window-height height)
          :scene
          {:fx/type :scene
-          :stylesheets stylesheets
+          :stylesheets skylobby.fx/stylesheets
           :root
           (if show-battle-window
             (merge
@@ -6779,10 +6636,12 @@
               (get by-server selected-server-tab))
             {:fx/type :pane})}})
       (merge
-        {:fx/type download-window}
+        {:fx/type download-window
+         :screen-bounds screen-bounds}
         (select-keys state download-window-keys))
       (merge
         {:fx/type import-window
+         :screen-bounds screen-bounds
          :tasks-by-type tasks-by-type}
         (select-keys state import-window-keys))
       (merge
@@ -6790,10 +6649,12 @@
         (select-keys state
           [:filter-maps-name :maps :on-change-map :show-maps]))
       (merge
-        {:fx/type rapid-download-window}
+        {:fx/type rapid-download-window
+         :screen-bounds screen-bounds}
         (select-keys state rapid-download-window-keys))
       (merge
         {:fx/type replays-window
+         :screen-bounds screen-bounds
          :tasks-by-type tasks-by-type}
         (select-keys state replays-window-keys))
       (merge
@@ -6809,11 +6670,8 @@
         {:fx/type settings-window}
         (select-keys state settings-window-keys))
       (merge
-        {:fx/type uikeys-window}
-        (select-keys state
-          [:filter-uikeys-action :selected-uikeys-action :show-uikeys-window :uikeys]))
-      (merge
-        {:fx/type tasks-window}
+        {:fx/type tasks-window
+         :screen-bounds screen-bounds}
         (select-keys state tasks-window-keys))]}))
 
 
@@ -6821,8 +6679,7 @@
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
   (log/info "Initializing periodic jobs")
-  (let [low-tasks-chimer (tasks-chimer-fn state-atom 1)
-        high-tasks-chimer (tasks-chimer-fn state-atom 3)
+  (let [task-chimers (map (partial tasks-chimer-fn state-atom) task-kinds)
         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
         check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
@@ -6834,9 +6691,11 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
-    {:chimers [low-tasks-chimer high-tasks-chimer
-               truncate-messages-chimer
-               check-app-update-chimer]}))
+    {:chimers
+     (concat
+       task-chimers
+       [truncate-messages-chimer
+        check-app-update-chimer])}))
 
 (defn init-async [state-atom]
   (future

@@ -8,7 +8,7 @@
 
 (defn map-sync-pane
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
-           import-tasks importables-by-path maps spring-isolation-dir update-maps]}]
+           import-tasks importables-by-path map-update-tasks maps spring-isolation-dir update-maps]}]
   (let [
         no-map-details (not (seq battle-map-details))
         map-exists (some (comp #{battle-map} :map-name) maps)]
@@ -19,12 +19,12 @@
                      :file (fs/maps-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
                       :task {:spring-lobby/task-type :spring-lobby/reconcile-maps}}
-     :refresh-in-progress update-maps
+     :refresh-in-progress (or (seq map-update-tasks) update-maps)
      :issues
      (concat
        (let [severity (cond
                         no-map-details
-                        (if map-exists
+                        (if (or map-exists (seq map-update-tasks))
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -33,7 +33,7 @@
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file battle-map-details))
                       (str "Map '" battle-map "' not found locally"))}])
-       (when (and no-map-details (not map-exists))
+       (when (and no-map-details (not map-exists) (empty? map-update-tasks))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals

@@ -1,9 +1,57 @@
 (ns spring-lobby-test
   (:require
     [clojure.java.io :as io]
-    [clojure.test :refer [deftest is]]
+    [clojure.test :refer [deftest is testing]]
     [cheshire.core :as json]
     [spring-lobby]))
+
+
+(deftest add-task!
+  (testing "kind and dedupe in queue"
+    (let [state (atom {})]
+      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/fake-task})
+      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/fake-task})
+      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/reconcile-engines})
+      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/update-rapid})
+      (is (= {:tasks-by-kind
+              {:spring-lobby/other-task
+               #{{:spring-lobby/task-type :spring-lobby/fake-task}}
+               :spring-lobby/resource-task
+               #{{:spring-lobby/task-type :spring-lobby/update-rapid}}
+               :spring-lobby/index-task
+               #{{:spring-lobby/task-type :spring-lobby/reconcile-engines}}}}
+             @state)))))
+
+
+(deftest handle-task!
+  (testing "empty"
+    (let [state (atom {:tasks-by-kind {}})
+          changes (atom [])]
+      (add-watch state :changes (fn [_k _ref _old-state new-state] (swap! changes conj new-state)))
+      (try
+        (spring-lobby/handle-task! state :spring-lobby/other-task)
+        (is (= {:tasks-by-kind {}}
+               @state))
+        (is (= [{:tasks-by-kind {}}] ; no update
+               @changes))
+        (finally
+          (remove-watch state :changes)))))
+  (testing "fake task"
+    (let [state (atom {:tasks-by-kind {:spring-lobby/other-task #{{:spring-lobby/task-type ::fake-task}}}})
+          changes (atom [])]
+      (add-watch state :changes (fn [_k _ref _old-state new-state] (swap! changes conj new-state)))
+      (try
+        (spring-lobby/handle-task! state :spring-lobby/other-task)
+        (is (= {:current-tasks {:spring-lobby/other-task nil}
+                :tasks-by-kind {:spring-lobby/other-task #{}}}
+               @state))
+        (is (= [{:current-tasks {:spring-lobby/other-task {:spring-lobby/task-type :spring-lobby-test/fake-task}}
+                 :tasks-by-kind {:spring-lobby/other-task #{}}}
+                {:current-tasks {:spring-lobby/other-task nil}
+                 :tasks-by-kind {:spring-lobby/other-task #{}}}]
+               @changes))
+        (finally
+          (remove-watch state :changes))))))
 
 
 (deftest available-name
