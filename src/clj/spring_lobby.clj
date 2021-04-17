@@ -1222,6 +1222,9 @@
                         (remove (comp known-file-paths fs/canonical-path) mod-files)
                         (map :file directory))) ; always scan dirs in case git changed
         to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
+        todo (concat to-add-file to-add-rapid)
+        this-round (take 5 todo)
+        next-round (drop 5 todo)
         all-paths (filter some? (concat known-file-paths known-rapid-paths))
         missing-files (set
                         (concat
@@ -1232,7 +1235,9 @@
     (apply update-file-cache! all-paths)
     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-    (doseq [file (concat to-add-file to-add-rapid)]
+    (when (seq this-round)
+      (log/info "Adding" (count this-round) "mods this iteration"))
+    (doseq [file this-round]
       (log/info "Reading mod from" file)
       (update-mod *state file))
     (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
@@ -1246,6 +1251,9 @@
                                       (remove (comp missing-files fs/canonical-path :file))
                                       set)))
                  (dissoc :update-mods))))
+    (when (seq next-round)
+      (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
+      (add-task! state-atom {::task-type ::reconcile-mods}))
     {:to-add-file-count (count to-add-file)
      :to-add-rapid-count (count to-add-rapid)}))
 
