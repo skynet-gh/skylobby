@@ -80,7 +80,7 @@
 (def download-window-width 1600)
 (def download-window-height 800)
 
-(def replays-window-width 2200)
+(def replays-window-width 2400)
 (def replays-window-height 1200)
 
 (def battle-window-width 1740)
@@ -4901,14 +4901,14 @@
    :filter-replay-type :http-download :map-details :maps :mod-details :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-map-details :replay-minimap-type :replay-mod-details :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
+   :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
    :show-replays :spring-isolation-dir :update-engines :update-maps :update-mods])
 
 (defn replays-window
   [{:keys [bar-replays-page battle-players-color-allyteam copying engines extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
-           filter-replay-type http-download map-details maps mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
+           filter-replay-type http-download map-details maps mod-details mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
-           replay-imports-by-map replay-imports-by-mod replay-minimap-type replay-mod-details replays-filter-specs replays-watched replays-window-details screen-bounds selected-replay-file selected-replay-id
+           replay-imports-by-map replay-imports-by-mod replay-minimap-type replays-filter-specs replays-watched replays-window-details screen-bounds selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
   (let [local-filenames (->> parsed-replays-by-path
                              vals
@@ -5654,7 +5654,7 @@
                                         (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                           [id team])))
                                     (into {}))
-                   sides (spring/mod-sides replay-mod-details)
+                   sides (spring/mod-sides (get mod-details gametype))
                    players (->> game
                                 (filter (comp #(string/starts-with? % "player") name first))
                                 (map
