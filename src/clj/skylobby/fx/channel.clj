@@ -10,7 +10,7 @@
 
 (def irc-colors
   {"00" "rgb(255,255,255)"
-   "01" "rgb(0,0,0)"
+   "01" "rgb(255,255,255)" ; use white for black since dark theme "rgb(0,0,0)"
    "02" "rgb(0,0,127)"
    "03" "rgb(0,147,0)"
    "04" "rgb(255,0,0)"
