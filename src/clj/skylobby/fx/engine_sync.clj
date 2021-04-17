@@ -8,13 +8,13 @@
 
 
 (defn engine-sync-pane
-  [{:keys [copying downloadables-by-url engine-details engine-file engine-version extract-tasks extracting file-cache http-download importables-by-path spring-isolation-dir update-engines]}]
+  [{:keys [copying downloadables-by-url engine-details engine-file engine-update-tasks engine-version extract-tasks extracting file-cache http-download importables-by-path spring-isolation-dir update-engines]}]
   {:fx/type sync-pane
    :h-box/margin 8
    :resource "Engine"
    :refresh-action {:event/type :spring-lobby/add-task
                     :task {:spring-lobby/task-type :spring-lobby/reconcile-engines}}
-   :refresh-in-progress update-engines
+   :refresh-in-progress (or (seq engine-update-tasks) update-engines)
    :browse-action {:event/type :spring-lobby/desktop-browse-dir
                    :file (or engine-file
                              (fs/engines-dir spring-isolation-dir))}
@@ -22,14 +22,15 @@
    (concat
      (let [severity (if engine-details
                       0
-                      (if update-engines -1 2))]
+                      (if (or (seq engine-update-tasks) update-engines)
+                        -1 2))]
        [{:severity severity
          :text "info"
          :human-text (str "Spring " engine-version)
          :tooltip (if (zero? severity)
                     (fs/canonical-path (:file engine-details))
                     (str "Engine '" engine-version "' not found locally"))}])
-     (when-not engine-details
+     (when (and (not engine-details) (empty? engine-update-tasks))
        (let [downloadable (->> downloadables-by-url
                                vals
                                (filter (comp #{:spring-lobby/engine} :resource-type))

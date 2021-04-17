@@ -10,7 +10,7 @@
 
 (def irc-colors
   {"00" "rgb(255,255,255)"
-   "01" "rgb(0,0,0)"
+   "01" "rgb(255,255,255)" ; use white for black since dark theme "rgb(0,0,0)"
    "02" "rgb(0,0,127)"
    "03" "rgb(0,147,0)"
    "04" "rgb(255,0,0)"
@@ -54,7 +54,7 @@
                  [{:fx/type :text
                    :text "\n"}])))))))
 
-(defn- channel-view-history [{:keys [chat-auto-scroll channel-name messages select-mode]}]
+(defn- channel-view-history [{:keys [chat-auto-scroll channel-name messages select-mode server-url]}]
   (let [messages (reverse messages)]
     (if select-mode
       (let [text (->> messages
@@ -79,7 +79,7 @@
            [{:fx/type :menu-item
              :text "Color mode"
              :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:channels channel-name :select-mode]
+                         :path [:by-server server-url :channels channel-name :select-mode]
                          :value false}}]}}})
       (let [texts (channel-texts messages)]
         {:fx/type with-scroll-text-flow-prop
@@ -95,7 +95,7 @@
            [{:fx/type :menu-item
              :text "Select mode"
              :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:channels channel-name :select-mode]
+                         :path [:by-server server-url :channels channel-name :select-mode]
                          :value true}}]}
           :content
           {:fx/type :text-flow
@@ -168,7 +168,7 @@
       :describe (fn [i] {:text (-> i str)})}}]})
 
 (defn channel-view
-  [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft]}]
+  [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft server-url]}]
   (let [{:keys [messages select-mode users]} (get channels channel-name)]
     {:fx/type :h-box
      :children
@@ -182,7 +182,8 @@
            :chat-auto-scroll chat-auto-scroll
            :channel-name channel-name
            :messages messages
-           :select-mode select-mode}
+           :select-mode select-mode
+           :server-url server-url}
           {:fx/type channel-view-input
            :channel-name channel-name
            :chat-auto-scroll chat-auto-scroll

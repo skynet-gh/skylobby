@@ -14,6 +14,13 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.4]
+
+- Rework task system to improve responsiveness
+- Split mod refresh task into chunks
+- Fix a parsing operation in render loop
+- Fix chat mode change
+
 ### [0.3.3]
 
 - Fix battle view render error

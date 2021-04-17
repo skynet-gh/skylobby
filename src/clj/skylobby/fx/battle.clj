@@ -92,6 +92,12 @@
         import-tasks (->> (get tasks-by-type :spring-lobby/import)
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+                                 set)
+        map-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-maps)
+                              set)
+        mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
+                              set)
         players (battle-players-and-bots state)
         team-counts (->> players
                          (map :battle-status)
@@ -327,20 +333,23 @@
                           :engine-details engine-details
                           :engine-file engine-file
                           :engine-version engine-version
-                          :extract-tasks extract-tasks}
+                          :extract-tasks extract-tasks
+                          :engine-update-tasks engine-update-tasks}
                          (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :update-engines]))
                        (merge
                          {:fx/type mod-sync-pane
                           :battle-modname battle-modname
                           :battle-mod-details battle-mod-details
                           :engine-details engine-details
-                          :engine-file engine-file}
+                          :engine-file engine-file
+                          :mod-update-tasks mod-update-tasks}
                          (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :update-mods]))
                        (merge
                          {:fx/type map-sync-pane
                           :battle-map battle-map
                           :battle-map-details battle-map-details
-                          :import-tasks import-tasks}
+                          :import-tasks import-tasks
+                          :map-update-tasks map-update-tasks}
                          (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :update-maps]))])})])}}
             {:fx/type :pane
              :v-box/vgrow :always}
@@ -401,7 +410,8 @@
            :chat-auto-scroll chat-auto-scroll
            :client client
            :hide-users true
-           :message-draft (get message-drafts channel-name)}]}]}
+           :message-draft (get message-drafts channel-name)
+           :server-url (first server)}]}]}
       {:fx/type :tab-pane
        :style {:-fx-min-width (+ u/minimap-size 20)
                :-fx-pref-width (+ u/minimap-size 20)

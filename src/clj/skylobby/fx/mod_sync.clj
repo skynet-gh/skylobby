@@ -7,7 +7,7 @@
     [spring-lobby.util :as u]))
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir springfiles-urls update-mods]}]
+(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-update-tasks mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir springfiles-urls update-mods]}]
   (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
         canonical-path (fs/canonical-path mod-file)
@@ -24,7 +24,7 @@
      (concat
        (let [severity (cond
                         no-mod-details
-                        (if mod-exists
+                        (if (or mod-exists (seq mod-update-tasks))
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -33,7 +33,7 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (str "Game '" battle-modname "' not found locally"))}])
-       (when (and no-mod-details (not mod-exists))
+       (when (and no-mod-details (not mod-exists) (empty? mod-update-tasks))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals

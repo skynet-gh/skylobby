@@ -52,34 +52,43 @@
     (try
       (println "Stopping chimer" chimer)
       (chimer)
-      (catch Exception e
+      (catch Throwable e
         (println "error stopping chimer" chimer e)))))
 
 (defn view [state]
   (try
     (require 'spring-lobby)
-    (let [new-view (var-get (find-var 'spring-lobby/root-view))]
-      (when (not (identical? old-view new-view))
-        (alter-var-root #'old-view (constantly new-view))))
-    (catch Exception _e
+    (if-let [new-view (var-get (find-var 'spring-lobby/root-view))]
+      (when new-view
+        (alter-var-root #'old-view (constantly new-view)))
+      (println "no new view found"))
+    (catch Throwable e
+      (println e)
+      (.printStackTrace e)
       (println "compile error, using old view")))
   (try
-    (old-view state)
-    (catch Exception _e
-      (println "exception in old view, probably unbound fn, fix asap"))))
+    (if old-view
+      (old-view state)
+      (println "no old view"))
+    (catch Throwable e
+      (println e)
+      (.printStackTrace e)
+      (println "exception in old view")
+      (throw e))))
 
 (defn event-handler [event]
   (try
     (require 'spring-lobby)
     (let [new-handler (var-get (find-var 'spring-lobby/event-handler))]
-      (when (not (identical? old-handler new-handler))
+      (when new-handler
         (alter-var-root #'old-handler (constantly new-handler))))
-    (catch Exception _e
-      (println "compile error, using old event handler")))
+    (catch Throwable e
+      (println e "compile error, using old event handler")))
   (try
     (old-handler event)
-    (catch Exception e
-      (println "exception in old event handler" e))))
+    (catch Throwable e
+      (println "exception in old event handler" e)
+      (throw e))))
 
 (defn create-renderer []
   (let [r (fx/create-renderer
@@ -112,7 +121,7 @@
         (println "Re-rendering")
         (try
           (renderer)
-          (catch Exception e
+          (catch Throwable e
             (println "error rendering" e)
             (throw e))))
       (do
@@ -121,10 +130,12 @@
     (try
       (let [init-fn (var-get (find-var 'spring-lobby/init))]
         (reset! init-state (init-fn *state)))
-      (catch Exception e
-        (println "init error" e)))
-    (catch Exception e
-      (println e))))
+      (catch Throwable e
+        (println "init error" e)
+        (throw e)))
+    (catch Throwable e
+      (println e)
+      (throw e))))
 
 (defn refresh-rerender []
   (println "Refreshing")
@@ -132,11 +143,12 @@
     (try
       (binding [*ns* *ns*]
         (let [res (refresh :after 'user/rerender)]
-          (if (instance? Exception res)
+          (if (instance? Throwable res)
             (io.aviso.repl/pretty-pst res)
             (println "Refresh finished:" res))))
-      (catch Exception e
-        (println e))
+      (catch Throwable e
+        (println e)
+        (throw e))
       (finally
         (reset! refreshing false)))))
 
@@ -149,8 +161,9 @@
           (try
             (reset! refreshing true)
             (refresh-rerender)
-            (catch Exception e
-              (println e)))))))
+            (catch Throwable e
+              (println e)
+              (throw e)))))))
   context)
 
 
@@ -159,14 +172,15 @@
     (require 'spring-lobby.client)
     (require 'spring-lobby.client.handler)
     (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
-      (when (not (identical? old-client-handler new-handler))
+      (when new-handler
         (alter-var-root #'old-client-handler (constantly new-handler))))
-    (catch Exception _e
-      (println "compile error, using old client handler")))
+    (catch Throwable e
+      (println e "compile error, using old client handler")))
   (try
     (old-client-handler state-atom server-url message)
-    (catch Exception _e
-      (println "exception in old client, probably unbound fn, fix asap"))))
+    (catch Throwable e
+      (println e "exception in old client, probably unbound fn, fix asap")
+      (throw e))))
 
 
 (defn init []
@@ -182,7 +196,7 @@
           (println "Initializing 7zip")
           (init-7z-fn)
           (println "Finished initializing 7zip")
-          (catch Exception e
+          (catch Throwable e
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
     (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))]
@@ -197,8 +211,9 @@
     (let [init-fn (var-get (find-var 'spring-lobby/init))]
       (reset! init-state (init-fn *state))
       (create-renderer))
-    (catch Exception e
+    (catch Throwable e
       (println e)
+      (.printStackTrace e)
       (throw e))))
 
 
