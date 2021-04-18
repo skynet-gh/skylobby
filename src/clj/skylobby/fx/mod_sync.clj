@@ -118,8 +118,9 @@
                  {:event/type :spring-lobby/add-task
                   :task {:spring-lobby/task-type :spring-lobby/update-rapid
                          :engine-version (:engine-version engine-details)
-                         :spring-isolation-dir spring-isolation-dir
-                         :force true}})}])
+                         :force true
+                         :mod-name battle-modname
+                         :spring-isolation-dir spring-isolation-dir}})}])
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/mod} :resource-type))

@@ -3318,7 +3318,7 @@
         (log/error e "Error updating battle color")))))
 
 (defmethod task-handler ::update-rapid
-  [{:keys [engine-version spring-isolation-dir] :as e}]
+  [{:keys [engine-version mod-name spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [engines file-cache] :as state} @*state ; TODO remove deref
@@ -3336,7 +3336,13 @@
         (deref
           (event-handler
             {:event/type ::rapid-download
-             :rapid-id "i18n:test" ; TODO how else to init rapid without download...
+             :rapid-id
+             (or (when mod-name
+                   (cond
+                     (string/includes? mod-name "Beyond All Reason") "byar:test"
+                     :else nil))
+                 "i18n:test")
+             ; TODO how else to init rapid without download...
              :engine-file (:file engine-details)
              :spring-isolation-dir spring-isolation-dir})))
       (log/warn "No engine details to do rapid init"))
@@ -5253,6 +5259,7 @@
                        :sortable false
                        :resizable true
                        :min-width 100
+                       :pref-width 200
                        :cell-value-factory identity
                        :cell-factory
                        {:fx/cell-type :table-cell
@@ -5455,6 +5462,7 @@
                                 :disable (boolean rapid-update)
                                 :on-action {:event/type ::add-task
                                             :task {::task-type ::update-rapid
+                                                   :mod-name mod-version
                                                    :force true}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
