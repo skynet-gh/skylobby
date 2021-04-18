@@ -6731,7 +6731,9 @@
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
   (log/info "Initializing periodic jobs")
-  (let [task-chimers (map (partial tasks-chimer-fn state-atom) task-kinds)
+  (let [task-chimers (->> task-kinds
+                          (map (partial tasks-chimer-fn state-atom))
+                          doall)
         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
         check-app-update-chimer (check-app-update-chimer-fn state-atom)]
     (add-watchers state-atom)
