@@ -239,6 +239,16 @@
                     :b r})]
     (Color/web (format "#%06x" (colors/rgb-int reversed)))))
 
+(defn javafx-color-to-spring
+  "Returns the spring bgr int color format from a javafx color."
+  [^javafx.scene.paint.Color color]
+  (colors/rgba-int
+    (colors/create-color
+      {:r (Math/round (* 255 (.getBlue color)))  ; switch blue to red
+       :g (Math/round (* 255 (.getGreen color)))
+       :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
+       :a 0})))
+
 (defn download-progress
   [{:keys [current total]}]
   (if (and current total)
