@@ -332,15 +332,11 @@
             (log/error e "Error in :state-to-edn for" filename "state watcher")))))))
 
 
-(defn- read-map-data [maps map-name]
+(defn- read-map-details [{:keys [map-name map-file]}]
   (let [log-map-name (str "'" map-name "'")]
-    (u/try-log (str "reading map data for " log-map-name)
-      (if-let [map-file (some->> maps
-                                 (filter (comp #{map-name} :map-name))
-                                 first
-                                 :file)]
-        (let [map-data (fs/read-map-data map-file)]
-          map-data)
+    (u/try-log (str "reading map details for " log-map-name)
+      (if map-file
+        (fs/read-map-data map-file)
         (log/warn "No file found for map" log-map-name)))))
 
 
@@ -645,15 +641,9 @@
                         (and
                           (or (not (some (comp #{new-map} :map-name) old-maps)))
                           map-exists))
-                (future
-                  (if map-exists
-                    (do
-                      (log/info "Updating battle map details for" new-map "was" old-map)
-                      (let [map-details (or (read-map-data new-maps new-map) {})]
-                        (swap! *state update :map-details cache/miss new-map map-details)))
-                    (do
-                      (log/info "Battle map not found, setting empty details for" new-map "was" old-map)
-                      (swap! *state update :map-details cache/miss new-map {})))))))
+                (add-task! *state {::task-type ::map-details
+                                   :map-name new-map
+                                   :map-file (:file map-exists)}))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
@@ -683,20 +673,9 @@
                         (and
                           (or (not (some (comp #{new-mod} :mod-name) old-mods)))
                           mod-exists))
-                (future
-                  (if mod-exists
-                    (do
-                      (log/info "Updating battle mod details for" new-mod "was" old-mod)
-                      (let [mod-details (or (some->> new-mods
-                                                     (filter filter-fn)
-                                                     first
-                                                     :file
-                                                     read-mod-data)
-                                            {})]
-                        (swap! *state update :mod-details cache/miss new-mod mod-details)))
-                    (do
-                      (log/info "Battle mod not found, setting empty details for" new-mod "was" old-mod)
-                      (swap! *state update :mod-details cache/miss new-mod {})))))))
+                (add-task! *state {::task-type ::mod-details
+                                   :mod-name new-mod
+                                   :mod-file (:file mod-exists)}))))
           (catch Exception e
             (log/error e "Error in :battle-mod-details state watcher"))))))
   (add-watch state-atom :replay-map-and-mod-details
@@ -740,8 +719,8 @@
                 mod-name-set (set [new-mod new-mod-sans-git])
                 filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
 
-                map-exists (some (comp #{new-map} :map-name) new-maps)
-                mod-exists (some filter-fn new-mods)]
+                map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
+                mod-exists (->> new-mods (filter filter-fn) first)]
             (when (or (and (or (not= old-replay-path new-replay-path)
                                (not= old-mod new-mod))
                            (and (not (string/blank? new-mod))
@@ -750,20 +729,9 @@
                       (and
                         (or (not (some filter-fn old-mods)))
                         mod-exists))
-              (if mod-exists
-                (do
-                  (log/info "Updating replay mod details for" new-mod "was" old-mod)
-                  (future
-                    (let [mod-details (or (some->> new-mods
-                                                   (filter filter-fn)
-                                                   first
-                                                   :file
-                                                   read-mod-data)
-                                          {})]
-                      (swap! *state update :mod-details cache/miss new-mod mod-details))))
-                (future
-                  (log/info "Replay mod not found, setting empty details for" new-mod "was" old-mod)
-                  (swap! *state update :mod-details cache/miss new-mod {}))))
+              (add-task! *state {::task-type ::mod-details
+                                 :mod-name new-mod
+                                 :mod-file (:file mod-exists)}))
             (when (or (and (or (not= old-replay-path new-replay-path)
                                (not= old-map new-map))
                            (and (not (string/blank? new-map))
@@ -772,17 +740,11 @@
                       (and
                         (or (not (some (comp #{new-map} :map-name) old-maps)))
                         map-exists))
-              (if map-exists
-                (do
-                  (log/info "Updating replay map details for" new-map "was" old-map)
-                  (future
-                    (let [map-details (or (read-map-data new-maps new-map) {})]
-                      (swap! *state update :map-details cache/miss new-map map-details))))
-                (future
-                  (log/info "Replay map not found, setting empty details for" new-map "was" old-map)
-                  (swap! *state update :map-details cache/miss new-map {})))))
+              (add-task! *state {::task-type ::map-details
+                                 :map-name new-map
+                                 :map-file (:file map-exists)})))
           (catch Exception e
-            (log/error e "Error in :battle-mod-details state watcher"))))))
+            (log/error e "Error in :replay-map-and-mod-details state watcher"))))))
   (add-watch state-atom :fix-missing-resource
     (fn [_k _ref old-state new-state]
       (when (not= (fix-resource-relevant-keys old-state)
@@ -839,7 +801,7 @@
               (swap! *state
                 (fn [{:keys [extra-import-sources] :as state}]
                   (-> state
-                      (dissoc :engines :maps :mods :battle-map-details :battle-mod-details)
+                      (dissoc :engines :maps :mods :map-details :mod-details)
                       (update :tasks-by-kind
                         add-multiple-tasks
                         [{::task-type ::reconcile-engines}
@@ -871,15 +833,6 @@
 
 
 (defmulti task-handler ::task-type)
-
-(defmethod task-handler ::fn
-  [{:keys [description function]}]
-  (log/info "Running function task" description)
-  (function))
-
-(defmethod task-handler ::update-mod
-  [{:keys [file]}]
-  (update-mod *state file))
 
 (defmethod task-handler :default [task]
   (when task
@@ -1164,30 +1117,6 @@
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 
-(defn- force-update-battle-engine
-  ([]
-   (force-update-battle-engine *state))
-  ([state-atom]
-   (log/info "Force updating battle engine")
-   (reconcile-engines state-atom)
-   (let [{:keys [battle battles engines]} @state-atom
-         battle-id (:battle-id battle)
-         battle-engine-version (-> battles (get battle-id) :battle-version)
-         _ (log/debug "Force updating battle engine details for" battle-engine-version)
-         filter-fn (comp #{battle-engine-version} :engine-version)
-         engine-details (some->> engines
-                                 (filter filter-fn)
-                                 first
-                                 :file
-                                 fs/engine-data)]
-     (swap! *state update :engines
-            (fn [engines]
-              (->> engines
-                   (remove filter-fn)
-                   (concat [engine-details])
-                   set)))
-     engine-details)))
-
 
 (defn- remove-all-duplicate-mods
   "Removes all copies of any mod that shares canonical-path with another mod."
@@ -1256,33 +1185,6 @@
       (add-task! state-atom {::task-type ::reconcile-mods}))
     {:to-add-file-count (count to-add-file)
      :to-add-rapid-count (count to-add-rapid)}))
-
-(defn- force-update-battle-mod
-  ([]
-   (force-update-battle-mod *state))
-  ([state-atom]
-   (log/info "Force updating battle mod")
-   (swap! *state
-     (fn [state]
-       (if (seq (:battle-mod-details state))
-         state
-         (assoc state :battle-mod-details nil))))
-   (reconcile-mods state-atom)
-   (let [{:keys [battle battles mods]} @state-atom
-         battle-id (:battle-id battle)
-         battle-modname (-> battles (get battle-id) :battle-modname)
-         _ (log/debug "Force updating battle mod details for" battle-modname)
-         battle-modname-sans-git (mod-name-sans-git battle-modname)
-         mod-name-set (set [battle-modname battle-modname-sans-git])
-         filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
-         mod-details (or (some->> mods
-                                  (filter filter-fn)
-                                  first
-                                  :file
-                                  read-mod-data)
-                         {})]
-     (swap! *state assoc :battle-mod-details mod-details)
-     mod-details)))
 
 
 (defn- update-cached-minimaps
@@ -1360,31 +1262,6 @@
       (add-task! state-atom {::task-type ::update-cached-minimaps}))
     {:todo-count (count todo)}))
 
-(defn- force-update-battle-map
-  ([]
-   (force-update-battle-map *state))
-  ([state-atom]
-   (log/info "Force updating battle map")
-   (swap! *state
-     (fn [state]
-       (if (seq (:battle-map-details state))
-         state
-         (assoc state :battle-map-details nil))))
-   (reconcile-maps state-atom)
-   (let [{:keys [battle battles maps]} @state-atom
-         battle-id (:battle-id battle)
-         battle-map (-> battles (get battle-id) :battle-map)
-         _ (log/debug "Force updating battle map details for" battle-map)
-         filter-fn (comp #{battle-map} :map-name)
-         map-details (or (some->> maps
-                                  (filter filter-fn)
-                                  first
-                                  :file
-                                  fs/read-map-data)
-                         {})]
-     (swap! *state assoc :battle-map-details map-details)
-     map-details)))
-
 
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
@@ -1460,6 +1337,28 @@
 
 (defmethod task-handler ::reconcile-maps [_]
   (reconcile-maps *state))
+
+
+(defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
+  (if map-file
+    (do
+      (log/info "Updating battle map details for" map-name)
+      (let [map-details (or (read-map-details map-data) {})]
+        (swap! *state update :map-details cache/miss map-name map-details)))
+    (do
+      (log/info "Map not found, setting empty details for" map-name)
+      (swap! *state update :map-details cache/miss map-name {}))))
+
+(defmethod task-handler ::mod-details [{:keys [mod-name mod-file]}]
+  (if mod-file
+    (do
+      (log/info "Updating mod details for" mod-name)
+      (let [mod-details (read-mod-data mod-file)]
+        (swap! *state update :mod-details cache/miss mod-name mod-details)))
+    (do
+      (log/info "Battle mod not found, setting empty details for" mod-name)
+      (swap! *state update :mod-details cache/miss mod-name {}))))
+
 
 (defmethod task-handler ::update-cached-minimaps [_]
   (update-cached-minimaps (:maps @*state)))
@@ -3238,34 +3137,6 @@
         bots))))
 
 
-(defn- spring-color
-  "Returns the spring bgr int color format from a javafx color."
-  [^javafx.scene.paint.Color color]
-  (colors/rgba-int
-    (colors/create-color
-      {:r (Math/round (* 255 (.getBlue color)))  ; switch blue to red
-       :g (Math/round (* 255 (.getGreen color)))
-       :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
-       :a 0})))
-
-
-(defn- to-bool [n]
-  (if (or (not n) (zero? n))
-    false
-    true))
-
-(defn- parse-skill [skill]
-  (cond
-    (number? skill)
-    skill
-    (string? skill)
-    (let [[_all n] (re-find #"~?#?([\d]+)#?" skill)]
-      (try
-        (Double/parseDouble n)
-        (catch Exception e
-          (log/warn e "Error parsing skill" skill))))
-    :else nil))
-
 (defmethod event-handler ::ring
   [{:keys [channel-name client username]}]
   (when channel-name
@@ -3288,47 +3159,6 @@
       (catch Exception e
         (log/error e "Error updating hostip")))))
 
-(defmethod event-handler ::isolation-type-change [{:fx/keys [event]}]
-  (log/info event))
-
-(defmethod event-handler ::force-update-battle-map [_e]
-  (future
-    (try
-      (force-update-battle-map *state)
-      (catch Exception e
-        (log/error e "Error force updating battle map")))))
-
-(defmethod event-handler ::delete-map [{:fx/keys [event]}]
-  (log/info event))
-
-(defmethod event-handler ::force-update-battle-mod [_e]
-  (future
-    (try
-      (force-update-battle-mod *state)
-      (catch Exception e
-        (log/error e "Error force updating battle mod")))))
-
-(defmethod event-handler ::force-update-battle-engine [_e]
-  (future
-    (try
-      (force-update-battle-engine *state)
-      (catch Exception e
-        (log/error e "Error force updating battle engine")))))
-
-(defmethod event-handler ::delete-mod [{:fx/keys [event]}]
-  (log/info event))
-
-(defmethod event-handler ::delete-engine
-  [{:keys [engines engine-version]}]
-  (if-let [engine-dir (some->> engines
-                               (filter (comp #{engine-version} :engine-version))
-                               first
-                               :file)]
-    (do
-      (log/info "Deleting engine dir" engine-dir)
-      (raynes-fs/delete-dir engine-dir)
-      (reconcile-engines *state))
-    (log/warn "No engine dir for" (pr-str engine-version) "found in" (with-out-str (pprint engines)))))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -3480,7 +3310,7 @@
     (try
       (let [^javafx.scene.control.ColorPicker source (.getSource event)
             javafx-color (.getValue source)
-            color-int (spring-color javafx-color)]
+            color-int (u/javafx-color-to-spring javafx-color)]
         (when is-me
           (swap! *state assoc :preferred-color color-int))
         (update-color client id opts color-int))
@@ -4247,11 +4077,11 @@
   {:text (str download-source-name " ( at " url " )")})
 
 (defmethod event-handler ::update-downloadables
-  [{:keys [force]}]
+  [opts]
   (doseq [download-source download-sources]
     (add-task! *state (merge
                         {::task-type ::update-downloadables
-                         :force force}
+                         :force (:force opts)}
                         download-source))))
 
 (def download-window-keys
@@ -4817,7 +4647,7 @@
                         (filter (comp #(string/starts-with? % "player") name first))
                         (filter (comp #{0 "0"} :spectator second))
                         (map (comp :skill second))
-                        (map parse-skill)
+                        (map u/parse-skill)
                         (filter some?))]
     skills))
 
@@ -5635,12 +5465,10 @@
                                 :on-action
                                 {:event/type ::add-task
                                  :task
-                                 {::task-type ::fn
-                                  :description "update downloadables"
-                                  :function
-                                  (fn []
-                                    (update-download-source
-                                      (assoc springfiles-maps-download-source :force true)))}}})}))}}])}}})
+                                 (merge
+                                   {::task-type ::update-downloadables
+                                    :force true}
+                                   springfiles-maps-download-source)}})}))}}])}}})
              {:fx/type :label
               :style {:-fx-font-size 24}
               :text " Loading replays..."})]
@@ -5673,7 +5501,7 @@
                                           (assoc :battle-status
                                                  {:id id
                                                   :team team
-                                                  :mode (not (to-bool spectator))
+                                                  :mode (not (u/to-bool spectator))
                                                   :handicap handicap
                                                   :side (get side-id-by-name side)
                                                   :ally allyteam}
