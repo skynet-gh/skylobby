@@ -103,7 +103,7 @@
            :style {:-fx-font-family monospace-font-family}
            :children texts}}}))))
 
-(defn- channel-view-input [{:keys [channel-name chat-auto-scroll client-data message-draft]}]
+(defn- channel-view-input [{:keys [channel-name chat-auto-scroll client-data message-draft server-key]}]
   {:fx/type :h-box
    :children
    [{:fx/type :button
@@ -111,17 +111,19 @@
      :on-action {:event/type :spring-lobby/send-message
                  :channel-name channel-name
                  :client-data client-data
-                 :message message-draft}}
+                 :message message-draft
+                 :server-key server-key}}
     {:fx/type :text-field
      :id "channel-text-field"
      :h-box/hgrow :always
      :text (str message-draft)
      :on-text-changed {:event/type :spring-lobby/assoc-in
-                       :path [:message-drafts channel-name]}
+                       :path [:by-server server-key :message-drafts channel-name]}
      :on-action {:event/type :spring-lobby/send-message
                  :channel-name channel-name
                  :client-data client-data
-                 :message message-draft}}
+                 :message message-draft
+                 :server-key server-key}}
     {:fx/type fx.ext.node/with-tooltip-props
      :props
      {:tooltip
@@ -188,7 +190,8 @@
            :channel-name channel-name
            :chat-auto-scroll chat-auto-scroll
            :client-data client-data
-           :message-draft message-draft}]}]
+           :message-draft message-draft
+           :server-key server-key}]}]
        (when (and (not hide-users)
                   (not (string/starts-with? channel-name "@")))
          [{:fx/type channel-view-users

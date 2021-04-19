@@ -11,9 +11,9 @@
 
 
 (def console-view-keys
-  [:client-data :console-auto-scroll :console-log :console-message-draft])
+  [:client-data :console-auto-scroll :console-log :console-message-draft :server-key])
 
-(defn console-view [{:keys [client-data console-auto-scroll console-log console-message-draft]}]
+(defn console-view [{:keys [client-data console-auto-scroll console-log console-message-draft server-key]}]
   (let [time-zone-id (.toZoneId (TimeZone/getDefault))
         console-text (string/join "\n"
                        (map
@@ -40,17 +40,19 @@
        :children
        [{:fx/type :button
          :text "Send"
-         :on-action {:event/type ::send-console
+         :on-action {:event/type :spring-lobby/send-console
                      :client-data client-data
-                     :message console-message-draft}}
+                     :message console-message-draft
+                     :server-key server-key}}
         {:fx/type :text-field
          :h-box/hgrow :always
          :text (str console-message-draft)
-         :on-text-changed {:event/type ::assoc-in
-                           :path [:by-server (u/server-key client-data) :console-message-draft]}
-         :on-action {:event/type ::send-console
+         :on-text-changed {:event/type :spring-lobby/assoc-in
+                           :path [:by-server server-key :console-message-draft]}
+         :on-action {:event/type :spring-lobby/send-console
                      :client-data client-data
-                     :message console-message-draft}}
+                     :message console-message-draft
+                     :server-key server-key}}
         {:fx/type fx.ext.node/with-tooltip-props
          :props
          {:tooltip
@@ -66,5 +68,5 @@
             :icon-literal "mdi-autorenew:20:white"}
            {:fx/type :check-box
             :selected (boolean console-auto-scroll)
-            :on-selected-changed {:event/type ::assoc
+            :on-selected-changed {:event/type :spring-lobby/assoc
                                   :key :console-auto-scroll}}]}}]}]}))

@@ -60,7 +60,7 @@
                          :text (str (-> server-data :server second :alias) " (" server-key ")")
                          :style {:-fx-font-size 18}}
                :on-close-request {:event/type :spring-lobby/disconnect
-                                  :server (:server server-data)}
+                                  :server-key server-key}
                :content
                (merge
                  {:fx/type fx.server-tab/server-tab}

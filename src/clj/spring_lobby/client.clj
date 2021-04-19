@@ -329,7 +329,7 @@
   (let [[old-state] (swap-vals! state-atom update-in [:by-server server-url]
                       (fn [state]
                         (-> state
-                            (dissoc :client :client-deferred)
+                            (dissoc :client-data)
                             (assoc :login-error m))))
-        client (-> old-state :by-server (get server-url) :client)]
+        client (-> old-state :by-server (get server-url) :client-data :client)]
     (disconnect client)))

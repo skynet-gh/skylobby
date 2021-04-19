@@ -358,13 +358,14 @@
            :battle-mod-details nil)))
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [battle client preferred-color]} (-> state-atom deref :by-server (get server-url))
+  (let [{:keys [battle client-data preferred-color]} (-> state-atom deref :by-server (get server-url))
         battle-status (assoc default-battle-status
                              :id (battle/available-team-id battle)
                              :ally (battle/available-ally battle)
                              :mode false)
         color (or preferred-color
                   (u/random-color))
+        client (:client client-data)
         msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
     (message/send-message client msg)))
 
@@ -425,7 +426,7 @@
                        (-> state
                            (dissoc :battle)
                            (assoc :last-failed-message m))))
-        client (-> state :by-server (get server-url) :client)]
+        client (-> state :by-server (get server-url) :client-data :client)]
     (when (= m "JOINBATTLEFAILED You are already in a battle")
       (message/send-message client "LEAVEBATTLE"))))
 

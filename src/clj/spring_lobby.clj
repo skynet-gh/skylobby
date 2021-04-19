@@ -1394,7 +1394,7 @@
   (update-disconnected! *state server-key))
 
 (defn- connect
-  [state-atom {:keys [client-deferred server server-key] :as state}]
+  [state-atom {:keys [client-deferred server server-key username] :as state}]
   (future
     (try
       (let [^SplicedStream client @client-deferred]
@@ -1411,7 +1411,8 @@
           (let [client-data {:client client
                              :client-deferred client-deferred
                              :server-key server-key
-                             :server-url (first server)}]
+                             :server-url (first server)
+                             :username username}]
             (log/info "Connecting to" server-key)
             (swap! state-atom update-in [:by-server server-key]
                    assoc
@@ -1424,7 +1425,7 @@
         (update-disconnected! *state server-key)))
     nil))
 
-(defmethod event-handler ::connect [{:keys [server server-key] :as state}]
+(defmethod event-handler ::connect [{:keys [server server-key username] :as state}]
   (future
     (try
       (let [server-url (first server)
@@ -1434,9 +1435,11 @@
                  (-> state
                      (assoc :selected-server-tab server-key)
                      (update-in [:by-server server-key]
-                       assoc :client-data {:client-deferred client-deferred}
+                       assoc :client-data {:client-deferred client-deferred
+                                           :server-url server-url
+                                           :username username}
                              :server server))))
-        (connect *state (assoc state :client-deferred client-deferred)))
+        (connect *state (assoc state :client-deferred client-deferred :username username)))
       (catch Exception e
         (log/error e "Error connecting")))))
 
@@ -3071,11 +3074,10 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
-(defmethod event-handler ::send-message [{:keys [channel-name client-data message]}]
+(defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key]}]
   (future
     (try
-      (let [server-key (u/server-key client-data)]
-        (swap! *state update-in [:by-server server-key :message-drafts] dissoc channel-name))
+      (swap! *state update-in [:by-server server-key :message-drafts] dissoc channel-name)
       (cond
         (string/blank? channel-name)
         (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
@@ -3100,11 +3102,10 @@
 (defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-tab-main (.getId event)))
 
-(defmethod event-handler ::send-console [{:keys [client-data message]}]
+(defmethod event-handler ::send-console [{:keys [client-data message server-key]}]
   (future
     (try
-      (let [server-key (u/server-key client-data)]
-        (swap! *state assoc-in [:by-server server-key :console-message-draft] ""))
+      (swap! *state assoc-in [:by-server server-key :console-message-draft] "")
       (when-not (string/blank? message)
         (client-message client-data message))
       (catch Exception e

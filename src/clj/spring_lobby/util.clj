@@ -201,8 +201,8 @@
             (log/warn "No server-url found for message:" message)
             state))))))
 
-(defn server-key [{:keys [server-url]}]
-  (str server-url)) ; TODO username too
+(defn server-key [{:keys [server-url username]}]
+  (str username "@" server-url))
 
 (defn append-console-log [state-atom server-key source message]
   (swap! state-atom
