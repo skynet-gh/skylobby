@@ -12,12 +12,12 @@
 
 
 (def battles-buttons-keys
-  [:accepted :battle :battle-password :battle-title :battles :client :compflags :engines :engine-filter
+  [:accepted :battle :battle-password :battle-title :battles :client-data :compflags :engines :engine-filter
    :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
    :pop-out-battle :scripttags :selected-battle :singleplayer-battle :spring-isolation-dir :use-springlobby-modname])
 
 (defn battles-buttons-view
-  [{:keys [accepted battle battles battle-password battle-title client compflags engine-version mod-name map-name maps
+  [{:keys [accepted battle battles battle-password battle-title client-data compflags engine-version mod-name map-name maps
            engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
            spring-isolation-dir]
     :as state}]
@@ -90,7 +90,7 @@
      :alignment :center-left
      :children
      (concat
-       (when (and accepted client (not battle))
+       (when (and accepted client-data (not battle))
          (let [host-battle-state
                (-> state
                    (clojure.set/rename-keys {:battle-title :title})
@@ -101,7 +101,7 @@
                host-battle-action (merge
                                     {:event/type :spring-lobby/host-battle
                                      :host-battle-state host-battle-state}
-                                    (select-keys state [:client :scripttags :use-springlobby-modname]))]
+                                    (select-keys state [:client-data :scripttags :use-springlobby-modname]))]
            [{:fx/type :button
              :text "Host Battle"
              :disable (boolean
@@ -151,7 +151,7 @@
          [{:fx/type :button
            :text "Leave Battle"
            :on-action {:event/type :spring-lobby/leave-battle
-                       :client client}}
+                       :client-data client-data}}
           {:fx/type :pane
            :h-box/margin 8}
           (if pop-out-battle
@@ -178,7 +178,7 @@
                :disable (boolean (and needs-password (string/blank? battle-password)))
                :on-action {:event/type :spring-lobby/join-battle
                            :battle-password battle-password
-                           :client client
+                           :client-data client-data
                            :selected-battle selected-battle
                            :battle-passworded
                            (= "1" (-> battles (get selected-battle) :battle-passworded))}}] ; TODO

@@ -58,7 +58,8 @@
 (defn view [state]
   (try
     (require 'spring-lobby)
-    (if-let [new-view (var-get (find-var 'spring-lobby/root-view))]
+    (require 'skylobby.fx.root)
+    (if-let [new-view (var-get (find-var 'skylobby.fx.root/root-view))]
       (when new-view
         (alter-var-root #'old-view (constantly new-view)))
       (println "no new view found"))
@@ -188,6 +189,7 @@
     [datafy pprint chime/chime-at string/split edn/read-string http/get]
     (hawk/watch! [{:paths ["src/clj" "test/clj"]
                    :handler refresh-on-file-change}])
+    (require 'skylobby.fx.root)
     (require 'spring-lobby)
     (require 'spring-lobby.fs)
     (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
@@ -202,7 +204,7 @@
     (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))]
       (reset! *state (initial-state-fn)))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
-    (alter-var-root #'old-view (constantly (var-get (find-var 'spring-lobby/root-view))))
+    (alter-var-root #'old-view (constantly (var-get (find-var 'skylobby.fx.root/root-view))))
     (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))
     (require 'spring-lobby.client)
     (require 'spring-lobby.client.handler)

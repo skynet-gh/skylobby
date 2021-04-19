@@ -335,7 +335,7 @@
        (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
        (into {})))
 
-(defn start-game [{:keys [client engines ^java.io.File spring-isolation-dir spring-settings] :as state}]
+(defn start-game [{:keys [client-data engines ^java.io.File spring-isolation-dir spring-settings] :as state}]
   (try
     (when (:auto-backup spring-settings)
       (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
@@ -343,7 +343,7 @@
         (log/info "Backing up Spring settings to" dest-dir)
         (copy-spring-settings spring-isolation-dir dest-dir)))
     (log/info "Starting game")
-    (client/send-message client "MYSTATUS 1")
+    (client/send-message (:client client-data) "MYSTATUS 1")
     (let [{:keys [battle-version]} (battle-details state)
           script-txt (battle-script-txt state)
           engine-dir (some->> engines
@@ -368,7 +368,7 @@
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp (fs/envp)
               process (.exec runtime cmdarray envp spring-isolation-dir)]
-          (client/send-message client "MYSTATUS 1")
+          (client/send-message (:client client-data) "MYSTATUS 1")
           (async/thread
             (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
               (loop []
@@ -387,10 +387,10 @@
                   (log/info "Spring stderr stream closed")))))
           (future
             (.waitFor process)
-            (client/send-message client "MYSTATUS 0")))))
+            (client/send-message (:client client-data) "MYSTATUS 0")))))
     (catch Exception e
       (log/error e "Error starting game")
-      (client/send-message client "MYSTATUS 0"))))
+      (client/send-message (:client client-data) "MYSTATUS 0"))))
 
 (defn watch-replay [{:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
   (try

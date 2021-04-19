@@ -12,6 +12,10 @@
     (javafx.scene.text Font FontWeight)))
 
 
+(def minimap-types
+  ["minimap" "metalmap" "heightmap"])
+
+
 (defn minimap-start-boxes [minimap-width minimap-height scripttags drag-allyteam]
   (let [game (:game scripttags)
         allyteams (->> game
@@ -99,7 +103,7 @@
            doall))))
 
 (defn minimap-pane
-  [{:keys [am-spec battle-details client drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
+  [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-height minimap-width] :or {minimap-height smf/minimap-size minimap-width smf/minimap-size}} smf
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
@@ -152,7 +156,7 @@
              :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
                                  :am-spec am-spec
                                  :channel-name (:channel-name battle-details)
-                                 :client client
+                                 :client-data client-data
                                  :map-details map-details
                                  :minimap-width minimap-width
                                  :minimap-height minimap-height
