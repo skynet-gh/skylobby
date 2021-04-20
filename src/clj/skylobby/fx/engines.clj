@@ -91,7 +91,8 @@
          :text "Reload engines"}}
        :desc
        {:fx/type :button
-        :on-action {:event/type :spring-lobby/reconcile-engines}
+        :on-action {:event/type :spring-lobby/add-task
+                    :task {:spring-lobby/task-type :spring-lobby/reconcile-engines}}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal "mdi-refresh:16:white"}}}])})

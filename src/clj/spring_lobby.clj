@@ -2,7 +2,6 @@
   (:require
     [chime.core :as chime]
     [clj-http.client :as clj-http]
-    [cljfx.api :as fx]
     [clojure.core.async :as async]
     [clojure.core.cache :as cache]
     [clojure.edn :as edn]
@@ -20,7 +19,6 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
-    [skylobby.fx.root :as fx.root]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
     [spring-lobby.battle :as battle]
@@ -41,7 +39,6 @@
     (java.awt Desktop Desktop$Action)
     (java.io File)
     (java.util List)
-    (javafx.application Platform)
     (javafx.event Event)
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
@@ -1275,6 +1272,10 @@
   (let [spring-roots (spring-roots @*state)]
     (doseq [spring-root spring-roots]
       (reconcile-maps *state spring-root))))
+
+
+(defmethod task-handler ::update-file-cache [{:keys [file]}]
+  (update-file-cache! file))
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
@@ -3175,30 +3176,3 @@
     (log/info "Sleeping to let JavaFX start")
     (async/<!! (async/timeout wait-before-init-tasks-ms))
     (init state-atom)))
-
-(defn -main [& _args]
-  (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
-  (let [before (u/curr-millis)]
-    (log/info "Main start")
-    (Platform/setImplicitExit true)
-    (log/info "Set JavaFX implicit exit")
-    (future
-      (log/info "Start 7Zip init, async")
-      (fs/init-7z!)
-      (log/info "Finished 7Zip init"))
-    (let [before-state (u/curr-millis)
-          _ (log/info "Loading initial state")
-          state (assoc (initial-state) :standalone true)]
-      (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
-      (reset! *state state))
-    (log/info "Creating renderer")
-    (let [r (fx/create-renderer
-              :middleware (fx/wrap-map-desc
-                            (fn [state]
-                              {:fx/type fx.root/root-view
-                               :state state}))
-              :opts {:fx.opt/map-event-handler event-handler})]
-      (log/info "Mounting renderer")
-      (fx/mount-renderer *state r))
-    (init-async *state)
-    (log/info "Main finished in" (- (u/curr-millis) before) "ms")))

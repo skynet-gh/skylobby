@@ -15,7 +15,7 @@
 (def uberjar-opts
   {:jar (str "dist/" u/app-name ".jar")
    :aot true
-   :main-class "spring-lobby"})
+   :main-class "spring-lobby.main"})
 
 
 (defn pom []

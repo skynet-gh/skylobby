@@ -3,6 +3,6 @@
 --name "skylobby"
 --main-class "clojure.main"
 --arguments -m
---arguments "spring-lobby"
+--arguments "spring-lobby.main"
 --vendor "skynet"
 --java-options "-server -Xms128m -Xmx1g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"

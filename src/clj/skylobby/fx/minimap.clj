@@ -105,7 +105,9 @@
 (defn minimap-pane
   [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
   (let [{:keys [smf]} map-details
-        {:keys [minimap-height minimap-width] :or {minimap-height smf/minimap-size minimap-width smf/minimap-size}} smf
+        {:keys [minimap-height minimap-width]
+         :or {minimap-height smf/minimap-display-size
+              minimap-width smf/minimap-display-size}} smf
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type

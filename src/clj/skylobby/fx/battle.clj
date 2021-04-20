@@ -98,6 +98,12 @@
                               set)
         mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
                               set)
+        mod-details-tasks (->> (get tasks-by-type :spring-lobby/mod-details)
+                               (filter (comp #{battle-modname} :mod-name))
+                               set)
+        rapid-tasks-by-id (->> (get tasks-by-type :spring-lobby/rapid-download)
+                               (map (juxt :rapid-id identity))
+                               (into {}))
         players (battle-players-and-bots state)
         team-counts (->> players
                          (map :battle-status)
@@ -342,7 +348,9 @@
                           :battle-mod-details battle-mod-details
                           :engine-details engine-details
                           :engine-file engine-file
-                          :mod-update-tasks mod-update-tasks}
+                          :mod-details-tasks mod-details-tasks
+                          :mod-update-tasks mod-update-tasks
+                          :rapid-tasks-by-id rapid-tasks-by-id}
                          (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :update-mods]))
                        (merge
                          {:fx/type map-sync-pane
