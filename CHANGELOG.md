@@ -11,6 +11,12 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.8]
+
+- Fix circular dependency issue in installer
+- Fix minimap size when loading
+- Add ability to retry rapid download in battle view
+
 ### [0.3.7]
 
 - Add support for TLS communication to the server
