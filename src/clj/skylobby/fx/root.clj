@@ -95,6 +95,7 @@
                     spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
                 ; TODO remove duplication with main-window
                 (assoc server-data
+                  :server-key selected-server-tab
                   :spring-isolation-dir spring-root
                   :engines (:engines spring-root-data)
                   :maps (:maps spring-root-data)
