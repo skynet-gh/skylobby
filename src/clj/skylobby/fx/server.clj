@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]))
@@ -18,22 +19,27 @@
              (str server-url))}))
 
 (defn server-combo-box [{:keys [disable on-value-changed server servers]}]
-  {:fx/type :combo-box
-   :disable (boolean disable)
-   :value server
-   :items (or (->> servers
-                   (sort-by (juxt (comp :alias second) first)))
-              [])
-   :prompt-text "< choose a server >"
-   :button-cell server-cell
-   :on-value-changed on-value-changed
-   :cell-factory
-   {:fx/cell-type :list-cell
-    :describe server-cell}})
+  (let [value (->> servers
+                   (filter (comp #{(first server)} first))
+                   first)
+        items (sort-by (juxt (comp :alias second) first) servers)]
+    {:fx/type ext-recreate-on-key-changed
+     :key items
+     :desc
+     {:fx/type :combo-box
+      :disable (boolean disable)
+      :value value
+      :items items
+      :prompt-text "< choose a server >"
+      :button-cell server-cell
+      :on-value-changed on-value-changed
+      :cell-factory
+      {:fx/cell-type :list-cell
+       :describe server-cell}}}))
 
 
 (def servers-window-keys
-  [:server-alias :server-edit :server-host :server-port :server-spring-root-draft :servers :show-servers-window])
+  [:server-alias :server-edit :server-host :server-port :server-spring-root-draft :server-ssl :servers :show-servers-window])
 
 (defn servers-window
   [{:keys [server-alias server-edit server-host server-port server-spring-root-draft server-ssl servers show-servers-window]}]
@@ -68,18 +74,9 @@
                 {:fx/type server-combo-box}
                 :server server-edit
                 :servers servers
-                :on-value-changed {:event/type :spring-lobby/assoc
-                                   :key :server-edit})]
+                :on-value-changed {:event/type :spring-lobby/edit-server})]
              (when server-edit
                [{:fx/type :button
-                 :alignment :center
-                 :on-action {:event/type :spring-lobby/edit-server
-                             :server-data (second server-edit)}
-                 :text ""
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-pencil:16:white"}}
-                {:fx/type :button
                  :alignment :center
                  :on-action {:event/type :spring-lobby/dissoc-in
                              :path [:servers url]}

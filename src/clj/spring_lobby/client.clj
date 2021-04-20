@@ -159,14 +159,13 @@
 
 (defn client
   ([server-url]
-   (apply client (parse-host-port server-url)))
-  ([host port]
-   (client host port nil))
-  ([host port {:keys [ssl]}]
-   (d/chain (tcp/client {:host host
-                         :port port
-                         :ssl? ssl})
-     #(wrap-duplex-stream protocol %))))
+   (client server-url nil))
+  ([server-url {:keys [ssl]}]
+   (let [[host port] (parse-host-port server-url)]
+     (d/chain (tcp/client {:host host
+                           :port port
+                           :ssl? ssl})
+       #(wrap-duplex-stream protocol %)))))
 
 
 (defmethod handler/handle :default [state-atom server-url m]
