@@ -4,7 +4,6 @@ Notable changes and todo list.
 
 ### TODO - future
 
-- Configure Spring directory per server or per game
 - Merged view of multiple servers
 - File pickers for path configs
 - Auto switch spring settings per server or per game
@@ -12,6 +11,12 @@ Notable changes and todo list.
 - Chat URL highlighting, text selection
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.3.6]
+
+- Add config in server window to set set Spring directory
+- Add ability to login to same server as multiple users
+- Add slider to shrink battles table when in a battle
 
 ### [0.3.5]
 
