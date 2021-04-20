@@ -133,7 +133,8 @@
          :text "Reload maps"}}
        :desc
        {:fx/type :button
-        :on-action {:event/type :spring-lobby/reload-maps}
+        :on-action {:event/type :spring-lobby/add-task
+                    :task {:spring-lobby/task-type :spring-lobby/reconcile-maps}}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal "mdi-refresh:16:white"}}}])})

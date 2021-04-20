@@ -1274,6 +1274,10 @@
       (reconcile-maps *state spring-root))))
 
 
+(defmethod task-handler ::update-file-cache [{:keys [file]}]
+  (update-file-cache! file))
+
+
 (defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
   (if map-file
     (do

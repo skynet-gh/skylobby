@@ -7,11 +7,14 @@
     [spring-lobby.util :as u]))
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-update-tasks mods rapid-data-by-version rapid-download rapid-update spring-isolation-dir springfiles-urls update-mods]}]
+(def no-springfiles
+  [#"Beyond All Reason"])
+
+
+(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks mod-update-tasks rapid-data-by-version rapid-download rapid-tasks-by-id rapid-update spring-isolation-dir springfiles-urls update-mods]}]
   (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
-        canonical-path (fs/canonical-path mod-file)
-        mod-exists (some (comp #{battle-modname} :mod-name) mods)]
+        canonical-path (fs/canonical-path mod-file)]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Game"
@@ -24,7 +27,7 @@
      (concat
        (let [severity (cond
                         no-mod-details
-                        (if (or mod-exists (seq mod-update-tasks))
+                        (if (or (seq mod-update-tasks) (seq mod-details-tasks))
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -33,7 +36,7 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (str "Game '" battle-modname "' not found locally"))}])
-       (when (and no-mod-details (not mod-exists) (empty? mod-update-tasks))
+       (when (and no-mod-details (empty? mod-details-tasks))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals
@@ -64,28 +67,31 @@
                    {:event/type :spring-lobby/http-downloadable
                     :downloadable downloadable
                     :spring-isolation-dir spring-isolation-dir})}]
-               [{:severity 2
-                 :text "download"
-                 :human-text (if springfiles-in-progress
-                               (u/download-progress springfiles-download)
-                               "Download from springfiles")
-                 :in-progress springfiles-in-progress
-                 :action
-                 {:event/type :spring-lobby/add-task
-                  :task
-                  {:spring-lobby/task-type :spring-lobby/download-springfiles
-                   :springname battle-modname
-                   :spring-isolation-dir spring-isolation-dir}}}]))
+               (when (and battle-modname (not (some #(re-find % battle-modname) no-springfiles)))
+                 [{:severity 2
+                   :text "download"
+                   :human-text (if springfiles-in-progress
+                                 (u/download-progress springfiles-download)
+                                 "Download from springfiles")
+                   :in-progress springfiles-in-progress
+                   :action
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/download-springfiles
+                     :springname battle-modname
+                     :spring-isolation-dir spring-isolation-dir}}}])))
            (let [rapid-data (get rapid-data-by-version battle-modname)
                  rapid-id (:id rapid-data)
-                 {:keys [running] :as rapid-download} (get rapid-download rapid-id)
-                 package-exists (fs/file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))]
-             [{:severity (if package-exists -1 2)
+                 rapid-download (get rapid-download rapid-id)
+                 running (some? (get rapid-tasks-by-id rapid-id))
+                 sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
+                 package-exists (fs/file-exists? file-cache sdp-file)]
+             [{:severity 2 ;(if package-exists -1 2)
                :text "rapid"
                :human-text (if rapid-id
                              (if engine-file
                                (cond
-                                 package-exists (str "Package downloaded, reading")
+                                 ;package-exists (str "Package downloaded, reading")
                                  rapid-update "Rapid updating..."
                                  running (str (u/download-progress rapid-download))
                                  :else
@@ -98,15 +104,16 @@
                                  "Needs engine first to download with rapid")))
                :tooltip (if rapid-id
                           (if engine-file
-                            (str "Use rapid downloader to get resource id " rapid-id
-                                 " using engine " (:engine-version engine-details))
+                            (if package-exists
+                              (str sdp-file)
+                              (str "Use rapid downloader to get resource id " rapid-id
+                                   " using engine " (:engine-version engine-details)))
                             "Rapid requires an engine to work, get engine first")
                           (str "No rapid download found for" battle-modname))
-               :in-progress (or running rapid-update package-exists)
+               :in-progress (or running rapid-update (and package-exists update-mods))
                :action
                (cond
                  (not engine-file) nil
-                 package-exists nil
                  (and rapid-id engine-file)
                  {:event/type :spring-lobby/add-task
                   :task
@@ -114,6 +121,11 @@
                    :rapid-id rapid-id
                    :engine-file engine-file
                    :spring-isolation-dir spring-isolation-dir}}
+                 package-exists
+                 {:event/type :spring-lobby/add-task
+                  :task
+                  {:spring-lobby/task-type :spring-lobby/update-file-cache
+                   :file sdp-file}}
                  :else
                  {:event/type :spring-lobby/add-task
                   :task {:spring-lobby/task-type :spring-lobby/update-rapid
