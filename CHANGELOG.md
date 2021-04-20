@@ -7,10 +7,13 @@ Notable changes and todo list.
 - Merged view of multiple servers
 - File pickers for path configs
 - Auto switch spring settings per server or per game
-- Add support for TLS communication to the server
 - Chat URL highlighting, text selection
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
+
+### [0.3.7]
+
+- Add support for TLS communication to the server
 
 ### [0.3.6]
 

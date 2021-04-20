@@ -1426,8 +1426,8 @@
 (defmethod event-handler ::connect [{:keys [server server-key username] :as state}]
   (future
     (try
-      (let [server-url (first server)
-            client-deferred (client/client server-url)] ; TODO catch connect errors somehow
+      (let [[server-url server-opts] server
+            client-deferred (client/client server-url server-opts)]
         (swap! *state
                (fn [state]
                  (-> state
@@ -1480,8 +1480,8 @@
 (defmethod event-handler ::register [{:keys [email password server username]}]
   (future
     (try
-      (let [server-url (first server)
-            client-deferred (client/client server-url) ; TODO catch connect errors somehow
+      (let [[server-url server-opts] server
+            client-deferred (client/client server-url server-opts)
             client @client-deferred
             client-data {:client client
                          :client-deferred client-deferred
@@ -1511,16 +1511,19 @@
         (log/error e "Error confirming agreement")))))
 
 (defmethod event-handler ::edit-server
-  [{:keys [server-data]}]
-  (swap! *state assoc
-         :server-host (:host server-data)
-         :server-port (:port server-data)
-         :server-alias (:alias server-data)
-         :server-ssl (:ssl server-data)
-         :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data))))
+  [{:fx/keys [event]}]
+  (let [[_server-url server-data] event]
+    (swap! *state assoc
+           :server-edit event
+           :server-host (:host server-data)
+           :server-port (:port server-data)
+           :server-alias (:alias server-data)
+           :server-ssl (:ssl server-data)
+           :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data)))))
 
 (defmethod event-handler ::update-server
   [{:keys [server-url server-data]}]
+  (log/info "Updating server" server-url "to" server-data)
   (swap! *state update-in [:servers server-url] merge server-data))
 
 
