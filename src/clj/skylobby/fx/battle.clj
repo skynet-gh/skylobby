@@ -129,8 +129,8 @@
          :username username}
         {:fx/type :h-box
          :style {
-                 :-fx-pref-height 320
-                 :-fx-max-height 320}
+                 :-fx-pref-height 400
+                 :-fx-max-height 400}
          :children
          [{:fx/type :v-box
            :children

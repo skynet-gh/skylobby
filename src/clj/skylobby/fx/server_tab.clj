@@ -43,36 +43,44 @@
                        :password password
                        :username username
                        :verification-code verification-code}}]}])
-     [(merge
-        {:fx/type fx.main-tabs/main-tab-view
-         :v-box/vgrow :always
-         :console-auto-scroll console-auto-scroll
-         :selected-tab-channel selected-tab-channel
-         :selected-tab-main selected-tab-main}
-        (select-keys state
-          (concat
-            fx.main-tabs/main-tab-view-keys
-            fx.main-tabs/my-channels-view-keys
-            fx.channels/channels-table-keys)))
-      (merge
-        {:fx/type fx.battles-buttons/battles-buttons-view}
-        (select-keys state fx.battles-buttons/battles-buttons-keys))]
-     (when (seq battle)
-       (if (:battle-id battle)
-         (when (not pop-out-battle)
-           [(merge
-              {:fx/type fx.battle/battle-view
-               :tasks-by-type tasks-by-type}
-              (select-keys state fx.battle/battle-view-keys))])
-         [{:fx/type :h-box
-           :alignment :top-left
-           :children
+     (let [main-tab [
+                     (merge
+                       {:fx/type fx.main-tabs/main-tab-view
+                        :v-box/vgrow :always
+                        :console-auto-scroll console-auto-scroll
+                        :selected-tab-channel selected-tab-channel
+                        :selected-tab-main selected-tab-main}
+                       (select-keys state
+                         (concat
+                           fx.main-tabs/main-tab-view-keys
+                           fx.main-tabs/my-channels-view-keys
+                           fx.channels/channels-table-keys)))
+                     (merge
+                       {:fx/type fx.battles-buttons/battles-buttons-view}
+                       (select-keys state fx.battles-buttons/battles-buttons-keys))]]
+       (if (and (seq battle) (or (not (:battle-id battle)) (not pop-out-battle)))
+         [{:fx/type :split-pane
+           :orientation :vertical
+           :divider-positions [0.35]
+           :v-box/vgrow :always
+           :items
            [{:fx/type :v-box
-             :h-box/hgrow :always
-             :children
-             [{:fx/type :label
-               :style {:-fx-font-size 20}
-               :text "Waiting for battle details from server..."}]}]}]))
+             :children main-tab}
+            (if (:battle-id battle)
+              (merge
+                {:fx/type fx.battle/battle-view
+                 :tasks-by-type tasks-by-type}
+                (select-keys state fx.battle/battle-view-keys))
+              {:fx/type :h-box
+               :alignment :top-left
+               :children
+               [{:fx/type :v-box
+                 :h-box/hgrow :always
+                 :children
+                 [{:fx/type :label
+                   :style {:-fx-font-size 20}
+                   :text "Waiting for battle details from server..."}]}]})]}]
+         main-tab))
      [{:fx/type :h-box
        :alignment :center-left
        :children

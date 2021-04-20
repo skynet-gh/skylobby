@@ -18,6 +18,7 @@
     [manifold.stream :as s]
     [me.raynes.fs :as raynes-fs]
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.root :as fx.root]
     [skylobby.resource :as resource]
@@ -123,14 +124,8 @@
 (defn- select-config [state]
   (select-keys state config-keys))
 
-(defn- select-maps [state]
-  (select-keys state [:maps]))
-
-(defn- select-engines [state]
-  (select-keys state [:engines]))
-
-(defn- select-mods [state]
-  (select-keys state [:mods]))
+(defn- select-spring [state]
+  (select-keys state [:by-spring-root]))
 
 (defn- select-importables [state]
   (select-keys state
@@ -148,15 +143,8 @@
   [{:select-fn select-config
     :filename "config.edn"
     :pretty true}
-   {:select-fn select-maps
-    :filename "maps.edn"
-    :pretty true}
-   {:select-fn select-engines
-    :filename "engines.edn"
-    :pretty true}
-   {:select-fn select-mods
-    :filename "mods.edn"
-    :pretty true}
+   {:select-fn select-spring
+    :filename "spring.edn"}
    {:select-fn select-importables
     :filename "importables.edn"}
    {:select-fn select-downloadables
@@ -269,7 +257,7 @@
      (assoc mod-data :mod-name mod-name))))
 
 
-(defn- update-mod [state-atom file]
+(defn- update-mod [state-atom spring-root-path file]
   (let [path (fs/canonical-path file)
         mod-data (try
                    (read-mod-data file {:modinfo-only false})
@@ -281,7 +269,7 @@
                            (boolean
                              (or (:engineoptions mod-data)
                                  (:modoptions mod-data))))]
-    (swap! state-atom update :mods
+    (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
            (fn [mods]
              (set
                (cond->
@@ -300,19 +288,6 @@
     (if-let [[_all mod-prefix _git] (parse-mod-name-git mod-name)]
       mod-prefix
       mod-name)))
-
-(defn- import-sources [extra-import-sources]
-  (concat
-    [{:import-source-name "Spring"
-      :file (fs/spring-root)
-      :builtin true}
-     {:import-source-name "Beyond All Reason"
-      :file (fs/bar-root)
-      :builtin true}
-     {:import-source-name "Zero-K"
-      :file (fs/zerok-root)
-      :builtin true}]
-    extra-import-sources))
 
 
 (defmulti event-handler :event/type)
@@ -342,21 +317,31 @@
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
 
 
+(defn spring-roots [{:keys [spring-isolation-dir servers]}]
+  (set
+    (filter some?
+      (concat
+        [spring-isolation-dir]
+        (map
+          (comp fs/file :spring-isolation-dir second)
+          servers)))))
+
+
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
     state
-    [:battle :by-server :map-details :maps]))
+    [:by-server :map-details :maps :servers :spring-isolation-dir]))
 
 (defn- battle-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:battle :by-server :mod-details :mods]))
+    [:by-server :mod-details :mods :servers :spring-isolation-dir]))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:map-details :maps :mod-details :mods :online-bar-replays :parsed-replays-by-path
-     :selected-replay-file :selected-replay-id]))
+    [:by-spring-root :map-details :mod-details :online-bar-replays :parsed-replays-by-path
+     :selected-replay-file :selected-replay-id :servers :spring-isolation-dir]))
 
 (defn- fix-resource-relevant-keys [state]
   (select-keys
@@ -541,14 +526,19 @@
         (try
           (doseq [[server-key new-server] (-> new-state :by-server seq)]
             (let [old-server (-> old-state :by-server (get server-key))
+                  server-url (-> new-server :client-data :server-url)
+                  {:keys [servers spring-isolation-dir]} new-state
+                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                  spring-isolation-dir)
+                  spring-root-path (fs/canonical-path spring-root)
+                  old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
+                  new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
                   old-battle-id (-> old-server :battle :battle-id)
                   new-battle-id (-> new-server :battle :battle-id)
                   old-map (-> old-server :battles (get old-battle-id) :battle-map)
                   new-map (-> new-server :battles (get new-battle-id) :battle-map)
                   map-details (-> new-state :map-details (get new-map))
                   map-changed (not= new-map (:map-name map-details))
-                  old-maps (:maps old-state)
-                  new-maps (:maps new-state)
                   map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)]
               (when (or (and (or (not= old-battle-id new-battle-id)
                                  (not= old-map new-map))
@@ -570,6 +560,13 @@
         (try
           (doseq [[server-key new-server] (-> new-state :by-server seq)]
             (let [old-server (-> old-state :by-server (get server-key))
+                  server-url (-> new-server :client-data :server-url)
+                  {:keys [servers spring-isolation-dir]} new-state
+                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                  spring-isolation-dir)
+                  spring-root-path (fs/canonical-path spring-root)
+                  old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+                  new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
                   old-battle-id (-> old-server :battle :battle-id)
                   new-battle-id (-> new-server :battle :battle-id)
                   old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
@@ -579,8 +576,6 @@
                   filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
                   mod-details (-> new-state :mod-details (get new-mod))
                   mod-changed (not= new-mod (:mod-name mod-details))
-                  old-mods (:mods old-state)
-                  new-mods (:mods new-state)
                   mod-exists (->> new-mods (filter filter-fn) first)]
               (when (or (and (or (not= old-battle-id new-battle-id)
                                  (not= old-mod new-mod))
@@ -602,7 +597,7 @@
         (try
           (let [old-selected-replay-file (:selected-replay-file old-state)
                 old-replay-id (:selected-replay-id old-state)
-                {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id]} new-state
+                {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id spring-isolation-dir]} new-state
 
                 old-replay-path (fs/canonical-path old-selected-replay-file)
                 new-replay-path (fs/canonical-path selected-replay-file)
@@ -626,11 +621,13 @@
                 map-changed (not= new-map (:map-name map-details))
                 mod-changed (not= new-mod (:mod-name mod-details))
 
-                old-maps (:maps old-state)
-                new-maps (:maps new-state)
+                spring-root-path (fs/canonical-path spring-isolation-dir)
 
-                old-mods (:mods old-state)
-                new-mods (:mods new-state)
+                old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
+                new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
+
+                old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+                new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
 
                 new-mod-sans-git (mod-name-sans-git new-mod)
                 mod-name-set (set [new-mod new-mod-sans-git])
@@ -725,7 +722,7 @@
                          {::task-type ::reconcile-mods}
                          {::task-type ::reconcile-maps}
                          {::task-type ::scan-imports
-                          :sources (import-sources extra-import-sources)}
+                          :sources (fx.import/import-sources extra-import-sources)}
                          {::task-type ::update-rapid}
                          {::task-type ::refresh-replays}]))))))
           (catch Exception e
@@ -781,7 +778,7 @@
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
              (handle-task! state-atom task-kind))
@@ -993,14 +990,21 @@
   ([]
    (reconcile-engines *state))
   ([state-atom]
-   (swap! state-atom assoc :update-engines true)
+   (reconcile-engines state-atom nil))
+  ([state-atom spring-root]
+   (swap! state-atom assoc :update-engines true) ; TODO remove
    (log/info "Reconciling engines")
    (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
-         _ (log/info "Updating engines in" spring-isolation-dir)
-         engine-dirs (fs/engine-dirs spring-isolation-dir)
-         known-canonical-paths (->> state :engines
+         spring-root (or spring-root spring-isolation-dir)
+         _ (log/info "Updating engines in" spring-root)
+         engine-dirs (fs/engine-dirs spring-root)
+         spring-root-path (fs/canonical-path spring-root)
+         known-canonical-paths (->> (-> state
+                                        :by-spring-root
+                                        (get spring-root-path))
+                                    :engines
                                     (map (comp fs/canonical-path :file))
                                     (filter some?)
                                     set)
@@ -1011,7 +1015,7 @@
                            (->> known-canonical-paths
                                 (remove (comp fs/exists io/file)))
                            (->> known-canonical-paths
-                                (remove (comp (partial fs/descendant? spring-isolation-dir) io/file)))))
+                                (remove (comp (partial fs/descendant? spring-root) io/file)))))
          to-remove (set
                      (concat missing-files
                              (remove canonical-path-set known-canonical-paths)))]
@@ -1020,17 +1024,17 @@
      (doseq [engine-dir to-add]
        (log/info "Detecting engine data for" engine-dir)
        (let [engine-data (fs/engine-data engine-dir)]
-         (swap! state-atom update :engines
+         (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
                 (fn [engines]
                   (set (conj engines engine-data))))))
      (log/debug "Removing" (count to-remove) "engines")
-     (swap! state-atom update :engines
+     (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
-     (swap! state-atom assoc :update-engines false)
+     (swap! state-atom assoc :update-engines false) ; TODO remove
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 
@@ -1049,59 +1053,66 @@
 
 (defn- reconcile-mods
   "Reads mod details and updates missing mods in :mods in state."
-  [state-atom]
-  (swap! state-atom assoc :update-mods true)
-  (log/info "Reconciling mods")
-  (remove-all-duplicate-mods state-atom)
-  (let [before (u/curr-millis)
-        {:keys [mods spring-isolation-dir]} @state-atom
-         _ (log/info "Updating mods in" spring-isolation-dir)
-        {:keys [rapid archive directory]} (group-by ::fs/source mods)
-        known-file-paths (set (map (comp fs/canonical-path :file) (concat archive directory)))
-        known-rapid-paths (set (map (comp fs/canonical-path :file) rapid))
-        mod-files (fs/mod-files spring-isolation-dir)
-        sdp-files (rapid/sdp-files spring-isolation-dir)
-        _ (log/info "Found" (count mod-files) "files and"
-                    (count sdp-files) "rapid archives to scan for mods")
-        to-add-file (set
-                      (concat
-                        (remove (comp known-file-paths fs/canonical-path) mod-files)
-                        (map :file directory))) ; always scan dirs in case git changed
-        to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
-        todo (concat to-add-file to-add-rapid)
-        this-round (take 5 todo)
-        next-round (drop 5 todo)
-        all-paths (filter some? (concat known-file-paths known-rapid-paths))
-        missing-files (set
-                        (concat
-                          (->> all-paths
-                               (remove (comp fs/exists io/file)))
-                          (->> all-paths
-                               (remove (comp (partial fs/descendant? spring-isolation-dir) io/file)))))]
-    (apply update-file-cache! all-paths)
-    (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
-              "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-    (when (seq this-round)
-      (log/info "Adding" (count this-round) "mods this iteration"))
-    (doseq [file this-round]
-      (log/info "Reading mod from" file)
-      (update-mod *state file))
-    (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
-    (swap! state-atom
-           (fn [state]
-             (-> state
-                 (update :mods (fn [mods]
-                                 (->> mods
-                                      (filter #(contains? % :is-game))
-                                      (remove (comp string/blank? :mod-name))
-                                      (remove (comp missing-files fs/canonical-path :file))
-                                      set)))
-                 (dissoc :update-mods))))
-    (when (seq next-round)
-      (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-      (add-task! state-atom {::task-type ::reconcile-mods}))
-    {:to-add-file-count (count to-add-file)
-     :to-add-rapid-count (count to-add-rapid)}))
+  ([state-atom]
+   (reconcile-mods state-atom nil))
+  ([state-atom spring-root]
+   (swap! state-atom assoc :update-mods true) ; TODO remove
+   (log/info "Reconciling mods")
+   (remove-all-duplicate-mods state-atom)
+   (let [before (u/curr-millis)
+         {:keys [spring-isolation-dir] :as state} @state-atom
+         spring-root (or spring-root spring-isolation-dir)
+         _ (log/info "Updating mods in" spring-root)
+         spring-root-path (fs/canonical-path spring-root)
+         mods (-> state :by-spring-root (get spring-root-path) :mods)
+         {:keys [rapid archive directory]} (group-by ::fs/source mods)
+         known-file-paths (set (map (comp fs/canonical-path :file) (concat archive directory)))
+         known-rapid-paths (set (map (comp fs/canonical-path :file) rapid))
+         mod-files (fs/mod-files spring-root)
+         sdp-files (rapid/sdp-files spring-root)
+         _ (log/info "Found" (count mod-files) "files and"
+                     (count sdp-files) "rapid archives to scan for mods")
+         to-add-file (set
+                       (concat
+                         (remove (comp known-file-paths fs/canonical-path) mod-files)
+                         (map :file directory))) ; always scan dirs in case git changed
+         to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
+         todo (concat to-add-file to-add-rapid)
+         ; TODO prioritize mods in battles
+         this-round (take 5 todo)
+         next-round (drop 5 todo)
+         all-paths (filter some? (concat known-file-paths known-rapid-paths))
+         missing-files (set
+                         (concat
+                           (->> all-paths
+                                (remove (comp fs/exists io/file)))
+                           (->> all-paths
+                                (remove (comp (partial fs/descendant? spring-root) io/file)))))]
+     (apply update-file-cache! all-paths)
+     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
+               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
+     (when (seq this-round)
+       (log/info "Adding" (count this-round) "mods this iteration"))
+     (doseq [file this-round]
+       (log/info "Reading mod from" file)
+       (update-mod *state spring-root-path file)) ; TODO inline?
+     (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
+     (swap! state-atom
+            (fn [state]
+              (-> state
+                  (update-in [:by-spring-root spring-root-path :mods]
+                    (fn [mods]
+                      (->> mods
+                           (filter #(contains? % :is-game))
+                           (remove (comp string/blank? :mod-name))
+                           (remove (comp missing-files fs/canonical-path :file))
+                           set)))
+                  (dissoc :update-mods))))
+     (when (seq next-round)
+       (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
+       (add-task! state-atom {::task-type ::reconcile-mods}))
+     {:to-add-file-count (count to-add-file)
+      :to-add-rapid-count (count to-add-rapid)})))
 
 
 (defn- update-cached-minimaps
@@ -1127,57 +1138,60 @@
 
 (defn- reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
-  [state-atom]
-  (swap! state-atom assoc :update-maps true)
-  (log/info "Reconciling maps")
-  (let [before (u/curr-millis)
-        {:keys [battle battles spring-isolation-dir] :as state} @state-atom
-        _ (log/info "Updating maps in" spring-isolation-dir)
-        battle-map (-> battles (get (:battle-id battle)) :battle-map)
-        map-files (fs/map-files spring-isolation-dir)
-        known-files (->> state :maps (map :file) set)
-        known-paths (->> known-files (map fs/canonical-path) set)
-        todo (remove (comp known-paths fs/canonical-path) map-files)
-        priorities (filterv (comp (partial resource/could-be-this-map? battle-map) (fn [f] {:resource-filename (fs/filename f)})) todo)
-        _ (log/info "Prioritizing map files for battle" (pr-str priorities))
-        this-round (concat priorities (take 5 todo))
-        next-round (drop 5 todo)
-        missing-paths (set
-                        (concat
-                          (->> known-files
-                               (remove fs/exists)
-                               (map fs/canonical-path))
-                          (->> known-files
-                               (remove (partial fs/descendant? spring-isolation-dir))
-                               (map fs/canonical-path))))]
-    (apply update-file-cache! map-files)
-    (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
-    (fs/make-dirs fs/maps-cache-root)
-    (when (seq this-round)
-      (log/info "Adding" (count this-round) "maps this iteration"))
-    (doseq [map-file this-round]
-      (log/info "Reading" map-file)
-      (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)]
-        (if map-name
-          (swap! state-atom update :maps
-                 (fn [maps]
-                   (set (conj maps (select-keys map-data [:file :map-name])))))
-          (log/warn "No map name found for" map-file))))
-    (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
-    (swap! state-atom update :maps
-           (fn [maps]
-             (->> maps
-                  (filter (comp fs/canonical-path :file))
-                  (remove (comp string/blank? :map-name))
-                  (remove (comp missing-paths fs/canonical-path :file))
-                  set)))
-    (swap! state-atom assoc :update-maps false)
-    (if (seq next-round)
-      (do
-        (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
-        (add-task! state-atom {::task-type ::reconcile-maps}))
-      (add-task! state-atom {::task-type ::update-cached-minimaps}))
-    {:todo-count (count todo)}))
+  ([state-atom]
+   (reconcile-maps state-atom nil))
+  ([state-atom spring-root]
+   (swap! state-atom assoc :update-maps true)
+   (log/info "Reconciling maps")
+   (let [before (u/curr-millis)
+         {:keys [spring-isolation-dir] :as state} @state-atom
+         spring-root (or spring-root spring-isolation-dir)
+         _ (log/info "Updating maps in" spring-root)
+         spring-root-path (fs/canonical-path spring-root)
+         maps (-> state :by-spring-root (get spring-root-path) :maps)
+         map-files (fs/map-files spring-root)
+         known-files (->> maps (map :file) set)
+         known-paths (->> known-files (map fs/canonical-path) set)
+         todo (remove (comp known-paths fs/canonical-path) map-files)
+         ; TODO prioritize maps in battles
+         this-round (take 5 todo)
+         next-round (drop 5 todo)
+         missing-paths (set
+                         (concat
+                           (->> known-files
+                                (remove fs/exists)
+                                (map fs/canonical-path))
+                           (->> known-files
+                                (remove (partial fs/descendant? spring-root))
+                                (map fs/canonical-path))))]
+     (apply update-file-cache! map-files)
+     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
+     (fs/make-dirs fs/maps-cache-root)
+     (when (seq this-round)
+       (log/info "Adding" (count this-round) "maps this iteration"))
+     (doseq [map-file this-round]
+       (log/info "Reading" map-file)
+       (let [{:keys [map-name] :as map-data} (fs/read-map-data map-file)]
+         (if map-name
+           (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+                  (fn [maps]
+                    (set (conj maps (select-keys map-data [:file :map-name])))))
+           (log/warn "No map name found for" map-file))))
+     (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
+     (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+            (fn [maps]
+              (->> maps
+                   (filter (comp fs/canonical-path :file))
+                   (remove (comp string/blank? :map-name))
+                   (remove (comp missing-paths fs/canonical-path :file))
+                   set)))
+     (swap! state-atom assoc :update-maps false)
+     (if (seq next-round)
+       (do
+         (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
+         (add-task! state-atom {::task-type ::reconcile-maps}))
+       (add-task! state-atom {::task-type ::update-cached-minimaps}))
+     {:todo-count (count todo)})))
 
 
 (defn- truncate-messages-chimer-fn [state-atom]
@@ -1246,14 +1260,21 @@
              true)})]
     (fn [] (.close chimer))))
 
+
 (defmethod task-handler ::reconcile-engines [_]
-  (reconcile-engines *state))
+  (let [spring-roots (spring-roots @*state)]
+    (doseq [spring-root spring-roots]
+      (reconcile-engines *state spring-root))))
 
 (defmethod task-handler ::reconcile-mods [_]
-  (reconcile-mods *state))
+  (let [spring-roots (spring-roots @*state)]
+    (doseq [spring-root spring-roots]
+      (reconcile-mods *state spring-root))))
 
 (defmethod task-handler ::reconcile-maps [_]
-  (reconcile-maps *state))
+  (let [spring-roots (spring-roots @*state)]
+    (doseq [spring-root spring-roots]
+      (reconcile-maps *state spring-root))))
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
@@ -1285,29 +1306,6 @@
 
 (defmethod task-handler ::refresh-replay-resources [_]
   (refresh-replay-resources *state))
-
-
-(defmethod event-handler ::reconcile-engines [_e]
-  (future
-    (try
-      (reconcile-engines *state)
-      (catch Exception e
-        (log/error e "Error reloading engines")))))
-
-
-(defmethod event-handler ::reload-mods [_e]
-  (future
-    (try
-      (reconcile-mods *state)
-      (catch Exception e
-        (log/error e "Error reloading mods")))))
-
-(defmethod event-handler ::reload-maps [_e]
-  (future
-    (try
-      (reconcile-maps *state)
-      (catch Exception e
-        (log/error e "Error reloading maps")))))
 
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
@@ -1444,7 +1442,6 @@
         (log/error e "Error connecting")))))
 
 (defmethod event-handler ::cancel-connect [{:keys [client client-deferred server-key]}]
-  #p server-key
   (future
     (try
       (if client-deferred
@@ -1519,7 +1516,8 @@
          :server-host (:host server-data)
          :server-port (:port server-data)
          :server-alias (:alias server-data)
-         :server-ssl (:ssl server-data)))
+         :server-ssl (:ssl server-data)
+         :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data))))
 
 (defmethod event-handler ::update-server
   [{:keys [server-url server-data]}]
@@ -2088,9 +2086,9 @@
         (update-copying dest {:status false})
         (update-file-cache! source dest)
         (case (:resource-type importable)
-          ::map (reconcile-maps *state)
-          ::mod (reconcile-mods *state)
-          ::engine (reconcile-engines *state)
+          ::map (reconcile-maps *state spring-isolation-dir)
+          ::mod (reconcile-mods *state spring-isolation-dir)
+          ::engine (reconcile-engines *state spring-isolation-dir)
           nil)))))
 
 (defmethod task-handler ::import [e]
@@ -2925,7 +2923,7 @@
   (swap! *state update-in (drop-last path) dissoc (last path)))
 
 (defmethod event-handler ::scan-imports
-  [{:keys [sources] :or {sources (import-sources (:extra-import-sources @*state))}}]
+  [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
   (doseq [import-source sources]
     (add-task! *state (merge
                         {::task-type ::scan-imports}

@@ -3,6 +3,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.server :as fx.server]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]))
 
 
@@ -61,10 +62,12 @@
 (def welcome-view-keys
   (concat
     fx.battle/battle-view-keys
-    [:app-update-available :by-server :client-data :map-details :mod-details :password :server :servers :tasks-by-type :username]))
+    [:app-update-available :by-spring-root :by-server :client-data :map-details :mod-details :password :server
+     :servers :spring-isolation-dir :tasks-by-type :username]))
 
 (defn welcome-view
-  [{:keys [app-update-available by-server client-data password server servers tasks-by-type username]
+  [{:keys [app-update-available by-spring-root by-server client-data password server servers
+           spring-isolation-dir tasks-by-type username]
     :as state}]
   {:fx/type :v-box
    :alignment :center
@@ -194,7 +197,8 @@
         (merge
           {:fx/type fx.battle/battle-view}
           (select-keys state fx.battle/battle-view-keys)
-          (:local by-server))])
+          (:local by-server)
+          (get by-spring-root (fs/canonical-path spring-isolation-dir)))])
      [{:fx/type :h-box
        :alignment :center-left
        :style {:-fx-font-size 14}

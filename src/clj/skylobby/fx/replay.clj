@@ -75,20 +75,21 @@
 
 
 (def replays-window-keys
-  [:bar-replays-page :battle-players-color-allyteam :copying :engines :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill :filter-replay-source
-   :filter-replay-type :http-download :map-details :maps :mod-details :mods :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
+  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill :filter-replay-source
+   :filter-replay-type :http-download :map-details :mod-details :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
    :show-replays :spring-isolation-dir :update-engines :update-maps :update-mods])
 
 (defn replays-window
-  [{:keys [bar-replays-page battle-players-color-allyteam copying engines extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
-           filter-replay-type http-download map-details maps mod-details mods new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
+  [{:keys [bar-replays-page battle-players-color-allyteam by-spring-root copying extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
+           filter-replay-type http-download map-details mod-details new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
            rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-minimap-type replays-filter-specs replays-watched replays-window-details screen-bounds selected-replay-file selected-replay-id
            show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
-  (let [local-filenames (->> parsed-replays-by-path
+  (let [{:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+        local-filenames (->> parsed-replays-by-path
                              vals
                              (map :filename)
                              (filter some?)

@@ -116,15 +116,16 @@
         startpostype (->> scripttags
                           :game
                           :startpostype
-                          spring/startpostype-name)]
+                          spring/startpostype-name)
+        max-width-or-height (max minimap-width minimap-height)]
     {:fx/type :stack-pane
+     :style
+     {:-fx-min-width max-width-or-height
+      :-fx-max-width max-width-or-height
+      :-fx-min-height max-width-or-height
+      :-fx-max-height max-width-or-height}
      :on-scroll {:event/type :spring-lobby/minimap-scroll
                  :minimap-type-key minimap-type-key}
-     :style
-     {:-fx-min-width u/minimap-size
-      :-fx-max-width u/minimap-size
-      :-fx-min-height u/minimap-size
-      :-fx-max-height u/minimap-size}
      :children
      (concat
        (if minimap-image

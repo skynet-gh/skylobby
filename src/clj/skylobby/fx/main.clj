@@ -3,7 +3,8 @@
     [clojure.string :as string]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [skylobby.fx.server-tab :as fx.server-tab]
-    [skylobby.fx.welcome :as fx.welcome]))
+    [skylobby.fx.welcome :as fx.welcome]
+    [spring-lobby.fs :as fs]))
 
 
 (defn valid-servers [by-server]
@@ -12,11 +13,13 @@
 
 
 (defn main-window
-  [{:keys [by-server server selected-server-tab selected-tab-channel selected-tab-main] :as state}]
-  (let [servers (valid-servers by-server)
+  [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main server servers
+           spring-isolation-dir]
+    :as state}]
+  (let [valid-servers (valid-servers by-server)
         tab-ids (concat ["local"]
-                        (map first servers)
-                        #_(when (seq servers) ["multi"]))
+                        (map first valid-servers)
+                        #_(when (seq valid-servers) ["multi"]))
         tab-id-set (set tab-ids)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
                              (.indexOf ^java.util.List tab-ids selected-server-tab))
@@ -68,10 +71,18 @@
                  server-data
                  {:selected-tab-channel selected-tab-channel
                   :selected-tab-main selected-tab-main
-                  :server-key server-key})})
-            servers)
+                  :server-key server-key}
+                 (let [server-url (-> server-data :client-data :server-url)
+                       spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                       spring-isolation-dir)
+                       spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
+                   {:spring-isolation-dir spring-root
+                    :engines (:engines spring-root-data)
+                    :maps (:maps spring-root-data)
+                    :mods (:mods spring-root-data)}))})
+            valid-servers)
           #_
-          (when (seq servers)
+          (when (seq valid-servers)
             [{:fx/type :tab
               :id "multi"
               :closable false

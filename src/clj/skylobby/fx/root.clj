@@ -14,6 +14,7 @@
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
+    [spring-lobby.fs :as fs]
     [spring-lobby.util :as u])
   (:import
     (javafx.stage Screen)))
@@ -38,7 +39,8 @@
      :height (.getHeight bounds)}))
 
 (defn root-view
-  [{{:keys [by-server current-tasks pop-out-battle selected-server-tab standalone tasks-by-kind]
+  [{{:keys [by-server by-spring-root current-tasks pop-out-battle selected-server-tab servers
+            spring-isolation-dir standalone tasks-by-kind]
      :as state}
     :state}]
   (let [{:keys [width height] :as screen-bounds} (screen-bounds)
@@ -86,7 +88,17 @@
               {:fx/type fx.battle/battle-view
                :tasks-by-type tasks-by-type}
               (select-keys state fx.battle/battle-view-keys)
-              (get by-server selected-server-tab))
+              (let [server-data (get by-server selected-server-tab)
+                    server-url (-> server-data :client-data :server-url)
+                    spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                    spring-isolation-dir)
+                    spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
+                ; TODO remove duplication with main-window
+                (assoc server-data
+                  :spring-isolation-dir spring-root
+                  :engines (:engines spring-root-data)
+                  :maps (:maps spring-root-data)
+                  :mods (:mods spring-root-data))))
             {:fx/type :pane})}})
       (merge
         {:fx/type fx.download/download-window

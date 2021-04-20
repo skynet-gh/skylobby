@@ -23,7 +23,7 @@
 
 (defn players-table
   [{:keys [am-host battle-players-color-allyteam channel-name client-data host-username players
-           scripttags server-url sides singleplayer username]}]
+           scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -49,8 +49,7 @@
                      (comp :ally :battle-status)
                      (comp (fnil - 0) u/parse-skill :skill))))
      :style {:-fx-font-size 14
-             :-fx-min-height 200
-             :-fx-pref-height 200}
+             :-fx-min-height 200}
      :row-factory
      {:fx/cell-type :table-row
       :describe (fn [{:keys [owner username user]}]
@@ -64,7 +63,7 @@
                          {:fx/type :menu-item
                           :text "Message"
                           :on-action {:event/type :spring-lobby/join-direct-message
-                                      :server-url server-url
+                                      :server-key server-key
                                       :username username}}])
                       [{:fx/type :menu-item
                         :text "Ring"
@@ -80,26 +79,30 @@
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!help"}}
+                                      :message "!help"
+                                      :server-key server-key}}
                          {:fx/type :menu-item
                           :text "!status battle"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!status battle"}}
+                                      :message "!status battle"
+                                      :server-key server-key}}
                          {:fx/type :menu-item
                           :text "!status game"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!status game"}}])
+                                      :message "!status game"
+                                      :server-key server-key}}])
                       (when (-> user :client-status :bot)
                         [{:fx/type :menu-item
                           :text "!whois"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message (str "!whois " username)}}])
+                                      :message (str "!whois " username)
+                                      :server-key server-key}}])
                       [{:fx/type :menu-item
                         :text (str "User ID: " (-> user :user-id))}])}})}
      :columns
@@ -208,7 +211,7 @@
       {:fx/type :table-column
        :text "Color"
        :resizable false
-       :pref-width 120
+       :pref-width 130
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell

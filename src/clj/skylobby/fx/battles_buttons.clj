@@ -147,7 +147,7 @@
      :style {:-fx-font-size 16}
      :children
      (concat
-       (when battle
+       (when (seq battle)
          [{:fx/type :button
            :text "Leave Battle"
            :on-action {:event/type :spring-lobby/leave-battle
@@ -170,7 +170,9 @@
              :on-action {:event/type :spring-lobby/assoc
                          :key :pop-out-battle
                          :value true}})])
-       (when (and (not battle) selected-battle (-> battles (get selected-battle)))
+       (when (and (empty? battle)
+                  selected-battle
+                  (-> battles (get selected-battle)))
          (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
            (concat
              [{:fx/type :button

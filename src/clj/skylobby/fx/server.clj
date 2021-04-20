@@ -3,6 +3,7 @@
     [clojure.string :as string]
     skylobby.fx
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]))
 
 
@@ -32,10 +33,10 @@
 
 
 (def servers-window-keys
-  [:server-alias :server-edit :server-host :server-port :servers :show-servers-window])
+  [:server-alias :server-edit :server-host :server-port :server-spring-root-draft :servers :show-servers-window])
 
 (defn servers-window
-  [{:keys [server-alias server-edit server-host server-port server-ssl servers show-servers-window]}]
+  [{:keys [server-alias server-edit server-host server-port server-spring-root-draft server-ssl servers show-servers-window]}]
   (let [url (first server-edit)
         port (if (string/blank? (str server-port))
                default-server-port (str server-port))
@@ -46,8 +47,8 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-servers-window}
-     :width 560
-     :height 320
+     :width 640
+     :height 400
      :scene
      {:fx/type :scene
       :stylesheets skylobby.fx/stylesheets
@@ -134,6 +135,17 @@
              :selected (boolean server-ssl)
              :on-selected-changed {:event/type :spring-lobby/assoc
                                    :key :server-ssl}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :alignment :center
+             :text " Spring root: "}
+            {:fx/type :text-field
+             :text (str server-spring-root-draft)
+             :h-box/hgrow :always
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :server-spring-root-draft}}]}
           {:fx/type :button
            :text (str
                    (if (contains? servers server-url) "Update" "Add")
@@ -146,5 +158,8 @@
                        {:port port
                         :host server-host
                         :alias server-alias
+                        :spring-isolation-dir
+                        (let [f (fs/file server-spring-root-draft)]
+                          (when (fs/exists? f) f))
                         :ssl (boolean server-ssl)}}}]}
         {:fx/type :pane})}}))
