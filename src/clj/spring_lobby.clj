@@ -165,19 +165,10 @@
     :alias "Beyond All Reason"}})
 
 
-(defn- dummy-matchmaking-queues []
-  (->> (iterate inc 1) ; TODO queues from server
-       (take 8)
-       (map (fn [i] (str i "v" i)))
-       (concat ["ffa"])
-       (map-indexed (fn [i n] [i {:queue-name n}]))
-       (into {})))
-
 (defn initial-state []
   (merge
     {:auto-get-resources true
      :battle-players-color-allyteam true
-     :matchmaking-queues (dummy-matchmaking-queues)
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
@@ -3141,8 +3132,8 @@
 (defmethod event-handler ::matchmaking-leave-all [{:keys [client-data]}]
   (client-message client-data "c.matchmaking.leave_all_queues"))
 
-(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id]}]
-  (client-message client-data (str "c.matchmaking.join_queue " queue-id)))
+(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id queue-name]}]
+  (client-message client-data (str "c.matchmaking.join_queue " (str queue-id ":" queue-name))))
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
   (client-message client-data (str "c.matchmaking.leave_queue " queue-id)))
