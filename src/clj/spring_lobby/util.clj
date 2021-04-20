@@ -12,8 +12,9 @@
     (java.net URL)
     (java.net URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
+    (java.security MessageDigest)
     (java.time LocalDateTime)
-    (java.util TimeZone)
+    (java.util Base64 TimeZone)
     (java.util.jar Manifest)
     (javafx.scene.paint Color)
     (org.apache.commons.io FileUtils)))
@@ -207,11 +208,13 @@
 (defn append-console-log [state-atom server-key source message]
   (swap! state-atom
     (fn [state]
-      (update-in state [:by-server server-key :console-log]
-        (fn [console-log]
-          (conj console-log {:timestamp (curr-millis)
-                             :source source
-                             :message message}))))))
+      (if (contains? (:by-server state) server-key)
+        (update-in state [:by-server server-key :console-log]
+          (fn [console-log]
+            (conj console-log {:timestamp (curr-millis)
+                               :source source
+                               :message message})))
+        state))))
 
 (defn update-chat-messages-fn
   ([username message]
@@ -310,3 +313,23 @@
                 :g (int (* 255 (Double/parseDouble g)))
                 :b (int (* 255 (Double/parseDouble r))))]
     (colors/rgba-int color)))
+
+
+
+; https://stackoverflow.com/a/39188819/984393
+(defn base64-encode [bs]
+  (.encodeToString (Base64/getEncoder) bs))
+
+; https://gist.github.com/jizhang/4325757
+(defn md5-bytes [^String s]
+  (let [algorithm (MessageDigest/getInstance "MD5")]
+    (.digest algorithm (.getBytes s))))
+
+(defn base64-md5 [password]
+  (base64-encode (md5-bytes password)))
+
+
+(defn agent-string []
+  (str app-name
+       "-"
+       (app-version)))

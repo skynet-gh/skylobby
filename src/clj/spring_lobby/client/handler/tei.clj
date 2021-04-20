@@ -2,7 +2,9 @@
   (:require
     [clojure.string :as string]
     [spring-lobby.client.handler :as handler]
-    [spring-lobby.util :as u]))
+    [spring-lobby.client.message :as message]
+    [spring-lobby.util :as u]
+    [taoensso.timbre :as log]))
 
 
 ; matchmaking
@@ -56,3 +58,14 @@
   (let [[_all queue-id-name] (re-find #"[^\s]+ (.*)" m)
         [queue-id queue-name] (string/split queue-id-name #":")]
     (swap! state update-in [:matchmaking-queues queue-id] assoc :ready-check false :queue-name queue-name)))
+
+
+; token
+
+
+(defmethod handler/handle "s.user.user_token" [state-atom server-key m]
+  (if-let [[_all _username auth-token] (re-find #"[^\s]+ ([^\t]+)\t([^\t]+)" m)]
+    (let [state (swap! state-atom assoc-in [:by-server server-key :auth-token] auth-token)
+          client (-> state :by-server (get server-key) :client-data :client)]
+      (message/send-message client (str "c.user.login " auth-token "\t" (u/agent-string))))
+    (log/error "Error parsing user token message")))

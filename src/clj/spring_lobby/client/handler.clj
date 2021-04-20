@@ -406,11 +406,6 @@
 (defmethod handle "OPENBATTLEFAILED" [state-atom server-url _m]
   (swap! state-atom update-in [:by-server server-url] dissoc :battle))
 
-(defmethod handle "COMPFLAGS" [state-atom server-url m]
-  (let [[_all remaining] (re-find #"\w+ (.*)" m)
-        compflags (string/split remaining #"\s+")]
-    (swap! state-atom assoc-in [:by-server server-url :compflags] compflags)))
-
 (defmethod handle "FAILED" [state-atom server-url m]
   (try
     (let [[_all reason] (re-find #"\w+ (.*)" m)

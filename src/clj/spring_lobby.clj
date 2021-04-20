@@ -1393,7 +1393,7 @@
   (update-disconnected! *state server-key))
 
 (defn- connect
-  [state-atom {:keys [client-deferred server server-key username] :as state}]
+  [state-atom {:keys [client-deferred server server-key password username] :as state}]
   (future
     (try
       (let [^SplicedStream client @client-deferred]
@@ -1407,16 +1407,20 @@
             (update-disconnected! *state server-key)))
         (if (s/closed? client)
           (log/warn "client was closed on create")
-          (let [client-data {:client client
+          (let [[server-url server-data] server
+                client-data {:client client
                              :client-deferred client-deferred
                              :server-key server-key
-                             :server-url (first server)
+                             :server-url server-url
+                             :ssl (:ssl server-data)
+                             :password password
                              :username username}]
             (log/info "Connecting to" server-key)
-            (swap! state-atom update-in [:by-server server-key]
-                   assoc
-                   :client-data client-data
-                   :login-error nil)
+            (swap! state-atom
+              (fn [state]
+                (-> state
+                    (update :login-error dissoc server-url)
+                    (assoc-in [:by-server server-key :client-data] client-data))))
             (client/connect state-atom (assoc state :client-data client-data)))))
       (catch Exception e
         (log/error e "Connect error")
@@ -1424,7 +1428,7 @@
         (update-disconnected! *state server-key)))
     nil))
 
-(defmethod event-handler ::connect [{:keys [server server-key username] :as state}]
+(defmethod event-handler ::connect [{:keys [server server-key password username] :as state}]
   (future
     (try
       (let [[server-url server-opts] server
@@ -1436,9 +1440,14 @@
                      (update-in [:by-server server-key]
                        assoc :client-data {:client-deferred client-deferred
                                            :server-url server-url
+                                           :ssl (:ssh (second server))
+                                           :password password
                                            :username username}
                              :server server))))
-        (connect *state (assoc state :client-deferred client-deferred :username username)))
+        (connect *state (assoc state
+                               :client-deferred client-deferred
+                               :password password
+                               :username username)))
       (catch Exception e
         (log/error e "Error connecting")))))
 
@@ -1490,7 +1499,7 @@
             server-key (u/server-key client-data)]
         (swap! *state dissoc :password-confirm)
         (client-message client-data
-          (str "REGISTER " username " " (client/base64-md5 password) " " email))
+          (str "REGISTER " username " " (u/base64-md5 password) " " email))
         (loop []
           (when-let [d (s/take! client)]
             (when-let [m @d]

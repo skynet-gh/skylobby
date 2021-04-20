@@ -62,11 +62,11 @@
 (def welcome-view-keys
   (concat
     fx.battle/battle-view-keys
-    [:app-update-available :by-spring-root :by-server :client-data :map-details :mod-details :password :server
+    [:app-update-available :by-spring-root :by-server :client-data :login-error :password :server
      :servers :spring-isolation-dir :tasks-by-type :username]))
 
 (defn welcome-view
-  [{:keys [app-update-available by-spring-root by-server client-data password server servers
+  [{:keys [app-update-available by-spring-root by-server client-data login-error password server servers
            spring-isolation-dir tasks-by-type username]
     :as state}]
   {:fx/type :v-box
@@ -136,13 +136,14 @@
                :graphic
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-plus:30:white"}}]}]
-           (if-not client-data
+           (when-not client-data
              [{:fx/type :button
                :text "Register"
                :on-action {:event/type :spring-lobby/toggle
-                           :key :show-register-window}}]
+                           :key :show-register-window}}])
+           (when-let [login-error (str " " (get login-error (first server)))]
              [{:fx/type :label
-               :text (str " " (-> by-server (get (first server)) :login-error))
+               :text (str " " login-error)
                :style {:-fx-text-fill "#FF0000"
                        :-fx-max-width "360px"}}])
            [{:fx/type :h-box
@@ -155,7 +156,7 @@
                :prompt-text "Username"
                :style {:-fx-pref-width 300
                        :-fx-max-width 300}
-               :disable (boolean (or client-data (not server)))
+               :disable (boolean (not server))
                :on-text-changed {:event/type :spring-lobby/username-change
                                  :server-url (first server)}}]}]
            (if-not client-data
