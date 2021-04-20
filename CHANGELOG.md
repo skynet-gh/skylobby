@@ -11,6 +11,13 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.9]
+
+- Fix chat in pop out battle window
+- Add support for teiserver token auth
+- Fix matchmaking after multi server
+- Fix battle map and mod sync after multi server
+
 ### [0.3.8]
 
 - Fix circular dependency issue in installer
