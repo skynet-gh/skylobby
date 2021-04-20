@@ -24,7 +24,7 @@
      (concat
        (let [severity (cond
                         no-map-details
-                        (if (or map-exists (seq map-update-tasks))
+                        (if map-exists
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -33,7 +33,7 @@
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file battle-map-details))
                       (str "Map '" battle-map "' not found locally"))}])
-       (when (and no-map-details (not map-exists) (empty? map-update-tasks))
+       (when (and no-map-details (not map-exists))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals

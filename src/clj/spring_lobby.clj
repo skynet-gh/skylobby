@@ -182,8 +182,8 @@
      :file-events (initial-file-events)
      :minimap-type (first fx.minimap/minimap-types)
      :replay-minimap-type (first fx.minimap/minimap-types)
-     :map-details (cache/fifo-cache-factory {})
-     :mod-details (cache/fifo-cache-factory {})}))
+     :map-details (cache/fifo-cache-factory {} :threshold 8)
+     :mod-details (cache/fifo-cache-factory {} :threshold 8)}))
 
 
 (def ^:dynamic *state (atom {}))
@@ -318,12 +318,12 @@
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :map-details :maps :servers :spring-isolation-dir]))
+    [:by-server :map-details :servers :spring-isolation-dir]))
 
 (defn- battle-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :mod-details :mods :servers :spring-isolation-dir]))
+    [:by-server :mod-details :servers :spring-isolation-dir]))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
@@ -1067,7 +1067,23 @@
          to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
          todo (concat to-add-file to-add-rapid)
          ; TODO prioritize mods in battles
-         this-round (take 5 todo)
+         battle-mods (->> state
+                          :by-server
+                          (map
+                            (fn [{:keys [battle battles]}]
+                              (-> battles (get (:battle-id battle)) :battle-modname)))
+                          (filter some?))
+         priorities (->> todo
+                         (filter
+                           (comp
+                             (fn [resource]
+                               (some
+                                 #(resource/could-be-this-mod? % resource)
+                                 battle-mods))
+                             (fn [f]
+                               {:resource-filename (fs/filename f)}))))
+         _ (log/info "Prioritizing mods in battles" priorities)
+         this-round (concat priorities (take 5 todo))
          next-round (drop 5 todo)
          all-paths (filter some? (concat known-file-paths known-rapid-paths))
          missing-files (set
@@ -1141,8 +1157,23 @@
          known-files (->> maps (map :file) set)
          known-paths (->> known-files (map fs/canonical-path) set)
          todo (remove (comp known-paths fs/canonical-path) map-files)
-         ; TODO prioritize maps in battles
-         this-round (take 5 todo)
+         battle-maps (->> state
+                          :by-server
+                          (map
+                            (fn [{:keys [battle battles]}]
+                              (-> battles (get (:battle-id battle)) :battle-map)))
+                          (filter some?))
+         priorities (->> todo
+                         (filter
+                           (comp
+                             (fn [resource]
+                               (some
+                                 #(resource/could-be-this-map? % resource)
+                                 battle-maps))
+                             (fn [f]
+                               {:resource-filename (fs/filename f)}))))
+         _ (log/info "Prioritizing maps in battles" priorities)
+         this-round (concat priorities (take 5 todo))
          next-round (drop 5 todo)
          missing-paths (set
                          (concat
