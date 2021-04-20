@@ -22,8 +22,8 @@
    11 "goldenrod"})
 
 (defn players-table
-  [{:keys [am-host battle-players-color-allyteam channel-name client host-username players
-           scripttags server-url sides singleplayer username]}]
+  [{:keys [am-host battle-players-color-allyteam channel-name client-data host-username players
+           scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -49,8 +49,7 @@
                      (comp :ally :battle-status)
                      (comp (fnil - 0) u/parse-skill :skill))))
      :style {:-fx-font-size 14
-             :-fx-min-height 200
-             :-fx-pref-height 200}
+             :-fx-min-height 200}
      :row-factory
      {:fx/cell-type :table-row
       :describe (fn [{:keys [owner username user]}]
@@ -64,12 +63,12 @@
                          {:fx/type :menu-item
                           :text "Message"
                           :on-action {:event/type :spring-lobby/join-direct-message
-                                      :server-url server-url
+                                      :server-key server-key
                                       :username username}}])
                       [{:fx/type :menu-item
                         :text "Ring"
                         :on-action {:event/type :spring-lobby/ring
-                                    :client client
+                                    :client-data client-data
                                     :channel-name channel-name
                                     :username username}}]
                       (when (and host-username
@@ -78,28 +77,32 @@
                         [{:fx/type :menu-item
                           :text "!help"
                           :on-action {:event/type :spring-lobby/send-message
-                                      :client client
+                                      :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!help"}}
+                                      :message "!help"
+                                      :server-key server-key}}
                          {:fx/type :menu-item
                           :text "!status battle"
                           :on-action {:event/type :spring-lobby/send-message
-                                      :client client
+                                      :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!status battle"}}
+                                      :message "!status battle"
+                                      :server-key server-key}}
                          {:fx/type :menu-item
                           :text "!status game"
                           :on-action {:event/type :spring-lobby/send-message
-                                      :client client
+                                      :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message "!status game"}}])
+                                      :message "!status game"
+                                      :server-key server-key}}])
                       (when (-> user :client-status :bot)
                         [{:fx/type :menu-item
                           :text "!whois"
                           :on-action {:event/type :spring-lobby/send-message
-                                      :client client
+                                      :client-data client-data
                                       :channel-name (u/user-channel host-username)
-                                      :message (str "!whois " username)}}])
+                                      :message (str "!whois " username)
+                                      :server-key server-key}}])
                       [{:fx/type :menu-item
                         :text (str "User ID: " (-> user :user-id))}])}})}
      :columns
@@ -133,7 +136,7 @@
                   :on-action
                   (merge
                     {:event/type :spring-lobby/kick-battle
-                     :client client
+                     :client-data client-data
                      :singleplayer singleplayer}
                     (select-keys id [:bot-name :username]))
                   :graphic
@@ -170,7 +173,7 @@
             {:fx/type :combo-box
              :value (str (:ally (:battle-status i)))
              :on-value-changed {:event/type :spring-lobby/battle-ally-changed
-                                :client (when-not singleplayer client)
+                                :client-data (when-not singleplayer client-data)
                                 :is-me (= (:username i) username)
                                 :is-bot (-> i :user :client-status :bot)
                                 :id i}
@@ -196,7 +199,7 @@
             {:fx/type :combo-box
              :value (str (:id (:battle-status i)))
              :on-value-changed {:event/type :spring-lobby/battle-team-changed
-                                :client (when-not singleplayer client)
+                                :client-data (when-not singleplayer client-data)
                                 :is-me (= (:username i) username)
                                 :is-bot (-> i :user :client-status :bot)
                                 :id i}
@@ -208,7 +211,7 @@
       {:fx/type :table-column
        :text "Color"
        :resizable false
-       :pref-width 120
+       :pref-width 130
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -222,7 +225,7 @@
             {:fx/type :color-picker
              :value (u/spring-color-to-javafx team-color)
              :on-action {:event/type :spring-lobby/battle-color-action
-                         :client (when-not singleplayer client)
+                         :client-data (when-not singleplayer client-data)
                          :is-me (= (:username i) username)
                          :is-bot (-> i :user :client-status :bot)
                          :id i}
@@ -285,7 +288,7 @@
             {:fx/type :check-box
              :selected (not (:mode (:battle-status i)))
              :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                   :client (when-not singleplayer client)
+                                   :client-data (when-not singleplayer client-data)
                                    :is-me (= (:username i) username)
                                    :is-bot (-> i :user :client-status :bot)
                                    :id i}
@@ -310,7 +313,7 @@
             {:fx/type :combo-box
              :value (->> i :battle-status :side (get sides) str)
              :on-value-changed {:event/type :spring-lobby/battle-side-changed
-                                :client (when-not singleplayer client)
+                                :client-data (when-not singleplayer client-data)
                                 :is-me (= (:username i) username)
                                 :is-bot (-> i :user :client-status :bot)
                                 :id i
@@ -358,6 +361,6 @@
               :value-converter :integer
               :value (int (or (:handicap (:battle-status i)) 0))
               :on-value-changed {:event/type :spring-lobby/battle-handicap-change
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :is-bot (-> i :user :client-status :bot)
                                  :id i}}}}})}}]}))

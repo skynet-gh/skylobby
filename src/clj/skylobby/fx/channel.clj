@@ -54,7 +54,7 @@
                  [{:fx/type :text
                    :text "\n"}])))))))
 
-(defn- channel-view-history [{:keys [chat-auto-scroll channel-name messages select-mode server-url]}]
+(defn- channel-view-history [{:keys [chat-auto-scroll channel-name messages select-mode server-key]}]
   (let [messages (reverse messages)]
     (if select-mode
       (let [text (->> messages
@@ -79,7 +79,7 @@
            [{:fx/type :menu-item
              :text "Color mode"
              :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:by-server server-url :channels channel-name :select-mode]
+                         :path [:by-server server-key :channels channel-name :select-mode]
                          :value false}}]}}})
       (let [texts (channel-texts messages)]
         {:fx/type with-scroll-text-flow-prop
@@ -95,7 +95,7 @@
            [{:fx/type :menu-item
              :text "Select mode"
              :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:by-server server-url :channels channel-name :select-mode]
+                         :path [:by-server server-key :channels channel-name :select-mode]
                          :value true}}]}
           :content
           {:fx/type :text-flow
@@ -103,25 +103,27 @@
            :style {:-fx-font-family monospace-font-family}
            :children texts}}}))))
 
-(defn- channel-view-input [{:keys [channel-name chat-auto-scroll client message-draft]}]
+(defn- channel-view-input [{:keys [channel-name chat-auto-scroll client-data message-draft server-key]}]
   {:fx/type :h-box
    :children
    [{:fx/type :button
      :text "Send"
      :on-action {:event/type :spring-lobby/send-message
                  :channel-name channel-name
-                 :client client
-                 :message message-draft}}
+                 :client-data client-data
+                 :message message-draft
+                 :server-key server-key}}
     {:fx/type :text-field
      :id "channel-text-field"
      :h-box/hgrow :always
      :text (str message-draft)
      :on-text-changed {:event/type :spring-lobby/assoc-in
-                       :path [:message-drafts channel-name]}
+                       :path [:by-server server-key :message-drafts channel-name]}
      :on-action {:event/type :spring-lobby/send-message
                  :channel-name channel-name
-                 :client client
-                 :message message-draft}}
+                 :client-data client-data
+                 :message message-draft
+                 :server-key server-key}}
     {:fx/type fx.ext.node/with-tooltip-props
      :props
      {:tooltip
@@ -168,7 +170,7 @@
       :describe (fn [i] {:text (-> i str)})}}]})
 
 (defn channel-view
-  [{:keys [channel-name channels chat-auto-scroll client hide-users message-draft server-url]}]
+  [{:keys [channel-name channels chat-auto-scroll client-data hide-users message-draft server-key]}]
   (let [{:keys [messages select-mode users]} (get channels channel-name)]
     {:fx/type :h-box
      :children
@@ -183,12 +185,13 @@
            :channel-name channel-name
            :messages messages
            :select-mode select-mode
-           :server-url server-url}
+           :server-key server-key}
           {:fx/type channel-view-input
            :channel-name channel-name
            :chat-auto-scroll chat-auto-scroll
-           :client client
-           :message-draft message-draft}]}]
+           :client-data client-data
+           :message-draft message-draft
+           :server-key server-key}]}]
        (when (and (not hide-users)
                   (not (string/starts-with? channel-name "@")))
          [{:fx/type channel-view-users

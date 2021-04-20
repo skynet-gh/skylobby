@@ -36,17 +36,17 @@
 
 (def battle-view-keys
   [:archiving :auto-get-resources :battles :battle :battle-players-color-allyteam :bot-name
-   :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version
+   :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client-data :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
    :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :server :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :server-key :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
-           channels chat-auto-scroll client downloadables-by-url
+           channels chat-auto-scroll client-data downloadables-by-url
            drag-allyteam drag-team engine-filter engines file-cache http-download map-filter
-           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server
+           map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server-key
            spring-isolation-dir spring-settings tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -119,18 +119,18 @@
          :battle-modname battle-modname
          :battle-players-color-allyteam battle-players-color-allyteam
          :channel-name channel-name
-         :client (when-not singleplayer client)
+         :client-data (when-not singleplayer client-data)
          :host-username host-username
          :players players
-         :server-url (first server)
+         :server-key server-key
          :scripttags scripttags
          :sides sides
          :singleplayer singleplayer
          :username username}
         {:fx/type :h-box
          :style {
-                 :-fx-pref-height 320
-                 :-fx-max-height 320}
+                 :-fx-pref-height 400
+                 :-fx-max-height 400}
          :children
          [{:fx/type :v-box
            :children
@@ -170,7 +170,7 @@
                                   :bot-username bot-username
                                   :bot-name bot-name
                                   :bot-version bot-version
-                                  :client client
+                                  :client-data client-data
                                   :singleplayer singleplayer
                                   :username username}}
                      #_
@@ -362,7 +362,7 @@
                :style {:-fx-padding "10px"}
                :on-selected-changed (merge me
                                       {:event/type :spring-lobby/battle-ready-change
-                                       :client (when-not singleplayer client)
+                                       :client-data (when-not singleplayer client-data)
                                        :username username})}
               {:fx/type :label
                :text (if am-spec " Auto Launch" " Ready")}
@@ -401,17 +401,17 @@
                    :am-spec am-spec
                    :battle-status my-battle-status
                    :channel-name channel-name
-                   :client client
+                   :client-data client-data
                    :host-ingame host-ingame})}}]}]}
           {:fx/type channel-view
            :h-box/hgrow :always
            :channel-name channel-name
            :channels channels
            :chat-auto-scroll chat-auto-scroll
-           :client client
+           :client-data client-data
            :hide-users true
            :message-draft (get message-drafts channel-name)
-           :server-url (first server)}]}]}
+           :server-key server-key}]}]}
       {:fx/type :tab-pane
        :style {:-fx-min-width (+ u/minimap-size 20)
                :-fx-pref-width (+ u/minimap-size 20)
@@ -434,7 +434,7 @@
            [{:fx/type minimap-pane
              :am-spec am-spec
              :battle-details battle-details
-             :client client
+             :client-data client-data
              :drag-allyteam drag-allyteam
              :drag-team drag-team
              :map-name battle-map
@@ -479,13 +479,13 @@
                       :path [:by-server :local :battles :singleplayer :battle-map]}
                      am-host
                      {:event/type :spring-lobby/battle-map-change
-                      :client client
+                      :client-data client-data
                       :maps maps}
                      :else
                      {:event/type :spring-lobby/suggest-battle-map
                       :battle-status battle-status
                       :channel-name channel-name
-                      :client client})}])}
+                      :client-data client-data})}])}
               {:fx/type :h-box
                :alignment :center-left
                :children
@@ -500,13 +500,15 @@
                    :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
                                       :am-host am-host
                                       :channel-name channel-name
-                                      :client client
+                                      :client-data client-data
                                       :singleplayer singleplayer}}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
                      :disable (and (not singleplayer) am-spec)
-                     :on-action {:event/type :spring-lobby/reset-start-positions}}])
+                     :on-action {:event/type :spring-lobby/reset-start-positions
+                                 :client-data client-data
+                                 :server-key server-key}}])
                  (when (= "Choose in game" startpostype)
                    [{:fx/type :button
                      :text "Clear boxes"
@@ -523,35 +525,35 @@
                      :text "FFA"
                      :on-action {:event/type :spring-lobby/battle-teams-ffa
                                  :battle battle
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "2 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-2
                                  :battle battle
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "3 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-3
                                  :battle battle
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "4 teams"
                      :on-action {:event/type :spring-lobby/battle-teams-4
                                  :battle battle
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :users users
                                  :username username}}
                     {:fx/type :button
                      :text "Humans vs Bots"
                      :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
                                  :battle battle
-                                 :client (when-not singleplayer client)
+                                 :client-data (when-not singleplayer client-data)
                                  :users users
                                  :username username}}]))}]}]}}}
         {:fx/type :tab
@@ -624,7 +626,7 @@
                          :on-selected-changed {:event/type :spring-lobby/modoption-change
                                                :am-host am-host
                                                :channel-name channel-name
-                                               :client client
+                                               :client-data client-data
                                                :modoption-key (:key i)
                                                :singleplayer singleplayer}
                          :disable (and (not singleplayer) am-spec)}}}}
@@ -650,7 +652,7 @@
                           :on-value-changed {:event/type :spring-lobby/modoption-change
                                              :am-host am-host
                                              :channel-name channel-name
-                                             :client client
+                                             :client-data client-data
                                              :modoption-key (:key i)
                                              :modoption-type (:type i)}}}}}}
                      "list"
@@ -672,7 +674,7 @@
                          :on-value-changed {:event/type :spring-lobby/modoption-change
                                             :am-host am-host
                                             :channel-name channel-name
-                                            :client client
+                                            :client-data client-data
                                             :modoption-key (:key i)}
                          :items (or (map (comp :key second) (:items i))
                                     [])}}}}
@@ -816,7 +818,7 @@
      :tabs
      [{:fx/type :tab
        :on-close-request {:event/type :spring-lobby/leave-battle
-                          :client (:client battle)}
+                          :client-data (:client-data battle)}
        :graphic {:fx/type :label
                  :text "Multiplayer"}
        :content

@@ -12,6 +12,10 @@
     (javafx.scene.text Font FontWeight)))
 
 
+(def minimap-types
+  ["minimap" "metalmap" "heightmap"])
+
+
 (defn minimap-start-boxes [minimap-width minimap-height scripttags drag-allyteam]
   (let [game (:game scripttags)
         allyteams (->> game
@@ -99,7 +103,7 @@
            doall))))
 
 (defn minimap-pane
-  [{:keys [am-spec battle-details client drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
+  [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-height minimap-width] :or {minimap-height smf/minimap-size minimap-width smf/minimap-size}} smf
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
@@ -112,15 +116,16 @@
         startpostype (->> scripttags
                           :game
                           :startpostype
-                          spring/startpostype-name)]
+                          spring/startpostype-name)
+        max-width-or-height (max minimap-width minimap-height)]
     {:fx/type :stack-pane
+     :style
+     {:-fx-min-width max-width-or-height
+      :-fx-max-width max-width-or-height
+      :-fx-min-height max-width-or-height
+      :-fx-max-height max-width-or-height}
      :on-scroll {:event/type :spring-lobby/minimap-scroll
                  :minimap-type-key minimap-type-key}
-     :style
-     {:-fx-min-width u/minimap-size
-      :-fx-max-width u/minimap-size
-      :-fx-min-height u/minimap-size
-      :-fx-max-height u/minimap-size}
      :children
      (concat
        (if minimap-image
@@ -152,7 +157,7 @@
              :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
                                  :am-spec am-spec
                                  :channel-name (:channel-name battle-details)
-                                 :client client
+                                 :client-data client-data
                                  :map-details map-details
                                  :minimap-width minimap-width
                                  :minimap-height minimap-height

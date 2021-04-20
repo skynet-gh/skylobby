@@ -201,6 +201,18 @@
             (log/warn "No server-url found for message:" message)
             state))))))
 
+(defn server-key [{:keys [server-url username]}]
+  (str username "@" server-url))
+
+(defn append-console-log [state-atom server-key source message]
+  (swap! state-atom
+    (fn [state]
+      (update-in state [:by-server server-key :console-log]
+        (fn [console-log]
+          (conj console-log {:timestamp (curr-millis)
+                             :source source
+                             :message message}))))))
+
 (defn update-chat-messages-fn
   ([username message]
    (update-chat-messages-fn username message false))
@@ -283,3 +295,18 @@
    (java-time/format "yyyyMMdd-HHmmss" (LocalDateTime/ofInstant
                                          (java-time/instant timestamp-millis)
                                          time-zone-id))))
+
+(defn non-battle-channels
+  [channels]
+  (->> channels
+       (remove (comp string/blank? :channel-name))
+       (remove (comp battle-channel-name? :channel-name))))
+
+
+(defn spring-script-color-to-int [rgbcolor]
+  (let [[r g b] (string/split rgbcolor #"\s")
+        color (colors/create-color
+                :r (int (* 255 (Double/parseDouble b)))
+                :g (int (* 255 (Double/parseDouble g)))
+                :b (int (* 255 (Double/parseDouble r))))]
+    (colors/rgba-int color)))

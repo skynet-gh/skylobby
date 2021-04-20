@@ -7,6 +7,9 @@
     [spring-lobby.rapid :as rapid]))
 
 
+(def resource-types
+  [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
+
 (defn resource-dest
   [root {:keys [resource-filename resource-name resource-file resource-type]}]
   (let [filename (or resource-filename

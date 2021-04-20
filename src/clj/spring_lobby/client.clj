@@ -249,48 +249,42 @@
                   (assoc :battle-map-details nil)))))))
 
 
-(defn ping-loop [state-atom server-url]
-  (swap! state-atom update-in [:by-server server-url]
-    (fn [{:keys [client] :as server-data}]
-      (assoc server-data
-        :ping-loop
-        (future
-          (try
-            (log/info "ping loop thread started")
-            (loop []
-              (async/<!! (async/timeout 30000))
-              (when (message/send-message client "PING")
-                (u/update-console-log state-atom :client client "PING")
-                (when-not (Thread/interrupted)
-                  (recur))))
-            (log/info "ping loop ended")
-            (catch Exception e
-              (log/error e "Error in ping loop"))))))))
+(defn ping-loop [state-atom server-key client]
+  (let [ping-loop (future
+                    (try
+                      (log/info "ping loop thread started")
+                      (loop []
+                        (async/<!! (async/timeout 30000))
+                        (when (message/send-message client "PING")
+                          (u/append-console-log state-atom server-key :client "PING")
+                          (when-not (Thread/interrupted)
+                            (recur))))
+                      (log/info "ping loop ended")
+                      (catch Exception e
+                        (log/error e "Error in ping loop"))))]
+    (swap! state-atom assoc-in [:by-server server-key :ping-loop] ping-loop)))
 
 
 (defn print-loop
-  [state-atom server-url]
-  (swap! state-atom update-in [:by-server server-url]
-    (fn [{:keys [client] :as server-data}]
-      (assoc server-data
-        :print-loop
-        (future
-          (try
-            (log/info "print loop thread started")
-            (loop []
-              (when-let [d (s/take! client)]
-                (when-let [m @d]
-                  (log/info (str "[" server-url "]") "<" (str "'" m "'"))
-                  (try
-                    (handler state-atom server-url m)
-                    (u/update-console-log state-atom :server client m)
-                    (catch Exception e
-                      (log/error e "Error handling message")))
-                  (when-not (Thread/interrupted)
-                    (recur)))))
-            (log/info "print loop ended")
-            (catch Exception e
-              (log/error e "Error in print loop"))))))))
+  [state-atom server-key client]
+  (let [print-loop (future
+                     (try
+                       (log/info "print loop thread started")
+                       (loop []
+                         (when-let [d (s/take! client)]
+                           (when-let [m @d]
+                             (log/info (str "[" server-key "]") "<" (str "'" m "'"))
+                             (try
+                               (handler state-atom server-key m)
+                               (u/append-console-log state-atom server-key :server m)
+                               (catch Exception e
+                                 (log/error e "Error handling message")))
+                             (when-not (Thread/interrupted)
+                               (recur)))))
+                       (log/info "print loop ended")
+                       (catch Exception e
+                         (log/error e "Error in print loop"))))]
+    (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 (defn base64-md5 [password]
   (base64-encode (md5-bytes password)))
@@ -309,20 +303,18 @@
 
 
 (defn connect
-  [state-atom server-url]
-  (let [state @state-atom
-        {:keys [my-channels password username]} state
-        {:keys [client]} (-> state :by-server (get server-url))]
-    (print-loop state-atom server-url)
+  [state-atom {:keys [client-data my-channels password server-key username]}]
+  (let [{:keys [client]} client-data]
+    (print-loop state-atom server-key client)
     (message/send-message client "LISTCOMPFLAGS")
     (login client "*" username password)
     (message/send-message client "CHANNELS")
-    (doseq [channel (get my-channels server-url)]
+    (doseq [channel (get my-channels server-key)]
       (let [[channel-name _] channel]
         (when-not (or (u/battle-channel-name? channel-name)
                       (u/user-channel-name? channel-name))
           (message/send-message client (str "JOIN " channel-name)))))
-    (ping-loop state-atom server-url)))
+    (ping-loop state-atom server-key client)))
 
 (defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
@@ -337,7 +329,7 @@
   (let [[old-state] (swap-vals! state-atom update-in [:by-server server-url]
                       (fn [state]
                         (-> state
-                            (dissoc :client :client-deferred)
+                            (dissoc :client-data)
                             (assoc :login-error m))))
-        client (-> old-state :by-server (get server-url) :client)]
+        client (-> old-state :by-server (get server-url) :client-data :client)]
     (disconnect client)))

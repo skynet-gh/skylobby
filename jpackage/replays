@@ -1,8 +1,0 @@
---input dist
---main-jar "skyreplays.jar"
---name "skyreplays"
---main-class "clojure.main"
---arguments -m
---arguments "spring-lobby.replays"
---vendor "skynet"
---java-options "-server -Xms128m -Xmx1g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"

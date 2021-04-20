@@ -7,6 +7,7 @@
     [gloss.io :as gio]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
+    [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
@@ -124,8 +125,11 @@
   (re-find #"\w+ ([^\s]+) (\w+)" m))
 
 (defn start-game-if-synced
-  [{:keys [by-server engines maps mods] :as state} server-url]
-  (let [{:keys [battle battles] :as server-data} (get by-server server-url)
+  [{:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
+  (let [{:keys [battle battles]} server-data
+        spring-root (or (-> servers (get (-> server-data :client-data :server-url)) :spring-isolation-dir)
+                        spring-isolation-dir)
+        {:keys [engines maps mods]} (-> by-spring-root (get (fs/canonical-path spring-root)))
         battle-detail (-> battles (get (:battle-id battle)))
         {:keys [battle-map battle-modname battle-version]} battle-detail
         has-engine (->> engines (filter (comp #{battle-version} :engine-version)) first)
@@ -135,7 +139,13 @@
       (do
         (log/info "Starting game to join host")
         (spring/start-game
-          (merge state server-data)))
+          (merge
+            state
+            server-data
+            {:spring-isolation-dir spring-root
+             :engines engines
+             :maps maps
+             :mods mods})))
       (log/info
         (str "Missing engine, mod, or map\n"
              (with-out-str
@@ -144,13 +154,13 @@
                   :mod has-mod
                   :map has-map})))))))
 
-(defmethod handle "CLIENTSTATUS" [state-atom server-url m]
+(defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
         decoded-status (decode-client-status client-status)
-        [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-url :users username :client-status] decoded-status)
-        {:keys [battle battles users] :as prev-server} (-> prev-state :by-server (get server-url))
+        [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
+        {:keys [battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
-        my-username (:username prev-server)
+        my-username (:username server-data)
         my-status (-> users (get my-username) :client-status)
         battle-detail (-> battles (get (:battle-id battle)))]
     (log/debug "CLIENTSTATUS" username decoded-status)
@@ -163,7 +173,7 @@
       (not (-> battle :users (get my-username) :battle-status :ready)) (log/debug "Not ready")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
-      (start-game-if-synced prev-state server-url))))
+      (start-game-if-synced prev-state server-data))))
 
 (defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
@@ -358,13 +368,14 @@
            :battle-mod-details nil)))
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [battle client preferred-color]} (-> state-atom deref :by-server (get server-url))
+  (let [{:keys [battle client-data preferred-color]} (-> state-atom deref :by-server (get server-url))
         battle-status (assoc default-battle-status
                              :id (battle/available-team-id battle)
                              :ally (battle/available-ally battle)
                              :mode false)
         color (or preferred-color
                   (u/random-color))
+        client (:client client-data)
         msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
     (message/send-message client msg)))
 
@@ -425,7 +436,7 @@
                        (-> state
                            (dissoc :battle)
                            (assoc :last-failed-message m))))
-        client (-> state :by-server (get server-url) :client)]
+        client (-> state :by-server (get server-url) :client-data :client)]
     (when (= m "JOINBATTLEFAILED You are already in a battle")
       (message/send-message client "LEAVEBATTLE"))))
 
