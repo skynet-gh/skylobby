@@ -4,9 +4,6 @@
     [spring-lobby.util :as u]))
 
 
-(def matchmaking-window-keys
-  [:client-data :matchmaking-queues :show-matchmaking-window])
-
 (defn matchmaking-window [{:keys [client-data matchmaking-queues show-matchmaking-window]}]
   {:fx/type :stage
    :showing (boolean show-matchmaking-window)
@@ -70,7 +67,7 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [[queue-id {:keys [am-in ready-check]}]]
+            (fn [[queue-id {:keys [am-in queue-name ready-check]}]]
               {:text ""
                :graphic
                {:fx/type :h-box
@@ -88,7 +85,8 @@
                                      :spring-lobby/matchmaking-leave
                                      :spring-lobby/matchmaking-join))
                      :client-data client-data
-                     :queue-id queue-id}}]
+                     :queue-id queue-id
+                     :queue-name queue-name}}]
                   (when ready-check
                     [{:fx/type :button
                       :text "Decline"

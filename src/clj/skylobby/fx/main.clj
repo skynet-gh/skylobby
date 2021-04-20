@@ -4,17 +4,19 @@
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
-    [spring-lobby.fs :as fs]))
+    [spring-lobby.fs :as fs]
+    [spring-lobby.util :as u]))
 
 
 (defn valid-servers [by-server]
   (->> (dissoc by-server :local)
-       (remove (comp string/blank? first))))
+       (remove (comp string/blank? first))
+       (filter (comp :accepted second))))
 
 
 (defn main-window
-  [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main server servers
-           spring-isolation-dir]
+  [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main
+           server servers spring-isolation-dir username]
     :as state}]
   (let [valid-servers (valid-servers by-server)
         tab-ids (concat ["local"]
@@ -51,7 +53,8 @@
                :v-box/vgrow :always}
               (select-keys state fx.welcome/welcome-view-keys)
               (-> by-server
-                  (get (first server))
+                  (get (u/server-key {:server-url (first server)
+                                      :username username}))
                   (select-keys [:accepted :client-data]))
               {:selected-tab-channel selected-tab-channel
                :selected-tab-main selected-tab-main})}]

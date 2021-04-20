@@ -17,12 +17,13 @@
     [taoensso.timbre :as log])
   (:import
     (java.nio ByteBuffer)
-    (java.security MessageDigest)
-    (java.util Base64)
     (manifold.stream SplicedStream)))
 
 
 (set! *warn-on-reflection* true)
+
+
+(declare ping-loop)
 
 
 (def ^:dynamic handler handler/handle) ; for overriding in dev
@@ -31,12 +32,6 @@
 ; https://github.com/spring/uberserver/blob/e63fee427136e5bafc1b20c8c984a5c348bc6624/protocol/Protocol.py#L190
 (def compflags "sp b t u cl lu")
   ; ^ found at springfightclub, was "sp u"
-
-
-(defn agent-string []
-  (str u/app-name
-       "-"
-       (u/app-version)))
 
 
 (def default-port 8200)
@@ -135,16 +130,6 @@
             :suffix 0))))))
 
 
-; https://stackoverflow.com/a/39188819/984393
-(defn base64-encode [bs]
-  (.encodeToString (Base64/getEncoder) bs))
-
-; https://gist.github.com/jizhang/4325757
-(defn md5-bytes [^String s]
-  (let [algorithm (MessageDigest/getInstance "MD5")]
-    (.digest algorithm (.getBytes s))))
-
-
 ; https://aleph.io/examples/literate.html#aleph.examples.tcp
 
 (defn wrap-duplex-stream
@@ -180,18 +165,38 @@
         parsed (spring-script/parse-scripttags script-tags-raw)]
     (swap! state-atom update-in [:by-server server-url :battle :scripttags] u/deep-merge parsed)))
 
-(defmethod handler/handle "TASSERVER" [state-atom server-url m]
-  (swap! state-atom assoc-in [:by-server server-url :tas-server] m))
 
-(defmethod handler/handle "TASServer" [state-atom server-url m]
-  (swap! state-atom assoc-in [:by-server server-url :tas-server] m))
+(defn handle-tasserver [state-atom server-key m]
+  (let [state (swap! state-atom assoc-in [:by-server server-key :tas-server] m)
+        client (-> state :by-server (get server-key) :client-data :client)]
+    (message/send-message client "LISTCOMPFLAGS")))
 
-(defmethod handler/handle "ACCEPTED" [state-atom server-url m]
-  (let [[_all username] (re-find #"\w+ (.*)" m)]
-    (swap! state-atom update-in [:by-server server-url]
-           assoc
-           :username username
-           :accepted true)))
+(defmethod handler/handle "TASSERVER" [state-atom server-key m]
+  (handle-tasserver state-atom server-key m))
+
+(defmethod handler/handle "TASServer" [state-atom server-key m]
+  (handle-tasserver state-atom server-key m))
+
+(defmethod handler/handle "ACCEPTED" [state-atom server-key m]
+  (let [[_all username] (re-find #"\w+ (.*)" m)
+        state (swap! state-atom
+                (fn [state]
+                  (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
+                    (-> state
+                        (update-in [:by-server server-key]
+                             assoc
+                             :username username
+                             :accepted true)
+                        (update :login-error dissoc server-url)))))
+        client (-> state :by-server (get server-key) :client-data :client)
+        my-channels (-> state :my-channels (get server-key))]
+    (message/send-message client "CHANNELS")
+    (doseq [channel my-channels]
+      (let [[channel-name _] channel]
+        (when-not (or (u/battle-channel-name? channel-name)
+                      (u/user-channel-name? channel-name))
+          (message/send-message client (str "JOIN " channel-name)))))
+    (ping-loop state-atom server-key client)))
 
 (defmethod handler/handle "MOTD" [_state-atom _server-url m]
   (log/trace "motd" m))
@@ -285,35 +290,33 @@
                          (log/error e "Error in print loop"))))]
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
-(defn base64-md5 [password]
-  (base64-encode (md5-bytes password)))
-
 (defn login
   ([client username password]
    (login client "*" username password))
   ([client local-addr username password]
    (when (string/blank? password)
      (throw (ex-info "Password is blank" {:username username})))
-   (let [pw-md5-base64 (base64-md5 password)
+   (let [pw-md5-base64 (u/base64-md5 password)
          user-id 0 ; (rand-int Integer/MAX_VALUE)
          msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                  " " (agent-string) "\t" user-id "\t" compflags)]
+                  " " (u/agent-string) "\t" user-id "\t" compflags)]
      (message/send-message client msg))))
 
 
+(defmethod handler/handle "COMPFLAGS" [state-atom server-key m]
+  (let [[_all remaining] (re-find #"\w+ (.*)" m)
+        compflags (set (string/split remaining #"\s+"))
+        state (swap! state-atom assoc-in [:by-server server-key :compflags] compflags)
+        {:keys [client ssl username password]} (-> state :by-server (get server-key) :client-data)]
+    (if (and ssl (contains? compflags "token-auth"))
+      (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
+      (login client username password))))
+
+
 (defn connect
-  [state-atom {:keys [client-data my-channels password server-key username]}]
+  [state-atom {:keys [client-data server-key]}]
   (let [{:keys [client]} client-data]
-    (print-loop state-atom server-key client)
-    (message/send-message client "LISTCOMPFLAGS")
-    (login client "*" username password)
-    (message/send-message client "CHANNELS")
-    (doseq [channel (get my-channels server-key)]
-      (let [[channel-name _] channel]
-        (when-not (or (u/battle-channel-name? channel-name)
-                      (u/user-channel-name? channel-name))
-          (message/send-message client (str "JOIN " channel-name)))))
-    (ping-loop state-atom server-key client)))
+    (print-loop state-atom server-key client)))
 
 (defn disconnect [^SplicedStream c]
   (log/info "disconnecting")
@@ -323,12 +326,13 @@
   (s/close! c)
   (log/info "connection closed?" (s/closed? c)))
 
-(defmethod handler/handle "DENIED" [state-atom server-url m]
+(defmethod handler/handle "DENIED" [state-atom server-key m]
   (log/info (str "Login denied: '" m "'"))
-  (let [[old-state] (swap-vals! state-atom update-in [:by-server server-url]
+  (let [[old-state] (swap-vals! state-atom
                       (fn [state]
-                        (-> state
-                            (dissoc :client-data)
-                            (assoc :login-error m))))
-        client (-> old-state :by-server (get server-url) :client-data :client)]
+                        (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
+                          (-> state
+                              (update-in [:by-server server-key] dissoc :accepted :client-data)
+                              (assoc-in [:login-error server-url] m)))))
+        client (-> old-state :by-server (get server-key) :client-data :client)]
     (disconnect client)))

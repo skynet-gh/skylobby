@@ -11,7 +11,7 @@
   [#"Beyond All Reason"])
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks mod-update-tasks rapid-data-by-version rapid-download rapid-tasks-by-id rapid-update spring-isolation-dir springfiles-urls update-mods]}]
+(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks rapid-data-by-version rapid-download rapid-tasks-by-id rapid-update spring-isolation-dir springfiles-urls update-mods]}]
   (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
         canonical-path (fs/canonical-path mod-file)]
@@ -27,7 +27,7 @@
      (concat
        (let [severity (cond
                         no-mod-details
-                        (if (or (seq mod-update-tasks) (seq mod-details-tasks))
+                        (if (seq mod-details-tasks)
                           -1 2)
                         :else 0)]
          [{:severity severity
