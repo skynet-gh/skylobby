@@ -17,12 +17,18 @@
                     (fn [[server-key {:keys [battle battles client-data] :as server-data}]]
                       (let [spring-root (or (-> servers (get (:server-url client-data)) :spring-isolation-dir)
                                             spring-isolation-dir)
-                            spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
+                            spring-root-data (get by-spring-root (fs/canonical-path spring-root))
+                            title (or (-> battles (get (:battle-id battle)) :battle-title)
+                                      (name server-key))]
                         {:fx/type :tab
-                         :on-close-request {:event/type :spring-lobby/leave-battle
-                                            :client-data client-data}
+                         :on-close-request
+                         (if (= :local server-key)
+                           {:event/type :spring-lobby/dissoc-in
+                            :path [:by-server :local :battle]}
+                           {:event/type :spring-lobby/leave-battle
+                            :client-data client-data})
                          :graphic {:fx/type :label
-                                   :text (str (-> battles (get (:battle-id battle)) :battle-title))}
+                                   :text (str title)}
                          :content
                          (merge
                            {:fx/type fx.battle/battle-view}
