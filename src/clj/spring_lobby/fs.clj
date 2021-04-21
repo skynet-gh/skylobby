@@ -998,3 +998,30 @@
 
 (defn file-exists? [file-cache f]
   (boolean (:exists (file-status file-cache f))))
+
+(defn file-cache-data [f]
+  (if f
+    {:canonical-path (canonical-path f)
+     :exists (exists f)
+     :is-directory (is-directory? f)
+     :last-modified (last-modified f)}
+    (log/warn (ex-info "stacktrace" {}) "Attempt to update file cache for nil file")))
+
+(defn file-cache-by-path [statuses]
+  (->> statuses
+       (filter some?)
+       (map (juxt :canonical-path identity))
+       (into {})))
+
+(defn update-file-cache!
+  "Updates the file cache in state for this file. This is so that we don't need to do IO in render,
+  and any updates to file statuses here can now cause UI redraws, which is good."
+  [state-atom & fs]
+  (let [statuses (for [f fs]
+                   (let [f (if (string? f)
+                             (io/file f)
+                             f)]
+                     (file-cache-data f)))
+        status-by-path (file-cache-by-path statuses)]
+    (swap! state-atom update :file-cache merge status-by-path)
+    status-by-path))

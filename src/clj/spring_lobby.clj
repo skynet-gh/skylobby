@@ -15,7 +15,6 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
-    [me.raynes.fs :as raynes-fs]
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
@@ -42,15 +41,14 @@
     (javafx.event Event)
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
-    (manifold.stream SplicedStream)
-    (org.apache.commons.io.input CountingInputStream))
+    (manifold.stream SplicedStream))
   (:gen-class))
 
 
 (set! *warn-on-reflection* true)
 
 
-(declare limit-download-status reconcile-engines reconcile-maps reconcile-mods)
+(declare limit-download-status)
 
 
 (def app-version (u/app-version))
@@ -780,33 +778,6 @@
               true)})]
      (fn [] (.close chimer)))))
 
-(defn- file-cache-data [f]
-  (if f
-    {:canonical-path (fs/canonical-path f)
-     :exists (fs/exists f)
-     :is-directory (fs/is-directory? f)
-     :last-modified (fs/last-modified f)}
-    (log/warn (ex-info "stacktrace" {}) "Attempt to update file cache for nil file")))
-
-(defn- file-cache-by-path [statuses]
-  (->> statuses
-       (filter some?)
-       (map (juxt :canonical-path identity))
-       (into {})))
-
-(defn- update-file-cache!
-  "Updates the file cache in state for this file. This is so that we don't need to do IO in render,
-  and any updates to file statuses here can now cause UI redraws, which is good."
-  [& fs]
-  (let [statuses (for [f fs]
-                   (let [f (if (string? f)
-                             (io/file f)
-                             f)]
-                     (file-cache-data f)))
-        status-by-path (file-cache-by-path statuses)]
-    (swap! *state update :file-cache merge status-by-path)
-    status-by-path))
-
 
 (defn- replay-game-type [allyteam-counts]
   (let [one-per-allyteam? (= #{1} (set allyteam-counts))
@@ -986,7 +957,7 @@
   ([state-atom spring-root]
    (swap! state-atom assoc :update-engines true) ; TODO remove
    (log/info "Reconciling engines")
-   (apply update-file-cache! (file-seq (fs/download-dir))) ; TODO move this somewhere
+   (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
@@ -1011,7 +982,7 @@
          to-remove (set
                      (concat missing-files
                              (remove canonical-path-set known-canonical-paths)))]
-     (apply update-file-cache! known-canonical-paths)
+     (apply fs/update-file-cache! state-atom known-canonical-paths)
      (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
      (doseq [engine-dir to-add]
        (log/info "Detecting engine data for" engine-dir)
@@ -1096,7 +1067,7 @@
                                 (remove (comp fs/exists io/file)))
                            (->> all-paths
                                 (remove (comp (partial fs/descendant? spring-root) io/file)))))]
-     (apply update-file-cache! all-paths)
+     (apply fs/update-file-cache! state-atom all-paths)
      (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
                "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
      (when (seq this-round)
@@ -1187,7 +1158,7 @@
                            (->> known-files
                                 (remove (partial fs/descendant? spring-root))
                                 (map fs/canonical-path))))]
-     (apply update-file-cache! map-files)
+     (apply fs/update-file-cache! state-atom map-files)
      (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
      (fs/make-dirs fs/maps-cache-root)
      (when (seq this-round)
@@ -1284,27 +1255,37 @@
     (fn [] (.close chimer))))
 
 
-(defmethod task-handler ::reconcile-engines [_]
+(defn reconcile-engines-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-engines *state spring-root))))
 
-(defmethod task-handler ::reconcile-mods [_]
+(defmethod task-handler ::reconcile-engines [_]
+  (reconcile-engines-all-spring-roots))
+
+
+(defn reconcile-mods-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-mods *state spring-root))))
 
-(defmethod task-handler ::reconcile-maps [_]
+(defmethod task-handler ::reconcile-mods [_]
+  (reconcile-mods-all-spring-roots))
+
+(defn reconcile-maps-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-maps *state spring-root))))
 
+(defmethod task-handler ::reconcile-maps [_]
+  (reconcile-maps-all-spring-roots))
+
 
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
-  (update-file-cache! file))
+  (fs/update-file-cache! *state file))
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
@@ -2122,11 +2103,11 @@
       (finally
         (update-copying source {:status false})
         (update-copying dest {:status false})
-        (update-file-cache! source dest)
+        (fs/update-file-cache! *state source dest)
         (case (:resource-type importable)
-          ::map (reconcile-maps *state spring-isolation-dir)
-          ::mod (reconcile-mods *state spring-isolation-dir)
-          ::engine (reconcile-engines *state spring-isolation-dir)
+          ::map (reconcile-maps-all-spring-roots)
+          ::mod (reconcile-mods-all-spring-roots)
+          ::engine (reconcile-engines-all-spring-roots)
           nil)))))
 
 (defmethod task-handler ::import [e]
@@ -2142,7 +2123,7 @@
         (try
           (git/fetch file)
           (git/reset-hard file battle-mod-git-ref)
-          (reconcile-mods *state)
+          (reconcile-mods-all-spring-roots)
           (catch Exception e
             (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
           (finally
@@ -2502,8 +2483,8 @@
           _ (log/info "Found" (count rapid-repos) "rapid repos")
           rapid-repo-files (map (partial rapid/version-file spring-isolation-dir) rapid-repos)
           new-files (->> rapid-repo-files
-                         (map file-cache-data)
-                         file-cache-by-path)
+                         (map fs/file-cache-data)
+                         fs/file-cache-by-path)
           rapid-versions (->> rapid-repo-files
                               (filter
                                 (fn [f]
@@ -2616,7 +2597,7 @@
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (.waitFor process)
-          (apply update-file-cache! (rapid/sdp-files spring-isolation-dir))
+          (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))
           (add-tasks! *state [{::task-type ::update-rapid-packages}
                               {::task-type ::reconcile-mods}])))
       (catch Exception e
@@ -2630,101 +2611,9 @@
   @(event-handler (assoc task :event/type ::rapid-download)))
 
 
-; https://github.com/dakrone/clj-http/pull/220/files
-(defn- print-progress-bar
-  "Render a simple progress bar given the progress and total. If the total is zero
-   the progress will run as indeterminated."
-  ([progress total] (print-progress-bar progress total {}))
-  ([progress total {:keys [bar-width]
-                    :or   {bar-width 10}}]
-   (if (pos? total)
-     (let [pct (/ progress total)
-           render-bar (fn []
-                        (let [bars (Math/floor (* pct bar-width))
-                              pad (- bar-width bars)]
-                          (str (clojure.string/join (repeat bars "="))
-                               (clojure.string/join (repeat pad " ")))))]
-       (print (str "[" (render-bar) "] "
-                   (int (* pct 100)) "% "
-                   progress "/" total)))
-     (let [render-bar (fn [] (clojure.string/join (repeat bar-width "-")))]
-       (print (str "[" (render-bar) "] "
-                   progress "/?"))))))
-
-(defn- insert-at
-  "Addes value into a vector at an specific index."
-  [v idx value]
-  (-> (subvec v 0 idx)
-      (conj value)
-      (into (subvec v idx))))
-
-(defn- insert-after
-  "Finds an item into a vector and adds val just after it.
-   If needle is not found, the input vector will be returned."
-  [^clojure.lang.APersistentVector v needle value]
-  (let [index (.indexOf v needle)]
-    (if (neg? index)
-      v
-      (insert-at v (inc index) value))))
-
-; https://github.com/dakrone/clj-http/blob/3.x/examples/progress_download.clj
-(defn- wrap-downloaded-bytes-counter
-  "Middleware that provides an CountingInputStream wrapping the stream output"
-  [http-client]
-  (fn [req]
-    (let [resp (http-client req)
-          counter (CountingInputStream. (:body resp))]
-      (merge resp {:body                     counter
-                   :downloaded-bytes-counter counter}))))
-
-
 (defmethod event-handler ::http-download
   [{:keys [dest url]}]
-  (swap! *state assoc-in [:http-download url] {:running true})
-  (log/info "Request to download" url "to" dest)
-  (future
-    (try
-      (fs/make-parent-dirs dest)
-      (clj-http/with-middleware
-        (-> clj-http/default-middleware
-            (insert-after clj-http/wrap-url wrap-downloaded-bytes-counter)
-            (conj clj-http/wrap-lower-case-headers))
-        (let [request (clj-http/get url {:as :stream})
-              ^String content-length (get-in request [:headers "content-length"] "0")
-              length (Integer/valueOf content-length)
-              buffer-size (* 1024 10)]
-          (swap! *state update-in [:http-download url]
-                 merge
-                 {:current 0
-                  :total length})
-          (with-open [^java.io.InputStream input (:body request)
-                      output (io/output-stream dest)]
-            (let [buffer (make-array Byte/TYPE buffer-size)
-                  ^CountingInputStream counter (:downloaded-bytes-counter request)]
-              (loop []
-                (let [size (.read input buffer)]
-                  (when (pos? size)
-                    (.write output buffer 0 size)
-                    (when counter
-                      (try
-                        (dh/with-rate-limiter {:ratelimiter limit-download-status
-                                               :max-wait-ms 0}
-                          (let [current (.getByteCount counter)]
-                            (swap! *state update-in [:http-download url]
-                                   merge
-                                   {:current current
-                                    :total length})))
-                        (catch Exception e
-                          (when-not (:throttled (ex-data e))
-                            (log/warn e "Error updating download status")))))
-                    (recur))))))))
-      (catch Exception e
-        (log/error e "Error downloading" url "to" dest)
-        (raynes-fs/delete dest))
-      (finally
-        (swap! *state assoc-in [:http-download url :running] false)
-        (update-file-cache! dest)
-        (log/info "Finished downloading" url "to" dest)))))
+  (http/download-file *state url dest))
 
 (defn- download-http-resource [{:keys [downloadable spring-isolation-dir]}]
   (log/info "Request to download" downloadable)
@@ -2735,18 +2624,14 @@
          :dest (resource/resource-dest spring-isolation-dir downloadable)
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
-      ::map (reconcile-maps *state)
-      ::mod (reconcile-mods *state)
-      ::engine (reconcile-engines *state)
+      ::map (reconcile-maps-all-spring-roots)
+      ::mod (reconcile-mods-all-spring-roots)
+      ::engine (reconcile-engines-all-spring-roots)
       nil)))
-
-(defmethod event-handler ::http-downloadable
-  [e]
-  (download-http-resource e))
 
 (defmethod task-handler ::http-downloadable
   [task]
-  @(event-handler (assoc task :event/type ::http-downloadable)))
+  @(download-http-resource task))
 
 (defmethod task-handler ::download-and-extract
   [{:keys [downloadable spring-isolation-dir] :as task}]
@@ -2805,7 +2690,7 @@
         (if dest
           (fs/extract-7z-fast file dest)
           (fs/extract-7z-fast file))
-        (reconcile-engines *state)
+        (reconcile-engines-all-spring-roots)
         (catch Exception e
           (log/error e "Error extracting 7z" file))
         (finally
@@ -2991,7 +2876,7 @@
     (log/info "Refreshing spring settings backups dir")
     (try
       (let [files (fs/list-files (fs/spring-settings-root))]
-        (apply update-file-cache! files))
+        (apply fs/update-file-cache! *state files))
       (catch Exception e
         (log/error e "Error refreshing spring settings backups dir")))))
 
@@ -3005,7 +2890,7 @@
                    (fs/exists? dest-dir)))
         (do
           (log/warn "File cache was out of date for" dest-dir)
-          (update-file-cache! dest-dir))
+          (fs/update-file-cache! *state dest-dir))
         (and (fs/exists? dest-dir) (not confirmed))  ; fail safe
         (log/warn "Spring settings backup called to existing dir"
                   dest-dir "but no confirmation")
