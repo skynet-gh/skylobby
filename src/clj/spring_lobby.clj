@@ -50,7 +50,7 @@
 (set! *warn-on-reflection* true)
 
 
-(declare limit-download-status reconcile-engines reconcile-maps reconcile-mods)
+(declare limit-download-status)
 
 
 (def app-version (u/app-version))
@@ -1284,23 +1284,33 @@
     (fn [] (.close chimer))))
 
 
-(defmethod task-handler ::reconcile-engines [_]
+(defn reconcile-engines-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-engines *state spring-root))))
 
-(defmethod task-handler ::reconcile-mods [_]
+(defmethod task-handler ::reconcile-engines [_]
+  (reconcile-engines-all-spring-roots))
+
+
+(defn reconcile-mods-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-mods *state spring-root))))
 
-(defmethod task-handler ::reconcile-maps [_]
+(defmethod task-handler ::reconcile-mods [_]
+  (reconcile-mods-all-spring-roots))
+
+(defn reconcile-maps-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-maps *state spring-root))))
+
+(defmethod task-handler ::reconcile-maps [_]
+  (reconcile-maps-all-spring-roots))
 
 
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
@@ -2124,9 +2134,9 @@
         (update-copying dest {:status false})
         (update-file-cache! source dest)
         (case (:resource-type importable)
-          ::map (reconcile-maps *state spring-isolation-dir)
-          ::mod (reconcile-mods *state spring-isolation-dir)
-          ::engine (reconcile-engines *state spring-isolation-dir)
+          ::map (reconcile-maps-all-spring-roots)
+          ::mod (reconcile-mods-all-spring-roots)
+          ::engine (reconcile-engines-all-spring-roots)
           nil)))))
 
 (defmethod task-handler ::import [e]
@@ -2142,7 +2152,7 @@
         (try
           (git/fetch file)
           (git/reset-hard file battle-mod-git-ref)
-          (reconcile-mods *state)
+          (reconcile-mods-all-spring-roots)
           (catch Exception e
             (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
           (finally
@@ -2735,9 +2745,9 @@
          :dest (resource/resource-dest spring-isolation-dir downloadable)
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
-      ::map (reconcile-maps *state)
-      ::mod (reconcile-mods *state)
-      ::engine (reconcile-engines *state)
+      ::map (reconcile-maps-all-spring-roots)
+      ::mod (reconcile-mods-all-spring-roots)
+      ::engine (reconcile-engines-all-spring-roots)
       nil)))
 
 (defmethod event-handler ::http-downloadable
@@ -2805,7 +2815,7 @@
         (if dest
           (fs/extract-7z-fast file dest)
           (fs/extract-7z-fast file))
-        (reconcile-engines *state)
+        (reconcile-engines-all-spring-roots)
         (catch Exception e
           (log/error e "Error extracting 7z" file))
         (finally
