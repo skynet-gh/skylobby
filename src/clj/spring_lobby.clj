@@ -16,7 +16,6 @@
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
     [me.raynes.fs :as raynes-fs]
-    [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.resource :as resource]
@@ -3147,12 +3146,6 @@
       (catch Exception e
         (log/error e "Error sending message" message "to server")))))
 
-
-(defn multi-server-tab
-  [state]
-  (merge
-    {:fx/type fx.battle/multi-battle-view-keys}
-    state))
 
 (defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-server-tab (.getId event)))

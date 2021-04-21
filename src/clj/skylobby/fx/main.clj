@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [skylobby.fx.multi-server :as fx.multi-server]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
     [spring-lobby.fs :as fs]
@@ -21,7 +22,7 @@
   (let [valid-servers (valid-servers by-server)
         tab-ids (concat ["local"]
                         (map first valid-servers)
-                        #_(when (seq valid-servers) ["multi"]))
+                        (when (seq valid-servers) ["multi"]))
         tab-id-set (set tab-ids)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
                              (.indexOf ^java.util.List tab-ids selected-server-tab))
@@ -84,7 +85,6 @@
                     :maps (:maps spring-root-data)
                     :mods (:mods spring-root-data)}))})
             valid-servers)
-          #_
           (when (seq valid-servers)
             [{:fx/type :tab
               :id "multi"
@@ -94,5 +94,5 @@
                         :style {:-fx-font-size 18}}
               :content
               (merge
-                {:fx/type multi-server-tab}
-                (select-keys state [:map-details :mod-details]))}]))}}]}))
+                {:fx/type fx.multi-server/multi-server-tab}
+                (select-keys state fx.multi-server/multi-server-tab-keys))}]))}}]}))

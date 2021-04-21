@@ -811,37 +811,3 @@
                       :dest-dir spring-isolation-dir
                       :file-cache file-cache
                       :source-dir i}}})}}]}]})}]}]}))
-
-
-(def multi-battle-view-keys
-  (concat
-    battle-view-keys
-    [:singleplayer-battle :singleplayer-battle-map-details :singleplayer-battle-mod-details]))
-
-(defn multi-battle-view
-  [{:keys [battle]}]
-  (if (< 1 (count battle))
-    {:fx/type :tab-pane
-     :style {:-fx-font-size 16}
-     :tabs
-     [{:fx/type :tab
-       :on-close-request {:event/type :spring-lobby/leave-battle
-                          :client-data (:client-data battle)}
-       :graphic {:fx/type :label
-                 :text "Multiplayer"}
-       :content
-       (merge
-         {:fx/type battle-view}
-         battle)}
-      {:fx/type :tab
-       :on-close-request {:event/type :spring-lobby/dissoc
-                          :key :singleplayer-battle}
-       :graphic {:fx/type :label
-                 :text "Singleplayer"}
-       :content
-       (merge
-         {:fx/type battle-view}
-         battle)}]}
-    (merge
-      {:fx/type battle-view}
-      battle)))

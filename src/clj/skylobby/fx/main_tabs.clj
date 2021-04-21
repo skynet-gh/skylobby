@@ -71,7 +71,7 @@
 (def battles-table-keys
   [:battle :battle-password :battles :client-data :selected-battle :server-key :users])
 
-(defn- battles-table [{:keys [battle battle-password battles client-data selected-battle server-key users]}]
+(defn battles-table [{:keys [battle battle-password battles client-data selected-battle server-key users]}]
   {:fx/type fx.ext.table-view/with-selection-props
    :props {:selection-mode :single
            :on-selected-item-changed {:event/type :spring-lobby/select-battle
