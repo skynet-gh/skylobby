@@ -11,6 +11,11 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.10]
+
+- Fix jar main class
+- Fix battle map and mod details retry
+
 ### [0.3.9]
 
 - Fix chat in pop out battle window

@@ -12,10 +12,8 @@
     (javafx.application Platform)))
 
 
-(def uberjar-opts
-  {:jar (str "dist/" u/app-name ".jar")
-   :aot true
-   :main-class "spring-lobby.main"})
+(def default-uberjar-opts
+  {:aot true})
 
 
 (defn pom []
@@ -72,7 +70,7 @@
 
 (def cli-options
   [[nil "--main-class MAIN" "Main class"
-    :default "spring-lobby"]
+    :default "spring-lobby.main"]
    [nil "--jar JAR" "Jar filename"
     :default (str "dist/" u/app-name ".jar")]])
 
@@ -81,7 +79,7 @@
     (pom)
     (fix-pom-version)
     (spit-version-resource)
-    (uberjar (merge uberjar-opts options))
+    (uberjar (merge default-uberjar-opts options))
     (fix-manifest)
     (println "\nSuccessfully built jar, exiting\n")
     (Platform/exit)))

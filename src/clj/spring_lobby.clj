@@ -318,12 +318,12 @@
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :map-details :servers :spring-isolation-dir]))
+    [:by-server :current-tasks :map-details :servers :spring-isolation-dir :tasks]))
 
 (defn- battle-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :mod-details :servers :spring-isolation-dir]))
+    [:by-server :current-tasks :mod-details :servers :spring-isolation-dir :tasks]))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
@@ -515,7 +515,7 @@
           (doseq [[server-key new-server] (-> new-state :by-server seq)]
             (let [old-server (-> old-state :by-server (get server-key))
                   server-url (-> new-server :client-data :server-url)
-                  {:keys [servers spring-isolation-dir]} new-state
+                  {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
                   spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                                   spring-isolation-dir)
                   spring-root-path (fs/canonical-path spring-root)
@@ -526,13 +526,15 @@
                   old-map (-> old-server :battles (get old-battle-id) :battle-map)
                   new-map (-> new-server :battles (get new-battle-id) :battle-map)
                   map-details (-> new-state :map-details (get new-map))
-                  map-changed (not= new-map (:map-name map-details))
-                  map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)]
-              (when (or (and (or (not= old-battle-id new-battle-id)
-                                 (not= old-map new-map))
-                             (and (not (string/blank? new-map))
-                                  (or (not (seq map-details))
-                                      map-changed)))
+                  map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
+                  all-tasks (concat tasks (vals current-tasks))]
+              (when (or (and (and (not (string/blank? new-map))
+                                  (not (seq map-details)))
+                             (or (not= old-battle-id new-battle-id)
+                                 (not= old-map new-map)
+                                 (and
+                                   (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
+                                   map-exists)))
                         (and
                           (or (not (some (comp #{new-map} :map-name) old-maps)))
                           map-exists))
@@ -549,7 +551,7 @@
           (doseq [[server-key new-server] (-> new-state :by-server seq)]
             (let [old-server (-> old-state :by-server (get server-key))
                   server-url (-> new-server :client-data :server-url)
-                  {:keys [servers spring-isolation-dir]} new-state
+                  {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
                   spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                                   spring-isolation-dir)
                   spring-root-path (fs/canonical-path spring-root)
@@ -563,13 +565,15 @@
                   mod-name-set (set [new-mod new-mod-sans-git])
                   filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
                   mod-details (-> new-state :mod-details (get new-mod))
-                  mod-changed (not= new-mod (:mod-name mod-details))
-                  mod-exists (->> new-mods (filter filter-fn) first)]
-              (when (or (and (or (not= old-battle-id new-battle-id)
-                                 (not= old-mod new-mod))
-                             (and (not (string/blank? new-mod))
-                                  (or (not (seq mod-details))
-                                      mod-changed)))
+                  mod-exists (->> new-mods (filter filter-fn) first)
+                  all-tasks (concat tasks (vals current-tasks))]
+              (when (or (and (and (not (string/blank? new-mod))
+                                  (not (seq mod-details)))
+                             (or (not= old-battle-id new-battle-id)
+                                 (not= old-mod new-mod)
+                                 (and
+                                   (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
+                                   mod-exists)))
                         (and
                           (or (not (some (comp #{new-mod} :mod-name) old-mods)))
                           mod-exists))
@@ -1082,7 +1086,7 @@
                                  battle-mods))
                              (fn [f]
                                {:resource-filename (fs/filename f)}))))
-         _ (log/info "Prioritizing mods in battles" priorities)
+         _ (log/info "Prioritizing mods in battles" (pr-str priorities))
          this-round (concat priorities (take 5 todo))
          next-round (drop 5 todo)
          all-paths (filter some? (concat known-file-paths known-rapid-paths))
@@ -1172,7 +1176,7 @@
                                  battle-maps))
                              (fn [f]
                                {:resource-filename (fs/filename f)}))))
-         _ (log/info "Prioritizing maps in battles" priorities)
+         _ (log/info "Prioritizing maps in battles" (pr-str priorities))
          this-round (concat priorities (take 5 todo))
          next-round (drop 5 todo)
          missing-paths (set
@@ -1282,16 +1286,19 @@
 
 (defmethod task-handler ::reconcile-engines [_]
   (let [spring-roots (spring-roots @*state)]
+    (log/info "Reconciling engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-engines *state spring-root))))
 
 (defmethod task-handler ::reconcile-mods [_]
   (let [spring-roots (spring-roots @*state)]
+    (log/info "Reconciling mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-mods *state spring-root))))
 
 (defmethod task-handler ::reconcile-maps [_]
   (let [spring-roots (spring-roots @*state)]
+    (log/info "Reconciling maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (reconcile-maps *state spring-root))))
 
@@ -1666,10 +1673,6 @@
 
 (defmethod event-handler ::host-battle
   [{:keys [client-data scripttags host-battle-state use-springlobby-modname]}]
-  (swap! *state assoc
-         :battle {}
-         :battle-map-details nil
-         :battle-mod-details nil)
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)
