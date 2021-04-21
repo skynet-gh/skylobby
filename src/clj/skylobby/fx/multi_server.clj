@@ -12,10 +12,9 @@
 (defn multi-battle-view
   [{:keys [by-server by-spring-root servers spring-isolation-dir] :as state}]
   (let [tabs (->> by-server
-                  vals
-                  (filter (comp :battle-id :battle))
+                  (filter (comp :battle-id :battle second))
                   (map
-                    (fn [{:keys [battle battles client-data] :as server-data}]
+                    (fn [[server-key {:keys [battle battles client-data] :as server-data}]]
                       (let [spring-root (or (-> servers (get (:server-url client-data)) :spring-isolation-dir)
                                             spring-isolation-dir)
                             spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
@@ -32,7 +31,8 @@
                            {:spring-isolation-dir spring-root
                             :engines (:engines spring-root-data)
                             :maps (:maps spring-root-data)
-                            :mods (:mods spring-root-data)})}))))]
+                            :mods (:mods spring-root-data)
+                            :server-key server-key})}))))]
     (cond
       (empty? tabs) {:fx/type :pane}
       (= 1 (count tabs)) (:content (first tabs))
