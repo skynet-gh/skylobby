@@ -11,6 +11,10 @@ Notable changes and todo list.
 - Hosted replay watching
 - Call Spring unitsync to get resource hashes
 
+### [0.3.11]
+
+- Fix dependency issue with async library
+
 ### [0.3.10]
 
 - Fix jar main class

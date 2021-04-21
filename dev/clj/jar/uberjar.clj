@@ -1,5 +1,6 @@
 (ns uberjar
   (:require
+    clojure.core.async
     [clojure.java.io :as io]
     [clojure.tools.cli :as cli]
     [clojure.tools.cli.api :as deps]
