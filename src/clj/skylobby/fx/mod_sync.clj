@@ -64,9 +64,11 @@
                             (str "No http download found for " battle-modname))
                  :action
                  (when downloadable
-                   {:event/type :spring-lobby/http-downloadable
-                    :downloadable downloadable
-                    :spring-isolation-dir spring-isolation-dir})}]
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/http-downloadable
+                     :downloadable downloadable
+                     :spring-isolation-dir spring-isolation-dir}})}]
                (when (and battle-modname (not (some #(re-find % battle-modname) no-springfiles)))
                  [{:severity 2
                    :text "download"
