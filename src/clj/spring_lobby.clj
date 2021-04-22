@@ -2466,7 +2466,8 @@
   [{:keys [engine-version mod-name spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
-        {:keys [engines file-cache] :as state} @*state ; TODO remove deref
+        {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
+        engines (-> by-spring-root (get (fs/canonical-path spring-isolation-dir)) :engines)
         engine-version (or engine-version (:engine-version state))
         spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         preferred-engine-details (spring/engine-details engines engine-version)
@@ -2531,13 +2532,18 @@
               (update :rapid-versions (fn [old-versions]
                                         (set (concat old-versions rapid-versions))))
               (update :file-cache merge new-files))))
-      (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms")
-      (add-task! *state {::task-type ::update-rapid-packages}))))
+      (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
+    (add-task! *state
+      (merge
+        {::task-type ::update-rapid-packages}
+        (when spring-isolation-dir
+          {:spring-isolation-dir spring-isolation-dir})))))
 
 (defmethod task-handler ::update-rapid-packages
-  [_e]
+  [{:keys [spring-isolation-dir]}]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-data-by-hash spring-isolation-dir]} @*state
+  (let [{:keys [rapid-data-by-hash] :as state} @*state
+        spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         sdp-files (doall (rapid/sdp-files spring-isolation-dir))
         packages (->> sdp-files
                       (filter some?)

@@ -804,8 +804,10 @@
                                 :disable (boolean rapid-update)
                                 :on-action {:event/type :spring-lobby/add-task
                                             :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                                                   :force true
+                                                   :engine-version engine-version
                                                    :mod-name mod-version
-                                                   :force true}}
+                                                   :spring-isolation-dir spring-isolation-dir}}
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-refresh:16:white"}}
