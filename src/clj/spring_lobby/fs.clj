@@ -590,7 +590,9 @@
           :engineoptions (try-file-lua "engineoptions.lua")
           :luaai (try-file-lua "luaai.lua")
           :sidedata (or (try-file-lua "gamedata/sidedata.lua")
-                        (try-file-lua "gamedata/sidedata.tdf"))})))))
+                        (try-file-lua "gamedata/sidedata.tdf")
+                        (u/postprocess-byar-units-en
+                          (try-file-lua "language/units_en.lua")))})))))
 
 (defn read-mod-file
   ([^java.io.File file]

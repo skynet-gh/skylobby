@@ -71,6 +71,13 @@
             :total 1234567890}))))
 
 
+(deftest mod-name-fix-git
+  (is (= "Balanced Annihilation V10.24"
+         (u/mod-name-fix-git "Balanced Annihilation V10.24")))
+  (is (= "Beyond All Reason $VERSION"
+         (u/mod-name-fix-git "Beyond All Reason git:f0cf2cb"))))
+
+
 (deftest format-hours
   (is (= "00:00:00"
          (u/format-hours (.toZoneId (TimeZone/getTimeZone "UTC")) 0))))

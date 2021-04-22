@@ -44,6 +44,7 @@
 
 (def ^:dynamic old-view nil)
 (def ^:dynamic old-handler nil)
+(def ^:dynamic old-task-handler nil)
 (def ^:dynamic old-client-handler nil)
 
 
@@ -57,8 +58,8 @@
 
 (defn view [state]
   (try
-    (require 'spring-lobby)
     (require 'skylobby.fx.root)
+    (require 'spring-lobby)
     (if-let [new-view (var-get (find-var 'skylobby.fx.root/root-view))]
       (when new-view
         (alter-var-root #'old-view (constantly new-view)))
@@ -168,6 +169,21 @@
   context)
 
 
+(defn task-handler [task]
+  (try
+    (require 'spring-lobby)
+    (let [new-handler (var-get (find-var 'spring-lobby/task-handler))]
+      (when new-handler
+        (alter-var-root #'old-task-handler (constantly new-handler))))
+    (catch Throwable e
+      (println e "compile error, using old task handler")))
+  (try
+    (old-task-handler task)
+    (catch Throwable e
+      (println e "exception in old task handler, probably unbound fn, fix asap")
+      (throw e))))
+
+
 (defn client-handler [state-atom server-url message]
   (try
     (require 'spring-lobby.client)
@@ -210,6 +226,9 @@
     (require 'spring-lobby.client.handler)
     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+    (require 'spring-lobby)
+    (alter-var-root #'old-task-handler (constantly (var-get (find-var 'spring-lobby/handle-task))))
+    (alter-var-root (find-var 'spring-lobby/handle-task) (constantly task-handler))
     (let [init-fn (var-get (find-var 'spring-lobby/init))]
       (reset! init-state (init-fn *state))
       (create-renderer))
