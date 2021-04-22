@@ -30,6 +30,12 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+### [0.3.12]
+
+- Fix resources not being reloaded in all Spring directories
+- Add balance and fixcolors buttons
+- Fix an issue starting a game from git
+
 ### [0.3.11]
 
 - Fix dependency issue with async library
