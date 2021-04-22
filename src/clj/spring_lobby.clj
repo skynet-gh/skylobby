@@ -15,6 +15,7 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
+    [skylobby.color :as color]
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
@@ -239,7 +240,7 @@
          (if (string/ends-with? (fs/filename f) ".sdp")
            (rapid/read-sdp-mod f opts)
            (fs/read-mod-file f opts))
-         mod-name (spring/mod-name mod-data)]
+         mod-name (u/mod-name mod-data)]
      (assoc mod-data :mod-name mod-name))))
 
 
@@ -262,18 +263,6 @@
                  (remove (comp #{path} fs/canonical-path :file) mods)
                  mod-details (conj mod-details)))))
     mod-data))
-
-
-(defn- parse-mod-name-git [mod-name]
-  (or (re-find #"(.+)\s([0-9a-f]+)$" mod-name)
-      (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)
-      (re-find #"(.+)\s(\$VERSION)$" mod-name)))
-
-(defn- mod-name-sans-git [mod-name]
-  (when mod-name
-    (if-let [[_all mod-prefix _git] (parse-mod-name-git mod-name)]
-      mod-prefix
-      mod-name)))
 
 
 (defmulti event-handler :event/type)
@@ -559,9 +548,9 @@
                   new-battle-id (-> new-server :battle :battle-id)
                   old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
                   new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
-                  new-mod-sans-git (mod-name-sans-git new-mod)
+                  new-mod-sans-git (u/mod-name-sans-git new-mod)
                   mod-name-set (set [new-mod new-mod-sans-git])
-                  filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+                  filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
                   mod-details (-> new-state :mod-details (get new-mod))
                   mod-exists (->> new-mods (filter filter-fn) first)
                   all-tasks (concat tasks (vals current-tasks))]
@@ -619,9 +608,9 @@
                 old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
                 new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
 
-                new-mod-sans-git (mod-name-sans-git new-mod)
+                new-mod-sans-git (u/mod-name-sans-git new-mod)
                 mod-name-set (set [new-mod new-mod-sans-git])
-                filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+                filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
 
                 map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
                 mod-exists (->> new-mods (filter filter-fn) first)]
@@ -738,6 +727,9 @@
 
 (defmulti task-handler ::task-type)
 
+(def ^:dynamic handle-task task-handler) ; for overriding in dev
+
+
 (defmethod task-handler :default [task]
   (when task
     (log/warn "Unknown task type" task)))
@@ -756,7 +748,7 @@
                                          (disj (set tasks) task)))
                                      (assoc-in [:current-tasks task-kind] task))))))
          task (-> after :current-tasks (get task-kind))]
-     (task-handler task)
+     (handle-task task)
      (when task
        (swap! state-atom update :current-tasks assoc task-kind nil))
      task)))
@@ -1660,11 +1652,9 @@
                   (string/blank? map-name))
       (future
         (try
-          (let [mod-name-parsed (parse-mod-name-git mod-name)
-                [_ mod-prefix _git] mod-name-parsed
-                adjusted-modname (if (and use-springlobby-modname mod-name-parsed)
-                                     (str mod-prefix " $VERSION")
-                                     mod-name)]
+          (let [adjusted-modname (if use-springlobby-modname
+                                   (u/mod-name-fix-git mod-name)
+                                   mod-name)]
             (open-battle client-data (assoc host-battle-state :mod-name adjusted-modname)))
           (when (seq scripttags)
             (client-message client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
@@ -2241,17 +2231,20 @@
 (defn- n-teams [{:keys [client-data] :as e} n]
   (future
     (try
-      (->> e
-           battle-players-and-bots
-           (filter (comp :mode :battle-status)) ; remove spectators
-           shuffle
-           (map-indexed
-             (fn [i id]
-               (let [a (mod i n)
-                     is-bot (boolean (:bot-name id))
-                     is-me (= (:username e) (:username id))]
-                 (apply-battle-status-changes client-data id {:is-me is-me :is-bot is-bot} {:id i :ally a}))))
-           doall)
+      (let [nonspec
+            (->> e
+                 battle-players-and-bots
+                 (filter (comp :mode :battle-status))) ; remove spectators
+            per-team (quot (count nonspec) n)]
+        (->> nonspec
+             shuffle
+             (map-indexed
+               (fn [i id]
+                 (let [a (quot i per-team)
+                       is-bot (boolean (:bot-name id))
+                       is-me (= (:username e) (:username id))]
+                   (apply-battle-status-changes client-data id {:is-me is-me :is-bot is-bot} {:id i :ally a}))))
+             doall))
       (catch Exception e
         (log/error e "Error updating to" n "teams")))))
 
@@ -2449,11 +2442,32 @@
       (catch Exception e
         (log/error e "Error updating battle color")))))
 
+(defmethod event-handler ::battle-balance [{:keys [client-data channel-name]}]
+  (client-message client-data (str "SAY " channel-name " !balance")))
+
+(defmethod event-handler ::battle-fix-colors
+  [{:keys [am-host client-data channel-name] :as e}]
+  (if am-host
+    (->> e
+         battle-players-and-bots
+         (filter (comp :mode :battle-status)) ; remove spectators
+         (map-indexed
+           (fn [_i {:keys [battle-status] :as id}]
+             (let [is-bot (boolean (:bot-name id))
+                   is-me (= (:username e) (:username id))
+                   color (color/team-color battle-status)
+                   opts {:id id :is-me is-me :is-bot is-bot}]
+               (update-battle-status client-data opts battle-status color))))
+         doall)
+    (client-message client-data (str "SAY " channel-name " !fixcolors"))))
+
+
 (defmethod task-handler ::update-rapid
   [{:keys [engine-version mod-name spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
-        {:keys [engines file-cache] :as state} @*state ; TODO remove deref
+        {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
+        engines (-> by-spring-root (get (fs/canonical-path spring-isolation-dir)) :engines)
         engine-version (or engine-version (:engine-version state))
         spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         preferred-engine-details (spring/engine-details engines engine-version)
@@ -2518,13 +2532,18 @@
               (update :rapid-versions (fn [old-versions]
                                         (set (concat old-versions rapid-versions))))
               (update :file-cache merge new-files))))
-      (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms")
-      (add-task! *state {::task-type ::update-rapid-packages}))))
+      (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
+    (add-task! *state
+      (merge
+        {::task-type ::update-rapid-packages}
+        (when spring-isolation-dir
+          {:spring-isolation-dir spring-isolation-dir})))))
 
 (defmethod task-handler ::update-rapid-packages
-  [_e]
+  [{:keys [spring-isolation-dir]}]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-data-by-hash spring-isolation-dir]} @*state
+  (let [{:keys [rapid-data-by-hash] :as state} @*state
+        spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         sdp-files (doall (rapid/sdp-files spring-isolation-dir))
         packages (->> sdp-files
                       (filter some?)

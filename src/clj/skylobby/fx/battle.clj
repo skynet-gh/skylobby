@@ -528,6 +528,28 @@
                :alignment :center-left
                :children
                (concat
+                 (when-not am-host
+                   [{:fx/type :button
+                     :text "Balance"
+                     :on-action {:event/type :spring-lobby/battle-balance
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :users users
+                                 :username username}}])
+                 [{:fx/type :button
+                   :text "Fix Colors"
+                   :on-action {:event/type :spring-lobby/battle-fix-colors
+                               :am-host am-host
+                               :battle battle
+                               :channel-name channel-name
+                               :client-data (when-not singleplayer client-data)
+                               :users users
+                               :username username}}])}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               (concat
                  (when am-host
                    [{:fx/type :button
                      :text "FFA"

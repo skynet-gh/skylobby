@@ -2,14 +2,39 @@
 
 Notable changes and todo list.
 
-### TODO - future
+## TODO - future
 
-- Merged view of multiple servers
-- File pickers for path configs
-- Auto switch spring settings per server or per game
+Annoyances:
+
+- SpringFiles download button appears before doing a search
+- Tables are not laid out when they get items
+- Chat box does not auto scroll, moves when new messages come in
+- Ally/team numbers start at 0 instead of 1, different from SPADS
+- Path settings are text fields not file pickers
+- Rapid is not updated automatically
+- Engine is not extracted automatically
+
+Features:
+
+- Up arrow in chat and console box should fill in last message
 - Chat URL highlighting, text selection
-- Hosted replay watching
+- Zero-K server protocol
+- Merged view of multiple servers
+- Auto switch spring settings per server or per game
 - Call Spring unitsync to get resource hashes
+
+Server or SPADS changes:
+
+- Hosted replay watching
+
+
+## Actual changelog
+
+### [0.3.12]
+
+- Fix resources not being reloaded in all Spring directories
+- Add balance and fixcolors buttons
+- Fix an issue starting a game from git
 
 ### [0.3.11]
 

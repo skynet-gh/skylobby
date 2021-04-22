@@ -277,11 +277,31 @@
       (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)
       (re-find #"(.+)\s(\$VERSION)$" mod-name)))
 
+(defn mod-name-sans-git [mod-name]
+  (when mod-name
+    (if-let [[_all mod-prefix _git] (parse-mod-name-git mod-name)]
+      mod-prefix
+      mod-name)))
+
 (defn mod-git-ref
   "Returns the git ref from the given mod name, or nil if it does not parse."
   [mod-name]
   (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
     git))
+
+(defn mod-name [{:keys [git-commit-id modinfo]}]
+  (str (:name modinfo) " "
+       (or (when git-commit-id
+             (str "git:" (short-git-commit git-commit-id)))
+           (:version modinfo))))
+
+(defn mod-name-fix-git
+  "Replace git commit with $VERSION for Spring"
+  [mod-name]
+  (let [mod-prefix (mod-name-sans-git mod-name)]
+    (if (not= mod-prefix mod-name)
+      (str mod-prefix " $VERSION")
+      mod-name)))
 
 (defn format-hours
   ([timestamp-millis]

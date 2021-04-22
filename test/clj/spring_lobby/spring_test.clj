@@ -15,7 +15,10 @@
   (testing "no players"
     (is (= expected-script-data
            (assoc-in
-             (spring/script-data battle {:is-host true :game {:myplayername "me"}})
+             (spring/script-data battle
+               {:is-host true
+                :game
+                {:myplayername "me"}})
              [:game :hostip] nil))))
   (testing "player and bot"
     (is (= expected-script-data-players
@@ -23,7 +26,16 @@
              battle-players
              {:is-host true
               :game {:myplayername "me"}
-              :sides {0 "ARM" 1 "CORE"}})))))
+              :sides {0 "ARM" 1 "CORE"}}))))
+  (testing "fix git game name"
+    (is (= (assoc-in expected-script-data [:game :gametype] "Beyond All Reason $VERSION")
+           (assoc-in
+             (spring/script-data
+               (assoc battle :battle-modname "Beyond All Reason git:f0cf2cb")
+               {:is-host true
+                :game
+                {:myplayername "me"}})
+             [:game :hostip] nil)))))
 
 (deftest script-test
   (is (= expected-script-txt

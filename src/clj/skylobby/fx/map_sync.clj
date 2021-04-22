@@ -62,9 +62,11 @@
                             (str "Download " url)))
                :in-progress in-progress
                :action (when (and downloadable (not dest-exists))
-                         {:event/type :spring-lobby/http-downloadable
-                          :downloadable downloadable
-                          :spring-isolation-dir spring-isolation-dir})}])
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          {:spring-lobby/task-type :spring-lobby/http-downloadable
+                           :downloadable downloadable
+                           :spring-isolation-dir spring-isolation-dir}})}])
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/map} :resource-type))

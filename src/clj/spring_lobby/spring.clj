@@ -174,7 +174,8 @@
             (when-let [gametype (if-let [modinfo (:modinfo mod-details)]
                                   (str (:name modinfo) " " (:version modinfo))
                                   (:battle-modname battle))]
-              {:gametype gametype})
+              (let [gametype (u/mod-name-fix-git gametype)]
+                {:gametype gametype}))
             (when-let [hostip (:battle-ip battle)]
               (when-not is-host
                 {:hostip hostip}))
@@ -262,12 +263,6 @@
                                  [k (assoc v :username k :user (get users k))])
                                %)))]
     (merge (get battles (:battle-id battle)) battle)))
-
-(defn mod-name [{:keys [git-commit-id modinfo]}]
-  (str (:name modinfo) " "
-       (or (when git-commit-id
-             (str "git:" (u/short-git-commit git-commit-id)))
-           (:version modinfo))))
 
 ; TODO find a better place for this
 (defn mod-details [mods filter-mod-name]
