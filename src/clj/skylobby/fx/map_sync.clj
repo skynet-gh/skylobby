@@ -8,7 +8,7 @@
 
 (defn map-sync-pane
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
-           import-tasks importables-by-path map-update-tasks maps spring-isolation-dir update-maps]}]
+           import-tasks importables-by-path map-update-tasks maps spring-isolation-dir tasks-by-type]}]
   (let [
         no-map-details (not (seq battle-map-details))
         map-exists (some (comp #{battle-map} :map-name) maps)]
@@ -19,7 +19,7 @@
                      :file (fs/maps-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
                       :task {:spring-lobby/task-type :spring-lobby/reconcile-maps}}
-     :refresh-in-progress (or (seq map-update-tasks) update-maps)
+     :refresh-in-progress (seq map-update-tasks)
      :issues
      (concat
        (let [severity (cond
@@ -42,7 +42,10 @@
                                    first)
                  url (:download-url downloadable)
                  download (get http-download url)
-                 in-progress (:running download)
+                 http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                          (map (comp :download-url :downloadable))
+                                          set)
+                 in-progress (or (:running download) (contains? http-download-tasks url))
                  dest (resource/resource-dest spring-isolation-dir downloadable)
                  dest-exists (fs/file-exists? file-cache dest)
                  severity (if dest-exists -1 2)]

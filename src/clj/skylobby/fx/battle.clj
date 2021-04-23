@@ -40,7 +40,7 @@
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
    :isolation-type :map-filter
    :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :server-key :spring-isolation-dir :spring-settings :springfiles-urls :tasks-by-type :update-engines :update-maps :update-mods :username :users])
+   :rapid-download :rapid-update :server-key :spring-isolation-dir :spring-settings :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
@@ -341,7 +341,7 @@
                           :engine-version engine-version
                           :extract-tasks extract-tasks
                           :engine-update-tasks engine-update-tasks}
-                         (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :update-engines]))
+                         (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-engines]))
                        (merge
                          {:fx/type mod-sync-pane
                           :battle-modname battle-modname
@@ -351,14 +351,14 @@
                           :mod-details-tasks mod-details-tasks
                           :mod-update-tasks mod-update-tasks
                           :rapid-tasks-by-id rapid-tasks-by-id}
-                         (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :rapid-update :spring-isolation-dir :springfiles-urls :update-mods]))
+                         (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))
                        (merge
                          {:fx/type map-sync-pane
                           :battle-map battle-map
                           :battle-map-details battle-map-details
                           :import-tasks import-tasks
                           :map-update-tasks map-update-tasks}
-                         (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :update-maps]))])})])}}
+                         (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
             {:fx/type :pane
              :v-box/vgrow :always}
             {:fx/type :h-box

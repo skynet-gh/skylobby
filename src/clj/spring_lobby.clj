@@ -2677,27 +2677,48 @@
         :spring-isolation-dir spring-isolation-dir})
     (add-task! *state {::task-type ::refresh-replays})))
 
-(defmethod task-handler ::download-springfiles
-  [{:keys [springname spring-isolation-dir]}]
+(defn search-springfiles
+  "Search springfiles.com for the given resource name, returns a string mirror url for the resource,
+  or nil if not found."
+  [{:keys [category springname]}]
   (log/info "Searching springfiles for" springname)
   (let [result (->> (clj-http/get "https://api.springfiles.com/json.php"
-                      {:query-params {:springname springname}
+                      {:query-params
+                       (merge
+                         {:springname springname
+                          :nosensitive "on"
+                          :category (or category "**")})
                        :as :json})
                     :body
                     first)]
-    (if result
-      (if-let [mirror (-> result :mirrors first)]
-        (do
-          (swap! *state assoc-in [:springfiles-urls springname] mirror)
-          (log/info "Found details for" springname "on springfiles" result)
-          @(download-http-resource
-             {:downloadable {:download-url mirror
-                             :resource-filename (:filename result)
-                             :resource-type ::mod} ; TODO other types?
-              :spring-isolation-dir spring-isolation-dir})
-          (add-task! *state {::task-type ::reconcile-mods}))
-        (log/info "No mirror to download" springname "on springfiles" result))
-      (log/info "No result for" springname "on springfiles"))))
+    (log/info "First result for" springname "search on springfiles:" result)
+    (when-let [mirrors (-> result :mirrors seq)]
+      {:filename (:filename result)
+       :mirrors mirrors})))
+
+(defmethod task-handler ::search-springfiles
+  [{:keys [springname] :as e}]
+  (if-not (string/blank? springname)
+    (let [search-result (search-springfiles e)]
+      (log/info "Found details for" springname "on springfiles" search-result)
+      (swap! *state assoc-in [:springfiles-search-results springname] search-result)
+      search-result)
+    (log/warn "No springname to search springfiles" e)))
+
+(defmethod task-handler ::download-springfiles
+  [{:keys [resource-type search-result springname spring-isolation-dir]}]
+  (if-let [{:keys [filename mirrors] :as search-result} (or search-result
+                                                            (search-springfiles springname))]
+    (do
+      (swap! *state assoc-in [:springfiles-search-results springname] search-result)
+      (log/info "Found details for" springname "on springfiles" search-result)
+      (add-task! *state
+        {::task-type ::http-downloadable
+         :downloadable {:download-url (rand-nth mirrors)
+                        :resource-filename filename
+                        :resource-type resource-type}
+         :spring-isolation-dir spring-isolation-dir}))
+    (log/info "No mirror to download" springname "on springfiles")))
 
 
 (defmethod event-handler ::extract-7z

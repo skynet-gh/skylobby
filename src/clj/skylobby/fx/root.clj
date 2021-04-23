@@ -117,7 +117,8 @@
       (merge
         {:fx/type fx.rapid/rapid-download-window
          :screen-bounds screen-bounds}
-        (select-keys state fx.rapid/rapid-download-window-keys))
+        (select-keys state fx.rapid/rapid-download-window-keys)
+        (get by-spring-root (fs/canonical-path spring-isolation-dir)))
       (merge
         {:fx/type fx.replay/replays-window
          :screen-bounds screen-bounds

@@ -77,17 +77,16 @@
 (def replays-window-keys
   [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill :filter-replay-source
    :filter-replay-type :http-download :map-details :mod-details :new-online-replays-count :on-close-request :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
-   :rapid-update
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-watched :replays-window-details :selected-replay-file :selected-replay-id :settings-button
-   :show-replays :spring-isolation-dir :update-engines :update-maps :update-mods])
+   :show-replays :spring-isolation-dir])
 
 (defn replays-window
   [{:keys [bar-replays-page battle-players-color-allyteam by-spring-root copying extra-replay-sources extracting file-cache filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill filter-replay-source
            filter-replay-type http-download map-details mod-details new-online-replays-count on-close-request online-bar-replays parsed-replays-by-path rapid-data-by-version rapid-download
-           rapid-update replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
+           replay-downloads-by-engine replay-downloads-by-map replay-downloads-by-mod
            replay-imports-by-map replay-imports-by-mod replay-minimap-type replays-filter-specs replays-watched replays-window-details screen-bounds selected-replay-file selected-replay-id
-           show-replays spring-isolation-dir tasks-by-type title update-engines update-maps update-mods]}]
+           show-replays spring-isolation-dir tasks-by-type title]}]
   (let [{:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
         local-filenames (->> parsed-replays-by-path
                              vals
@@ -183,6 +182,20 @@
         download-tasks (->> (get tasks-by-type :spring-lobby/download-bar-replay)
                             (map :id)
                             set)
+        http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                 (map (comp :download-url :downloadable))
+                                 set)
+        rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
+                         (map :rapid-id)
+                         set)
+        rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
+                                seq)
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+                                 seq)
+        map-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-maps)
+                              seq)
+        mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
+                              seq)
         {:keys [width height]} screen-bounds
         time-zone-id (.toZoneId (TimeZone/getDefault))
         sources (replay-sources {:extra-replay-sources extra-replay-sources})]
@@ -655,7 +668,7 @@
                                 :graphic
                                 {:fx/type font-icon/lifecycle
                                  :icon-literal "mdi-movie:16:white"}}
-                               (and (not matching-engine) update-engines)
+                               (and (not matching-engine) engine-update-tasks)
                                {:fx/type :button
                                 :text " Engines updating..."
                                 :disable true}
@@ -681,12 +694,14 @@
                                         :file source
                                         :dest dest}}})
                                    (let [{:keys [download-url]} engine-downloadable
-                                         {:keys [running] :as download} (get http-download download-url)]
+                                         {:keys [running] :as download} (get http-download download-url)
+                                         in-progress (or running
+                                                         (contains? http-download-tasks download-url))]
                                      {:fx/type :button
-                                      :text (if running
+                                      :text (if in-progress
                                               (str (u/download-progress download))
                                               " Download engine")
-                                      :disable (boolean running)
+                                      :disable (boolean in-progress)
                                       :on-action {:event/type :spring-lobby/add-task
                                                   :task {:spring-lobby/task-type :spring-lobby/download-and-extract
                                                          :downloadable engine-downloadable
@@ -694,11 +709,7 @@
                                       :graphic
                                       {:fx/type font-icon/lifecycle
                                        :icon-literal "mdi-download:16:white"}})))
-                               (:running mod-rapid-download)
-                               {:fx/type :button
-                                :text (str (u/download-progress mod-rapid-download))
-                                :disable true}
-                               (and (not matching-mod) update-mods)
+                               (and (not matching-mod) mod-update-tasks)
                                {:fx/type :button
                                 :text " Games updating..."
                                 :disable true}
@@ -722,25 +733,31 @@
                                   {:fx/type font-icon/lifecycle
                                    :icon-literal "mdi-content-copy:16:white"}})
                                (and (not matching-mod) mod-rapid matching-engine)
-                               {:fx/type :button
-                                :text (str " Download game")
-                                :on-action {:event/type :spring-lobby/add-task
-                                            :task
-                                            {:spring-lobby/task-type :spring-lobby/rapid-download
-                                             :engine-file (:file matching-engine)
-                                             :rapid-id (:id mod-rapid)
-                                             :spring-isolation-dir spring-isolation-dir}}
-                                :graphic
-                                {:fx/type font-icon/lifecycle
-                                 :icon-literal "mdi-download:16:white"}}
+                               (let [in-progress (contains? rapid-tasks (:id mod-rapid))]
+                                 {:fx/type :button
+                                  :text (if in-progress
+                                          (u/download-progress mod-rapid-download)
+                                          (str " Download game"))
+                                  :disable in-progress
+                                  :on-action {:event/type :spring-lobby/add-task
+                                              :task
+                                              {:spring-lobby/task-type :spring-lobby/rapid-download
+                                               :engine-file (:file matching-engine)
+                                               :rapid-id (:id mod-rapid)
+                                               :spring-isolation-dir spring-isolation-dir}}
+                                  :graphic
+                                  {:fx/type font-icon/lifecycle
+                                   :icon-literal "mdi-download:16:white"}})
                                (and (not matching-mod) mod-downloadable)
                                (let [{:keys [download-url]} mod-downloadable
-                                     {:keys [running] :as download} (get http-download download-url)]
+                                     {:keys [running] :as download} (get http-download download-url)
+                                     in-progress (or running
+                                                     (contains? http-download-tasks download-url))]
                                  {:fx/type :button
-                                  :text (if running
+                                  :text (if in-progress
                                           (str (u/download-progress download))
                                           " Download game")
-                                  :disable (boolean running)
+                                  :disable (boolean in-progress)
                                   :on-action {:event/type :spring-lobby/add-task
                                               :task {:spring-lobby/task-type :spring-lobby/http-downloadable
                                                      :downloadable mod-downloadable
@@ -748,7 +765,7 @@
                                   :graphic
                                   {:fx/type font-icon/lifecycle
                                    :icon-literal "mdi-download:16:white"}})
-                               (and (not matching-map) update-maps)
+                               (and (not matching-map) map-update-tasks)
                                {:fx/type :button
                                 :text " Maps updating..."
                                 :disable true}
@@ -778,12 +795,14 @@
                                    :icon-literal "mdi-content-copy:16:white"}})
                                (and (not matching-map) map-downloadable)
                                (let [{:keys [download-url]} map-downloadable
-                                     {:keys [running] :as download} (get http-download download-url)]
+                                     {:keys [running] :as download} (get http-download download-url)
+                                     in-progress (or running
+                                                     (contains? http-download-tasks download-url))]
                                  {:fx/type :button
-                                  :text (if running
+                                  :text (if in-progress
                                           (str (u/download-progress download))
                                           " Download map")
-                                  :disable (boolean running)
+                                  :disable (boolean in-progress)
                                   :on-action
                                   {:event/type :spring-lobby/add-task
                                    :task
@@ -797,20 +816,23 @@
                                {:fx/type :label
                                 :text " No engine"}
                                (not matching-mod)
-                               {:fx/type :button
-                                :text (if rapid-update
-                                        " Updating rapid..."
-                                        " Update rapid")
-                                :disable (boolean rapid-update)
-                                :on-action {:event/type :spring-lobby/add-task
-                                            :task {:spring-lobby/task-type :spring-lobby/update-rapid
-                                                   :force true
-                                                   :engine-version engine-version
-                                                   :mod-name mod-version
-                                                   :spring-isolation-dir spring-isolation-dir}}
-                                :graphic
-                                {:fx/type font-icon/lifecycle
-                                 :icon-literal "mdi-refresh:16:white"}}
+                               (if (string/ends-with? mod-version "$VERSION")
+                                 {:fx/type :label
+                                  :text " Unknown game version "}
+                                 {:fx/type :button
+                                  :text (if rapid-update-tasks
+                                          " Updating rapid..."
+                                          " Update rapid")
+                                  :disable (boolean rapid-update-tasks)
+                                  :on-action {:event/type :spring-lobby/add-task
+                                              :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                                                     :force true
+                                                     :engine-version engine-version
+                                                     :mod-name mod-version
+                                                     :spring-isolation-dir spring-isolation-dir}}
+                                  :graphic
+                                  {:fx/type font-icon/lifecycle
+                                   :icon-literal "mdi-refresh:16:white"}})
                                (not matching-map)
                                {:fx/type :button
                                 :text " No map, update downloads"

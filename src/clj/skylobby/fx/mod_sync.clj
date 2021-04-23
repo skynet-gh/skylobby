@@ -11,7 +11,7 @@
   [#"Beyond All Reason"])
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks rapid-data-by-version rapid-download rapid-tasks-by-id rapid-update spring-isolation-dir springfiles-urls update-mods]}]
+(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir springfiles-search-results tasks-by-type update-mods]}]
   (let [no-mod-details (not (seq battle-mod-details))
         mod-file (:file battle-mod-details)
         canonical-path (fs/canonical-path mod-file)]
@@ -47,8 +47,13 @@
                  in-progress (-> http-download (get download-url) :running)
                  {:keys [download-source-name download-url]} downloadable
                  file-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
-                 springfiles-url (get springfiles-urls battle-modname)
-                 springfiles-download (get http-download springfiles-url)
+                 springname battle-modname
+                 springfiles-searched (contains? springfiles-search-results springname)
+                 springfiles-search-result (get springfiles-search-results springname)
+                 springfiles-download (->> http-download
+                                           (filter (comp (set (:mirror springfiles-search-result)) first))
+                                           first
+                                           second)
                  springfiles-in-progress (:running springfiles-download)]
              (if downloadable
                [{:severity (if file-exists -1 2)
@@ -71,35 +76,51 @@
                      :spring-isolation-dir spring-isolation-dir}})}]
                (when (and battle-modname (not (some #(re-find % battle-modname) no-springfiles)))
                  [{:severity 2
-                   :text "download"
+                   :text "springfiles"
                    :human-text (if springfiles-in-progress
                                  (u/download-progress springfiles-download)
-                                 "Download from springfiles")
+                                 (if springfiles-searched
+                                   (if springfiles-search-result
+                                     "Download from springfiles"
+                                     "Not found on springfiles")
+                                   "Search springfiles"))
                    :in-progress springfiles-in-progress
                    :action
-                   {:event/type :spring-lobby/add-task
-                    :task
-                    {:spring-lobby/task-type :spring-lobby/download-springfiles
-                     :springname battle-modname
-                     :spring-isolation-dir spring-isolation-dir}}}])))
+                   (when (or (not springfiles-searched) springfiles-search-result)
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      (if springfiles-searched
+                        {:spring-lobby/task-type :spring-lobby/download-springfiles
+                         :resource-type :spring-lobby/mod
+                         :search-result springfiles-search-result
+                         :springname springname
+                         :spring-isolation-dir spring-isolation-dir}
+                        {:spring-lobby/task-type :spring-lobby/search-springfiles
+                         :springname springname})})}])))
            (let [rapid-data (get rapid-data-by-version battle-modname)
                  rapid-id (:id rapid-data)
                  rapid-download (get rapid-download rapid-id)
                  running (some? (get rapid-tasks-by-id rapid-id))
                  sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
-                 package-exists (fs/file-exists? file-cache sdp-file)]
-             [{:severity 2 ;(if package-exists -1 2)
+                 package-exists (fs/file-exists? file-cache sdp-file)
+                 rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
+                                  (map :rapid-id)
+                                  set)
+                 rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
+                                         seq)
+                 in-progress (or running
+                                 rapid-update-tasks
+                                 (contains? rapid-tasks rapid-id))]
+             [{:severity 2
                :text "rapid"
                :human-text (if rapid-id
                              (if engine-file
                                (cond
-                                 ;package-exists (str "Package downloaded, reading")
-                                 rapid-update "Rapid updating..."
-                                 running (str (u/download-progress rapid-download))
-                                 :else
-                                 (str "Download rapid " rapid-id))
+                                 rapid-update-tasks "Rapid updating..."
+                                 in-progress (str (u/download-progress rapid-download))
+                                 :else (str "Download rapid " rapid-id))
                                "Needs engine first to download with rapid")
-                             (if rapid-update
+                             (if rapid-update-tasks
                                "Rapid updating..."
                                (if engine-file
                                  "No rapid download, update rapid"
@@ -112,7 +133,7 @@
                                    " using engine " (:engine-version engine-details)))
                             "Rapid requires an engine to work, get engine first")
                           (str "No rapid download found for" battle-modname))
-               :in-progress (or running rapid-update (and package-exists update-mods))
+               :in-progress in-progress
                :action
                (cond
                  (not engine-file) nil
