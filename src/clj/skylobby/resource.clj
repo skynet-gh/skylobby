@@ -80,11 +80,13 @@
                 (normalize-mod resource-filename))))))
 
 (defn same-resource-file? [resource1 resource2]
-  (and (:resource-file resource1)
-       (= (:resource-file resource1)
-          (:resource-file resource2))))
+  (boolean
+    (and (:resource-file resource1)
+         (= (:resource-file resource1)
+            (:resource-file resource2)))))
 
 (defn same-resource-filename? [resource1 resource2]
-  (and (:resource-filename resource1)
-       (= (:resource-filename resource1)
-          (:resource-filename resource2))))
+  (boolean
+    (and (:resource-filename resource1)
+         (= (:resource-filename resource1)
+            (:resource-filename resource2)))))

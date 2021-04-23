@@ -11,6 +11,39 @@
          expected-script-txt expected-script-txt-players)
 
 
+(deftest startpostype-name
+  (is (= "Fixed"
+         (spring/startpostype-name 0)))
+  (is (= "Choose before game"
+         (spring/startpostype-name 3))))
+
+
+(deftest normalize-team
+  (is (= :team1
+         (spring/normalize-team :team1)))
+  (is (= :team1
+         (spring/normalize-team :1)))
+  (is (= :team1
+         (spring/normalize-team "1")))
+  (is (= :team1
+         (spring/normalize-team "team1"))))
+
+
+(deftest script-data-client
+  (is (= {:game
+          {:hostip "127.0.0.1"
+           :hostport 12345
+           :ishost 0
+           :mypasswd "secret-password"
+           :myplayername "skynet"}}
+         (spring/script-data-client
+           {:battle-ip "127.0.0.1"
+            :battle-port 12345
+            :script-password "secret-password"}
+           {:game
+            {:myplayername "skynet"}}))))
+
+
 (deftest script-data
   (testing "no players"
     (is (= expected-script-data
@@ -52,6 +85,13 @@
         (let [diff (clojure.data/diff (string/split-lines expected) (string/split-lines actual))]
           (println "diff:")
           (pprint diff))))))
+
+
+(deftest engine-details
+  (is (= nil
+         (spring/engine-details [] nil)))
+  (is (= {:engine-version "12345"}
+         (spring/engine-details [{:engine-version "1234"} {:engine-version "12345"} {}] "12345"))))
 
 
 (def battle

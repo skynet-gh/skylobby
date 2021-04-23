@@ -50,6 +50,8 @@
         (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
             URL. .openStream Manifest. .getMainAttributes
             (.getValue "Build-Number"))))
+    (catch ClassNotFoundException _e
+      (log/info "Class not found, assuming running in dev and not as a jar"))
     (catch Exception e
       (log/debug e "Unable to read version from manifest"))))
 
@@ -184,24 +186,6 @@
   (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
 
 
-(defn update-console-log [state-atom source client message]
-  (swap! state-atom
-    (fn [state]
-      (let [server-url (->> state  ; TODO fix hack
-                            :by-server
-                            (filter #(identical? (-> % second :client) client))
-                            first
-                            first)]
-        (if server-url
-          (update-in state [:by-server server-url :console-log]
-            (fn [console-log]
-              (conj console-log {:timestamp (curr-millis)
-                                 :source source
-                                 :message message})))
-          (do
-            (log/warn "No server-url found for message:" message)
-            state))))))
-
 (defn server-key [{:keys [server-url username]}]
   (str username "@" server-url))
 
@@ -257,12 +241,14 @@
 (defn javafx-color-to-spring
   "Returns the spring bgr int color format from a javafx color."
   [^javafx.scene.paint.Color color]
-  (colors/rgba-int
-    (colors/create-color
-      {:r (Math/round (* 255 (.getBlue color)))  ; switch blue to red
-       :g (Math/round (* 255 (.getGreen color)))
-       :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
-       :a 0})))
+  (if color
+    (colors/rgba-int
+      (colors/create-color
+        {:r (Math/round (* 255 (.getBlue color)))  ; switch blue to red
+         :g (Math/round (* 255 (.getGreen color)))
+         :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
+         :a 0}))
+    0))
 
 (defn download-progress
   [{:keys [current total]}]
@@ -332,6 +318,7 @@
                 :r (int (* 255 (Double/parseDouble b)))
                 :g (int (* 255 (Double/parseDouble g)))
                 :b (int (* 255 (Double/parseDouble r))))]
+    color
     (colors/rgba-int color)))
 
 

@@ -8,13 +8,13 @@
 
 
 (defn engine-sync-pane
-  [{:keys [copying downloadables-by-url engine-details engine-file engine-update-tasks engine-version extract-tasks extracting file-cache http-download importables-by-path spring-isolation-dir update-engines]}]
+  [{:keys [copying downloadables-by-url engine-details engine-file engine-update-tasks engine-version extract-tasks extracting file-cache http-download importables-by-path spring-isolation-dir springfiles-search-results]}]
   {:fx/type sync-pane
    :h-box/margin 8
    :resource "Engine"
    :refresh-action {:event/type :spring-lobby/add-task
                     :task {:spring-lobby/task-type :spring-lobby/reconcile-engines}}
-   :refresh-in-progress (or (seq engine-update-tasks) update-engines)
+   :refresh-in-progress (seq engine-update-tasks)
    :browse-action {:event/type :spring-lobby/desktop-browse-dir
                    :file (or engine-file
                              (fs/engines-dir spring-isolation-dir))}
@@ -22,7 +22,7 @@
    (concat
      (let [severity (if engine-details
                       0
-                      (if (or (seq engine-update-tasks) update-engines)
+                      (if (seq engine-update-tasks)
                         -1 2))]
        [{:severity severity
          :text "info"
@@ -79,6 +79,41 @@
                :action {:event/type :spring-lobby/extract-7z
                         :file dest
                         :dest extract-target}}]))))
+     (when-not engine-details
+       (let [springname (str "Spring " engine-version)
+             springfiles-searched (contains? springfiles-search-results springname)
+             springfiles-search-result (get springfiles-search-results springname)
+             springfiles-download (->> http-download
+                                       (filter (comp (set (:mirrors springfiles-search-result)) first))
+                                       first
+                                       second)
+             springfiles-in-progress (:running springfiles-download)]
+         [{:severity 2
+           :text "springfiles"
+           :human-text (if springfiles-in-progress
+                         (u/download-progress springfiles-download)
+                         (if springfiles-searched
+                           (if springfiles-search-result
+                             "Download from springfiles"
+                             "Not found on springfiles")
+                           "Search springfiles"))
+           :in-progress springfiles-in-progress
+           :action
+           (when (or (not springfiles-searched) springfiles-search-result)
+             {:event/type :spring-lobby/add-task
+              :task
+              (if springfiles-searched
+                {:spring-lobby/task-type :spring-lobby/download-springfiles
+                 :resource-type :spring-lobby/engine
+                 :search-result springfiles-search-result
+                 :springname springname
+                 :spring-isolation-dir spring-isolation-dir}
+                {:spring-lobby/task-type :spring-lobby/search-springfiles
+                 :category (cond
+                             (fs/windows?) "engine_windows*"
+                             (fs/linux?) "engine_linux*"
+                             :else "**")
+                 :springname springname})})}]))
      (when-not engine-details
        (let [importable (some->> importables-by-path
                                  vals

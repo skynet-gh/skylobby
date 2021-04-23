@@ -6,18 +6,22 @@ Notable changes and todo list.
 
 Annoyances:
 
-- SpringFiles download button appears before doing a search
 - Tables are not laid out when they get items
 - Chat box does not auto scroll, moves when new messages come in
 - Ally/team numbers start at 0 instead of 1, different from SPADS
 - Path settings are text fields not file pickers
 - Rapid is not updated automatically
 - Engine is not extracted automatically
+- Downloads and other tasks cannot be cancelled
+- Task workers run every second, can just be state watchers
 
 Features:
 
 - Up arrow in chat and console box should fill in last message
+- Highlight window and tabs when rang or new direct message
+- Add new butler downloader system
 - Chat URL highlighting, text selection
+- Away mode, auto or manual
 - Zero-K server protocol
 - Merged view of multiple servers
 - Auto switch spring settings per server or per game
@@ -29,6 +33,15 @@ Server or SPADS changes:
 
 
 ## Actual changelog
+
+
+### [0.3.13]
+
+- Improve feedback for when downloads and imports start
+- Fix replays rapid download and git version action
+- Fix rapid download window
+- Fix SpringFiles download button appearing before doing a search
+- Add more unit tests
 
 ### [0.3.12]
 

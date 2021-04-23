@@ -49,7 +49,7 @@
      :showing (boolean show-rapid-downloader)
      :title (str u/app-name " Rapid Downloader")
      :icons skylobby.fx/icons
-     :on-close-request {:event/type :dissoc
+     :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-rapid-downloader}
      :width (min rapid-download-window-width width)
      :height (min rapid-download-window-height height)
