@@ -3,7 +3,8 @@
     [clojure.test :refer [deftest is]]
     [spring-lobby.util :as u])
   (:import
-    (java.util TimeZone)))
+    (java.util TimeZone)
+    (javafx.scene.paint Color)))
 
 
 (deftest battle-channel-name?
@@ -12,16 +13,15 @@
   (is (false? (u/battle-channel-name? "main"))))
 
 
-(deftest update-console-log
-  (let [state-atom (atom {:by-server {"localhost" {:client :fake-client}
+(deftest append-console-log
+  (let [state-atom (atom {:by-server {"skynet@localhost" {}
                                       "other" {}}})
         now 12345]
     (with-redefs [u/curr-millis (constantly now)]
-      (u/update-console-log state-atom :server :fake-client "message"))
+      (u/append-console-log state-atom "skynet@localhost" :server "message"))
     (is (= {:by-server
-            {"localhost"
-             {:client :fake-client
-              :console-log [{:message "message"
+            {"skynet@localhost"
+             {:console-log [{:message "message"
                              :timestamp now
                              :source :server}]}
              "other" {}}}
@@ -58,6 +58,22 @@
             :owner "skynet"}))))
 
 
+(deftest spring-color-to-javafx
+  (is (= "0x000000ff"
+         (str
+           (u/spring-color-to-javafx nil))))
+  (is (= "0x393000ff"
+         (str
+           (u/spring-color-to-javafx 12345)))))
+
+
+(deftest javafx-color-to-spring
+  (is (= 0
+         (u/javafx-color-to-spring nil)))
+  (is (= 12345
+         (u/javafx-color-to-spring (Color/web "0x393000ff")))))
+
+
 (deftest download-progress
   (is (= "Downloading..."
          (u/download-progress nil)))
@@ -81,3 +97,35 @@
 (deftest format-hours
   (is (= "00:00:00"
          (u/format-hours (.toZoneId (TimeZone/getTimeZone "UTC")) 0))))
+
+
+(deftest format-datetime
+  (is (= "19700101-000000"
+         (u/format-datetime (.toZoneId (TimeZone/getTimeZone "UTC")) 0))))
+
+
+(deftest non-battle-channels
+  (is (= [{:channel-name "@skynet"}
+          {:channel-name "main"}]
+         (u/non-battle-channels
+           [{:channel-name "@skynet"}
+            {:channel-name "main"}
+            {:channel-name "__battle__12345"}]))))
+
+
+(deftest spring-script-color-to-int
+  (is (= 4278190080 ; 255 alpha
+         (u/spring-script-color-to-int "0.0 0.0 0.0")))
+  (is (= 4287518238
+         (u/spring-script-color-to-int "0.12 0.34 0.56"))))
+
+
+(deftest base64-md5
+  (is (= "1B2M2Y8AsgTpgAmY7PhCfg=="
+         (u/base64-md5 ""))))
+
+
+(deftest agent-string
+  (is (= "skylobby-git:1234567"
+         (with-redefs [u/short-git-commit (constantly "1234567")]
+           (u/agent-string)))))
