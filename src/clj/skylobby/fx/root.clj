@@ -113,7 +113,8 @@
       (merge
         {:fx/type fx.maps/maps-window
          :screen-bounds screen-bounds}
-        (select-keys state fx.maps/maps-window-keys))
+        (select-keys state fx.maps/maps-window-keys)
+        server-data)
       (merge
         {:fx/type fx.rapid/rapid-download-window
          :screen-bounds screen-bounds}
