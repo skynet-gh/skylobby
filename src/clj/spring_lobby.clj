@@ -2228,22 +2228,32 @@
         (log/error e "Error applying battle status changes")))))
 
 
+(defn balance-teams [battle-players-and-bots teams-count]
+  (let [nonspec (->> battle-players-and-bots
+                     (filter (comp u/to-bool :mode :battle-status)))] ; remove spectators
+    (->> nonspec
+         shuffle
+         (map-indexed
+           (fn [i id]
+             (let [ally (mod i teams-count)]
+               {:id id
+                :opts {:is-bot (boolean (:bot-name id))}
+                :status-changes {:ally ally}})))
+         (sort-by (comp :ally :status-changes))
+         (map-indexed
+           (fn [i data]
+             (assoc-in data [:status-changes :id] i))))))
+
+
 (defn- n-teams [{:keys [client-data] :as e} n]
   (future
     (try
-      (let [nonspec
-            (->> e
-                 battle-players-and-bots
-                 (filter (comp :mode :battle-status))) ; remove spectators
-            per-team (quot (count nonspec) n)]
-        (->> nonspec
-             shuffle
-             (map-indexed
-               (fn [i id]
-                 (let [a (quot i per-team)
-                       is-bot (boolean (:bot-name id))
-                       is-me (= (:username e) (:username id))]
-                   (apply-battle-status-changes client-data id {:is-me is-me :is-bot is-bot} {:id i :ally a}))))
+      (let [new-teams (balance-teams (battle-players-and-bots e) n)]
+        (->> new-teams
+             (map
+               (fn [{:keys [id opts status-changes]}]
+                 (let [is-me (= (:username e) (:username id))]
+                   (apply-battle-status-changes client-data (assoc id :is-me is-me) opts status-changes))))
              doall))
       (catch Exception e
         (log/error e "Error updating to" n "teams")))))
