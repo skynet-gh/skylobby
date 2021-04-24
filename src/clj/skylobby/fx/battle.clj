@@ -38,14 +38,14 @@
   [:archiving :auto-get-resources :battles :battle :battle-players-color-allyteam :bot-name
    :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client-data :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version
    :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
-   :isolation-type :map-filter
+   :isolation-type
    :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
    :rapid-download :rapid-update :server-key :spring-isolation-dir :spring-settings :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods :username :users])
 
 (defn battle-view
   [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
            channels chat-auto-scroll client-data downloadables-by-url
-           drag-allyteam drag-team engine-filter engines file-cache http-download map-filter
+           drag-allyteam drag-team engine-filter engines file-cache http-download
            map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server-key
            spring-isolation-dir spring-settings tasks-by-type users username]
     :as state}]
@@ -281,7 +281,7 @@
                      {:fx/type maps-view
                       :downloadables-by-url downloadables-by-url
                       :http-downloads http-download
-                      :map-filter map-filter
+                      :map-input-prefix map-input-prefix
                       :map-name battle-map
                       :maps maps
                       :tasks-by-type tasks-by-type
@@ -326,7 +326,7 @@
                           :alignment :center-left
                           :children
                           [{:fx/type maps-view
-                            :map-filter map-filter
+                            :map-input-prefix map-input-prefix
                             :map-name battle-map
                             :maps maps
                             :spring-isolation-dir spring-isolation-dir
