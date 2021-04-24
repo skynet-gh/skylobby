@@ -11,8 +11,8 @@
   [#"Beyond All Reason"])
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path mod-details-tasks rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir springfiles-search-results tasks-by-type update-mods]}]
-  (let [no-mod-details (not (seq battle-mod-details))
+(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path indexed-mod mod-update-tasks rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir springfiles-search-results tasks-by-type]}]
+  (let [no-mod-details (not (resource/details? battle-mod-details))
         mod-file (:file battle-mod-details)
         canonical-path (fs/canonical-path mod-file)]
     {:fx/type sync-pane
@@ -22,12 +22,12 @@
                      :file (fs/mods-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
                       :task {:spring-lobby/task-type :spring-lobby/reconcile-mods}}
-     :refresh-in-progress update-mods
+     :refresh-in-progress mod-update-tasks
      :issues
      (concat
        (let [severity (cond
                         no-mod-details
-                        (if (seq mod-details-tasks)
+                        (if indexed-mod
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -35,8 +35,10 @@
            :human-text battle-modname
            :tooltip (if (zero? severity)
                       canonical-path
-                      (str "Game '" battle-modname "' not found locally"))}])
-       (when (and no-mod-details (empty? mod-details-tasks))
+                      (if indexed-mod
+                        (str "Loading mod details for '" battle-modname "'")
+                        (str "Game '" battle-modname "' not found locally")))}])
+       (when (and no-mod-details (not indexed-mod))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals

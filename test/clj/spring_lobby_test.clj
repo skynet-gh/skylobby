@@ -112,3 +112,92 @@
               :numteams "2",
               :startpostype "2"}}}
            (:body (spring-lobby/process-bar-replay (second replays)))))))
+
+
+(deftest balance-teams
+  (is (= []
+         (spring-lobby/balance-teams nil 2)))
+  (let [players [{:battle-status {:ally 0
+                                  :id 0
+                                  :mode 1}
+                  :username "skynet"}
+                 {:ai-name "NullAI"
+                  :ai-version "0.1"
+                  :battle-status {:ally 3
+                                  :id 3
+                                  :mode 1}
+                  :bot-name "bot1"
+                  :owner "skynet"
+                  :user {:client-status {:bot true}}}
+                 {:ai-name "NullAI"
+                  :ai-version "0.1"
+                  :battle-status {:ally 4
+                                  :id 4
+                                  :mode 1}
+                  :bot-name "bot2"
+                  :owner "skynet"
+                  :user {:client-status {:bot true}}}
+                 {:ai-name "NullAI"
+                  :ai-version "0.1"
+                  :battle-status {:ally 1
+                                  :id 1
+                                  :mode 1}
+                  :bot-name "bot3"
+                  :owner "skynet"
+                  :user {:client-status {:bot true}}}
+                 {:ai-name "NullAI"
+                  :ai-version "0.1"
+                  :battle-status {:ally 2
+                                  :id 2
+                                  :mode 1}
+                  :bot-name "bot4"
+                  :owner "skynet"
+                  :user {:client-status {:bot true}}}]]
+    (is (= [{:ally 0
+             :id 0}
+            {:ally 0
+             :id 1}
+            {:ally 0
+             :id 2}
+            {:ally 1
+             :id 3}
+            {:ally 1
+             :id 4}]
+           (map :status-changes
+             (spring-lobby/balance-teams players 2))))
+    (is (= [{:ally 0
+             :id 0}
+            {:ally 0
+             :id 1}
+            {:ally 1
+             :id 2}
+            {:ally 1
+             :id 3}
+            {:ally 2
+             :id 4}]
+           (map :status-changes
+             (spring-lobby/balance-teams players 3))))
+    (is (= [{:ally 0
+             :id 0}
+            {:ally 0
+             :id 1}
+            {:ally 1
+             :id 2}
+            {:ally 2
+             :id 3}
+            {:ally 3
+             :id 4}]
+           (map :status-changes
+             (spring-lobby/balance-teams players 4))))
+    (is (= [{:ally 0
+             :id 0}
+            {:ally 1
+             :id 1}
+            {:ally 2
+             :id 2}
+            {:ally 3
+             :id 3}
+            {:ally 4
+             :id 4}]
+           (map :status-changes
+             (spring-lobby/balance-teams players 5))))))

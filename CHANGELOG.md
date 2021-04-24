@@ -9,7 +9,6 @@ Annoyances:
 - Tables are not laid out when they get items
 - Chat box does not auto scroll, moves when new messages come in
 - Ally/team numbers start at 0 instead of 1, different from SPADS
-- Path settings are text fields not file pickers
 - Rapid is not updated automatically
 - Engine is not extracted automatically
 - Downloads and other tasks cannot be cancelled
@@ -17,6 +16,9 @@ Annoyances:
 
 Features:
 
+- Use resource sync for status in battles
+- Open replay files or links
+- Open battle links
 - Up arrow in chat and console box should fill in last message
 - Highlight window and tabs when rang or new direct message
 - Add new butler downloader system
@@ -34,6 +36,16 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.14]
+
+- Fix issue with map and mod details when changing spring dir
+- Use file pickers for dir settings
+- Show spring directories on main screen
+- Fix team number buttons
+- Fix map filtering in singleplayer battle
+- Improve layout of welcome page when in singleplayer battle
+- Fix singleplayer battle engine/mod/map pickers set global choice
 
 ### [0.3.13]
 

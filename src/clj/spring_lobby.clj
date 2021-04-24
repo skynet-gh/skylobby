@@ -42,6 +42,7 @@
     (javafx.event Event)
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
+    (javafx.stage DirectoryChooser)
     (manifold.stream SplicedStream))
   (:gen-class))
 
@@ -236,12 +237,15 @@
   ([f]
    (read-mod-data f nil))
   ([f opts]
-   (let [mod-data
-         (if (string/ends-with? (fs/filename f) ".sdp")
-           (rapid/read-sdp-mod f opts)
-           (fs/read-mod-file f opts))
-         mod-name (u/mod-name mod-data)]
-     (assoc mod-data :mod-name mod-name))))
+   (try
+     (let [mod-data
+           (if (string/ends-with? (fs/filename f) ".sdp")
+             (rapid/read-sdp-mod f opts)
+             (fs/read-mod-file f opts))
+           mod-name (u/mod-name mod-data)]
+       (assoc mod-data :mod-name mod-name))
+     (catch Exception e
+       (log/warn e "Error reading mod details")))))
 
 
 (defn- update-mod [state-atom spring-root-path file]
@@ -305,12 +309,12 @@
 (defn- battle-map-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :current-tasks :map-details :servers :spring-isolation-dir :tasks]))
+    [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks]))
 
 (defn- battle-mod-details-relevant-keys [state]
   (select-keys
     state
-    [:by-server :current-tasks :mod-details :servers :spring-isolation-dir :tasks]))
+    [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks]))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
@@ -334,6 +338,11 @@
   (select-keys
     state
     [:battle :battles]))
+
+(defn- fix-selected-server-relevant-keys [state]
+  (select-keys
+    state
+    [:server :servers]))
 
 
 (defn server-auto-resources [_old-state new-state old-server new-server]
@@ -493,6 +502,7 @@
   (remove-watch state-atom :fix-spring-isolation-dir)
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
+  (remove-watch state-atom :fix-selected-server)
   (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
@@ -512,8 +522,8 @@
                   new-battle-id (-> new-server :battle :battle-id)
                   old-map (-> old-server :battles (get old-battle-id) :battle-map)
                   new-map (-> new-server :battles (get new-battle-id) :battle-map)
-                  map-details (-> new-state :map-details (get new-map))
                   map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
+                  map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
                   all-tasks (concat tasks (vals current-tasks))]
               (when (or (and (and (not (string/blank? new-map))
                                   (not (seq map-details)))
@@ -551,8 +561,8 @@
                   new-mod-sans-git (u/mod-name-sans-git new-mod)
                   mod-name-set (set [new-mod new-mod-sans-git])
                   filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-                  mod-details (-> new-state :mod-details (get new-mod))
                   mod-exists (->> new-mods (filter filter-fn) first)
+                  mod-details (-> new-state :mod-details (get (fs/canonical-path (:file mod-exists))))
                   all-tasks (concat tasks (vals current-tasks))]
               (when (or (and (and (not (string/blank? new-mod))
                                   (not (seq mod-details)))
@@ -694,7 +704,6 @@
               (swap! *state
                 (fn [{:keys [extra-import-sources] :as state}]
                   (-> state
-                      (dissoc :engines :maps :mods :map-details :mod-details)
                       (update :tasks-by-kind
                         add-multiple-tasks
                         [{::task-type ::reconcile-engines}
@@ -722,7 +731,21 @@
             (log/info "Adding" (count tasks) "to auto get resources")
             (add-tasks! *state tasks))
           (catch Exception e
-            (log/error e "Error in :auto-get-resources state watcher")))))))
+            (log/error e "Error in :auto-get-resources state watcher"))))))
+  (add-watch state-atom :fix-selected-server
+    (fn [_k _ref old-state new-state]
+      (when (not= (fix-selected-server-relevant-keys old-state)
+                  (fix-selected-server-relevant-keys new-state))
+        (try
+          (let [{:keys [server servers]} new-state
+                [server-url server-data] server
+                actual-server-data (get servers server-url)]
+            (when (not= server-data actual-server-data)
+              (let [new-server [server-url actual-server-data]]
+                (log/info "Fixing selected server from" server "to" new-server)
+                (swap! state-atom assoc :server new-server))))
+          (catch Exception e
+            (log/error e "Error in :fix-selected-server state watcher")))))))
 
 
 (defmulti task-handler ::task-type)
@@ -1284,8 +1307,12 @@
   (if map-file
     (do
       (log/info "Updating battle map details for" map-name)
-      (let [map-details (or (read-map-details map-data) {})]
-        (swap! *state update :map-details cache/miss map-name map-details)))
+      (let [map-details (or (read-map-details map-data) {:map-name map-name
+                                                         :file map-file
+                                                         :error true
+                                                         :tries 1})] ; TODO inc
+        (log/info "Got map details for" map-name map-file (keys map-details))
+        (swap! *state update :map-details cache/miss (fs/canonical-path map-file) map-details)))
     (do
       (log/info "Map not found, setting empty details for" map-name)
       (swap! *state update :map-details cache/miss map-name {}))))
@@ -1294,8 +1321,12 @@
   (if mod-file
     (do
       (log/info "Updating mod details for" mod-name)
-      (let [mod-details (read-mod-data mod-file)]
-        (swap! *state update :mod-details cache/miss mod-name mod-details)))
+      (let [mod-details (or (read-mod-data mod-file) {:mod-name mod-name
+                                                      :file mod-file
+                                                      :error true
+                                                      :tries 1})] ; TODO inc
+        (log/info "Got mod details for" mod-name mod-file (keys mod-details))
+        (swap! *state update :mod-details cache/miss (fs/canonical-path mod-file) mod-details)))
     (do
       (log/info "Battle mod not found, setting empty details for" mod-name)
       (swap! *state update :mod-details cache/miss mod-name {}))))
@@ -1784,6 +1815,17 @@
         (log/error e "Error browsing url" url)))))
 
 
+; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
+(defmethod event-handler ::file-chooser-spring-root
+  [{:fx/keys [event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
+  (let [window (.getWindow (.getScene (.getTarget event)))
+        chooser (doto (DirectoryChooser.)
+                  (.setTitle "Select Spring Directory")
+                  (.setInitialDirectory spring-isolation-dir))]
+    (when-let [file (.showDialog chooser window)]
+      (log/info "Setting spring isolation dir at" target "to" file)
+      (swap! *state assoc-in target file))))
+
 
 (defmethod event-handler ::battle-password-change
   [{:fx/keys [event]}]
@@ -2228,22 +2270,32 @@
         (log/error e "Error applying battle status changes")))))
 
 
+(defn balance-teams [battle-players-and-bots teams-count]
+  (let [nonspec (->> battle-players-and-bots
+                     (filter (comp u/to-bool :mode :battle-status)))] ; remove spectators
+    (->> nonspec
+         shuffle
+         (map-indexed
+           (fn [i id]
+             (let [ally (mod i teams-count)]
+               {:id id
+                :opts {:is-bot (boolean (:bot-name id))}
+                :status-changes {:ally ally}})))
+         (sort-by (comp :ally :status-changes))
+         (map-indexed
+           (fn [i data]
+             (assoc-in data [:status-changes :id] i))))))
+
+
 (defn- n-teams [{:keys [client-data] :as e} n]
   (future
     (try
-      (let [nonspec
-            (->> e
-                 battle-players-and-bots
-                 (filter (comp :mode :battle-status))) ; remove spectators
-            per-team (quot (count nonspec) n)]
-        (->> nonspec
-             shuffle
-             (map-indexed
-               (fn [i id]
-                 (let [a (quot i per-team)
-                       is-bot (boolean (:bot-name id))
-                       is-me (= (:username e) (:username id))]
-                   (apply-battle-status-changes client-data id {:is-me is-me :is-bot is-bot} {:id i :ally a}))))
+      (let [new-teams (balance-teams (battle-players-and-bots e) n)]
+        (->> new-teams
+             (map
+               (fn [{:keys [id opts status-changes]}]
+                 (let [is-me (= (:username e) (:username id))]
+                   (apply-battle-status-changes client-data (assoc id :is-me is-me) opts status-changes))))
              doall))
       (catch Exception e
         (log/error e "Error updating to" n "teams")))))
@@ -2879,11 +2931,41 @@
 
 (defmethod event-handler ::dissoc
   [e]
+  (log/info "Dissoc" (:key e))
   (swap! *state dissoc (:key e)))
 
 (defmethod event-handler ::dissoc-in
   [{:keys [path]}]
-  (swap! *state update-in (drop-last path) dissoc (last path)))
+  (log/info "Dissoc" path)
+  (if (= 1 (count path))
+    (swap! *state dissoc (first path))
+    (swap! *state update-in (drop-last path) dissoc (last path))))
+
+
+(defmethod event-handler ::singleplayer-engine-changed [{:fx/keys [event] :keys [engine-version]}]
+  (let [engine-version (or engine-version event)]
+    (swap! *state
+           (fn [server]
+             (-> server
+                 (assoc :engine-version engine-version)
+                 (assoc-in [:by-server :local :battles :singleplayer :battle-version] engine-version))))))
+
+(defmethod event-handler ::singleplayer-mod-changed [{:fx/keys [event] :keys [mod-name]}]
+  (let [mod-name (or mod-name event)]
+    (swap! *state
+           (fn [server]
+             (-> server
+                 (assoc :mod-name mod-name)
+                 (assoc-in [:by-server :local :battles :singleplayer :battle-modname] mod-name))))))
+
+(defmethod event-handler ::singleplayer-map-changed [{:fx/keys [event] :keys [map-name]}]
+  (let [map-name (or map-name event)]
+    (swap! *state
+           (fn [server]
+             (-> server
+                 (assoc :map-name map-name)
+                 (assoc-in [:by-server :local :battles :singleplayer :battle-map] map-name))))))
+
 
 (defmethod event-handler ::scan-imports
   [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]

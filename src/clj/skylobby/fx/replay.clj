@@ -856,7 +856,9 @@
                                         (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                           [id team])))
                                     (into {}))
-                   sides (spring/mod-sides (get mod-details gametype))
+                   indexed-mod (get mods-by-version mapname)
+                   replay-mod-details (get mod-details (resource/details-cache-key indexed-mod))
+                   sides (spring/mod-sides replay-mod-details)
                    players (->> game
                                 (filter (comp #(string/starts-with? % "player") name first))
                                 (map
@@ -900,7 +902,9 @@
                                                :handicap handicap
                                                :side (get side-id-by-name side)
                                                :ally allyteam}
-                                              :team-color team-color))))))]
+                                              :team-color team-color))))))
+                   indexed-map (get maps-by-version mapname)
+                   replay-map-details (get map-details (resource/details-cache-key indexed-map))]
                [{:fx/type :h-box
                  :alignment :center-left
                  :children
@@ -949,7 +953,7 @@
                    [
                     {:fx/type fx.minimap/minimap-pane
                      :map-name mapname
-                     :map-details (get map-details mapname)
+                     :map-details replay-map-details
                      :minimap-type replay-minimap-type
                      :minimap-type-key :replay-minimap-type
                      :scripttags script-data}
@@ -958,7 +962,7 @@
                      :children
                      [{:fx/type :label
                        :text (str " Size: "
-                                  (when-let [{:keys [map-width map-height]} (-> map-details (get mapname) :smf :header)]
+                                  (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
                                     (str
                                       (when map-width (quot map-width 64))
                                       " x "

@@ -8,10 +8,9 @@
 
 (defn map-sync-pane
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
-           import-tasks importables-by-path map-update-tasks maps spring-isolation-dir tasks-by-type]}]
+           import-tasks importables-by-path indexed-map map-update-tasks spring-isolation-dir tasks-by-type]}]
   (let [
-        no-map-details (not (seq battle-map-details))
-        map-exists (some (comp #{battle-map} :map-name) maps)]
+        no-map-details (not (resource/details? battle-map-details))]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Map"
@@ -24,7 +23,7 @@
      (concat
        (let [severity (cond
                         no-map-details
-                        (if map-exists
+                        (if indexed-map
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -32,8 +31,10 @@
            :human-text battle-map
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file battle-map-details))
-                      (str "Map '" battle-map "' not found locally"))}])
-       (when (and no-map-details (not map-exists))
+                      (if indexed-map
+                        (str "Loading map details for '" battle-map "'")
+                        (str "Map '" battle-map "' not found locally")))}])
+       (when (and no-map-details (not indexed-map))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals

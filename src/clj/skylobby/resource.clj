@@ -90,3 +90,15 @@
     (and (:resource-filename resource1)
          (= (:resource-filename resource1)
             (:resource-filename resource2)))))
+
+
+(defn details?
+  "Returns true if the given possible resource details have content, false otherwise."
+  [details]
+  (boolean
+    (and
+      details
+      (not (:error details)))))
+
+(defn details-cache-key [resource]
+  (fs/canonical-path (:file resource)))

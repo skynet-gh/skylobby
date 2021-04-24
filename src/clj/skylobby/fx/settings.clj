@@ -16,8 +16,7 @@
 
 (defn settings-window
   [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path extra-replay-recursive show-settings-window spring-isolation-dir
-           spring-isolation-dir-draft]
+           extra-replay-path extra-replay-recursive show-settings-window spring-isolation-dir]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -40,33 +39,34 @@
         :children
         [
          {:fx/type :label
-          :text " Spring Isolation Dir"
+          :text " Default Spring Dir"
           :style {:-fx-font-size 24}}
-         {:fx/type :label
-          :text (str (fs/canonical-path spring-isolation-dir))}
          {:fx/type :h-box
           :alignment :center-left
           :children
-          [{:fx/type :button
-            :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
-            :disable (string/blank? spring-isolation-dir-draft)
+          [
+           {:fx/type :text-field
+            :disable true
+            :text (str (fs/canonical-path spring-isolation-dir))
+            :style {:-fx-min-width 600}
+            :on-text-changed {:event/type :spring-lobby/assoc
+                              :key :spring-isolation-dir-draft}}
+           {:fx/type :button
+            :on-action {:event/type :spring-lobby/file-chooser-spring-root}
             :text ""
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-content-save:16:white"}}
-           {:fx/type :text-field
-            :text (str spring-isolation-dir-draft)
-            :style {:-fx-min-width 600}
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :spring-isolation-dir-draft}}]}
+             :icon-literal "mdi-file-find:16:white"}}]}
          {:fx/type :h-box
           :alignment :center-left
           :children
-          [{:fx/type :button
+          [{:fx/type :label
+            :text " Preset: "}
+           {:fx/type :button
             :on-action {:event/type :spring-lobby/assoc
                         :key :spring-isolation-dir
                         :value (fs/default-isolation-dir)}
-            :text "Default"}
+            :text "Skylobby"}
            {:fx/type :button
             :on-action {:event/type :spring-lobby/assoc
                         :key :spring-isolation-dir
