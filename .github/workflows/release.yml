@@ -111,14 +111,14 @@ jobs:
           java-version: '14'
       - run: iwr -useb download.clojure.org/install/win-install-1.10.3.822.ps1 | iex
       - run: clojure -M:uberjar:headless
-        #      - uses: actions/upload-release-asset@v1.0.2
-        #        env:
-        #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        #        with:
-        #          upload_url: ${{ github.event.release.upload_url }}
-        #          asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
-        #          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-windows.jar
-        #          asset_content_type: application/java-archive
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/${{ env.CI_REPOSITORY_NAME }}.jar
+          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-windows.jar
+          asset_content_type: application/java-archive
       - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/windows
       - uses: actions/upload-release-asset@v1.0.2
         env:
