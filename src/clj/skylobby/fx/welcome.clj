@@ -59,29 +59,23 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close-octagon:16:white"}}]))}))
 
-(def welcome-view-keys
-  (concat
-    fx.battle/battle-view-keys
-    [:app-update-available :by-spring-root :by-server :client-data :login-error :password :server
-     :servers :spring-isolation-dir :tasks-by-type :username]))
 
-(defn welcome-view
-  [{:keys [app-update-available by-spring-root by-server client-data login-error password server servers
-           spring-isolation-dir tasks-by-type username]
+#_
+(defn welcome-buttons
+  [{:keys [app-update-available client-data login-error password server servers username]
     :as state}]
   {:fx/type :v-box
-   :alignment :center
-   :style {:-fx-font-size 20}
    :children
-   (concat
-     [{:fx/type :pane
-       :v-box/vgrow :always}
-      {:fx/type :h-box
-       :alignment :center
+   [{:fx/type :pane
+     :v-box/vgrow :always}
+    {:fx/type :h-box
+     :alignment :center
+     :children
+     [
+      {:fx/type :flow-pane
+       :alignment :center-left
        :children
-       [
-        {:fx/type :v-box
-         :alignment :center-left
+       [{:fx/type :v-box
          :children
          (concat
            (when-let [{:keys [latest]} app-update-available]
@@ -119,8 +113,11 @@
             {:fx/type :button
              :text "Settings"
              :on-action {:event/type :spring-lobby/toggle
-                         :key :show-settings-window}}
-            {:fx/type :label
+                         :key :show-settings-window}}])}
+        {:fx/type :v-box
+         :children
+         (concat
+           [{:fx/type :label
              :text "Join a Multiplayer Server:"}
             {:fx/type :h-box
              :children
@@ -140,12 +137,12 @@
              [{:fx/type :button
                :text "Register"
                :on-action {:event/type :spring-lobby/toggle
-                           :key :show-register-window}}])
-           (when-let [login-error (str " " (get login-error (first server)))]
-             [{:fx/type :label
-               :text (str " " login-error)
-               :style {:-fx-text-fill "#FF0000"
-                       :-fx-max-width "360px"}}])
+                           :key :show-register-window}}
+              (when-let [login-error (str " " (get login-error (first server)))]
+                [{:fx/type :label
+                  :text (str " " login-error)
+                  :style {:-fx-text-fill "#FF0000"
+                          :-fx-max-width "360px"}}])])
            [{:fx/type :h-box
              :alignment :center-left
              :children
@@ -184,29 +181,201 @@
            [(merge
               {:fx/type connect-button
                :server-key (u/server-key client-data)}
-              (select-keys state connect-button-keys))])}]}]
-     [{:fx/type :pane
-       :v-box/vgrow :always}]
-     (when (-> by-server :local :battle :battle-id)
-       [{:fx/type :h-box
-         :alignment :center-left
-         :children
-         [{:fx/type :button
-           :text "Close Singleplayer Battle"
-           :on-action {:event/type :spring-lobby/dissoc-in
-                       :path [:by-server :local :battle]}}]}
-        (merge
-          {:fx/type fx.battle/battle-view}
-          (select-keys state fx.battle/battle-view-keys)
-          (:local by-server)
-          (get by-spring-root (fs/canonical-path spring-isolation-dir)))])
+              (select-keys state connect-button-keys))])}]}]}
+    {:fx/type :pane
+     :v-box/vgrow :always}]})
+
+
+
+(defn singleplayer-buttons
+  [{:keys [app-update-available]}]
+  {:fx/type :v-box
+   :children
+   (concat
+     (when-let [{:keys [latest]} app-update-available]
+       (let [color "gold"]
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :button
+             :text (str "Update to " latest)
+             :on-action {:event/type :spring-lobby/desktop-browse-url
+                         :url app-update-browseurl}
+             :style {:-fx-base color
+                     :-fx-background color}
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-open-in-new:30:black"}}
+            {:fx/type :button
+             :text ""
+             :on-action {:event/type :spring-lobby/dissoc
+                         :key :app-update-available}
+             :style {:-fx-base color
+                     :-fx-background color}
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-close:30:black"}}]}]))
+     [
+      {:fx/type :button
+       :text "Singleplayer Battle"
+       :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
+      {:fx/type :button
+       :text "Watch Replays"
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-replays}}
+      {:fx/type :button
+       :text "Settings"
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-settings-window}}])})
+
+(defn multiplayer-buttons
+  [{:keys [client-data login-error password server servers username]
+    :as state}]
+  {:fx/type :v-box
+   :children
+   (concat
+     [{:fx/type :label
+       :text "Join a Multiplayer Server:"}
+      {:fx/type :h-box
+       :children
+       [
+        {:fx/type fx.server/server-combo-box
+         :server server
+         :servers servers
+         :on-value-changed {:event/type :spring-lobby/on-change-server}}
+        {:fx/type :button
+         :text ""
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-servers-window}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-plus:30:white"}}]}]
+     (when-not client-data
+       [{:fx/type :button
+         :text "Register"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-register-window}}])
+     (when-let [login-error (str " " (get login-error (first server)))]
+       [{:fx/type :label
+         :text (str " " login-error)
+         :style {:-fx-text-fill "#FF0000"
+                 :-fx-max-width "360px"}}])
      [{:fx/type :h-box
        :alignment :center-left
-       :style {:-fx-font-size 14}
        :children
-       [{:fx/type :pane
-         :h-box/hgrow :always}
+       [{:fx/type :label
+         :text "Username: "}
+        {:fx/type :text-field
+         :text username
+         :prompt-text "Username"
+         :style {:-fx-pref-width 300
+                 :-fx-max-width 300}
+         :disable (boolean (not server))
+         :on-text-changed {:event/type :spring-lobby/username-change
+                           :server-url (first server)}}]}]
+     (if-not client-data
+       [
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :label
+           :text "Password: "}
+          {:fx/type :password-field
+           :text password
+           :disable (boolean (not server))
+           :prompt-text "Password"
+           :style {:-fx-pref-width 300}
+           :on-text-changed {:event/type :spring-lobby/password-change
+                             :server-url (first server)}}]}]
+       [{:fx/type :label
+         :style {:-fx-font-size 16}
+         :text "Logged in"}
         {:fx/type :button
-         :text (str (count tasks-by-type) " tasks")
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-tasks-window}}]}])})
+         :text "Go to server tab"
+         :on-action {:event/type :spring-lobby/assoc
+                     :key :selected-server-tab
+                     :value (first server)}}])
+     [(merge
+        {:fx/type connect-button
+         :server-key (u/server-key client-data)}
+        (select-keys state connect-button-keys))])})
+
+(def welcome-view-keys
+  (concat
+    fx.battle/battle-view-keys
+    [:app-update-available :by-spring-root :by-server :client-data :login-error :password :server
+     :servers :spring-isolation-dir :tasks-by-type :username]))
+
+(defn welcome-view
+  [{:keys [by-spring-root by-server
+           spring-isolation-dir tasks-by-type]
+    :as state}]
+  {:fx/type :v-box
+   :alignment :center
+   :style {:-fx-font-size 20}
+   :children
+   [
+    {:fx/type :pane
+     :v-box/vgrow :always}
+    (if (-> by-server :local :battle :battle-id)
+      {:fx/type :v-box
+       :children
+       [{:fx/type :h-box
+         :children
+         [
+          {:fx/type :pane
+           :h-box/hgrow :always}
+          (merge
+            {:fx/type singleplayer-buttons}
+            state)
+          (merge
+            {:fx/type multiplayer-buttons}
+            state)
+          {:fx/type :pane
+           :h-box/hgrow :always}]}
+        {:fx/type :v-box
+         :children
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :button
+             :text "Close Singleplayer Battle"
+             :on-action {:event/type :spring-lobby/dissoc-in
+                         :path [:by-server :local :battle]}}]}
+          (merge
+            {:fx/type fx.battle/battle-view}
+            (select-keys state fx.battle/battle-view-keys)
+            (:local by-server)
+            (get by-spring-root (fs/canonical-path spring-isolation-dir)))]}]}
+      {:fx/type :h-box
+       :children
+       [
+        {:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :v-box
+         :children
+         [{:fx/type :pane
+           :v-box/vgrow :always}
+          (merge
+            {:fx/type singleplayer-buttons}
+            state)
+          (merge
+            {:fx/type multiplayer-buttons}
+            state)
+          {:fx/type :pane
+           :v-box/vgrow :always}]}
+        {:fx/type :pane
+         :h-box/hgrow :always}]})
+    {:fx/type :pane
+     :v-box/vgrow :always}
+    {:fx/type :h-box
+     :alignment :center-left
+     :style {:-fx-font-size 14}
+     :children
+     [{:fx/type :pane
+       :h-box/hgrow :always}
+      {:fx/type :button
+       :text (str (count tasks-by-type) " tasks")
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-tasks-window}}]}]})
