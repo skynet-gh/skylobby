@@ -61,7 +61,7 @@
 
 
 (defn singleplayer-buttons
-  [{:keys [app-update-available]}]
+  [{:keys [app-update-available spring-isolation-dir]}]
   {:fx/type :v-box
    :children
    (concat
@@ -90,6 +90,27 @@
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-close:30:black"}}]}]))
      [
+      {:fx/type :v-box
+       :style {:-fx-font-size 16}
+       :children
+       [
+        {:fx/type :label
+         :text " Default Spring Dir"
+         :style {:-fx-font-size 20}}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [
+          {:fx/type :text-field
+           :disable true
+           :text (str spring-isolation-dir)
+           :style {:-fx-min-width 400}}
+          {:fx/type :button
+           :on-action {:event/type :spring-lobby/file-chooser-spring-root}
+           :text ""
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-file-find:16:white"}}]}]}
       {:fx/type :button
        :text "Singleplayer Battle"
        :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
@@ -123,7 +144,41 @@
                      :key :show-servers-window}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-plus:30:white"}}]}]
+          :icon-literal "mdi-plus:30:white"}}]}
+      (let [[server-url server-details] server
+            spring-isolation-dir (:spring-isolation-dir server-details)]
+        {:fx/type :v-box
+         :style {:-fx-font-size 16}
+         :children
+         [
+          {:fx/type :label
+           :text " Server-specific Spring Dir"
+           :style {:-fx-font-size 20}}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           (concat
+             [
+              {:fx/type :text-field
+               :disable true
+               :text (str (or spring-isolation-dir
+                              " < use default >"))
+               :style {:-fx-min-width 400}}]
+             (when spring-isolation-dir
+               [{:fx/type :button
+                 :text ""
+                 :on-action {:event/type :spring-lobby/dissoc-in
+                             :path [:servers server-url :spring-isolation-dir]}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-close:16:white"}}])
+             [{:fx/type :button
+               :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                           :target [:servers server-url :spring-isolation-dir]}
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-file-find:16:white"}}])}]})]
      (when-not client-data
        [{:fx/type :button
          :text "Register"

@@ -13,6 +13,7 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring :as spring]
@@ -66,8 +67,10 @@
         battle-details (spring/battle-details {:battle battle :battles battles :users users})
         engine-version (:battle-version battle-details)
         engine-details (spring/engine-details engines engine-version)
-        battle-map-details (get map-details battle-map)
-        battle-mod-details (get mod-details battle-modname)
+        indexed-map (->> maps (filter (comp #{battle-map} :map-name)) first)
+        battle-map-details (get map-details (resource/details-cache-key indexed-map))
+        indexed-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
+        battle-mod-details (get mod-details (resource/details-cache-key indexed-mod))
         in-sync (boolean (and (seq battle-map-details)
                               (seq battle-mod-details)
                               (seq engine-details)))
@@ -259,8 +262,7 @@
                       :engine-version engine-version
                       :engines engines
                       :tasks-by-type tasks-by-type
-                      :on-value-changed {:event/type :spring-lobby/assoc-in
-                                         :path [:by-server :local :battles :singleplayer :battle-version]}
+                      :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed}
                       :spring-isolation-dir spring-isolation-dir}
                      (if (seq engine-details)
                        {:fx/type mods-view
@@ -273,8 +275,7 @@
                         :rapid-data-by-id rapid-data-by-id
                         :rapid-download rapid-download
                         :tasks-by-type tasks-by-type
-                        :on-value-changed {:event/type :spring-lobby/assoc-in
-                                           :path [:by-server :local :battles :singleplayer :battle-modname]}
+                        :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed}
                         :spring-isolation-dir spring-isolation-dir}
                        {:fx/type :label
                         :text " Game: Get an engine first"})
@@ -285,8 +286,7 @@
                       :map-name battle-map
                       :maps maps
                       :tasks-by-type tasks-by-type
-                      :on-value-changed {:event/type :spring-lobby/assoc-in
-                                         :path [:by-server :local :battles :singleplayer :battle-map]}
+                      :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
                       :spring-isolation-dir spring-isolation-dir}]}
                    {:fx/type :flow-pane
                     :vgap 5
@@ -348,6 +348,7 @@
                           :battle-mod-details battle-mod-details
                           :engine-details engine-details
                           :engine-file engine-file
+                          :indexed-mod indexed-mod
                           :mod-details-tasks mod-details-tasks
                           :mod-update-tasks mod-update-tasks
                           :rapid-tasks-by-id rapid-tasks-by-id}
@@ -356,6 +357,7 @@
                          {:fx/type map-sync-pane
                           :battle-map battle-map
                           :battle-map-details battle-map-details
+                          :indexed-map indexed-map
                           :import-tasks import-tasks
                           :map-update-tasks map-update-tasks}
                          (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}

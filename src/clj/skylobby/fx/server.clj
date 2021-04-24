@@ -135,14 +135,29 @@
           {:fx/type :h-box
            :alignment :center-left
            :children
-           [{:fx/type :label
-             :alignment :center
-             :text " Spring root: "}
-            {:fx/type :text-field
-             :text (str server-spring-root-draft)
-             :h-box/hgrow :always
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :server-spring-root-draft}}]}
+           (concat
+             [{:fx/type :label
+               :alignment :center
+               :text " Spring root: "}
+              {:fx/type :text-field
+               :disable true
+               :text (str server-spring-root-draft)
+               :h-box/hgrow :always}]
+             (when server-spring-root-draft
+               [{:fx/type :button
+                 :text ""
+                 :on-action {:event/type :spring-lobby/dissoc-in
+                             :path [:server-spring-root-draft]}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-close:16:white"}}])
+             [{:fx/type :button
+               :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                           :target [:server-spring-root-draft]}
+               :text ""
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-file-find:16:white"}}])}
           {:fx/type :button
            :text (str
                    (if (contains? servers server-url) "Update" "Add")
@@ -155,8 +170,6 @@
                        {:port port
                         :host server-host
                         :alias server-alias
-                        :spring-isolation-dir
-                        (let [f (fs/file server-spring-root-draft)]
-                          (when (fs/exists? f) f))
+                        :spring-isolation-dir (fs/file server-spring-root-draft)
                         :ssl (boolean server-ssl)}}}]}
         {:fx/type :pane})}}))
