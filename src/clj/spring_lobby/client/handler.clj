@@ -5,6 +5,7 @@
     [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
+    [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
     [spring-lobby.fs :as fs]
@@ -20,14 +21,18 @@
 (set! *warn-on-reflection* true)
 
 
+; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html#MYBATTLESTATUS:client
 (def default-battle-status
   {:ready true
    :ally 0
    :handicap 0
    :mode 0
-   :sync 1
+   :sync 2 ; unsynced
    :id 0
    :side 0})
+
+(defn sync-number [sync-bool]
+  (if sync-bool 1 2))
 
 (def default-client-status "0")
 
@@ -368,15 +373,22 @@
            :battle-mod-details nil)))
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [battle client-data preferred-color]} (-> state-atom deref :by-server (get server-url))
-        battle-status (assoc default-battle-status
-                             :id (battle/available-team-id battle)
-                             :ally (battle/available-ally battle)
-                             :mode false)
-        color (or preferred-color
-                  (u/random-color))
+  (let [{:keys [map-details mod-details servers spring-isolation-dir] :as state} @state-atom
+        {:keys [battle client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
+        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                        spring-isolation-dir)
+        spring-root-path (fs/canonical-path spring-root)
+        spring (-> state :by-spring-root (get spring-root-path))
+        my-username (:username client-data)
+        {:keys [battle-status]} (-> battle :users (get my-username))
+        new-battle-status (assoc (or battle-status default-battle-status)
+                            :id (battle/available-team-id battle)
+                            :ally (battle/available-ally battle)
+                            :sync (sync-number
+                                    (resource/sync-status server-data spring mod-details map-details)))
+        color (or preferred-color (u/random-color))
         client (:client client-data)
-        msg (str "MYBATTLESTATUS " (encode-battle-status battle-status) " " color)]
+        msg (str "MYBATTLESTATUS " (encode-battle-status new-battle-status) " " color)]
     (message/send-message client msg)))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]
