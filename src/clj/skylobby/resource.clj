@@ -4,7 +4,8 @@
     [clojure.string :as string]
     [spring-lobby.fs :as fs]
     [spring-lobby.http :as http]
-    [spring-lobby.rapid :as rapid]))
+    [spring-lobby.rapid :as rapid]
+    [spring-lobby.util :as u]))
 
 
 (def resource-types
@@ -98,7 +99,35 @@
   (boolean
     (and
       details
+      (seq details)
       (not (:error details)))))
 
 (defn details-cache-key [resource]
   (fs/canonical-path (:file resource)))
+
+
+(defn sync-status [server-data spring mod-details map-details]
+  (let [battle-id (-> server-data :battle :battle-id)
+        battle (-> server-data :battles (get battle-id))
+        engines (:engines spring)
+        engine (:battle-version battle)
+        engine-details (->> engines (filter (comp #{engine} :engine-version)) first)
+
+        mod-name (:battle-modname battle)
+        mod-sans-git (u/mod-name-sans-git mod-name)
+        mod-name-set (set [mod-name mod-sans-git])
+        filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+        mods (:mods spring)
+        mod-index (->> mods (filter filter-fn) first)
+        mod-details (-> mod-details (get (fs/canonical-path (:file mod-index))))
+
+        map-name (:battle-map battle)
+        maps (:maps spring)
+        map-index (->> maps (filter (comp #{map-name} :map-name)) first)
+        map-details (-> map-details (get (fs/canonical-path (:file map-index))))]
+    (boolean
+      (and map-index
+           (details? map-details)
+           mod-index
+           (details? mod-details)
+           (seq engine-details)))))

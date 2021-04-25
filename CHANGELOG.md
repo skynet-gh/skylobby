@@ -37,6 +37,13 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.15]
+
+- Add CLI flag `--spring-root`
+- Send actual sync status to server
+- Fix concurrency issue writing configs
+- Re-enable Windows jar upload
+
 ### [0.3.14]
 
 - Fix issue with map and mod details when changing spring dir

@@ -193,6 +193,7 @@
   (message/send-message client message)
   (u/append-console-log *state (u/server-key client-data) :client message))
 
+
 (defn- spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
   ([data filename]
@@ -209,20 +210,16 @@
          (pr-str data))))))
 
 
-(defn- add-watch-state-to-edn
-  [state-atom]
-  (add-watch state-atom :state-to-edn
-    (fn [_k _ref old-state new-state]
-      (doseq [{:keys [select-fn filename]} state-to-edn]
-        (try
-          (let [old-data (select-fn old-state)
-                new-data (select-fn new-state)]
-            (when (not= old-data new-data)
-              (future
-                (u/try-log (str "update " filename)
-                  (spit-app-edn new-data filename)))))
-          (catch Exception e
-            (log/error e "Error in :state-to-edn for" filename "state watcher")))))))
+(defn- spit-state-config-to-edn [old-state new-state]
+  (doseq [{:keys [select-fn filename]} state-to-edn]
+    (try
+      (let [old-data (select-fn old-state)
+            new-data (select-fn new-state)]
+        (when (not= old-data new-data)
+          (u/try-log (str "update " filename)
+            (spit-app-edn new-data filename))))
+      (catch Exception e
+        (log/error e "Error writing config edn" filename)))))
 
 
 (defn- read-map-details [{:keys [map-name map-file]}]
@@ -343,6 +340,11 @@
   (select-keys
     state
     [:server :servers]))
+
+(defn- update-battle-status-sync-relevant-keys [state]
+  (select-keys
+    state
+    [:by-server :mod-details :map-details :servers :spring-isolation-dir]))
 
 
 (defn server-auto-resources [_old-state new-state old-server new-server]
@@ -503,7 +505,7 @@
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
   (remove-watch state-atom :fix-selected-server)
-  (add-watch-state-to-edn state-atom)
+  (remove-watch state-atom :update-battle-status-sync)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (when (not= (battle-map-details-relevant-keys old-state)
@@ -745,7 +747,41 @@
                 (log/info "Fixing selected server from" server "to" new-server)
                 (swap! state-atom assoc :server new-server))))
           (catch Exception e
-            (log/error e "Error in :fix-selected-server state watcher")))))))
+            (log/error e "Error in :fix-selected-server state watcher"))))))
+  (add-watch state-atom :update-battle-status-sync
+    (fn [_k _ref old-state new-state]
+      (when (not= (update-battle-status-sync-relevant-keys old-state)
+                  (update-battle-status-sync-relevant-keys new-state))
+        (try
+          (doseq [[server-key new-server] (-> new-state :by-server seq)]
+            (let [old-server (-> old-state :by-server (get server-key))
+                  server-url (-> new-server :client-data :server-url)
+                  {:keys [servers spring-isolation-dir]} new-state
+                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                  spring-isolation-dir)
+                  spring-root-path (fs/canonical-path spring-root)
+
+                  old-spring (-> old-state :by-spring-root (get spring-root-path))
+                  new-spring (-> new-state :by-spring-root (get spring-root-path))
+
+                  old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
+                  new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
+
+                  new-sync-number (handler/sync-number new-sync)
+                  battle (:battle new-server)
+                  client-data (:client-data new-server)
+                  my-username (:username client-data)
+                  {:keys [battle-status team-color]} (-> battle :users (get my-username))
+                  old-sync-number (-> battle :users (get my-username) :battle-status :sync)]
+              (when (and (:battle-id battle)
+                         (not= old-sync new-sync))
+                (log/info "Updating battle sync status for" server-key "from" old-sync
+                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
+                (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+                  (client-message client-data
+                    (str "MYBATTLESTATUS " (handler/encode-battle-status new-battle-status) " " team-color))))))
+          (catch Exception e
+            (log/error e "Error in :update-battle-status-sync state watcher")))))))
 
 
 (defmulti task-handler ::task-type)
@@ -1255,7 +1291,7 @@
       (log/info "No update available, or not running a jar. Latest:" latest-version "current" current-version))))
 
 (defn- check-app-update-chimer-fn [state-atom]
-  (log/info "Starting channels update chimer")
+  (log/info "Starting app update check chimer")
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
@@ -1265,7 +1301,27 @@
             (check-app-update state-atom))
           {:error-handler
            (fn [e]
-             (log/error e "Error force updating resources")
+             (log/error e "Error checking for app update")
+             true)})]
+    (fn [] (.close chimer))))
+
+
+(defn- spit-app-config-chimer-fn [state-atom]
+  (log/info "Starting app config spit chimer")
+  (let [old-state-atom (atom {})
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (let [old-state @old-state-atom
+                  new-state @state-atom]
+              (spit-state-config-to-edn old-state new-state)
+              (reset! old-state-atom new-state)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error spitting app config edn")
              true)})]
     (fn [] (.close chimer))))
 
@@ -1923,14 +1979,14 @@
     (try
       (let [existing-bots (keys (:bots battle))
             bot-username (available-name existing-bots bot-username)
-            status (assoc client/default-battle-status
+            status (assoc handler/default-battle-status
                           :ready true
                           :mode 1
                           :sync 1
                           :id (battle/available-team-id battle)
                           :ally (battle/available-ally battle)
                           :side (rand-nth [0 1]))
-            bot-status (client/encode-battle-status status)
+            bot-status (handler/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
         (if singleplayer
@@ -2204,7 +2260,7 @@
         (client-message client-data
           (str prefix
                " "
-               (client/encode-battle-status battle-status)
+               (handler/encode-battle-status battle-status)
                " "
                team-color)))
       (let [data {:battle-status battle-status
@@ -3196,7 +3252,8 @@
                           (map (partial tasks-chimer-fn state-atom))
                           doall)
         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-        check-app-update-chimer (check-app-update-chimer-fn state-atom)]
+        check-app-update-chimer (check-app-update-chimer-fn state-atom)
+        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -3210,7 +3267,8 @@
      (concat
        task-chimers
        [truncate-messages-chimer
-        check-app-update-chimer])}))
+        check-app-update-chimer
+        spit-app-config-chimer])}))
 
 (defn init-async [state-atom]
   (future

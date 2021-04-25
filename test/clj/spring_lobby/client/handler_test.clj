@@ -4,6 +4,30 @@
     [spring-lobby.client.handler :as handler]))
 
 
+(deftest decode-battle-status
+  (is (= {:ready false,
+          :ally 0,
+          :handicap 0,
+          :mode true,
+          :sync 2,
+          :id 0,
+          :side 0}
+         (handler/decode-battle-status "8389632"))))
+
+
+(deftest encode-battle-status
+  (let [encoded (handler/encode-battle-status
+                  {:ready false,
+                   :ally 0,
+                   :handicap 0,
+                   :mode true,
+                   :sync 2,
+                   :id 0,
+                   :side 0})]
+    (is (= "8389632"
+           encoded))))
+
+
 (deftest parse-addbot
   (is (= ["12" "kekbot1" "skynet9001" "0" "0" "KAIK|0.13"]
          (rest (handler/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13"))))

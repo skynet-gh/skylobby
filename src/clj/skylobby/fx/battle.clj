@@ -13,6 +13,7 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.fx.sync :refer [severity-styles]]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -71,8 +72,8 @@
         battle-map-details (get map-details (resource/details-cache-key indexed-map))
         indexed-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
         battle-mod-details (get mod-details (resource/details-cache-key indexed-mod))
-        in-sync (boolean (and (seq battle-map-details)
-                              (seq battle-mod-details)
+        in-sync (boolean (and (resource/details? battle-map-details)
+                              (resource/details? battle-mod-details)
                               (seq engine-details)))
         engine-file (:file engine-details)
         bots (fs/bots engine-file)
@@ -363,6 +364,23 @@
                          (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
             {:fx/type :pane
              :v-box/vgrow :always}
+            {:fx/type :label
+             :text (str
+                     " "
+                     (if (= 1 (:sync my-battle-status))
+                       "synced"
+                       "unsynced")
+                     " ")
+             :style
+             (merge
+               {:-fx-background-radius 3
+                :-fx-border-color "#666666"
+                :-fx-border-radius 3
+                :-fx-border-style "solid"
+                :-fx-border-width 1}
+               (get severity-styles
+                 (if (= 1 (:sync my-battle-status))
+                   0 2)))}
             {:fx/type :h-box
              :alignment :center-left
              :style {:-fx-font-size 24}
