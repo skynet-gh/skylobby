@@ -193,6 +193,7 @@
   (message/send-message client message)
   (u/append-console-log *state (u/server-key client-data) :client message))
 
+
 (defn- spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
   ([data filename]
@@ -209,20 +210,16 @@
          (pr-str data))))))
 
 
-(defn- add-watch-state-to-edn
-  [state-atom]
-  (add-watch state-atom :state-to-edn
-    (fn [_k _ref old-state new-state]
-      (doseq [{:keys [select-fn filename]} state-to-edn]
-        (try
-          (let [old-data (select-fn old-state)
-                new-data (select-fn new-state)]
-            (when (not= old-data new-data)
-              (future
-                (u/try-log (str "update " filename)
-                  (spit-app-edn new-data filename)))))
-          (catch Exception e
-            (log/error e "Error in :state-to-edn for" filename "state watcher")))))))
+(defn- spit-state-config-to-edn [old-state new-state]
+  (doseq [{:keys [select-fn filename]} state-to-edn]
+    (try
+      (let [old-data (select-fn old-state)
+            new-data (select-fn new-state)]
+        (when (not= old-data new-data)
+          (u/try-log (str "update " filename)
+            (spit-app-edn new-data filename))))
+      (catch Exception e
+        (log/error e "Error writing config edn" filename)))))
 
 
 (defn- read-map-details [{:keys [map-name map-file]}]
@@ -503,7 +500,6 @@
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
   (remove-watch state-atom :fix-selected-server)
-  (add-watch-state-to-edn state-atom)
   (add-watch state-atom :battle-map-details
     (fn [_k _ref old-state new-state]
       (when (not= (battle-map-details-relevant-keys old-state)
@@ -1255,7 +1251,7 @@
       (log/info "No update available, or not running a jar. Latest:" latest-version "current" current-version))))
 
 (defn- check-app-update-chimer-fn [state-atom]
-  (log/info "Starting channels update chimer")
+  (log/info "Starting app update check chimer")
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
@@ -1265,7 +1261,27 @@
             (check-app-update state-atom))
           {:error-handler
            (fn [e]
-             (log/error e "Error force updating resources")
+             (log/error e "Error checking for app update")
+             true)})]
+    (fn [] (.close chimer))))
+
+
+(defn- spit-app-config-chimer-fn [state-atom]
+  (log/info "Starting app config spit chimer")
+  (let [old-state-atom (atom {})
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (let [old-state @old-state-atom
+                  new-state @state-atom]
+              (spit-state-config-to-edn old-state new-state)
+              (reset! old-state-atom new-state)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error spitting app config edn")
              true)})]
     (fn [] (.close chimer))))
 
@@ -3196,7 +3212,8 @@
                           (map (partial tasks-chimer-fn state-atom))
                           doall)
         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-        check-app-update-chimer (check-app-update-chimer-fn state-atom)]
+        check-app-update-chimer (check-app-update-chimer-fn state-atom)
+        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -3210,7 +3227,8 @@
      (concat
        task-chimers
        [truncate-messages-chimer
-        check-app-update-chimer])}))
+        check-app-update-chimer
+        spit-app-config-chimer])}))
 
 (defn init-async [state-atom]
   (future
