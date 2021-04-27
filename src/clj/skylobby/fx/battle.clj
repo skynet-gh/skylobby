@@ -144,293 +144,295 @@
          :children
          [{:fx/type :v-box
            :children
-           [
-            {:fx/type :scroll-pane
-             :fit-to-width true
-             :hbar-policy :never
-             :content
-             {:fx/type :v-box
-              :children
-              (concat
-                [{:fx/type :label
-                  :style {:-fx-font-size 20}
-                  :text (str " "
-                             (when (< 1 (count team-counts))
-                               (string/join "v" team-counts)))}
-                 {:fx/type :h-box
-                  :alignment :center-left
-                  :children
-                  [{:fx/type :check-box
-                    :selected (boolean battle-players-color-allyteam)
-                    :on-selected-changed {:event/type :spring-lobby/assoc
-                                          :key :battle-players-color-allyteam}}
-                   {:fx/type :label
-                    :text " Color player name by allyteam"}]}]
-                (when (or singleplayer (not am-spec))
-                  [{:fx/type :flow-pane
-                    :children
-                    [{:fx/type :button
-                      :text "Add Bot"
-                      :disable (or (and am-spec (not singleplayer))
-                                   (string/blank? bot-username)
-                                   (string/blank? bot-name)
-                                   (string/blank? bot-version))
-                      :on-action {:event/type :spring-lobby/add-bot
-                                  :battle battle
-                                  :bot-username bot-username
-                                  :bot-name bot-name
-                                  :bot-version bot-version
-                                  :client-data client-data
-                                  :singleplayer singleplayer
-                                  :username username}}
-                     #_
-                     {:fx/type :h-box
-                      :alignment :center-left
-                      :children
-                      [{:fx/type :label
-                        :text " Bot Name: "}
-                       {:fx/type :text-field
-                        :prompt-text "Bot Name"
-                        :text (str bot-username)
-                        :on-text-changed {:event/type :spring-lobby/change-bot-username}}]}
-                     {:fx/type :h-box
-                      :alignment :center-left
-                      :children
-                      [
-                       {:fx/type :label
-                        :text " AI: "}
-                       {:fx/type :combo-box
-                        :value bot-name
-                        :disable (empty? bot-names)
-                        :on-value-changed {:event/type :spring-lobby/change-bot-name
-                                           :bots bots}
-                        :items (sort bot-names)}]}
-                     {:fx/type :h-box
-                      :alignment :center-left
-                      :children
-                      [
-                       #_
-                       {:fx/type :label
-                        :text " Version: "}
-                       {:fx/type :combo-box
-                        :value bot-version
-                        :disable (string/blank? bot-name)
-                        :on-value-changed {:event/type :spring-lobby/change-bot-version}
-                        :items (or bot-versions [])}]}]}])
-                (when-not singleplayer
-                  [{:fx/type :h-box
+           (concat
+             [
+              {:fx/type :scroll-pane
+               :fit-to-width true
+               :hbar-policy :never
+               :content
+               {:fx/type :v-box
+                :children
+                (concat
+                  [{:fx/type :label
+                    :style {:-fx-font-size 20}
+                    :text (str " "
+                               (when (< 1 (count team-counts))
+                                 (string/join "v" team-counts)))}
+                   {:fx/type :h-box
                     :alignment :center-left
                     :children
                     [{:fx/type :check-box
-                      :selected (boolean auto-get-resources)
+                      :selected (boolean battle-players-color-allyteam)
                       :on-selected-changed {:event/type :spring-lobby/assoc
-                                            :key :auto-get-resources}}
+                                            :key :battle-players-color-allyteam}}
                      {:fx/type :label
-                      :text " Auto import or download resources"}]}])
-                [{:fx/type :h-box
-                  :alignment :center-left
-                  :children
-                  (concat
-                    (when (and am-host (not singleplayer))
-                      [{:fx/type :label
-                        :text " Replay: "}
-                       {:fx/type :combo-box
-                        :prompt-text " < host a replay > "
-                        :style {:-fx-max-width 300}
-                        :value (-> scripttags :game :demofile)
-                        :on-value-changed {:event/type :spring-lobby/assoc-in
-                                           :path [:battle :scripttags :game :demofile]}
-                        :items (->> parsed-replays-by-path
-                                    (sort-by (comp :filename second))
-                                    reverse
-                                    (mapv first))
-                        :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
-                    (when (-> scripttags :game :demofile)
+                      :text " Color player name by allyteam"}]}]
+                  (when (or singleplayer (not am-spec))
+                    [{:fx/type :flow-pane
+                      :children
                       [{:fx/type :button
-                        :on-action {:event/type :spring-lobby/dissoc-in
-                                    :path [:battle :scripttags :game :demofile]}
-                        :graphic
-                        {:fx/type font-icon/lifecycle
-                         :icon-literal "mdi-close:16:white"}}]))}
-                 (if singleplayer
-                   {:fx/type :v-box
+                        :text "Add Bot"
+                        :disable (or (and am-spec (not singleplayer))
+                                     (string/blank? bot-username)
+                                     (string/blank? bot-name)
+                                     (string/blank? bot-version))
+                        :on-action {:event/type :spring-lobby/add-bot
+                                    :battle battle
+                                    :bot-username bot-username
+                                    :bot-name bot-name
+                                    :bot-version bot-version
+                                    :client-data client-data
+                                    :singleplayer singleplayer
+                                    :username username}}
+                       #_
+                       {:fx/type :h-box
+                        :alignment :center-left
+                        :children
+                        [{:fx/type :label
+                          :text " Bot Name: "}
+                         {:fx/type :text-field
+                          :prompt-text "Bot Name"
+                          :text (str bot-username)
+                          :on-text-changed {:event/type :spring-lobby/change-bot-username}}]}
+                       {:fx/type :h-box
+                        :alignment :center-left
+                        :children
+                        [
+                         {:fx/type :label
+                          :text " AI: "}
+                         {:fx/type :combo-box
+                          :value bot-name
+                          :disable (empty? bot-names)
+                          :on-value-changed {:event/type :spring-lobby/change-bot-name
+                                             :bots bots}
+                          :items (sort bot-names)}]}
+                       {:fx/type :h-box
+                        :alignment :center-left
+                        :children
+                        [
+                         #_
+                         {:fx/type :label
+                          :text " Version: "}
+                         {:fx/type :combo-box
+                          :value bot-version
+                          :disable (string/blank? bot-name)
+                          :on-value-changed {:event/type :spring-lobby/change-bot-version}
+                          :items (or bot-versions [])}]}]}])
+                  (when-not singleplayer
+                    [{:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      [{:fx/type :check-box
+                        :selected (boolean auto-get-resources)
+                        :on-selected-changed {:event/type :spring-lobby/assoc
+                                              :key :auto-get-resources}}
+                       {:fx/type :label
+                        :text " Auto import or download resources"}]}])
+                  [{:fx/type :h-box
+                    :alignment :center-left
                     :children
-                    [
-                     {:fx/type engines-view
-                      :downloadables-by-url downloadables-by-url
-                      :http-download http-download
-                      :engine-filter engine-filter
-                      :engine-version engine-version
-                      :engines engines
-                      :tasks-by-type tasks-by-type
-                      :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed}
-                      :spring-isolation-dir spring-isolation-dir}
-                     (if (seq engine-details)
-                       {:fx/type mods-view
+                    (concat
+                      (when (and am-host (not singleplayer))
+                        [{:fx/type :label
+                          :text " Replay: "}
+                         {:fx/type :combo-box
+                          :prompt-text " < host a replay > "
+                          :style {:-fx-max-width 300}
+                          :value (-> scripttags :game :demofile)
+                          :on-value-changed {:event/type :spring-lobby/assoc-in
+                                             :path [:battle :scripttags :game :demofile]}
+                          :items (->> parsed-replays-by-path
+                                      (sort-by (comp :filename second))
+                                      reverse
+                                      (mapv first))
+                          :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
+                      (when (-> scripttags :game :demofile)
+                        [{:fx/type :button
+                          :on-action {:event/type :spring-lobby/dissoc-in
+                                      :path [:battle :scripttags :game :demofile]}
+                          :graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-close:16:white"}}]))}
+                   (if singleplayer
+                     {:fx/type :v-box
+                      :children
+                      [
+                       {:fx/type engines-view
                         :downloadables-by-url downloadables-by-url
                         :http-download http-download
-                        :engine-file engine-file
-                        :mod-filter mod-filter
-                        :mod-name battle-modname
-                        :mods mods
-                        :rapid-data-by-id rapid-data-by-id
-                        :rapid-download rapid-download
+                        :engine-filter engine-filter
+                        :engine-version engine-version
+                        :engines engines
                         :tasks-by-type tasks-by-type
-                        :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed}
+                        :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed}
                         :spring-isolation-dir spring-isolation-dir}
-                       {:fx/type :label
-                        :text " Game: Get an engine first"})
-                     {:fx/type maps-view
-                      :downloadables-by-url downloadables-by-url
-                      :http-downloads http-download
-                      :map-input-prefix map-input-prefix
-                      :map-name battle-map
-                      :maps maps
-                      :tasks-by-type tasks-by-type
-                      :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
-                      :spring-isolation-dir spring-isolation-dir}]}
-                   {:fx/type :flow-pane
-                    :vgap 5
-                    :hgap 5
-                    :padding 5
-                    :children
-                    (if singleplayer
-                      (concat
-                        [{:fx/type :h-box
-                          :alignment :center-left
-                          :children
-                          [{:fx/type engines-view
-                            :downloadables-by-url downloadables-by-url
-                            :engine-filter engine-filter
-                            :engine-version engine-version
-                            :engines engines
-                            :spring-isolation-dir spring-isolation-dir
-                            :suggest true
-                            :on-value-changed {:event/type :spring-lobby/assoc-in
-                                               :path [:by-server :local :battles :singleplayer :battle-version]}}]}]
-                        (if (seq engine-details)
-                          [{:fx/type mods-view
-                            :mod-filter mod-filter
-                            :mod-name battle-modname
-                            :mods mods
-                            :rapid-data-by-version rapid-data-by-version
-                            :spring-isolation-dir spring-isolation-dir
-                            :suggest true
-                            :on-value-changed {:event/type :spring-lobby/assoc-in
-                                               :path [:by-server :local :battles :singleplayer :battle-modname]}}]
+                       (if (seq engine-details)
+                         {:fx/type mods-view
+                          :downloadables-by-url downloadables-by-url
+                          :http-download http-download
+                          :engine-file engine-file
+                          :mod-filter mod-filter
+                          :mod-name battle-modname
+                          :mods mods
+                          :rapid-data-by-id rapid-data-by-id
+                          :rapid-download rapid-download
+                          :tasks-by-type tasks-by-type
+                          :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed}
+                          :spring-isolation-dir spring-isolation-dir}
+                         {:fx/type :label
+                          :text " Game: Get an engine first"})
+                       {:fx/type maps-view
+                        :downloadables-by-url downloadables-by-url
+                        :http-downloads http-download
+                        :map-input-prefix map-input-prefix
+                        :map-name battle-map
+                        :maps maps
+                        :tasks-by-type tasks-by-type
+                        :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
+                        :spring-isolation-dir spring-isolation-dir}]}
+                     {:fx/type :flow-pane
+                      :vgap 5
+                      :hgap 5
+                      :padding 5
+                      :children
+                      (if singleplayer
+                        (concat
                           [{:fx/type :h-box
                             :alignment :center-left
                             :children
-                            [{:fx/type :label
-                              :text " Game: Get an engine first"}]}])
-                        [{:fx/type :h-box
-                          :alignment :center-left
-                          :children
-                          [{:fx/type maps-view
-                            :map-input-prefix map-input-prefix
-                            :map-name battle-map
-                            :maps maps
-                            :spring-isolation-dir spring-isolation-dir
-                            :suggest true
-                            :on-value-changed {:event/type :spring-lobby/assoc-in
-                                               :path [:by-server :local :battles :singleplayer :battle-map]}}]}])
-                      [
-                       (merge
-                         {:fx/type engine-sync-pane
-                          :engine-details engine-details
-                          :engine-file engine-file
-                          :engine-version engine-version
-                          :extract-tasks extract-tasks
-                          :engine-update-tasks engine-update-tasks}
-                         (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-engines]))
-                       (merge
-                         {:fx/type mod-sync-pane
-                          :battle-modname battle-modname
-                          :battle-mod-details battle-mod-details
-                          :engine-details engine-details
-                          :engine-file engine-file
-                          :indexed-mod indexed-mod
-                          :mod-details-tasks mod-details-tasks
-                          :mod-update-tasks mod-update-tasks
-                          :rapid-tasks-by-id rapid-tasks-by-id}
-                         (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))
-                       (merge
-                         {:fx/type map-sync-pane
-                          :battle-map battle-map
-                          :battle-map-details battle-map-details
-                          :indexed-map indexed-map
-                          :import-tasks import-tasks
-                          :map-update-tasks map-update-tasks}
-                         (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
-            {:fx/type :pane
-             :v-box/vgrow :always}
-            {:fx/type :label
-             :text (str
-                     " "
-                     (if (= 1 (:sync my-battle-status))
-                       "synced"
-                       "unsynced")
-                     " ")
-             :style
-             (merge
-               {:-fx-background-radius 3
-                :-fx-border-color "#666666"
-                :-fx-border-radius 3
-                :-fx-border-style "solid"
-                :-fx-border-width 1}
-               (get severity-styles
-                 (if (= 1 (:sync my-battle-status))
-                   0 2)))}
-            {:fx/type :h-box
-             :alignment :center-left
-             :style {:-fx-font-size 24}
-             :children
-             [{:fx/type :check-box
-               :selected (-> my-battle-status :ready boolean)
-               :style {:-fx-padding "10px"}
-               :on-selected-changed (merge me
-                                      {:event/type :spring-lobby/battle-ready-change
-                                       :client-data (when-not singleplayer client-data)
-                                       :username username})}
-              {:fx/type :label
-               :text (if am-spec " Auto Launch" " Ready")}
+                            [{:fx/type engines-view
+                              :downloadables-by-url downloadables-by-url
+                              :engine-filter engine-filter
+                              :engine-version engine-version
+                              :engines engines
+                              :spring-isolation-dir spring-isolation-dir
+                              :suggest true
+                              :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                 :path [:by-server :local :battles :singleplayer :battle-version]}}]}]
+                          (if (seq engine-details)
+                            [{:fx/type mods-view
+                              :mod-filter mod-filter
+                              :mod-name battle-modname
+                              :mods mods
+                              :rapid-data-by-version rapid-data-by-version
+                              :spring-isolation-dir spring-isolation-dir
+                              :suggest true
+                              :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                 :path [:by-server :local :battles :singleplayer :battle-modname]}}]
+                            [{:fx/type :h-box
+                              :alignment :center-left
+                              :children
+                              [{:fx/type :label
+                                :text " Game: Get an engine first"}]}])
+                          [{:fx/type :h-box
+                            :alignment :center-left
+                            :children
+                            [{:fx/type maps-view
+                              :map-input-prefix map-input-prefix
+                              :map-name battle-map
+                              :maps maps
+                              :spring-isolation-dir spring-isolation-dir
+                              :suggest true
+                              :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                 :path [:by-server :local :battles :singleplayer :battle-map]}}]}])
+                        [
+                         (merge
+                           {:fx/type engine-sync-pane
+                            :engine-details engine-details
+                            :engine-file engine-file
+                            :engine-version engine-version
+                            :extract-tasks extract-tasks
+                            :engine-update-tasks engine-update-tasks}
+                           (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-engines]))
+                         (merge
+                           {:fx/type mod-sync-pane
+                            :battle-modname battle-modname
+                            :battle-mod-details battle-mod-details
+                            :engine-details engine-details
+                            :engine-file engine-file
+                            :indexed-mod indexed-mod
+                            :mod-details-tasks mod-details-tasks
+                            :mod-update-tasks mod-update-tasks
+                            :rapid-tasks-by-id rapid-tasks-by-id}
+                           (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))
+                         (merge
+                           {:fx/type map-sync-pane
+                            :battle-map battle-map
+                            :battle-map-details battle-map-details
+                            :indexed-map indexed-map
+                            :import-tasks import-tasks
+                            :map-update-tasks map-update-tasks}
+                           (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
               {:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type fx.ext.node/with-tooltip-props
-               :props
-               {:tooltip
-                {:fx/type :tooltip
-                 :show-delay [10 :ms]
-                 :style {:-fx-font-size 12}
-                 :text (cond
-                         am-host "You are the host, start the game"
-                         host-ingame "Join game in progress"
-                         :else (str "Call vote to start the game"))}}
-               :desc
-               {:fx/type :button
-                :text (cond
-                        (and am-ingame (not singleplayer))
-                        "Game running"
-                        (and am-spec (not host-ingame) (not singleplayer))
-                        "Game not running"
-                        :else
-                        (str (if (and (not singleplayer) (or host-ingame am-spec))
-                               "Join" "Start")
-                             " Game"))
-                :disable (boolean (and (not singleplayer)
-                                       (or (and (not host-ingame) am-spec)
-                                           (and (not am-spec) am-ingame)
-                                           (not in-sync))))
-                :on-action
-                (merge
-                  {:event/type :spring-lobby/start-battle}
-                  state
-                  {:am-host am-host
-                   :am-spec am-spec
-                   :battle-status my-battle-status
-                   :channel-name channel-name
-                   :client-data client-data
-                   :host-ingame host-ingame})}}]}]}
+               :v-box/vgrow :always}]
+             (when-not singleplayer
+               [{:fx/type :label
+                 :text (str
+                         " "
+                         (if (= 1 (:sync my-battle-status))
+                           "synced"
+                           "unsynced")
+                         " ")
+                 :style
+                 (merge
+                   {:-fx-background-radius 3
+                    :-fx-border-color "#666666"
+                    :-fx-border-radius 3
+                    :-fx-border-style "solid"
+                    :-fx-border-width 1}
+                   (get severity-styles
+                     (if (= 1 (:sync my-battle-status))
+                       0 2)))}])
+             [{:fx/type :h-box
+               :alignment :center-left
+               :style {:-fx-font-size 24}
+               :children
+               [{:fx/type :check-box
+                 :selected (-> my-battle-status :ready boolean)
+                 :style {:-fx-padding "10px"}
+                 :on-selected-changed (merge me
+                                        {:event/type :spring-lobby/battle-ready-change
+                                         :client-data (when-not singleplayer client-data)
+                                         :username username})}
+                {:fx/type :label
+                 :text (if am-spec " Auto Launch" " Ready")}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type fx.ext.node/with-tooltip-props
+                 :props
+                 {:tooltip
+                  {:fx/type :tooltip
+                   :show-delay [10 :ms]
+                   :style {:-fx-font-size 12}
+                   :text (cond
+                           am-host "You are the host, start the game"
+                           host-ingame "Join game in progress"
+                           :else (str "Call vote to start the game"))}}
+                 :desc
+                 {:fx/type :button
+                  :text (cond
+                          (and am-ingame (not singleplayer))
+                          "Game running"
+                          (and am-spec (not host-ingame) (not singleplayer))
+                          "Game not running"
+                          :else
+                          (str (if (and (not singleplayer) (or host-ingame am-spec))
+                                 "Join" "Start")
+                               " Game"))
+                  :disable (boolean (and (not singleplayer)
+                                         (or (and (not host-ingame) am-spec)
+                                             (and (not am-spec) am-ingame)
+                                             (not in-sync))))
+                  :on-action
+                  (merge
+                    {:event/type :spring-lobby/start-battle}
+                    state
+                    {:am-host am-host
+                     :am-spec am-spec
+                     :battle-status my-battle-status
+                     :channel-name channel-name
+                     :client-data client-data
+                     :host-ingame host-ingame})}}]}])}
           {:fx/type channel-view
            :h-box/hgrow :always
            :channel-name channel-name

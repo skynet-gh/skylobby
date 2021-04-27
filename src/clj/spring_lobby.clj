@@ -3173,7 +3173,7 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
-(defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key]}]
+(defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
   (future
     (try
       (swap! *state update-in [:by-server server-key :message-drafts] dissoc channel-name)
@@ -3183,14 +3183,24 @@
         (string/blank? message)
         (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
         :else
-        (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
-          (if-let [[_all message] (re-find #"^/me (.*)$" message)]
-            (if private-message
-              (client-message client-data (str "SAYPRIVATEEX " username " " message))
-              (client-message client-data (str "SAYEX " channel-name " " message)))
-            (if private-message
-              (client-message client-data (str "SAYPRIVATE " username " " message))
-              (client-message client-data (str "SAY " channel-name " " message))))))
+        (cond
+          (re-find #"^/ingame" message) (client-message client-data "GETUSERINFO")
+          (re-find #"^/msg" message)
+          (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
+            @(event-handler
+               (merge e
+                 {:event/type ::send-message
+                  :channel-name (str "@" user)
+                  :message message})))
+          :else
+          (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
+            (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+              (if private-message
+                (client-message client-data (str "SAYPRIVATEEX " username " " message))
+                (client-message client-data (str "SAYEX " channel-name " " message)))
+              (if private-message
+                (client-message client-data (str "SAYPRIVATE " username " " message))
+                (client-message client-data (str "SAY " channel-name " " message)))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 

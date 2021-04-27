@@ -37,6 +37,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.16]
+
+- Add status icon for player sync
+- Add chat commands for /msg and /ingame
+- Add CLI flag `--server-url` to set selected server
+
 ### [0.3.15]
 
 - Add CLI flag `--spring-root`

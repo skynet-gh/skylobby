@@ -14,7 +14,8 @@
 
 
 (def cli-options
-  [[nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]])
+  [[nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
+   [nil "--server-url SERVER_URL" "Set the selected server config by url"]])
 
 
 (defn -main [& args]
@@ -31,11 +32,17 @@
           (log/info "Finished 7Zip init"))
         (let [before-state (u/curr-millis)
               _ (log/info "Loading initial state")
+              initial-state (spring-lobby/initial-state)
               state (merge
-                      (spring-lobby/initial-state)
+                      initial-state
                       {:standalone true}
                       (when (contains? options :spring-root)
-                        {:spring-isolation-dir (fs/file (:spring-root options))}))]
+                        {:spring-isolation-dir (fs/file (:spring-root options))})
+                      (when (contains? options :server-url)
+                        {:server (->> initial-state
+                                      :servers
+                                      (filter (comp #{(:server-url options)} first))
+                                      first)}))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
           (reset! spring-lobby/*state state))
         (log/info "Creating renderer")
