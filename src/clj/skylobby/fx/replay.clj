@@ -208,8 +208,8 @@
        on-close-request
        {:event/type :spring-lobby/dissoc
         :key :show-replays})
-     :width (min replays-window-width width)
-     :height (min replays-window-height height)
+     :width ((fnil min replays-window-width) width replays-window-width)
+     :height ((fnil min replays-window-height) height replays-window-height)
      :scene
      {:fx/type :scene
       :stylesheets skylobby.fx/stylesheets

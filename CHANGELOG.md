@@ -37,6 +37,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.17]
+
+- Fix use of deprecated api removed in Java 16
+- Add max tries and retry button for battle map details
+- Fix username and password with `--server-url` arg
+
 ### [0.3.16]
 
 - Add status icon for player sync

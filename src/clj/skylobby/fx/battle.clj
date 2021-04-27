@@ -98,7 +98,9 @@
                           set)
         engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
                                  set)
-        map-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-maps)
+        map-update-tasks (->> tasks-by-type
+                              (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
+                              (mapcat second)
                               set)
         mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
                               set)
