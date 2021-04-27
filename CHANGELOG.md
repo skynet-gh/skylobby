@@ -4,7 +4,7 @@ Notable changes and todo list.
 
 ## TODO - future
 
-Annoyances:
+Current Annoyances:
 
 - Tables are not laid out when they get items
 - Chat box does not auto scroll, moves when new messages come in
@@ -14,19 +14,24 @@ Annoyances:
 - Downloads and other tasks cannot be cancelled
 - Task workers run every second, can just be state watchers
 
-Features:
+Future Features:
 
-- Use resource sync for status in battles
+- Add button to spectate/play, or switch teams
+- Parse autohost messages and display in UI
+- Visually group teams in players table
+- Away mode, auto or manual
+- Track and display player away time
 - Open replay files or links
 - Open battle links
 - Up arrow in chat and console box should fill in last message
+- First run intro window
 - Highlight window and tabs when rang or new direct message
 - Add new butler downloader system
 - Chat URL highlighting, text selection
-- Away mode, auto or manual
 - Zero-K server protocol
 - Merged view of multiple servers
 - Auto switch spring settings per server or per game
+- Improve map filter window
 - Call Spring unitsync to get resource hashes
 
 Server or SPADS changes:
@@ -36,6 +41,15 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.19]
+
+- Greatly improve performance by making some state watchers periodic
+- Fix resource details cache empty key issue for map and mod sync
+
+### [0.3.18]
+
+- Fix map details not loading automatically
 
 ### [0.3.17]
 
