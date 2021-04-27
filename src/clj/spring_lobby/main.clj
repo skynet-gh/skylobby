@@ -39,10 +39,18 @@
                       (when (contains? options :spring-root)
                         {:spring-isolation-dir (fs/file (:spring-root options))})
                       (when (contains? options :server-url)
-                        {:server (->> initial-state
-                                      :servers
-                                      (filter (comp #{(:server-url options)} first))
-                                      first)}))]
+                        (let [server (->> initial-state
+                                          :servers
+                                          (filter (comp #{(:server-url options)} first))
+                                          first)
+                              {:keys [password username]} (->> initial-state
+                                                               :logins
+                                                               (filter (comp #{(:server-url options)} first))
+                                                               first
+                                                               second)]
+                          {:server server
+                           :password password
+                           :username username})))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
           (reset! spring-lobby/*state state))
         (log/info "Creating renderer")
