@@ -69,9 +69,9 @@
         engine-version (:battle-version battle-details)
         engine-details (spring/engine-details engines engine-version)
         indexed-map (->> maps (filter (comp #{battle-map} :map-name)) first)
-        battle-map-details (get map-details (resource/details-cache-key indexed-map))
+        battle-map-details (resource/cached-details map-details indexed-map)
         indexed-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
-        battle-mod-details (get mod-details (resource/details-cache-key indexed-mod))
+        battle-mod-details (resource/cached-details mod-details indexed-mod)
         in-sync (boolean (and (resource/details? battle-map-details)
                               (resource/details? battle-mod-details)
                               (seq engine-details)))
@@ -132,6 +132,7 @@
          :battle-players-color-allyteam battle-players-color-allyteam
          :channel-name channel-name
          :client-data (when-not singleplayer client-data)
+         :host-ingame host-ingame
          :host-username host-username
          :players players
          :server-key server-key
@@ -368,23 +369,24 @@
               {:fx/type :pane
                :v-box/vgrow :always}]
              (when-not singleplayer
-               [{:fx/type :label
+               [{:fx/type :button
                  :text (str
                          " "
                          (if (= 1 (:sync my-battle-status))
                            "synced"
                            "unsynced")
                          " ")
+                 :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                             :map-resource indexed-map
+                             :mod-resource indexed-mod}
                  :style
-                 (merge
-                   {:-fx-background-radius 3
-                    :-fx-border-color "#666666"
-                    :-fx-border-radius 3
-                    :-fx-border-style "solid"
-                    :-fx-border-width 1}
-                   (get severity-styles
-                     (if (= 1 (:sync my-battle-status))
-                       0 2)))}])
+                 (assoc
+                   (dissoc
+                     (get severity-styles
+                       (if (= 1 (:sync my-battle-status))
+                         0 2))
+                     :-fx-background-color)
+                   :-fx-font-size 14)}])
              [{:fx/type :h-box
                :alignment :center-left
                :style {:-fx-font-size 24}

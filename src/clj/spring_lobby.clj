@@ -3106,6 +3106,19 @@
   (update-download-source source))
 
 
+(defmethod event-handler ::clear-map-and-mod-details
+  [{:keys [map-resource mod-resource]}]
+  (let [map-key (resource/details-cache-key map-resource)
+        mod-key (resource/details-cache-key mod-resource)]
+    (swap! *state
+      (fn [state]
+        (cond-> state
+                map-key
+                (update :map-details cache/miss map-key nil)
+                mod-key
+                (update :mod-details cache/miss mod-key nil))))))
+
+
 (defmethod event-handler ::import-source-change
   [{:fx/keys [event]}]
   (swap! *state assoc :import-source-name (:import-source-name event)))
