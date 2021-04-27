@@ -526,20 +526,23 @@
                   new-map (-> new-server :battles (get new-battle-id) :battle-map)
                   map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
                   map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
+                  tries (or (:tries map-details) resource/max-tries)
                   all-tasks (concat tasks (vals current-tasks))]
-              (when (or (and (and (not (string/blank? new-map))
-                                  (not (seq map-details)))
-                             (or (not= old-battle-id new-battle-id)
-                                 (not= old-map new-map)
-                                 (and
-                                   (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
-                                   map-exists)))
-                        (and
-                          (or (not (some (comp #{new-map} :map-name) old-maps)))
-                          map-exists))
+              (when (and (< tries resource/max-tries)
+                         (or (and (and (not (string/blank? new-map))
+                                       (not (resource/details? map-details)))
+                                  (or (not= old-battle-id new-battle-id)
+                                      (not= old-map new-map)
+                                      (and
+                                        (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
+                                        map-exists)))
+                             (and
+                               (or (not (some (comp #{new-map} :map-name) old-maps)))
+                               map-exists)))
                 (add-task! *state {::task-type ::map-details
                                    :map-name new-map
-                                   :map-file (:file map-exists)}))))
+                                   :map-file (:file map-exists)
+                                   :tries tries}))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher"))))))
   (add-watch state-atom :battle-mod-details
@@ -807,9 +810,15 @@
                                          (disj (set tasks) task)))
                                      (assoc-in [:current-tasks task-kind] task))))))
          task (-> after :current-tasks (get task-kind))]
-     (handle-task task)
-     (when task
-       (swap! state-atom update :current-tasks assoc task-kind nil))
+     (try
+       (handle-task task)
+       (catch Throwable t
+         (log/error t "Critical error running task"))
+       (catch Exception e
+         (log/error e "Error running task"))
+       (finally
+         (when task
+           (swap! state-atom update :current-tasks assoc task-kind nil))))
      task)))
 
 
@@ -1359,14 +1368,14 @@
   (fs/update-file-cache! *state file))
 
 
-(defmethod task-handler ::map-details [{:keys [map-name map-file] :as map-data}]
+(defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
   (if map-file
     (do
       (log/info "Updating battle map details for" map-name)
       (let [map-details (or (read-map-details map-data) {:map-name map-name
                                                          :file map-file
                                                          :error true
-                                                         :tries 1})] ; TODO inc
+                                                         :tries ((fnil inc 0) tries)})]
         (log/info "Got map details for" map-name map-file (keys map-details))
         (swap! *state update :map-details cache/miss (fs/canonical-path map-file) map-details)))
     (do

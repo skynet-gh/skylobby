@@ -10,7 +10,10 @@
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
            import-tasks importables-by-path indexed-map map-update-tasks spring-isolation-dir tasks-by-type]}]
   (let [
-        no-map-details (not (resource/details? battle-map-details))]
+        no-map-details (not (resource/details? battle-map-details))
+        tries (:tries battle-map-details)
+        at-max-tries (or (not (number? tries))
+                         (>= tries resource/max-tries))]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Map"
@@ -23,7 +26,7 @@
      (concat
        (let [severity (cond
                         no-map-details
-                        (if indexed-map
+                        (if (and indexed-map (seq map-update-tasks))
                           -1 2)
                         :else 0)]
          [{:severity severity
@@ -34,6 +37,18 @@
                       (if indexed-map
                         (str "Loading map details for '" battle-map "'")
                         (str "Map '" battle-map "' not found locally")))}])
+       (when (and no-map-details at-max-tries (empty? map-update-tasks))
+         [{:severity 2
+           :text "retry"
+           :human-text "Max tries exceeded, click to retry"
+           :tooltip "Attempt to reload map details"
+           :action
+           {:event/type :spring-lobby/add-task
+            :task
+            {:spring-lobby/task-type :spring-lobby/map-details
+             :map-name battle-map
+             :map-file (:file indexed-map)
+             :tries 0}}}])
        (when (and no-map-details (not indexed-map))
          (concat
            (let [downloadable (->> downloadables-by-url

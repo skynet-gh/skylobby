@@ -8,6 +8,9 @@
     [spring-lobby.util :as u]))
 
 
+(def max-tries 5)
+
+
 (def resource-types
   [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
 

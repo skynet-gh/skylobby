@@ -175,12 +175,11 @@
 
 (defn scale-minimap-image [minimap-width minimap-height minimap-image]
   (when minimap-image
-    (let [^sun.awt.image.ToolkitImage scaled
-          (.getScaledInstance ^java.awt.Image minimap-image
-            minimap-width minimap-height java.awt.Image/SCALE_SMOOTH)
-          _ (.getWidth scaled)
-          _ (.getHeight scaled)]
-      (.getBufferedImage scaled))))
+    (let [scaled (BufferedImage. minimap-width minimap-height BufferedImage/TYPE_INT_RGB)
+          graphics2d (.createGraphics scaled)]
+      (.drawImage graphics2d minimap-image 0 0 minimap-width minimap-height nil)
+      (.dispose graphics2d)
+      scaled)))
 
 (defn minimap-dimensions [map-smf-header]
   (let [{:keys [map-width map-height]} map-smf-header]
