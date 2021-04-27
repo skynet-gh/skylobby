@@ -236,7 +236,7 @@
       {:fx/type :table-column
        :text "Status"
        :resizable false
-       :pref-width 56
+       :pref-width 82
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
@@ -249,7 +249,13 @@
              {:fx/type :h-box
               :children
               (concat
-                [(cond
+                [
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal
+                  (if (= 1 (:sync battle-status))
+                    "mdi-sync:16:green"
+                    "mdi-sync-off:16:red")}
+                 (cond
                    (:bot client-status)
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-robot:16:grey"}
