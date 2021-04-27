@@ -12,8 +12,8 @@
   (let [
         no-map-details (not (resource/details? battle-map-details))
         tries (:tries battle-map-details)
-        at-max-tries (or (not (number? tries))
-                         (>= tries resource/max-tries))]
+        at-max-tries (and (number? tries)
+                          (>= tries resource/max-tries))]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Map"
