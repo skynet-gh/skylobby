@@ -528,7 +528,8 @@
                   map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
                   tries (or (:tries map-details) resource/max-tries)
                   all-tasks (concat tasks (vals current-tasks))]
-              (when (and (< tries resource/max-tries)
+              (when (and (or (not (resource/details? map-details))
+                             (< tries resource/max-tries))
                          (or (and (and (not (string/blank? new-map))
                                        (not (resource/details? map-details)))
                                   (or (not= old-battle-id new-battle-id)
@@ -1369,18 +1370,27 @@
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
-  (if map-file
-    (do
-      (log/info "Updating battle map details for" map-name)
-      (let [map-details (or (read-map-details map-data) {:map-name map-name
-                                                         :file map-file
-                                                         :error true
-                                                         :tries ((fnil inc 0) tries)})]
-        (log/info "Got map details for" map-name map-file (keys map-details))
-        (swap! *state update :map-details cache/miss (fs/canonical-path map-file) map-details)))
-    (do
-      (log/info "Map not found, setting empty details for" map-name)
-      (swap! *state update :map-details cache/miss map-name {}))))
+  (let [new-tries ((fnil inc 0) tries)
+        error-data {:error true
+                    :file map-file
+                    :map-name map-name
+                    :tries new-tries}
+        cache-key (fs/canonical-path map-file)]
+    (try
+      (if map-file
+        (do
+          (log/info "Updating battle map details for" map-name)
+          (let [map-details (or (read-map-details map-data) error-data)]
+            (log/info "Got map details for" map-name map-file (keys map-details))
+            (swap! *state update :map-details cache/miss cache-key map-details)))
+        (do
+          (log/info "Map not found, setting empty details for" map-name)
+          (swap! *state update :map-details cache/miss cache-key {:tries new-tries})))
+      (catch Throwable t
+        (log/error t "Error updating map details")
+        (swap! *state update :map-details cache/miss cache-key error-data)
+        (throw t)))))
+
 
 (defmethod task-handler ::mod-details [{:keys [mod-name mod-file]}]
   (if mod-file
