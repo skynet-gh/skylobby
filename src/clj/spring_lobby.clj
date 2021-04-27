@@ -34,6 +34,7 @@
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte]
     [version-clj.core :as version])
   (:import
     (java.awt Desktop Desktop$Action)
@@ -304,14 +305,28 @@
 
 
 (defn- battle-map-details-relevant-keys [state]
-  (select-keys
-    state
-    [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks]))
+  (-> state
+      (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks])
+      (update :by-server
+        (fn [by-server]
+          (reduce-kv
+            (fn [m k v]
+              (assoc m k
+                (select-keys v [:client-data :battle :battles])))
+            {}
+            by-server)))))
 
-(defn- battle-mod-details-relevant-keys [state]
-  (select-keys
-    state
-    [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks]))
+(defn- battle-mod-details-relevant-data [state]
+  (-> state
+      (select-keys [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks])
+      (update :by-server
+        (fn [by-server]
+          (reduce-kv
+            (fn [m k v]
+              (assoc m k
+                (select-keys v [:client-data :battle :battles])))
+            {}
+            by-server)))))
 
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
@@ -341,10 +356,18 @@
     state
     [:server :servers]))
 
-(defn- update-battle-status-sync-relevant-keys [state]
-  (select-keys
-    state
-    [:by-server :mod-details :map-details :servers :spring-isolation-dir]))
+(defn- update-battle-status-sync-relevant-data [state]
+  (-> state
+      (select-keys [:by-server :by-spring-root :mod-details :map-details :servers :spring-isolation-dir])
+      (update :by-server
+        (fn [by-server]
+          (reduce-kv
+            (fn [m k v]
+              (assoc m k
+                (select-keys v [:client-data :battle :battles])))
+            {}
+            by-server)))))
+
 
 
 (defn server-auto-resources [_old-state new-state old-server new-server]
@@ -492,170 +515,163 @@
         (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
 
 
-(defn- add-watchers
-  "Adds all *state watchers."
-  [state-atom]
-  (remove-watch state-atom :state-to-edn)
-  (remove-watch state-atom :debug)
-  (remove-watch state-atom :battle-map-details)
-  (remove-watch state-atom :battle-mod-details)
-  (remove-watch state-atom :replay-map-and-mod-details)
-  (remove-watch state-atom :fix-missing-resource)
-  (remove-watch state-atom :fix-spring-isolation-dir)
-  (remove-watch state-atom :spring-isolation-dir-changed)
-  (remove-watch state-atom :auto-get-resources)
-  (remove-watch state-atom :fix-selected-server)
-  (remove-watch state-atom :update-battle-status-sync)
-  (add-watch state-atom :battle-map-details
-    (fn [_k _ref old-state new-state]
-      (when (not= (battle-map-details-relevant-keys old-state)
-                  (battle-map-details-relevant-keys new-state))
-        (try
-          (doseq [[server-key new-server] (-> new-state :by-server seq)]
-            (let [old-server (-> old-state :by-server (get server-key))
-                  server-url (-> new-server :client-data :server-url)
-                  {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
-                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                  spring-isolation-dir)
-                  spring-root-path (fs/canonical-path spring-root)
-                  old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
-                  new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
-                  old-battle-id (-> old-server :battle :battle-id)
-                  new-battle-id (-> new-server :battle :battle-id)
-                  old-map (-> old-server :battles (get old-battle-id) :battle-map)
-                  new-map (-> new-server :battles (get new-battle-id) :battle-map)
-                  map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-                  map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
-                  tries (or (:tries map-details) resource/max-tries)
-                  all-tasks (concat tasks (vals current-tasks))]
-              (when (and (or (not (resource/details? map-details))
-                             (< tries resource/max-tries))
-                         (or (and (and (not (string/blank? new-map))
-                                       (not (resource/details? map-details)))
-                                  (or (not= old-battle-id new-battle-id)
-                                      (not= old-map new-map)
-                                      (and
-                                        (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
-                                        map-exists)))
+(defn battle-map-details-watcher [_k state-atom old-state new-state]
+  (when (not= (battle-map-details-relevant-keys old-state)
+              (battle-map-details-relevant-keys new-state))
+    (try
+      (doseq [[server-key new-server] (-> new-state :by-server seq)]
+        (let [old-server (-> old-state :by-server (get server-key))
+              server-url (-> new-server :client-data :server-url)
+              {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
+              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                              spring-isolation-dir)
+              spring-root-path (fs/canonical-path spring-root)
+              old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
+              new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
+              old-battle-id (-> old-server :battle :battle-id)
+              new-battle-id (-> new-server :battle :battle-id)
+              old-map (-> old-server :battles (get old-battle-id) :battle-map)
+              new-map (-> new-server :battles (get new-battle-id) :battle-map)
+              map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
+              map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
+              tries (or (:tries map-details) resource/max-tries)
+              all-tasks (concat tasks (vals current-tasks))]
+          (when (and (or (not (resource/details? map-details))
+                         (< tries resource/max-tries))
+                     (or (and (and (not (string/blank? new-map))
+                                   (not (resource/details? map-details)))
+                              (or (not= old-battle-id new-battle-id)
+                                  (not= old-map new-map)
+                                  (and
+                                    (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
+                                    map-exists)))
+                         (and
+                           (or (not (some (comp #{new-map} :map-name) old-maps)))
+                           map-exists)))
+            (add-task! state-atom
+              {::task-type ::map-details
+               :map-name new-map
+               :map-file (:file map-exists)
+               :tries tries}))))
+      (catch Exception e
+        (log/error e "Error in :battle-map-details state watcher")))))
+
+
+(defn battle-mod-details-watcher [_k state-atom old-state new-state]
+  (when (not= (battle-mod-details-relevant-data old-state)
+              (battle-mod-details-relevant-data new-state))
+    (try
+      (doseq [[server-key new-server] (-> new-state :by-server seq)]
+        (let [old-server (-> old-state :by-server (get server-key))
+              server-url (-> new-server :client-data :server-url)
+              {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
+              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                              spring-isolation-dir)
+              spring-root-path (fs/canonical-path spring-root)
+              old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+              new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
+              old-battle-id (-> old-server :battle :battle-id)
+              new-battle-id (-> new-server :battle :battle-id)
+              old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
+              new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
+              new-mod-sans-git (u/mod-name-sans-git new-mod)
+              mod-name-set (set [new-mod new-mod-sans-git])
+              filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+              mod-exists (->> new-mods (filter filter-fn) first)
+              mod-details (-> new-state :mod-details (get (fs/canonical-path (:file mod-exists))))
+              all-tasks (concat tasks (vals current-tasks))]
+          (when (or (and (and (not (string/blank? new-mod))
+                              (not (seq mod-details)))
+                         (or (not= old-battle-id new-battle-id)
+                             (not= old-mod new-mod)
                              (and
-                               (or (not (some (comp #{new-map} :map-name) old-maps)))
-                               map-exists)))
-                (add-task! *state {::task-type ::map-details
-                                   :map-name new-map
-                                   :map-file (:file map-exists)
-                                   :tries tries}))))
-          (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher"))))))
-  (add-watch state-atom :battle-mod-details
-    (fn [_k _ref old-state new-state]
-      (when (not= (battle-mod-details-relevant-keys old-state)
-                  (battle-mod-details-relevant-keys new-state))
-        (try
-          (doseq [[server-key new-server] (-> new-state :by-server seq)]
-            (let [old-server (-> old-state :by-server (get server-key))
-                  server-url (-> new-server :client-data :server-url)
-                  {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
-                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                  spring-isolation-dir)
-                  spring-root-path (fs/canonical-path spring-root)
-                  old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-                  new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-                  old-battle-id (-> old-server :battle :battle-id)
-                  new-battle-id (-> new-server :battle :battle-id)
-                  old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
-                  new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
-                  new-mod-sans-git (u/mod-name-sans-git new-mod)
-                  mod-name-set (set [new-mod new-mod-sans-git])
-                  filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-                  mod-exists (->> new-mods (filter filter-fn) first)
-                  mod-details (-> new-state :mod-details (get (fs/canonical-path (:file mod-exists))))
-                  all-tasks (concat tasks (vals current-tasks))]
-              (when (or (and (and (not (string/blank? new-mod))
-                                  (not (seq mod-details)))
-                             (or (not= old-battle-id new-battle-id)
-                                 (not= old-mod new-mod)
-                                 (and
-                                   (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
-                                   mod-exists)))
-                        (and
-                          (or (not (some (comp #{new-mod} :mod-name) old-mods)))
-                          mod-exists))
-                (add-task! *state {::task-type ::mod-details
-                                   :mod-name new-mod
-                                   :mod-file (:file mod-exists)}))))
-          (catch Exception e
-            (log/error e "Error in :battle-mod-details state watcher"))))))
-  (add-watch state-atom :replay-map-and-mod-details
-    (fn [_k _ref old-state new-state]
-      (when (not= (replay-map-and-mod-details-relevant-keys old-state)
-                  (replay-map-and-mod-details-relevant-keys new-state))
-        (try
-          (let [old-selected-replay-file (:selected-replay-file old-state)
-                old-replay-id (:selected-replay-id old-state)
-                {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id spring-isolation-dir]} new-state
+                               (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
+                               mod-exists)))
+                    (and
+                      (or (not (some (comp #{new-mod} :mod-name) old-mods)))
+                      mod-exists))
+            (add-task! state-atom
+              {::task-type ::mod-details
+               :mod-name new-mod
+               :mod-file (:file mod-exists)}))))
+      (catch Exception e
+        (log/error e "Error in :battle-mod-details state watcher")))))
 
-                old-replay-path (fs/canonical-path old-selected-replay-file)
-                new-replay-path (fs/canonical-path selected-replay-file)
 
-                old-replay (or (get parsed-replays-by-path old-replay-path)
-                               (get online-bar-replays old-replay-id))
-                new-replay (or (get parsed-replays-by-path new-replay-path)
-                               (get online-bar-replays selected-replay-id))
+(defn replay-map-and-mod-details-watcher [_k state-atom old-state new-state]
+  (when (not= (replay-map-and-mod-details-relevant-keys old-state)
+              (replay-map-and-mod-details-relevant-keys new-state))
+    (try
+      (let [old-selected-replay-file (:selected-replay-file old-state)
+            old-replay-id (:selected-replay-id old-state)
+            {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id spring-isolation-dir]} new-state
 
-                old-game (-> old-replay :body :script-data :game)
-                old-mod (:gametype old-game)
-                old-map (:mapname old-game)
+            old-replay-path (fs/canonical-path old-selected-replay-file)
+            new-replay-path (fs/canonical-path selected-replay-file)
 
-                new-game (-> new-replay :body :script-data :game)
-                new-mod (:gametype new-game)
-                new-map (:mapname new-game)
+            old-replay (or (get parsed-replays-by-path old-replay-path)
+                           (get online-bar-replays old-replay-id))
+            new-replay (or (get parsed-replays-by-path new-replay-path)
+                           (get online-bar-replays selected-replay-id))
 
-                map-details (-> new-state :map-details (get new-map))
-                mod-details (-> new-state :mod-details (get new-mod))
+            old-game (-> old-replay :body :script-data :game)
+            old-mod (:gametype old-game)
+            old-map (:mapname old-game)
 
-                map-changed (not= new-map (:map-name map-details))
-                mod-changed (not= new-mod (:mod-name mod-details))
+            new-game (-> new-replay :body :script-data :game)
+            new-mod (:gametype new-game)
+            new-map (:mapname new-game)
 
-                spring-root-path (fs/canonical-path spring-isolation-dir)
+            map-details (-> new-state :map-details (get new-map))
+            mod-details (-> new-state :mod-details (get new-mod))
 
-                old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
-                new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
+            map-changed (not= new-map (:map-name map-details))
+            mod-changed (not= new-mod (:mod-name mod-details))
 
-                old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-                new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
+            spring-root-path (fs/canonical-path spring-isolation-dir)
 
-                new-mod-sans-git (u/mod-name-sans-git new-mod)
-                mod-name-set (set [new-mod new-mod-sans-git])
-                filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+            old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
+            new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
 
-                map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-                mod-exists (->> new-mods (filter filter-fn) first)]
-            (when (or (and (or (not= old-replay-path new-replay-path)
-                               (not= old-mod new-mod))
-                           (and (not (string/blank? new-mod))
-                                (or (not (seq mod-details))
-                                    mod-changed)))
-                      (and
-                        (or (not (some filter-fn old-mods)))
-                        mod-exists))
-              (add-task! *state {::task-type ::mod-details
-                                 :mod-name new-mod
-                                 :mod-file (:file mod-exists)}))
-            (when (or (and (or (not= old-replay-path new-replay-path)
-                               (not= old-map new-map))
-                           (and (not (string/blank? new-map))
-                                (or (not (seq map-details))
-                                    map-changed)))
-                      (and
-                        (or (not (some (comp #{new-map} :map-name) old-maps)))
-                        map-exists))
-              (add-task! *state {::task-type ::map-details
-                                 :map-name new-map
-                                 :map-file (:file map-exists)})))
-          (catch Exception e
-            (log/error e "Error in :replay-map-and-mod-details state watcher"))))))
-  (add-watch state-atom :fix-missing-resource
-    (fn [_k _ref old-state new-state]
+            old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+            new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
+
+            new-mod-sans-git (u/mod-name-sans-git new-mod)
+            mod-name-set (set [new-mod new-mod-sans-git])
+            filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+
+            map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
+            mod-exists (->> new-mods (filter filter-fn) first)]
+        (when (or (and (or (not= old-replay-path new-replay-path)
+                           (not= old-mod new-mod))
+                       (and (not (string/blank? new-mod))
+                            (or (not (seq mod-details))
+                                mod-changed)))
+                  (and
+                    (or (not (some filter-fn old-mods)))
+                    mod-exists))
+          (add-task! state-atom
+            {::task-type ::mod-details
+             :mod-name new-mod
+             :mod-file (:file mod-exists)}))
+        (when (or (and (or (not= old-replay-path new-replay-path)
+                           (not= old-map new-map))
+                       (and (not (string/blank? new-map))
+                            (or (not (seq map-details))
+                                map-changed)))
+                  (and
+                    (or (not (some (comp #{new-map} :map-name) old-maps)))
+                    map-exists))
+          (add-task! *state {::task-type ::map-details
+                             :map-name new-map
+                             :map-file (:file map-exists)})))
+      (catch Exception e
+        (log/error e "Error in :replay-map-and-mod-details state watcher")))))
+
+
+(defn fix-missing-resource-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:id ::state-watcher}
+    (tufte/p :fix-missing-resource-watcher
       (when (not= (fix-resource-relevant-keys old-state)
                   (fix-resource-relevant-keys new-state))
         (try
@@ -684,9 +700,12 @@
                          mod-fix (assoc :mod-name mod-fix)
                          map-fix (assoc :map-name map-fix))))))
           (catch Exception e
-            (log/error e "Error in :battle-map-details state watcher"))))))
-  (add-watch state-atom :fix-spring-isolation-dir
-    (fn [_k _ref old-state new-state]
+            (log/error e "Error in :battle-map-details state watcher")))))))
+
+
+(defn fix-spring-isolation-dir-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:id ::state-watcher}
+    (tufte/p :fix-spring-isolation-dir-watcher
       (when (not= old-state new-state)
         (try
           (let [{:keys [spring-isolation-dir]} new-state]
@@ -695,9 +714,11 @@
               (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
               (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
           (catch Exception e
-            (log/error e "Error in :fix-spring-isolation-dir state watcher"))))))
-  (add-watch state-atom :spring-isolation-dir-changed
-    (fn [_k _ref old-state new-state]
+            (log/error e "Error in :fix-spring-isolation-dir state watcher")))))))
+
+(defn spring-isolation-dir-changed-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:id ::state-watcher}
+    (tufte/p :spring-isolation-dir-changed-watcher
       (when (not= old-state new-state)
         (try
           (let [{:keys [spring-isolation-dir]} new-state]
@@ -707,7 +728,7 @@
                              (fs/canonical-path (:spring-isolation-dir old-state))))
               (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
                         "to" spring-isolation-dir "updating resources")
-              (swap! *state
+              (swap! state-atom
                 (fn [{:keys [extra-import-sources] :as state}]
                   (-> state
                       (update :tasks-by-kind
@@ -720,9 +741,12 @@
                          {::task-type ::update-rapid}
                          {::task-type ::refresh-replays}]))))))
           (catch Exception e
-            (log/error e "Error in :spring-isolation-dir-changed state watcher"))))))
-  (add-watch state-atom :auto-get-resources
-    (fn [_k _ref old-state new-state]
+            (log/error e "Error in :spring-isolation-dir-changed state watcher")))))))
+
+
+(defn auto-get-resources-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:id ::state-watcher}
+    (tufte/p :auto-get-resources-watcher
       (when (not= (auto-get-resources-relevant-keys old-state)
                   (auto-get-resources-relevant-keys new-state))
         (try
@@ -735,11 +759,14 @@
                                 (filter some?)
                                 seq)]
             (log/info "Adding" (count tasks) "to auto get resources")
-            (add-tasks! *state tasks))
+            (add-tasks! state-atom tasks))
           (catch Exception e
-            (log/error e "Error in :auto-get-resources state watcher"))))))
-  (add-watch state-atom :fix-selected-server
-    (fn [_k _ref old-state new-state]
+            (log/error e "Error in :auto-get-resources state watcher")))))))
+
+
+(defn fix-selected-server-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:id ::state-watcher}
+    (tufte/p :fix-selected-server-watcher
       (when (not= (fix-selected-server-relevant-keys old-state)
                   (fix-selected-server-relevant-keys new-state))
         (try
@@ -751,41 +778,86 @@
                 (log/info "Fixing selected server from" server "to" new-server)
                 (swap! state-atom assoc :server new-server))))
           (catch Exception e
-            (log/error e "Error in :fix-selected-server state watcher"))))))
+            (log/error e "Error in :fix-selected-server state watcher")))))))
+
+
+(defn update-battle-status-sync-watcher [_k _ref old-state new-state]
+  (when (not= (update-battle-status-sync-relevant-data old-state)
+              (update-battle-status-sync-relevant-data new-state))
+    (try
+      (doseq [[server-key new-server] (-> new-state :by-server seq)]
+        (let [old-server (-> old-state :by-server (get server-key))
+              server-url (-> new-server :client-data :server-url)
+              {:keys [servers spring-isolation-dir]} new-state
+              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                              spring-isolation-dir)
+              spring-root-path (fs/canonical-path spring-root)
+
+              old-spring (-> old-state :by-spring-root (get spring-root-path))
+              new-spring (-> new-state :by-spring-root (get spring-root-path))
+
+              old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
+              new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
+
+              new-sync-number (handler/sync-number new-sync)
+              battle (:battle new-server)
+              client-data (:client-data new-server)
+              my-username (:username client-data)
+              {:keys [battle-status team-color]} (-> battle :users (get my-username))
+              old-sync-number (-> battle :users (get my-username) :battle-status :sync)]
+          (when (and (:battle-id battle)
+                     (not= old-sync new-sync))
+            (log/info "Updating battle sync status for" server-key "from" old-sync
+                      "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
+            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+              (client-message client-data
+                (str "MYBATTLESTATUS " (handler/encode-battle-status new-battle-status) " " team-color))))))
+      (catch Exception e
+        (log/error e "Error in :update-battle-status-sync state watcher")))))
+
+
+(defn- add-watchers
+  "Adds all *state watchers."
+  [state-atom]
+  (remove-watch state-atom :state-to-edn)
+  (remove-watch state-atom :debug)
+  (remove-watch state-atom :battle-map-details)
+  (remove-watch state-atom :battle-mod-details)
+  (remove-watch state-atom :replay-map-and-mod-details)
+  (remove-watch state-atom :fix-missing-resource)
+  (remove-watch state-atom :fix-spring-isolation-dir)
+  (remove-watch state-atom :spring-isolation-dir-changed)
+  (remove-watch state-atom :auto-get-resources)
+  (remove-watch state-atom :fix-selected-server)
+  (remove-watch state-atom :update-battle-status-sync)
+  #_
+  (add-watch state-atom :battle-map-details
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:id ::state-watcher}
+        (tufte/p :battle-map-details-watcher
+          (battle-map-details-watcher _k state-atom old-state new-state)))))
+  #_
+  (add-watch state-atom :battle-mod-details
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:id ::state-watcher}
+        (tufte/p :battle-mod-details-watcher
+          (battle-mod-details-watcher _k state-atom old-state new-state)))))
+  (add-watch state-atom :replay-map-and-mod-details
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:id ::state-watcher}
+        (tufte/p :replay-map-and-mod-details-watcher
+          (replay-map-and-mod-details-watcher _k state-atom old-state new-state)))))
+  (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
+  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
+  (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
+  (add-watch state-atom :auto-get-resources auto-get-resources-watcher)
+  (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
+  #_
   (add-watch state-atom :update-battle-status-sync
-    (fn [_k _ref old-state new-state]
-      (when (not= (update-battle-status-sync-relevant-keys old-state)
-                  (update-battle-status-sync-relevant-keys new-state))
-        (try
-          (doseq [[server-key new-server] (-> new-state :by-server seq)]
-            (let [old-server (-> old-state :by-server (get server-key))
-                  server-url (-> new-server :client-data :server-url)
-                  {:keys [servers spring-isolation-dir]} new-state
-                  spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                  spring-isolation-dir)
-                  spring-root-path (fs/canonical-path spring-root)
-
-                  old-spring (-> old-state :by-spring-root (get spring-root-path))
-                  new-spring (-> new-state :by-spring-root (get spring-root-path))
-
-                  old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
-                  new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
-
-                  new-sync-number (handler/sync-number new-sync)
-                  battle (:battle new-server)
-                  client-data (:client-data new-server)
-                  my-username (:username client-data)
-                  {:keys [battle-status team-color]} (-> battle :users (get my-username))
-                  old-sync-number (-> battle :users (get my-username) :battle-status :sync)]
-              (when (and (:battle-id battle)
-                         (not= old-sync new-sync))
-                (log/info "Updating battle sync status for" server-key "from" old-sync
-                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
-                (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-                  (client-message client-data
-                    (str "MYBATTLESTATUS " (handler/encode-battle-status new-battle-status) " " team-color))))))
-          (catch Exception e
-            (log/error e "Error in :update-battle-status-sync state watcher")))))))
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:id ::state-watcher}
+        (tufte/p :update-battle-status-sync-watcher
+          (update-battle-status-sync-watcher))))))
 
 
 (defmulti task-handler ::task-type)
@@ -1332,6 +1404,49 @@
           {:error-handler
            (fn [e]
              (log/error e "Error spitting app config edn")
+             true)})]
+    (fn [] (.close chimer))))
+
+
+(defn- state-change-chimer-fn
+  "Creates a chimer that runs a state watcher fn periodically."
+  [state-atom k watcher-fn]
+  (let [old-state-atom (atom {})
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/instant)
+            (java-time/duration 1 :seconds))
+          (fn [_chimestamp]
+            (let [old-state @old-state-atom
+                  new-state @state-atom]
+              (tufte/profile {:id ::chimer}
+                (tufte/p k
+                  (watcher-fn k state-atom old-state new-state)))
+              (reset! old-state-atom new-state)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error in" k "state change chimer")
+             true)})]
+    (fn [] (.close chimer))))
+
+
+; https://github.com/ptaoussanis/tufte/blob/master/examples/clj/src/example/server.clj
+(defn- profile-print-chimer-fn [_state-atom]
+  (log/info "Starting profile print chimer")
+  (let [stats-accumulator (tufte/add-accumulating-handler! {:ns-pattern "*"})
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/duration 1 :minutes))
+          (fn [_chimestamp]
+            (if-let [m (not-empty @stats-accumulator)]
+              (log/info (str "Profiler stats:\n" (tufte/format-grouped-pstats m)))
+              (log/warn "No profiler stats to print")))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error in profiler print")
              true)})]
     (fn [] (.close chimer))))
 
@@ -3273,6 +3388,13 @@
   (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))
 
 
+(def state-watch-chimers
+  [[:battle-map-details-watcher battle-map-details-watcher]
+   [:battle-mod-details-watcher battle-mod-details-watcher]
+   ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
+
+
 (defn- init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
@@ -3280,9 +3402,14 @@
   (let [task-chimers (->> task/task-kinds
                           (map (partial tasks-chimer-fn state-atom))
                           doall)
+        state-chimers (->> state-watch-chimers
+                           (map (fn [[k watcher-fn]]
+                                  (state-change-chimer-fn state-atom k watcher-fn)))
+                           doall)
         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
         check-app-update-chimer (check-app-update-chimer-fn state-atom)
-        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)]
+        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
+        profile-print-chimer (profile-print-chimer-fn state-atom)]
     (add-watchers state-atom)
     (add-task! state-atom {::task-type ::reconcile-engines})
     (add-task! state-atom {::task-type ::reconcile-mods})
@@ -3295,9 +3422,12 @@
     {:chimers
      (concat
        task-chimers
+       state-chimers
        [truncate-messages-chimer
         check-app-update-chimer
-        spit-app-config-chimer])}))
+        spit-app-config-chimer
+        profile-print-chimer])}))
+
 
 (defn init-async [state-atom]
   (future
