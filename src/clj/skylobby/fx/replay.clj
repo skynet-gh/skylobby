@@ -90,134 +90,133 @@
            show-replays spring-isolation-dir tasks-by-type title]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :replays-window
-      (let [{:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
-            local-filenames (->> parsed-replays-by-path
-                                 vals
-                                 (map :filename)
-                                 (filter some?)
-                                 set)
-            online-only-replays (->> online-bar-replays
+      {:fx/type :stage
+       :showing (boolean show-replays)
+       :title (or title (str u/app-name " Replays"))
+       :icons skylobby.fx/icons
+       :on-close-request
+       (or
+         on-close-request
+         {:event/type :spring-lobby/dissoc
+          :key :show-replays})
+       :width ((fnil min replays-window-width) (:width screen-bounds) replays-window-width)
+       :height ((fnil min replays-window-height) (:height screen-bounds) replays-window-height)
+       :scene
+       {:fx/type :scene
+        :stylesheets skylobby.fx/stylesheets
+        :root
+        (if show-replays
+          (let [{:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+                local-filenames (->> parsed-replays-by-path
                                      vals
-                                     (remove (comp local-filenames :filename)))
-            all-replays (->> parsed-replays-by-path
-                             vals
-                             (concat online-only-replays)
-                             (sort-by (comp str :unix-time :header))
-                             reverse
-                             doall)
-            replay-types (set (map :game-type all-replays))
-            num-players (->> all-replays
-                             (map replay-player-count)
-                             set
-                             sort)
-            filter-terms (->> (string/split (or filter-replay "") #"\s+")
-                              (remove string/blank?)
-                              (map string/lower-case))
-            includes-term? (fn [s term]
-                             (let [lc (string/lower-case (or s ""))]
-                               (string/includes? lc term)))
-            replays (->> all-replays
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-source
-                               (= filter-replay-source (:source-name replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-type
-                               (= filter-replay-type (:game-type replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-players
-                               (<= filter-replay-min-players (replay-player-count replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-max-players
-                               (<= (replay-player-count replay) filter-replay-max-players)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-skill
-                               (if-let [avg (average-skill (replay-skills replay))]
-                                 (<= filter-replay-min-skill avg)
-                                 false)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if (empty? filter-terms)
-                               true
-                               (every?
-                                 (some-fn
-                                   (partial includes-term? (:filename replay))
-                                   (partial includes-term? (-> replay :header :engine-version))
-                                   (partial includes-term? (-> replay :body :script-data :game :gametype))
-                                   (partial includes-term? (-> replay :body :script-data :game :mapname))
-                                   (fn [term]
-                                     (let [players (some->> replay :body :script-data :game
-                                                            (filter (comp #(string/starts-with? % "player") name first))
-                                                            (filter
-                                                              (if replays-filter-specs
-                                                                (constantly true)
-                                                                (comp #{0 "0"} :spectator second)))
-                                                            (map (comp sanitize-replay-filter :name second)))]
-                                       (some #(includes-term? % term) players))))
-                                 filter-terms)))))
-            selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
-                                (get online-bar-replays selected-replay-id))
-            engines-by-version (into {} (map (juxt :engine-version identity) engines))
-            mods-by-version (into {} (map (juxt :mod-name identity) mods))
-            maps-by-version (into {} (map (juxt :map-name identity) maps))
-
-            selected-engine-version (-> selected-replay :header :engine-version)
-            selected-matching-engine (get engines-by-version selected-engine-version)
-            selected-matching-mod (get mods-by-version (-> selected-replay :body :script-data :game :gametype))
-            selected-matching-map (get maps-by-version (-> selected-replay :body :script-data :game :mapname))
-            extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
-                               (map (comp fs/canonical-path :file))
-                               set)
-            import-tasks (->> (get tasks-by-type :spring-lobby/import)
-                              (map (comp fs/canonical-path :resource-file :importable))
-                              set)
-            refresh-tasks (get tasks-by-type :spring-lobby/refresh-replays)
-            index-downloads-tasks (get tasks-by-type :spring-lobby/download-bar-replays)
-            download-tasks (->> (get tasks-by-type :spring-lobby/download-bar-replay)
-                                (map :id)
-                                set)
-            http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
-                                     (map (comp :download-url :downloadable))
+                                     (map :filename)
+                                     (filter some?)
                                      set)
-            rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
-                             (map :rapid-id)
-                             set)
-            rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
-                                    seq)
-            engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
-                                     seq)
-            map-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-maps)
-                                  seq)
-            mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
-                                  seq)
-            {:keys [width height]} screen-bounds
-            time-zone-id (.toZoneId (TimeZone/getDefault))
-            sources (replay-sources {:extra-replay-sources extra-replay-sources})]
-        {:fx/type :stage
-         :showing (boolean show-replays)
-         :title (or title (str u/app-name " Replays"))
-         :icons skylobby.fx/icons
-         :on-close-request
-         (or
-           on-close-request
-           {:event/type :spring-lobby/dissoc
-            :key :show-replays})
-         :width ((fnil min replays-window-width) width replays-window-width)
-         :height ((fnil min replays-window-height) height replays-window-height)
-         :scene
-         {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
-          :root
-          (if show-replays
+                online-only-replays (->> online-bar-replays
+                                         vals
+                                         (remove (comp local-filenames :filename)))
+                all-replays (->> parsed-replays-by-path
+                                 vals
+                                 (concat online-only-replays)
+                                 (sort-by (comp str :unix-time :header))
+                                 reverse
+                                 doall)
+                replay-types (set (map :game-type all-replays))
+                num-players (->> all-replays
+                                 (map replay-player-count)
+                                 set
+                                 sort)
+                filter-terms (->> (string/split (or filter-replay "") #"\s+")
+                                  (remove string/blank?)
+                                  (map string/lower-case))
+                includes-term? (fn [s term]
+                                 (let [lc (string/lower-case (or s ""))]
+                                   (string/includes? lc term)))
+                replays (->> all-replays
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-source
+                                   (= filter-replay-source (:source-name replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-type
+                                   (= filter-replay-type (:game-type replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-min-players
+                                   (<= filter-replay-min-players (replay-player-count replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-max-players
+                                   (<= (replay-player-count replay) filter-replay-max-players)
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-min-skill
+                                   (if-let [avg (average-skill (replay-skills replay))]
+                                     (<= filter-replay-min-skill avg)
+                                     false)
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if (empty? filter-terms)
+                                   true
+                                   (every?
+                                     (some-fn
+                                       (partial includes-term? (:filename replay))
+                                       (partial includes-term? (-> replay :header :engine-version))
+                                       (partial includes-term? (-> replay :body :script-data :game :gametype))
+                                       (partial includes-term? (-> replay :body :script-data :game :mapname))
+                                       (fn [term]
+                                         (let [players (some->> replay :body :script-data :game
+                                                                (filter (comp #(string/starts-with? % "player") name first))
+                                                                (filter
+                                                                  (if replays-filter-specs
+                                                                    (constantly true)
+                                                                    (comp #{0 "0"} :spectator second)))
+                                                                (map (comp sanitize-replay-filter :name second)))]
+                                           (some #(includes-term? % term) players))))
+                                     filter-terms)))))
+                selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
+                                    (get online-bar-replays selected-replay-id))
+                engines-by-version (into {} (map (juxt :engine-version identity) engines))
+                mods-by-version (into {} (map (juxt :mod-name identity) mods))
+                maps-by-version (into {} (map (juxt :map-name identity) maps))
+
+                selected-engine-version (-> selected-replay :header :engine-version)
+                selected-matching-engine (get engines-by-version selected-engine-version)
+                selected-matching-mod (get mods-by-version (-> selected-replay :body :script-data :game :gametype))
+                selected-matching-map (get maps-by-version (-> selected-replay :body :script-data :game :mapname))
+                extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
+                                   (map (comp fs/canonical-path :file))
+                                   set)
+                import-tasks (->> (get tasks-by-type :spring-lobby/import)
+                                  (map (comp fs/canonical-path :resource-file :importable))
+                                  set)
+                refresh-tasks (get tasks-by-type :spring-lobby/refresh-replays)
+                index-downloads-tasks (get tasks-by-type :spring-lobby/download-bar-replays)
+                download-tasks (->> (get tasks-by-type :spring-lobby/download-bar-replay)
+                                    (map :id)
+                                    set)
+                http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                         (map (comp :download-url :downloadable))
+                                         set)
+                rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
+                                 (map :rapid-id)
+                                 set)
+                rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
+                                        seq)
+                engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+                                         seq)
+                map-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-maps)
+                                      seq)
+                mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
+                                      seq)
+                time-zone-id (.toZoneId (TimeZone/getDefault))
+                sources (replay-sources {:extra-replay-sources extra-replay-sources})]
             {:fx/type :v-box
              :style {:-fx-font-size 14}
              :children
@@ -976,5 +975,5 @@
                            :value replay-minimap-type
                            :items fx.minimap/minimap-types
                            :on-value-changed {:event/type :spring-lobby/assoc
-                                              :key :replay-minimap-type}}]}]}]}])))}
-            {:fx/type :pane})}}))))
+                                              :key :replay-minimap-type}}]}]}]}])))})
+          {:fx/type :pane})}})))
