@@ -14,7 +14,10 @@
 
 
 (def cli-options
-  [[nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
+  [[nil "--chat-channel CHANNEL_NAME" "Add a default chat channel to connect to"
+    :assoc-fn (fn [m k v]
+                (update m k conj v))]
+   [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]])
 
@@ -53,7 +56,12 @@
                                                                second)]
                           {:server server
                            :password password
-                           :username username})))]
+                           :username username}))
+                      (when (contains? options :chat-channel)
+                        {:global-chat-channels
+                         (map
+                           (juxt identity (constantly {}))
+                           (:chat-channel options))}))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
           (reset! spring-lobby/*state state))
         (log/info "Creating renderer")
