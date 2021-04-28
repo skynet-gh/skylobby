@@ -8,7 +8,7 @@
   (:import
     (javafx.beans.value ChangeListener)
     (javafx.scene Node)
-    (javafx.scene.control ScrollPane TextArea)))
+    (javafx.scene.control ScrollPane TableView TextArea)))
 
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
@@ -62,6 +62,18 @@
                            (.setVvalue scroll-pos)))))
                    fx.lifecycle/scalar
                    :default [[] 0])}))
+
+(def with-layout-on-items-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:items (fx.prop/make
+             (fx.mutator/setter
+               (fn [^TableView table-view items]
+                 (.setAll (.getItems table-view) items)
+                 (.resizeColumn table-view (first (.getColumns table-view)) -100.0)
+                 (.resizeColumn table-view (first (.getColumns table-view)) 100.0)))
+             fx.lifecycle/scalar
+             :default [])}))
 
 
 ; https://github.com/cljfx/cljfx/issues/94#issuecomment-691708477

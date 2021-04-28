@@ -140,7 +140,7 @@
         :id "battles"
         :content
         {:fx/type :split-pane
-         :divider-positions [0.80]
+         :divider-positions [0.75]
          :items
          [
           {:fx/type :v-box
