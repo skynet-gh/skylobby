@@ -42,6 +42,10 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.21]
+
+- Fix `--skylobby-root` not coerced to file
+
 ### [0.3.20]
 
 - Add flag icons for countries
