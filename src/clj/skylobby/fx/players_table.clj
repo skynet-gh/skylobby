@@ -48,7 +48,8 @@
                      (comp not :mode :battle-status)
                      (comp :bot :client-status :user)
                      (comp :ally :battle-status)
-                     (comp (fnil - 0) u/parse-skill :skill))))
+                     (comp (fnil - 0) u/parse-skill :skill)
+                     (comp :id :battle-status))))
      :style {:-fx-font-size 14
              :-fx-min-height 200}
      :row-factory
@@ -259,13 +260,14 @@
              {:fx/type :h-box
               :children
               (concat
-                [
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal
-                  (if (= 1 (:sync battle-status))
-                    "mdi-sync:16:green"
-                    "mdi-sync-off:16:red")}
-                 (cond
+                (when-not singleplayer
+                  [
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal
+                    (if (= 1 (:sync battle-status))
+                      "mdi-sync:16:green"
+                      "mdi-sync-off:16:red")}])
+                [(cond
                    (:bot client-status)
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-robot:16:grey"}
