@@ -1,3 +1,4 @@
 --win-menu
 --type "msi"
 --icon "resources/icon.ico"
+--win-dir-chooser
