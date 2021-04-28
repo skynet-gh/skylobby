@@ -1,3 +1,4 @@
+--verbose
 --input dist
 --main-jar "skylobby.jar"
 --name "skylobby"
@@ -6,3 +7,4 @@
 --arguments "spring-lobby.main"
 --vendor "skynet"
 --java-options "-server -Xms128m -Xmx1g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
+--resource-dir "jpackage/resources"

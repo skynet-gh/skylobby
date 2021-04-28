@@ -163,6 +163,16 @@
      "linux64"
      "win32")))
 
+(defn platform64
+  ([]
+   (platform64 (get-sys-data)))
+  ([{:keys [os-name]}]
+   (if (and os-name
+            (string/includes? os-name "Linux")
+            (not (wsl?)))
+     "linux64"
+     "win64")))
+
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."
   [^File f]

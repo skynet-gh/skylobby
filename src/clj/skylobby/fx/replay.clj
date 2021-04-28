@@ -858,7 +858,7 @@
                                             (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                               [id team])))
                                         (into {}))
-                       indexed-mod (get mods-by-version mapname)
+                       indexed-mod (get mods-by-version gametype)
                        replay-mod-details (get mod-details (resource/details-cache-key indexed-mod))
                        sides (spring/mod-sides replay-mod-details)
                        players (->> game
@@ -921,7 +921,8 @@
                            :battle-modname gametype
                            :battle-players-color-allyteam battle-players-color-allyteam
                            :players (concat players bots)
-                           :sides sides}
+                           :sides sides
+                           :singleplayer true}
                           {:fx/type :h-box
                            :alignment :center-left
                            :children

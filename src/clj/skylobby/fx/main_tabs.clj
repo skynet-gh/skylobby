@@ -1,6 +1,7 @@
 (ns skylobby.fx.main-tabs
   (:require
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [clojure.string :as string]
     [skylobby.fx.battles-table :as fx.battles-table]
     [skylobby.fx.console :as fx.console]
     [skylobby.fx.channel :as fx.channel]
@@ -72,24 +73,48 @@
   ["battles" "chat" "console"])
 (def main-tab-id-set (set main-tab-ids))
 
+
+(def main-tab-state-keys
+  [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main])
+
 (def main-tab-view-keys
   (concat
     fx.battles-table/battles-table-keys
     fx.console/console-view-keys
     fx.user/users-table-keys
-    [:battles :client-data :channels :join-channel-name :selected-tab-channel :selected-tab-main
+    [:battles :client-data :channels :filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main
      :server :users]))
 
 (defn main-tab-view
-  [{:keys [battles client-data channels join-channel-name selected-tab-main server-key users]
+  [{:keys [battles client-data channels filter-battles filter-users join-channel-name selected-tab-main server-key users]
     :as state}]
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
         users-view {:fx/type :v-box
                     :children
-                    [{:fx/type :label
-                      :text (str "Users (" (count users) ")")}
+                    [{:fx/type :h-box
+                      :alignment :center-left
+                      :children
+                      (concat
+                        [
+                         {:fx/type :label
+                          :text (str "Users (" (count users) ")")}
+                         {:fx/type :pane
+                          :h-box/hgrow :always}
+                         {:fx/type :label
+                          :text (str " Filter: ")}
+                         {:fx/type :text-field
+                          :text (str filter-users)
+                          :on-text-changed {:event/type :spring-lobby/assoc
+                                            :key :filter-users}}]
+                        (when-not (string/blank? filter-users)
+                          [{:fx/type :button
+                            :on-action {:event/type :spring-lobby/dissoc
+                                        :key :filter-users}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-close:16:white"}}]))}
                      (merge
                        {:fx/type fx.user/users-table
                         :v-box/vgrow :always}
@@ -115,13 +140,33 @@
         :id "battles"
         :content
         {:fx/type :split-pane
-         :divider-positions [0.80]
+         :divider-positions [0.75]
          :items
          [
           {:fx/type :v-box
            :children
-           [{:fx/type :label
-             :text (str "Battles (" (count battles) ")")}
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             (concat
+               [
+                {:fx/type :label
+                 :text (str "Battles (" (count battles) ")")}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type :label
+                 :text (str " Filter: ")}
+                {:fx/type :text-field
+                 :text (str filter-battles)
+                 :on-text-changed {:event/type :spring-lobby/assoc
+                                   :key :filter-battles}}]
+               (when-not (string/blank? filter-battles)
+                 [{:fx/type :button
+                   :on-action {:event/type :spring-lobby/dissoc
+                               :key :filter-battles}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-close:16:white"}}]))}
             (merge
               {:fx/type fx.battles-table/battles-table
                :v-box/vgrow :always}

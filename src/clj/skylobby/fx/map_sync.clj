@@ -26,7 +26,7 @@
      (concat
        (let [severity (cond
                         no-map-details
-                        (if (and indexed-map (seq map-update-tasks))
+                        (if indexed-map
                           -1 2)
                         :else 0)]
          [{:severity severity

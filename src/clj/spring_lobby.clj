@@ -111,9 +111,9 @@
 
 
 (def config-keys
-  [:auto-get-resources :battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
+  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
    :username])
@@ -430,7 +430,7 @@
                                        (filter (partial resource/could-be-this-engine? battle-version))
                                        first)
               engine-download-task (->> all-tasks
-                                        (filter (comp #{::http-downloadable} ::task-type))
+                                        (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
                                         (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
                                         first)
               mod-downloadable (->> downloadables
@@ -463,7 +463,7 @@
                               (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-downloadable))))
                          (do
                            (log/info "Adding task to auto download engine" engine-downloadable)
-                           {::task-type ::http-downloadable
+                           {::task-type ::download-and-extract
                             :downloadable engine-downloadable
                             :spring-isolation-dir spring-root})
                          :else
@@ -1245,16 +1245,21 @@
                 (fn [map-details]
                   (let [minimap-file (-> map-details :map-name fs/minimap-image-cache-file)]
                     (or (:force opts) (not (fs/exists minimap-file))))))
-              (sort-by :map-name))]
+              (sort-by :map-name))
+         per-round 3
+         this-round (take per-round to-update)
+         next-round (drop per-round to-update)]
      (log/info (count to-update) "maps do not have cached minimap image files")
-     (doseq [map-details to-update]
+     (doseq [map-details this-round]
        (if-let [map-file (:file map-details)]
          (do
            (log/info "Caching minimap for" map-file)
            (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
              (when-let [minimap-image-scaled (:minimap-image-scaled smf)]
                (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
-         (log/error "Map is missing file" (:map-name map-details)))))))
+         (log/error "Map is missing file" (:map-name map-details))))
+     (when (seq next-round)
+       (add-task! *state {::task-type ::update-cached-minimaps})))))
 
 (defn- reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
@@ -1531,7 +1536,10 @@
 
 
 (defmethod task-handler ::update-cached-minimaps [_]
-  (update-cached-minimaps (:maps @*state)))
+  (let [{:keys [by-spring-root]} @*state
+        all-maps (mapcat :maps (vals by-spring-root))]
+    (log/info "Found" (count all-maps) "maps to update cached minimaps for")
+    (update-cached-minimaps all-maps)))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
@@ -1898,6 +1906,8 @@
   (future
     (try
       (client-message client-data "LEAVEBATTLE")
+      (let [server-key (u/server-key client-data)]
+        (swap! *state update-in [:by-server server-key] dissoc :battle))
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
@@ -2263,11 +2273,6 @@
                            :startposy z ; for SpringLobby bug
                            :startposz z}
                 scripttags {:game {(keyword (str "team" team)) team-data}}]
-            (swap! *state
-                   (fn [state]
-                     (-> state
-                         (update :scripttags u/deep-merge scripttags)
-                         (update-in [:battle :scripttags] u/deep-merge scripttags))))
             (if singleplayer
               (swap! *state update-in
                      [:by-server :local :battle :scripttags :game (keyword (str "team" team))]
@@ -2416,6 +2421,13 @@
                  (-> state
                      (update-in [:by-server :local :battles :singleplayer (if is-bot :bots :users) player-name] merge data)
                      (update-in [:by-server :local :battle (if is-bot :bots :users) player-name] merge data))))))))
+
+(defmethod event-handler ::update-battle-status
+  [{:keys [client-data opts battle-status team-color]}]
+  (update-battle-status client-data opts battle-status team-color))
+
+(defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
+  (client-message client-data (str "MYSTATUS " (handler/encode-client-status client-status))))
 
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future
@@ -2623,7 +2635,10 @@
   (future
     (try
       (if (or is-me is-bot)
-        (update-battle-status client-data data (assoc (:battle-status id) :mode (not event)) (:team-color id))
+        (let [mode (if (contains? data :value)
+                     (:value data)
+                     (not event))]
+          (update-battle-status client-data data (assoc (:battle-status id) :mode mode) (:team-color id)))
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
@@ -2907,7 +2922,7 @@
 
 (defmethod task-handler ::download-and-extract
   [{:keys [downloadable spring-isolation-dir] :as task}]
-  @(event-handler (assoc task :event/type ::http-downloadable))
+  @(download-http-resource task)
   (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
         extract-file (when download-file
                        (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
@@ -2977,6 +2992,7 @@
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
   (future
+    (fs/update-file-cache! *state file dest)
     (let [path (fs/canonical-path file)]
       (try
         (swap! *state assoc-in [:extracting path] true)
@@ -3127,7 +3143,8 @@
                 map-key
                 (update :map-details cache/miss map-key nil)
                 mod-key
-                (update :mod-details cache/miss mod-key nil))))))
+                (update :mod-details cache/miss mod-key nil))))
+    (add-task! *state {::task-type ::reconcile-engines})))
 
 
 (defmethod event-handler ::import-source-change

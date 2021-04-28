@@ -12,7 +12,8 @@
 
 
 (def resource-types
-  [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
+  [:spring-lobby/engine :spring-lobby/map :spring-lobby/mod :spring-lobby/sdp])
+  ; TODO split out packaging type from resource type...
 
 (defn resource-dest
   [root {:keys [resource-filename resource-name resource-file resource-type]}]
@@ -48,6 +49,8 @@
                (or (= engine-version resource-filename)
                    (= lce lcf)
                    (= (http/engine-archive engine-version)
+                      resource-filename)
+                   (= (http/engine-archive engine-version "master" (fs/platform64))
                       resource-filename)
                    (= (http/bar-engine-filename engine-version) resource-filename)))))))
 

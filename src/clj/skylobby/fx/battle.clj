@@ -37,6 +37,16 @@
                :user {:client-status {:bot true}}))
       (:bots battle))))
 
+(def battle-view-state-keys
+  [:archiving :auto-get-resources :battle-players-color-allyteam :bot-name
+   :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
+   :drag-team :engine-filter :engine-version
+   :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
+   :map-input-prefix :map-details :message-drafts :minimap-type :mod-details :mod-filter
+   :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
+   :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
+   :tasks-by-type :username])
+
 (def battle-view-keys
   [:archiving :auto-get-resources :battles :battle :battle-players-color-allyteam :bot-name
    :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client-data :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version
@@ -55,13 +65,17 @@
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :battle-view
       (let [{:keys [battle-id scripttags]} battle
+            bot-username (if (string/blank? bot-username)
+                           "bot1"
+                           bot-username)
             singleplayer (= :singleplayer battle-id)
             {:keys [battle-map battle-modname channel-name host-username]} (get battles battle-id)
             host-user (get users host-username)
             me (-> battle :users (get username))
             my-battle-status (:battle-status me)
             am-host (= username host-username)
-            am-ingame (-> users (get username) :client-status :ingame)
+            my-client-status (-> users (get username) :client-status)
+            am-ingame (:ingame my-client-status)
             am-spec (-> me :battle-status :mode not)
             host-ingame (-> host-user :client-status :ingame)
             startpostype (->> scripttags
@@ -114,6 +128,9 @@
                                    (map (juxt :rapid-id identity))
                                    (into {}))
             players (battle-players-and-bots state)
+            my-player (->> players
+                           (filter (comp #{username} :username))
+                           first)
             team-counts (->> players
                              (map :battle-status)
                              (filter :mode)
@@ -371,25 +388,52 @@
                                (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
                   {:fx/type :pane
                    :v-box/vgrow :always}]
-                 (when-not singleplayer
-                   [{:fx/type :button
-                     :text (str
-                             " "
-                             (if (= 1 (:sync my-battle-status))
-                               "synced"
-                               "unsynced")
-                             " ")
-                     :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                                 :map-resource indexed-map
-                                 :mod-resource indexed-mod}
-                     :style
-                     (assoc
-                       (dissoc
-                         (get severity-styles
-                           (if (= 1 (:sync my-battle-status))
-                             0 2))
-                         :-fx-background-color)
-                       :-fx-font-size 14)}])
+                 [{:fx/type :h-box
+                   :children
+                   (concat
+                     (when-not singleplayer
+                       [{:fx/type :button
+                         :text (str
+                                 " "
+                                 (if (= 1 (:sync my-battle-status))
+                                   "synced"
+                                   "unsynced")
+                                 " ")
+                         :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                                     :map-resource indexed-map
+                                     :mod-resource indexed-mod}
+                         :style
+                         (assoc
+                           (dissoc
+                             (get severity-styles
+                               (if (= 1 (:sync my-battle-status))
+                                 0 2))
+                             :-fx-background-color)
+                           :-fx-font-size 14)}])
+                     [{:fx/type :pane
+                       :h-box/hgrow :always}]
+                     (when-not singleplayer
+                       [(let [am-away (:away my-client-status)]
+                          (merge
+                            {:fx/type :button
+                             :text (if am-away "Away" "Here")
+                             :on-action {:event/type :spring-lobby/update-client-status
+                                         :client-data (when-not singleplayer client-data)
+                                         :client-status (assoc my-client-status :away (not am-away))}}
+                            (when am-away
+                              {:graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-sleep:16:grey"}})))])
+                     [{:fx/type :button
+                       :text (if am-spec
+                               "Spectating"
+                               "Playing")
+                       :on-action {:event/type :spring-lobby/battle-spectate-change
+                                   :client-data (when-not singleplayer client-data)
+                                   :is-me true
+                                   :is-bot false
+                                   :id my-player
+                                   :value am-spec}}])}]
                  [{:fx/type :h-box
                    :alignment :center-left
                    :style {:-fx-font-size 24}

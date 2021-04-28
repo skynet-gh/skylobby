@@ -6,11 +6,17 @@
     [skylobby.fx.main-tabs :as fx.main-tabs]))
 
 
+(def server-tab-state-keys
+  (concat
+    fx.battle/battle-view-state-keys
+    fx.main-tabs/main-tab-state-keys
+    [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
+
 (def server-tab-keys
   (concat
     fx.battle/battle-view-keys
     fx.main-tabs/main-tab-view-keys
-    [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
+    server-tab-state-keys))
 
 (defn server-tab
   [{:keys [agreement battle client-data console-auto-scroll last-failed-message password pop-out-battle
@@ -58,7 +64,9 @@
                      (merge
                        {:fx/type fx.battles-buttons/battles-buttons-view}
                        (select-keys state fx.battles-buttons/battles-buttons-keys))]]
-       (if (and (seq battle) (or (not (:battle-id battle)) (not pop-out-battle)))
+       (if (and (seq battle)
+                (or (not (:battle-id battle))
+                    (not pop-out-battle)))
          [{:fx/type :split-pane
            :orientation :vertical
            :divider-positions [0.35]

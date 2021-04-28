@@ -105,8 +105,8 @@
          :icons skylobby.fx/icons
          :on-close-request {:event/type :spring-lobby/dissoc
                             :key :show-downloader}
-         :width (min download-window-width width)
-         :height (min download-window-height height)
+         :width ((fnil min download-window-width) width download-window-width)
+         :height ((fnil min download-window-height) height download-window-height)
          :scene
          {:fx/type :scene
           :stylesheets skylobby.fx/stylesheets
