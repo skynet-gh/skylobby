@@ -1,13 +1,14 @@
 (ns skylobby.fx.user
   (:require
+    [clojure.string :as string]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
 
 
-(def users-table-keys [:battles :client-data :server-key :users])
+(def users-table-keys [:battles :client-data :filter-users :server-key :users])
 
-(defn users-table [{:keys [battles client-data server-key users]}]
+(defn users-table [{:keys [battles client-data filter-users server-key users]}]
   (let [battles-by-users (->> battles
                               vals
                               (mapcat
@@ -16,11 +17,21 @@
                                     (fn [[username _status]]
                                       [username battle])
                                     (:users battle))))
-                              (into {}))]
+                              (into {}))
+        filter-lc (when-not (string/blank? filter-users)
+                    (string/lower-case filter-users))
+        filtered-users (->> users
+                            (filter
+                              (fn [[username _]]
+                                (if filter-lc
+                                  (if (string/blank? username)
+                                    false
+                                    (string/includes? (string/lower-case username) filter-lc))
+                                  true))))]
     {:fx/type :table-view
      :style {:-fx-font-size 15}
      :column-resize-policy :constrained ; TODO auto resize
-     :items (->> users
+     :items (->> filtered-users
                  vals
                  (filter :username)
                  (sort-by :username String/CASE_INSENSITIVE_ORDER)

@@ -17,6 +17,8 @@
   [[nil "--chat-channel CHANNEL_NAME" "Add a default chat channel to connect to"
     :assoc-fn (fn [m k v]
                 (update m k conj v))]
+   [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
+   [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]])
@@ -44,6 +46,10 @@
                       {:standalone true}
                       (when (contains? options :spring-root)
                         {:spring-isolation-dir (fs/file (:spring-root options))})
+                      (when (contains? options :filter-battles)
+                        {:filter-battles (:filters-battle options)})
+                      (when (contains? options :filter-users)
+                        {:filter-users (:filters-users options)})
                       (when (contains? options :server-url)
                         (let [server (->> initial-state
                                           :servers
