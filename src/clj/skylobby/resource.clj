@@ -108,6 +108,10 @@
 (defn details-cache-key [resource]
   (fs/canonical-path (:file resource)))
 
+(defn cached-details [cache resource]
+  (when-let [k (details-cache-key resource)]
+    (get cache k)))
+
 
 (defn sync-status [server-data spring mod-details map-details]
   (let [battle-id (-> server-data :battle :battle-id)

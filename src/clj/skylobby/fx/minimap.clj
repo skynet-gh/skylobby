@@ -5,7 +5,8 @@
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.spring :as spring]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
   (:import
     (javafx.embed.swing SwingFXUtils)
     (javafx.scene.paint Color)
@@ -104,130 +105,132 @@
 
 (defn minimap-pane
   [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
-  (let [{:keys [smf]} map-details
-        {:keys [minimap-height minimap-width]
-         :or {minimap-height smf/minimap-display-size
-              minimap-width smf/minimap-display-size}} smf
-        starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
-        start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
-        minimap-image (case minimap-type
-                        "metalmap" (:metalmap-image smf)
-                        "heightmap" (:heightmap-image smf)
-                        ; else
-                        (:minimap-image-scaled smf))
-        startpostype (->> scripttags
-                          :game
-                          :startpostype
-                          spring/startpostype-name)
-        max-width-or-height (max minimap-width minimap-height)]
-    {:fx/type :stack-pane
-     :style
-     {:-fx-min-width max-width-or-height
-      :-fx-max-width max-width-or-height
-      :-fx-min-height max-width-or-height
-      :-fx-max-height max-width-or-height}
-     :on-scroll {:event/type :spring-lobby/minimap-scroll
-                 :minimap-type-key minimap-type-key}
-     :children
-     (concat
-       (if minimap-image
-         (let [image (SwingFXUtils/toFXImage minimap-image nil)]
-           [{:fx/type :image-view
-             :image image
-             :fit-width minimap-width
-             :fit-height minimap-height
-             :preserve-ratio true}])
-         [{:fx/type :v-box
-           :alignment :center
-           :children
-           [
-            {:fx/type :label
-             :text (str map-name)
-             :style {:-fx-font-size 16}}
-            {:fx/type :label
-             :text (if map-details ; nil vs empty map
-                     "(not found)"
-                     "(loading...)")
-             :alignment :center}]}])
-       [(merge
-          (when (or singleplayer (not am-spec))
-            {:on-mouse-pressed {:event/type :spring-lobby/minimap-mouse-pressed
-                                :startpostype startpostype
-                                :starting-points starting-points
-                                :start-boxes start-boxes}
-             :on-mouse-dragged {:event/type :spring-lobby/minimap-mouse-dragged}
-             :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
-                                 :am-spec am-spec
-                                 :channel-name (:channel-name battle-details)
-                                 :client-data client-data
-                                 :map-details map-details
-                                 :minimap-width minimap-width
-                                 :minimap-height minimap-height
-                                 :singleplayer singleplayer}})
-          {:fx/type :canvas
-           :width minimap-width
-           :height minimap-height
-           :draw
-           (fn [^javafx.scene.canvas.Canvas canvas]
-             (let [gc (.getGraphicsContext2D canvas)
-                   border-color (if (not= "minimap" minimap-type)
-                                  Color/WHITE Color/BLACK)
-                   random (= "Random" startpostype)
-                   random-teams (when random
-                                  (let [teams (spring/teams battle-details)]
-                                    (set (map str (take (count teams) (iterate inc 0))))))
-                   starting-points (if random
-                                     (filter (comp random-teams :team) starting-points)
-                                     starting-points)]
-               (.clearRect gc 0 0 minimap-width minimap-height)
-               (.setFill gc Color/RED)
-               (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
-               (if (#{"Fixed" "Random" "Choose before game"} startpostype)
-                 (doseq [{:keys [x y team color]} starting-points]
-                   (let [drag (when (and drag-team
-                                         (= team (:team drag-team)))
-                                drag-team)
-                         x (or (:x drag) x)
-                         y (or (:y drag) y)
-                         xc (- x (if (= 1 (count team)) ; single digit
-                                   (* u/start-pos-r -0.6)
-                                   (* u/start-pos-r -0.2)))
-                         yc (+ y (/ u/start-pos-r 0.75))
-                         text (if random "?" team)
-                         fill-color (if random Color/RED color)]
-                     (.beginPath gc)
-                     (.rect gc x y
-                            (* 2 u/start-pos-r)
-                            (* 2 u/start-pos-r))
-                     (.setFill gc fill-color)
-                     (.fill gc)
-                     (.setStroke gc border-color)
-                     (.stroke gc)
-                     (.closePath gc)
-                     (.setStroke gc Color/BLACK)
-                     (.strokeText gc text xc yc)
-                     (.setFill gc Color/WHITE)
-                     (.fillText gc text xc yc)))
-                 (when minimap-image
-                   (doseq [{:keys [allyteam x y width height]} start-boxes]
-                     (when (and x y width height)
-                       (let [color (Color/color 0.5 0.5 0.5 0.5)
-                             border 4
-                             text allyteam
-                             font-size 20.0
-                             xt (+ x (quot font-size 2))
-                             yt (+ y (* font-size 1.2))]
+  (tufte/profile {:id :skylobby/ui}
+    (tufte/p :minimap-pane
+      (let [{:keys [smf]} map-details
+            {:keys [minimap-height minimap-width]
+             :or {minimap-height smf/minimap-display-size
+                  minimap-width smf/minimap-display-size}} smf
+            starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
+            start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
+            minimap-image (case minimap-type
+                            "metalmap" (:metalmap-image smf)
+                            "heightmap" (:heightmap-image smf)
+                            ; else
+                            (:minimap-image-scaled smf))
+            startpostype (->> scripttags
+                              :game
+                              :startpostype
+                              spring/startpostype-name)
+            max-width-or-height (max minimap-width minimap-height)]
+        {:fx/type :stack-pane
+         :style
+         {:-fx-min-width max-width-or-height
+          :-fx-max-width max-width-or-height
+          :-fx-min-height max-width-or-height
+          :-fx-max-height max-width-or-height}
+         :on-scroll {:event/type :spring-lobby/minimap-scroll
+                     :minimap-type-key minimap-type-key}
+         :children
+         (concat
+           (if minimap-image
+             (let [image (SwingFXUtils/toFXImage minimap-image nil)]
+               [{:fx/type :image-view
+                 :image image
+                 :fit-width minimap-width
+                 :fit-height minimap-height
+                 :preserve-ratio true}])
+             [{:fx/type :v-box
+               :alignment :center
+               :children
+               [
+                {:fx/type :label
+                 :text (str map-name)
+                 :style {:-fx-font-size 16}}
+                {:fx/type :label
+                 :text (if map-details ; nil vs empty map
+                         "(not found)"
+                         "(loading...)")
+                 :alignment :center}]}])
+           [(merge
+              (when (or singleplayer (not am-spec))
+                {:on-mouse-pressed {:event/type :spring-lobby/minimap-mouse-pressed
+                                    :startpostype startpostype
+                                    :starting-points starting-points
+                                    :start-boxes start-boxes}
+                 :on-mouse-dragged {:event/type :spring-lobby/minimap-mouse-dragged}
+                 :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
+                                     :am-spec am-spec
+                                     :channel-name (:channel-name battle-details)
+                                     :client-data client-data
+                                     :map-details map-details
+                                     :minimap-width minimap-width
+                                     :minimap-height minimap-height
+                                     :singleplayer singleplayer}})
+              {:fx/type :canvas
+               :width minimap-width
+               :height minimap-height
+               :draw
+               (fn [^javafx.scene.canvas.Canvas canvas]
+                 (let [gc (.getGraphicsContext2D canvas)
+                       border-color (if (not= "minimap" minimap-type)
+                                      Color/WHITE Color/BLACK)
+                       random (= "Random" startpostype)
+                       random-teams (when random
+                                      (let [teams (spring/teams battle-details)]
+                                        (set (map str (take (count teams) (iterate inc 0))))))
+                       starting-points (if random
+                                         (filter (comp random-teams :team) starting-points)
+                                         starting-points)]
+                   (.clearRect gc 0 0 minimap-width minimap-height)
+                   (.setFill gc Color/RED)
+                   (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
+                   (if (#{"Fixed" "Random" "Choose before game"} startpostype)
+                     (doseq [{:keys [x y team color]} starting-points]
+                       (let [drag (when (and drag-team
+                                             (= team (:team drag-team)))
+                                    drag-team)
+                             x (or (:x drag) x)
+                             y (or (:y drag) y)
+                             xc (- x (if (= 1 (count team)) ; single digit
+                                       (* u/start-pos-r -0.6)
+                                       (* u/start-pos-r -0.2)))
+                             yc (+ y (/ u/start-pos-r 0.75))
+                             text (if random "?" team)
+                             fill-color (if random Color/RED color)]
                          (.beginPath gc)
-                         (.rect gc (+ x (quot border 2)) (+ y (quot border 2)) (inc (- width border)) (inc (- height border)))
-                         (.setFill gc color)
+                         (.rect gc x y
+                                (* 2 u/start-pos-r)
+                                (* 2 u/start-pos-r))
+                         (.setFill gc fill-color)
                          (.fill gc)
-                         (.setStroke gc Color/BLACK)
-                         (.setLineWidth gc border)
+                         (.setStroke gc border-color)
                          (.stroke gc)
                          (.closePath gc)
-                         (.setFont gc (Font/font "Regular" FontWeight/BOLD font-size))
                          (.setStroke gc Color/BLACK)
-                         (.setLineWidth gc 2.0)
-                         (.strokeText gc text xt yt)
+                         (.strokeText gc text xc yc)
                          (.setFill gc Color/WHITE)
-                         (.fillText gc text xt yt))))))))})])}))
+                         (.fillText gc text xc yc)))
+                     (when minimap-image
+                       (doseq [{:keys [allyteam x y width height]} start-boxes]
+                         (when (and x y width height)
+                           (let [color (Color/color 0.5 0.5 0.5 0.5)
+                                 border 4
+                                 text allyteam
+                                 font-size 20.0
+                                 xt (+ x (quot font-size 2))
+                                 yt (+ y (* font-size 1.2))]
+                             (.beginPath gc)
+                             (.rect gc (+ x (quot border 2)) (+ y (quot border 2)) (inc (- width border)) (inc (- height border)))
+                             (.setFill gc color)
+                             (.fill gc)
+                             (.setStroke gc Color/BLACK)
+                             (.setLineWidth gc border)
+                             (.stroke gc)
+                             (.closePath gc)
+                             (.setFont gc (Font/font "Regular" FontWeight/BOLD font-size))
+                             (.setStroke gc Color/BLACK)
+                             (.setLineWidth gc 2.0)
+                             (.strokeText gc text xt yt)
+                             (.setFill gc Color/WHITE)
+                             (.fillText gc text xt yt))))))))})])}))))

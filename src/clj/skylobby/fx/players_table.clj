@@ -22,8 +22,8 @@
    11 "goldenrod"})
 
 (defn players-table
-  [{:keys [am-host battle-players-color-allyteam channel-name client-data host-username players
-           scripttags server-key sides singleplayer username]}]
+  [{:keys [am-host battle-players-color-allyteam channel-name client-data host-ingame host-username
+           players scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -74,27 +74,36 @@
                       (when (and host-username
                                  (= host-username username)
                                  (-> user :client-status :bot))
-                        [{:fx/type :menu-item
-                          :text "!help"
-                          :on-action {:event/type :spring-lobby/send-message
-                                      :client-data client-data
-                                      :channel-name (u/user-channel host-username)
-                                      :message "!help"
-                                      :server-key server-key}}
-                         {:fx/type :menu-item
-                          :text "!status battle"
-                          :on-action {:event/type :spring-lobby/send-message
-                                      :client-data client-data
-                                      :channel-name (u/user-channel host-username)
-                                      :message "!status battle"
-                                      :server-key server-key}}
-                         {:fx/type :menu-item
-                          :text "!status game"
-                          :on-action {:event/type :spring-lobby/send-message
-                                      :client-data client-data
-                                      :channel-name (u/user-channel host-username)
-                                      :message "!status game"
-                                      :server-key server-key}}])
+                        (concat
+                          [{:fx/type :menu-item
+                            :text "!help"
+                            :on-action {:event/type :spring-lobby/send-message
+                                        :client-data client-data
+                                        :channel-name (u/user-channel host-username)
+                                        :message "!help"
+                                        :server-key server-key}}
+                           {:fx/type :menu-item
+                            :text "!status battle"
+                            :on-action {:event/type :spring-lobby/send-message
+                                        :client-data client-data
+                                        :channel-name (u/user-channel host-username)
+                                        :message "!status battle"
+                                        :server-key server-key}}
+                           {:fx/type :menu-item
+                            :text "!status game"
+                            :on-action {:event/type :spring-lobby/send-message
+                                        :client-data client-data
+                                        :channel-name (u/user-channel host-username)
+                                        :message "!status game"
+                                        :server-key server-key}}]
+                          (when-not host-ingame
+                            [{:fx/type :menu-item
+                              :text "!stats"
+                              :on-action {:event/type :spring-lobby/send-message
+                                          :client-data client-data
+                                          :channel-name (u/user-channel host-username)
+                                          :message "!stats"
+                                          :server-key server-key}}])))
                       (when (-> user :client-status :bot)
                         [{:fx/type :menu-item
                           :text "!whois"

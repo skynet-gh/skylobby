@@ -223,7 +223,7 @@
          :text "Go to server tab"
          :on-action {:event/type :spring-lobby/assoc
                      :key :selected-server-tab
-                     :value (first server)}}])
+                     :value (str username "@" (first server))}}])
      [(merge
         {:fx/type connect-button
          :server-key (u/server-key client-data)}
