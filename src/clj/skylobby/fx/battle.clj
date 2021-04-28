@@ -37,6 +37,16 @@
                :user {:client-status {:bot true}}))
       (:bots battle))))
 
+(def battle-view-state-keys
+  [:archiving :auto-get-resources :battle-players-color-allyteam :bot-name
+   :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
+   :drag-team :engine-filter :engine-version
+   :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
+   :map-input-prefix :map-details :message-drafts :minimap-type :mod-details :mod-filter
+   :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
+   :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
+   :tasks-by-type :username])
+
 (def battle-view-keys
   [:archiving :auto-get-resources :battles :battle :battle-players-color-allyteam :bot-name
    :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client-data :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version

@@ -8,6 +8,7 @@
 
 (def server-tab-state-keys
   (concat
+    fx.battle/battle-view-state-keys
     fx.main-tabs/main-tab-state-keys
     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
 

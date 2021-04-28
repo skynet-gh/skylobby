@@ -2922,7 +2922,7 @@
 
 (defmethod task-handler ::download-and-extract
   [{:keys [downloadable spring-isolation-dir] :as task}]
-  @(event-handler (assoc task :event/type ::http-downloadable))
+  @(download-http-resource task)
   (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
         extract-file (when download-file
                        (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
@@ -2992,6 +2992,7 @@
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
   (future
+    (fs/update-file-cache! *state file dest)
     (let [path (fs/canonical-path file)]
       (try
         (swap! *state assoc-in [:extracting path] true)
@@ -3142,7 +3143,8 @@
                 map-key
                 (update :map-details cache/miss map-key nil)
                 mod-key
-                (update :mod-details cache/miss mod-key nil))))))
+                (update :mod-details cache/miss mod-key nil))))
+    (add-task! *state {::task-type ::reconcile-engines})))
 
 
 (defmethod event-handler ::import-source-change
