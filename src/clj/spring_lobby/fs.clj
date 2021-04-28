@@ -280,7 +280,8 @@
 (defn app-root
   "Returns the root directory for this application"
   []
-  (or app-root-override
+  (or (when app-root-override
+        (file app-root-override))
       (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
         (cond
           (string/includes? os-name "Linux")
