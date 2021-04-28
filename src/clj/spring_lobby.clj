@@ -343,8 +343,9 @@
   (select-keys
     state
     [:auto-get-resources
-     :by-server :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path :maps :mods
-     :rapid-data-by-version :spring-isolation-dir :tasks]))
+     :by-server :by-spring-root
+     :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path
+     :rapid-data-by-version :servers :spring-isolation-dir :tasks]))
 
 (defn- auto-get-resources-server-relevant-keys [state]
   (select-keys
@@ -374,10 +375,15 @@
   (when (not= (auto-get-resources-server-relevant-keys old-server)
               (auto-get-resources-server-relevant-keys new-server))
     (try
-      (when (and (:auto-get-resources new-state) (:spring-isolation-dir new-state))
-        (let [{:keys [current-tasks downloadables-by-url engines file-cache importables-by-path
-                      maps mods rapid-data-by-version spring-isolation-dir tasks]} new-state
-              {:keys [battle battles]} new-server
+      (when (:auto-get-resources new-state)
+        (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
+                      rapid-data-by-version servers spring-isolation-dir tasks]} new-state
+              {:keys [battle battles client-data]} new-server
+              server-url (:server-url client-data)
+              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                              spring-isolation-dir)
+              spring-root-path (fs/canonical-path spring-root)
+              {:keys [engines maps mods]} (-> new-state :by-spring-root (get spring-root-path))
               old-battle-details (-> old-server :battles (get (-> old-server :battle :battle-id)))
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
               rapid-data (get rapid-data-by-version battle-modname)
@@ -445,21 +451,21 @@
                        (cond
                          (and engine-importable
                               (not engine-import-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-importable))))
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-importable))))
                          (do
                            (log/info "Adding task to auto import engine" engine-importable)
                            {::task-type ::import
                             :importable engine-importable
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          (and (not engine-importable)
                               engine-downloadable
                               (not engine-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir engine-downloadable))))
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-downloadable))))
                          (do
                            (log/info "Adding task to auto download engine" engine-downloadable)
                            {::task-type ::http-downloadable
                             :downloadable engine-downloadable
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          :else
                          nil))
                      (when
@@ -468,21 +474,21 @@
                        (cond
                          (and map-importable
                               (not map-import-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-importable))))
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-importable))))
                          (do
                            (log/info "Adding task to auto import map" map-importable)
                            {::task-type ::import
                             :importable map-importable
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          (and (not map-importable)
                               map-downloadable
                               (not map-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir map-downloadable))))
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-downloadable))))
                          (do
                            (log/info "Adding task to auto download map" map-downloadable)
                            {::task-type ::http-downloadable
                             :downloadable map-downloadable
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          :else
                          nil))
                      (when
@@ -492,22 +498,22 @@
                          (and rapid-id
                               (not rapid-task)
                               engine-file
-                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp")))))
+                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp")))))
                          (do
                            (log/info "Adding task to auto download rapid" rapid-id)
                            {::task-type ::rapid-download
                             :engine-file engine-file
                             :rapid-id rapid-id
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          (and (not rapid-id)
                               mod-downloadable
                               (not mod-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir mod-downloadable))))
+                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root mod-downloadable))))
                          (do
                            (log/info "Adding task to auto download mod" mod-downloadable)
                            {::task-type ::http-downloadable
                             :downloadable mod-downloadable
-                            :spring-isolation-dir spring-isolation-dir})
+                            :spring-isolation-dir spring-root})
                          :else
                          nil))]]
          (filter some? tasks)))
@@ -806,7 +812,9 @@
               {:keys [battle-status team-color]} (-> battle :users (get my-username))
               old-sync-number (-> battle :users (get my-username) :battle-status :sync)]
           (when (and (:battle-id battle)
-                     (not= old-sync new-sync))
+                     (or (not= old-sync new-sync)
+                         (not= (:battle-id battle)
+                               (-> old-server :battle :battle-id))))
             (log/info "Updating battle sync status for" server-key "from" old-sync
                       "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
@@ -1416,7 +1424,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/instant)
-            (java-time/duration 1 :seconds))
+            (java-time/duration 3 :seconds))
           (fn [_chimestamp]
             (let [old-state @old-state-atom
                   new-state @state-atom]
