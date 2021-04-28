@@ -55,6 +55,9 @@
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :battle-view
       (let [{:keys [battle-id scripttags]} battle
+            bot-username (if (string/blank? bot-username)
+                           "bot1"
+                           bot-username)
             singleplayer (= :singleplayer battle-id)
             {:keys [battle-map battle-modname channel-name host-username]} (get battles battle-id)
             host-user (get users host-username)

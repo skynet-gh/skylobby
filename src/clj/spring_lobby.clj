@@ -111,10 +111,10 @@
 
 
 (def config-keys
-  [:auto-get-resources :battle-title :battle-password :bot-name :bot-username :bot-version :chat-auto-scroll
+  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
    :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :logins :map-name
-   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
+   :mod-name :password :pop-out-battle :preferred-color :rapid-repo
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
    :username])
 
