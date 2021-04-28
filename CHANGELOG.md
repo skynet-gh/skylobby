@@ -42,6 +42,11 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.22]
+
+- Add server auto connect option
+- Add `--chat-channel` cli arg
+
 ### [0.3.21]
 
 - Fix `--skylobby-root` not coerced to file
