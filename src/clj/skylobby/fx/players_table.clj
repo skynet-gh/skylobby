@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
+    [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]))
@@ -353,7 +354,12 @@
        :cell-value-factory (comp :country :user)
        :cell-factory
        {:fx/cell-type :table-cell
-        :describe (fn [country] {:text (str country)})}}
+        :describe
+        (fn [country]
+          {:text ""
+           :graphic
+           {:fx/type flag-icon/flag-icon
+            :country-code country}})}}
       {:fx/type :table-column
        :text "Bonus"
        :resizable true

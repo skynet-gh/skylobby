@@ -42,6 +42,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.20]
+
+- Add flag icons for countries
+- Add `--skylobby-root` to set skylobby config and log directory
+- Fix auto download which broke after multi spring dirs
+
 ### [0.3.19]
 
 - Greatly improve performance by making some state watchers periodic

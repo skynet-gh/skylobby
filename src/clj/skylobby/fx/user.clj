@@ -1,5 +1,6 @@
 (ns skylobby.fx.user
   (:require
+    [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
 
@@ -121,7 +122,12 @@
        :cell-value-factory :country
        :cell-factory
        {:fx/cell-type :table-cell
-        :describe (fn [country] {:text (str country)})}}
+        :describe
+        (fn [country]
+          {:text ""
+           :graphic
+           {:fx/type flag-icon/flag-icon
+            :country-code country}})}}
       #_
       {:fx/type :table-column
        :text "Rank"
