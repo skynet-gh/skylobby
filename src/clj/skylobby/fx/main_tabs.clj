@@ -73,6 +73,10 @@
   ["battles" "chat" "console"])
 (def main-tab-id-set (set main-tab-ids))
 
+
+(def main-tab-state-keys
+  [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main])
+
 (def main-tab-view-keys
   (concat
     fx.battles-table/battles-table-keys

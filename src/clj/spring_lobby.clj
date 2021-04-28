@@ -430,7 +430,7 @@
                                        (filter (partial resource/could-be-this-engine? battle-version))
                                        first)
               engine-download-task (->> all-tasks
-                                        (filter (comp #{::http-downloadable} ::task-type))
+                                        (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
                                         (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
                                         first)
               mod-downloadable (->> downloadables
@@ -463,7 +463,7 @@
                               (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-downloadable))))
                          (do
                            (log/info "Adding task to auto download engine" engine-downloadable)
-                           {::task-type ::http-downloadable
+                           {::task-type ::download-and-extract
                             :downloadable engine-downloadable
                             :spring-isolation-dir spring-root})
                          :else
@@ -1906,6 +1906,8 @@
   (future
     (try
       (client-message client-data "LEAVEBATTLE")
+      (let [server-key (u/server-key client-data)]
+        (swap! *state update-in [:by-server server-key] dissoc :battle))
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
@@ -2271,11 +2273,6 @@
                            :startposy z ; for SpringLobby bug
                            :startposz z}
                 scripttags {:game {(keyword (str "team" team)) team-data}}]
-            (swap! *state
-                   (fn [state]
-                     (-> state
-                         (update :scripttags u/deep-merge scripttags)
-                         (update-in [:battle :scripttags] u/deep-merge scripttags))))
             (if singleplayer
               (swap! *state update-in
                      [:by-server :local :battle :scripttags :game (keyword (str "team" team))]

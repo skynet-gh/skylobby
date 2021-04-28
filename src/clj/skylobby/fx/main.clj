@@ -70,7 +70,7 @@
                :content
                (merge
                  {:fx/type fx.server-tab/server-tab}
-                 (select-keys state fx.server-tab/server-tab-keys)
+                 (select-keys state fx.server-tab/server-tab-state-keys)
                  server-data
                  {:selected-tab-channel selected-tab-channel
                   :selected-tab-main selected-tab-main
