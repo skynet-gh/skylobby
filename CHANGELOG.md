@@ -6,20 +6,16 @@ Notable changes and todo list.
 
 Current Annoyances:
 
-- Tables are not laid out when they get items
 - Chat box does not auto scroll, moves when new messages come in
 - Ally/team numbers start at 0 instead of 1, different from SPADS
 - Rapid is not updated automatically
 - Engine is not extracted automatically
 - Downloads and other tasks cannot be cancelled
-- Task workers run every second, can just be state watchers
 
 Future Features:
 
-- Add button to spectate/play, or switch teams
 - Parse autohost messages and display in UI
 - Visually group teams in players table
-- Away mode, auto or manual
 - Track and display player away time
 - Open replay files or links
 - Open battle links
@@ -41,6 +37,20 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.23]
+
+- Improve installer user feedback
+- Add battles and users filters with cli args
+- Add spectate/play toggle button
+- Fix broken add bot
+- Add away mode button
+- Fix minimap image caching
+- Add new task type for downloads
+- Fix team color orders
+- Fix replays mod details
+- Fix broken engine download
+- Force tables to layout when they get items
 
 ### [0.3.22]
 
