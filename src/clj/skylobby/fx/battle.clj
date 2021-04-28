@@ -117,6 +117,9 @@
                                    (map (juxt :rapid-id identity))
                                    (into {}))
             players (battle-players-and-bots state)
+            my-player (->> players
+                           (filter (comp #{username} :username))
+                           first)
             team-counts (->> players
                              (map :battle-status)
                              (filter :mode)
@@ -374,25 +377,40 @@
                                (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
                   {:fx/type :pane
                    :v-box/vgrow :always}]
-                 (when-not singleplayer
-                   [{:fx/type :button
-                     :text (str
-                             " "
-                             (if (= 1 (:sync my-battle-status))
-                               "synced"
-                               "unsynced")
-                             " ")
-                     :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                                 :map-resource indexed-map
-                                 :mod-resource indexed-mod}
-                     :style
-                     (assoc
-                       (dissoc
-                         (get severity-styles
-                           (if (= 1 (:sync my-battle-status))
-                             0 2))
-                         :-fx-background-color)
-                       :-fx-font-size 14)}])
+                 [{:fx/type :h-box
+                   :children
+                   (concat
+                     (when-not singleplayer
+                       [{:fx/type :button
+                         :text (str
+                                 " "
+                                 (if (= 1 (:sync my-battle-status))
+                                   "synced"
+                                   "unsynced")
+                                 " ")
+                         :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                                     :map-resource indexed-map
+                                     :mod-resource indexed-mod}
+                         :style
+                         (assoc
+                           (dissoc
+                             (get severity-styles
+                               (if (= 1 (:sync my-battle-status))
+                                 0 2))
+                             :-fx-background-color)
+                           :-fx-font-size 14)}])
+                     [{:fx/type :pane
+                       :h-box/hgrow :always}
+                      {:fx/type :button
+                       :text (if am-spec
+                               "Spectating"
+                               "Playing")
+                       :on-action {:event/type :spring-lobby/battle-spectate-change
+                                   :client-data (when-not singleplayer client-data)
+                                   :is-me true
+                                   :is-bot false
+                                   :id my-player
+                                   :value am-spec}}])}]
                  [{:fx/type :h-box
                    :alignment :center-left
                    :style {:-fx-font-size 24}
