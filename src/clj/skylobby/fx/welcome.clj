@@ -1,5 +1,6 @@
 (ns skylobby.fx.welcome
   (:require
+    [clojure.string :as string]
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.server :as fx.server]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -34,7 +35,9 @@
                       (and
                         server
                         (not client)
-                        client-deferred)))
+                        client-deferred)
+                      (string/blank? username)
+                      (string/blank? password)))
          :on-action (if client
                       {:event/type :spring-lobby/disconnect
                        :server-key server-key}

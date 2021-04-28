@@ -143,7 +143,9 @@
                              :accepted true)
                         (update :login-error dissoc server-url)))))
         client (-> state :by-server (get server-key) :client-data :client)
-        my-channels (-> state :my-channels (get server-key))]
+        my-channels (concat
+                      (-> state :my-channels (get server-key))
+                      (:global-chat-channels state))]
     (message/send-message client "CHANNELS")
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
