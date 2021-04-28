@@ -14,13 +14,16 @@
 
 
 (def cli-options
-  [[nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
+  [[nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
+   [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]])
 
 
 (defn -main [& args]
   (let [{:keys [options]} (cli/parse-opts args cli-options)]
     (try
+      (when-let [app-root-override (:skylobby-root options)]
+        (alter-var-root #'fs/app-root-override (constantly app-root-override)))
       (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
       (let [before (u/curr-millis)]
         (log/info "Main start")

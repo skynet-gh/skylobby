@@ -23,6 +23,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def ^:dynamic app-root-override nil)
+
+
 (defn init-7z! []
   (SevenZip/initSevenZipFromPlatformJAR))
 
@@ -277,16 +280,17 @@
 (defn app-root
   "Returns the root directory for this application"
   []
-  (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
-    (cond
-      (string/includes? os-name "Linux")
-      (if (wsl? sys-data)
-        (io/file "/mnt" "c" "Users" user-name app-folder)
-        (io/file user-home app-folder))
-      (string/includes? os-name "Windows")
-      (io/file user-home app-folder)
-      :else
-      (io/file user-home app-folder))))
+  (or app-root-override
+      (let [{:keys [os-name user-name user-home] :as sys-data} (get-sys-data)]
+        (cond
+          (string/includes? os-name "Linux")
+          (if (wsl? sys-data)
+            (io/file "/mnt" "c" "Users" user-name app-folder)
+            (io/file user-home app-folder))
+          (string/includes? os-name "Windows")
+          (io/file user-home app-folder)
+          :else
+          (io/file user-home app-folder)))))
 
 (defn config-root
   []
