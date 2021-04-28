@@ -64,7 +64,8 @@
             me (-> battle :users (get username))
             my-battle-status (:battle-status me)
             am-host (= username host-username)
-            am-ingame (-> users (get username) :client-status :ingame)
+            my-client-status (-> users (get username) :client-status)
+            am-ingame (:ingame my-client-status)
             am-spec (-> me :battle-status :mode not)
             host-ingame (-> host-user :client-status :ingame)
             startpostype (->> scripttags
@@ -400,8 +401,20 @@
                              :-fx-background-color)
                            :-fx-font-size 14)}])
                      [{:fx/type :pane
-                       :h-box/hgrow :always}
-                      {:fx/type :button
+                       :h-box/hgrow :always}]
+                     (when-not singleplayer
+                       [(let [am-away (:away my-client-status)]
+                          (merge
+                            {:fx/type :button
+                             :text (if am-away "Away" "Here")
+                             :on-action {:event/type :spring-lobby/update-client-status
+                                         :client-data (when-not singleplayer client-data)
+                                         :client-status (assoc my-client-status :away (not am-away))}}
+                            (when am-away
+                              {:graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-sleep:16:grey"}})))])
+                     [{:fx/type :button
                        :text (if am-spec
                                "Spectating"
                                "Playing")

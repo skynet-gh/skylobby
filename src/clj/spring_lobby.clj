@@ -2425,6 +2425,13 @@
                      (update-in [:by-server :local :battles :singleplayer (if is-bot :bots :users) player-name] merge data)
                      (update-in [:by-server :local :battle (if is-bot :bots :users) player-name] merge data))))))))
 
+(defmethod event-handler ::update-battle-status
+  [{:keys [client-data opts battle-status team-color]}]
+  (update-battle-status client-data opts battle-status team-color))
+
+(defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
+  (client-message client-data (str "MYSTATUS " (handler/encode-client-status client-status))))
+
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future
     (try

@@ -34,7 +34,7 @@
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
 
-(def default-client-status "0")
+(def default-client-status-str "0")
 
 (def client-status-protocol
   (gloss/compile-frame
@@ -78,6 +78,20 @@
         ByteBuffer))
     :prefix))
 
+(def default-client-status
+  (decode-client-status default-client-status-str))
+
+(defn encode-client-status [client-status]
+  (str
+    (.get
+      ^ByteBuffer
+      (gio/to-byte-buffer
+        (gio/encode client-status-protocol
+          (assoc
+            (merge default-client-status client-status)
+            :prefix false)))
+      0)))
+
 (defn decode-battle-status [status-str]
   (dissoc
     (gio/decode battle-status-protocol
@@ -118,7 +132,7 @@
                 :country country
                 :user-id user-id
                 :user-agent user-agent
-                :client-status (decode-client-status default-client-status)}]
+                :client-status default-client-status}]
       (swap! state-atom assoc-in [:by-server server-url :users username] user))
     (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
