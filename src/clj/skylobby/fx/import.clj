@@ -85,8 +85,8 @@
          :icons skylobby.fx/icons
          :on-close-request {:event/type :spring-lobby/dissoc
                             :key :show-importer}
-         :width (min import-window-width width)
-         :height (min import-window-height height)
+         :width ((fnil min import-window-width) width import-window-width)
+         :height ((fnil min import-window-height) height import-window-height)
          :scene
          {:fx/type :scene
           :stylesheets skylobby.fx/stylesheets

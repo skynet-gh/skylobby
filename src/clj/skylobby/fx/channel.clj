@@ -193,6 +193,7 @@
            :message-draft message-draft
            :server-key server-key}]}]
        (when (and (not hide-users)
+                  channel-name
                   (not (string/starts-with? channel-name "@")))
          [{:fx/type channel-view-users
            :users users}]))}))

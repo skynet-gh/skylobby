@@ -7,6 +7,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(def tasks-window-width 1600)
+(def tasks-window-height 1000)
+
 (def tasks-window-keys
   [:current-tasks :show-tasks-window :tasks-by-kind])
 
@@ -20,8 +23,8 @@
          :icons skylobby.fx/icons
          :on-close-request {:event/type :spring-lobby/dissoc
                             :key :show-tasks-window}
-         :width (min width 1600)
-         :height (min height 1000)
+         :width ((fnil min tasks-window-width) width tasks-window-width)
+         :height ((fnil min tasks-window-height) height tasks-window-height)
          :scene
          {:fx/type :scene
           :stylesheets skylobby.fx/stylesheets

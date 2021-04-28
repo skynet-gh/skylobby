@@ -54,8 +54,8 @@
          :icons skylobby.fx/icons
          :on-close-request {:event/type :spring-lobby/dissoc
                             :key :show-rapid-downloader}
-         :width (min rapid-download-window-width width)
-         :height (min rapid-download-window-height height)
+         :width ((fnil min rapid-download-window-width) width rapid-download-window-width)
+         :height ((fnil min rapid-download-window-height) height rapid-download-window-height)
          :scene
          {:fx/type :scene
           :stylesheets skylobby.fx/stylesheets
