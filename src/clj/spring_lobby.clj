@@ -1245,16 +1245,21 @@
                 (fn [map-details]
                   (let [minimap-file (-> map-details :map-name fs/minimap-image-cache-file)]
                     (or (:force opts) (not (fs/exists minimap-file))))))
-              (sort-by :map-name))]
+              (sort-by :map-name))
+         per-round 3
+         this-round (take per-round to-update)
+         next-round (drop per-round to-update)]
      (log/info (count to-update) "maps do not have cached minimap image files")
-     (doseq [map-details to-update]
+     (doseq [map-details this-round]
        (if-let [map-file (:file map-details)]
          (do
            (log/info "Caching minimap for" map-file)
            (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
              (when-let [minimap-image-scaled (:minimap-image-scaled smf)]
                (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
-         (log/error "Map is missing file" (:map-name map-details)))))))
+         (log/error "Map is missing file" (:map-name map-details))))
+     (when (seq next-round)
+       (add-task! *state {::task-type ::update-cached-minimaps})))))
 
 (defn- reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
@@ -1531,7 +1536,10 @@
 
 
 (defmethod task-handler ::update-cached-minimaps [_]
-  (update-cached-minimaps (:maps @*state)))
+  (let [{:keys [by-spring-root]} @*state
+        all-maps (mapcat :maps (vals by-spring-root))]
+    (log/info "Found" (count all-maps) "maps to update cached minimaps for")
+    (update-cached-minimaps all-maps)))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
