@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     [cljfx.ext.table-view :as fx.ext.table-view]
+    [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
 
@@ -121,7 +122,12 @@
       :cell-value-factory #(:country (get users (:host-username %)))
       :cell-factory
       {:fx/cell-type :table-cell
-       :describe (fn [country] {:text (str country)})}}
+       :describe
+       (fn [country]
+         {:text ""
+          :graphic
+          {:fx/type flag-icon/flag-icon
+           :country-code country}})}}
      {:fx/type :table-column
       :text "Host"
       :pref-width 100

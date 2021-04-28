@@ -1,6 +1,7 @@
 {:paths ["src/clj" "resources"]
  :mvn/repos
- {"local" {:url "file:./repo"}}
+ {"local" {:url "file:./repo"}
+  "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
   byte-streams/byte-streams {:mvn/version "0.2.4"}
@@ -23,6 +24,7 @@
   expound/expound {:mvn/version "0.8.9"}
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
+  org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   hashp/hashp {:mvn/version "0.2.1"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   jarohen/chime {:mvn/version "0.3.2"}
