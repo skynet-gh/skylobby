@@ -40,10 +40,12 @@
 
 
 (def servers-window-keys
-  [:server-alias :server-edit :server-host :server-port :server-spring-root-draft :server-ssl :servers :show-servers-window])
+  [:server-alias :server-auto-connect :server-edit :server-host :server-port
+   :server-spring-root-draft :server-ssl :servers :show-servers-window])
 
 (defn servers-window
-  [{:keys [server-alias server-edit server-host server-port server-spring-root-draft server-ssl servers show-servers-window]}]
+  [{:keys [server-alias server-auto-connect server-edit server-host server-port
+           server-spring-root-draft server-ssl servers show-servers-window]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :servers-window
       (let [url (first server-edit)
@@ -129,6 +131,17 @@
                :children
                [{:fx/type :label
                  :alignment :center
+                 :text " Auto-connect: "}
+                {:fx/type :check-box
+                 :h-box/hgrow :always
+                 :selected (boolean server-auto-connect)
+                 :on-selected-changed {:event/type :spring-lobby/assoc
+                                       :key :server-auto-connect}}]}
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :alignment :center
                  :text " SSL: "}
                 {:fx/type :check-box
                  :h-box/hgrow :always
@@ -161,18 +174,21 @@
                    :graphic
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-file-find:16:white"}}])}
-              {:fx/type :button
-               :text (str
-                       (if (contains? servers server-url) "Update" "Add")
-                       " server")
-               :style {:-fx-font-size 20}
-               :disable (string/blank? server-host)
-               :on-action {:event/type :spring-lobby/update-server
-                           :server-url server-url
-                           :server-data
-                           {:port port
-                            :host server-host
-                            :alias server-alias
-                            :spring-isolation-dir (fs/file server-spring-root-draft)
-                            :ssl (boolean server-ssl)}}}]}
+              (let [server-data {:port port
+                                 :host server-host
+                                 :alias server-alias
+                                 :spring-isolation-dir (fs/file server-spring-root-draft)
+                                 :auto-connect (boolean server-auto-connect)
+                                 :ssl (boolean server-ssl)}]
+                {:fx/type :button
+                 :text (str
+                         (if (contains? servers server-url) "Update" "Add")
+                         " server")
+                 :style {:-fx-font-size 20}
+                 :disable (or (string/blank? server-host)
+                              (= (update server-data :spring-isolation-dir fs/canonical-path)
+                                 (update (second server-edit) :spring-isolation-dir fs/canonical-path)))
+                 :on-action {:event/type :spring-lobby/update-server
+                             :server-url server-url
+                             :server-data server-data}})]}
             {:fx/type :pane})}}))))

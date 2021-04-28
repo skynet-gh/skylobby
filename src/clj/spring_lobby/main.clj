@@ -66,6 +66,7 @@
           (log/info "Mounting renderer")
           (fx/mount-renderer spring-lobby/*state r))
         (spring-lobby/init-async spring-lobby/*state)
+        (spring-lobby/auto-connect-servers spring-lobby/*state)
         (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
       (catch Throwable t
         (spit "skylobby-fatal-error.txt" (str t))))))

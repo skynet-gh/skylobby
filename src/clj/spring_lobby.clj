@@ -1759,13 +1759,16 @@
            :server-host (:host server-data)
            :server-port (:port server-data)
            :server-alias (:alias server-data)
+           :server-auto-connect (:auto-connect server-data)
            :server-ssl (:ssl server-data)
            :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data)))))
 
 (defmethod event-handler ::update-server
   [{:keys [server-url server-data]}]
   (log/info "Updating server" server-url "to" server-data)
-  (swap! *state update-in [:servers server-url] merge server-data))
+  (swap! *state update-in [:servers server-url] merge server-data)
+  (event-handler {:event/type ::edit-server
+                  :fx/event [server-url server-data]}))
 
 
 (defmethod event-handler ::delete-extra-import-source [{:keys [file]}]
@@ -3448,6 +3451,21 @@
         check-app-update-chimer
         spit-app-config-chimer
         profile-print-chimer])}))
+
+
+(defn auto-connect-servers [state-atom]
+  (let [{:keys [logins servers]} @state-atom]
+    (doseq [[server-url :as server] (filter (comp :auto-connect second) servers)]
+      (when-let [{:keys [password username] :as login} (get logins server-url)]
+        (when (and password username)
+          (let [server-key (u/server-key {:server-url server-url
+                                          :username username})]
+            (event-handler
+              (merge
+                {:event/type ::connect
+                 :server server
+                 :server-key server-key}
+                login))))))))
 
 
 (defn init-async [state-atom]
