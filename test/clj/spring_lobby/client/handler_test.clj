@@ -1,7 +1,8 @@
 (ns spring-lobby.client.handler-test
   (:require
     [clojure.test :refer [deftest is]]
-    [spring-lobby.client.handler :as handler]))
+    [spring-lobby.client.handler :as handler]
+    [spring-lobby.util :as u]))
 
 
 (deftest decode-battle-status
@@ -72,3 +73,74 @@
           nil
           nil]
          (rest (handler/parse-adduser "ADDUSER skynet ?? 8")))))
+
+(deftest handle-SAIDFROM
+  (let [state-atom (atom {})
+        server-key :server1
+        now 12345]
+    (with-redefs [u/curr-millis (constantly now)]
+      (handler/handle state-atom server-key "SAIDFROM evolution user:springrts.com :)"))
+    (is (= {:by-server
+            {:server1
+             {:channels
+              {"evolution"
+               {:messages
+                [{:ex false
+                  :text ":)"
+                  :timestamp now
+                  :username "user:springrts.com"}]}}}}}
+           @state-atom))))
+
+(deftest handle-CLIENTSFROM
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key
+      "CLIENTSFROM evolution appservice user1:discord user:springrts.com user3:discord user4:discord")
+    (is (= {:by-server
+            {:server1
+             {:channels
+              {"evolution"
+               {:users
+                {"user1:discord" {:bridge "appservice"}
+                 "user3:discord" {:bridge "appservice"}
+                 "user4:discord" {:bridge "appservice"}
+                 "user:springrts.com" {:bridge "appservice"}}}}}}}
+           @state-atom))))
+
+(deftest handle-JOINEDFROM
+  (let [state-atom (atom
+                     {:by-server
+                      {:server1
+                       {:channels
+                        {"evolution"
+                         {:users
+                          {"user1:discord" {:bridge "appservice"}}}}}}})
+        server-key :server1]
+    (handler/handle state-atom server-key "JOINEDFROM evolution appservice user4:discord")
+    (is (= {:by-server
+            {:server1
+             {:channels
+              {"evolution"
+               {:users
+                {"user1:discord" {:bridge "appservice"}
+                 "user4:discord" {:bridge "appservice"}}}}}}}
+           @state-atom))))
+
+(deftest handle-LEFTFROM
+  (let [state-atom (atom
+                     {:by-server
+                      {:server1
+                       {:channels
+                        {"evolution"
+                         {:users
+                          {"user1:discord" {:bridge "appservice"}
+                           "user4:discord" {:bridge "appservice"}}}}}}})
+        server-key :server1]
+    (handler/handle state-atom server-key "LEFTFROM evolution user1:discord")
+    (is (= {:by-server
+            {:server1
+             {:channels
+              {"evolution"
+               {:users
+                {"user4:discord" {:bridge "appservice"}}}}}}}
+           @state-atom))))
