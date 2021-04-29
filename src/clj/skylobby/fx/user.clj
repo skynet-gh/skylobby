@@ -41,7 +41,7 @@
       :column-resize-policy :constrained ; TODO auto resize
       :row-factory
       {:fx/cell-type :table-row
-       :describe (fn [{:keys [user-id username]}]
+       :describe (fn [{:keys [client-status country user-agent user-id username]}]
                    (let [{:keys [battle-id battle-title] :as battle} (get battles-by-users username)]
                      (merge
                        {:on-mouse-clicked
@@ -75,15 +75,28 @@
                                :on-action {:event/type :spring-lobby/send-message
                                            :client-data client-data
                                            :channel-name (u/user-channel username)
-                                           :message "!ranking"}}])
+                                           :message "!ranking"}}
+                              {:fx/type :menu-item
+                               :text "!set privacyMode 0"
+                               :on-action {:event/type :spring-lobby/send-message
+                                           :client-data client-data
+                                           :channel-name (u/user-channel username)
+                                           :message "!set privacyMode 0"}}])
                            [{:fx/type :menu-item
                              :text (str "User ID: " user-id)}])}}
-                       (when battle
-                         {:tooltip
-                          {:fx/type :tooltip
-                           :style {:-fx-font-size 16}
-                           :show-delay [10 :ms]
-                           :text (str "Battle: " battle-title)}}))))}
+                       {:tooltip
+                        {:fx/type :tooltip
+                         :style {:-fx-font-size 16}
+                         :show-delay [10 :ms]
+                         :text (str username "\n\n"
+                                    (when (:access client-status)
+                                      "Admin\n")
+                                    "ID: " user-id "\n"
+                                    "Country: " country "\n"
+                                    "Rank: " (:rank client-status) "\n"
+                                    "Lobby: " user-agent "\n"
+                                    (when battle
+                                      (str "\nBattle: " battle-title)))}})))}
       :columns
       [{:fx/type :table-column
         :text "Username"

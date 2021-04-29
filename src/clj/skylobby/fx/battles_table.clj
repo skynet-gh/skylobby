@@ -40,7 +40,7 @@
        :column-resize-policy :constrained ; TODO auto resize
        :row-factory
        {:fx/cell-type :table-row
-        :describe (fn [i]
+        :describe (fn [{:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version users]}]
                     {:on-mouse-clicked
                      {:event/type :spring-lobby/on-mouse-clicked-battles-row
                       :battle battle
@@ -52,12 +52,15 @@
                      {:fx/type :tooltip
                       :style {:-fx-font-size 16}
                       :show-delay [10 :ms]
-                      :text (->> i
-                                 :users
-                                 keys
-                                 (sort String/CASE_INSENSITIVE_ORDER)
-                                 (string/join "\n")
-                                 (str "Players:\n\n"))}
+                      :text (str battle-title "\n\n"
+                                 "Map: " battle-map "\n"
+                                 "Game: " battle-modname "\n"
+                                 "Engine: " battle-engine " " battle-version "\n\n"
+                                 (->> users
+                                      keys
+                                      (sort String/CASE_INSENSITIVE_ORDER)
+                                      (string/join "\n")
+                                      (str "Players:\n\n")))}
                      :context-menu
                      {:fx/type :context-menu
                       :items
@@ -66,7 +69,7 @@
                         :on-action {:event/type :spring-lobby/join-battle
                                     :battle battle
                                     :client-data client-data
-                                    :selected-battle (:battle-id i)}}]}})}
+                                    :selected-battle battle-id}}]}})}
        :columns
        [
         {:fx/type :table-column
