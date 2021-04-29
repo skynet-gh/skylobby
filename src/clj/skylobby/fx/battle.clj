@@ -542,7 +542,7 @@
                      :value minimap-type
                      :items u/minimap-types
                      :on-value-changed {:event/type :spring-lobby/assoc
-                                        :key :spring-lobby/minimap-type}}]}
+                                        :key :minimap-type}}]}
                   {:fx/type :h-box
                    :style {:-fx-max-width u/minimap-size}
                    :children
@@ -607,6 +607,7 @@
                          :on-action {:event/type :spring-lobby/battle-balance
                                      :am-host am-host
                                      :battle battle
+                                     :channel-name channel-name
                                      :client-data (when-not singleplayer client-data)
                                      :users users
                                      :username username}}])
