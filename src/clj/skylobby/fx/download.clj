@@ -66,11 +66,11 @@
 
 
 (def download-window-keys
-  [:download-filter :download-source-name :download-type :downloadables-by-url :file-cache
+  [:css :download-filter :download-source-name :download-type :downloadables-by-url :file-cache
    :http-download :show-downloader :show-stale :spring-isolation-dir])
 
 (defn download-window
-  [{:keys [download-filter download-type download-source-name downloadables-by-url file-cache
+  [{:keys [css download-filter download-type download-source-name downloadables-by-url file-cache
            http-download screen-bounds show-downloader spring-isolation-dir]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :download-window
@@ -109,7 +109,7 @@
          :height ((fnil min download-window-height) height download-window-height)
          :scene
          {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
+          :stylesheets (skylobby.fx/stylesheet-urls css)
           :root
           (if show-downloader
             {:fx/type :v-box

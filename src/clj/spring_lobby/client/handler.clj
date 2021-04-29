@@ -240,6 +240,10 @@
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
     (swap! state-atom assoc-in [:by-server server-url :channels channel-name :users username] {})))
 
+(defmethod handle "JOINEDFROM" [state-atom server-url m]
+  (let [[_all channel-name bridge username] (re-find #"\w+\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)" m)]
+    (swap! state-atom assoc-in [:by-server server-url :channels channel-name :users username] {:bridge bridge})))
+
 (defmethod handle "CLIENTS" [state-atom server-url m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
         parts (string/split remaining #"\s+")
@@ -250,6 +254,14 @@
              (apply assoc users
                     (mapcat (fn [client] [client {}]) clients))))))
 
+(defmethod handle "CLIENTSFROM" [state-atom server-url m]
+  (let [[_all remaining] (re-find #"\w+ (.*)" m)
+        [channel-name bridge & clients] (string/split remaining #"\s+")]
+    (swap! state-atom update-in [:by-server server-url :channels channel-name :users]
+           (fn [users]
+             (apply assoc users
+                    (mapcat (fn [client] [client {:bridge bridge}]) clients))))))
+
 (defmethod handle "SAID" [state-atom server-url m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
@@ -259,6 +271,11 @@
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
       (u/update-chat-messages-fn username message true))))
+
+(defmethod handle "SAIDFROM" [state-atom server-url m]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
+    (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
+      (u/update-chat-messages-fn username message))))
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
@@ -312,14 +329,21 @@
                   script-password
                   (assoc-in [:battle :script-password] script-password)))))))
 
-(defmethod handle "LEFT" [state-atom server-url m]
+(defn- left [state-atom server-key channel-name username]
+  (swap! state-atom update-in [:by-server server-key]
+         (fn [state]
+           (let [next-state (update-in state [:channels channel-name :users] dissoc username)]
+             (if (= (:username state) username) ; me
+               (update next-state :my-channels dissoc channel-name)
+               next-state)))))
+
+(defmethod handle "LEFT" [state-atom server-key m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
-    (swap! state-atom update-in [:by-server server-url]
-           (fn [state]
-             (let [next-state (update-in state [:channels channel-name :users] dissoc username)]
-               (if (= (:username state) username) ; me
-                 (update next-state :my-channels dissoc channel-name)
-                 next-state))))))
+    (left state-atom server-key channel-name username)))
+
+(defmethod handle "LEFTFROM" [state-atom server-key m]
+  (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
+    (left state-atom server-key channel-name username)))
 
 (defmethod handle "REMOVESCRIPTTAGS" [state-atom server-url m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)

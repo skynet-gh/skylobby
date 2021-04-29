@@ -9,6 +9,7 @@
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.1"}
   cljfx/cljfx {:mvn/version "1.7.13"}
+  cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
   clojure.java-time/clojure.java-time {:mvn/version "0.3.2"}

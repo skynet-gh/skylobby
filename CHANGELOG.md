@@ -17,6 +17,7 @@ Future Features:
 - Parse autohost messages and display in UI
 - Visually group teams in players table
 - Track and display player away time
+- Arbitrary engine directories
 - Open replay files or links
 - Open battle links
 - Up arrow in chat and console box should fill in last message
@@ -37,6 +38,11 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.25]
+
+- Add support for bridged chat
+- Add custom CSS section to settings
 
 ### [0.3.24]
 

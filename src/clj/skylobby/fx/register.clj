@@ -8,11 +8,11 @@
 
 
 (def register-window-keys
-  [:email :password :password-confirm :register-response :server :servers :show-register-window
+  [:css :email :password :password-confirm :register-response :server :servers :show-register-window
    :username])
 
 (defn register-window
-  [{:keys [email password password-confirm register-response server servers show-register-window username]}]
+  [{:keys [css email password password-confirm register-response server servers show-register-window username]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :register-window
       {:fx/type :stage
@@ -25,7 +25,7 @@
        :height 400
        :scene
        {:fx/type :scene
-        :stylesheets skylobby.fx/stylesheets
+        :stylesheets (skylobby.fx/stylesheet-urls css)
         :root
         (if show-register-window
           {:fx/type :v-box

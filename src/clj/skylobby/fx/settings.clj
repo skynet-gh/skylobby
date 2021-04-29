@@ -10,14 +10,18 @@
     [taoensso.tufte :as tufte]))
 
 
+(def settings-window-width 800)
+(def settings-window-height 1000)
+
+
 (def settings-window-keys
-  [:extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
+  [:css :extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
    :extra-replay-recursive
-   :extra-replay-sources :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
+   :extra-replay-sources :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window
-  [{:keys [extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path extra-replay-recursive show-settings-window spring-isolation-dir]
+  [{:keys [css extra-import-name extra-import-path extra-import-sources extra-replay-name
+           extra-replay-path extra-replay-recursive screen-bounds show-settings-window spring-isolation-dir]
     :as state}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :settings-window
@@ -27,11 +31,11 @@
        :icons skylobby.fx/icons
        :on-close-request {:event/type :spring-lobby/dissoc
                           :key :show-settings-window}
-       :width 800
-       :height 800
+       :width ((fnil min settings-window-width) (:width screen-bounds) settings-window-width)
+       :height ((fnil min settings-window-height) (:height screen-bounds) settings-window-height)
        :scene
        {:fx/type :scene
-        :stylesheets skylobby.fx/stylesheets
+        :stylesheets (skylobby.fx/stylesheet-urls css)
         :root
         (if show-settings-window
           {:fx/type :scroll-pane
@@ -197,5 +201,31 @@
                {:fx/type :check-box
                 :selected (boolean extra-replay-recursive)
                 :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :extra-replay-recursive}}]}]}}
+                                      :key :extra-replay-recursive}}]}
+             {:fx/type :label
+              :text " Appearance"
+              :style {:-fx-font-size 24}}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :label
+                :text " Preset: "}
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/update-css
+                            :css skylobby.fx/default-style-data}
+                :text "Default"}
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/update-css
+                            :css skylobby.fx/black-style-data}
+                :text "Black"}
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/update-css
+                            :css {}}
+                :text "JavaFX"}]}
+             (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/load-custom-css
+                            :file custom-file}
+                :text (str "Custom from " custom-file)})]}}
          {:fx/type :pane})}})))

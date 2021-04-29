@@ -40,11 +40,11 @@
 
 
 (def servers-window-keys
-  [:server-alias :server-auto-connect :server-edit :server-host :server-port
+  [:css :server-alias :server-auto-connect :server-edit :server-host :server-port
    :server-spring-root-draft :server-ssl :servers :show-servers-window])
 
 (defn servers-window
-  [{:keys [server-alias server-auto-connect server-edit server-host server-port
+  [{:keys [css server-alias server-auto-connect server-edit server-host server-port
            server-spring-root-draft server-ssl servers show-servers-window]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :servers-window
@@ -62,7 +62,7 @@
          :height 400
          :scene
          {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
+          :stylesheets (skylobby.fx/stylesheet-urls css)
           :root
           (if show-servers-window
             {:fx/type :v-box

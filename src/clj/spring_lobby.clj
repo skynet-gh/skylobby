@@ -2,6 +2,7 @@
   (:require
     [chime.core :as chime]
     [clj-http.client :as clj-http]
+    [cljfx.css :as css]
     [clojure.core.async :as async]
     [clojure.core.cache :as cache]
     [clojure.edn :as edn]
@@ -16,6 +17,7 @@
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
     [skylobby.color :as color]
+    skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
@@ -112,7 +114,7 @@
 
 (def config-keys
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
-   :console-auto-scroll :engine-version :extra-import-sources :extra-replay-sources :filter-replay
+   :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
@@ -2038,6 +2040,20 @@
       (swap! *state assoc-in target file))))
 
 
+(defmethod event-handler ::update-css
+  [{:keys [css]}]
+  (let [registered (css/register :skylobby.fx/default css)]
+    (swap! *state assoc :css registered)))
+
+(defmethod event-handler ::load-custom-css
+  [{:keys [file]}]
+  (if (fs/exists? file)
+    (let [css (edn/read-string (slurp file))]
+      (event-handler {:css css
+                      :event/type ::update-css}))
+    (log/warn "Custom CSS file does not exist" file)))
+
+
 (defmethod event-handler ::battle-password-change
   [{:fx/keys [event]}]
   (swap! *state assoc :battle-password event))
@@ -3439,6 +3455,13 @@
 (defn- init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
+  (try
+    (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
+      (when-not (fs/exists? custom-css-file)
+        (log/info "Creating initial custom CSS file" custom-css-file)
+        (spit custom-css-file skylobby.fx/default-style-data)))
+    (catch Exception e
+      (log/error e "Error creating custom CSS file")))
   (log/info "Initializing periodic jobs")
   (let [task-chimers (->> task/task-kinds
                           (map (partial tasks-chimer-fn state-atom))
