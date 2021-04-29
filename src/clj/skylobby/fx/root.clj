@@ -40,7 +40,7 @@
      :height (.getHeight bounds)}))
 
 (defn root-view
-  [{{:keys [by-server by-spring-root current-tasks pop-out-battle selected-server-tab servers
+  [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
             show-matchmaking-window spring-isolation-dir standalone tasks-by-kind]
      :as state}
     :state}]
@@ -80,7 +80,7 @@
                               :standalone standalone}
            :scene
            {:fx/type :scene
-            :stylesheets skylobby.fx/stylesheets
+            :stylesheets (skylobby.fx/stylesheet-urls css)
             :root (merge
                     {:fx/type fx.main/main-window}
                     state
@@ -95,7 +95,7 @@
            :height (min battle-window-height height)
            :scene
            {:fx/type :scene
-            :stylesheets skylobby.fx/stylesheets
+            :stylesheets (skylobby.fx/stylesheet-urls css)
             :root
             (if show-battle-window
               (merge

@@ -41,11 +41,11 @@
 
 
 (def import-window-keys
-  [:copying :extra-import-sources :file-cache :import-filter :import-source-name :import-type
+  [:copying :css :extra-import-sources :file-cache :import-filter :import-source-name :import-type
    :importables-by-path :show-importer :spring-isolation-dir])
 
 (defn import-window
-  [{:keys [copying extra-import-sources file-cache import-filter import-type import-source-name importables-by-path
+  [{:keys [copying css extra-import-sources file-cache import-filter import-type import-source-name importables-by-path
            screen-bounds
            show-importer spring-isolation-dir tasks-by-type]}]
   (tufte/profile {:id :skylobby/ui}
@@ -89,7 +89,7 @@
          :height ((fnil min import-window-height) height import-window-height)
          :scene
          {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
+          :stylesheets (skylobby.fx/stylesheet-urls css)
           :root
           (if show-importer
             {:fx/type :v-box

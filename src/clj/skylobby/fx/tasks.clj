@@ -11,9 +11,9 @@
 (def tasks-window-height 1000)
 
 (def tasks-window-keys
-  [:current-tasks :show-tasks-window :tasks-by-kind])
+  [:css :current-tasks :show-tasks-window :tasks-by-kind])
 
-(defn tasks-window [{:keys [current-tasks screen-bounds show-tasks-window tasks-by-kind]}]
+(defn tasks-window [{:keys [css current-tasks screen-bounds show-tasks-window tasks-by-kind]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :tasks-window
       (let [{:keys [width height]} screen-bounds]
@@ -27,7 +27,7 @@
          :height ((fnil min tasks-window-height) height tasks-window-height)
          :scene
          {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
+          :stylesheets (skylobby.fx/stylesheet-urls css)
           :root
           (if show-tasks-window
             {:fx/type :v-box

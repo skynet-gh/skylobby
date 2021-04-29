@@ -15,11 +15,11 @@
 
 
 (def rapid-download-window-keys
-  [:engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
+  [:css :engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
    :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader :spring-isolation-dir])
 
 (defn rapid-download-window
-  [{:keys [engine-version engines rapid-download rapid-filter rapid-repo rapid-repos rapid-versions
+  [{:keys [css engine-version engines rapid-download rapid-filter rapid-repo rapid-repos rapid-versions
            rapid-packages screen-bounds sdp-files show-rapid-downloader spring-isolation-dir]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :rapid-download-window
@@ -58,7 +58,7 @@
          :height ((fnil min rapid-download-window-height) height rapid-download-window-height)
          :scene
          {:fx/type :scene
-          :stylesheets skylobby.fx/stylesheets
+          :stylesheets (skylobby.fx/stylesheet-urls css)
           :root
           (if show-rapid-downloader
             {:fx/type :v-box

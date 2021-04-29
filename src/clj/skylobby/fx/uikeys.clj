@@ -55,7 +55,7 @@
         (.getText key-event))))
 
 
-(defn uikeys-window [{:keys [filter-uikeys-action selected-uikeys-action show-uikeys-window uikeys]}]
+(defn uikeys-window [{:keys [css filter-uikeys-action selected-uikeys-action show-uikeys-window uikeys]}]
   (let [default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
                            [])
         filtered-uikeys (->>  default-uikeys
@@ -78,7 +78,7 @@
      :height 1000
      :scene
      {:fx/type :scene
-      :stylesheets skylobby.fx/stylesheets
+      :stylesheets (skylobby.fx/stylesheet-urls css)
       :root
       (if show-uikeys-window
         {:fx/type :v-box

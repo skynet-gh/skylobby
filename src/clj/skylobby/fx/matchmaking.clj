@@ -5,7 +5,7 @@
     [taoensso.tufte :as tufte]))
 
 
-(defn matchmaking-window [{:keys [client-data matchmaking-queues show-matchmaking-window]}]
+(defn matchmaking-window [{:keys [client-data css matchmaking-queues show-matchmaking-window]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :replays-window
       {:fx/type :stage
@@ -18,7 +18,7 @@
        :height 700
        :scene
        {:fx/type :scene
-        :stylesheets skylobby.fx/stylesheets
+        :stylesheets (skylobby.fx/stylesheet-urls css)
         :root
         (if show-matchmaking-window
           {:fx/type :v-box
