@@ -76,7 +76,7 @@
                     {:spring-lobby/task-type :spring-lobby/http-downloadable
                      :downloadable downloadable
                      :spring-isolation-dir spring-isolation-dir}})}]
-               (when (and battle-modname (not (some #(re-find % battle-modname) no-springfiles)))
+               (when (and springname (not (some #(re-find % springname) no-springfiles)))
                  [{:severity 2
                    :text "springfiles"
                    :human-text (if springfiles-in-progress

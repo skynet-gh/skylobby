@@ -47,9 +47,9 @@
                       (when (contains? options :spring-root)
                         {:spring-isolation-dir (fs/file (:spring-root options))})
                       (when (contains? options :filter-battles)
-                        {:filter-battles (:filters-battle options)})
+                        {:filter-battles (:filter-battles options)})
                       (when (contains? options :filter-users)
-                        {:filter-users (:filters-users options)})
+                        {:filter-users (:filter-users options)})
                       (when (contains? options :server-url)
                         (let [server (->> initial-state
                                           :servers

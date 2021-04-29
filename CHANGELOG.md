@@ -38,6 +38,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.24]
+
+- Fix balance button and minimap type combo box
+- Fix battles and users filter cli args
+- Add springfiles download for maps
+
 ### [0.3.23]
 
 - Improve installer user feedback

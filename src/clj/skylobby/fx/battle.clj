@@ -385,7 +385,7 @@
                                 :indexed-map indexed-map
                                 :import-tasks import-tasks
                                 :map-update-tasks map-update-tasks}
-                               (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
+                               (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))])})])}}
                   {:fx/type :pane
                    :v-box/vgrow :always}]
                  [{:fx/type :h-box
@@ -542,7 +542,7 @@
                      :value minimap-type
                      :items u/minimap-types
                      :on-value-changed {:event/type :spring-lobby/assoc
-                                        :key :spring-lobby/minimap-type}}]}
+                                        :key :minimap-type}}]}
                   {:fx/type :h-box
                    :style {:-fx-max-width u/minimap-size}
                    :children
@@ -607,6 +607,7 @@
                          :on-action {:event/type :spring-lobby/battle-balance
                                      :am-host am-host
                                      :battle battle
+                                     :channel-name channel-name
                                      :client-data (when-not singleplayer client-data)
                                      :users users
                                      :username username}}])
