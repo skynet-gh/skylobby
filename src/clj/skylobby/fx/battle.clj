@@ -385,7 +385,7 @@
                                 :indexed-map indexed-map
                                 :import-tasks import-tasks
                                 :map-update-tasks map-update-tasks}
-                               (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :tasks-by-type :update-maps]))])})])}}
+                               (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))])})])}}
                   {:fx/type :pane
                    :v-box/vgrow :always}]
                  [{:fx/type :h-box
