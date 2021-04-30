@@ -90,8 +90,8 @@
     string-or-number
     (boolean? string-or-number)
     (if string-or-number 1 0)
-    (string? string-or-number)
-    (edn/read-string string-or-number)
+    (or (keyword? string-or-number) (string? string-or-number))
+    (edn/read-string (name string-or-number))
     :else
     nil))
 

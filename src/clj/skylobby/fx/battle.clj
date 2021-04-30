@@ -23,6 +23,169 @@
     [taoensso.tufte :as tufte]))
 
 
+; https://clojuredocs.org/clojure.core/split-with#example-5e48288ce4b0ca44402ef839
+(defn split-by [pred coll]
+  (lazy-seq
+    (when-let [s (seq coll)]
+      (let [!pred (complement pred)
+            [xs ys] (split-with !pred s)]
+        (if (seq xs)
+          (cons xs (split-by pred ys))
+          (let [skip (take-while pred s)
+                others (drop-while pred s)
+                [xs ys] (split-with !pred others)]
+            (cons (concat skip xs)
+                  (split-by pred ys))))))))
+
+(defn modoptions-table
+  [{:keys [am-host am-spec battle channel-name client-data modoptions singleplayer]}]
+  (let [first-option (-> modoptions first second)
+        is-section (-> first-option :type (= "section"))
+        header (when is-section first-option)
+        options (if is-section
+                  (rest modoptions)
+                  modoptions)
+        items (->> options
+                   (sort-by (comp u/to-number first))
+                   (map second)
+                   (filter :key)
+                   (map #(update % :key (comp keyword string/lower-case))))]
+    {:fx/type :v-box
+     :children
+     [{:fx/type :label
+       :text (str (:name header))
+       :style {:-fx-font-size 18}}
+      {:fx/type :label
+       :text (str (:desc header))
+       :style {:-fx-font-size 14}}
+      {:fx/type :table-view
+       :column-resize-policy :constrained
+       :items items
+       :style {:-fx-pref-height (+ 60 (* 40 (count items)))}
+       :columns
+       [{:fx/type :table-column
+         :text "Key"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text ""
+             :graphic
+             {:fx/type fx.ext.node/with-tooltip-props
+              :props
+              {:tooltip
+               {:fx/type :tooltip
+                :show-delay [10 :ms]
+                :text (str (:name i) "\n\n" (:desc i))}}
+              :desc
+              (merge
+                {:fx/type :label
+                 :text (or (some-> i :key name str)
+                           "")}
+                (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
+                  (when (not (spring-script/tag= i v))
+                    {:style {:-fx-font-weight :bold}})))}})}}
+        {:fx/type :table-column
+         :text "Value"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            (let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
+              (case (:type i)
+                "bool"
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :check-box
+                    :selected (u/to-bool (or v (:def i)))
+                    :on-selected-changed {:event/type :spring-lobby/modoption-change
+                                          :am-host am-host
+                                          :channel-name channel-name
+                                          :client-data client-data
+                                          :modoption-key (:key i)
+                                          :singleplayer singleplayer}
+                    :disable (and (not singleplayer) am-spec)}}}}
+                "number"
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :text-field
+                    :disable (and (not singleplayer) am-spec)
+                    :text-formatter
+                    {:fx/type :text-formatter
+                     :value-converter :number
+                     :value (u/to-number (or v (:def i)))
+                     :on-value-changed {:event/type :spring-lobby/modoption-change
+                                        :am-host am-host
+                                        :channel-name channel-name
+                                        :client-data client-data
+                                        :modoption-key (:key i)
+                                        :modoption-type (:type i)}}}}}}
+                "list"
+                {:text ""
+                 :graphic
+                 {:fx/type ext-recreate-on-key-changed
+                  :key (str (:key i))
+                  :desc
+                  {:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text (str (:name i) "\n\n" (:desc i))}}
+                   :desc
+                   {:fx/type :combo-box
+                    :disable (and (not singleplayer) am-spec)
+                    :value (or v (:def i))
+                    :on-value-changed {:event/type :spring-lobby/modoption-change
+                                       :am-host am-host
+                                       :channel-name channel-name
+                                       :client-data client-data
+                                       :modoption-key (:key i)}
+                    :items (or (map (comp :key second) (:items i))
+                               [])}}}}
+                {:text (str (:def i))})))}}]}]}))
+
+(defn modoptions-view [{:keys [modoptions] :as state}]
+  (let [sorted (sort-by (comp u/to-number first) modoptions)
+        by-section (split-by (comp #{"section"} :type second) sorted)]
+    {:fx/type :scroll-pane
+     :fit-to-width true
+     :hbar-policy :never
+     :content
+     {:fx/type :v-box
+      :alignment :top-left
+      :children
+      (map
+        (fn [section]
+          (merge
+            {:fx/type modoptions-table}
+            state
+            {:modoptions section}))
+        by-section)}}))
+
+
 (defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [{:keys [battle users]}]
@@ -676,121 +839,14 @@
              {:fx/type :v-box
               :alignment :top-left
               :children
-              [{:fx/type :table-view
-                :v-box/vgrow :always
-                :column-resize-policy :constrained
-                :items (or (some->> battle-mod-details
-                                    :modoptions
-                                    (map second)
-                                    (filter :key)
-                                    (map #(update % :key (comp keyword string/lower-case)))
-                                    (sort-by :key)
-                                    (remove (comp #{"section"} :type)))
-                           [])
-                :columns
-                [{:fx/type :table-column
-                  :text "Key"
-                  :cell-value-factory identity
-                  :cell-factory
-                  {:fx/cell-type :table-cell
-                   :describe
-                   (fn [i]
-                     {:text ""
-                      :graphic
-                      {:fx/type fx.ext.node/with-tooltip-props
-                       :props
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :text (str (:name i) "\n\n" (:desc i))}}
-                       :desc
-                       (merge
-                         {:fx/type :label
-                          :text (or (some-> i :key name str)
-                                    "")}
-                         (when-let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
-                           (when (not (spring-script/tag= i v))
-                             {:style {:-fx-font-weight :bold}})))}})}}
-                 {:fx/type :table-column
-                  :text "Value"
-                  :cell-value-factory identity
-                  :cell-factory
-                  {:fx/cell-type :table-cell
-                   :describe
-                   (fn [i]
-                     (let [v (-> battle :scripttags :game :modoptions (get (:key i)))]
-                       (case (:type i)
-                         "bool"
-                         {:text ""
-                          :graphic
-                          {:fx/type ext-recreate-on-key-changed
-                           :key (str (:key i))
-                           :desc
-                           {:fx/type fx.ext.node/with-tooltip-props
-                            :props
-                            {:tooltip
-                             {:fx/type :tooltip
-                              :show-delay [10 :ms]
-                              :text (str (:name i) "\n\n" (:desc i))}}
-                            :desc
-                            {:fx/type :check-box
-                             :selected (u/to-bool (or v (:def i)))
-                             :on-selected-changed {:event/type :spring-lobby/modoption-change
-                                                   :am-host am-host
-                                                   :channel-name channel-name
-                                                   :client-data client-data
-                                                   :modoption-key (:key i)
-                                                   :singleplayer singleplayer}
-                             :disable (and (not singleplayer) am-spec)}}}}
-                         "number"
-                         {:text ""
-                          :graphic
-                          {:fx/type ext-recreate-on-key-changed
-                           :key (str (:key i))
-                           :desc
-                           {:fx/type fx.ext.node/with-tooltip-props
-                            :props
-                            {:tooltip
-                             {:fx/type :tooltip
-                              :show-delay [10 :ms]
-                              :text (str (:name i) "\n\n" (:desc i))}}
-                            :desc
-                            {:fx/type :text-field
-                             :disable (and (not singleplayer) am-spec)
-                             :text-formatter
-                             {:fx/type :text-formatter
-                              :value-converter :number
-                              :value (u/to-number (or v (:def i)))
-                              :on-value-changed {:event/type :spring-lobby/modoption-change
-                                                 :am-host am-host
-                                                 :channel-name channel-name
-                                                 :client-data client-data
-                                                 :modoption-key (:key i)
-                                                 :modoption-type (:type i)}}}}}}
-                         "list"
-                         {:text ""
-                          :graphic
-                          {:fx/type ext-recreate-on-key-changed
-                           :key (str (:key i))
-                           :desc
-                           {:fx/type fx.ext.node/with-tooltip-props
-                            :props
-                            {:tooltip
-                             {:fx/type :tooltip
-                              :show-delay [10 :ms]
-                              :text (str (:name i) "\n\n" (:desc i))}}
-                            :desc
-                            {:fx/type :combo-box
-                             :disable (and (not singleplayer) am-spec)
-                             :value (or v (:def i))
-                             :on-value-changed {:event/type :spring-lobby/modoption-change
-                                                :am-host am-host
-                                                :channel-name channel-name
-                                                :client-data client-data
-                                                :modoption-key (:key i)}
-                             :items (or (map (comp :key second) (:items i))
-                                        [])}}}}
-                         {:text (str (:def i))})))}}]}]}}
+              [{:fx/type modoptions-view
+                :am-host am-host
+                :am-spec am-spec
+                :battle battle
+                :channel-name channel-name
+                :client-data client-data
+                :modoptions (:modoptions battle-mod-details)
+                :singleplayer singleplayer}]}}
             {:fx/type :tab
              :graphic {:fx/type :label
                        :text "Spring settings"}
