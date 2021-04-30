@@ -922,34 +922,6 @@
      (fn [] (.close chimer)))))
 
 
-(defn- replay-game-type [allyteam-counts]
-  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
-        num-allyteams (count allyteam-counts)]
-    (cond
-      (= 2 num-allyteams)
-      (if one-per-allyteam?
-        :duel
-        :team)
-      (< 2 num-allyteams)
-      (if one-per-allyteam?
-        :ffa
-        :teamffa)
-      :else
-      :invalid)))
-
-(defn- replay-type-and-players [parsed-replay]
-  (let [teams (->> parsed-replay
-                   :body
-                   :script-data
-                   :game
-                   (filter (comp #(string/starts-with? % "team") name first)))
-        teams-by-allyteam (->> teams
-                               (group-by (comp keyword (partial str "allyteam") :allyteam second)))
-        allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
-    {:game-type (replay-game-type allyteam-counts)
-     :player-counts allyteam-counts}))
-
-
 (defn- replay-sources [{:keys [extra-replay-sources]}]
   (concat
     [{:replay-source-name "skylobby"
@@ -988,18 +960,10 @@
         parsed-replays (->> this-round
                             (map
                               (fn [[source f]]
-                                (let [replay (try
-                                               (replay/decode-replay f)
-                                               (catch Exception e
-                                                 (log/error e "Error reading replay" f)))]
-                                  [(fs/canonical-path f)
-                                   (merge
-                                     {:file f
-                                      :filename (fs/filename f)
-                                      :file-size (fs/size f)}
-                                     replay
-                                     {:source-name source}
-                                     (replay-type-and-players replay))])))
+                                [(fs/canonical-path f)
+                                 (merge
+                                   (replay/parse-replay f)
+                                   {:source-name source})]))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
     (let [new-state (swap! state-atom update :parsed-replays-by-path
@@ -3332,7 +3296,7 @@
         (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
         (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
         (assoc :player-counts player-counts)
-        (assoc :game-type (replay-game-type player-counts)))))
+        (assoc :game-type (replay/replay-game-type player-counts)))))
 
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
@@ -3491,6 +3455,20 @@
         check-app-update-chimer
         spit-app-config-chimer
         profile-print-chimer])}))
+
+(defn standalone-replay-init [state-atom]
+  (let [task-chimers (->> task/task-kinds
+                          (map (partial tasks-chimer-fn state-atom))
+                          doall)
+        state-chimers (->> state-watch-chimers
+                           (map (fn [[k watcher-fn]]
+                                  (state-change-chimer-fn state-atom k watcher-fn)))
+                           doall)]
+    (log/info "Finished standalone replay init")
+    {:chimers
+     (concat
+       task-chimers
+       state-chimers)}))
 
 
 (defn auto-connect-servers [state-atom]

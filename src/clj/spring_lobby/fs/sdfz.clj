@@ -5,7 +5,8 @@
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
-    [spring-lobby.spring.script :as spring-script])
+    [spring-lobby.spring.script :as spring-script]
+    [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
 
@@ -75,10 +76,41 @@
                 (dissoc :script-txt)))))))
 
 
-(defn parse-replay-filename [^java.io.File f]
-  (let [filename (fs/filename f)
-        [_all timestamp game-id map-name sync-version] (re-find replay-filename-re filename)]
-    {:timestamp timestamp
-     :game-id game-id
-     :map-name map-name
-     :engine-version (fs/sync-version-to-engine-version sync-version)}))
+(defn replay-game-type [allyteam-counts]
+  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
+        num-allyteams (count allyteam-counts)]
+    (cond
+      (= 2 num-allyteams)
+      (if one-per-allyteam?
+        :duel
+        :team)
+      (< 2 num-allyteams)
+      (if one-per-allyteam?
+        :ffa
+        :teamffa)
+      :else
+      :invalid)))
+
+(defn- replay-type-and-players [parsed-replay]
+  (let [teams (->> parsed-replay
+                   :body
+                   :script-data
+                   :game
+                   (filter (comp #(string/starts-with? % "team") name first)))
+        teams-by-allyteam (->> teams
+                               (group-by (comp keyword (partial str "allyteam") :allyteam second)))
+        allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
+    {:game-type (replay-game-type allyteam-counts)
+     :player-counts allyteam-counts}))
+
+(defn parse-replay [^java.io.File f]
+  (let [replay (try
+                 (decode-replay f)
+                 (catch Exception e
+                   (log/error e "Error reading replay" f)))]
+    (merge
+      {:file f
+       :filename (fs/filename f)
+       :file-size (fs/size f)}
+      replay
+      (replay-type-and-players replay))))

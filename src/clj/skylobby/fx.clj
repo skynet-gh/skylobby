@@ -2,7 +2,9 @@
   (:require
     [cljfx.css :as css]
     [clojure.java.io :as io]
-    [spring-lobby.fs :as fs]))
+    [spring-lobby.fs :as fs])
+  (:import
+    (javafx.stage Screen)))
 
 
 (def monospace-font-family
@@ -48,3 +50,12 @@
    (str (io/resource "icon256.png"))
    (str (io/resource "icon512.png"))
    (str (io/resource "icon1024.png"))])
+
+
+(defn screen-bounds []
+  (let [screen (Screen/getPrimary)
+        bounds (.getVisualBounds screen)]
+    {:min-x (.getMinX bounds)
+     :min-y (.getMinY bounds)
+     :width (.getWidth bounds)
+     :height (.getHeight bounds)}))

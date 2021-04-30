@@ -2,10 +2,13 @@
   (:require
     [cljfx.api :as fx]
     clojure.core.async
+    [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     spring-lobby
     [spring-lobby.fs :as fs]
+    [spring-lobby.fs.sdfz :as sdfz]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -25,7 +28,7 @@
 
 
 (defn -main [& args]
-  (let [{:keys [options]} (cli/parse-opts args cli-options)]
+  (let [{:keys [arguments options]} (cli/parse-opts args cli-options)]
     (try
       (when-let [app-root-override (:skylobby-root options)]
         (alter-var-root #'fs/app-root-override (constantly app-root-override)))
@@ -34,10 +37,6 @@
         (log/info "Main start")
         (Platform/setImplicitExit true)
         (log/info "Set JavaFX implicit exit")
-        (future
-          (log/info "Start 7Zip init, async")
-          (fs/init-7z!)
-          (log/info "Finished 7Zip init"))
         (let [before-state (u/curr-millis)
               _ (log/info "Loading initial state")
               initial-state (spring-lobby/initial-state)
@@ -70,17 +69,48 @@
                            (:chat-channel options))}))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
           (reset! spring-lobby/*state state))
-        (log/info "Creating renderer")
-        (let [r (fx/create-renderer
-                  :middleware (fx/wrap-map-desc
-                                (fn [state]
-                                  {:fx/type fx.root/root-view
-                                   :state state}))
-                  :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
-          (log/info "Mounting renderer")
-          (fx/mount-renderer spring-lobby/*state r))
-        (spring-lobby/init-async spring-lobby/*state)
-        (spring-lobby/auto-connect-servers spring-lobby/*state)
-        (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
+        (let [first-arg-as-file (some-> arguments first fs/file)
+              first-arg-filename (fs/filename first-arg-as-file)]
+          (if (and (string/ends-with? first-arg-filename ".sdfz")
+                   (fs/exists? first-arg-as-file))
+            (let [
+                  _ (fs/init-7z!)
+                  selected-replay (sdfz/parse-replay first-arg-as-file)]
+              (log/info "Opening replay view")
+              (swap! spring-lobby/*state
+                     assoc
+                     :selected-replay selected-replay
+                     :selected-replay-file first-arg-as-file)
+              (spring-lobby/replay-map-and-mod-details-watcher nil spring-lobby/*state nil @spring-lobby/*state)
+              (let [r (fx/create-renderer
+                        :middleware (fx/wrap-map-desc
+                                      (fn [state]
+                                        {:fx/type fx.replay/standalone-replay-window
+                                         :state state}))
+                        :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+                (log/info "Mounting renderer")
+                (fx/mount-renderer spring-lobby/*state r))
+              (spring-lobby/standalone-replay-init spring-lobby/*state)
+              (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
+            (do
+              (future
+                (log/info "Start 7Zip init, async")
+                (fs/init-7z!)
+                (log/info "Finished 7Zip init"))
+              (log/info "Creating renderer")
+              (let [r (fx/create-renderer
+                        :middleware (fx/wrap-map-desc
+                                      (fn [state]
+                                        {:fx/type fx.root/root-view
+                                         :state state}))
+                        :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+                (log/info "Mounting renderer")
+                (fx/mount-renderer spring-lobby/*state r))
+              (spring-lobby/init-async spring-lobby/*state)
+              (spring-lobby/auto-connect-servers spring-lobby/*state)
+              (log/info "Main finished in" (- (u/curr-millis) before) "ms")))))
       (catch Throwable t
-        (spit "skylobby-fatal-error.txt" (str t))))))
+        (println (str t))
+        (log/error t "Fatal error")
+        (spit "skylobby-fatal-error.txt" (str t))
+        (System/exit -1)))))

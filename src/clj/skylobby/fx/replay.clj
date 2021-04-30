@@ -8,8 +8,11 @@
     java-time
     skylobby.fx
     [skylobby.fx.download :refer [springfiles-maps-download-source]]
+    [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
+    [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.minimap :as fx.minimap]
+    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
@@ -22,6 +25,10 @@
   (:import
     (java.time LocalDateTime)
     (java.util TimeZone)))
+
+
+(def replay-window-width 1600)
+(def replay-window-height 740)
 
 
 (def replays-window-width 2400)
@@ -73,6 +80,175 @@
 
 (defn- sanitize-replay-filter [s]
   (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
+
+
+(def replay-view-keys
+  [:battle-players-color-allyteam :map-details :mod-details :replay-minimap-type :spring-isolation-dir])
+
+(defn replay-view
+  [{:keys [battle-players-color-allyteam engines engines-by-version maps-by-version map-details
+           mods-by-version mod-details replay-minimap-type selected-replay show-sync spring-isolation-dir]
+    :as state}]
+  (let [
+        selected-engine-version (-> selected-replay :header :engine-version)
+        selected-matching-engine (get engines-by-version selected-engine-version)
+        mod-name (-> selected-replay :body :script-data :game :gametype)
+        selected-matching-mod (get mods-by-version mod-name)
+        map-name (-> selected-replay :body :script-data :game :mapname)
+        selected-matching-map (get maps-by-version map-name)
+        script-data (-> selected-replay :body :script-data)
+        {:keys [gametype mapname] :as game} (:game script-data)
+        teams-by-id (->> game
+                         (filter (comp #(string/starts-with? % "team") name first))
+                         (map
+                           (fn [[teamid team]]
+                             (let [[_all id] (re-find #"team(\d+)" (name teamid))]
+                               [id team])))
+                         (into {}))
+        indexed-mod (get mods-by-version gametype)
+        replay-mod-details (get mod-details (resource/details-cache-key indexed-mod))
+        sides (spring/mod-sides replay-mod-details)
+        players (->> game
+                     (filter (comp #(string/starts-with? % "player") name first))
+                     (map
+                       (fn [[playerid {:keys [spectator team] :as player}]]
+                         (let [[_all id] (re-find #"player(\d+)" (name playerid))
+                               {:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
+                               team-color (try (u/spring-script-color-to-int rgbcolor)
+                                               (catch Exception e
+                                                 (log/debug e "Error parsing color")
+                                                 0))
+                               side-id-by-name (clojure.set/map-invert sides)]
+                           (-> player
+                               (clojure.set/rename-keys
+                                 {:name :username
+                                  :countrycode :country})
+                               (assoc :battle-status
+                                      {:id id
+                                       :team team
+                                       :mode (not (u/to-bool spectator))
+                                       :handicap handicap
+                                       :side (get side-id-by-name side)
+                                       :ally allyteam}
+                                      :team-color team-color))))))
+        bots (->> game
+                  (filter (comp #(string/starts-with? % "ai") name first))
+                  (map
+                    (fn [[aiid {:keys [team] :as ai}]]
+                      (let [{:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
+                            team-color (try (u/spring-script-color-to-int rgbcolor)
+                                            (catch Exception e
+                                              (log/debug e "Error parsing color")
+                                              0))
+                            side-id-by-name (clojure.set/map-invert sides)]
+                        (-> ai
+                            (clojure.set/rename-keys
+                              {:name :username})
+                            (assoc :battle-status
+                                   {:id aiid
+                                    :team team
+                                    :mode true
+                                    :handicap handicap
+                                    :side (get side-id-by-name side)
+                                    :ally allyteam}
+                                   :team-color team-color))))))
+        indexed-map (get maps-by-version mapname)
+        replay-map-details (get map-details (resource/details-cache-key indexed-map))]
+    {:fx/type :h-box
+     :alignment :center-left
+     :children
+     [
+      {:fx/type :v-box
+       :h-box/hgrow :always
+       :children
+       (concat
+         [{:fx/type fx.players-table/players-table
+           :v-box/vgrow :always
+           :am-host false
+           :battle-modname gametype
+           :battle-players-color-allyteam battle-players-color-allyteam
+           :players (concat players bots)
+           :sides sides
+           :singleplayer true}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :check-box
+             :selected (boolean battle-players-color-allyteam)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :battle-players-color-allyteam}}
+            {:fx/type :label
+             :text " Color player name by allyteam"}]}]
+         (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+           (let [watch-button {:fx/type :button
+                               :style {:-fx-font-size 24}
+                               :text " Watch"
+                               :on-action
+                               {:event/type :spring-lobby/watch-replay
+                                :engines engines
+                                :engine-version selected-engine-version
+                                :replay selected-replay
+                                :spring-isolation-dir spring-isolation-dir}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-movie:24:white"}}]
+             [{:fx/type :h-box
+               :children
+               [watch-button
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                watch-button]}])))}
+      {:fx/type :v-box
+       :children
+       (concat
+         [
+          {:fx/type fx.minimap/minimap-pane
+           :map-name mapname
+           :map-details replay-map-details
+           :minimap-type replay-minimap-type
+           :minimap-type-key :replay-minimap-type
+           :scripttags script-data}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text (str " Size: "
+                        (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
+                          (str
+                            (when map-width (quot map-width 64))
+                            " x "
+                            (when map-height (quot map-height 64)))))}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :combo-box
+             :value replay-minimap-type
+             :items fx.minimap/minimap-types
+             :on-value-changed {:event/type :spring-lobby/assoc
+                                :key :replay-minimap-type}}]}]
+         (when show-sync
+           [{:fx/type :flow-pane
+             :vgap 5
+             :hgap 5
+             :padding 5
+             :children
+             [(merge
+                {:fx/type engine-sync-pane
+                 :engine-details selected-matching-engine
+                 :engine-file (:file selected-matching-engine)
+                 :engine-version selected-engine-version}
+                state)
+              (merge
+                {:fx/type mod-sync-pane
+                 :battle-modname mod-name
+                 :battle-mod-details selected-matching-mod
+                 :engine-details selected-matching-engine
+                 :engine-file (:file selected-matching-engine)}
+                state)
+              (merge
+                {:fx/type map-sync-pane
+                 :battle-map map-name
+                 :battle-map-details selected-matching-map}
+                state)]}]))}]}))
 
 
 (def replays-window-keys
@@ -978,3 +1154,40 @@
                            :on-value-changed {:event/type :spring-lobby/assoc
                                               :key :replay-minimap-type}}]}]}]}])))})
           {:fx/type :pane})}})))
+
+
+(def app-version (u/app-version))
+
+
+(defn standalone-replay-window
+  [{{:keys [by-spring-root css selected-replay spring-isolation-dir]
+     :as state}
+    :state}]
+  (let [{:keys [width height]} (skylobby.fx/screen-bounds)
+        {:keys [engines maps mods] :as spring-data} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+        engines-by-version (into {} (map (juxt :engine-version identity) engines))
+        mods-by-version (into {} (map (juxt :mod-name identity) mods))
+        maps-by-version (into {} (map (juxt :map-name identity) maps))]
+    {:fx/type :stage
+     :showing true
+     :title (str "skyreplays " app-version)
+     :icons skylobby.fx/icons
+     :x 100
+     :y 100
+     :width (min replay-window-width width)
+     :height (min replay-window-height height)
+     :on-close-request {:event/type :spring-lobby/main-window-on-close-request
+                        :standalone true}
+     :scene
+     {:fx/type :scene
+      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :root (merge
+              {:fx/type replay-view}
+              (select-keys state replay-view-keys)
+              spring-data
+              {
+               :engines-by-version engines-by-version
+               :maps-by-version maps-by-version
+               :mods-by-version mods-by-version
+               :selected-replay selected-replay
+               :show-sync true})}}))
