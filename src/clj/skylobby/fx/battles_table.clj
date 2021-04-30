@@ -3,7 +3,7 @@
     [clojure.string :as string]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [skylobby.fx.flag-icon :as flag-icon]
-    [skylobby.fx.ext :refer [with-layout-on-items-prop]]
+    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
 
@@ -20,20 +20,19 @@
              :on-selected-item-changed {:event/type :spring-lobby/select-battle
                                         :server-key server-key}}
      :desc
-     {:fx/type with-layout-on-items-prop
-      :props {
-              :items (->> battles
-                          vals
-                          (filter :battle-title)
-                          (filter
-                            (fn [{:keys [battle-map battle-modname battle-title]}]
-                              (if filter-lc
-                                (or (and battle-map (string/includes? (string/lower-case battle-map) filter-lc))
-                                    (and battle-modname (string/includes? (string/lower-case battle-modname) filter-lc))
-                                    (string/includes? (string/lower-case battle-title) filter-lc))
-                                true)))
-                          (sort-by (juxt (comp count :users) :battle-spectators))
-                          reverse)}
+     {:fx/type ext-table-column-auto-size
+      :items (->> battles
+                  vals
+                  (filter :battle-title)
+                  (filter
+                    (fn [{:keys [battle-map battle-modname battle-title]}]
+                      (if filter-lc
+                        (or (and battle-map (string/includes? (string/lower-case battle-map) filter-lc))
+                            (and battle-modname (string/includes? (string/lower-case battle-modname) filter-lc))
+                            (string/includes? (string/lower-case battle-title) filter-lc))
+                        true)))
+                  (sort-by (juxt (comp count :users) :battle-spectators))
+                  reverse)
       :desc
       {:fx/type :table-view
        :style {:-fx-font-size 15}

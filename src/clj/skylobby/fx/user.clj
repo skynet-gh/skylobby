@@ -1,7 +1,7 @@
 (ns skylobby.fx.user
   (:require
     [clojure.string :as string]
-    [skylobby.fx.ext :refer [with-layout-on-items-prop]]
+    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
@@ -29,12 +29,12 @@
                                     false
                                     (string/includes? (string/lower-case username) filter-lc))
                                   true))))]
-    {:fx/type with-layout-on-items-prop
-     :props {:items (->> filtered-users
-                         vals
-                         (filter :username)
-                         (sort-by :username String/CASE_INSENSITIVE_ORDER)
-                         vec)}
+    {:fx/type ext-table-column-auto-size
+     :items (->> filtered-users
+                 vals
+                 (filter :username)
+                 (sort-by :username String/CASE_INSENSITIVE_ORDER)
+                 vec)
      :desc
      {:fx/type :table-view
       :style {:-fx-font-size 15}

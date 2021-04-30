@@ -1,7 +1,7 @@
 (ns skylobby.fx.players-table
   (:require
     [clojure.string :as string]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed with-layout-on-items-prop]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
@@ -40,15 +40,15 @@
                                         :skill (or skill (:skill tags))
                                         :skilluncertainty uncertainty)))
                              players)]
-    {:fx/type with-layout-on-items-prop
-     :props {:items (->> players-with-skill
-                         (sort-by
-                           (juxt
-                             (comp not :mode :battle-status)
-                             (comp :bot :client-status :user)
-                             (comp :ally :battle-status)
-                             (comp (fnil - 0) u/parse-skill :skill)
-                             (comp :id :battle-status))))}
+    {:fx/type ext-table-column-auto-size
+     :items (->> players-with-skill
+                 (sort-by
+                   (juxt
+                     (comp not :mode :battle-status)
+                     (comp :bot :client-status :user)
+                     (comp :ally :battle-status)
+                     (comp (fnil - 0) u/parse-skill :skill)
+                     (comp :id :battle-status))))
      :desc
      {:fx/type :table-view
       :column-resize-policy :constrained ; TODO auto resize
