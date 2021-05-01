@@ -199,10 +199,17 @@
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (decode-battle-status battle-status)]
     (log/info "Updating status of" username "to" decoded "with color" team-color)
-    (swap! state-atom update-in [:by-server server-url :battle :users username]
-           assoc
-           :battle-status decoded
-           :team-color team-color)))
+    (swap! state-atom update-in [:by-server server-url]
+      (fn [server]
+        (cond-> server
+          true
+          (update-in [:battle :users username]
+            assoc
+            :battle-status decoded
+            :team-color team-color)
+          (= username (:username server))
+          (update :auto-launch (fn [old] (if (:mode decoded) true old))))))))
+
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) ([^\s]+) (\w+) (\w+)" m)
