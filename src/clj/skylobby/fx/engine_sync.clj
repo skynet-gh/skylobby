@@ -66,7 +66,7 @@
              :action (when (and downloadable (not dest-exists))
                        {:event/type :spring-lobby/add-task
                         :task
-                        {:spring-lobby/task-type :spring-lobby/http-downloadable
+                        {:spring-lobby/task-type :spring-lobby/download-and-extract
                          :downloadable downloadable
                          :spring-isolation-dir spring-isolation-dir}})}]
            (when dest-exists

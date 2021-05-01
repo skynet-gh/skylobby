@@ -33,10 +33,8 @@
    ".text-field"
    {:-fx-prompt-text-fill "rgb(180, 180, 180)"}})
 
-
 (def default-style
   (css/register ::default default-style-data))
-
 
 (defn stylesheet-urls [css]
   [(str (::css/url (or css default-style)))])

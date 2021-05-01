@@ -560,13 +560,15 @@
                              (when-let [slurped (slurp-zip-entry zf entries filename)]
                                (lua/read-modinfo slurped))
                              (catch Exception e
-                               (log/warn e "Error loading" filename "from" file))))
+                               (log/trace e "Error loading" filename "from" file)
+                               (log/warn "Error loading" filename "from" file))))
            try-entry-script (fn [filename]
                               (try
                                 (when-let [slurped (slurp-zip-entry zf entries filename)]
                                   (spring-script/parse-script slurped))
                                 (catch Exception e
-                                  (log/warn e "Error loading" filename "from" file))))]
+                                  (log/trace e "Error loading" filename "from" file)
+                                  (log/warn "Error loading" filename "from" file))))]
        (merge
          {:file file
           :modinfo (try-entry-lua "modinfo.lua")
@@ -591,7 +593,8 @@
                           (catch java.io.FileNotFoundException _e
                             (log/warn "Mod" file "is missing expected file" filename))
                           (catch Exception e
-                            (log/warn e "Error loading" filename "from" file))))]
+                            (log/trace e "Error loading" filename "from" file)
+                            (log/warn "Error loading" filename "from" file))))]
      (merge
        {:file file
         :modinfo (try-file-lua "modinfo.lua")

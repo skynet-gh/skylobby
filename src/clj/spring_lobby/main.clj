@@ -1,14 +1,17 @@
 (ns spring-lobby.main
   (:require
     [cljfx.api :as fx]
+    [cljfx.css :as css]
     clojure.core.async
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     spring-lobby
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as sdfz]
+    [spring-lobby.replays :as replays]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -68,11 +71,23 @@
                            (juxt identity (constantly {}))
                            (:chat-channel options))}))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
-          (reset! spring-lobby/*state state))
+          (reset! spring-lobby/*state state)
+          (swap! spring-lobby/*state assoc :css (css/register :skylobby.fx/current
+                                                  (or (:css state)
+                                                      skylobby.fx/default-style-data))))
         (let [first-arg-as-file (some-> arguments first fs/file)
               first-arg-filename (fs/filename first-arg-as-file)]
-          (if (and (string/ends-with? first-arg-filename ".sdfz")
-                   (fs/exists? first-arg-as-file))
+          (cond
+            (= "skyreplays" (first arguments))
+            (do
+              (log/info "Starting skyreplays")
+              (swap! spring-lobby/*state assoc :show-replays true :standalone true)
+              (fs/init-7z!)
+              (replays/create-renderer)
+              (spring-lobby/init-async spring-lobby/*state))
+            (and (not (string/blank? first-arg-filename))
+                 (string/ends-with? first-arg-filename ".sdfz")
+                 (fs/exists? first-arg-as-file))
             (let [
                   _ (fs/init-7z!)
                   selected-replay (sdfz/parse-replay first-arg-as-file)]
@@ -92,6 +107,7 @@
                 (fx/mount-renderer spring-lobby/*state r))
               (spring-lobby/standalone-replay-init spring-lobby/*state)
               (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
+            :else
             (do
               (future
                 (log/info "Start 7Zip init, async")
@@ -110,7 +126,8 @@
               (spring-lobby/auto-connect-servers spring-lobby/*state)
               (log/info "Main finished in" (- (u/curr-millis) before) "ms")))))
       (catch Throwable t
-        (println (str t))
+        (let [st (with-out-str (.printStackTrace t))]
+          (println st)
+          (spit "skylobby-fatal-error.txt" st))
         (log/error t "Fatal error")
-        (spit "skylobby-fatal-error.txt" (str t))
         (System/exit -1)))))

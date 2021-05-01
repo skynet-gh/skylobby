@@ -2006,7 +2006,7 @@
 
 (defmethod event-handler ::update-css
   [{:keys [css]}]
-  (let [registered (css/register :skylobby.fx/default css)]
+  (let [registered (css/register :skylobby.fx/current css)]
     (swap! *state assoc :css registered)))
 
 (defmethod event-handler ::load-custom-css
@@ -3464,6 +3464,13 @@
                            (map (fn [[k watcher-fn]]
                                   (state-change-chimer-fn state-atom k watcher-fn)))
                            doall)]
+    (add-watchers state-atom)
+    (add-task! state-atom {::task-type ::reconcile-engines})
+    (add-task! state-atom {::task-type ::reconcile-mods})
+    (add-task! state-atom {::task-type ::reconcile-maps})
+    (add-task! state-atom {::task-type ::update-rapid})
+    (event-handler {:event/type ::update-downloadables})
+    (event-handler {:event/type ::scan-imports})
     (log/info "Finished standalone replay init")
     {:chimers
      (concat
