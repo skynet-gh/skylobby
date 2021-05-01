@@ -16,9 +16,7 @@
     [skylobby.fx.tasks :as fx.tasks]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
-    [taoensso.tufte :as tufte])
-  (:import
-    (javafx.stage Screen)))
+    [taoensso.tufte :as tufte]))
 
 
 (def app-version (u/app-version))
@@ -31,14 +29,6 @@
 (def main-window-height 1200)
 
 
-(defn- screen-bounds []
-  (let [screen (Screen/getPrimary)
-        bounds (.getVisualBounds screen)]
-    {:min-x (.getMinX bounds)
-     :min-y (.getMinY bounds)
-     :width (.getWidth bounds)
-     :height (.getHeight bounds)}))
-
 (defn root-view
   [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
             show-matchmaking-window spring-isolation-dir standalone tasks-by-kind]
@@ -46,7 +36,7 @@
     :state}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :root
-      (let [{:keys [width height] :as screen-bounds} (screen-bounds)
+      (let [{:keys [width height] :as screen-bounds} (skylobby.fx/screen-bounds)
             all-tasks (->> tasks-by-kind
                            (mapcat second)
                            (concat (vals current-tasks))

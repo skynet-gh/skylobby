@@ -5,6 +5,7 @@
     [chime.core :as chime]
     [clj-http.client :as http]
     [cljfx.api :as fx]
+    [cljfx.css :as css]
     [clojure.datafy :refer [datafy]]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
@@ -208,6 +209,7 @@
     (require 'skylobby.fx.root)
     (require 'spring-lobby)
     (require 'spring-lobby.fs)
+    (require 'skylobby.fx)
     (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
       (future
         (try
@@ -217,8 +219,12 @@
           (catch Throwable e
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
-    (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))]
-      (reset! *state (initial-state-fn)))
+    (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
+          initial-state (initial-state-fn)]
+      (reset! *state (initial-state-fn))
+      (swap! *state assoc :css (css/register :skylobby.fx/current
+                                 (or (:css initial-state)
+                                     (var-get (find-var 'skylobby.fx/default-style-data))))))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
     (alter-var-root #'old-view (constantly (var-get (find-var 'skylobby.fx.root/root-view))))
     (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))

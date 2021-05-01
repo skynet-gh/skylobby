@@ -177,7 +177,7 @@
   (let [[_all username client-status] (parse-client-status m)
         decoded-status (decode-client-status client-status)
         [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
-        {:keys [battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
+        {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)
         my-status (-> users (get my-username) :client-status)
@@ -189,7 +189,7 @@
       (= username my-username) (log/debug "Ignoring own game start")
       (:ingame my-status) (log/debug "Already in game")
       (not battle) (log/debug "Not in a battle")
-      (not (-> battle :users (get my-username) :battle-status :ready)) (log/debug "Not ready")
+      (not auto-launch) (log/debug "Not auto starting game")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
       (start-game-if-synced prev-state server-data))))

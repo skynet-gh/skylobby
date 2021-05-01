@@ -144,3 +144,20 @@
                {:users
                 {"user4:discord" {:bridge "appservice"}}}}}}}
            @state-atom))))
+
+
+(deftest handle-CLIENTSTATUS
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "CLIENTSTATUS skynet 0")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"skynet"
+               {:client-status
+                {:access false
+                 :away false
+                 :bot false
+                 :ingame false
+                 :rank 0}}}}}}
+           @state-atom))))

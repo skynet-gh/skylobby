@@ -63,6 +63,14 @@
                    fx.lifecycle/scalar
                    :default [[] 0])}))
 
+(defn fix-table-columns [^TableView table-view]
+  (when table-view
+    (when-let [items (.getItems table-view)]
+      (when (seq items)
+        (when-let [column (first (.getColumns table-view))]
+          (.resizeColumn table-view column -100.0)
+          (.resizeColumn table-view column 100.0))))))
+
 (def with-layout-on-items-prop
   (fx.lifecycle/make-ext-with-props
    fx.lifecycle/dynamic
@@ -70,10 +78,22 @@
              (fx.mutator/setter
                (fn [^TableView table-view items]
                  (.setAll (.getItems table-view) items)
-                 (.resizeColumn table-view (first (.getColumns table-view)) -100.0)
-                 (.resizeColumn table-view (first (.getColumns table-view)) 100.0)))
+                 (fix-table-columns table-view)))
              fx.lifecycle/scalar
              :default [])}))
+
+(defn ext-table-column-auto-size [{:keys [desc items]}]
+  {:fx/type with-layout-on-items-prop
+   :props {:items items}
+   :desc desc})
+
+
+; figure out layout on create
+#_
+{:fx/type fx/ext-on-instance-lifecycle
+ :on-created (fn [^TableView table-view]
+               (Platform/runLater (fn [] (fix-table-columns table-view))))
+ :desc desc}
 
 
 ; https://github.com/cljfx/cljfx/issues/94#issuecomment-691708477

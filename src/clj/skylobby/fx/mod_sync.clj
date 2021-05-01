@@ -108,7 +108,9 @@
                  rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
                                   (map :rapid-id)
                                   set)
-                 rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
+                 rapid-update-tasks (->> tasks-by-type
+                                         (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
+                                         (mapcat second)
                                          seq)
                  in-progress (or running
                                  rapid-update-tasks

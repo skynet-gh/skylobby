@@ -1,5 +1,6 @@
 (ns spring-lobby
   (:require
+    [aleph.http :as aleph-http]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.css :as css]
@@ -16,6 +17,8 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
+    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
+    [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
@@ -41,6 +44,7 @@
   (:import
     (java.awt Desktop Desktop$Action)
     (java.io File)
+    (java.net InetAddress InetSocketAddress)
     (java.util List)
     (javafx.event Event)
     (javafx.scene.control Tab)
@@ -922,34 +926,6 @@
      (fn [] (.close chimer)))))
 
 
-(defn- replay-game-type [allyteam-counts]
-  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
-        num-allyteams (count allyteam-counts)]
-    (cond
-      (= 2 num-allyteams)
-      (if one-per-allyteam?
-        :duel
-        :team)
-      (< 2 num-allyteams)
-      (if one-per-allyteam?
-        :ffa
-        :teamffa)
-      :else
-      :invalid)))
-
-(defn- replay-type-and-players [parsed-replay]
-  (let [teams (->> parsed-replay
-                   :body
-                   :script-data
-                   :game
-                   (filter (comp #(string/starts-with? % "team") name first)))
-        teams-by-allyteam (->> teams
-                               (group-by (comp keyword (partial str "allyteam") :allyteam second)))
-        allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
-    {:game-type (replay-game-type allyteam-counts)
-     :player-counts allyteam-counts}))
-
-
 (defn- replay-sources [{:keys [extra-replay-sources]}]
   (concat
     [{:replay-source-name "skylobby"
@@ -988,18 +964,10 @@
         parsed-replays (->> this-round
                             (map
                               (fn [[source f]]
-                                (let [replay (try
-                                               (replay/decode-replay f)
-                                               (catch Exception e
-                                                 (log/error e "Error reading replay" f)))]
-                                  [(fs/canonical-path f)
-                                   (merge
-                                     {:file f
-                                      :filename (fs/filename f)
-                                      :file-size (fs/size f)}
-                                     replay
-                                     {:source-name source}
-                                     (replay-type-and-players replay))])))
+                                [(fs/canonical-path f)
+                                 (merge
+                                   (replay/parse-replay f)
+                                   {:source-name source})]))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
     (let [new-state (swap! state-atom update :parsed-replays-by-path
@@ -2042,7 +2010,7 @@
 
 (defmethod event-handler ::update-css
   [{:keys [css]}]
-  (let [registered (css/register :skylobby.fx/default css)]
+  (let [registered (css/register :skylobby.fx/current css)]
     (swap! *state assoc :css registered)))
 
 (defmethod event-handler ::load-custom-css
@@ -3332,7 +3300,7 @@
         (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
         (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
         (assoc :player-counts player-counts)
-        (assoc :game-type (replay-game-type player-counts)))))
+        (assoc :game-type (replay/replay-game-type player-counts)))))
 
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
@@ -3452,6 +3420,49 @@
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 
+(defn ipc-handler
+  ([req]
+   (ipc-handler *state req))
+  ([state-atom req]
+   (log/info "IPC handler request" req)
+   (cond
+     (= "/replay" (:uri req))
+     (let [path (-> req :params :path)]
+       (if-let [file (fs/file path)]
+         (let [parsed-replay (replay/parse-replay file)]
+           (log/info "Loading replay from IPC" path)
+           (swap! state-atom
+             (fn [state]
+               (-> state
+                   (assoc :show-replays true
+                          :selected-replay parsed-replay
+                          :selected-replay-file file)
+                   (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
+         (log/warn "Unable to coerce to file" path)))
+     :else
+     (log/info "Nothing to do for IPC request" req))
+   {:status 200
+    :headers {"content-type" "text/plain"}
+    :body "ok"}))
+
+(defn start-ipc-server
+  "Starts an HTTP server so that replays and battles can be loaded into running instance."
+  []
+  (if (u/is-port-open? u/ipc-port)
+    (do
+      (log/info "Starting IPC server on port" u/ipc-port)
+      (let [server (aleph-http/start-server
+                     (-> (partial ipc-handler *state)
+                         wrap-keyword-params
+                         wrap-params)
+                     {:socket-address
+                      (InetSocketAddress.
+                        (InetAddress/getByName nil)
+                        u/ipc-port)})]
+        (swap! *state assoc :ipc-server server)))
+    (log/warn "IPC port unavailable" u/ipc-port)))
+
+
 (defn- init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
@@ -3460,6 +3471,10 @@
       (when-not (fs/exists? custom-css-file)
         (log/info "Creating initial custom CSS file" custom-css-file)
         (spit custom-css-file skylobby.fx/default-style-data)))
+    (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+      (when-not (fs/exists? custom-css-file)
+        (log/info "Creating initial custom CSS file" custom-css-file)
+        (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
     (catch Exception e
       (log/error e "Error creating custom CSS file")))
   (log/info "Initializing periodic jobs")
@@ -3483,6 +3498,7 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
+    (start-ipc-server)
     {:chimers
      (concat
        task-chimers
@@ -3491,6 +3507,27 @@
         check-app-update-chimer
         spit-app-config-chimer
         profile-print-chimer])}))
+
+(defn standalone-replay-init [state-atom]
+  (let [task-chimers (->> task/task-kinds
+                          (map (partial tasks-chimer-fn state-atom))
+                          doall)
+        state-chimers (->> state-watch-chimers
+                           (map (fn [[k watcher-fn]]
+                                  (state-change-chimer-fn state-atom k watcher-fn)))
+                           doall)]
+    (add-watchers state-atom)
+    (add-task! state-atom {::task-type ::reconcile-engines})
+    (add-task! state-atom {::task-type ::reconcile-mods})
+    (add-task! state-atom {::task-type ::reconcile-maps})
+    (add-task! state-atom {::task-type ::update-rapid})
+    (event-handler {:event/type ::update-downloadables})
+    (event-handler {:event/type ::scan-imports})
+    (log/info "Finished standalone replay init")
+    {:chimers
+     (concat
+       task-chimers
+       state-chimers)}))
 
 
 (defn auto-connect-servers [state-atom]

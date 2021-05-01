@@ -227,5 +227,11 @@
                {:fx/type :button
                 :on-action {:event/type :spring-lobby/load-custom-css
                             :file custom-file}
-                :text (str "Custom from " custom-file)})]}}
+                :text (str "Custom from " custom-file)})
+             (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/assoc
+                            :key :css
+                            :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
+                :text (str "Custom from " custom-css-file)})]}}
          {:fx/type :pane})}})))

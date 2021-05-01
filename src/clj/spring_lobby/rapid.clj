@@ -173,7 +173,8 @@
         (when-not (string/blank? contents)
           (lua/read-modinfo contents))))
     (catch Exception e
-      (log/warn e "Error reading" filename "in" f))))
+      (log/trace e "Error reading" filename "in" f)
+      (log/warn "Error reading" filename "in" f))))
 
 (defn- try-inner-script
   [f filename]
