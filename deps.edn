@@ -46,6 +46,7 @@
   org.slf4j/log4j-over-slf4j {:mvn/version "1.7.30"}
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.30"}
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
+  ring/ring-core {:mvn/version "1.9.3"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
   version-clj/version-clj {:mvn/version "2.0.1"}}

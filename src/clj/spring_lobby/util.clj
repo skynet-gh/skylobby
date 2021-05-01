@@ -9,8 +9,7 @@
     [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
-    (java.net URL)
-    (java.net URLDecoder URLEncoder)
+    (java.net ServerSocket URL URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.security MessageDigest)
     (java.time LocalDateTime)
@@ -340,3 +339,16 @@
   (str app-name
        "-"
        (app-version)))
+
+
+(def ipc-port 12345)
+
+; https://stackoverflow.com/a/4883851/984393
+(defn is-port-open? [port]
+  (try
+    (with-open [_server (ServerSocket. port)]
+      true)
+    (catch Exception e
+      (log/trace e "Port is not available" port)
+      (log/info "Port is not available" port)
+      false)))

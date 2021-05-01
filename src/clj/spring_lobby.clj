@@ -1,5 +1,6 @@
 (ns spring-lobby
   (:require
+    [aleph.http :as aleph-http]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.css :as css]
@@ -16,6 +17,8 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
+    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
+    [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
@@ -41,6 +44,7 @@
   (:import
     (java.awt Desktop Desktop$Action)
     (java.io File)
+    (java.net InetAddress InetSocketAddress)
     (java.util List)
     (javafx.event Event)
     (javafx.scene.control Tab)
@@ -3416,6 +3420,49 @@
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 
+(defn ipc-handler
+  ([req]
+   (ipc-handler *state req))
+  ([state-atom req]
+   (log/info "IPC handler request" req)
+   (cond
+     (= "/replay" (:uri req))
+     (let [path (-> req :params :path)]
+       (if-let [file (fs/file path)]
+         (let [parsed-replay (replay/parse-replay file)]
+           (log/info "Loading replay from IPC" path)
+           (swap! state-atom
+             (fn [state]
+               (-> state
+                   (assoc :show-replays true
+                          :selected-replay parsed-replay
+                          :selected-replay-file file)
+                   (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
+         (log/warn "Unable to coerce to file" path)))
+     :else
+     (log/info "Nothing to do for IPC request" req))
+   {:status 200
+    :headers {"content-type" "text/plain"}
+    :body "ok"}))
+
+(defn start-ipc-server
+  "Starts an HTTP server so that replays and battles can be loaded into running instance."
+  []
+  (if (u/is-port-open? u/ipc-port)
+    (do
+      (log/info "Starting IPC server on port" u/ipc-port)
+      (let [server (aleph-http/start-server
+                     (-> (partial ipc-handler *state)
+                         wrap-keyword-params
+                         wrap-params)
+                     {:socket-address
+                      (InetSocketAddress.
+                        (InetAddress/getByName nil)
+                        u/ipc-port)})]
+        (swap! *state assoc :ipc-server server)))
+    (log/warn "IPC port unavailable" u/ipc-port)))
+
+
 (defn- init
   "Things to do on program init, or in dev after a recompile."
   [state-atom]
@@ -3447,6 +3494,7 @@
     (event-handler {:event/type ::update-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished periodic jobs init")
+    (start-ipc-server)
     {:chimers
      (concat
        task-chimers
