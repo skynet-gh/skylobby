@@ -3471,6 +3471,10 @@
       (when-not (fs/exists? custom-css-file)
         (log/info "Creating initial custom CSS file" custom-css-file)
         (spit custom-css-file skylobby.fx/default-style-data)))
+    (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+      (when-not (fs/exists? custom-css-file)
+        (log/info "Creating initial custom CSS file" custom-css-file)
+        (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
     (catch Exception e
       (log/error e "Error creating custom CSS file")))
   (log/info "Initializing periodic jobs")
