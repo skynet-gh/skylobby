@@ -11,6 +11,7 @@ Current Annoyances:
 - Rapid is not updated automatically
 - Engine is not extracted automatically
 - Downloads and other tasks cannot be cancelled
+- Replace 7Zip with Apache commons-compress to fix concurrency issue
 
 Future Features:
 
@@ -18,7 +19,6 @@ Future Features:
 - Visually group teams in players table
 - Track and display player away time
 - Arbitrary engine directories
-- Open replay files or links
 - Open battle links
 - Up arrow in chat and console box should fill in last message
 - First run intro window
@@ -38,6 +38,15 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.26]
+
+- Add file association for .sdfz
+- Add launcher for skyreplays
+- Fix display of modoption sections
+- Decouple battle ready from auto start
+- Add IPC server to open replay in running process
+- Add support for css custom style
 
 ### [0.3.25]
 
