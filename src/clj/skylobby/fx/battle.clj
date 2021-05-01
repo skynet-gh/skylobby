@@ -899,6 +899,8 @@
                        bot-username)
         singleplayer (= :singleplayer battle-id)
         {:keys [battle-map battle-modname channel-name host-username]} (get battles battle-id)
+        channel-name (or channel-name
+                         (str "__battle__" battle-id))
         host-user (get users host-username)
         me (-> battle :users (get username))
         my-battle-status (:battle-status me)

@@ -183,6 +183,25 @@
            @state-atom))))
 
 
+(deftest handle-SAIDBATTLEEX
+  (let [state-atom (atom {:by-server {:server1 {:battle {:battle-id "1"}}}})
+        server-key :server1
+        now 12345]
+    (with-redefs [u/curr-millis (constantly now)]
+      (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi [Z]kynet! Current battle type is team."))
+    (is (= {:by-server
+            {:server1
+             {:battle {:battle-id "1"}
+              :channels
+              {"__battle__1"
+               {:messages
+                [{:ex true
+                  :text "* Hi [Z]kynet! Current battle type is team."
+                  :timestamp now
+                  :username "[teh]cluster1[01]"}]}}}}}
+           @state-atom))))
+
+
 (deftest handle-SAIDFROM
   (let [state-atom (atom {})
         server-key :server1

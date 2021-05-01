@@ -2077,7 +2077,11 @@
         (not (:mode battle-status)) (log/info "Cannot suggest battle map as spectator")
         :else
         (let [map-name (or map-name event)]
-          (client-message client-data (str "SAY " channel-name " !map " map-name))))
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!map " map-name)})))
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
@@ -2169,11 +2173,19 @@
   (future
     (try
       (when-not (:mode battle-status)
-        (client-message client-data (str "SAY " channel-name " !joinas spec"))
+        @(event-handler
+           {:event/type ::send-message
+            :channel-name channel-name
+            :client-data client-data
+            :message (str "!joinas spec")})
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
         (spring/start-game state)
-        (client-message client-data (str "SAY " channel-name " !cv start")))
+        @(event-handler
+           {:event/type ::send-message
+            :channel-name channel-name
+            :client-data client-data
+            :message (str "!cv start")}))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
@@ -2541,7 +2553,11 @@
 (defmethod event-handler ::ring
   [{:keys [channel-name client-data username]}]
   (when channel-name
-    (client-message client-data (str "SAY " channel-name " !ring " username))))
+    @(event-handler
+       {:event/type ::send-message
+        :channel-name channel-name
+        :client-data client-data
+        :message (str "!ring " username)})))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2695,7 +2711,11 @@
         (log/error e "Error updating battle color")))))
 
 (defmethod event-handler ::battle-balance [{:keys [client-data channel-name]}]
-  (client-message client-data (str "SAY " channel-name " !balance")))
+  @(event-handler
+     {:event/type ::send-message
+      :channel-name channel-name
+      :client-data client-data
+      :message (str "!balance")}))
 
 (defmethod event-handler ::battle-fix-colors
   [{:keys [am-host client-data channel-name] :as e}]
@@ -2711,7 +2731,11 @@
                    opts {:id id :is-me is-me :is-bot is-bot}]
                (update-battle-status client-data opts battle-status color))))
          doall)
-    (client-message client-data (str "SAY " channel-name " !fixcolors"))))
+    @(event-handler
+       {:event/type ::send-message
+        :channel-name channel-name
+        :client-data client-data
+        :message (str "!fixcolors")})))
 
 
 (defmethod task-handler ::update-rapid
@@ -3352,14 +3376,19 @@
                   :channel-name (str "@" user)
                   :message message})))
           :else
-          (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
+          (let [[private-message username] (re-find #"^@(.*)$" channel-name)
+                unified (-> client-data :compflags (contains? "u"))]
             (if-let [[_all message] (re-find #"^/me (.*)$" message)]
               (if private-message
                 (client-message client-data (str "SAYPRIVATEEX " username " " message))
-                (client-message client-data (str "SAYEX " channel-name " " message)))
+                (if (and (not unified) (u/battle-channel-name? channel-name))
+                  (client-message client-data (str "SAYBATTLEEX " message))
+                  (client-message client-data (str "SAYEX " channel-name " " message))))
               (if private-message
                 (client-message client-data (str "SAYPRIVATE " username " " message))
-                (client-message client-data (str "SAY " channel-name " " message)))))))
+                (if (and (not unified) (u/battle-channel-name? channel-name))
+                  (client-message client-data (str "SAYBATTLE " message))
+                  (client-message client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 

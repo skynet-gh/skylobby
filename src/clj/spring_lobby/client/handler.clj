@@ -278,6 +278,30 @@
     (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
       (u/update-chat-messages-fn username message))))
 
+; legacy battle chat
+(defmethod handle "SAIDBATTLE" [state-atom server-key m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server]
+        (if-let [battle-id (-> server :battle :battle-id)]
+          (let [channel-name (str "__battle__" battle-id)]
+            (-> server
+                (update-in [:channels channel-name :messages]
+                  (u/update-chat-messages-fn username message))))
+          server)))))
+
+(defmethod handle "SAIDBATTLEEX" [state-atom server-key m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server]
+        (if-let [battle-id (-> server :battle :battle-id)]
+          (let [channel-name (str "__battle__" battle-id)]
+            (-> server
+                (update-in [:channels channel-name :messages]
+                  (u/update-chat-messages-fn username message true))))
+          server)))))
+
+
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url]

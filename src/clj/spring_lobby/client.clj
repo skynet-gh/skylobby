@@ -262,11 +262,17 @@
 (defmethod handler/handle "COMPFLAGS" [state-atom server-key m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
         compflags (set (string/split remaining #"\s+"))
-        state (swap! state-atom assoc-in [:by-server server-key :compflags] compflags)
+        state (swap! state-atom update-in [:by-server server-key]
+                 (fn [state]
+                   (-> state
+                       (assoc :compflags compflags)
+                       (assoc-in [:client-data :compflags] compflags))))
+        accepted (-> state :by-server (get server-key) :accepted)
         {:keys [client ssl username password]} (-> state :by-server (get server-key) :client-data)]
-    (if (and ssl (contains? compflags "token-auth"))
-      (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
-      (login client username password))))
+    (when (not accepted)
+      (if (and ssl (contains? compflags "token-auth"))
+        (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
+        (login client username password)))))
 
 
 (defn connect
