@@ -20,7 +20,8 @@
     :-fx-accent "rgb(80, 80, 80)"
     :-fx-background "rgb(50, 50, 50)"
     :-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
-    :-fx-control-inner-background "rgb(50, 50, 50)"}
+    :-fx-control-inner-background "rgb(50, 50, 50)"
+    :-fx-selection-bar-non-focused "rgb(60, 60, 60)"}
    ".text-field"
    {:-fx-prompt-text-fill "rgb(180, 180, 180)"}})
 (def black-style-data
@@ -29,7 +30,8 @@
     :-fx-accent "rgb(50, 50, 50)"
     :-fx-background "rgb(0, 0, 0)"
     :-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
-    :-fx-control-inner-background "rgb(30, 30, 30)"}
+    :-fx-control-inner-background "rgb(30, 30, 30)"
+    :-fx-selection-bar-non-focused "rgb(40, 40, 40)"}
    ".text-field"
    {:-fx-prompt-text-fill "rgb(180, 180, 180)"}})
 
