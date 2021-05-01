@@ -3375,6 +3375,9 @@
                  {:event/type ::send-message
                   :channel-name (str "@" user)
                   :message message})))
+          (re-find #"^/rename" message)
+          (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
+            (client-message client-data (str "RENAMEACCOUNT " new-username)))
           :else
           (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                 unified (-> client-data :compflags (contains? "u"))]
