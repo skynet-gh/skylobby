@@ -132,7 +132,7 @@
         (create-renderer)))
     (try
       (let [init-fn (var-get (find-var 'spring-lobby/init))]
-        (reset! init-state (init-fn *state)))
+        (reset! init-state (init-fn *state {:skip-tasks true})))
       (catch Throwable e
         (println "init error" e)
         (throw e)))

@@ -218,13 +218,13 @@
 
 
 (defn- spit-state-config-to-edn [old-state new-state]
-  (doseq [{:keys [select-fn filename]} state-to-edn]
+  (doseq [{:keys [select-fn filename] :as opts} state-to-edn]
     (try
       (let [old-data (select-fn old-state)
             new-data (select-fn new-state)]
         (when (not= old-data new-data)
           (u/try-log (str "update " filename)
-            (spit-app-edn new-data filename))))
+            (spit-app-edn new-data filename opts))))
       (catch Exception e
         (log/error e "Error writing config edn" filename)))))
 
@@ -3465,48 +3465,51 @@
 
 (defn- init
   "Things to do on program init, or in dev after a recompile."
-  [state-atom]
-  (try
-    (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
-      (when-not (fs/exists? custom-css-file)
-        (log/info "Creating initial custom CSS file" custom-css-file)
-        (spit custom-css-file skylobby.fx/default-style-data)))
-    (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
-      (when-not (fs/exists? custom-css-file)
-        (log/info "Creating initial custom CSS file" custom-css-file)
-        (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
-    (catch Exception e
-      (log/error e "Error creating custom CSS file")))
-  (log/info "Initializing periodic jobs")
-  (let [task-chimers (->> task/task-kinds
-                          (map (partial tasks-chimer-fn state-atom))
-                          doall)
-        state-chimers (->> state-watch-chimers
-                           (map (fn [[k watcher-fn]]
-                                  (state-change-chimer-fn state-atom k watcher-fn)))
+  ([state-atom]
+   (init state-atom nil))
+  ([state-atom {:keys [skip-tasks]}]
+   (try
+     (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
+       (when-not (fs/exists? custom-css-file)
+         (log/info "Creating initial custom CSS file" custom-css-file)
+         (spit custom-css-file skylobby.fx/default-style-data)))
+     (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+       (when-not (fs/exists? custom-css-file)
+         (log/info "Creating initial custom CSS file" custom-css-file)
+         (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
+     (catch Exception e
+       (log/error e "Error creating custom CSS file")))
+   (log/info "Initializing periodic jobs")
+   (let [task-chimers (->> task/task-kinds
+                           (map (partial tasks-chimer-fn state-atom))
                            doall)
-        truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-        check-app-update-chimer (check-app-update-chimer-fn state-atom)
-        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-        profile-print-chimer (profile-print-chimer-fn state-atom)]
-    (add-watchers state-atom)
-    (add-task! state-atom {::task-type ::reconcile-engines})
-    (add-task! state-atom {::task-type ::reconcile-mods})
-    (add-task! state-atom {::task-type ::reconcile-maps})
-    (add-task! state-atom {::task-type ::refresh-replays})
-    (add-task! state-atom {::task-type ::update-rapid})
-    (event-handler {:event/type ::update-downloadables})
-    (event-handler {:event/type ::scan-imports})
-    (log/info "Finished periodic jobs init")
-    (start-ipc-server)
-    {:chimers
-     (concat
-       task-chimers
-       state-chimers
-       [truncate-messages-chimer
-        check-app-update-chimer
-        spit-app-config-chimer
-        profile-print-chimer])}))
+         state-chimers (->> state-watch-chimers
+                            (map (fn [[k watcher-fn]]
+                                   (state-change-chimer-fn state-atom k watcher-fn)))
+                            doall)
+         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         check-app-update-chimer (check-app-update-chimer-fn state-atom)
+         spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
+         profile-print-chimer (profile-print-chimer-fn state-atom)]
+     (add-watchers state-atom)
+     (when-not skip-tasks
+       (add-task! state-atom {::task-type ::reconcile-engines})
+       (add-task! state-atom {::task-type ::reconcile-mods})
+       (add-task! state-atom {::task-type ::reconcile-maps})
+       (add-task! state-atom {::task-type ::refresh-replays})
+       (add-task! state-atom {::task-type ::update-rapid})
+       (event-handler {:event/type ::update-downloadables})
+       (event-handler {:event/type ::scan-imports}))
+     (log/info "Finished periodic jobs init")
+     (start-ipc-server)
+     {:chimers
+      (concat
+        task-chimers
+        state-chimers
+        [truncate-messages-chimer
+         check-app-update-chimer
+         spit-app-config-chimer
+         profile-print-chimer])})))
 
 (defn standalone-replay-init [state-atom]
   (let [task-chimers (->> task/task-kinds
