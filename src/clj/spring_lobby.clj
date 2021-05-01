@@ -30,6 +30,7 @@
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
     [spring-lobby.git :as git]
@@ -2401,7 +2402,10 @@
     (if client-data
       (let [prefix (if is-bot
                      (str "UPDATEBOT " player-name) ; TODO normalize
-                     "MYBATTLESTATUS")]
+                     "MYBATTLESTATUS")
+            battle-status (if (and (not is-bot) (:mode battle-status))
+                            (assoc battle-status :ready true)
+                            battle-status)]
         (log/debug player-name (pr-str battle-status) team-color)
         (client-message client-data
           (str prefix
@@ -2423,7 +2427,7 @@
   (update-battle-status client-data opts battle-status team-color))
 
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
-  (client-message client-data (str "MYSTATUS " (handler/encode-client-status client-status))))
+  (client-message client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
 
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future

@@ -8,6 +8,7 @@
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
@@ -34,18 +35,6 @@
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
 
-(def default-client-status-str "0")
-
-(def client-status-protocol
-  (gloss/compile-frame
-    (gloss/bit-map
-      :prefix 1
-      :bot 1
-      :access 1
-      :rank 3
-      :away 1
-      :ingame 1)))
-
 (def battle-status-protocol
   (gloss/compile-frame
     (gloss/bit-map
@@ -65,32 +54,6 @@
   {:game
    {:startpostype 1
     :modoptions {}}})
-
-
-(defn decode-client-status [status-str]
-  (dissoc
-    (gio/decode client-status-protocol
-      (byte-streams/convert
-        (.array
-          (.put
-            (ByteBuffer/allocate 1)
-            (Byte/parseByte status-str)))
-        ByteBuffer))
-    :prefix))
-
-(def default-client-status
-  (decode-client-status default-client-status-str))
-
-(defn encode-client-status [client-status]
-  (str
-    (.get
-      ^ByteBuffer
-      (gio/to-byte-buffer
-        (gio/encode client-status-protocol
-          (assoc
-            (merge default-client-status client-status)
-            :prefix false)))
-      0)))
 
 (defn decode-battle-status [status-str]
   (dissoc
@@ -133,7 +96,7 @@
                 :cpu cpu
                 :user-id user-id
                 :user-agent user-agent
-                :client-status default-client-status}]
+                :client-status cu/default-client-status}]
       (swap! state-atom assoc-in [:by-server server-url :users username] user))
     (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
@@ -176,7 +139,7 @@
 
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
-        decoded-status (decode-client-status client-status)
+        decoded-status (cu/decode-client-status client-status)
         [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
