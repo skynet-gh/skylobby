@@ -7,12 +7,16 @@
     [taoensso.tufte :as tufte]))
 
 
+(def register-window-width 500)
+(def register-window-height 400)
+
+
 (def register-window-keys
   [:css :email :password :password-confirm :register-response :server :servers :show-register-window
    :username])
 
 (defn register-window
-  [{:keys [css email password password-confirm register-response server servers show-register-window username]}]
+  [{:keys [css email password password-confirm register-response screen-bounds server servers show-register-window username]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :register-window
       {:fx/type :stage
@@ -21,8 +25,8 @@
        :icons skylobby.fx/icons
        :on-close-request {:event/type :spring-lobby/dissoc
                           :key :show-register-window}
-       :width 500
-       :height 400
+       :width ((fnil min register-window-width) (:width screen-bounds) register-window-width)
+       :height ((fnil min register-window-height) (:height screen-bounds) register-window-height)
        :scene
        {:fx/type :scene
         :stylesheets (skylobby.fx/stylesheet-urls css)

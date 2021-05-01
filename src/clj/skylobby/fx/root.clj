@@ -119,7 +119,8 @@
              :tasks-by-type tasks-by-type}
             (select-keys state fx.replay/replays-window-keys))
           (merge
-            {:fx/type fx.matchmaking/matchmaking-window}
+            {:fx/type fx.matchmaking/matchmaking-window
+             :screen-bounds screen-bounds}
             server-data
             {:show-matchmaking-window
              (and show-matchmaking-window
@@ -129,13 +130,16 @@
                        (filter #{"matchmaking"})
                        seq))})
           (merge
-            {:fx/type fx.server/servers-window}
+            {:fx/type fx.server/servers-window
+             :screen-bounds screen-bounds}
             (select-keys state fx.server/servers-window-keys))
           (merge
-            {:fx/type fx.register/register-window}
+            {:fx/type fx.register/register-window
+             :screen-bounds screen-bounds}
             (select-keys state fx.register/register-window-keys))
           (merge
-            {:fx/type fx.settings/settings-window}
+            {:fx/type fx.settings/settings-window
+             :screen-bounds screen-bounds}
             (select-keys state fx.settings/settings-window-keys))
           (merge
             {:fx/type fx.tasks/tasks-window

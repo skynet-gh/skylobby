@@ -58,7 +58,7 @@
   (some-> map-name-or-filename
           string/lower-case
           (string/replace #"\s+" "_")
-          (string/replace #"-" "_")
+          (string/replace #"[-']" "_")
           (string/replace #"\.sd[7z]$" "")))
 
 (defn could-be-this-map?

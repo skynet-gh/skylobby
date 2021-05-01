@@ -39,6 +39,15 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.27]
+
+- Add /rename chat command
+- Add handling for legacy battle chat
+- Set ready and auto launch when playing
+- Fix background color css issue
+- Fix some windows not limited to screen size
+- Fix handler for ADDUSER in some cases
+
 ### [0.3.26]
 
 - Add file association for .sdfz

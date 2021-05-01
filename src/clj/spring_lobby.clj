@@ -30,6 +30,7 @@
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
     [spring-lobby.git :as git]
@@ -218,13 +219,13 @@
 
 
 (defn- spit-state-config-to-edn [old-state new-state]
-  (doseq [{:keys [select-fn filename]} state-to-edn]
+  (doseq [{:keys [select-fn filename] :as opts} state-to-edn]
     (try
       (let [old-data (select-fn old-state)
             new-data (select-fn new-state)]
         (when (not= old-data new-data)
           (u/try-log (str "update " filename)
-            (spit-app-edn new-data filename))))
+            (spit-app-edn new-data filename opts))))
       (catch Exception e
         (log/error e "Error writing config edn" filename)))))
 
@@ -2077,7 +2078,11 @@
         (not (:mode battle-status)) (log/info "Cannot suggest battle map as spectator")
         :else
         (let [map-name (or map-name event)]
-          (client-message client-data (str "SAY " channel-name " !map " map-name))))
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!map " map-name)})))
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
@@ -2169,11 +2174,19 @@
   (future
     (try
       (when-not (:mode battle-status)
-        (client-message client-data (str "SAY " channel-name " !joinas spec"))
+        @(event-handler
+           {:event/type ::send-message
+            :channel-name channel-name
+            :client-data client-data
+            :message (str "!joinas spec")})
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
         (spring/start-game state)
-        (client-message client-data (str "SAY " channel-name " !cv start")))
+        @(event-handler
+           {:event/type ::send-message
+            :channel-name channel-name
+            :client-data client-data
+            :message (str "!cv start")}))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
@@ -2389,7 +2402,10 @@
     (if client-data
       (let [prefix (if is-bot
                      (str "UPDATEBOT " player-name) ; TODO normalize
-                     "MYBATTLESTATUS")]
+                     "MYBATTLESTATUS")
+            battle-status (if (and (not is-bot) (:mode battle-status))
+                            (assoc battle-status :ready true)
+                            battle-status)]
         (log/debug player-name (pr-str battle-status) team-color)
         (client-message client-data
           (str prefix
@@ -2411,7 +2427,7 @@
   (update-battle-status client-data opts battle-status team-color))
 
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
-  (client-message client-data (str "MYSTATUS " (handler/encode-client-status client-status))))
+  (client-message client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
 
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future
@@ -2541,7 +2557,11 @@
 (defmethod event-handler ::ring
   [{:keys [channel-name client-data username]}]
   (when channel-name
-    (client-message client-data (str "SAY " channel-name " !ring " username))))
+    @(event-handler
+       {:event/type ::send-message
+        :channel-name channel-name
+        :client-data client-data
+        :message (str "!ring " username)})))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -2695,7 +2715,11 @@
         (log/error e "Error updating battle color")))))
 
 (defmethod event-handler ::battle-balance [{:keys [client-data channel-name]}]
-  (client-message client-data (str "SAY " channel-name " !balance")))
+  @(event-handler
+     {:event/type ::send-message
+      :channel-name channel-name
+      :client-data client-data
+      :message (str "!balance")}))
 
 (defmethod event-handler ::battle-fix-colors
   [{:keys [am-host client-data channel-name] :as e}]
@@ -2711,7 +2735,11 @@
                    opts {:id id :is-me is-me :is-bot is-bot}]
                (update-battle-status client-data opts battle-status color))))
          doall)
-    (client-message client-data (str "SAY " channel-name " !fixcolors"))))
+    @(event-handler
+       {:event/type ::send-message
+        :channel-name channel-name
+        :client-data client-data
+        :message (str "!fixcolors")})))
 
 
 (defmethod task-handler ::update-rapid
@@ -3351,15 +3379,23 @@
                  {:event/type ::send-message
                   :channel-name (str "@" user)
                   :message message})))
+          (re-find #"^/rename" message)
+          (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
+            (client-message client-data (str "RENAMEACCOUNT " new-username)))
           :else
-          (let [[private-message username] (re-find #"^@(.*)$" channel-name)]
+          (let [[private-message username] (re-find #"^@(.*)$" channel-name)
+                unified (-> client-data :compflags (contains? "u"))]
             (if-let [[_all message] (re-find #"^/me (.*)$" message)]
               (if private-message
                 (client-message client-data (str "SAYPRIVATEEX " username " " message))
-                (client-message client-data (str "SAYEX " channel-name " " message)))
+                (if (and (not unified) (u/battle-channel-name? channel-name))
+                  (client-message client-data (str "SAYBATTLEEX " message))
+                  (client-message client-data (str "SAYEX " channel-name " " message))))
               (if private-message
                 (client-message client-data (str "SAYPRIVATE " username " " message))
-                (client-message client-data (str "SAY " channel-name " " message)))))))
+                (if (and (not unified) (u/battle-channel-name? channel-name))
+                  (client-message client-data (str "SAYBATTLE " message))
+                  (client-message client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
@@ -3465,48 +3501,51 @@
 
 (defn- init
   "Things to do on program init, or in dev after a recompile."
-  [state-atom]
-  (try
-    (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
-      (when-not (fs/exists? custom-css-file)
-        (log/info "Creating initial custom CSS file" custom-css-file)
-        (spit custom-css-file skylobby.fx/default-style-data)))
-    (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
-      (when-not (fs/exists? custom-css-file)
-        (log/info "Creating initial custom CSS file" custom-css-file)
-        (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
-    (catch Exception e
-      (log/error e "Error creating custom CSS file")))
-  (log/info "Initializing periodic jobs")
-  (let [task-chimers (->> task/task-kinds
-                          (map (partial tasks-chimer-fn state-atom))
-                          doall)
-        state-chimers (->> state-watch-chimers
-                           (map (fn [[k watcher-fn]]
-                                  (state-change-chimer-fn state-atom k watcher-fn)))
+  ([state-atom]
+   (init state-atom nil))
+  ([state-atom {:keys [skip-tasks]}]
+   (try
+     (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
+       (when-not (fs/exists? custom-css-file)
+         (log/info "Creating initial custom CSS file" custom-css-file)
+         (spit custom-css-file skylobby.fx/default-style-data)))
+     (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+       (when-not (fs/exists? custom-css-file)
+         (log/info "Creating initial custom CSS file" custom-css-file)
+         (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
+     (catch Exception e
+       (log/error e "Error creating custom CSS file")))
+   (log/info "Initializing periodic jobs")
+   (let [task-chimers (->> task/task-kinds
+                           (map (partial tasks-chimer-fn state-atom))
                            doall)
-        truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-        check-app-update-chimer (check-app-update-chimer-fn state-atom)
-        spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-        profile-print-chimer (profile-print-chimer-fn state-atom)]
-    (add-watchers state-atom)
-    (add-task! state-atom {::task-type ::reconcile-engines})
-    (add-task! state-atom {::task-type ::reconcile-mods})
-    (add-task! state-atom {::task-type ::reconcile-maps})
-    (add-task! state-atom {::task-type ::refresh-replays})
-    (add-task! state-atom {::task-type ::update-rapid})
-    (event-handler {:event/type ::update-downloadables})
-    (event-handler {:event/type ::scan-imports})
-    (log/info "Finished periodic jobs init")
-    (start-ipc-server)
-    {:chimers
-     (concat
-       task-chimers
-       state-chimers
-       [truncate-messages-chimer
-        check-app-update-chimer
-        spit-app-config-chimer
-        profile-print-chimer])}))
+         state-chimers (->> state-watch-chimers
+                            (map (fn [[k watcher-fn]]
+                                   (state-change-chimer-fn state-atom k watcher-fn)))
+                            doall)
+         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         check-app-update-chimer (check-app-update-chimer-fn state-atom)
+         spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
+         profile-print-chimer (profile-print-chimer-fn state-atom)]
+     (add-watchers state-atom)
+     (when-not skip-tasks
+       (add-task! state-atom {::task-type ::reconcile-engines})
+       (add-task! state-atom {::task-type ::reconcile-mods})
+       (add-task! state-atom {::task-type ::reconcile-maps})
+       (add-task! state-atom {::task-type ::refresh-replays})
+       (add-task! state-atom {::task-type ::update-rapid})
+       (event-handler {:event/type ::update-downloadables})
+       (event-handler {:event/type ::scan-imports}))
+     (log/info "Finished periodic jobs init")
+     (start-ipc-server)
+     {:chimers
+      (concat
+        task-chimers
+        state-chimers
+        [truncate-messages-chimer
+         check-app-update-chimer
+         spit-app-config-chimer
+         profile-print-chimer])})))
 
 (defn standalone-replay-init [state-atom]
   (let [task-chimers (->> task/task-kinds

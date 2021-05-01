@@ -19,21 +19,35 @@
    {:-fx-base "rgb(50, 50, 50)"
     :-fx-accent "rgb(80, 80, 80)"
     :-fx-background "rgb(50, 50, 50)"
-    :-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
+    ;:-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
     :-fx-control-inner-background "rgb(50, 50, 50)"
     :-fx-selection-bar-non-focused "rgb(60, 60, 60)"}
    ".text-field"
-   {:-fx-prompt-text-fill "rgb(180, 180, 180)"}})
+   {:-fx-prompt-text-fill "rgb(180, 180, 180)"}
+   ".skylobby"
+   {"-normal"
+    {"> .ikonli-font-icon"
+     {:-fx-icon-color "white"}}}})
 (def black-style-data
   {".root"
    {:-fx-base "rgb(20, 20, 20)"
     :-fx-accent "rgb(50, 50, 50)"
     :-fx-background "rgb(0, 0, 0)"
-    :-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
+    ;:-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
     :-fx-control-inner-background "rgb(30, 30, 30)"
     :-fx-selection-bar-non-focused "rgb(40, 40, 40)"}
    ".text-field"
-   {:-fx-prompt-text-fill "rgb(180, 180, 180)"}})
+   {:-fx-prompt-text-fill "rgb(180, 180, 180)"}
+   ".skylobby"
+   {"-normal"
+    {"> .ikonli-font-icon"
+     {:-fx-icon-color "white"}}}})
+(def javafx-style-data
+  {".skylobby"
+   {"-normal"
+    {"> .ikonli-font-icon"
+     {:-fx-icon-color "dimgrey"}}}})
+
 
 (def default-style
   (css/register ::default default-style-data))

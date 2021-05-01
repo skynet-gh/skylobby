@@ -51,28 +51,156 @@
 (deftest parse-adduser
   (is (= ["skynet"
           "??"
+          nil
+          nil
           "8"
           " SpringLobby 0.270 (win x32)"
           "SpringLobby 0.270 (win x32)"]
          (rest (handler/parse-adduser "ADDUSER skynet ?? 8 SpringLobby 0.270 (win x32)"))))
   (is (= ["ChanServ"
           "US"
-          "None"
+          nil
+          nil
+          "0"
           " ChanServ"
           "ChanServ"]
-         (rest (handler/parse-adduser "ADDUSER ChanServ US None ChanServ"))))
+         (rest (handler/parse-adduser "ADDUSER ChanServ US 0 ChanServ"))))
   (is (= ["[teh]host20"
           "HU"
+          nil
+          nil
           "2218"
           " SPADS v0.12.18"
           "SPADS v0.12.18"]
          (rest (handler/parse-adduser "ADDUSER [teh]host20 HU 2218 SPADS v0.12.18"))))
   (is (= ["skynet"
           "??"
+          nil
+          nil
           "8"
           nil
           nil]
-         (rest (handler/parse-adduser "ADDUSER skynet ?? 8")))))
+         (rest (handler/parse-adduser "ADDUSER skynet ?? 8"))))
+  (is (= ["[Z]ecrus"
+          "US"
+          " 0"
+          "0"
+          "67"
+          " SpringLobby 0.270-49-gab254fe7d (windows64)"
+          "SpringLobby 0.270-49-gab254fe7d (windows64)"]
+         (rest (handler/parse-adduser "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)")))))
+
+(deftest handle-ADDUSER
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "ADDUSER skynet ?? 8 SpringLobby 0.270 (win x32)")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"skynet"
+               {:client-status {:access false
+                                :away false
+                                :bot false
+                                :ingame false
+                                :rank 0}
+                :country "??"
+                :cpu nil
+                :user-agent "SpringLobby 0.270 (win x32)"
+                :user-id "8"
+                :username "skynet"}}}}}
+           @state-atom)))
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "ADDUSER ChanServ US 0 ChanServ")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"ChanServ"
+               {:client-status {:access false
+                                :away false
+                                :bot false
+                                :ingame false
+                                :rank 0}
+                :country "US"
+                :cpu nil
+                :user-agent "ChanServ"
+                :user-id "0"
+                :username "ChanServ"}}}}}
+           @state-atom)))
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "ADDUSER [teh]host20 HU 2218 SPADS v0.12.18")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"[teh]host20"
+               {:client-status {:access false
+                                :away false
+                                :bot false
+                                :ingame false
+                                :rank 0}
+                :country "HU"
+                :cpu nil
+                :user-agent "SPADS v0.12.18"
+                :user-id "2218"
+                :username "[teh]host20"}}}}}
+           @state-atom)))
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "ADDUSER skynet ?? 8")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"skynet"
+               {:client-status {:access false
+                                :away false
+                                :bot false
+                                :ingame false
+                                :rank 0}
+                :country "??"
+                :cpu nil
+                :user-agent nil
+                :user-id "8"
+                :username "skynet"}}}}}
+           @state-atom)))
+  (let [state-atom (atom {})
+        server-key :server1]
+    (handler/handle state-atom server-key "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)")
+    (is (= {:by-server
+            {:server1
+             {:users
+              {"[Z]ecrus"
+               {:client-status {:access false
+                                :away false
+                                :bot false
+                                :ingame false
+                                :rank 0}
+                :country "US"
+                :cpu "0"
+                :user-agent "SpringLobby 0.270-49-gab254fe7d (windows64)"
+                :user-id "67"
+                :username "[Z]ecrus"}}}}}
+           @state-atom))))
+
+
+(deftest handle-SAIDBATTLEEX
+  (let [state-atom (atom {:by-server {:server1 {:battle {:battle-id "1"}}}})
+        server-key :server1
+        now 12345]
+    (with-redefs [u/curr-millis (constantly now)]
+      (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi [Z]kynet! Current battle type is team."))
+    (is (= {:by-server
+            {:server1
+             {:battle {:battle-id "1"}
+              :channels
+              {"__battle__1"
+               {:messages
+                [{:ex true
+                  :text "* Hi [Z]kynet! Current battle type is team."
+                  :timestamp now
+                  :username "[teh]cluster1[01]"}]}}}}}
+           @state-atom))))
+
 
 (deftest handle-SAIDFROM
   (let [state-atom (atom {})

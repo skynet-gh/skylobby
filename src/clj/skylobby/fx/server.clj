@@ -11,6 +11,9 @@
 
 (def default-server-port 8200)
 
+(def server-window-width 640)
+(def server-window-height 400)
+
 
 (defn- server-cell
   [[server-url server-data]]
@@ -44,7 +47,7 @@
    :server-spring-root-draft :server-ssl :servers :show-servers-window])
 
 (defn servers-window
-  [{:keys [css server-alias server-auto-connect server-edit server-host server-port
+  [{:keys [css screen-bounds server-alias server-auto-connect server-edit server-host server-port
            server-spring-root-draft server-ssl servers show-servers-window]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :servers-window
@@ -58,8 +61,8 @@
          :icons skylobby.fx/icons
          :on-close-request {:event/type :spring-lobby/dissoc
                             :key :show-servers-window}
-         :width 640
-         :height 400
+         :width ((fnil min server-window-width) (:width screen-bounds) server-window-width)
+         :height ((fnil min server-window-height) (:height screen-bounds) server-window-height)
          :scene
          {:fx/type :scene
           :stylesheets (skylobby.fx/stylesheet-urls css)

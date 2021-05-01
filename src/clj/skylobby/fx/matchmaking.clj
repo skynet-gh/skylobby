@@ -5,7 +5,11 @@
     [taoensso.tufte :as tufte]))
 
 
-(defn matchmaking-window [{:keys [client-data css matchmaking-queues show-matchmaking-window]}]
+(def matchmaking-window-width 600)
+(def matchmaking-window-height 700)
+
+
+(defn matchmaking-window [{:keys [client-data css matchmaking-queues screen-bounds show-matchmaking-window]}]
   (tufte/profile {:id :skylobby/ui}
     (tufte/p :replays-window
       {:fx/type :stage
@@ -14,8 +18,8 @@
        :icons skylobby.fx/icons
        :on-close-request {:event/type :spring-lobby/dissoc
                           :key :show-matchmaking-window}
-       :width 600
-       :height 700
+       :width ((fnil min matchmaking-window-width) (:width screen-bounds) matchmaking-window-width)
+       :height ((fnil min matchmaking-window-height) (:height screen-bounds) matchmaking-window-height)
        :scene
        {:fx/type :scene
         :stylesheets (skylobby.fx/stylesheet-urls css)

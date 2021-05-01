@@ -59,11 +59,12 @@
                 :on-text-changed {:event/type :spring-lobby/assoc
                                   :key :spring-isolation-dir-draft}}
                {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
                 :on-action {:event/type :spring-lobby/file-chooser-spring-root}
                 :text ""
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-file-find:16:white"}}]}
+                 :icon-literal "mdi-file-find:16"}}]}
              {:fx/type :h-box
               :alignment :center-left
               :children
@@ -95,13 +96,14 @@
                    :alignment :center-left
                    :children
                    [{:fx/type :button
+                     :style-class ["button" "skylobby-normal"]
                      :on-action {:event/type :spring-lobby/delete-extra-import-source
                                  :file file}
                      :disable (boolean builtin)
                      :text ""
                      :graphic
                      {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-delete:16:white"}}
+                      :icon-literal "mdi-delete:16"}}
                     {:fx/type :v-box
                      :children
                      [{:fx/type :label
@@ -114,6 +116,7 @@
               :alignment :center-left
               :children
               [{:fx/type :button
+                :style-class ["button" "skylobby-normal"]
                 :text ""
                 :disable (or (string/blank? extra-import-name)
                              (string/blank? extra-import-path))
@@ -122,7 +125,7 @@
                             :extra-import-name extra-import-name}
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-plus:16:white"}}
+                 :icon-literal "mdi-plus:16"}}
                {:fx/type :label
                 :text " Name: "}
                {:fx/type :text-field
@@ -146,13 +149,14 @@
                    :alignment :center-left
                    :children
                    [{:fx/type :button
+                     :style-class ["button" "skylobby-normal"]
                      :on-action {:event/type :spring-lobby/delete-extra-replay-source
                                  :file file}
                      :disable (boolean builtin)
                      :text ""
                      :graphic
                      {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-delete:16:white"}}
+                      :icon-literal "mdi-delete:16"}}
                     {:fx/type :v-box
                      :children
                      [{:fx/type :h-box
@@ -174,6 +178,7 @@
               :children
               [
                {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
                 :disable (or (string/blank? extra-replay-name)
                              (string/blank? extra-replay-path))
                 :on-action {:event/type :spring-lobby/add-extra-replay-source
@@ -183,7 +188,7 @@
                 :text ""
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-plus:16:white"}}
+                 :icon-literal "mdi-plus:16"}}
                {:fx/type :label
                 :text " Name: "}
                {:fx/type :text-field
@@ -221,7 +226,7 @@
                 :text "Black"}
                {:fx/type :button
                 :on-action {:event/type :spring-lobby/update-css
-                            :css {}}
+                            :css skylobby.fx/javafx-style-data}
                 :text "JavaFX"}]}
              (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
                {:fx/type :button

@@ -8,6 +8,7 @@
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
@@ -34,18 +35,6 @@
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
 
-(def default-client-status-str "0")
-
-(def client-status-protocol
-  (gloss/compile-frame
-    (gloss/bit-map
-      :prefix 1
-      :bot 1
-      :access 1
-      :rank 3
-      :away 1
-      :ingame 1)))
-
 (def battle-status-protocol
   (gloss/compile-frame
     (gloss/bit-map
@@ -65,32 +54,6 @@
   {:game
    {:startpostype 1
     :modoptions {}}})
-
-
-(defn decode-client-status [status-str]
-  (dissoc
-    (gio/decode client-status-protocol
-      (byte-streams/convert
-        (.array
-          (.put
-            (ByteBuffer/allocate 1)
-            (Byte/parseByte status-str)))
-        ByteBuffer))
-    :prefix))
-
-(def default-client-status
-  (decode-client-status default-client-status-str))
-
-(defn encode-client-status [client-status]
-  (str
-    (.get
-      ^ByteBuffer
-      (gio/to-byte-buffer
-        (gio/encode client-status-protocol
-          (assoc
-            (merge default-client-status client-status)
-            :prefix false)))
-      0)))
 
 (defn decode-battle-status [status-str]
   (dissoc
@@ -124,15 +87,16 @@
 
 
 (defn parse-adduser [m]
-  (re-find #"\w+ ([^\s]+) ([^\s]+) ([^\s]+)( (.+))?" m))
+  (re-find #"\w+ ([^\s]+) ([^\s]+)( ([\d]+))? ([\d]+)( (.+))?" m))
 
 (defmethod handle "ADDUSER" [state-atom server-url m]
-  (if-let [[_all username country user-id _ user-agent] (parse-adduser m)]
+  (if-let [[_all username country _cpu cpu user-id _user-agent user-agent] (parse-adduser m)]
     (let [user {:username username
                 :country country
+                :cpu cpu
                 :user-id user-id
                 :user-agent user-agent
-                :client-status default-client-status}]
+                :client-status cu/default-client-status}]
       (swap! state-atom assoc-in [:by-server server-url :users username] user))
     (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
@@ -175,7 +139,7 @@
 
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
-        decoded-status (decode-client-status client-status)
+        decoded-status (cu/decode-client-status client-status)
         [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
@@ -198,10 +162,17 @@
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (decode-battle-status battle-status)]
     (log/info "Updating status of" username "to" decoded "with color" team-color)
-    (swap! state-atom update-in [:by-server server-url :battle :users username]
-           assoc
-           :battle-status decoded
-           :team-color team-color)))
+    (swap! state-atom update-in [:by-server server-url]
+      (fn [server]
+        (cond-> server
+          true
+          (update-in [:battle :users username]
+            assoc
+            :battle-status decoded
+            :team-color team-color)
+          (= username (:username server))
+          (update :auto-launch (fn [old] (if (:mode decoded) true old))))))))
+
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) ([^\s]+) (\w+) (\w+)" m)
@@ -276,6 +247,30 @@
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
       (u/update-chat-messages-fn username message))))
+
+; legacy battle chat
+(defmethod handle "SAIDBATTLE" [state-atom server-key m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server]
+        (if-let [battle-id (-> server :battle :battle-id)]
+          (let [channel-name (str "__battle__" battle-id)]
+            (-> server
+                (update-in [:channels channel-name :messages]
+                  (u/update-chat-messages-fn username message))))
+          server)))))
+
+(defmethod handle "SAIDBATTLEEX" [state-atom server-key m]
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server]
+        (if-let [battle-id (-> server :battle :battle-id)]
+          (let [channel-name (str "__battle__" battle-id)]
+            (-> server
+                (update-in [:channels channel-name :messages]
+                  (u/update-chat-messages-fn username message true))))
+          server)))))
+
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]

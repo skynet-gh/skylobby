@@ -54,6 +54,14 @@
              :download-source-name "BAR GitHub spring"
              :resource-updated 1616282430238})))))
 
+
+(deftest normalize-map
+  (is (= "seth_s_ravine_3.1"
+         (resource/normalize-map "Seth's Ravine 3.1")))
+  (is (= "seth_s_ravine_3.1"
+         (resource/normalize-map "seth_s_ravine_3.1.sd7"))))
+
+
 (deftest could-be-this-map?
   (is (true?
         (resource/could-be-this-map?
@@ -74,6 +82,11 @@
         (resource/could-be-this-map?
           "Zed 2.2"
           {:resource-filename "zed_2.2.sd7"
+           :resource-type :spring-lobby/map})))
+  (is (true?
+        (resource/could-be-this-map?
+          "Seth's Ravine 3.1"
+          {:resource-filename "seth_s_ravine_3.1.sd7"
            :resource-type :spring-lobby/map}))))
 
 

@@ -9,6 +9,7 @@
     [clojure.walk]
     [com.evocomputing.colors :as colors]
     [spring-lobby.client.message :as client]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]))
@@ -330,62 +331,62 @@
        (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
        (into {})))
 
-(defn start-game [{:keys [client-data engines ^java.io.File spring-isolation-dir spring-settings] :as state}]
-  (try
-    (when (:auto-backup spring-settings)
-      (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
-            dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
-        (log/info "Backing up Spring settings to" dest-dir)
-        (copy-spring-settings spring-isolation-dir dest-dir)))
-    (log/info "Starting game")
-    (client/send-message (:client client-data) "MYSTATUS 1")
-    (let [{:keys [battle-version]} (battle-details state)
-          script-txt (battle-script-txt state)
-          engine-dir (some->> engines
-                              (filter (comp #{battle-version} :engine-version))
-                              first
-                              :file)
-          engine-file (io/file engine-dir (fs/spring-executable))
-          _ (log/info "Engine executable" engine-file)
-          _ (fs/set-executable engine-file)
-          script-file (io/file spring-isolation-dir "script.txt")
-          script-file-param (fs/wslpath script-file)
-          isolation-dir-param (fs/wslpath engine-dir)
-          write-dir-param (fs/wslpath spring-isolation-dir)]
-      (spit script-file script-txt)
-      (log/info "Wrote script to" script-file)
-      (let [command [(fs/canonical-path engine-file)
-                     "--isolation-dir" isolation-dir-param
-                     "--write-dir" write-dir-param
-                     script-file-param]
-            runtime (Runtime/getRuntime)]
-        (log/info "Running '" command "'")
-        (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-              ^"[Ljava.lang.String;" envp (fs/envp)
-              process (.exec runtime cmdarray envp spring-isolation-dir)]
-          (client/send-message (:client client-data) "MYSTATUS 1")
-          (async/thread
-            (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (do
-                    (log/info "(spring out)" line)
-                    (recur))
-                  (log/info "Spring stdout stream closed")))))
-          (async/thread
-            (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (do
-                    (log/info "(spring err)" line)
-                    (recur))
-                  (log/info "Spring stderr stream closed")))))
-          (future
-            (.waitFor process)
-            (client/send-message (:client client-data) "MYSTATUS 0")))))
-    (catch Exception e
-      (log/error e "Error starting game")
-      (client/send-message (:client client-data) "MYSTATUS 0"))))
+(defn start-game [{:keys [client-data engines ^java.io.File spring-isolation-dir spring-settings username users] :as state}]
+  (let [my-client-status (-> users (get username) :client-status)]
+    (try
+      (when (:auto-backup spring-settings)
+        (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
+              dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
+          (log/info "Backing up Spring settings to" dest-dir)
+          (copy-spring-settings spring-isolation-dir dest-dir)))
+      (log/info "Starting game")
+      (client/send-message (:client client-data) (str "MYSTATUS " (cu/encode-client-status (assoc my-client-status :ingame true))))
+      (let [{:keys [battle-version]} (battle-details state)
+            script-txt (battle-script-txt state)
+            engine-dir (some->> engines
+                                (filter (comp #{battle-version} :engine-version))
+                                first
+                                :file)
+            engine-file (io/file engine-dir (fs/spring-executable))
+            _ (log/info "Engine executable" engine-file)
+            _ (fs/set-executable engine-file)
+            script-file (io/file spring-isolation-dir "script.txt")
+            script-file-param (fs/wslpath script-file)
+            isolation-dir-param (fs/wslpath engine-dir)
+            write-dir-param (fs/wslpath spring-isolation-dir)]
+        (spit script-file script-txt)
+        (log/info "Wrote script to" script-file)
+        (let [command [(fs/canonical-path engine-file)
+                       "--isolation-dir" isolation-dir-param
+                       "--write-dir" write-dir-param
+                       script-file-param]
+              runtime (Runtime/getRuntime)]
+          (log/info "Running '" command "'")
+          (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+                ^"[Ljava.lang.String;" envp (fs/envp)
+                process (.exec runtime cmdarray envp spring-isolation-dir)]
+            (async/thread
+              (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+                (loop []
+                  (if-let [line (.readLine reader)]
+                    (do
+                      (log/info "(spring out)" line)
+                      (recur))
+                    (log/info "Spring stdout stream closed")))))
+            (async/thread
+              (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+                (loop []
+                  (if-let [line (.readLine reader)]
+                    (do
+                      (log/info "(spring err)" line)
+                      (recur))
+                    (log/info "Spring stderr stream closed")))))
+            (future
+              (.waitFor process)))))
+      (catch Exception e
+        (log/error e "Error starting game"))
+      (finally
+        (client/send-message (:client client-data) (str "MYSTATUS " (cu/encode-client-status (assoc my-client-status :ingame false))))))))
 
 (defn watch-replay [{:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
   (try
