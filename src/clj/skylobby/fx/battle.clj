@@ -48,15 +48,13 @@
    :tasks-by-type :username])
 
 (def battle-view-keys
-  [:archiving :auto-get-resources :battles :battle :battle-players-color-allyteam :bot-name
-   :bot-username :bot-version :channels :chat-auto-scroll :cleaning :client-data :copying :downloadables-by-url :drag-allyteam :drag-team :engine-filter :engine-version
-   :engines :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
-   :isolation-type
-   :map-input-prefix :map-details :maps :message-drafts :minimap-type :mod-details :mod-filter :mods :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :server-key :spring-isolation-dir :spring-settings :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods :username :users])
+  (concat
+    battle-view-state-keys
+    [:auto-launch :battles :battle :channels :client-data :engines :maps :mods
+     :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view
-  [{:keys [auto-get-resources battle battles battle-players-color-allyteam bot-name bot-username bot-version
+  [{:keys [auto-get-resources auto-launch battle battles battle-players-color-allyteam bot-name bot-username bot-version
            channels chat-auto-scroll client-data downloadables-by-url
            drag-allyteam drag-team engine-filter engines file-cache http-download
            map-input-prefix map-details maps message-drafts minimap-type mod-details mod-filter mods parsed-replays-by-path rapid-data-by-id rapid-data-by-version rapid-download server-key
@@ -389,6 +387,7 @@
                   {:fx/type :pane
                    :v-box/vgrow :always}]
                  [{:fx/type :h-box
+                   :alignment :center-left
                    :children
                    (concat
                      (when-not singleplayer
@@ -411,7 +410,14 @@
                              :-fx-background-color)
                            :-fx-font-size 14)}])
                      [{:fx/type :pane
-                       :h-box/hgrow :always}]
+                       :h-box/hgrow :always}
+                      {:fx/type :check-box
+                       :selected (boolean auto-launch)
+                       :style {:-fx-padding "10px"}
+                       :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                             :path [:by-server server-key :auto-launch]}}
+                      {:fx/type :label
+                       :text "Auto Launch "}]
                      (when-not singleplayer
                        [(let [am-away (:away my-client-status)]
                           (merge
@@ -438,52 +444,54 @@
                    :alignment :center-left
                    :style {:-fx-font-size 24}
                    :children
-                   [{:fx/type :check-box
-                     :selected (-> my-battle-status :ready boolean)
-                     :style {:-fx-padding "10px"}
-                     :on-selected-changed (merge me
-                                            {:event/type :spring-lobby/battle-ready-change
-                                             :client-data (when-not singleplayer client-data)
-                                             :username username})}
-                    {:fx/type :label
-                     :text (if am-spec " Auto Launch" " Ready")}
-                    {:fx/type :pane
-                     :h-box/hgrow :always}
-                    {:fx/type fx.ext.node/with-tooltip-props
-                     :props
-                     {:tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
-                       :style {:-fx-font-size 12}
-                       :text (cond
-                               am-host "You are the host, start the game"
-                               host-ingame "Join game in progress"
-                               :else (str "Call vote to start the game"))}}
-                     :desc
-                     {:fx/type :button
-                      :text (cond
-                              (and am-ingame (not singleplayer))
-                              "Game running"
-                              (and am-spec (not host-ingame) (not singleplayer))
-                              "Game not running"
-                              :else
-                              (str (if (and (not singleplayer) (or host-ingame am-spec))
-                                     "Join" "Start")
-                                   " Game"))
-                      :disable (boolean (and (not singleplayer)
-                                             (or (and (not host-ingame) am-spec)
-                                                 (and (not am-spec) am-ingame)
-                                                 (not in-sync))))
-                      :on-action
-                      (merge
-                        {:event/type :spring-lobby/start-battle}
-                        state
-                        {:am-host am-host
-                         :am-spec am-spec
-                         :battle-status my-battle-status
-                         :channel-name channel-name
-                         :client-data client-data
-                         :host-ingame host-ingame})}}]}])}
+                   (concat
+                     (when-not am-spec
+                       [{:fx/type :check-box
+                         :selected (-> my-battle-status :ready boolean)
+                         :style {:-fx-padding "10px"}
+                         :on-selected-changed (merge me
+                                                {:event/type :spring-lobby/battle-ready-change
+                                                 :client-data (when-not singleplayer client-data)
+                                                 :username username})}
+                        {:fx/type :label
+                         :text " Ready"}])
+                     [{:fx/type :pane
+                       :h-box/hgrow :always}
+                      {:fx/type fx.ext.node/with-tooltip-props
+                       :props
+                       {:tooltip
+                        {:fx/type :tooltip
+                         :show-delay [10 :ms]
+                         :style {:-fx-font-size 12}
+                         :text (cond
+                                 am-host "You are the host, start the game"
+                                 host-ingame "Join game in progress"
+                                 :else (str "Call vote to start the game"))}}
+                       :desc
+                       {:fx/type :button
+                        :text (cond
+                                (and am-ingame (not singleplayer))
+                                "Game running"
+                                (and am-spec (not host-ingame) (not singleplayer))
+                                "Game not running"
+                                :else
+                                (str (if (and (not singleplayer) (or host-ingame am-spec))
+                                       "Join" "Start")
+                                     " Game"))
+                        :disable (boolean (and (not singleplayer)
+                                               (or (and (not host-ingame) am-spec)
+                                                   (and (not am-spec) am-ingame)
+                                                   (not in-sync))))
+                        :on-action
+                        (merge
+                          {:event/type :spring-lobby/start-battle}
+                          state
+                          {:am-host am-host
+                           :am-spec am-spec
+                           :battle-status my-battle-status
+                           :channel-name channel-name
+                           :client-data client-data
+                           :host-ingame host-ingame})}}])}])}
               {:fx/type channel-view
                :h-box/hgrow :always
                :channel-name channel-name
