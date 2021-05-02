@@ -11,10 +11,17 @@
   [#"Beyond All Reason"])
 
 
-(defn mod-sync-pane [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file file-cache gitting http-download importables-by-path indexed-mod mod-update-tasks rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir springfiles-search-results tasks-by-type]}]
+(defn mod-sync-pane
+  [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file
+           file-cache gitting http-download importables-by-path indexed-mod mod-update-tasks
+           rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir
+           springfiles-search-results tasks-by-type]}]
   (let [no-mod-details (not (resource/details? battle-mod-details))
         mod-file (:file battle-mod-details)
-        canonical-path (fs/canonical-path mod-file)]
+        canonical-path (fs/canonical-path mod-file)
+        download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                   (map (juxt (comp :download-url :downloadable) identity))
+                                   (into {}))]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Game"
@@ -46,25 +53,34 @@
                                    (filter (partial resource/could-be-this-mod? battle-modname))
                                    first)
                  download-url (:download-url downloadable)
-                 in-progress (-> http-download (get download-url) :running)
+                 download (get http-download download-url)
+                 in-progress (or (:running download)
+                                 (contains? download-tasks-by-url download-url))
                  {:keys [download-source-name download-url]} downloadable
                  file-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
                  springname battle-modname
                  springfiles-searched (contains? springfiles-search-results springname)
                  springfiles-search-result (get springfiles-search-results springname)
+                 springfiles-mirror-set (set (:mirrors springfiles-search-result))
                  springfiles-download (->> http-download
-                                           (filter (comp (set (:mirror springfiles-search-result)) first))
+                                           (filter (comp springfiles-mirror-set first))
                                            first
                                            second)
-                 springfiles-in-progress (:running springfiles-download)]
+                 springfiles-in-progress (or (:running springfiles-download)
+                                             (->> download-tasks-by-url
+                                                  keys
+                                                  (filter springfiles-mirror-set)
+                                                  seq))]
              (if downloadable
                [{:severity (if file-exists -1 2)
                  :text "download"
-                 :human-text (if no-mod-details
-                               (if downloadable
-                                 (str "Download from " download-source-name)
-                                 (str "No download for " battle-modname))
-                               (:mod-name battle-mod-details))
+                 :human-text (if in-progress
+                               (u/download-progress download)
+                               (if no-mod-details
+                                 (if downloadable
+                                   (str "Download from " download-source-name)
+                                   (str "No download for " battle-modname))
+                                 (:mod-name battle-mod-details)))
                  :in-progress in-progress
                  :tooltip (if downloadable
                             (str "Download from " download-source-name " at " download-url)

@@ -84,8 +84,8 @@
 
 (defn replay-view
   [{:keys [battle-players-color-allyteam engines engines-by-version maps-by-version map-details
-           mods-by-version mod-details replay-minimap-type selected-replay show-sync
-           spring-isolation-dir]
+           mods-by-version mod-details replay-minimap-type selected-replay show-sync show-sync-left
+           spring-isolation-dir tasks-by-type]
     :as state}]
   (let [script-data (-> selected-replay :body :script-data)
         {:keys [gametype mapname] :as game} (:game script-data)
@@ -150,102 +150,125 @@
                                     :ally allyteam}
                                    :team-color team-color))))))
         indexed-map (get maps-by-version mapname)
-        replay-map-details (get map-details (resource/details-cache-key indexed-map))]
+        replay-map-details (get map-details (resource/details-cache-key indexed-map))
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+                                 set)
+        extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
+                           (map (comp fs/canonical-path :file))
+                           set)
+        map-update-tasks (->> tasks-by-type
+                              (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
+                              (mapcat second)
+                              set)
+        mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
+                              set)
+        mod-details-tasks (->> (get tasks-by-type :spring-lobby/mod-details)
+                               (filter (comp #{mod-name} :mod-name))
+                               set)
+        sync-pane {:fx/type :flow-pane
+                   :vgap 5
+                   :hgap 5
+                   :padding 5
+                   :children
+                   [(merge
+                      {:fx/type engine-sync-pane
+                       :engine-details selected-matching-engine
+                       :engine-file (:file selected-matching-engine)
+                       :engine-update-tasks engine-update-tasks
+                       :engine-version selected-engine-version
+                       :extract-tasks extract-tasks}
+                      state)
+                    (merge
+                      {:fx/type mod-sync-pane
+                       :battle-modname mod-name
+                       :battle-mod-details selected-matching-mod
+                       :engine-details selected-matching-engine
+                       :engine-file (:file selected-matching-engine)
+                       :mod-details-tasks mod-details-tasks
+                       :mod-update-tasks mod-update-tasks}
+                      state)
+                    (merge
+                      {:fx/type map-sync-pane
+                       :battle-map map-name
+                       :battle-map-details selected-matching-map
+                       :map-update-tasks map-update-tasks}
+                      state)]}]
     {:fx/type :h-box
      :alignment :center-left
      :children
-     [
-      {:fx/type :v-box
-       :h-box/hgrow :always
-       :children
-       (concat
-         [{:fx/type fx.players-table/players-table
-           :v-box/vgrow :always
-           :am-host false
-           :battle-modname gametype
-           :battle-players-color-allyteam battle-players-color-allyteam
-           :players (concat players bots)
-           :sides sides
-           :singleplayer true}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :check-box
-             :selected (boolean battle-players-color-allyteam)
-             :on-selected-changed {:event/type :spring-lobby/assoc
-                                   :key :battle-players-color-allyteam}}
-            {:fx/type :label
-             :text " Color player name by allyteam"}]}]
-         (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-           (let [watch-button {:fx/type :button
-                               :style {:-fx-font-size 24}
-                               :text " Watch"
-                               :on-action
-                               {:event/type :spring-lobby/watch-replay
-                                :engines engines
-                                :engine-version selected-engine-version
-                                :replay selected-replay
-                                :spring-isolation-dir spring-isolation-dir}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-movie:24:white"}}]
-             [{:fx/type :h-box
-               :children
-               [watch-button
-                {:fx/type :pane
-                 :h-box/hgrow :always}
-                watch-button]}])))}
-      {:fx/type :v-box
-       :children
-       (concat
-         [
-          {:fx/type fx.minimap/minimap-pane
-           :map-name mapname
-           :map-details replay-map-details
-           :minimap-type replay-minimap-type
-           :minimap-type-key :replay-minimap-type
-           :scripttags script-data}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text (str " Size: "
-                        (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
-                          (str
-                            (when map-width (quot map-width 64))
-                            " x "
-                            (when map-height (quot map-height 64)))))}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :combo-box
-             :value replay-minimap-type
-             :items fx.minimap/minimap-types
-             :on-value-changed {:event/type :spring-lobby/assoc
-                                :key :replay-minimap-type}}]}]
-         (when show-sync
-           [{:fx/type :flow-pane
-             :vgap 5
-             :hgap 5
-             :padding 5
+     (concat
+       [
+        {:fx/type :v-box
+         :h-box/hgrow :always
+         :children
+         (concat
+           [{:fx/type fx.players-table/players-table
+             :v-box/vgrow :always
+             :am-host false
+             :battle-modname gametype
+             :battle-players-color-allyteam battle-players-color-allyteam
+             :players (concat players bots)
+             :sides sides
+             :singleplayer true}
+            {:fx/type :h-box
+             :alignment :center-left
              :children
-             [(merge
-                {:fx/type engine-sync-pane
-                 :engine-details selected-matching-engine
-                 :engine-file (:file selected-matching-engine)
-                 :engine-version selected-engine-version}
-                state)
-              (merge
-                {:fx/type mod-sync-pane
-                 :battle-modname mod-name
-                 :battle-mod-details selected-matching-mod
-                 :engine-details selected-matching-engine
-                 :engine-file (:file selected-matching-engine)}
-                state)
-              (merge
-                {:fx/type map-sync-pane
-                 :battle-map map-name
-                 :battle-map-details selected-matching-map}
-                state)]}]))}]}))
+             [{:fx/type :check-box
+               :selected (boolean battle-players-color-allyteam)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :battle-players-color-allyteam}}
+              {:fx/type :label
+               :text " Color player name by allyteam"}]}]
+           (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+             (let [watch-button {:fx/type :button
+                                 :style {:-fx-font-size 24}
+                                 :text " Watch"
+                                 :on-action
+                                 {:event/type :spring-lobby/watch-replay
+                                  :engines engines
+                                  :engine-version selected-engine-version
+                                  :replay selected-replay
+                                  :spring-isolation-dir spring-isolation-dir}
+                                 :graphic
+                                 {:fx/type font-icon/lifecycle
+                                  :icon-literal "mdi-movie:24:white"}}]
+               [{:fx/type :h-box
+                 :children
+                 [watch-button
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  watch-button]}])))}]
+       (when show-sync-left
+         [sync-pane])
+       [{:fx/type :v-box
+         :children
+         (concat
+           [
+            {:fx/type fx.minimap/minimap-pane
+             :map-name mapname
+             :map-details replay-map-details
+             :minimap-type replay-minimap-type
+             :minimap-type-key :replay-minimap-type
+             :scripttags script-data}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text (str " Size: "
+                          (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
+                            (str
+                              (when map-width (quot map-width 64))
+                              " x "
+                              (when map-height (quot map-height 64)))))}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :combo-box
+               :value replay-minimap-type
+               :items fx.minimap/minimap-types
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :replay-minimap-type}}]}]
+           (when show-sync
+             [sync-pane]))}])}))
 
 
 (defn replays-table
@@ -677,12 +700,12 @@
   [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css
    :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
    :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
-   :http-download :map-details :mod-details :new-online-replays-count :on-close-request
+   :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
    :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs
    :replays-watched :replays-window-details :selected-replay-file :selected-replay-id
-   :settings-button :show-replays :spring-isolation-dir])
+   :settings-button :show-replays :spring-isolation-dir :springfiles-search-results])
 
 (defn replays-window-impl
   [{:keys [bar-replays-page by-spring-root css extra-replay-sources
@@ -1057,138 +1080,11 @@
                 {:fx/type replay-view}
                 state
                 {:engines-by-version engines-by-version
+                 :engines engines
                  :maps-by-version maps-by-version
                  :mods-by-version mods-by-version
-                 :selected-replay selected-replay})]
-             #_
-             (let [script-data (-> selected-replay :body :script-data)
-                   {:keys [gametype mapname] :as game} (:game script-data)
-                   teams-by-id (->> game
-                                    (filter (comp #(string/starts-with? % "team") name first))
-                                    (map
-                                      (fn [[teamid team]]
-                                        (let [[_all id] (re-find #"team(\d+)" (name teamid))]
-                                          [id team])))
-                                    (into {}))
-                   indexed-mod (get mods-by-version gametype)
-                   replay-mod-details (get mod-details (resource/details-cache-key indexed-mod))
-                   sides (spring/mod-sides replay-mod-details)
-                   players (->> game
-                                (filter (comp #(string/starts-with? % "player") name first))
-                                (map
-                                  (fn [[playerid {:keys [spectator team] :as player}]]
-                                    (let [[_all id] (re-find #"player(\d+)" (name playerid))
-                                          {:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
-                                          team-color (try (u/spring-script-color-to-int rgbcolor)
-                                                          (catch Exception e
-                                                            (log/debug e "Error parsing color")
-                                                            0))
-                                          side-id-by-name (clojure.set/map-invert sides)]
-                                      (-> player
-                                          (clojure.set/rename-keys
-                                            {:name :username
-                                             :countrycode :country})
-                                          (assoc :battle-status
-                                                 {:id id
-                                                  :team team
-                                                  :mode (not (u/to-bool spectator))
-                                                  :handicap handicap
-                                                  :side (get side-id-by-name side)
-                                                  :ally allyteam}
-                                                 :team-color team-color))))))
-                   bots (->> game
-                             (filter (comp #(string/starts-with? % "ai") name first))
-                             (map
-                               (fn [[aiid {:keys [team] :as ai}]]
-                                 (let [{:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
-                                       team-color (try (u/spring-script-color-to-int rgbcolor)
-                                                       (catch Exception e
-                                                         (log/debug e "Error parsing color")
-                                                         0))
-                                       side-id-by-name (clojure.set/map-invert sides)]
-                                   (-> ai
-                                       (clojure.set/rename-keys
-                                         {:name :username})
-                                       (assoc :battle-status
-                                              {:id aiid
-                                               :team team
-                                               :mode true
-                                               :handicap handicap
-                                               :side (get side-id-by-name side)
-                                               :ally allyteam}
-                                              :team-color team-color))))))
-                   indexed-map (get maps-by-version mapname)
-                   replay-map-details (get map-details (resource/details-cache-key indexed-map))]
-               [{:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type :v-box
-                   :h-box/hgrow :always
-                   :children
-                   (concat
-                     [{:fx/type fx.players-table/players-table
-                       :v-box/vgrow :always
-                       :am-host false
-                       :battle-modname gametype
-                       :battle-players-color-allyteam battle-players-color-allyteam
-                       :players (concat players bots)
-                       :sides sides
-                       :singleplayer true}
-                      {:fx/type :h-box
-                       :alignment :center-left
-                       :children
-                       [{:fx/type :check-box
-                         :selected (boolean battle-players-color-allyteam)
-                         :on-selected-changed {:event/type :spring-lobby/assoc
-                                               :key :battle-players-color-allyteam}}
-                        {:fx/type :label
-                         :text " Color player name by allyteam"}]}]
-                     (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-                       (let [watch-button {:fx/type :button
-                                           :style {:-fx-font-size 24}
-                                           :text " Watch"
-                                           :on-action
-                                           {:event/type :spring-lobby/watch-replay
-                                            :engines engines
-                                            :engine-version selected-engine-version
-                                            :replay selected-replay
-                                            :spring-isolation-dir spring-isolation-dir}
-                                           :graphic
-                                           {:fx/type font-icon/lifecycle
-                                            :icon-literal "mdi-movie:24:white"}}]
-                         [{:fx/type :h-box
-                           :children
-                           [watch-button
-                            {:fx/type :pane
-                             :h-box/hgrow :always}
-                            watch-button]}])))}
-                  {:fx/type :v-box
-                   :children
-                   [
-                    {:fx/type fx.minimap/minimap-pane
-                     :map-name mapname
-                     :map-details replay-map-details
-                     :minimap-type replay-minimap-type
-                     :minimap-type-key :replay-minimap-type
-                     :scripttags script-data}
-                    {:fx/type :h-box
-                     :alignment :center-left
-                     :children
-                     [{:fx/type :label
-                       :text (str " Size: "
-                                  (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
-                                    (str
-                                      (when map-width (quot map-width 64))
-                                      " x "
-                                      (when map-height (quot map-height 64)))))}
-                      {:fx/type :pane
-                       :h-box/hgrow :always}
-                      {:fx/type :combo-box
-                       :value replay-minimap-type
-                       :items fx.minimap/minimap-types
-                       :on-value-changed {:event/type :spring-lobby/assoc
-                                          :key :replay-minimap-type}}]}]}]}])))})
+                 :selected-replay selected-replay
+                 :show-sync-left true})]))})
       {:fx/type :pane})}})
 
 (defn replays-window [state]

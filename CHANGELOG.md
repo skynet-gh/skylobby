@@ -39,6 +39,13 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.29]
+
+- Add resource sync to left of map in replay view
+- Fix typo causing map download progress to be hidden
+- Fix replay sync springfiles download
+- Fix selected replay watching
+
 ### [0.3.28]
 
 - Fix replay watching

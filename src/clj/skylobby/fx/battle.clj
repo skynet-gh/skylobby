@@ -1018,7 +1018,7 @@
            :host-ingame host-ingame
            :import-tasks import-tasks
            :in-sync in-sync
-           :indexed-map indexed-mod
+           :indexed-map indexed-map
            :indexed-mod indexed-mod
            :map-update-tasks map-update-tasks
            :mod-details-tasks mod-details-tasks

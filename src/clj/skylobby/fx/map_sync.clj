@@ -69,11 +69,13 @@
                  springname battle-map
                  springfiles-searched (contains? springfiles-search-results springname)
                  springfiles-search-result (get springfiles-search-results springname)
+                 springfiles-mirror-set (set (:mirrors springfiles-search-result))
                  springfiles-download (->> http-download
-                                           (filter (comp (set (:mirror springfiles-search-result)) first))
+                                           (filter (comp springfiles-mirror-set first))
                                            first
                                            second)
-                 springfiles-in-progress (:running springfiles-download)]
+                 springfiles-in-progress (or (:running springfiles-download)
+                                             (some springfiles-mirror-set http-download-tasks))]
              (if downloadable
                [{:severity severity
                  :text "download"

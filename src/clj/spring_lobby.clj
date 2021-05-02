@@ -1484,18 +1484,25 @@
 
 
 (defmethod task-handler ::mod-details [{:keys [mod-name mod-file]}]
-  (if mod-file
-    (do
-      (log/info "Updating mod details for" mod-name)
-      (let [mod-details (or (read-mod-data mod-file) {:mod-name mod-name
-                                                      :file mod-file
-                                                      :error true
-                                                      :tries 1})] ; TODO inc
-        (log/info "Got mod details for" mod-name mod-file (keys mod-details))
-        (swap! *state update :mod-details cache/miss (fs/canonical-path mod-file) mod-details)))
-    (do
-      (log/info "Battle mod not found, setting empty details for" mod-name)
-      (swap! *state update :mod-details cache/miss mod-name {}))))
+  (let [error-data {:mod-name mod-name
+                    :file mod-file
+                    :error true
+                    :tries 1} ; TODO inc
+        cache-key (fs/canonical-path mod-file)]
+    (try
+      (if mod-file
+        (do
+          (log/info "Updating mod details for" mod-name)
+          (let [mod-details (or (read-mod-data mod-file) error-data)]
+            (log/info "Got mod details for" mod-name mod-file (keys mod-details))
+            (swap! *state update :mod-details cache/miss cache-key mod-details)))
+        (do
+          (log/info "Battle mod not found, setting empty details for" mod-name)
+          (swap! *state update :mod-details cache/miss cache-key {})))
+      (catch Throwable t
+        (log/error t "Error updating mod details")
+        (swap! *state update :mod-details cache/miss cache-key error-data)
+        (throw t)))))
 
 
 (defmethod task-handler ::update-cached-minimaps [_]
@@ -2964,7 +2971,7 @@
                     :body
                     first)]
     (log/info "First result for" springname "search on springfiles:" result)
-    (when-let [mirrors (-> result :mirrors seq)]
+    (when-let [mirrors (->> result :mirrors (filter some?) (remove #(string/includes? % "spring1.admin-box.com")) seq)]
       {:filename (:filename result)
        :mirrors mirrors})))
 
