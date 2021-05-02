@@ -3569,18 +3569,27 @@
 
 
 (defn auto-connect-servers [state-atom]
-  (let [{:keys [logins servers]} @state-atom]
+  (let [{:keys [by-server logins servers]} @state-atom]
     (doseq [[server-url :as server] (filter (comp :auto-connect second) servers)]
       (when-let [{:keys [password username] :as login} (get logins server-url)]
         (when (and password username)
           (let [server-key (u/server-key {:server-url server-url
                                           :username username})]
-            (event-handler
-              (merge
-                {:event/type ::connect
-                 :server server
-                 :server-key server-key}
-                login))))))))
+            (if (contains? by-server server-key)
+              (log/warn "Already connected to" server-key)
+              (event-handler
+                (merge
+                  {:event/type ::connect
+                   :server server
+                   :server-key server-key}
+                  login)))))))))
+
+(defmethod event-handler ::auto-connect-servers [_]
+  (future
+    (try
+      (auto-connect-servers *state)
+      (catch Exception e
+        (log/error e "Error connecting to auto servers")))))
 
 
 (defn init-async [state-atom]

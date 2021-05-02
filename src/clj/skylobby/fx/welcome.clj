@@ -127,7 +127,7 @@
                    :key :show-settings-window}}])})
 
 (defn multiplayer-buttons
-  [{:keys [client-data login-error password server servers username]
+  [{:keys [by-server client-data login-error logins password server servers username]
     :as state}]
   {:fx/type :v-box
    :children
@@ -182,11 +182,6 @@
                :graphic
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-file-find:16:white"}}])}]})]
-     (when-not client-data
-       [{:fx/type :button
-         :text "Register"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-register-window}}])
      (when-let [login-error (str " " (get login-error (first server)))]
        [{:fx/type :label
          :text (str " " login-error)
@@ -227,20 +222,46 @@
          :on-action {:event/type :spring-lobby/assoc
                      :key :selected-server-tab
                      :value (str username "@" (first server))}}])
-     [(merge
-        {:fx/type connect-button
-         :server-key (u/server-key client-data)}
-        (select-keys state connect-button-keys))])})
+     [{:fx/type :h-box
+       :children
+       (concat
+         [(merge
+            {:fx/type connect-button
+             :server-key (u/server-key client-data)}
+            (select-keys state connect-button-keys))
+          {:fx/type :pane
+           :h-box/hgrow :always}]
+         (when-not client-data
+           [{:fx/type :button
+             :text "Register"
+             :on-action {:event/type :spring-lobby/toggle
+                         :key :show-register-window}}]))}]
+     (let [auto-servers (->> servers
+                             (filter (comp :auto-connect second)))
+           auto-servers-not-connected (->> auto-servers
+                                           (map (fn [[server-url _server-data]]
+                                                  (u/server-key
+                                                    {:server-url server-url
+                                                     :username (-> logins (get server-url) :username)})))
+                                           (filter some?)
+                                           (remove (fn [server-key] (contains? by-server server-key))))]
+       (when (seq auto-servers)
+         [{:fx/type :button
+           :text (if (empty? auto-servers-not-connected)
+                   "All auto-connect servers connected"
+                   (str "Connect to " (count auto-servers-not-connected) " auto-connect servers"))
+           :disable (empty? auto-servers-not-connected)
+           :on-action {:event/type :spring-lobby/auto-connect-servers}}])))})
+
 
 (def welcome-view-keys
   (concat
     fx.battle/battle-view-keys
-    [:app-update-available :by-spring-root :by-server :client-data :login-error :password :server
-     :servers :spring-isolation-dir :tasks-by-type :username]))
+    [:app-update-available :by-spring-root :by-server :client-data :login-error :logins :password
+     :server :servers :spring-isolation-dir :tasks-by-type :username]))
 
 (defn welcome-view
-  [{:keys [by-spring-root by-server
-           spring-isolation-dir tasks-by-type]
+  [{:keys [by-spring-root by-server spring-isolation-dir tasks-by-type]
     :as state}]
   {:fx/type :v-box
    :alignment :center
