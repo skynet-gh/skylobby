@@ -1070,6 +1070,7 @@
                    :rapid-update-tasks rapid-update-tasks
                    :rapid-tasks rapid-tasks
                    :replays replays
+                   :selected-replay selected-replay
                    :time-zone-id time-zone-id}))
              {:fx/type :label
               :style {:-fx-font-size 24}
