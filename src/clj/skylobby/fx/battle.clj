@@ -274,11 +274,14 @@
                    #_
                    {:fx/type :label
                     :text " Version: "}
-                   {:fx/type :combo-box
-                    :value bot-version
-                    :disable (string/blank? bot-name)
-                    :on-value-changed {:event/type :spring-lobby/change-bot-version}
-                    :items (or bot-versions [])}]}]}])
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str bot-name)
+                    :desc
+                    {:fx/type :combo-box
+                     :value bot-version
+                     :disable (string/blank? bot-name)
+                     :on-value-changed {:event/type :spring-lobby/change-bot-version}
+                     :items (or bot-versions [])}}]}]}])
             (when-not singleplayer
               [{:fx/type :h-box
                 :alignment :center-left
