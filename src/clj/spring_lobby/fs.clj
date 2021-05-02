@@ -24,6 +24,7 @@
 
 
 (def ^:dynamic app-root-override nil)
+(def ^:dynamic replay-sources-override nil)
 
 
 (defn init-7z! []
@@ -331,6 +332,20 @@
 (defn replays-dir
   [root]
   (io/file root "demos"))
+
+(defn builtin-replay-sources []
+  (if replay-sources-override
+    replay-sources-override
+    [{:replay-source-name "skylobby"
+      :file (replays-dir (default-isolation-dir))
+      :builtin true}
+     {:replay-source-name "Beyond All Reason"
+      :file (replays-dir (bar-root))
+      :builtin true}
+     {:replay-source-name "Spring"
+      :file (replays-dir (spring-root))
+      :builtin true}]))
+
 
 (defn replay-files
   ([dir]

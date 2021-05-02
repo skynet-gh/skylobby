@@ -31,7 +31,7 @@
 
 (defn root-view
   [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
-            show-matchmaking-window spring-isolation-dir standalone tasks-by-kind]
+            show-matchmaking-window spring-isolation-dir standalone tasks-by-kind window-maximized]
      :as state}
     :state}]
   (tufte/profile {:id :skylobby/ui}
@@ -62,6 +62,7 @@
            :showing true
            :title (str "skylobby " app-version)
            :icons skylobby.fx/icons
+           :maximized (boolean window-maximized)
            :x 100
            :y 100
            :width (min main-window-width width)
