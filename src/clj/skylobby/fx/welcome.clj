@@ -46,7 +46,7 @@
                        :server-key server-key
                        :password password
                        :username username})}]
-       (when (and client-deferred (not client))
+       (when (and client-deferred (or (not client) (not accepted)))
          [{:fx/type :button
            :text ""
            :tooltip

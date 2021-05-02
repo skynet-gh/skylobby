@@ -49,6 +49,12 @@
      {:-fx-icon-color "dimgrey"}}}})
 
 
+(def style-presets
+  {"default" default-style-data
+   "black" black-style-data
+   "javafx" javafx-style-data})
+
+
 (def default-style
   (css/register ::default default-style-data))
 

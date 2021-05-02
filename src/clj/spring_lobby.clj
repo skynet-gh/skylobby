@@ -24,6 +24,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
+    [skylobby.fx.replay :as fx.replay]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
     [spring-lobby.battle :as battle]
@@ -45,7 +46,7 @@
   (:import
     (java.awt Desktop Desktop$Action)
     (java.io File)
-    (java.net InetAddress InetSocketAddress)
+    (java.net InetAddress InetSocketAddress URL)
     (java.util List)
     (javafx.event Event)
     (javafx.scene.control Tab)
@@ -80,14 +81,19 @@
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn- read-file-tag [cs]
   (io/file cs))
+(defn- read-url-tag [spec]
+  (URL. spec))
 
 ; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
 (def custom-readers
-  {'spring-lobby/java.io.File #'spring-lobby/read-file-tag})
+  {'spring-lobby/java.io.File #'spring-lobby/read-file-tag
+   'spring-lobby/java.net.URL #'spring-lobby/read-url-tag})
 
 ; https://stackoverflow.com/a/23592006/984393
 (defmethod print-method File [f ^java.io.Writer w]
   (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
+(defmethod print-method URL [url ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
 
 
 (defn- slurp-config-edn
@@ -927,20 +933,6 @@
      (fn [] (.close chimer)))))
 
 
-(defn- replay-sources [{:keys [extra-replay-sources]}]
-  (concat
-    [{:replay-source-name "skylobby"
-      :file (fs/replays-dir (fs/default-isolation-dir))
-      :builtin true}
-     {:replay-source-name "Beyond All Reason"
-      :file (fs/replays-dir (fs/bar-root))
-      :builtin true}
-     {:replay-source-name "Spring"
-      :file (fs/replays-dir (fs/spring-root))
-      :builtin true}]
-    extra-replay-sources))
-
-
 (defn- refresh-replays
   [state-atom]
   (log/info "Refreshing replays")
@@ -954,7 +946,7 @@
                         (map
                           (juxt (constantly replay-source-name) identity)
                           files)))
-                    (replay-sources state))
+                    (fx.replay/replay-sources state))
         todo (->> all-files
                   (remove (comp existing-paths fs/canonical-path second))
                   (sort-by (comp fs/filename second))

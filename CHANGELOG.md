@@ -39,6 +39,14 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.28]
+
+- Fix replay watching
+- Add `--css-file FILE` CLI option to set custom CSS using a file
+- Add `--css-preset PRESET` CLI option to set a CSS preset theme
+- Add `--replay-source DIR` CLI option to replace default replay sources with a custom list
+- Add `--window-maximized` CLI option to start the main window maximized
+
 ### [0.3.27]
 
 - Add /rename chat command

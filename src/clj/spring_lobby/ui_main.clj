@@ -23,11 +23,17 @@
   [[nil "--chat-channel CHANNEL_NAME" "Add a default chat channel to connect to"
     :assoc-fn (fn [m k v]
                 (update m k conj v))]
+   [nil "--css-file CSS_FILE" "Use the given file for CSS style"]
+   [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
+   [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
+    :assoc-fn (fn [m k v]
+                (update m k conj v))]
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
-   [nil "--server-url SERVER_URL" "Set the selected server config by url"]])
+   [nil "--server-url SERVER_URL" "Set the selected server config by url"]
+   [nil "--window-maximized" "Start with the main window maximized"]])
 
 
 (defn -main [& args]
@@ -40,6 +46,15 @@
     (try
       (when-let [app-root-override (:skylobby-root options)]
         (alter-var-root #'fs/app-root-override (constantly app-root-override)))
+      (when-let [replay-sources (seq (:replay-source options))]
+        (let [replay-sources-override (map
+                                        (fn [source]
+                                          {:replay-source-name ""
+                                           :file (fs/file source)
+                                           :builtin true})
+                                        replay-sources)]
+          (log/info "Replacing replay sources with" (pr-str replay-sources-override))
+          (alter-var-root #'fs/replay-sources-override (constantly replay-sources-override))))
       (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
       (let [before (u/curr-millis)]
         (log/info "Main start")
@@ -57,6 +72,8 @@
                         {:filter-battles (:filter-battles options)})
                       (when (contains? options :filter-users)
                         {:filter-users (:filter-users options)})
+                      (when (contains? options :window-maximized)
+                        {:window-maximized true})
                       (when (contains? options :server-url)
                         (let [server (->> initial-state
                                           :servers
@@ -77,9 +94,17 @@
                            (:chat-channel options))}))]
           (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
           (reset! spring-lobby/*state state)
-          (swap! spring-lobby/*state assoc :css (css/register :skylobby.fx/current
-                                                  (or (:css state)
-                                                      skylobby.fx/default-style-data))))
+          (let [previous-css (css/register :skylobby.fx/current
+                                (or (:css state)
+                                    skylobby.fx/default-style-data))
+                css (cond
+                      (:css-file options)
+                      {:cljfx.css/url (some-> options :css-file fs/file .toURI .toURL)}
+                      (:css-preset options)
+                      (css/register :skylobby.fx/current
+                        (get skylobby.fx/style-presets (some-> options :css-preset string/lower-case)))
+                      :else previous-css)]
+            (swap! spring-lobby/*state assoc :css css)))
         (cond
           (= "skyreplays" (first arguments))
           (do

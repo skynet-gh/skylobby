@@ -37,15 +37,7 @@
 
 (defn replay-sources [{:keys [extra-replay-sources]}]
   (concat
-    [{:replay-source-name "skylobby"
-      :file (fs/replays-dir (fs/default-isolation-dir))
-      :builtin true}
-     {:replay-source-name "Beyond All Reason"
-      :file (fs/replays-dir (fs/bar-root))
-      :builtin true}
-     {:replay-source-name "Spring"
-      :file (fs/replays-dir (fs/spring-root))
-      :builtin true}]
+    (fs/builtin-replay-sources)
     extra-replay-sources))
 
 
@@ -1044,6 +1036,7 @@
                   {:download-tasks download-tasks
                    :engine-update-tasks engine-update-tasks
                    :engines-by-version engines-by-version
+                   :engines engines
                    :extract-tasks extract-tasks
                    :http-download-tasks http-download-tasks
                    :import-tasks import-tasks
