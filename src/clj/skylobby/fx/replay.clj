@@ -1044,6 +1044,7 @@
                   {:download-tasks download-tasks
                    :engine-update-tasks engine-update-tasks
                    :engines-by-version engines-by-version
+                   :engines engines
                    :extract-tasks extract-tasks
                    :http-download-tasks http-download-tasks
                    :import-tasks import-tasks
