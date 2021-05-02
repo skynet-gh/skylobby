@@ -269,9 +269,9 @@
                        (assoc-in [:client-data :compflags] compflags))))
         accepted (-> state :by-server (get server-key) :accepted)
         {:keys [client ssl username password]} (-> state :by-server (get server-key) :client-data)]
-    (when (not accepted)
-      (if (and ssl (contains? compflags "token-auth"))
-        (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
+    (if (and ssl (contains? compflags "token-auth"))
+      (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
+      (when (not accepted)
         (login client username password)))))
 
 
