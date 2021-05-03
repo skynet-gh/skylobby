@@ -2401,10 +2401,7 @@
     (if client-data
       (let [prefix (if is-bot
                      (str "UPDATEBOT " player-name) ; TODO normalize
-                     "MYBATTLESTATUS")
-            battle-status (if (and (not is-bot) (:mode battle-status))
-                            (assoc battle-status :ready true)
-                            battle-status)]
+                     "MYBATTLESTATUS")]
         (log/debug player-name (pr-str battle-status) team-color)
         (client-message client-data
           (str prefix
@@ -2640,8 +2637,12 @@
       (if (or is-me is-bot)
         (let [mode (if (contains? data :value)
                      (:value data)
-                     (not event))]
-          (update-battle-status client-data data (assoc (:battle-status id) :mode mode) (:team-color id)))
+                     (not event))
+              battle-status (assoc (:battle-status id) :mode mode)
+              battle-status (if (and (not is-bot) (:mode battle-status))
+                              (assoc battle-status :ready true)
+                              battle-status)]
+          (update-battle-status client-data data battle-status (:team-color id)))
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
@@ -3569,18 +3570,27 @@
 
 
 (defn auto-connect-servers [state-atom]
-  (let [{:keys [logins servers]} @state-atom]
+  (let [{:keys [by-server logins servers]} @state-atom]
     (doseq [[server-url :as server] (filter (comp :auto-connect second) servers)]
       (when-let [{:keys [password username] :as login} (get logins server-url)]
         (when (and password username)
           (let [server-key (u/server-key {:server-url server-url
                                           :username username})]
-            (event-handler
-              (merge
-                {:event/type ::connect
-                 :server server
-                 :server-key server-key}
-                login))))))))
+            (if (contains? by-server server-key)
+              (log/warn "Already connected to" server-key)
+              (event-handler
+                (merge
+                  {:event/type ::connect
+                   :server server
+                   :server-key server-key}
+                  login)))))))))
+
+(defmethod event-handler ::auto-connect-servers [_]
+  (future
+    (try
+      (auto-connect-servers *state)
+      (catch Exception e
+        (log/error e "Error connecting to auto servers")))))
 
 
 (defn init-async [state-atom]

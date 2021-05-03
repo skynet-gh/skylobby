@@ -5,7 +5,8 @@
     skylobby.fx
     [skylobby.fx.ext :refer [with-scroll-text-prop]]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u])
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte])
   (:import
     (java.util TimeZone)))
 
@@ -13,7 +14,7 @@
 (def console-view-keys
   [:client-data :console-auto-scroll :console-log :console-message-draft :server-key])
 
-(defn console-view [{:keys [client-data console-auto-scroll console-log console-message-draft server-key]}]
+(defn console-view-impl [{:keys [client-data console-auto-scroll console-log console-message-draft server-key]}]
   (let [time-zone-id (.toZoneId (TimeZone/getDefault))
         console-text (string/join "\n"
                        (map
@@ -70,3 +71,10 @@
             :selected (boolean console-auto-scroll)
             :on-selected-changed {:event/type :spring-lobby/assoc
                                   :key :console-auto-scroll}}]}}]}]}))
+
+
+(defn console-view
+  [state]
+  (tufte/profile {:id :skylobby/ui}
+    (tufte/p :console-view
+      (console-view-impl state))))

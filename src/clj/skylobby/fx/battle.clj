@@ -274,11 +274,14 @@
                    #_
                    {:fx/type :label
                     :text " Version: "}
-                   {:fx/type :combo-box
-                    :value bot-version
-                    :disable (string/blank? bot-name)
-                    :on-value-changed {:event/type :spring-lobby/change-bot-version}
-                    :items (or bot-versions [])}]}]}])
+                   {:fx/type ext-recreate-on-key-changed
+                    :key (str bot-name)
+                    :desc
+                    {:fx/type :combo-box
+                     :value bot-version
+                     :disable (string/blank? bot-name)
+                     :on-value-changed {:event/type :spring-lobby/change-bot-version}
+                     :items (or bot-versions [])}}]}]}])
             (when-not singleplayer
               [{:fx/type :h-box
                 :alignment :center-left
@@ -450,16 +453,16 @@
                    :-fx-background-color)
                  :-fx-font-size 14)}])
            [{:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :check-box
-             :selected (boolean auto-launch)
-             :style {:-fx-padding "10px"}
-             :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:by-server server-key :auto-launch]}}
-            {:fx/type :label
-             :text "Auto Launch "}]
+             :h-box/hgrow :always}]
            (when-not singleplayer
-             [(let [am-away (:away my-client-status)]
+             [{:fx/type :check-box
+               :selected (boolean auto-launch)
+               :style {:-fx-padding "10px"}
+               :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                     :path [:by-server server-key :auto-launch]}}
+              {:fx/type :label
+               :text "Auto Launch "}
+              (let [am-away (:away my-client-status)]
                 (merge
                   {:fx/type :button
                    :text (if am-away "Away" "Here")
@@ -1021,6 +1024,7 @@
            :indexed-map indexed-map
            :indexed-mod indexed-mod
            :map-update-tasks map-update-tasks
+           :me me
            :mod-details-tasks mod-details-tasks
            :mod-update-tasks mod-update-tasks
            :my-battle-status my-battle-status

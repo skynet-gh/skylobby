@@ -26,7 +26,7 @@
 (def battle-window-height 800)
 
 (def main-window-width 1920)
-(def main-window-height 1200)
+(def main-window-height 1280)
 
 
 (defn root-view
