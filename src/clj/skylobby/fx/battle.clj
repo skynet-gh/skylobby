@@ -1055,7 +1055,8 @@
        :singleplayer singleplayer
        :spring-isolation-dir spring-isolation-dir
        :spring-settings spring-settings
-       :startpostype startpostype}]}))
+       :startpostype startpostype
+       :username username}]}))
 
 (defn battle-view
   [state]
