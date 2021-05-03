@@ -39,6 +39,13 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.30]
+
+- Fix ready checkbox not doing anything
+- Fix selected replay when opening from file
+- Fix bot version display when changing bot name
+- Add button to connect to auto-connect servers
+
 ### [0.3.29]
 
 - Add resource sync to left of map in replay view
