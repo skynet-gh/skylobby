@@ -5,7 +5,8 @@
     [skylobby.fx :refer [monospace-font-family]]
     [skylobby.fx.ext :refer [with-scroll-text-prop with-scroll-text-flow-prop]]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (def irc-colors
@@ -169,7 +170,7 @@
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (-> i str)})}}]})
 
-(defn channel-view
+(defn channel-view-impl
   [{:keys [channel-name channels chat-auto-scroll client-data hide-users message-draft server-key]}]
   (let [{:keys [messages select-mode users]} (get channels channel-name)]
     {:fx/type :h-box
@@ -197,3 +198,10 @@
                   (not (string/starts-with? channel-name "@")))
          [{:fx/type channel-view-users
            :users users}]))}))
+
+
+(defn channel-view
+  [state]
+  (tufte/profile {:id :skylobby/ui}
+    (tufte/p :channel-view
+      (channel-view-impl state))))
