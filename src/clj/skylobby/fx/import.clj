@@ -91,15 +91,14 @@
       :root
       (if show-importer
         {:fx/type :v-box
+         :style {:-fx-font-size 16}
          :children
          [{:fx/type :button
-           :style {:-fx-font-size 16}
            :text "Refresh All Imports"
            :on-action {:event/type :spring-lobby/scan-imports
                        :sources import-sources}}
           {:fx/type :h-box
            :alignment :center-left
-           :style {:-fx-font-size 16}
            :children
            (concat
              [{:fx/type :label

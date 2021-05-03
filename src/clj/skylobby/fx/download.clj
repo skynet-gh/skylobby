@@ -111,10 +111,10 @@
       :root
       (if show-downloader
         {:fx/type :v-box
+         :style {:-fx-font-size 16}
          :children
          [{:fx/type :h-box
            :alignment :center-left
-           :style {:-fx-font-size 16}
            :children
            (concat
              [{:fx/type :label
