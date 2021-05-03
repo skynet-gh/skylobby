@@ -202,6 +202,7 @@
 
 (defn channel-view
   [state]
-  (tufte/profile {:id :skylobby/ui}
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
     (tufte/p :channel-view
       (channel-view-impl state))))

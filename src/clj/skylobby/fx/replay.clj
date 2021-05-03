@@ -1089,7 +1089,8 @@
       {:fx/type :pane})}})
 
 (defn replays-window [state]
-  (tufte/profile {:id :skylobby/ui}
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
     (tufte/p :replays-window
       (replays-window-impl state))))
 

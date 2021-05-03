@@ -1055,11 +1055,13 @@
        :singleplayer singleplayer
        :spring-isolation-dir spring-isolation-dir
        :spring-settings spring-settings
-       :startpostype startpostype}]}))
+       :startpostype startpostype
+       :username username}]}))
 
 (defn battle-view
   [state]
-  (tufte/profile {:id :skylobby/ui}
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
     (tufte/p :battle-view
       (battle-view-impl state))))
 

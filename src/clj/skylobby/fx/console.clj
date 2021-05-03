@@ -75,6 +75,7 @@
 
 (defn console-view
   [state]
-  (tufte/profile {:id :skylobby/ui}
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
     (tufte/p :console-view
       (console-view-impl state))))
