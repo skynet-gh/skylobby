@@ -39,6 +39,11 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.31]
+
+- Fix occasional crash due to profiler concurrency
+- Fix battle map suggest
+
 ### [0.3.30]
 
 - Fix ready checkbox not doing anything
