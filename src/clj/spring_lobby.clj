@@ -2401,10 +2401,7 @@
     (if client-data
       (let [prefix (if is-bot
                      (str "UPDATEBOT " player-name) ; TODO normalize
-                     "MYBATTLESTATUS")
-            battle-status (if (and (not is-bot) (:mode battle-status))
-                            (assoc battle-status :ready true)
-                            battle-status)]
+                     "MYBATTLESTATUS")]
         (log/debug player-name (pr-str battle-status) team-color)
         (client-message client-data
           (str prefix
@@ -2640,8 +2637,12 @@
       (if (or is-me is-bot)
         (let [mode (if (contains? data :value)
                      (:value data)
-                     (not event))]
-          (update-battle-status client-data data (assoc (:battle-status id) :mode mode) (:team-color id)))
+                     (not event))
+              battle-status (assoc (:battle-status id) :mode mode)
+              battle-status (if (and (not is-bot) (:mode battle-status))
+                              (assoc battle-status :ready true)
+                              battle-status)]
+          (update-battle-status client-data data battle-status (:team-color id)))
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))

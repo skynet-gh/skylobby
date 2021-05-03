@@ -1024,6 +1024,7 @@
            :indexed-map indexed-map
            :indexed-mod indexed-mod
            :map-update-tasks map-update-tasks
+           :me me
            :mod-details-tasks mod-details-tasks
            :mod-update-tasks mod-update-tasks
            :my-battle-status my-battle-status
