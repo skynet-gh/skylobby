@@ -689,7 +689,8 @@
 
 
 (defn fix-missing-resource-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:id ::state-watcher}
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
     (tufte/p :fix-missing-resource-watcher
       (when (not= (fix-resource-relevant-keys old-state)
                   (fix-resource-relevant-keys new-state))
@@ -723,7 +724,8 @@
 
 
 (defn fix-spring-isolation-dir-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:id ::state-watcher}
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
     (tufte/p :fix-spring-isolation-dir-watcher
       (when (not= old-state new-state)
         (try
@@ -736,7 +738,8 @@
             (log/error e "Error in :fix-spring-isolation-dir state watcher")))))))
 
 (defn spring-isolation-dir-changed-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:id ::state-watcher}
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
     (tufte/p :spring-isolation-dir-changed-watcher
       (when (not= old-state new-state)
         (try
@@ -764,7 +767,8 @@
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:id ::state-watcher}
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
     (tufte/p :auto-get-resources-watcher
       (when (not= (auto-get-resources-relevant-keys old-state)
                   (auto-get-resources-relevant-keys new-state))
@@ -784,7 +788,8 @@
 
 
 (defn fix-selected-server-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:id ::state-watcher}
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
     (tufte/p :fix-selected-server-watcher
       (when (not= (fix-selected-server-relevant-keys old-state)
                   (fix-selected-server-relevant-keys new-state))
@@ -854,18 +859,21 @@
   #_
   (add-watch state-atom :battle-map-details
     (fn [_k state-atom old-state new-state]
-      (tufte/profile {:id ::state-watcher}
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
         (tufte/p :battle-map-details-watcher
           (battle-map-details-watcher _k state-atom old-state new-state)))))
   #_
   (add-watch state-atom :battle-mod-details
     (fn [_k state-atom old-state new-state]
-      (tufte/profile {:id ::state-watcher}
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
         (tufte/p :battle-mod-details-watcher
           (battle-mod-details-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :replay-map-and-mod-details
     (fn [_k state-atom old-state new-state]
-      (tufte/profile {:id ::state-watcher}
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
         (tufte/p :replay-map-and-mod-details-watcher
           (replay-map-and-mod-details-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
@@ -876,7 +884,8 @@
   #_
   (add-watch state-atom :update-battle-status-sync
     (fn [_k state-atom old-state new-state]
-      (tufte/profile {:id ::state-watcher}
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
         (tufte/p :update-battle-status-sync-watcher
           (update-battle-status-sync-watcher))))))
 
@@ -1396,7 +1405,8 @@
           (fn [_chimestamp]
             (let [old-state @old-state-atom
                   new-state @state-atom]
-              (tufte/profile {:id ::chimer}
+              (tufte/profile {:dynamic? true
+                              :id ::chimer}
                 (tufte/p k
                   (watcher-fn k state-atom old-state new-state)))
               (reset! old-state-atom new-state)))
