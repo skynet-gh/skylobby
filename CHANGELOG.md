@@ -39,6 +39,11 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.32]
+
+- Fix modoptions missing
+- Add map description
+
 ### [0.3.31]
 
 - Fix occasional crash due to profiler concurrency

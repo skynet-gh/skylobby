@@ -601,6 +601,10 @@
              :items u/minimap-types
              :on-value-changed {:event/type :spring-lobby/assoc
                                 :key :minimap-type}}]}
+          {:fx/type :label
+           :text (str
+                   (when-let [description (-> battle-map-details :mapinfo :description)]
+                     description))}
           {:fx/type :h-box
            :style {:-fx-max-width u/minimap-size}
            :children
@@ -1042,6 +1046,7 @@
        :battle-details battle-details
        :battle-map battle-map
        :battle-map-details battle-map-details
+       :battle-mod-details battle-mod-details
        :channel-name channel-name
        :client-data client-data
        :drag-allyteam drag-allyteam
