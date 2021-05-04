@@ -166,15 +166,20 @@
 
 
 (defn- try-inner-lua
-  [f filename]
-  (try
-    (when-let [inner (rapid-inner f filename)]
-      (let [contents (slurp (:content-bytes inner))]
-        (when-not (string/blank? contents)
-          (lua/read-modinfo contents))))
-    (catch Exception e
-      (log/trace e "Error reading" filename "in" f)
-      (log/warn "Error reading" filename "in" f))))
+  ([f filename]
+   (try-inner-lua f filename nil))
+  ([f filename {:keys [quiet] :or {quiet true}}]
+   (try
+     (when-let [inner (rapid-inner f filename)]
+       (let [contents (slurp (:content-bytes inner))]
+         (when-not (string/blank? contents)
+           (lua/read-modinfo contents))))
+     (catch Exception e
+       (if quiet
+         (do
+           (log/trace e "Error reading" filename "in" f)
+           (log/warn "Error reading" filename "in" f))
+         (log/warn e "Error reading" filename "in" f))))))
 
 (defn- try-inner-script
   [f filename]
@@ -190,7 +195,7 @@
   ([^java.io.File f]
    (read-sdp-mod f nil))
   ([^java.io.File f {:keys [modinfo-only]}]
-   (let [modinfo (try-inner-lua f "modinfo.lua")] ; TODO don't parse the .sdp over and over
+   (let [modinfo (try-inner-lua f "modinfo.lua" {:quiet false})] ; TODO don't parse the .sdp over and over
      (when-not modinfo
        (throw (ex-info "Could not read mod" {:file f})))
      (merge
@@ -199,7 +204,7 @@
         :modinfo modinfo}
        (when-not modinfo-only
          (when modinfo
-           {:modoptions (try-inner-lua f "modoptions.lua")
+           {:modoptions (try-inner-lua f "modoptions.lua" {:quiet false})
             :engineoptions (try-inner-lua f "engineoptions.lua")
             :luaai (try-inner-lua f "luaai.lua")
             :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")

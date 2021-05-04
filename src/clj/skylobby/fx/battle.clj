@@ -1042,6 +1042,7 @@
        :battle-details battle-details
        :battle-map battle-map
        :battle-map-details battle-map-details
+       :battle-mod-details battle-mod-details
        :channel-name channel-name
        :client-data client-data
        :drag-allyteam drag-allyteam
