@@ -134,7 +134,8 @@
                {:path log-path
                 :max-size 100000000
                 :backlog 9
-                :stacktrace-fonts {}})}}))
+                :stacktrace-fonts {}})}})
+  (log/handle-uncaught-jvm-exceptions!))
 
 
 (defmacro try-log
