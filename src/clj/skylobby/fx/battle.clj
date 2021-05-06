@@ -115,6 +115,7 @@
                                           :channel-name channel-name
                                           :client-data client-data
                                           :modoption-key (:key i)
+                                          :modoption-type (:type i)
                                           :singleplayer singleplayer}
                     :disable (and (not singleplayer) am-spec)}}}}
                 "number"
@@ -141,7 +142,8 @@
                                         :channel-name channel-name
                                         :client-data client-data
                                         :modoption-key (:key i)
-                                        :modoption-type (:type i)}}}}}}
+                                        :modoption-type (:type i)
+                                        :singleplayer singleplayer}}}}}}
                 "list"
                 {:text ""
                  :graphic
@@ -162,7 +164,9 @@
                                        :am-host am-host
                                        :channel-name channel-name
                                        :client-data client-data
-                                       :modoption-key (:key i)}
+                                       :modoption-key (:key i)
+                                       :modoption-type (:type i)
+                                       :singleplayer singleplayer}
                     :items (or (map (comp :key second) (:items i))
                                [])}}}}
                 {:text (str (:def i))})))}}]}]}))
@@ -735,7 +739,7 @@
         :am-spec am-spec
         :battle battle
         :channel-name channel-name
-        :client-data client-data
+        :client-data (when-not singleplayer client-data)
         :modoptions (:modoptions battle-mod-details)
         :singleplayer singleplayer}]}}
     {:fx/type :tab

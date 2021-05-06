@@ -528,7 +528,17 @@
                             :downloadable mod-downloadable
                             :spring-isolation-dir spring-root})
                          :else
-                         nil))]]
+                         nil))
+                     (when
+                       (and (not rapid-id)
+                            (-> new-server :battle :battle-id)
+                            (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))
+                              ; ^ only do when first joining a battle
+                       (log/info "Adding task to update rapid looking for" battle-modname)
+                       {::task-type ::update-rapid
+                        :engine-version battle-version
+                        :mod-name battle-modname
+                        :spring-isolation-dir spring-root})]]
          (filter some? tasks)))
       (catch Exception e
         (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
@@ -2815,6 +2825,7 @@
       (swap! *state
         (fn [state]
           (-> state
+              (assoc :rapid-updated (u/curr-millis))
               (assoc :rapid-repos rapid-repos)
               (update :rapid-data-by-hash merge rapid-data-by-hash)
               (update :rapid-data-by-id merge rapid-data-by-id)

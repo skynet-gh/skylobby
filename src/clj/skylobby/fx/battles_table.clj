@@ -73,7 +73,7 @@
        [
         {:fx/type :table-column
          :text "Game"
-         :pref-width 200
+         :pref-width 220
          :cell-value-factory :battle-modname
          :cell-factory
          {:fx/cell-type :table-cell

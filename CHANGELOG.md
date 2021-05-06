@@ -39,6 +39,13 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.33]
+
+- Add rapid update to auto resource tasks
+- Add uncaught error logging handler
+- Fix modoptions in singleplayer
+- Make rapid package update message more clear
+
 ### [0.3.32]
 
 - Fix modoptions missing
