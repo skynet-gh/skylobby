@@ -133,18 +133,17 @@
                                  (contains? rapid-tasks rapid-id))]
              [{:severity 2
                :text "rapid"
-               :human-text (if rapid-id
-                             (if engine-file
+               :human-text
+                           (if engine-file
+                             (if rapid-id
                                (cond
-                                 rapid-update-tasks "Rapid updating..."
+                                 rapid-update-tasks "Updating rapid packages..."
                                  in-progress (str (u/download-progress rapid-download))
                                  :else (str "Download rapid " rapid-id))
-                               "Needs engine first to download with rapid")
-                             (if rapid-update-tasks
-                               "Rapid updating..."
-                               (if engine-file
-                                 "No rapid download, update rapid"
-                                 "Needs engine first to download with rapid")))
+                               (if rapid-update-tasks
+                                 "Rapid updating..."
+                                 "No rapid download found, update packages"))
+                             "Needs engine first to download with rapid")
                :tooltip (if rapid-id
                           (if engine-file
                             (if package-exists
