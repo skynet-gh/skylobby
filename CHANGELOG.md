@@ -39,6 +39,10 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.34]
+
+- Fix resource churn for replays and battle mods
+
 ### [0.3.33]
 
 - Add rapid update to auto resource tasks
