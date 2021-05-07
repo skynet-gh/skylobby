@@ -29,7 +29,7 @@
                      :file (fs/mods-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
                       :task {:spring-lobby/task-type :spring-lobby/reconcile-mods}}
-     :refresh-in-progress mod-update-tasks
+     :refresh-in-progress (seq mod-update-tasks)
      :issues
      (concat
        (let [severity (cond
@@ -135,13 +135,12 @@
                :text "rapid"
                :human-text
                            (if engine-file
-                             (if rapid-id
-                               (cond
-                                 rapid-update-tasks "Updating rapid packages..."
-                                 in-progress (str (u/download-progress rapid-download))
-                                 :else (str "Download rapid " rapid-id))
-                               (if rapid-update-tasks
-                                 "Rapid updating..."
+                             (if rapid-update-tasks
+                               "Updating rapid packages..."
+                               (if rapid-id
+                                 (if in-progress
+                                   (str (u/download-progress rapid-download))
+                                   (str "Download rapid " rapid-id))
                                  "No rapid download found, update packages"))
                              "Needs engine first to download with rapid")
                :tooltip (if rapid-id

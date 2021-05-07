@@ -197,7 +197,7 @@
            chat-auto-scroll client-data downloadables-by-url engine-details engine-file
            engine-filter engine-update-tasks engine-version engines extract-tasks http-download
            host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
-           map-update-tasks maps me message-drafts mod-details-tasks mod-filter mod-update-tasks
+           map-update-tasks maps me message-drafts mod-filter mod-update-tasks
            mods my-battle-status my-client-status my-player parsed-replays-by-path rapid-data-by-id
            rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key singleplayer
            spring-isolation-dir tasks-by-type team-counts username]
@@ -419,7 +419,6 @@
                       :engine-details engine-details
                       :engine-file engine-file
                       :indexed-mod indexed-mod
-                      :mod-details-tasks mod-details-tasks
                       :mod-update-tasks mod-update-tasks
                       :rapid-tasks-by-id rapid-tasks-by-id}
                      (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))
@@ -961,11 +960,10 @@
                               (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
                               (mapcat second)
                               set)
-        mod-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-mods)
+        mod-update-tasks (->> tasks-by-type
+                              (filter (comp #{:spring-lobby/mod-details :spring-lobby/reconcile-mods} first))
+                              (mapcat second)
                               set)
-        mod-details-tasks (->> (get tasks-by-type :spring-lobby/mod-details)
-                               (filter (comp #{battle-modname} :mod-name))
-                               set)
         rapid-tasks-by-id (->> (get tasks-by-type :spring-lobby/rapid-download)
                                (map (juxt :rapid-id identity))
                                (into {}))
@@ -1033,7 +1031,6 @@
            :indexed-mod indexed-mod
            :map-update-tasks map-update-tasks
            :me me
-           :mod-details-tasks mod-details-tasks
            :mod-update-tasks mod-update-tasks
            :my-battle-status my-battle-status
            :my-client-status my-client-status

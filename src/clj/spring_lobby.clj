@@ -196,8 +196,8 @@
      :file-events (initial-file-events)
      :minimap-type (first fx.minimap/minimap-types)
      :replay-minimap-type (first fx.minimap/minimap-types)
-     :map-details (cache/fifo-cache-factory {} :threshold 8)
-     :mod-details (cache/fifo-cache-factory {} :threshold 8)}))
+     :map-details (cache/fifo-cache-factory {} :threshold 16)
+     :mod-details (cache/fifo-cache-factory {} :threshold 16)}))
 
 
 (def ^:dynamic *state (atom {}))
@@ -577,10 +577,12 @@
                          (and
                            (or (not (some (comp #{new-map} :map-name) old-maps)))
                            map-exists)))
+            (log/info "Mod details update for" server-key)
             (add-task! state-atom
               {::task-type ::map-details
                :map-name new-map
                :map-file (:file map-exists)
+               :source :battle-map-details-watcher
                :tries tries}))))
       (catch Exception e
         (log/error e "Error in :battle-map-details state watcher")))))
@@ -607,22 +609,23 @@
               mod-name-set (set [new-mod new-mod-sans-git])
               filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
               mod-exists (->> new-mods (filter filter-fn) first)
-              mod-details (-> new-state :mod-details (get (fs/canonical-path (:file mod-exists))))
+              mod-details (resource/cached-details (:mod-details new-state) mod-exists)
               all-tasks (concat tasks (vals current-tasks))]
           (when (or (and (and (not (string/blank? new-mod))
-                              (not (seq mod-details)))
+                              (not (resource/details? mod-details)))
                          (or (not= old-battle-id new-battle-id)
                              (not= old-mod new-mod)
                              (and
                                (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
                                mod-exists)))
-                    (and
-                      (or (not (some (comp #{new-mod} :mod-name) old-mods)))
-                      mod-exists))
+                    (and (or (not (some filter-fn old-mods)))
+                         mod-exists))
+            (log/info "Mod details update for" server-key)
             (add-task! state-atom
               {::task-type ::mod-details
                :mod-name new-mod
-               :mod-file (:file mod-exists)}))))
+               :mod-file (:file mod-exists)
+               :source :battle-mod-details-watcher}))))
       (catch Exception e
         (log/error e "Error in :battle-mod-details state watcher")))))
 
@@ -651,12 +654,6 @@
             new-mod (:gametype new-game)
             new-map (:mapname new-game)
 
-            map-details (-> new-state :map-details (get new-map))
-            mod-details (-> new-state :mod-details (get new-mod))
-
-            map-changed (not= new-map (:map-name map-details))
-            mod-changed (not= new-mod (:mod-name mod-details))
-
             spring-root-path (fs/canonical-path spring-isolation-dir)
 
             old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
@@ -670,30 +667,40 @@
             filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
 
             map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-            mod-exists (->> new-mods (filter filter-fn) first)]
-        (when (or (and (or (not= old-replay-path new-replay-path)
-                           (not= old-mod new-mod))
-                       (and (not (string/blank? new-mod))
-                            (or (not (seq mod-details))
-                                mod-changed)))
-                  (and
-                    (or (not (some filter-fn old-mods)))
-                    mod-exists))
-          (add-task! state-atom
-            {::task-type ::mod-details
-             :mod-name new-mod
-             :mod-file (:file mod-exists)}))
-        (when (or (and (or (not= old-replay-path new-replay-path)
-                           (not= old-map new-map))
-                       (and (not (string/blank? new-map))
-                            (or (not (seq map-details))
-                                map-changed)))
-                  (and
-                    (or (not (some (comp #{new-map} :map-name) old-maps)))
-                    map-exists))
-          (add-task! *state {::task-type ::map-details
-                             :map-name new-map
-                             :map-file (:file map-exists)})))
+            mod-exists (->> new-mods (filter filter-fn) first)
+
+            map-details (resource/cached-details (:map-details new-state) map-exists)
+            mod-details (resource/cached-details (:mod-details new-state) mod-exists)
+
+            map-changed (not= new-map (:map-name map-details))
+            mod-changed (not= new-mod (:mod-name mod-details))
+
+            tasks [
+                   (when (or (and (or (not= old-replay-path new-replay-path)
+                                      (not= old-mod new-mod))
+                                  (and (not (string/blank? new-mod))
+                                       (or (not (resource/details? mod-details))
+                                           mod-changed)))
+                             (and
+                               (or (not (some filter-fn old-mods)))
+                               mod-exists))
+                     {::task-type ::mod-details
+                      :mod-name new-mod
+                      :mod-file (:file mod-exists)})
+                   (when (or (and (or (not= old-replay-path new-replay-path)
+                                      (not= old-map new-map))
+                                  (and (not (string/blank? new-map))
+                                       (or (not (resource/details? map-details))
+                                           map-changed)))
+                             (and
+                               (or (not (some (comp #{new-map} :map-name) old-maps)))
+                               map-exists))
+                     {::task-type ::map-details
+                      :map-name new-map
+                      :map-file (:file map-exists)})]]
+        (when-let [tasks (->> tasks (filter some?) seq)]
+          (log/info "Adding" (count tasks) "for replay resources")
+          (add-tasks! state-atom tasks)))
       (catch Exception e
         (log/error e "Error in :replay-map-and-mod-details state watcher")))))
 
