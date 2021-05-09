@@ -283,12 +283,15 @@
 (defmethod handle "SAIDPRIVATE" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel username)]
-    (swap! state-atom update-in [:by-server server-url]
+    (swap! state-atom
       (fn [state]
         (-> state
-            (update-in [:channels channel-name :messages]
-              (u/update-chat-messages-fn username message))
-            (assoc-in [:my-channels channel-name] {})
+            (update-in [:by-server server-url]
+              (fn [state]
+                (-> state
+                    (update-in [:channels channel-name :messages]
+                      (u/update-chat-messages-fn username message))
+                    (assoc-in [:my-channels channel-name] {}))))
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channel channel-name))))))
 
@@ -303,12 +306,15 @@
 (defmethod handle "SAIDPRIVATEEX" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel username)]
-    (swap! state-atom update-in [:by-server server-url]
+    (swap! state-atom
       (fn [state]
         (-> state
-            (update-in [:channels channel-name :messages]
-              (u/update-chat-messages-fn username message true))
-            (assoc-in [:my-channels channel-name] {})
+            (update-in [:by-server server-url]
+              (fn [state]
+                (-> state
+                    (update-in [:channels channel-name :messages]
+                      (u/update-chat-messages-fn username message true))
+                    (assoc-in [:my-channels channel-name] {}))))
             (assoc :selected-tab-main "chat")
             (assoc :selected-tab-channel channel-name))))))
 
