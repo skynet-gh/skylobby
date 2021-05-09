@@ -57,9 +57,10 @@
                        (let [scroll-pos (if auto-scroll
                                           ##Inf
                                           (.getVvalue scroll-pane))]
-                         (doto scroll-pane
-                           (some-> .getParent .layout)
-                           (.setVvalue scroll-pos)))))
+                         (when auto-scroll
+                           (doto scroll-pane
+                             (some-> .getParent .layout)
+                             (.setVvalue scroll-pos))))))
                    fx.lifecycle/scalar
                    :default [[] 0])}))
 

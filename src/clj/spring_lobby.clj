@@ -3212,6 +3212,17 @@
     (swap! *state dissoc (first path))
     (swap! *state update-in (drop-last path) dissoc (last path))))
 
+(defmethod event-handler ::enable-auto-scroll-if-at-bottom
+  [{:fx/keys [event]}]
+  (when (neg? (.getDeltaY event))
+    (log/info "Scrolled to bottom of chat, enabling auto-scroll")
+    (swap! *state assoc :chat-auto-scroll true)))
+
+(defmethod event-handler ::disable-auto-scroll
+  [_e]
+  (log/info "Scrolled up in chat, enabling auto-scroll")
+  (swap! *state assoc :chat-auto-scroll false))
+
 
 (defmethod event-handler ::singleplayer-engine-changed [{:fx/keys [event] :keys [engine-version]}]
   (let [engine-version (or engine-version event)]
