@@ -39,6 +39,11 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.35]
+
+- Enable/disable chat auto scroll when at bottom/scrolled up
+- Attempt to fix issue with chat moving on new message when scrolled up
+
 ### [0.3.34]
 
 - Fix resource churn for replays and battle mods
