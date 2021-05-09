@@ -55,7 +55,8 @@
                  [{:fx/type :text
                    :text "\n"}])))))))
 
-(defn- channel-view-history [{:keys [chat-auto-scroll channel-name messages select-mode server-key]}]
+(defn- channel-view-history-impl
+  [{:keys [chat-auto-scroll channel-name messages select-mode server-key]}]
   (let [messages (reverse messages)]
     (if select-mode
       (let [text (->> messages
@@ -90,6 +91,7 @@
           :style {:-fx-min-width 200
                   :-fx-pref-width 200}
           :fit-to-width true
+          :on-scroll {:event/type :spring-lobby/enable-auto-scroll-if-at-bottom}
           :context-menu
           {:fx/type :context-menu
            :items
@@ -100,9 +102,16 @@
                          :value true}}]}
           :content
           {:fx/type :text-flow
-           :on-scroll (fn [e] (some-> e .getTarget .getParent .requestFocus))
+           :on-scroll {:event/type :spring-lobby/disable-auto-scroll}
            :style {:-fx-font-family monospace-font-family}
            :children texts}}}))))
+
+(defn channel-view-history
+  [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :channel-view-history
+      (channel-view-history-impl state))))
 
 (defn- channel-view-input [{:keys [channel-name chat-auto-scroll client-data message-draft server-key]}]
   {:fx/type :h-box
@@ -172,7 +181,7 @@
 
 (defn channel-view-impl
   [{:keys [channel-name channels chat-auto-scroll client-data hide-users message-draft server-key]}]
-  (let [{:keys [messages select-mode users]} (get channels channel-name)]
+  (let [{:keys [users] :as channel-data} (get channels channel-name)]
     {:fx/type :h-box
      :children
      (concat
@@ -180,13 +189,13 @@
          :h-box/hgrow :always
          :style {:-fx-font-size 16}
          :children
-         [{:fx/type channel-view-history
-           :v-box/vgrow :always
-           :chat-auto-scroll chat-auto-scroll
-           :channel-name channel-name
-           :messages messages
-           :select-mode select-mode
-           :server-key server-key}
+         [(merge
+            {:fx/type channel-view-history
+             :v-box/vgrow :always
+             :chat-auto-scroll chat-auto-scroll
+             :channel-name channel-name
+             :server-key server-key}
+            channel-data)
           {:fx/type channel-view-input
            :channel-name channel-name
            :chat-auto-scroll chat-auto-scroll
