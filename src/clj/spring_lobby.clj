@@ -994,6 +994,7 @@
                              (let [replays-by-path (if (map? old-replays) old-replays {})]
                                (->> replays-by-path
                                     (filter (comp all-paths first)) ; remove missing files
+                                    (filter (comp :game-id :header second)) ; re-parse if no game id
                                     (remove (comp zero? :file-size second)) ; remove empty files
                                     (remove (comp #{:invalid} :game-type second)) ; remove invalid
                                     (concat parsed-replays)
