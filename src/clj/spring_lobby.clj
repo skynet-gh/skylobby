@@ -203,6 +203,9 @@
 (def ^:dynamic *state (atom {}))
 
 
+(def ^:dynamic disable-update-check false)
+
+
 (defn- client-message [{:keys [client] :as client-data} message]
   (message/send-message client message)
   (u/append-console-log *state (u/server-key client-data) :client message))
@@ -1383,7 +1386,9 @@
             (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
             (java-time/duration 1 :hours))
           (fn [_chimestamp]
-            (check-app-update state-atom))
+            (if disable-update-check
+              (log/info "App update check disabled, skipping")
+              (check-app-update state-atom)))
           {:error-handler
            (fn [e]
              (log/error e "Error checking for app update")

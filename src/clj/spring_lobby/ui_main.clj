@@ -27,6 +27,7 @@
    [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
+   [nil "--no-update-check" "Diable skylobby self update check"]
    [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
     :assoc-fn (fn [m k v]
                 (update m k conj v))]
@@ -44,6 +45,8 @@
                              (string/ends-with? first-arg-filename ".sdfz")
                              (fs/exists? first-arg-as-file))]
     (try
+      (when (:no-update-check options)
+        (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
       (when-let [app-root-override (:skylobby-root options)]
         (alter-var-root #'fs/app-root-override (constantly app-root-override)))
       (when-let [replay-sources (seq (:replay-source options))]
