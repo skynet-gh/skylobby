@@ -6,6 +6,7 @@
     [org.clojars.smee.binary.core :as b]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring.script :as spring-script]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))
@@ -68,7 +69,7 @@
           (fn [header]
             (-> header
                 (update :engine-version sanitize-replay-engine)
-                (dissoc :game-id))))
+                (update :game-id u/bytes->hex))))
         (update :body
           (fn [body]
             (-> body

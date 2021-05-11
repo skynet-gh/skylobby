@@ -127,7 +127,7 @@
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
    :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
+   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
    :username])
 
@@ -148,7 +148,7 @@
 
 (defn- select-replays [state]
   (select-keys state
-    [:bar-replays-page :online-bar-replays]))
+    [:online-bar-replays]))
 
 (def state-to-edn
   [{:select-fn select-config
@@ -201,6 +201,9 @@
 
 
 (def ^:dynamic *state (atom {}))
+
+
+(def ^:dynamic disable-update-check false)
 
 
 (defn- client-message [{:keys [client] :as client-data} message]
@@ -994,6 +997,7 @@
                              (let [replays-by-path (if (map? old-replays) old-replays {})]
                                (->> replays-by-path
                                     (filter (comp all-paths first)) ; remove missing files
+                                    (filter (comp :game-id :header second)) ; re-parse if no game id
                                     (remove (comp zero? :file-size second)) ; remove empty files
                                     (remove (comp #{:invalid} :game-type second)) ; remove invalid
                                     (concat parsed-replays)
@@ -1382,7 +1386,9 @@
             (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
             (java-time/duration 1 :hours))
           (fn [_chimestamp]
-            (check-app-update state-atom))
+            (if disable-update-check
+              (log/info "App update check disabled, skipping")
+              (check-app-update state-atom)))
           {:error-handler
            (fn [e]
              (log/error e "Error checking for app update")

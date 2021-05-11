@@ -277,13 +277,17 @@
              [sync-pane]))}])}))
 
 
+(def replay-id
+  (some-fn :id (comp :game-id :header)))
+
+
 (defn replays-table
   [{:keys [copying download-tasks engines engines-by-version engine-update-tasks extract-tasks
            extracting file-cache http-download http-download-tasks import-tasks
            maps-by-version mods-by-version rapid-data-by-version rapid-download
            rapid-update-tasks replay-downloads-by-engine replay-downloads-by-map
            replay-downloads-by-mod rapid-tasks replay-imports-by-map replay-imports-by-mod
-           replays-window-details replays replays-watched selected-replay spring-isolation-dir
+           replays-window-details replays replays-tags replays-watched selected-replay spring-isolation-dir
            tasks-by-type
            time-zone-id]}]
   (let [
@@ -312,7 +316,18 @@
         :columns
         (concat
           (when replays-window-details
-            [{:fx/type :table-column
+            [
+             {:fx/type :table-column
+              :text "ID"
+              :resizable true
+              :pref-width 80
+              :cell-value-factory replay-id
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [id]
+                 {:text (str id)})}}
+             {:fx/type :table-column
               :text "Source"
               :resizable true
               :pref-width 80
@@ -456,6 +471,26 @@
                                    (.toMinutesPart duration)
                                    (.toSecondsPart duration)))]
                  {:text (str formatted)}))}}
+           {:fx/type :table-column
+            :text "Tag"
+            :sortable false
+            :resizable false
+            :pref-width 140
+            :cell-value-factory identity
+            :cell-factory
+            {:fx/cell-type :table-cell
+             :describe
+             (fn [replay]
+               (let [id (replay-id replay)]
+                 {:text ""
+                  :graphic
+                  {:fx/type ext-recreate-on-key-changed
+                   :key (str id)
+                   :desc
+                   {:fx/type :text-field
+                    :text (str (get replays-tags id))
+                    :on-text-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:replays-tags id]}}}}))}}
            {:fx/type :table-column
             :text "Watched"
             :sortable false
@@ -719,15 +754,15 @@
    :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
    :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs
-   :replays-watched :replays-window-details :selected-replay-file :selected-replay-id
+   :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
+   :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id
    :settings-button :show-replays :spring-isolation-dir :springfiles-search-results])
 
 (defn replays-window-impl
   [{:keys [bar-replays-page by-spring-root css extra-replay-sources file-cache
            filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
            filter-replay-source filter-replay-type map-details mod-details new-online-replays-count
-           on-close-request online-bar-replays replays-filter-specs
+           on-close-request online-bar-replays replays-filter-specs replays-tags replays-window-dedupe
            replays-window-details parsed-replays-by-path screen-bounds selected-replay-file
            selected-replay-id show-replays spring-isolation-dir tasks-by-type title]
     :as state}]
@@ -807,7 +842,7 @@
                                true
                                (every?
                                  (some-fn
-                                   (partial includes-term? (:filename replay))
+                                   (partial includes-term? (get replays-tags (replay-id replay)))
                                    (partial includes-term? (-> replay :header :engine-version))
                                    (partial includes-term? (-> replay :body :script-data :game :gametype))
                                    (partial includes-term? (-> replay :body :script-data :game :mapname))
@@ -817,10 +852,30 @@
                                                             (filter
                                                               (if replays-filter-specs
                                                                 (constantly true)
-                                                                (comp #{0 "0"} :spectator second)))
-                                                            (map (comp sanitize-replay-filter :name second)))]
+                                                                (some-fn
+                                                                  (comp #{0 "0"} :spectator second)
+                                                                  (comp not #(contains? % :spectator) second))))
+                                                            (map (comp #(some % [:name :username]) second))
+                                                            (map sanitize-replay-filter))]
                                        (some #(includes-term? % term) players))))
                                  filter-terms)))))
+            replays (if replays-window-dedupe
+                      (:replays
+                        (reduce ; dedupe by id
+                          (fn [agg curr]
+                            (let [id (replay-id curr)]
+                              (cond
+                                (not id)
+                                (update agg :replays conj curr)
+                                (contains? (:seen-ids agg) id) agg
+                                :else
+                                (-> agg
+                                    (update :replays conj curr)
+                                    (update :seen-ids conj id)))))
+                          {:replays []
+                           :seen-ids #{}}
+                          replays))
+                      replays)
             selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
                                 (get online-bar-replays selected-replay-id))
             engines-by-version (into {} (map (juxt :engine-version identity) engines))
@@ -876,7 +931,7 @@
                   {:fx/type :text-field
                    :style {:-fx-min-width 400}
                    :text (str filter-replay)
-                   :prompt-text "Filter by filename, engine, map, game, player"
+                   :prompt-text "Filter by filename, engine, map, game, player, or tag"
                    :on-text-changed {:event/type :spring-lobby/assoc
                                      :key :filter-replay}}]
                  (when-not (string/blank? filter-replay)
@@ -904,6 +959,17 @@
                      :h-box/margin 8
                      :on-selected-changed {:event/type :spring-lobby/assoc
                                            :key :replays-filter-specs}}]}
+                  {:fx/type :h-box
+                   :alignment :center-left
+                   :children
+                   [
+                    {:fx/type :label
+                     :text " Dedupe: "}
+                    {:fx/type :check-box
+                     :selected (boolean replays-window-dedupe)
+                     :h-box/margin 8
+                     :on-selected-changed {:event/type :spring-lobby/assoc
+                                           :key :replays-window-dedupe}}]}
                   {:fx/type :h-box
                    :alignment :center-left
                    :children
