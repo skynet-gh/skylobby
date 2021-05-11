@@ -39,6 +39,13 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.36]
+
+- Add tag string field for replays
+- Add dedupe of replays by id
+- Fix filter by player name for online replays
+- Add `--no-update-check` cli flag for embedded skylobby
+
 ### [0.3.35]
 
 - Enable/disable chat auto scroll when at bottom/scrolled up
