@@ -127,7 +127,7 @@
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
    :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo
+   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
    :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
    :username])
 
@@ -148,7 +148,7 @@
 
 (defn- select-replays [state]
   (select-keys state
-    [:bar-replays-page :online-bar-replays]))
+    [:online-bar-replays]))
 
 (def state-to-edn
   [{:select-fn select-config
