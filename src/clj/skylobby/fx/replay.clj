@@ -770,7 +770,7 @@
 
 
 (def replays-window-keys
-  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css
+  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css :downloadables-by-url
    :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
    :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
    :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
