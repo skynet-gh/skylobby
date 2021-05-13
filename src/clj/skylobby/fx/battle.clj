@@ -836,17 +836,18 @@
           :column-resize-policy :constrained
           :items (or (some->> (fs/spring-settings-root)
                               fs/list-files ; TODO IO in render
-                              (filter fs/is-directory?))
+                              (filter fs/is-directory?)
+                              reverse)
                      [])
           :columns
           [{:fx/type :table-column
             :text "Directory"
-            :cell-value-factory identity
+            :cell-value-factory fs/filename
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
-             (fn [i]
-               {:text (str (fs/filename i))})}}
+             (fn [filename]
+               {:text (str filename)})}}
            {:fx/type :table-column
             :text "Action"
             :cell-value-factory identity
@@ -864,7 +865,18 @@
                   :confirmed true ; TODO confirm
                   :dest-dir spring-isolation-dir
                   :file-cache file-cache
-                  :source-dir i}}})}}]}]})}]})
+                  :source-dir i}}})}}]}]})}
+    {:fx/type :tab
+     :graphic {:fx/type :label
+               :text "uikeys"}
+     :closable false
+     :content
+     {:fx/type :v-box
+      :children
+      [{:fx/type :button
+        :text "show window"
+        :on-action {:event/type :spring-lobby/assoc
+                    :key :show-uikeys-window}}]}}]})
 
 
 (defn battle-players-and-bots

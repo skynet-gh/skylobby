@@ -317,6 +317,7 @@
         (concat
           (when replays-window-details
             [
+             #_
              {:fx/type :table-column
               :text "ID"
               :resizable true
@@ -512,239 +513,260 @@
                     :on-selected-changed {:event/type :spring-lobby/assoc-in
                                           :path [:replays-watched path]}}}}))}}
            {:fx/type :table-column
-            :text "Watch"
+            :text "Actions"
             :sortable false
             :resizable true
-            :min-width 100
+            :min-width 200
             :pref-width 200
             :cell-value-factory identity
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
              (fn [i]
-               (let [engine-version (-> i :header :engine-version)
-                     matching-engine (get engines-by-version engine-version)
-                     engine-downloadable (get replay-downloads-by-engine engine-version)
-                     mod-version (-> i :body :script-data :game :gametype)
-                     matching-mod (get mods-by-version mod-version)
-                     mod-downloadable (get replay-downloads-by-mod mod-version)
-                     mod-importable (get replay-imports-by-mod mod-version)
-                     mod-rapid (get rapid-data-by-version mod-version)
-                     map-name (-> i :body :script-data :game :mapname)
-                     matching-map (get maps-by-version map-name)
-                     map-downloadable (get replay-downloads-by-map map-name)
-                     map-importable (get replay-imports-by-map map-name)
-                     mod-rapid-download (get rapid-download (:id mod-rapid))]
-                 {:text ""
-                  :style {:-fx-alignment "CENTER-RIGHT"}
-                  :graphic
-                  (cond
-                    (:id i) ; BAR online replay
-                    (let [fileName (:fileName i)
-                          download-url (when fileName (http/bar-replay-download-url fileName))
-                          {:keys [running] :as download} (get http-download download-url)
-                          in-progress (or running
-                                          (contains? download-tasks (:id i)))]
-                      {:fx/type :button
-                       :text
-                       (if in-progress
-                         (str (u/download-progress download))
-                         " Download replay")
-                       :disable (boolean in-progress)
-                       :on-action {:event/type :spring-lobby/add-task
-                                   :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
-                                          :id (:id i)
-                                          :spring-isolation-dir spring-isolation-dir}}
+               {:text ""
+                :graphic
+                {:fx/type :h-box
+                 :children
+                 (concat
+                   (when-let [file (:file i)]
+                     [{:fx/type :button
+                       :on-action {:event/type :spring-lobby/desktop-browse-dir
+                                   :file file}
                        :graphic
                        {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-download:16:white"}})
-                    (and matching-engine matching-mod matching-map)
-                    {:fx/type :button
-                     :text " Watch"
-                     :on-action
-                     {:event/type :spring-lobby/watch-replay
-                      :engines engines
-                      :engine-version engine-version
-                      :replay i
-                      :spring-isolation-dir spring-isolation-dir}
-                     :graphic
-                     {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-movie:16:white"}}
-                    (and (not matching-engine) engine-update-tasks)
-                    {:fx/type :button
-                     :text " Engines updating..."
-                     :disable true}
-                    (and (not matching-engine) engine-downloadable)
-                    (let [source (resource/resource-dest spring-isolation-dir engine-downloadable)]
-                      (if (fs/file-exists? file-cache source)
-                        (let [dest (io/file spring-isolation-dir "engine"
-                                            (fs/without-extension
-                                              (:resource-filename engine-downloadable)))
-                              in-progress (boolean
-                                            (or (get extracting (fs/canonical-path source))
-                                                (contains? extract-tasks (fs/canonical-path source))))]
-                          {:fx/type :button
-                           :text (if in-progress "Extracting..." " Extract engine")
-                           :disable in-progress
+                        :icon-literal "mdi-folder:16:white"}}])
+                   (when-let [id (replay-id i)]
+                     (let [mod-version (-> i :body :script-data :game :gametype)]
+                       (when (and (not (string/blank? mod-version))
+                                  (string/starts-with? mod-version "Beyond All Reason"))
+                         [{:fx/type :button
+                           :on-action {:event/type :spring-lobby/desktop-browse-url
+                                       :url (str "https://bar-rts.com/replays/" id)}
                            :graphic
                            {:fx/type font-icon/lifecycle
-                            :icon-literal "mdi-archive:16:white"}
-                           :on-action
-                           {:event/type :spring-lobby/add-task
-                            :task
-                            {:spring-lobby/task-type :spring-lobby/extract-7z
-                             :file source
-                             :dest dest}}})
-                        (let [{:keys [download-url]} engine-downloadable
+                            :icon-literal "mdi-web:16:white"}}])))
+                   [{:fx/type :pane
+                     :h-box/hgrow :always}
+                    (let [engine-version (-> i :header :engine-version)
+                          matching-engine (get engines-by-version engine-version)
+                          engine-downloadable (get replay-downloads-by-engine engine-version)
+                          mod-version (-> i :body :script-data :game :gametype)
+                          matching-mod (get mods-by-version mod-version)
+                          mod-downloadable (get replay-downloads-by-mod mod-version)
+                          mod-importable (get replay-imports-by-mod mod-version)
+                          mod-rapid (get rapid-data-by-version mod-version)
+                          map-name (-> i :body :script-data :game :mapname)
+                          matching-map (get maps-by-version map-name)
+                          map-downloadable (get replay-downloads-by-map map-name)
+                          map-importable (get replay-imports-by-map map-name)
+                          mod-rapid-download (get rapid-download (:id mod-rapid))]
+                      (cond
+                        (:id i) ; BAR online replay
+                        (let [fileName (:fileName i)
+                              download-url (when fileName (http/bar-replay-download-url fileName))
+                              {:keys [running] :as download} (get http-download download-url)
+                              in-progress (or running
+                                              (contains? download-tasks (:id i)))]
+                          {:fx/type :button
+                           :text
+                           (if in-progress
+                             (str (u/download-progress download))
+                             " Download replay")
+                           :disable (boolean in-progress)
+                           :on-action {:event/type :spring-lobby/add-task
+                                       :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
+                                              :id (:id i)
+                                              :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-download:16:white"}})
+                        (and matching-engine matching-mod matching-map)
+                        {:fx/type :button
+                         :text " Watch"
+                         :on-action
+                         {:event/type :spring-lobby/watch-replay
+                          :engines engines
+                          :engine-version engine-version
+                          :replay i
+                          :spring-isolation-dir spring-isolation-dir}
+                         :graphic
+                         {:fx/type font-icon/lifecycle
+                          :icon-literal "mdi-movie:16:white"}}
+                        (and (not matching-engine) engine-update-tasks)
+                        {:fx/type :button
+                         :text " Engines updating..."
+                         :disable true}
+                        (and (not matching-engine) engine-downloadable)
+                        (let [source (resource/resource-dest spring-isolation-dir engine-downloadable)]
+                          (if (fs/file-exists? file-cache source)
+                            (let [dest (io/file spring-isolation-dir "engine"
+                                                (fs/without-extension
+                                                  (:resource-filename engine-downloadable)))
+                                  in-progress (boolean
+                                                (or (get extracting (fs/canonical-path source))
+                                                    (contains? extract-tasks (fs/canonical-path source))))]
+                              {:fx/type :button
+                               :text (if in-progress "Extracting..." " Extract engine")
+                               :disable in-progress
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-archive:16:white"}
+                               :on-action
+                               {:event/type :spring-lobby/add-task
+                                :task
+                                {:spring-lobby/task-type :spring-lobby/extract-7z
+                                 :file source
+                                 :dest dest}}})
+                            (let [{:keys [download-url]} engine-downloadable
+                                  {:keys [running] :as download} (get http-download download-url)
+                                  in-progress (or running
+                                                  (contains? http-download-tasks download-url))]
+                              {:fx/type :button
+                               :text (if in-progress
+                                       (str (u/download-progress download))
+                                       " Download engine")
+                               :disable (boolean in-progress)
+                               :on-action {:event/type :spring-lobby/add-task
+                                           :task {:spring-lobby/task-type :spring-lobby/download-and-extract
+                                                  :downloadable engine-downloadable
+                                                  :spring-isolation-dir spring-isolation-dir}}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-download:16:white"}})))
+                        (and (not matching-mod) mod-update-tasks)
+                        {:fx/type :button
+                         :text " Games updating..."
+                         :disable true}
+                        (and (not matching-mod) mod-importable)
+                        (let [{:keys [resource-file]} mod-importable
+                              resource-path (fs/canonical-path resource-file)
+                              in-progress (boolean
+                                            (or (-> copying (get resource-path) :status boolean)
+                                                (contains? import-tasks resource-path)))]
+                          {:fx/type :button
+                           :text (if in-progress
+                                   " Importing..."
+                                   " Import game")
+                           :disable in-progress
+                           :on-action {:event/type :spring-lobby/add-task
+                                       :task
+                                       {:spring-lobby/task-type :spring-lobby/import
+                                        :importable mod-importable
+                                        :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-content-copy:16:white"}})
+                        (and (not matching-mod) mod-rapid matching-engine)
+                        (let [in-progress (contains? rapid-tasks (:id mod-rapid))]
+                          {:fx/type :button
+                           :text (if in-progress
+                                   (u/download-progress mod-rapid-download)
+                                   (str " Download game"))
+                           :disable in-progress
+                           :on-action {:event/type :spring-lobby/add-task
+                                       :task
+                                       {:spring-lobby/task-type :spring-lobby/rapid-download
+                                        :engine-file (:file matching-engine)
+                                        :rapid-id (:id mod-rapid)
+                                        :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-download:16:white"}})
+                        (and (not matching-mod) mod-downloadable)
+                        (let [{:keys [download-url]} mod-downloadable
                               {:keys [running] :as download} (get http-download download-url)
                               in-progress (or running
                                               (contains? http-download-tasks download-url))]
                           {:fx/type :button
                            :text (if in-progress
                                    (str (u/download-progress download))
-                                   " Download engine")
+                                   " Download game")
                            :disable (boolean in-progress)
                            :on-action {:event/type :spring-lobby/add-task
-                                       :task {:spring-lobby/task-type :spring-lobby/download-and-extract
-                                              :downloadable engine-downloadable
+                                       :task {:spring-lobby/task-type :spring-lobby/http-downloadable
+                                              :downloadable mod-downloadable
                                               :spring-isolation-dir spring-isolation-dir}}
                            :graphic
                            {:fx/type font-icon/lifecycle
-                            :icon-literal "mdi-download:16:white"}})))
-                    (and (not matching-mod) mod-update-tasks)
-                    {:fx/type :button
-                     :text " Games updating..."
-                     :disable true}
-                    (and (not matching-mod) mod-importable)
-                    (let [{:keys [resource-file]} mod-importable
-                          resource-path (fs/canonical-path resource-file)
-                          in-progress (boolean
-                                        (or (-> copying (get resource-path) :status boolean)
-                                            (contains? import-tasks resource-path)))]
-                      {:fx/type :button
-                       :text (if in-progress
-                               " Importing..."
-                               " Import game")
-                       :disable in-progress
-                       :on-action {:event/type :spring-lobby/add-task
-                                   :task
-                                   {:spring-lobby/task-type :spring-lobby/import
-                                    :importable mod-importable
-                                    :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-content-copy:16:white"}})
-                    (and (not matching-mod) mod-rapid matching-engine)
-                    (let [in-progress (contains? rapid-tasks (:id mod-rapid))]
-                      {:fx/type :button
-                       :text (if in-progress
-                               (u/download-progress mod-rapid-download)
-                               (str " Download game"))
-                       :disable in-progress
-                       :on-action {:event/type :spring-lobby/add-task
-                                   :task
-                                   {:spring-lobby/task-type :spring-lobby/rapid-download
-                                    :engine-file (:file matching-engine)
-                                    :rapid-id (:id mod-rapid)
-                                    :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-download:16:white"}})
-                    (and (not matching-mod) mod-downloadable)
-                    (let [{:keys [download-url]} mod-downloadable
-                          {:keys [running] :as download} (get http-download download-url)
-                          in-progress (or running
-                                          (contains? http-download-tasks download-url))]
-                      {:fx/type :button
-                       :text (if in-progress
-                               (str (u/download-progress download))
-                               " Download game")
-                       :disable (boolean in-progress)
-                       :on-action {:event/type :spring-lobby/add-task
-                                   :task {:spring-lobby/task-type :spring-lobby/http-downloadable
-                                          :downloadable mod-downloadable
-                                          :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-download:16:white"}})
-                    (and (not matching-map) map-update-tasks)
-                    {:fx/type :button
-                     :text " Maps updating..."
-                     :disable true}
-                    (and (not matching-map) map-importable)
-                    (let [{:keys [resource-file]} map-importable
-                          resource-path (fs/canonical-path resource-file)
-                          in-progress (boolean
-                                        (or (-> copying (get resource-path) :status boolean)
-                                            (contains? import-tasks resource-path)))]
-                      {:fx/type :button
-                       :text (if in-progress
-                               " Importing..."
-                               " Import map")
-                       :tooltip
-                       {:fx/type :tooltip
-                        :show-delay [10 :ms]
-                        :text (str (:resource-file map-importable))}
-                       :disable in-progress
-                       :on-action
-                       {:event/type :spring-lobby/add-task
-                        :task
-                        {:spring-lobby/task-type :spring-lobby/import
-                         :importable map-importable
-                         :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-content-copy:16:white"}})
-                    (and (not matching-map) map-downloadable)
-                    (let [{:keys [download-url]} map-downloadable
-                          {:keys [running] :as download} (get http-download download-url)
-                          in-progress (or running
-                                          (contains? http-download-tasks download-url))]
-                      {:fx/type :button
-                       :text (if in-progress
-                               (str (u/download-progress download))
-                               " Download map")
-                       :disable (boolean in-progress)
-                       :on-action
-                       {:event/type :spring-lobby/add-task
-                        :task
-                        {:spring-lobby/task-type :spring-lobby/http-downloadable
-                         :downloadable map-downloadable
-                         :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-download:16:white"}})
-                    (not matching-engine)
-                    {:fx/type :label
-                     :text " No engine"}
-                    (not matching-mod)
-                    (if (string/ends-with? mod-version "$VERSION")
-                      {:fx/type :label
-                       :text " Unknown game version "}
-                      {:fx/type :button
-                       :text (if rapid-update-tasks
-                               " Updating rapid..."
-                               " Update rapid")
-                       :disable (boolean rapid-update-tasks)
-                       :on-action {:event/type :spring-lobby/add-task
-                                   :task {:spring-lobby/task-type :spring-lobby/update-rapid
-                                          :force true
-                                          :engine-version engine-version
-                                          :mod-name mod-version
-                                          :spring-isolation-dir spring-isolation-dir}}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-refresh:16:white"}})
-                    (not matching-map)
-                    {:fx/type :button
-                     :text " No map, update downloads"
-                     :on-action
-                     {:event/type :spring-lobby/add-task
-                      :task
-                      (merge
-                        {:spring-lobby/task-type :spring-lobby/update-downloadables
-                         :force true}
-                        springfiles-maps-download-source)}})}))}}])}}}}))
+                            :icon-literal "mdi-download:16:white"}})
+                        (and (not matching-map) map-update-tasks)
+                        {:fx/type :button
+                         :text " Maps updating..."
+                         :disable true}
+                        (and (not matching-map) map-importable)
+                        (let [{:keys [resource-file]} map-importable
+                              resource-path (fs/canonical-path resource-file)
+                              in-progress (boolean
+                                            (or (-> copying (get resource-path) :status boolean)
+                                                (contains? import-tasks resource-path)))]
+                          {:fx/type :button
+                           :text (if in-progress
+                                   " Importing..."
+                                   " Import map")
+                           :tooltip
+                           {:fx/type :tooltip
+                            :show-delay [10 :ms]
+                            :text (str (:resource-file map-importable))}
+                           :disable in-progress
+                           :on-action
+                           {:event/type :spring-lobby/add-task
+                            :task
+                            {:spring-lobby/task-type :spring-lobby/import
+                             :importable map-importable
+                             :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-content-copy:16:white"}})
+                        (and (not matching-map) map-downloadable)
+                        (let [{:keys [download-url]} map-downloadable
+                              {:keys [running] :as download} (get http-download download-url)
+                              in-progress (or running
+                                              (contains? http-download-tasks download-url))]
+                          {:fx/type :button
+                           :text (if in-progress
+                                   (str (u/download-progress download))
+                                   " Download map")
+                           :disable (boolean in-progress)
+                           :on-action
+                           {:event/type :spring-lobby/add-task
+                            :task
+                            {:spring-lobby/task-type :spring-lobby/http-downloadable
+                             :downloadable map-downloadable
+                             :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-download:16:white"}})
+                        (not matching-engine)
+                        {:fx/type :label
+                         :text " No engine"}
+                        (not matching-mod)
+                        (if (string/ends-with? mod-version "$VERSION")
+                          {:fx/type :label
+                           :text " Unknown game version "}
+                          {:fx/type :button
+                           :text (if rapid-update-tasks
+                                   " Updating rapid..."
+                                   " Update rapid")
+                           :disable (boolean rapid-update-tasks)
+                           :on-action {:event/type :spring-lobby/add-task
+                                       :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                                              :force true
+                                              :engine-version engine-version
+                                              :mod-name mod-version
+                                              :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-refresh:16:white"}})
+                        (not matching-map)
+                        {:fx/type :button
+                         :text " No map, update downloads"
+                         :on-action
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          (merge
+                            {:spring-lobby/task-type :spring-lobby/update-downloadables
+                             :force true}
+                            springfiles-maps-download-source)}}))])}})}}])}}}}))
 
 
 (def replays-window-keys
@@ -1163,22 +1185,25 @@
               :style {:-fx-font-size 24}
               :text " Loading replays..."})]
            (when selected-replay
-             [
-              (merge
-                {:fx/type replay-view}
-                state
-                {:engines-by-version engines-by-version
-                 :engines engines
-                 :file-cache file-cache
-                 :import-tasks import-tasks
-                 :maps-by-version maps-by-version
-                 :map-details map-details
-                 :mod-details mod-details
-                 :mod-update-tasks mod-update-tasks
-                 :mods-by-version mods-by-version
-                 :selected-replay selected-replay
-                 :show-sync-left true
-                 :tasks-by-type tasks-by-type})]))})
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str (or (fs/canonical-path selected-replay-file)
+                             selected-replay-id))
+               :desc
+               (merge
+                 {:fx/type replay-view}
+                 state
+                 {:engines-by-version engines-by-version
+                  :engines engines
+                  :file-cache file-cache
+                  :import-tasks import-tasks
+                  :maps-by-version maps-by-version
+                  :map-details map-details
+                  :mod-details mod-details
+                  :mod-update-tasks mod-update-tasks
+                  :mods-by-version mods-by-version
+                  :selected-replay selected-replay
+                  :show-sync-left true
+                  :tasks-by-type tasks-by-type})}]))})
       {:fx/type :pane})}})
 
 (defn replays-window [state]

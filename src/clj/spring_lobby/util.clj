@@ -1,7 +1,6 @@
 (ns spring-lobby.util
   (:require
     [com.evocomputing.colors :as colors]
-    [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.string :as string]
     java-time
@@ -91,7 +90,15 @@
     (boolean? string-or-number)
     (if string-or-number 1 0)
     (or (keyword? string-or-number) (string? string-or-number))
-    (edn/read-string (name string-or-number))
+    (or
+      (try
+        (Long/parseLong (name string-or-number))
+        (catch Exception e
+          (log/trace e "Error parsing long from" string-or-number)))
+      (try
+        (Double/parseDouble (name string-or-number))
+        (catch Exception e
+          (log/trace e "Error parsing double from" string-or-number))))
     :else
     nil))
 
@@ -99,7 +106,11 @@
   (cond
     (boolean? v) v
     (number? v) (not (zero? v))
-    (string? v) (recur (to-number v))
+    (string? v)
+    (case v
+      "true" true
+      "false" false
+      (recur (to-number v)))
     :else
     (boolean v)))
 

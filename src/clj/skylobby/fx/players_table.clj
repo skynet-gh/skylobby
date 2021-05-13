@@ -41,14 +41,15 @@
                                         :skilluncertainty uncertainty)))
                              players)]
     {:fx/type ext-table-column-auto-size
-     :items (->> players-with-skill
-                 (sort-by
-                   (juxt
-                     (comp not :mode :battle-status)
-                     (comp :bot :client-status :user)
-                     (comp :ally :battle-status)
-                     (comp (fnil - 0) u/parse-skill :skill)
-                     (comp :id :battle-status))))
+     :items
+     (sort-by
+       (juxt
+         (comp u/to-number not :mode :battle-status)
+         (comp u/to-number :bot :client-status :user)
+         (comp u/to-number :ally :battle-status)
+         (comp (fnil - 0) u/parse-skill :skill)
+         (comp u/to-number :id :battle-status))
+       players-with-skill)
      :desc
      {:fx/type :table-view
       :column-resize-policy :constrained ; TODO auto resize
@@ -306,7 +307,7 @@
              :key (u/nickname i)
              :desc
              {:fx/type :check-box
-              :selected (not (:mode (:battle-status i)))
+              :selected (-> i :battle-status :mode not boolean)
               :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
                                     :client-data (when-not singleplayer client-data)
                                     :is-me (= (:username i) username)
