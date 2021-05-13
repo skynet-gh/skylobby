@@ -128,8 +128,8 @@
    :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
-   :replays-watched :replays-window-details :server :servers :spring-isolation-dir :spring-settings :uikeys
-   :username])
+   :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
+   :spring-settings :uikeys :username])
 
 
 (defn- select-config [state]
@@ -2000,14 +2000,16 @@
   [{:keys [file]}]
   (future
     (try
-      (if (fs/wsl-or-windows?)
-        (let [runtime (Runtime/getRuntime) ; TODO hacky?
-              command ["explorer.exe" (fs/wslpath file)]
-              ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-          (log/info "Running" (pr-str command))
-          (.exec runtime cmdarray nil nil))
-        (let [desktop (Desktop/getDesktop)]
-          (.browseFileDirectory desktop file)))
+      (let [desktop (Desktop/getDesktop)]
+        (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
+          (.browseFileDirectory desktop file)
+          (if (fs/wsl-or-windows?)
+            (let [runtime (Runtime/getRuntime) ; TODO hacky?
+                  command ["explorer.exe" (fs/wslpath (fs/parent-file file))]
+                  ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+              (log/info "Running" (pr-str command))
+              (.exec runtime cmdarray nil nil))
+            (log/info "No way to browse dir" file))))
       (catch Exception e
         (log/error e "Error browsing file" file)))))
 
