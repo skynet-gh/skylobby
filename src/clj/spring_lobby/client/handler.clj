@@ -153,7 +153,9 @@
       (= username my-username) (log/debug "Ignoring own game start")
       (:ingame my-status) (log/debug "Already in game")
       (not battle) (log/debug "Not in a battle")
-      (not auto-launch) (log/debug "Not auto starting game")
+      (and (not auto-launch)
+           (not (:mode my-status)))
+      (log/debug "Not auto starting game")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
       :else
       (start-game-if-synced prev-state server-data))))
@@ -164,14 +166,11 @@
     (log/info "Updating status of" username "to" decoded "with color" team-color)
     (swap! state-atom update-in [:by-server server-url]
       (fn [server]
-        (cond-> server
-          true
-          (update-in [:battle :users username]
-            assoc
-            :battle-status decoded
-            :team-color team-color)
-          (= username (:username server))
-          (update :auto-launch (fn [old] (if (:mode decoded) true old))))))))
+        (-> server
+            (update-in [:battle :users username]
+              assoc
+              :battle-status decoded
+              :team-color team-color))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]

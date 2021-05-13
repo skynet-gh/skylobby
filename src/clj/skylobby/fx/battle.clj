@@ -457,15 +457,17 @@
                  :-fx-font-size 14)}])
            [{:fx/type :pane
              :h-box/hgrow :always}]
-           (when-not singleplayer
+           (when (and (not (:mode my-battle-status))
+                      (not singleplayer))
              [{:fx/type :check-box
                :selected (boolean auto-launch)
                :style {:-fx-padding "10px"}
                :on-selected-changed {:event/type :spring-lobby/assoc-in
                                      :path [:by-server server-key :auto-launch]}}
               {:fx/type :label
-               :text "Auto Launch "}
-              (let [am-away (:away my-client-status)]
+               :text "Auto Launch "}])
+           (when (not singleplayer)
+             [(let [am-away (:away my-client-status)]
                 (merge
                   {:fx/type :button
                    :text (if am-away "Away" "Here")
