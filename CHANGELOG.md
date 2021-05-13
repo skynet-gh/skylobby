@@ -39,6 +39,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.37]
+
+- Make auto launch only apply while spectating
+- Add replay buttons to open folder or BAR online
+- Fix rare issue with players table in replays
+
 ### [0.3.36]
 
 - Add tag string field for replays
