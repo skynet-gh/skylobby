@@ -15,6 +15,8 @@ Current Annoyances:
 
 Future Features:
 
+- Track and display game running time
+- Friends list support
 - Parse autohost messages and display in UI
 - Visually group teams in players table
 - Track and display player away time
