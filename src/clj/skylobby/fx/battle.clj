@@ -436,7 +436,7 @@
          :alignment :center-left
          :children
          (concat
-           (when-not singleplayer
+           (if-not singleplayer
              [{:fx/type :button
                :text (str
                        " "
@@ -454,7 +454,12 @@
                      (if (= 1 (:sync my-battle-status))
                        0 2))
                    :-fx-background-color)
-                 :-fx-font-size 14)}])
+                 :-fx-font-size 14)}]
+             [{:fx/type :button
+               :text "reload"
+               :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                           :map-resource indexed-map
+                           :mod-resource indexed-mod}}])
            [{:fx/type :pane
              :h-box/hgrow :always}]
            (when (and (not (:mode my-battle-status))
