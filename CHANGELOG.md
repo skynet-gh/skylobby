@@ -41,6 +41,10 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.38]
+
+- Add chat log to replay details view
+
 ### [0.3.37]
 
 - Make auto launch only apply while spectating
