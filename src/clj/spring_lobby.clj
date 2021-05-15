@@ -78,6 +78,12 @@
 (def map-browse-box-height 224)
 
 
+(def maps-batch-size 5)
+(def minimap-batch-size 3)
+(def mods-batch-size 5)
+(def replays-batch-size 10)
+
+
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn- read-file-tag [cs]
   (io/file cs))
@@ -197,7 +203,8 @@
      :minimap-type (first fx.minimap/minimap-types)
      :replay-minimap-type (first fx.minimap/minimap-types)
      :map-details (cache/fifo-cache-factory {} :threshold 16)
-     :mod-details (cache/fifo-cache-factory {} :threshold 16)}))
+     :mod-details (cache/fifo-cache-factory {} :threshold 16)
+     :replay-details (cache/fifo-cache-factory {} :threshold 8)}))
 
 
 (def ^:dynamic *state (atom {}))
@@ -639,7 +646,8 @@
     (try
       (let [old-selected-replay-file (:selected-replay-file old-state)
             old-replay-id (:selected-replay-id old-state)
-            {:keys [online-bar-replays parsed-replays-by-path selected-replay-file selected-replay-id spring-isolation-dir]} new-state
+            {:keys [online-bar-replays parsed-replays-by-path replay-details selected-replay-file
+                    selected-replay-id spring-isolation-dir]} new-state
 
             old-replay-path (fs/canonical-path old-selected-replay-file)
             new-replay-path (fs/canonical-path selected-replay-file)
@@ -678,6 +686,8 @@
             map-changed (not= new-map (:map-name map-details))
             mod-changed (not= new-mod (:mod-name mod-details))
 
+            replay-details (get replay-details new-replay-path)
+
             tasks [
                    (when (or (and (or (not= old-replay-path new-replay-path)
                                       (not= old-mod new-mod))
@@ -700,7 +710,11 @@
                                map-exists))
                      {::task-type ::map-details
                       :map-name new-map
-                      :map-file (:file map-exists)})]]
+                      :map-file (:file map-exists)})
+                   (when (and (not= old-replay-path new-replay-path)
+                              (not replay-details))
+                     {::task-type ::replay-details
+                      :replay-file selected-replay-file})]]
         (when-let [tasks (->> tasks (filter some?) seq)]
           (log/info "Adding" (count tasks) "for replay resources")
           (add-tasks! state-atom tasks)))
@@ -981,8 +995,8 @@
                   (sort-by (comp fs/filename second))
                   reverse)
         all-paths (set (map (comp fs/canonical-path second) all-files))
-        this-round (take 100 todo)
-        next-round (drop 100 todo)
+        this-round (take replays-batch-size todo)
+        next-round (drop replays-batch-size todo)
         parsed-replays (->> this-round
                             (map
                               (fn [[source f]]
@@ -1003,7 +1017,8 @@
                                     (concat parsed-replays)
                                     (into {})))))]
       (if (seq next-round)
-        (add-task! state-atom {::task-type ::refresh-replays})
+        (add-task! state-atom {::task-type ::refresh-replays
+                               :todo (count next-round)})
         (do
           (when (seq this-round)
             (spit-app-edn
@@ -1192,8 +1207,8 @@
                              (fn [f]
                                {:resource-filename (fs/filename f)}))))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
-         this-round (concat priorities (take 5 todo))
-         next-round (drop 5 todo)
+         this-round (concat priorities (take mods-batch-size todo))
+         next-round (drop mods-batch-size todo)
          all-paths (filter some? (concat known-file-paths known-rapid-paths))
          missing-files (set
                          (concat
@@ -1223,7 +1238,8 @@
                   (dissoc :update-mods))))
      (when (seq next-round)
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-       (add-task! state-atom {::task-type ::reconcile-mods}))
+       (add-task! state-atom {::task-type ::reconcile-mods
+                              :todo (count next-round)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
 
@@ -1239,9 +1255,8 @@
                   (let [minimap-file (-> map-details :map-name fs/minimap-image-cache-file)]
                     (or (:force opts) (not (fs/exists minimap-file))))))
               (sort-by :map-name))
-         per-round 3
-         this-round (take per-round to-update)
-         next-round (drop per-round to-update)]
+         this-round (take minimap-batch-size to-update)
+         next-round (drop minimap-batch-size to-update)]
      (log/info (count to-update) "maps do not have cached minimap image files")
      (doseq [map-details this-round]
        (if-let [map-file (:file map-details)]
@@ -1252,7 +1267,8 @@
                (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
-       (add-task! *state {::task-type ::update-cached-minimaps})))))
+       (add-task! *state {::task-type ::update-cached-minimaps
+                          :todo (count next-round)})))))
 
 (defn- reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
@@ -1287,8 +1303,8 @@
                              (fn [f]
                                {:resource-filename (fs/filename f)}))))
          _ (log/info "Prioritizing maps in battles" (pr-str priorities))
-         this-round (concat priorities (take 5 todo))
-         next-round (drop 5 todo)
+         this-round (concat priorities (take maps-batch-size todo))
+         next-round (drop maps-batch-size todo)
          missing-paths (set
                          (concat
                            (->> known-files
@@ -1322,7 +1338,8 @@
      (if (seq next-round)
        (do
          (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
-         (add-task! state-atom {::task-type ::reconcile-maps}))
+         (add-task! state-atom {::task-type ::reconcile-maps
+                                :todo (count next-round)}))
        (add-task! state-atom {::task-type ::update-cached-minimaps}))
      {:todo-count (count todo)})))
 
@@ -1535,6 +1552,24 @@
       (catch Throwable t
         (log/error t "Error updating mod details")
         (swap! *state update :mod-details cache/miss cache-key error-data)
+        (throw t)))))
+
+
+(defmethod task-handler ::replay-details [{:keys [replay-file]}]
+  (let [cache-key (fs/canonical-path replay-file)]
+    (try
+      (if (and replay-file (fs/exists? replay-file))
+        (do
+          (log/info "Updating replay details for" replay-file)
+          (let [replay-details (replay/parse-replay replay-file {:parse-stream true})]
+            (log/info "Got replay details for" replay-file (keys replay-details))
+            (swap! *state update :replay-details cache/miss cache-key replay-details)))
+        (do
+          (log/info "Replay not found, setting empty details for" replay-file)
+          (swap! *state update :replay-details cache/miss cache-key {:error true})))
+      (catch Throwable t
+        (log/error t "Error updating replay details")
+        (swap! *state update :replay-details cache/miss cache-key {:error true})
         (throw t)))))
 
 

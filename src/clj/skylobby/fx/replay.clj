@@ -73,19 +73,34 @@
 (defn- sanitize-replay-filter [s]
   (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
 
+; https://github.com/Jazcash/sdfz-demo-parser/blob/a4391f14ee4bc08aedb5434d66cf99ad94913597/src/demo-parser.ts#L233
+(defn- format-chat-dest [dest]
+  (let [dest-type (case dest
+                    252 :ally
+                    253 :spec
+                    254 :global
+                    :self)]
+    (when (and (not= :global dest-type)
+               (not= :self dest-type))
+      (str " ("
+           (if (= :ally dest-type)
+             "a"
+             "s")
+           ")"))))
+
 
 (def replay-view-keys
   (concat
-    [:battle-players-color-allyteam :map-details :mod-details :replay-minimap-type :spring-isolation-dir]
-    [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :springfiles-search-results
-     :tasks-by-type :update-engines]
-    [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :rapid-data-by-version :rapid-download :springfiles-search-results :tasks-by-type :update-mods]
-    [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))
+    [:battle-players-color-allyteam :copying :downloadables-by-url :extracting :file-cache :gitting
+     :http-download :importables-by-path :map-details :mod-details :rapid-data-by-version
+     :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
+     :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods]))
 
 (defn replay-view
-  [{:keys [battle-players-color-allyteam engines engines-by-version file-cache import-tasks maps-by-version map-details
-           mods-by-version mod-details mod-update-tasks replay-minimap-type selected-replay show-sync show-sync-left
-           spring-isolation-dir tasks-by-type]
+  [{:keys [battle-players-color-allyteam engines engines-by-version file-cache import-tasks
+           maps-by-version map-details mods-by-version mod-details mod-update-tasks replay-details
+           replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
+           tasks-by-type]
     :as state}]
   (let [script-data (-> selected-replay :body :script-data)
         {:keys [gametype mapname] :as game} (:game script-data)
@@ -244,8 +259,43 @@
                   {:fx/type :pane
                    :h-box/hgrow :always}
                   watch-button]}])))}]
-       (when show-sync-left
-         [sync-pane])
+       [{:fx/type :v-box
+         :children
+         (concat
+           (when show-sync-left
+             [sync-pane])
+           (if-let [details (get replay-details (fs/canonical-path (:file selected-replay)))]
+             (let [player-num-to-name (->> details
+                                           :body
+                                           :demo-stream
+                                           (map (comp :demo-stream-chunk :body))
+                                           (filter (comp #{6} :command :header))
+                                           (map :body)
+                                           (map (juxt :player-num :player-name))
+                                           (into {}))]
+               [{:fx/type :label
+                 :text "Chat log"}
+                {:fx/type :text-area
+                 :v-box/vgrow :always
+                 :editable false
+                 :text
+                 (->> details
+                      :body
+                      :demo-stream
+                      (map (comp :demo-stream-chunk :body))
+                      (filter (comp #{7} :command :header))
+                      (map :body)
+                      (remove (comp #(string/starts-with? % "My player ID is") :message))
+                      (map
+                        (fn [{:keys [from dest message]}]
+                          (str
+                            (get player-num-to-name from)
+                            (format-chat-dest dest)
+                            ": "
+                            message)))
+                      (string/join "\n"))}])
+             [{:fx/type :label
+               :text "Loading replay stream..."}]))}]
        [{:fx/type :v-box
          :children
          (concat
@@ -770,11 +820,11 @@
 
 
 (def replays-window-keys
-  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css
+  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css :downloadables-by-url
    :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
    :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
    :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
-   :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download
+   :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download :replay-details
    :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
    :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id

@@ -15,6 +15,8 @@ Current Annoyances:
 
 Future Features:
 
+- Track and display game running time
+- Friends list support
 - Parse autohost messages and display in UI
 - Visually group teams in players table
 - Track and display player away time
@@ -38,6 +40,10 @@ Server or SPADS changes:
 
 ## Actual changelog
 
+
+### [0.3.38]
+
+- Add chat log to replay details view
 
 ### [0.3.37]
 
