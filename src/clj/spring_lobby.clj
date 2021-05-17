@@ -202,9 +202,9 @@
      :file-events (initial-file-events)
      :minimap-type (first fx.minimap/minimap-types)
      :replay-minimap-type (first fx.minimap/minimap-types)
-     :map-details (cache/fifo-cache-factory {} :threshold 16)
-     :mod-details (cache/fifo-cache-factory {} :threshold 16)
-     :replay-details (cache/fifo-cache-factory {} :threshold 8)}))
+     :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
+     :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
+     :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)}))
 
 
 (def ^:dynamic *state (atom {}))

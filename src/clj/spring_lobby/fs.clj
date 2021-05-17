@@ -79,6 +79,23 @@
   (when f
     (.getParentFile f)))
 
+; https://stackoverflow.com/a/25267111/984393
+(defn descendant?
+  "Returns true if f is a possible descendant of dir."
+  [dir f]
+  (let [fp (canonical-path f)
+        dp (canonical-path dir)]
+    (and fp dp
+      (string/starts-with? fp dp))))
+
+(defn child?
+  "Returns true if f is a possible descendant of dir."
+  [dir f]
+  (and dir f
+       (= (canonical-path dir)
+          (when-let [parent (parent-file f)]
+            (canonical-path parent)))))
+
 (defn list-files [^File f]
   (when f
     (.listFiles f)))
@@ -887,14 +904,19 @@
      (merge
        (when-let [smf-file (->> all-files
                                 (filter (comp #(string/ends-with? % ".smf") string/lower-case filename))
+                                (sort-by (comp not (partial child? file)))
                                 first)]
          (read-smf-file smf-file opts))
        (when-let [mapinfo-file (->> all-files
                                     (filter (comp #{"mapinfo.lua"} string/lower-case filename))
+                                    (sort-by (comp not (partial child? file)))
                                     first)]
-         (parse-mapinfo file (slurp (io/input-stream mapinfo-file)) (canonical-path mapinfo-file)))
+         (let [content (slurp mapinfo-file)
+               path (canonical-path mapinfo-file)]
+           (parse-mapinfo file content path)))
        (when-let [smd-file (->> all-files
                                 (filter (comp #(string/ends-with? % ".smd") string/lower-case filename))
+                                (sort-by (comp not (partial child? file)))
                                 first)]
          (let [smd (when-let [map-data (slurp (io/input-stream smd-file))]
                      (spring-script/parse-script map-data))]
@@ -957,23 +979,6 @@
   ([root map-name]
    (io/file root (str map-name ".minimap.png"))))
 
-
-; https://stackoverflow.com/a/25267111/984393
-(defn descendant?
-  "Returns true if f is a possible descendant of dir."
-  [dir f]
-  (let [fp (canonical-path f)
-        dp (canonical-path dir)]
-    (and fp dp
-      (string/starts-with? fp dp))))
-
-(defn child?
-  "Returns true if f is a possible descendant of dir."
-  [dir f]
-  (and dir f
-       (= (canonical-path dir)
-          (when-let [parent (parent-file f)]
-            (canonical-path parent)))))
 
 (defn copy-dir
   [^java.io.File source ^java.io.File dest]

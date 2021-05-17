@@ -1,7 +1,8 @@
 (ns spring-lobby.client.handler-test
   (:require
-    [clojure.test :refer [deftest is]]
+    [clojure.test :refer [deftest is testing]]
     [spring-lobby.client.handler :as handler]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.util :as u]))
 
 
@@ -275,17 +276,65 @@
 
 
 (deftest handle-CLIENTSTATUS
-  (let [state-atom (atom {})
-        server-key :server1]
-    (handler/handle state-atom server-key "CLIENTSTATUS skynet 0")
-    (is (= {:by-server
-            {:server1
-             {:users
-              {"skynet"
-               {:client-status
-                {:access false
-                 :away false
-                 :bot false
-                 :ingame false
-                 :rank 0}}}}}}
-           @state-atom))))
+  (testing "zero"
+    (let [state-atom (atom {})
+          game-started (atom false)
+          server-key :server1]
+      (with-redefs [handler/start-game-if-synced (fn [& _] (reset! game-started true))]
+        (handler/handle state-atom server-key "CLIENTSTATUS skynet 0"))
+      (is (= {:by-server
+              {:server1
+               {:users
+                {"skynet"
+                 {:client-status
+                  {:access false
+                   :away false
+                   :bot false
+                   :ingame false
+                   :rank 0}}}}}}
+             @state-atom))
+      (is (false? @game-started))))
+  (testing "start game"
+    (let [host "skynet"
+          me "me"
+          state-atom (atom
+                       {:by-server
+                        {:server1
+                         {:battle
+                          {:battle-id :battle1
+                           :users
+                           {me
+                            {:battle-status {:mode true}}}}
+                          :battles
+                          {:battle1
+                           {:host-username host}}
+                          :username me}}})
+          game-started (atom false)
+          server-key :server1
+          client-status-str (cu/encode-client-status
+                              (assoc
+                                cu/default-client-status
+                                :ingame true))]
+      (with-redefs [handler/start-game-if-synced (fn [& _] (reset! game-started true))]
+        (handler/handle state-atom server-key (str "CLIENTSTATUS " host " " client-status-str)))
+      (is (= {:by-server
+              {:server1
+               {:battle
+                {:battle-id :battle1
+                 :users
+                 {me
+                  {:battle-status {:mode true}}}}
+                :battles
+                {:battle1
+                 {:host-username host}}
+                :username me
+                :users
+                {"skynet"
+                 {:client-status
+                  {:access false
+                   :away false
+                   :bot false
+                   :ingame true
+                   :rank 0}}}}}}
+             @state-atom))
+      (is (true? @game-started)))))

@@ -145,7 +145,9 @@
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)
         my-status (-> users (get my-username) :client-status)
-        battle-detail (-> battles (get (:battle-id battle)))]
+        battle-detail (-> battles (get (:battle-id battle)))
+        my-battle-status (-> battle :users (get my-username) :battle-status)
+        am-spec (not (:mode my-battle-status))]
     (log/debug "CLIENTSTATUS" username decoded-status)
     (cond
       (not (:ingame decoded-status)) (log/debug "Not in game")
@@ -153,10 +155,9 @@
       (= username my-username) (log/debug "Ignoring own game start")
       (:ingame my-status) (log/debug "Already in game")
       (not battle) (log/debug "Not in a battle")
-      (and (not auto-launch)
-           (not (:mode my-status)))
-      (log/debug "Not auto starting game")
       (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
+      (and (not auto-launch) am-spec)
+      (log/info "Not auto starting game" (pr-str {:spec am-spec :auto-launch auto-launch}))
       :else
       (start-game-if-synced prev-state server-data))))
 
