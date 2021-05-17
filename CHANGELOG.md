@@ -41,6 +41,12 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.39]
+
+- Fix auto launch detecting spectator incorrectly
+- Stop sending `!joinas spec` when no script password
+- Fix resource details caches not sorted
+
 ### [0.3.38]
 
 - Add chat log to replay details view
