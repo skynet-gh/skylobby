@@ -22,21 +22,21 @@
 (def sdfz-header
   (b/ordered-map
     :magic (b/string "ISO-8859-1" :length 16)
-    :version :uint-le
-    :header-size :uint-le
+    :version :int-le
+    :header-size :int-le
     :engine-version (b/string "ISO-8859-1" :length 256)
     :game-id (b/blob :length 16)
     :unix-time :ulong-le
-    :script-size :uint-le
-    :demo-stream-size :uint-le
-    :game-time :uint-le
-    :wallclock-time :uint-le
-    :max-player-num :uint-le
-    :num-players :uint-le
-    :team-stat-size :uint-le
-    :team-stat-elim-size :uint-le
-    :team-stat-period :uint-le
-    :winning-ally-team :uint-le))
+    :script-size :int-le
+    :demo-stream-size :int-le
+    :game-time :int-le
+    :wallclock-time :int-le
+    :max-player-num :int-le
+    :num-players :int-le
+    :team-stat-size :int-le
+    :team-stat-elim-size :int-le
+    :team-stat-period :int-le
+    :winning-ally-team :int-le))
 
 ; https://github.com/spring/spring/blob/master/rts/System/LoadSave/demofile.h#L31-L42
 (def sdfz-protocol
@@ -52,69 +52,38 @@
     :keep-header? true))
 
 
-(def map-draw-header
-  (b/ordered-map
-    :message-size :ubyte
-    :player-num :ubyte
-    :command :ubyte))
-
-(def map-draw-protocol
-  (b/header
-    map-draw-header
-    (fn [{:keys [message-size command]}]
-      (case command
-        0 ; point
-        (b/ordered-map
-          :x :ushort-le
-          :z :ushort-le
-          :message (b/string "ISO-8859-1" :length (- message-size 8)))
-        1 ; erase
-        (b/ordered-map
-          :x :ushort-le
-          :z :ushort-le)
-        2 ; line
-        (b/ordered-map
-          :x1 :ushort-le
-          :z1 :ushort-le
-          :x2 :ushort-le
-          :z2 :ushort-le)
-        ; else
-        (b/repeated :ubyte :length (- message-size 4))))
-    (constantly nil) ; TODO writing replays
-    :keep-header? true))
-
 ; https://github.com/spring/spring/blob/develop/rts/Net/Protocol/NetMessageTypes.h
 (def net-message-header
   (b/ordered-map
-    :command :ubyte))
+    :command :byte))
 
 (defn net-message-protocol [length]
   (b/header
     net-message-header
     (fn [{:keys [command]}]
-      (case command
-        6 (b/ordered-map
-            :pad :ubyte
-            :player-num :ubyte
-            :player-name (b/string "ISO-8859-1" :length (- length 3)))
-        7 (b/ordered-map
-            :pad :ubyte
-            :from :ubyte
-            :dest :ubyte
-            :message (b/string "ISO-8859-1" :length (- length 4)))
-        30 (b/ordered-map
-             :pad :ubyte
-             :player-num :ubyte
-             :winning-ally-teams (b/repeated :ubyte :length (- length 3)))
-        31 map-draw-protocol
-        36 (b/ordered-map
-             :player-num :ubyte
-             :my-team :ubyte
-             :ready :ubyte
-             :x :float-le
-             :y :float-le
-             :z :float-le)
-        (b/blob :length (dec length))))
+      (let [l (dec length)]
+        (case command
+          6 (b/ordered-map
+              :pad :byte
+              :player-num :ubyte
+              :player-name (b/string "ISO-8859-1" :length (- length 3)))
+          7 (b/ordered-map
+              :pad :byte
+              :from :ubyte
+              :dest :ubyte
+              :message (b/string "ISO-8859-1" :length (- length 4)))
+          30 (b/ordered-map
+               :pad :byte
+               :player-num :ubyte
+               :winning-ally-teams (b/repeated :ubyte :length (- length 3)))
+          36 (b/ordered-map
+               :player-num :ubyte
+               :my-team :ubyte
+               :ready :ubyte
+               :x :float-le
+               :y :float-le
+               :z :float-le)
+          (b/blob :length l))))
     (constantly nil) ; TODO writing replays
     :keep-header? true))
 
@@ -167,8 +136,7 @@
                    (fn [demo-stream-raw]
                      (if parse-stream
                        (try
-                         (with-open [is (io/input-stream demo-stream-raw)]
-                           (b/decode (b/repeated demo-stream-chunk-protocol) is))
+                         (b/decode (b/repeated demo-stream-chunk-protocol) (io/input-stream demo-stream-raw))
                          (catch Exception e
                            (log/warn e "Exception parsing demo stream")))
                        nil))))))))))
