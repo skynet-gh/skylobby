@@ -28,7 +28,7 @@
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   hashp/hashp {:mvn/version "0.2.1"}
   instaparse/instaparse {:mvn/version "1.4.10"}
-  jarohen/chime {:mvn/version "0.3.2"}
+  jarohen/chime {:mvn/version "0.3.3"}
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
@@ -59,10 +59,10 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
-    io.aviso/pretty {:mvn/version "0.1.37"}
+    io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -78,10 +78,10 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.24.1"}
     hawk/hawk {:mvn/version "0.2.11"}
-    io.aviso/pretty {:mvn/version "0.1.37"}
+    io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -98,7 +98,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.910"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -125,5 +125,5 @@
   {:extra-deps
    {com.cognitect/test-runner
     {:git/url "https://github.com/cognitect-labs/test-runner"
-     :sha "b6b3193fcc42659d7e46ecd1884a228993441182"}}
+     :sha "2d69f33d7980c3353b246c28f72ffeafbd9f2fab"}}
    :main-opts ["-m" "cognitect.test-runner" "-d" "test/clj"]}}}

@@ -332,7 +332,13 @@
        (into {})))
 
 (defn start-game [{:keys [client-data engines ^java.io.File spring-isolation-dir spring-settings username users] :as state}]
-  (let [my-client-status (-> users (get username) :client-status)]
+  (let [my-client-status (-> users (get username) :client-status)
+        set-ingame (fn [ingame]
+                     (client/send-message
+                       (:client client-data)
+                       (str "MYSTATUS "
+                            (cu/encode-client-status
+                              (assoc my-client-status :ingame ingame)))))]
     (try
       (when (:auto-backup spring-settings)
         (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
@@ -340,7 +346,7 @@
           (log/info "Backing up Spring settings to" dest-dir)
           (copy-spring-settings spring-isolation-dir dest-dir)))
       (log/info "Starting game")
-      (client/send-message (:client client-data) (str "MYSTATUS " (cu/encode-client-status (assoc my-client-status :ingame true))))
+      (set-ingame true)
       (let [{:keys [battle-version]} (battle-details state)
             script-txt (battle-script-txt state)
             engine-dir (some->> engines
@@ -382,11 +388,12 @@
                       (recur))
                     (log/info "Spring stderr stream closed")))))
             (future
-              (.waitFor process)))))
+              (.waitFor process)
+              (set-ingame false)))))
       (catch Exception e
-        (log/error e "Error starting game"))
-      (finally
-        (client/send-message (:client client-data) (str "MYSTATUS " (cu/encode-client-status (assoc my-client-status :ingame false))))))))
+        (log/error e "Error starting game")
+        (set-ingame false)))))
+
 
 (defn watch-replay [{:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
   (try

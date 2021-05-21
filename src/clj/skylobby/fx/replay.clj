@@ -283,32 +283,16 @@
                       :body
                       :demo-stream
                       (map (comp :demo-stream-chunk :body))
-                      (filter (comp #{7 31} :command :header))
-                      (remove (comp (fnil #(string/starts-with? % "My player ID is") "") :message :body))
+                      (filter (comp #{7} :command :header))
+                      (map :body)
+                      (remove (comp #(string/starts-with? % "My player ID is") :message))
                       (map
-                        (fn [{:keys [header body]}]
-                          (case (:command header)
-                            7
-                            (let [{:keys [from dest message]} body
-                                  player-name (get player-num-to-name from)]
-                              (str
-                                (if player-name
-                                  (str player-name (format-chat-dest dest) ":")
-                                  "*")
-                                " "
-                                message))
-                            31
-                            (let [{:keys [command player-num]} (:header body)
-                                  {:keys [message]} (:body body)]
-                              (when (= 0 command)
-                                (let [player-name (get player-num-to-name player-num)]
-                                  (str
-                                    "* " player-name ": "
-                                    (if (string/blank? (string/trim (string/replace (or message "") #"\P{Print}" "")))
-                                      "Look here!"
-                                      message)))))
-                            nil)))
-                      (filter some?)
+                        (fn [{:keys [from dest message]}]
+                          (str
+                            (get player-num-to-name from)
+                            (format-chat-dest dest)
+                            ": "
+                            message)))
                       (string/join "\n"))}])
              [{:fx/type :label
                :text "Loading replay stream..."}]))}]
