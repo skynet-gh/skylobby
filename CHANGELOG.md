@@ -41,6 +41,11 @@ Server or SPADS changes:
 ## Actual changelog
 
 
+### [0.3.40]
+
+- Fix ingame status not set correctly
+- Fix replay parsing sometimes causing memory issues
+
 ### [0.3.39]
 
 - Fix auto launch detecting spectator incorrectly
