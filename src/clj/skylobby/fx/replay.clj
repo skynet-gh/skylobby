@@ -914,6 +914,7 @@
                                true
                                (every?
                                  (some-fn
+                                   (partial includes-term? (replay-id replay))
                                    (partial includes-term? (get replays-tags (replay-id replay)))
                                    (partial includes-term? (-> replay :header :engine-version))
                                    (partial includes-term? (-> replay :body :script-data :game :gametype))
