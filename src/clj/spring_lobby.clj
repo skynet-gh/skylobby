@@ -801,24 +801,21 @@
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:dynamic? true
-                  :id ::state-watcher}
-    (tufte/p :auto-get-resources-watcher
-      (when (not= (auto-get-resources-relevant-keys old-state)
-                  (auto-get-resources-relevant-keys new-state))
-        (try
-          (when-let [tasks (->> new-state
-                                :by-server
-                                (mapcat
-                                  (fn [[server-key  new-server]]
-                                    (let [old-server (-> old-state :by-server (get server-key))]
-                                      (server-auto-resources old-state new-state old-server new-server))))
-                                (filter some?)
-                                seq)]
-            (log/info "Adding" (count tasks) "to auto get resources")
-            (add-tasks! state-atom tasks))
-          (catch Exception e
-            (log/error e "Error in :auto-get-resources state watcher")))))))
+  (when (not= (auto-get-resources-relevant-keys old-state)
+              (auto-get-resources-relevant-keys new-state))
+    (try
+      (when-let [tasks (->> new-state
+                            :by-server
+                            (mapcat
+                              (fn [[server-key  new-server]]
+                                (let [old-server (-> old-state :by-server (get server-key))]
+                                  (server-auto-resources old-state new-state old-server new-server))))
+                            (filter some?)
+                            seq)]
+        (log/info "Adding" (count tasks) "to auto get resources")
+        (add-tasks! state-atom tasks))
+      (catch Exception e
+        (log/error e "Error in :auto-get-resources state watcher")))))
 
 
 (defn- fix-selected-replay-relevant-keys [state]
@@ -938,7 +935,13 @@
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
   (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
   (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
-  (add-watch state-atom :auto-get-resources auto-get-resources-watcher)
+  #_
+  (add-watch state-atom :auto-get-resources
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :auto-get-resources-watcher
+          (auto-get-resources-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
   (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
   #_
@@ -3561,6 +3564,7 @@
   [[:battle-map-details-watcher battle-map-details-watcher]
    [:battle-mod-details-watcher battle-mod-details-watcher]
    ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:auto-get-resources-watcher auto-get-resources-watcher]
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 
