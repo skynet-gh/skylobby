@@ -113,7 +113,8 @@
                          "< choose a game >"
                          mod-name)})}
              :on-key-pressed {:event/type :spring-lobby/mods-key-pressed}
-             :on-hidden {:event/type :spring-lobby/mods-hidden}}]))
+             :on-hidden {:event/type :spring-lobby/dissoc
+                         :key :mod-filter}}]))
        [{:fx/type fx.ext.node/with-tooltip-props
          :props
          {:tooltip

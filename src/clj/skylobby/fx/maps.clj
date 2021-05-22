@@ -89,7 +89,8 @@
                        "< choose a map >"
                        map-name)})}
            :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
-           :on-hidden {:event/type :spring-lobby/maps-hidden}}]))
+           :on-hidden {:event/type :spring-lobby/dissoc
+                       :key :map-input-prefix}}]))
      [{:fx/type :button
        :text ""
        :on-action {:event/type :spring-lobby/show-maps-window

@@ -2027,8 +2027,8 @@
 (defmethod event-handler ::maps-key-pressed [{:fx/keys [event]}]
   (swap! *state update :map-input-prefix (update-filter-fn event)))
 
-(defmethod event-handler ::maps-hidden [_e]
-  (swap! *state dissoc :map-input-prefix))
+(defmethod event-handler ::host-replay-key-pressed [{:fx/keys [event]}]
+  (swap! *state update :filter-host-replay (update-filter-fn event)))
 
 (defmethod event-handler ::show-maps-window
   [{:keys [on-change-map]}]
@@ -2051,14 +2051,8 @@
 (defmethod event-handler ::engines-key-pressed [{:fx/keys [event]}]
   (swap! *state update :engine-filter (update-filter-fn event)))
 
-(defmethod event-handler ::engines-hidden [_e]
-  (swap! *state dissoc :engine-filter))
-
 (defmethod event-handler ::mods-key-pressed [{:fx/keys [event]}]
   (swap! *state update :mod-filter (update-filter-fn event)))
-
-(defmethod event-handler ::mods-hidden [_e]
-  (swap! *state dissoc :mod-filter))
 
 (defmethod event-handler ::desktop-browse-dir
   [{:keys [file]}]
