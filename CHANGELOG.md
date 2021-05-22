@@ -6,10 +6,7 @@ Notable changes and todo list.
 
 Current Annoyances:
 
-- Chat box does not auto scroll, moves when new messages come in
 - Ally/team numbers start at 0 instead of 1, different from SPADS
-- Rapid is not updated automatically
-- Engine is not extracted automatically
 - Downloads and other tasks cannot be cancelled
 - Replace 7Zip with Apache commons-compress to fix concurrency issue
 
@@ -33,13 +30,18 @@ Future Features:
 - Improve map filter window
 - Call Spring unitsync to get resource hashes
 
-Server or SPADS changes:
-
-- Hosted replay watching
-
 
 ## Actual changelog
 
+
+### [0.3.41]
+
+- Add setting to disable tasks while in a game, for performance
+- Fix battle hosting
+- Add filtering for hosting replay files
+- Add replay filtering by game id
+- Improve replay view for online replays
+- Switch auto resources to periodic for performance
 
 ### [0.3.40]
 
