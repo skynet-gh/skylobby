@@ -131,7 +131,8 @@
 
 (def config-keys
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
-   :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
+   :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
+   :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
@@ -189,6 +190,7 @@
   (merge
     {:auto-get-resources true
      :battle-players-color-allyteam true
+     :disable-tasks-while-in-game true
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
@@ -801,25 +803,46 @@
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
+  (when (not= (auto-get-resources-relevant-keys old-state)
+              (auto-get-resources-relevant-keys new-state))
+    (try
+      (when-let [tasks (->> new-state
+                            :by-server
+                            (mapcat
+                              (fn [[server-key  new-server]]
+                                (let [old-server (-> old-state :by-server (get server-key))]
+                                  (server-auto-resources old-state new-state old-server new-server))))
+                            (filter some?)
+                            seq)]
+        (log/info "Adding" (count tasks) "to auto get resources")
+        (add-tasks! state-atom tasks))
+      (catch Exception e
+        (log/error e "Error in :auto-get-resources state watcher")))))
+
+
+(defn- fix-selected-replay-relevant-keys [state]
+  (select-keys
+    state
+    [:parsed-replays-by-path :selected-replay-file :selected-replay-id]))
+
+(defn fix-selected-replay-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
                   :id ::state-watcher}
-    (tufte/p :auto-get-resources-watcher
-      (when (not= (auto-get-resources-relevant-keys old-state)
-                  (auto-get-resources-relevant-keys new-state))
+    (tufte/p :fix-selected-replay-watcher
+      (when (not= (fix-selected-replay-relevant-keys old-state)
+                  (fix-selected-replay-relevant-keys new-state))
         (try
-          (when-let [tasks (->> new-state
-                                :by-server
-                                (mapcat
-                                  (fn [[server-key  new-server]]
-                                    (let [old-server (-> old-state :by-server (get server-key))]
-                                      (server-auto-resources old-state new-state old-server new-server))))
-                                (filter some?)
-                                seq)]
-            (log/info "Adding" (count tasks) "to auto get resources")
-            (add-tasks! state-atom tasks))
+          (let [{:keys [parsed-replays-by-path selected-replay-file selected-replay-id]} new-state]
+            (when (and selected-replay-id (not selected-replay-file))
+              (when-let [local (->> parsed-replays-by-path
+                                    vals
+                                    (filter (comp #{selected-replay-id} :game-id :header))
+                                    first
+                                    :file)]
+                (log/info "Fixing selected replay from" selected-replay-id "to" local)
+                (swap! state-atom assoc :selected-replay-id nil :selected-replay-file local))))
           (catch Exception e
-            (log/error e "Error in :auto-get-resources state watcher")))))))
-
+            (log/error e "Error in :fix-selected-replay state watcher")))))))
 
 (defn fix-selected-server-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
@@ -888,6 +911,7 @@
   (remove-watch state-atom :fix-spring-isolation-dir)
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
+  (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
   (remove-watch state-atom :update-battle-status-sync)
   #_
@@ -913,7 +937,14 @@
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
   (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
   (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
-  (add-watch state-atom :auto-get-resources auto-get-resources-watcher)
+  #_
+  (add-watch state-atom :auto-get-resources
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :auto-get-resources-watcher
+          (auto-get-resources-watcher _k state-atom old-state new-state)))))
+  (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
   (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
   #_
   (add-watch state-atom :update-battle-status-sync
@@ -959,6 +990,10 @@
      task)))
 
 
+(defn- my-client-status [{:keys [username users]}]
+  (-> users (get username) :client-status))
+
+
 (defn- tasks-chimer-fn
   ([state-atom task-kind]
    (log/info "Starting tasks chimer for" task-kind)
@@ -968,7 +1003,11 @@
              (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (handle-task! state-atom task-kind))
+             (let [{:keys [by-server disable-tasks-while-in-game]} @state-atom
+                   in-any-game (some (comp :ingame my-client-status second) by-server)]
+               (if (and disable-tasks-while-in-game in-any-game)
+                 (log/warn "Skipping task handler while in game")
+                 (handle-task! state-atom task-kind))))
            {:error-handler
             (fn [e]
               (log/error e "Error handling task of kind" task-kind)
@@ -1998,8 +2037,8 @@
 (defmethod event-handler ::maps-key-pressed [{:fx/keys [event]}]
   (swap! *state update :map-input-prefix (update-filter-fn event)))
 
-(defmethod event-handler ::maps-hidden [_e]
-  (swap! *state dissoc :map-input-prefix))
+(defmethod event-handler ::host-replay-key-pressed [{:fx/keys [event]}]
+  (swap! *state update :filter-host-replay (update-filter-fn event)))
 
 (defmethod event-handler ::show-maps-window
   [{:keys [on-change-map]}]
@@ -2022,14 +2061,8 @@
 (defmethod event-handler ::engines-key-pressed [{:fx/keys [event]}]
   (swap! *state update :engine-filter (update-filter-fn event)))
 
-(defmethod event-handler ::engines-hidden [_e]
-  (swap! *state dissoc :engine-filter))
-
 (defmethod event-handler ::mods-key-pressed [{:fx/keys [event]}]
   (swap! *state update :mod-filter (update-filter-fn event)))
-
-(defmethod event-handler ::mods-hidden [_e]
-  (swap! *state dissoc :mod-filter))
 
 (defmethod event-handler ::desktop-browse-dir
   [{:keys [file]}]
@@ -3535,6 +3568,7 @@
   [[:battle-map-details-watcher battle-map-details-watcher]
    [:battle-mod-details-watcher battle-mod-details-watcher]
    ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:auto-get-resources-watcher auto-get-resources-watcher]
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 

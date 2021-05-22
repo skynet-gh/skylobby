@@ -11,15 +11,18 @@
 (def matchmaking-compflag "matchmaking")
 
 
+(def battles-buttons-state-keys
+  [:battle-password :battle-title :engines :engine-filter :engine-version :map-input-prefix
+   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :spring-isolation-dir
+   :use-springlobby-modname])
+
 (def battles-buttons-keys
-  [:accepted :battle :battle-password :battle-title :battles :client-data :compflags :engines :engine-filter
-   :engine-version :map-input-prefix :map-name :maps :mod-filter :mod-name :mods
-   :pop-out-battle :scripttags :selected-battle :singleplayer-battle :spring-isolation-dir :use-springlobby-modname])
+  [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle])
 
 (defn battles-buttons-view
-  [{:keys [accepted battle battles battle-password battle-title client-data compflags engine-version mod-name map-name maps
-           engines mods map-input-prefix engine-filter mod-filter pop-out-battle selected-battle
-           spring-isolation-dir]
+  [{:keys [accepted battle battles battle-password battle-title client-data compflags engine-version
+           engines mod-name map-name maps mods map-input-prefix engine-filter mod-filter
+           pop-out-battle selected-battle spring-isolation-dir]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left

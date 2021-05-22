@@ -195,8 +195,8 @@
            battle-mod-details battle-players-color-allyteam battle-map battle-modname bot-name
            bot-names bot-username bot-version bot-versions bots channel-name channels
            chat-auto-scroll client-data downloadables-by-url engine-details engine-file
-           engine-filter engine-update-tasks engine-version engines extract-tasks http-download
-           host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
+           engine-filter engine-update-tasks engine-version engines extract-tasks filter-host-replay
+           http-download host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
            map-update-tasks maps me message-drafts mod-filter mod-update-tasks
            mods my-battle-status my-client-status my-player parsed-replays-by-path rapid-data-by-id
            rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key singleplayer
@@ -301,19 +301,29 @@
               :children
               (concat
                 (when (and am-host (not singleplayer))
-                  [{:fx/type :label
-                    :text " Replay: "}
-                   {:fx/type :combo-box
-                    :prompt-text " < host a replay > "
-                    :style {:-fx-max-width 300}
-                    :value (-> scripttags :game :demofile)
-                    :on-value-changed {:event/type :spring-lobby/assoc-in
-                                       :path [:battle :scripttags :game :demofile]}
-                    :items (->> parsed-replays-by-path
-                                (sort-by (comp :filename second))
-                                reverse
-                                (mapv first))
-                    :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
+                  (let [filter-replay-lc (if filter-host-replay
+                                           (string/lower-case filter-host-replay)
+                                           "")]
+                    [{:fx/type :label
+                      :text " Replay: "}
+                     {:fx/type :combo-box
+                      :prompt-text " < host a replay > "
+                      :style {:-fx-max-width 300}
+                      :value (-> scripttags :game :demofile)
+                      :on-value-changed {:event/type :spring-lobby/assoc-in
+                                         :path [:by-server server-key :battle :scripttags :game :demofile]}
+                      :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
+                      :on-hidden {:event/type :spring-lobby/dissoc
+                                  :key :filter-host-replay}
+                      :items (->> parsed-replays-by-path
+                                  (filter (comp :filename second))
+                                  (filter (comp #(string/includes? (string/lower-case %) filter-replay-lc)
+                                                :filename
+                                                second))
+                                  (sort-by (comp :filename second))
+                                  reverse
+                                  (mapv first))
+                      :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]))
                 (when (-> scripttags :game :demofile)
                   [{:fx/type :button
                     :on-action {:event/type :spring-lobby/dissoc-in
@@ -904,7 +914,7 @@
   [:archiving :auto-get-resources :battle-players-color-allyteam :bot-name
    :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
    :drag-team :engine-filter :engine-version
-   :extracting :file-cache :git-clone :gitting :http-download :importables-by-path
+   :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :importables-by-path
    :map-input-prefix :map-details :message-drafts :minimap-type :mod-details :mod-filter
    :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
    :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
@@ -918,8 +928,8 @@
 
 (defn battle-view-impl
   [{:keys [battle battles battle-players-color-allyteam bot-name bot-username bot-version
-           client-data drag-allyteam drag-team engines file-cache map-input-prefix map-details maps
-           minimap-type mod-details mods server-key spring-isolation-dir spring-settings
+           client-data drag-allyteam drag-team engines file-cache map-input-prefix map-details
+           maps minimap-type mod-details mods server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle

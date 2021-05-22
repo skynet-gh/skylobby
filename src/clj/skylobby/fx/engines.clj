@@ -69,7 +69,8 @@
                       "< choose an engine >"
                       engine)})}
           :on-key-pressed {:event/type :spring-lobby/engines-key-pressed}
-          :on-hidden {:event/type :spring-lobby/engines-hidden}}]))
+          :on-hidden {:event/type :spring-lobby/dissoc
+                      :key :engine-filter}}]))
      [{:fx/type fx.ext.node/with-tooltip-props
        :props
        {:tooltip
