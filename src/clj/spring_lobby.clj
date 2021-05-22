@@ -821,6 +821,30 @@
             (log/error e "Error in :auto-get-resources state watcher")))))))
 
 
+(defn- fix-selected-replay-relevant-keys [state]
+  (select-keys
+    state
+    [:parsed-replays-by-path :selected-replay-file :selected-replay-id]))
+
+(defn fix-selected-replay-watcher [_k state-atom old-state new-state]
+  (tufte/profile {:dynamic? true
+                  :id ::state-watcher}
+    (tufte/p :fix-selected-replay-watcher
+      (when (not= (fix-selected-replay-relevant-keys old-state)
+                  (fix-selected-replay-relevant-keys new-state))
+        (try
+          (let [{:keys [parsed-replays-by-path selected-replay-file selected-replay-id]} new-state]
+            (when (and selected-replay-id (not selected-replay-file))
+              (when-let [local (->> parsed-replays-by-path
+                                    vals
+                                    (filter (comp #{selected-replay-id} :game-id :header))
+                                    first
+                                    :file)]
+                (log/info "Fixing selected replay from" selected-replay-id "to" local)
+                (swap! state-atom assoc :selected-replay-id nil :selected-replay-file local))))
+          (catch Exception e
+            (log/error e "Error in :fix-selected-replay state watcher")))))))
+
 (defn fix-selected-server-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
                   :id ::state-watcher}
@@ -888,6 +912,7 @@
   (remove-watch state-atom :fix-spring-isolation-dir)
   (remove-watch state-atom :spring-isolation-dir-changed)
   (remove-watch state-atom :auto-get-resources)
+  (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
   (remove-watch state-atom :update-battle-status-sync)
   #_
@@ -914,6 +939,7 @@
   (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
   (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
   (add-watch state-atom :auto-get-resources auto-get-resources-watcher)
+  (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
   (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
   #_
   (add-watch state-atom :update-battle-status-sync

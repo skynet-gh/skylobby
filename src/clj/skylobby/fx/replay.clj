@@ -97,7 +97,7 @@
      :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods]))
 
 (defn replay-view
-  [{:keys [battle-players-color-allyteam engines engines-by-version file-cache import-tasks
+  [{:keys [battle-players-color-allyteam download-tasks engines engines-by-version file-cache import-tasks
            maps-by-version map-details mods-by-version mod-details mod-update-tasks replay-details
            replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
            tasks-by-type]
@@ -183,15 +183,27 @@
                    :hgap 5
                    :padding 5
                    :children
-                   [(merge
-                      {:fx/type engine-sync-pane
-                       :engine-details selected-matching-engine
-                       :engine-file (:file selected-matching-engine)
-                       :engine-update-tasks engine-update-tasks
-                       :engine-version selected-engine-version
-                       :extract-tasks extract-tasks
-                       :tasks-by-type tasks-by-type}
-                      state)
+                   [(if-let [id (:id selected-replay)]
+                      (let [in-progress (contains? download-tasks id)]
+                        {:fx/type :button
+                         :style {:-fx-font-size 20}
+                         :text (if in-progress
+                                 "Downloading..."
+                                 "Download replay")
+                         :disable (boolean in-progress)
+                         :on-action {:event/type :spring-lobby/add-task
+                                     :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
+                                            :id id
+                                            :spring-isolation-dir spring-isolation-dir}}})
+                      (merge
+                        {:fx/type engine-sync-pane
+                         :engine-details selected-matching-engine
+                         :engine-file (:file selected-matching-engine)
+                         :engine-update-tasks engine-update-tasks
+                         :engine-version selected-engine-version
+                         :extract-tasks extract-tasks
+                         :tasks-by-type tasks-by-type}
+                        state))
                     (merge
                       {:fx/type mod-sync-pane
                        :battle-modname mod-name
@@ -1243,7 +1255,8 @@
                (merge
                  {:fx/type replay-view}
                  state
-                 {:engines-by-version engines-by-version
+                 {:download-tasks download-tasks
+                  :engines-by-version engines-by-version
                   :engines engines
                   :file-cache file-cache
                   :import-tasks import-tasks
