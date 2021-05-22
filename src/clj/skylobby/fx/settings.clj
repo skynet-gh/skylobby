@@ -15,13 +15,14 @@
 
 
 (def settings-window-keys
-  [:css :extra-import-name :extra-import-path :extra-import-sources :extra-replay-name :extra-replay-path
-   :extra-replay-recursive
-   :extra-replay-sources :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
+  [:css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources
+   :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window-impl
-  [{:keys [css extra-import-name extra-import-path extra-import-sources extra-replay-name
-           extra-replay-path extra-replay-recursive screen-bounds show-settings-window spring-isolation-dir]
+  [{:keys [css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
+           extra-replay-name extra-replay-path extra-replay-recursive screen-bounds
+           show-settings-window spring-isolation-dir]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -83,6 +84,19 @@
                         :key :spring-isolation-dir
                         :value (fs/spring-root)}
             :text "Spring"}]}
+         {:fx/type :label
+          :text " Performance"
+          :style {:-fx-font-size 24}}
+         {:fx/type :h-box
+          :style {:-fx-font-size 18}
+          :children
+          [
+           {:fx/type :check-box
+            :selected (boolean disable-tasks-while-in-game)
+            :on-selected-changed {:event/type :spring-lobby/assoc
+                                  :key :disable-tasks-while-in-game}}
+           {:fx/type :label
+            :text " Disable tasks while in game"}]}
          {:fx/type :label
           :text " Import Sources"
           :style {:-fx-font-size 24}}

@@ -131,7 +131,8 @@
 
 (def config-keys
   [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
-   :console-auto-scroll :css :engine-version :extra-import-sources :extra-replay-sources :filter-replay
+   :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
+   :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
@@ -189,6 +190,7 @@
   (merge
     {:auto-get-resources true
      :battle-players-color-allyteam true
+     :disable-tasks-while-in-game true
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
@@ -988,6 +990,10 @@
      task)))
 
 
+(defn- my-client-status [{:keys [username users]}]
+  (-> users (get username) :client-status))
+
+
 (defn- tasks-chimer-fn
   ([state-atom task-kind]
    (log/info "Starting tasks chimer for" task-kind)
@@ -997,7 +1003,11 @@
              (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (handle-task! state-atom task-kind))
+             (let [{:keys [by-server disable-tasks-while-in-game]} @state-atom
+                   in-any-game (some (comp :ingame my-client-status second) by-server)]
+               (if (and disable-tasks-while-in-game in-any-game)
+                 (log/warn "Skipping task handler while in game")
+                 (handle-task! state-atom task-kind))))
            {:error-handler
             (fn [e]
               (log/error e "Error handling task of kind" task-kind)
