@@ -760,46 +760,40 @@
 
 
 (defn fix-spring-isolation-dir-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:dynamic? true
-                  :id ::state-watcher}
-    (tufte/p :fix-spring-isolation-dir-watcher
-      (when (not= old-state new-state)
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when-not (and spring-isolation-dir
-                           (instance? File spring-isolation-dir))
-              (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-              (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
-          (catch Exception e
-            (log/error e "Error in :fix-spring-isolation-dir state watcher")))))))
+  (when (not= old-state new-state)
+    (try
+      (let [{:keys [spring-isolation-dir]} new-state]
+        (when-not (and spring-isolation-dir
+                       (instance? File spring-isolation-dir))
+          (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
+          (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
+      (catch Exception e
+        (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
 
 (defn spring-isolation-dir-changed-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:dynamic? true
-                  :id ::state-watcher}
-    (tufte/p :spring-isolation-dir-changed-watcher
-      (when (not= old-state new-state)
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when (and spring-isolation-dir
-                       (instance? File spring-isolation-dir)
-                       (not= (fs/canonical-path spring-isolation-dir)
-                             (fs/canonical-path (:spring-isolation-dir old-state))))
-              (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
-                        "to" spring-isolation-dir "updating resources")
-              (swap! state-atom
-                (fn [{:keys [extra-import-sources] :as state}]
-                  (-> state
-                      (update :tasks-by-kind
-                        add-multiple-tasks
-                        [{::task-type ::reconcile-engines}
-                         {::task-type ::reconcile-mods}
-                         {::task-type ::reconcile-maps}
-                         {::task-type ::scan-imports
-                          :sources (fx.import/import-sources extra-import-sources)}
-                         {::task-type ::update-rapid}
-                         {::task-type ::refresh-replays}]))))))
-          (catch Exception e
-            (log/error e "Error in :spring-isolation-dir-changed state watcher")))))))
+  (when (not= old-state new-state)
+    (try
+      (let [{:keys [spring-isolation-dir]} new-state]
+        (when (and spring-isolation-dir
+                   (instance? File spring-isolation-dir)
+                   (not= (fs/canonical-path spring-isolation-dir)
+                         (fs/canonical-path (:spring-isolation-dir old-state))))
+          (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
+                    "to" spring-isolation-dir "updating resources")
+          (swap! state-atom
+            (fn [{:keys [extra-import-sources] :as state}]
+              (-> state
+                  (update :tasks-by-kind
+                    add-multiple-tasks
+                    [{::task-type ::reconcile-engines}
+                     {::task-type ::reconcile-mods}
+                     {::task-type ::reconcile-maps}
+                     {::task-type ::scan-imports
+                      :sources (fx.import/import-sources extra-import-sources)}
+                     {::task-type ::update-rapid}
+                     {::task-type ::refresh-replays}]))))))
+      (catch Exception e
+        (log/error e "Error in :spring-isolation-dir-changed state watcher")))))
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
@@ -928,6 +922,7 @@
                       :id ::state-watcher}
         (tufte/p :battle-mod-details-watcher
           (battle-mod-details-watcher _k state-atom old-state new-state)))))
+  #_
   (add-watch state-atom :replay-map-and-mod-details
     (fn [_k state-atom old-state new-state]
       (tufte/profile {:dynamic? true
@@ -935,8 +930,20 @@
         (tufte/p :replay-map-and-mod-details-watcher
           (replay-map-and-mod-details-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
-  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
-  (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
+  #_
+  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :fix-spring-isolation-dir-watcher
+          (fix-spring-isolation-dir-watcher _k state-atom old-state new-state)))))
+  #_
+  (add-watch state-atom :spring-isolation-dir-changed
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :spring-isolation-dir-changed-watcher
+          (spring-isolation-dir-changed-watcher _k state-atom old-state new-state)))))
   #_
   (add-watch state-atom :auto-get-resources
     (fn [_k state-atom old-state new-state]
@@ -3570,10 +3577,13 @@
 
 
 (def state-watch-chimers
-  [[:battle-map-details-watcher battle-map-details-watcher]
-   [:battle-mod-details-watcher battle-mod-details-watcher]
-   ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+  [
    [:auto-get-resources-watcher auto-get-resources-watcher]
+   [:battle-map-details-watcher battle-map-details-watcher]
+   [:battle-mod-details-watcher battle-mod-details-watcher]
+   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher]
+   [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher]
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 
