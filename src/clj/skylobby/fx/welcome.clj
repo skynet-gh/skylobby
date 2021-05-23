@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -257,77 +258,73 @@
 (def welcome-view-keys
   (concat
     fx.battle/battle-view-keys
+    fx.bottom-bar/bottom-bar-keys
     [:app-update-available :by-spring-root :by-server :client-data :login-error :logins :password
      :server :servers :spring-isolation-dir :tasks-by-type :username]))
 
 (defn welcome-view
-  [{:keys [by-spring-root by-server spring-isolation-dir tasks-by-type]
+  [{:keys [by-spring-root by-server spring-isolation-dir]
     :as state}]
   {:fx/type :v-box
    :alignment :center
    :style {:-fx-font-size 20}
    :children
-   [
-    {:fx/type :pane
-     :v-box/vgrow :always}
-    (if (-> by-server :local :battle :battle-id)
-      {:fx/type :v-box
-       :children
-       [{:fx/type :h-box
+   (concat
+     [
+      {:fx/type :pane
+       :v-box/vgrow :always}
+      (if (-> by-server :local :battle :battle-id)
+        {:fx/type :v-box
+         :children
+         [{:fx/type :h-box
+           :children
+           [
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            (merge
+              {:fx/type singleplayer-buttons}
+              state)
+            (merge
+              {:fx/type multiplayer-buttons}
+              state)
+            {:fx/type :pane
+             :h-box/hgrow :always}]}
+          {:fx/type :v-box
+           :children
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :button
+               :text "Close Singleplayer Battle"
+               :on-action {:event/type :spring-lobby/dissoc-in
+                           :path [:by-server :local :battle]}}]}
+            (merge
+              {:fx/type fx.battle/battle-view}
+              (select-keys state fx.battle/battle-view-keys)
+              (:local by-server)
+              (get by-spring-root (fs/canonical-path spring-isolation-dir)))]}]}
+        {:fx/type :h-box
          :children
          [
           {:fx/type :pane
            :h-box/hgrow :always}
-          (merge
-            {:fx/type singleplayer-buttons}
-            state)
-          (merge
-            {:fx/type multiplayer-buttons}
-            state)
-          {:fx/type :pane
-           :h-box/hgrow :always}]}
-        {:fx/type :v-box
-         :children
-         [{:fx/type :h-box
-           :alignment :center-left
+          {:fx/type :v-box
            :children
-           [{:fx/type :button
-             :text "Close Singleplayer Battle"
-             :on-action {:event/type :spring-lobby/dissoc-in
-                         :path [:by-server :local :battle]}}]}
-          (merge
-            {:fx/type fx.battle/battle-view}
-            (select-keys state fx.battle/battle-view-keys)
-            (:local by-server)
-            (get by-spring-root (fs/canonical-path spring-isolation-dir)))]}]}
-      {:fx/type :h-box
-       :children
-       [
-        {:fx/type :pane
-         :h-box/hgrow :always}
-        {:fx/type :v-box
-         :children
-         [{:fx/type :pane
-           :v-box/vgrow :always}
-          (merge
-            {:fx/type singleplayer-buttons}
-            state)
-          (merge
-            {:fx/type multiplayer-buttons}
-            state)
+           [{:fx/type :pane
+             :v-box/vgrow :always}
+            (merge
+              {:fx/type singleplayer-buttons}
+              state)
+            (merge
+              {:fx/type multiplayer-buttons}
+              state)
+            {:fx/type :pane
+             :v-box/vgrow :always}]}
           {:fx/type :pane
-           :v-box/vgrow :always}]}
-        {:fx/type :pane
-         :h-box/hgrow :always}]})
-    {:fx/type :pane
-     :v-box/vgrow :always}
-    {:fx/type :h-box
-     :alignment :center-left
-     :style {:-fx-font-size 14}
-     :children
-     [{:fx/type :pane
-       :h-box/hgrow :always}
-      {:fx/type :button
-       :text (str (count tasks-by-type) " tasks")
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-tasks-window}}]}]})
+           :h-box/hgrow :always}]})]
+     (when-not (-> by-server :local :battle :battle-id)
+       [{:fx/type :pane
+         :v-box/vgrow :always}])
+     [(merge
+        {:fx/type fx.bottom-bar/bottom-bar}
+        (select-keys state fx.bottom-bar/bottom-bar-keys))])})

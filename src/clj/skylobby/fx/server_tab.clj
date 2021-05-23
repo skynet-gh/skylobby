@@ -2,6 +2,7 @@
   (:require
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
+    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.channels :as fx.channels]
     [skylobby.fx.main-tabs :as fx.main-tabs]))
 
@@ -10,6 +11,7 @@
   (concat
     fx.battle/battle-view-state-keys
     fx.battles-buttons/battles-buttons-state-keys
+    fx.bottom-bar/bottom-bar-keys
     fx.main-tabs/main-tab-state-keys
     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
 
@@ -20,7 +22,7 @@
     server-tab-state-keys))
 
 (defn server-tab
-  [{:keys [agreement battle client-data console-auto-scroll last-failed-message password pop-out-battle
+  [{:keys [agreement battle client-data console-auto-scroll password pop-out-battle
            selected-tab-channel selected-tab-main tasks-by-type username verification-code]
     :as state}]
   {:fx/type :v-box
@@ -92,15 +94,6 @@
                    :style {:-fx-font-size 20}
                    :text "Waiting for battle details from server..."}]}]})]}]
          main-tab))
-     [{:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :label
-         :text (str last-failed-message)
-         :style {:-fx-text-fill "#FF0000"}}
-        {:fx/type :pane
-         :h-box/hgrow :always}
-        {:fx/type :button
-         :text (str (count tasks-by-type) " tasks")
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-tasks-window}}]}])})
+     [(merge
+        {:fx/type fx.bottom-bar/bottom-bar}
+        (select-keys state fx.bottom-bar/bottom-bar-keys))])})

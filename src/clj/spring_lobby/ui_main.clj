@@ -27,6 +27,10 @@
    [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
+   [nil "--music-dir MUSIC_DIR" "Set the music-dir config to the given directory"]
+   [nil "--music-volume MUSIC_VOLUME" "Set the music-volume config to the given value between 0.0 and 1.0"
+    :parse-fn #(Double/parseDouble %)
+    :validate-fn [#(<= 0 % 1) "Must be a number between 0.0 and 1.0"]]
    [nil "--no-update-check" "Diable skylobby self update check"]
    [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
     :assoc-fn (fn [m k v]
@@ -71,6 +75,10 @@
                       {:standalone true}
                       (when (contains? options :spring-root)
                         {:spring-isolation-dir (fs/file (:spring-root options))})
+                      (when (contains? options :music-dir)
+                        {:music-dir (fs/file (:music-dir options))})
+                      (when (contains? options :music-volume)
+                        {:music-volume (:music-volume options)})
                       (when (contains? options :filter-battles)
                         {:filter-battles (:filter-battles options)})
                       (when (contains? options :filter-users)
