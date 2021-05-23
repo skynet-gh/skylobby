@@ -147,7 +147,8 @@
                   (filter (comp #(string/starts-with? % "ai") name first))
                   (mapv
                     (fn [[aiid {:keys [team] :as ai}]]
-                      (let [{:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
+                      (let [[_all id] (re-find #"ai(\d+)" (name aiid))
+                            {:keys [allyteam handicap rgbcolor side] :as team} (get teams-by-id (str team))
                             team-color (try (u/spring-script-color-to-int rgbcolor)
                                             (catch Exception e
                                               (log/debug e "Error parsing color")
@@ -157,7 +158,7 @@
                             (clojure.set/rename-keys
                               {:name :username})
                             (assoc :battle-status
-                                   {:id aiid
+                                   {:id id
                                     :team team
                                     :mode true
                                     :handicap handicap
