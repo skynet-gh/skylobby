@@ -2016,6 +2016,8 @@
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
+                   (assoc-in [:by-server :local :client-data] nil)
+                   (assoc-in [:by-server :local :server-key] :local)
                    (assoc-in [:by-server :local :username] username)
                    (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
                                                                          :battle-map map-name
@@ -2341,8 +2343,11 @@
   [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
   (future
     (try
-      (let [x (.getX event)
-            y (.getY event)]
+      (let [canvas (.getTarget event)
+            width (.getWidth canvas)
+            height (.getHeight canvas)
+            x (min width (max 0 (.getX event)))
+            y (min height (max 0 (.getY event)))]
         (swap! *state
                (fn [state]
                  (cond
