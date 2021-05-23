@@ -34,6 +34,14 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.42]
+
+- Add music player, `--music-dir`, and `--music-volume` cli options
+- Fix clear start boxes
+- Contain start boxes dragging to minimap
+- Fix AI id in replay players table
+- Change slowest state watchers to periodic
+
 ### [0.3.41]
 
 - Add setting to disable tasks while in a game, for performance
