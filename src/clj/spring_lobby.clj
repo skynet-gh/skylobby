@@ -51,6 +51,7 @@
     (javafx.event Event)
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
+    (javafx.scene.media Media MediaPlayer)
     (javafx.stage DirectoryChooser)
     (manifold.stream SplicedStream))
   (:gen-class))
@@ -134,7 +135,7 @@
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :username])
 
@@ -760,46 +761,40 @@
 
 
 (defn fix-spring-isolation-dir-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:dynamic? true
-                  :id ::state-watcher}
-    (tufte/p :fix-spring-isolation-dir-watcher
-      (when (not= old-state new-state)
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when-not (and spring-isolation-dir
-                           (instance? File spring-isolation-dir))
-              (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-              (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
-          (catch Exception e
-            (log/error e "Error in :fix-spring-isolation-dir state watcher")))))))
+  (when (not= old-state new-state)
+    (try
+      (let [{:keys [spring-isolation-dir]} new-state]
+        (when-not (and spring-isolation-dir
+                       (instance? File spring-isolation-dir))
+          (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
+          (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
+      (catch Exception e
+        (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
 
 (defn spring-isolation-dir-changed-watcher [_k state-atom old-state new-state]
-  (tufte/profile {:dynamic? true
-                  :id ::state-watcher}
-    (tufte/p :spring-isolation-dir-changed-watcher
-      (when (not= old-state new-state)
-        (try
-          (let [{:keys [spring-isolation-dir]} new-state]
-            (when (and spring-isolation-dir
-                       (instance? File spring-isolation-dir)
-                       (not= (fs/canonical-path spring-isolation-dir)
-                             (fs/canonical-path (:spring-isolation-dir old-state))))
-              (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
-                        "to" spring-isolation-dir "updating resources")
-              (swap! state-atom
-                (fn [{:keys [extra-import-sources] :as state}]
-                  (-> state
-                      (update :tasks-by-kind
-                        add-multiple-tasks
-                        [{::task-type ::reconcile-engines}
-                         {::task-type ::reconcile-mods}
-                         {::task-type ::reconcile-maps}
-                         {::task-type ::scan-imports
-                          :sources (fx.import/import-sources extra-import-sources)}
-                         {::task-type ::update-rapid}
-                         {::task-type ::refresh-replays}]))))))
-          (catch Exception e
-            (log/error e "Error in :spring-isolation-dir-changed state watcher")))))))
+  (when (not= old-state new-state)
+    (try
+      (let [{:keys [spring-isolation-dir]} new-state]
+        (when (and spring-isolation-dir
+                   (instance? File spring-isolation-dir)
+                   (not= (fs/canonical-path spring-isolation-dir)
+                         (fs/canonical-path (:spring-isolation-dir old-state))))
+          (log/info "Spring isolation dir changed from" (:spring-isolation-dir old-state)
+                    "to" spring-isolation-dir "updating resources")
+          (swap! state-atom
+            (fn [{:keys [extra-import-sources] :as state}]
+              (-> state
+                  (update :tasks-by-kind
+                    add-multiple-tasks
+                    [{::task-type ::reconcile-engines}
+                     {::task-type ::reconcile-mods}
+                     {::task-type ::reconcile-maps}
+                     {::task-type ::scan-imports
+                      :sources (fx.import/import-sources extra-import-sources)}
+                     {::task-type ::update-rapid}
+                     {::task-type ::refresh-replays}]))))))
+      (catch Exception e
+        (log/error e "Error in :spring-isolation-dir-changed state watcher")))))
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
@@ -928,6 +923,7 @@
                       :id ::state-watcher}
         (tufte/p :battle-mod-details-watcher
           (battle-mod-details-watcher _k state-atom old-state new-state)))))
+  #_
   (add-watch state-atom :replay-map-and-mod-details
     (fn [_k state-atom old-state new-state]
       (tufte/profile {:dynamic? true
@@ -935,8 +931,20 @@
         (tufte/p :replay-map-and-mod-details-watcher
           (replay-map-and-mod-details-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
-  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher)
-  (add-watch state-atom :spring-isolation-dir-changed spring-isolation-dir-changed-watcher)
+  #_
+  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :fix-spring-isolation-dir-watcher
+          (fix-spring-isolation-dir-watcher _k state-atom old-state new-state)))))
+  #_
+  (add-watch state-atom :spring-isolation-dir-changed
+    (fn [_k state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :spring-isolation-dir-changed-watcher
+          (spring-isolation-dir-changed-watcher _k state-atom old-state new-state)))))
   #_
   (add-watch state-atom :auto-get-resources
     (fn [_k state-atom old-state new-state]
@@ -1383,6 +1391,140 @@
      {:todo-count (count todo)})))
 
 
+(defmethod event-handler ::stop-music
+  [{:keys [media-player]}]
+  (when media-player
+    (.dispose media-player))
+  (swap! *state
+    (fn [state]
+      (-> state
+          (dissoc :media-player :music-now-playing :music-paused)
+          (assoc :music-stopped true)))))
+
+(defn music-files [music-dir]
+  (when (fs/exists? music-dir)
+    (->> (fs/list-files music-dir)
+         (sort-by fs/filename)
+         (remove (comp #(string/starts-with? % ".") fs/filename))
+         (remove (comp #(string/ends-with? % ".ini") fs/filename))
+         (into []))))
+
+(defn music-player
+  [{:keys [music-file music-volume]}]
+  (if music-file
+    (let [media-url (-> music-file .toURI .toURL)
+          media (Media. (str media-url))
+          media-player (MediaPlayer. media)
+          audio-equalizer (.getAudioEqualizer media-player)]
+      (.setAutoPlay media-player true)
+      (.setVolume media-player (or music-volume 1.0))
+      (.setOnEndOfMedia media-player
+        (fn []
+          (event-handler
+            (merge
+              {:event/type ::next-music}
+              (select-keys @*state [:media-player :music-now-playing :music-queue :music-volume])))))
+      (.setEnabled audio-equalizer true)
+      media-player)
+    (log/info "No music to play")))
+
+(defmethod event-handler ::start-music
+  [{:keys [music-queue music-volume]}]
+  (let [music-file (first music-queue)
+        media-player (music-player
+                       {:music-file music-file
+                        :music-volume music-volume})]
+    (swap! *state assoc
+           :music-paused false
+           :media-player media-player
+           :music-now-playing music-file)))
+
+(defn next-value
+  "Returns the value in the given list immediately following the given value, wrapping around if
+  needed."
+  ([l v]
+   (next-value l v nil))
+  ([l v {:keys [direction] :or {direction inc}}]
+   (when (seq l)
+     (get
+       l
+       (mod
+         (direction (.indexOf ^List l v))
+         (count l))))))
+
+(defmethod event-handler ::prev-music
+  [{:keys [media-player music-now-playing music-queue music-volume]}]
+  (when media-player
+    (.dispose media-player))
+  (let [music-file (next-value music-queue music-now-playing {:direction dec})
+        media-player (music-player
+                       {:music-file music-file
+                        :music-volume music-volume})]
+    (swap! *state assoc
+           :music-paused false
+           :media-player media-player
+           :music-now-playing music-file)))
+
+(defmethod event-handler ::next-music
+  [{:keys [media-player music-now-playing music-queue music-volume]}]
+  (when media-player
+    (.dispose media-player))
+  (let [music-file (next-value music-queue music-now-playing)
+        media-player (music-player
+                       {:music-file music-file
+                        :music-volume music-volume})]
+    (swap! *state assoc
+           :music-paused false
+           :media-player media-player
+           :music-now-playing music-file)))
+
+(defmethod event-handler ::toggle-music-play
+  [{:keys [media-player music-paused]}]
+  (when media-player
+    (if music-paused
+      (.play media-player)
+      (.pause media-player))
+    (swap! *state assoc
+           :music-paused (not music-paused)
+           :music-stopped false)))
+
+(defmethod event-handler ::on-change-music-volume
+  [{:fx/keys [event] :keys [media-player]}]
+  (let [volume event]
+    (when media-player
+      (.setVolume media-player volume))
+    (swap! *state assoc :music-volume volume)))
+
+
+(defn- update-music-queue-chimer-fn [state-atom]
+  (log/info "Starting update music queue chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+            (java-time/duration 30 :seconds))
+          (fn [_chimestamp]
+            (log/info "Updating music queue")
+            (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
+              (if music-dir
+                (let [music-files (music-files music-dir)]
+                  (if (or media-player music-stopped)
+                    (swap! state-atom assoc :music-queue music-files)
+                    (let [music-file (next-value music-files music-now-playing)
+                          media-player (music-player
+                                         {:music-file music-file
+                                          :music-volume music-volume})]
+                      (swap! state-atom assoc
+                             :media-player media-player
+                             :music-now-playing music-file
+                             :music-queue music-files))))
+                (log/info "No music dir" music-dir))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating music queue")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
@@ -1408,10 +1550,9 @@
                                 channels))))))
                   {}
                   by-server))))
-
           {:error-handler
            (fn [e]
-             (log/error e "Error force updating resources")
+             (log/error e "Error truncating messages")
              true)})]
     (fn [] (.close chimer))))
 
@@ -2016,6 +2157,8 @@
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
+                   (assoc-in [:by-server :local :client-data] nil)
+                   (assoc-in [:by-server :local :server-key] :local)
                    (assoc-in [:by-server :local :username] username)
                    (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
                                                                          :battle-map map-name
@@ -2341,8 +2484,11 @@
   [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
   (future
     (try
-      (let [x (.getX event)
-            y (.getY event)]
+      (let [canvas (.getTarget event)
+            width (.getWidth canvas)
+            height (.getHeight canvas)
+            x (min width (max 0 (.getX event)))
+            y (min height (max 0 (.getY event)))]
         (swap! *state
                (fn [state]
                  (cond
@@ -2476,10 +2622,7 @@
                  direction (if (pos? (.getDeltaY event))
                              dec
                              inc)
-                 next-index (mod
-                              (direction (.indexOf ^List fx.minimap/minimap-types minimap-type))
-                              (count fx.minimap/minimap-types))
-                 next-type (get fx.minimap/minimap-types next-index)]
+                 next-type (next-value fx.minimap/minimap-types minimap-type {:direction direction})]
              (assoc state minimap-type-key next-type)))))
 
 (defn- battle-players-and-bots
@@ -3278,8 +3421,15 @@
 
 (defmethod event-handler ::dissoc
   [e]
-  (log/info "Dissoc" (:key e))
-  (swap! *state dissoc (:key e)))
+  (if-let [ks (:keys e)]
+    (do
+      (log/info "Dissoc" ks)
+      (swap! *state
+        (fn [state]
+          (apply dissoc state ks))))
+    (do
+      (log/info "Dissoc" (:key e))
+      (swap! *state dissoc (:key e)))))
 
 (defmethod event-handler ::dissoc-in
   [{:keys [path]}]
@@ -3565,10 +3715,13 @@
 
 
 (def state-watch-chimers
-  [[:battle-map-details-watcher battle-map-details-watcher]
-   [:battle-mod-details-watcher battle-mod-details-watcher]
-   ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+  [
    [:auto-get-resources-watcher auto-get-resources-watcher]
+   [:battle-map-details-watcher battle-map-details-watcher]
+   [:battle-mod-details-watcher battle-mod-details-watcher]
+   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher]
+   [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher]
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
 
 
@@ -3639,10 +3792,11 @@
                             (map (fn [[k watcher-fn]]
                                    (state-change-chimer-fn state-atom k watcher-fn)))
                             doall)
-         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
+         profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-         profile-print-chimer (profile-print-chimer-fn state-atom)]
+         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         update-music-queue-chimer (update-music-queue-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -3658,10 +3812,13 @@
       (concat
         task-chimers
         state-chimers
-        [truncate-messages-chimer
+        [
          check-app-update-chimer
+         profile-print-chimer
          spit-app-config-chimer
-         profile-print-chimer])})))
+         truncate-messages-chimer
+         update-music-queue-chimer])})))
+
 
 (defn standalone-replay-init [state-atom]
   (let [task-chimers (->> task/task-kinds

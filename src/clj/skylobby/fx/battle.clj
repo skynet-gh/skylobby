@@ -676,7 +676,16 @@
                [{:fx/type :button
                  :text "Clear boxes"
                  :disable (and (not singleplayer) am-spec)
-                 :on-action {:event/type :spring-lobby/clear-start-boxes}}]))}
+                 :on-action {:event/type :spring-lobby/clear-start-boxes
+                             :allyteam-ids (->> scripttags
+                                                :game
+                                                (filter (comp #(string/starts-with? % "allyteam") name first))
+                                                (map
+                                                  (fn [[teamid _team]]
+                                                    (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
+                                                      id))))
+                             :client-data client-data
+                             :server-key server-key}}]))}
           {:fx/type :label
            :text (str "")}
           {:fx/type :h-box

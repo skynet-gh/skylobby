@@ -205,23 +205,25 @@
         {:fx/cell-type :table-cell
          :describe
          (fn [i]
-           {:text ""
-            :graphic
-            {:fx/type ext-recreate-on-key-changed
-             :key (u/nickname i)
-             :desc
-             {:fx/type :combo-box
-              :value (str (:id (:battle-status i)))
-              :on-value-changed {:event/type :spring-lobby/battle-team-changed
-                                 :client-data (when-not singleplayer client-data)
-                                 :is-me (= (:username i) username)
-                                 :is-bot (-> i :user :client-status :bot)
-                                 :id i}
-              :items (map str (take 16 (iterate inc 0)))
-              :disable (or (not username)
-                           (not (or am-host
-                                    (= (:username i) username)
-                                    (= (:owner i) username))))}}})}}
+           (let [items (map str (take 16 (iterate inc 0)))
+                 value (str (:id (:battle-status i)))]
+             {:text ""
+              :graphic
+              {:fx/type ext-recreate-on-key-changed
+               :key (u/nickname i)
+               :desc
+               {:fx/type :combo-box
+                :value value
+                :on-value-changed {:event/type :spring-lobby/battle-team-changed
+                                   :client-data (when-not singleplayer client-data)
+                                   :is-me (= (:username i) username)
+                                   :is-bot (-> i :user :client-status :bot)
+                                   :id i}
+                :items items
+                :disable (or (not username)
+                             (not (or am-host
+                                      (= (:username i) username)
+                                      (= (:owner i) username))))}}}))}}
        {:fx/type :table-column
         :text "Color"
         :resizable false

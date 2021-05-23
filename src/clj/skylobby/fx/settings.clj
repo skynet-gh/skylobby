@@ -16,13 +16,14 @@
 
 (def settings-window-keys
   [:css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
-   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources
+   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
+   :music-dir :music-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window-impl
   [{:keys [css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
-           extra-replay-name extra-replay-path extra-replay-recursive screen-bounds
-           show-settings-window spring-isolation-dir]
+           extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
+           music-volume screen-bounds show-settings-window spring-isolation-dir]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -250,7 +251,41 @@
             :on-action {:event/type :spring-lobby/assoc
                         :key :css
                         :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
-            :text (str "Custom from " custom-css-file)})]}}
+            :text (str "Custom from " custom-css-file)})
+         {:fx/type :label
+          :text " Music"
+          :style {:-fx-font-size 24}}
+         {:fx/type :h-box
+          :alignment :center-left
+          :children
+          [
+           {:fx/type :text-field
+            :disable true
+            :text (str (fs/canonical-path music-dir))
+            :style {:-fx-min-width 600}}
+           {:fx/type :button
+            :style-class ["button" "skylobby-normal"]
+            :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                        :target [:music-dir]}
+            :text ""
+            :graphic
+            {:fx/type font-icon/lifecycle
+             :icon-literal "mdi-file-find:16"}}]}
+         {:fx/type :h-box
+          :alignment :center-left
+          :children
+          [
+           {:fx/type :label
+            :text " Music Volume: "
+            :style {:-fx-font-size 18}}
+           {:fx/type :slider
+            :min 0.0
+            :max 1.0
+            :value (if (number? music-volume)
+                     music-volume
+                     1.0)
+            :on-value-changed {:event/type :spring-lobby/on-change-music-volume
+                               :media-player media-player}}]}]}}
      {:fx/type :pane})}})
 
 (defn settings-window [state]
