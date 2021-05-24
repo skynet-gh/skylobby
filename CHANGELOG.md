@@ -34,6 +34,13 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.43]
+
+- Add battle run time display
+- Add pause and resume of lobby music when in game
+- Filter out non-playable files from music folder
+- Fix `--music-volume` cli option and improve cli error messages
+
 ### [0.3.42]
 
 - Add music player, `--music-dir`, and `--music-volume` cli options
