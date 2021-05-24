@@ -108,7 +108,7 @@
   (re-find #"\w+ ([^\s]+) (\w+)" m))
 
 (defn start-game-if-synced
-  [{:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
+  [state-atom {:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
   (let [{:keys [battle battles]} server-data
         spring-root (or (-> servers (get (-> server-data :client-data :server-url)) :spring-isolation-dir)
                         spring-isolation-dir)
@@ -122,6 +122,7 @@
       (do
         (log/info "Starting game to join host")
         (spring/start-game
+          state-atom
           (merge
             state
             server-data
@@ -140,7 +141,15 @@
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
         decoded-status (cu/decode-client-status client-status)
-        [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
+        now (u/curr-millis)
+        [prev-state _curr-state] (swap-vals! state-atom update-in [:by-server server-key :users username]
+                                   (fn [user-data]
+                                     (let [prev-status (:client-status user-data)]
+                                       (cond-> user-data
+                                         true
+                                         (assoc :client-status decoded-status)
+                                         (and (not (:ingame prev-status)) (:ingame decoded-status))
+                                         (assoc :game-start-time now)))))
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)
@@ -159,7 +168,7 @@
       (and (not auto-launch) am-spec)
       (log/info "Not auto starting game" (pr-str {:spec am-spec :auto-launch auto-launch}))
       :else
-      (start-game-if-synced prev-state server-data))))
+      (start-game-if-synced state-atom prev-state server-data))))
 
 (defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)

@@ -12,7 +12,7 @@
     fx.battle/battle-view-state-keys
     fx.battles-buttons/battles-buttons-state-keys
     fx.bottom-bar/bottom-bar-keys
-    fx.main-tabs/main-tab-state-keys
+    fx.main-tabs/main-tab-view-state-keys
     [:console-auto-scroll :map-details :mod-details :pop-out-battle :selected-battle]))
 
 (def server-tab-keys
@@ -61,6 +61,7 @@
                         :selected-tab-main selected-tab-main}
                        (select-keys state
                          (concat
+                           fx.main-tabs/main-tab-view-state-keys
                            fx.main-tabs/main-tab-view-keys
                            fx.main-tabs/my-channels-view-keys
                            fx.channels/channels-table-keys)))

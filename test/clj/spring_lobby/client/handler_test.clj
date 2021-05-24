@@ -314,8 +314,10 @@
           client-status-str (cu/encode-client-status
                               (assoc
                                 cu/default-client-status
-                                :ingame true))]
-      (with-redefs [handler/start-game-if-synced (fn [& _] (reset! game-started true))]
+                                :ingame true))
+          now 12345]
+      (with-redefs [handler/start-game-if-synced (fn [& _] (reset! game-started true))
+                    u/curr-millis (constantly now)]
         (handler/handle state-atom server-key (str "CLIENTSTATUS " host " " client-status-str)))
       (is (= {:by-server
               {:server1
@@ -335,6 +337,7 @@
                    :away false
                    :bot false
                    :ingame true
-                   :rank 0}}}}}}
+                   :rank 0}
+                  :game-start-time now}}}}}
              @state-atom))
       (is (true? @game-started)))))

@@ -74,8 +74,10 @@
 (def main-tab-id-set (set main-tab-ids))
 
 
-(def main-tab-state-keys
-  [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main])
+(def main-tab-view-state-keys
+  (concat
+    fx.battles-table/battles-table-state-keys
+    [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
 
 (def main-tab-view-keys
   (concat
@@ -86,7 +88,8 @@
      :server :users]))
 
 (defn main-tab-view
-  [{:keys [battles client-data channels filter-battles filter-users join-channel-name selected-tab-main server-key users]
+  [{:keys [battles client-data channels filter-battles filter-users join-channel-name
+           selected-tab-main server-key users]
     :as state}]
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)

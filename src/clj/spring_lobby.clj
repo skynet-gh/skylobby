@@ -1404,16 +1404,25 @@
 (defn music-files [music-dir]
   (when (fs/exists? music-dir)
     (->> (fs/list-files music-dir)
-         (sort-by fs/filename)
          (remove (comp #(string/starts-with? % ".") fs/filename))
-         (remove (comp #(string/ends-with? % ".ini") fs/filename))
+         (filter
+           (comp
+             (fn [filename]
+               (some
+                 (partial string/ends-with? filename)
+                 [".aif" ".aiff" ".fxm" ".flv" ".m3u8" ".mp3" ".mp4" ".m4a" ".m4v" ".wav"]))
+             fs/filename))
+         (sort-by fs/filename)
          (into []))))
 
 (defn music-player
   [{:keys [music-file music-volume]}]
   (if music-file
     (let [media-url (-> music-file .toURI .toURL)
-          media (Media. (str media-url))
+          media (try
+                  (Media. (str media-url))
+                  (catch Exception e
+                    (log/error e "Error playing media" music-file)))
           media-player (MediaPlayer. media)
           audio-equalizer (.getAudioEqualizer media-player)]
       (.setAutoPlay media-player true)
@@ -1522,6 +1531,22 @@
           {:error-handler
            (fn [e]
              (log/error e "Error updating music queue")
+             true)})]
+    (fn [] (.close chimer))))
+
+(defn- update-now-chimer-fn [state-atom]
+  (log/info "Starting update now chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+            (java-time/duration 1 :seconds))
+          (fn [_chimestamp]
+            (log/info "Updating now")
+            (swap! state-atom assoc :now (u/curr-millis)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
              true)})]
     (fn [] (.close chimer))))
 
@@ -2426,7 +2451,7 @@
             :message (str "!joinas spec")})
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
-        (spring/start-game state)
+        (spring/start-game *state state)
         @(event-handler
            {:event/type ::send-message
             :channel-name channel-name
@@ -3796,7 +3821,8 @@
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-         update-music-queue-chimer (update-music-queue-chimer-fn state-atom)]
+         update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
+         update-now-chimer (update-now-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -3817,7 +3843,8 @@
          profile-print-chimer
          spit-app-config-chimer
          truncate-messages-chimer
-         update-music-queue-chimer])})))
+         update-music-queue-chimer
+         update-now-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]
