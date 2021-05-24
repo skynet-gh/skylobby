@@ -140,7 +140,15 @@
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
         decoded-status (cu/decode-client-status client-status)
-        [prev-state _curr-state] (swap-vals! state-atom assoc-in [:by-server server-key :users username :client-status] decoded-status)
+        now (u/curr-millis)
+        [prev-state _curr-state] (swap-vals! state-atom update-in [:by-server server-key :users username]
+                                   (fn [user-data]
+                                     (let [prev-status (:client-status user-data)]
+                                       (cond-> user-data
+                                         true
+                                         (assoc :client-status decoded-status)
+                                         (and (not (:ingame prev-status)) (:ingame decoded-status))
+                                         (assoc :game-start-time now)))))
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)

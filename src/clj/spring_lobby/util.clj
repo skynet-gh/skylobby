@@ -317,6 +317,15 @@
                                          (java-time/instant timestamp-millis)
                                          time-zone-id))))
 
+
+(defn format-duration [duration]
+  (when duration
+    (format "%d:%02d:%02d"
+      (.toHours duration)
+      (.toMinutesPart duration)
+      (.toSecondsPart duration))))
+
+
 (defn non-battle-channels
   [channels]
   (->> channels

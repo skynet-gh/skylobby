@@ -2,19 +2,26 @@
   (:require
     [clojure.string :as string]
     [cljfx.ext.table-view :as fx.ext.table-view]
+    java-time
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
-    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]))
 
 
+(def battles-table-state-keys
+  [:battle-password :filter-battles :now])
+
 (def battles-table-keys
-  [:battle :battle-password :battles :client-data :filter-battles :selected-battle :server-key :users])
+  (concat
+    battles-table-state-keys
+    [:battle :battles :client-data :selected-battle :server-key :users]))
 
 (defn battles-table
-  [{:keys [battle battle-password battles client-data filter-battles selected-battle server-key users]}]
+  [{:keys [battle battle-password battles client-data filter-battles now selected-battle server-key users]}]
   (let [filter-lc (when-not (string/blank? filter-battles)
-                    (string/lower-case filter-battles))]
+                    (string/lower-case filter-battles))
+        now (or now (u/curr-millis))]
     {:fx/type fx.ext.table-view/with-selection-props
      :props {:selection-mode :single
              :on-selected-item-changed {:event/type :spring-lobby/select-battle
@@ -73,7 +80,7 @@
        [
         {:fx/type :table-column
          :text "Game"
-         :pref-width 220
+         :pref-width 240
          :cell-value-factory :battle-modname
          :cell-factory
          {:fx/cell-type :table-cell
@@ -81,29 +88,37 @@
         {:fx/type :table-column
          :text "Status"
          :resizable false
-         :pref-width 56
+         :pref-width 112
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
           :describe
           (fn [status]
-            (cond
-              (or (= "1" (:battle-passworded status))
-                  (= "1" (:battle-locked status)))
+            (let [{:keys [game-start-time] :as user-data} (->> status :host-username (get users))
+                  ingame (-> user-data :client-status :ingame)]
               {:text ""
                :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-lock:16:yellow"}}
-              (->> status :host-username (get users) :client-status :ingame)
-              {:text ""
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-sword:16:red"}}
-              :else
-              {:text ""
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-checkbox-blank-circle-outline:16:green"}}))}}
+               {:fx/type :h-box
+                :children
+                (concat
+                  (if (or (= "1" (:battle-passworded status))
+                          (= "1" (:battle-locked status)))
+                    [{:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-lock:16:yellow"}]
+                    [{:fx/type :pane
+                      :style {:-fx-pref-width 16}}])
+                  [(if ingame
+                     {:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-sword:16:red"}
+                     {:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-checkbox-blank-circle-outline:16:green"})]
+                  (when (and ingame game-start-time)
+                    [{:fx/type ext-recreate-on-key-changed
+                      :key (str now)
+                      :desc
+                      {:fx/type :label
+                       :text
+                       (str " " (u/format-duration (java-time/duration (- now game-start-time) :millis)))}}]))}}))}}
         {:fx/type :table-column
          :text "Map"
          :pref-width 200

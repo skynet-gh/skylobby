@@ -1525,6 +1525,22 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn- update-now-chimer-fn [state-atom]
+  (log/info "Starting update now chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+            (java-time/duration 1 :seconds))
+          (fn [_chimestamp]
+            (log/info "Updating now")
+            (swap! state-atom assoc :now (u/curr-millis)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
@@ -3796,7 +3812,8 @@
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
-         update-music-queue-chimer (update-music-queue-chimer-fn state-atom)]
+         update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
+         update-now-chimer (update-now-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -3817,7 +3834,8 @@
          profile-print-chimer
          spit-app-config-chimer
          truncate-messages-chimer
-         update-music-queue-chimer])})))
+         update-music-queue-chimer
+         update-now-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]

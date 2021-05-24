@@ -529,11 +529,7 @@
              (fn [game-time]
                (let [duration (when game-time (java-time/duration game-time :seconds))
                      ; https://stackoverflow.com/a/44343699/984393
-                     formatted (when duration
-                                 (format "%d:%02d:%02d"
-                                   (.toHours duration)
-                                   (.toMinutesPart duration)
-                                   (.toSecondsPart duration)))]
+                     formatted (u/format-duration duration)]
                  {:text (str formatted)}))}}
            {:fx/type :table-column
             :text "Tag"
