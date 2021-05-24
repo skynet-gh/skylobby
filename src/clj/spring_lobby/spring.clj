@@ -331,9 +331,28 @@
        (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
        (into {})))
 
-(defn start-game [{:keys [client-data engines ^java.io.File spring-isolation-dir spring-settings username users] :as state}]
+(defn start-game
+  [state-atom
+   {:keys [client-data engines media-player music-paused ^java.io.File spring-isolation-dir
+           spring-settings username users]
+    :as state}]
   (let [my-client-status (-> users (get username) :client-status)
         set-ingame (fn [ingame]
+                     (if ingame
+                       (if (and media-player (not music-paused))
+                         (do
+                           (log/info "Pausing media player")
+                           (.pause media-player)
+                           (swap! state-atom assoc :music-paused true))
+                         (when (and ingame (not media-player))
+                           (log/info "No media player to pause")))
+                       (if (and media-player (not music-paused))
+                         (do
+                           (log/info "Resuming media player")
+                           (.play media-player)
+                           (swap! state-atom assoc :music-paused false))
+                         (when (and ingame (not media-player))
+                           (log/info "No media player to resume"))))
                      (client/send-message
                        (:client client-data)
                        (str "MYSTATUS "

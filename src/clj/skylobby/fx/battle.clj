@@ -924,7 +924,8 @@
    :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
    :drag-team :engine-filter :engine-version
    :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :importables-by-path
-   :map-input-prefix :map-details :message-drafts :minimap-type :mod-details :mod-filter
+   :map-input-prefix :map-details :media-player :message-drafts :minimap-type :mod-details :mod-filter
+   :music-paused
    :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
    :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
    :tasks-by-type :username])

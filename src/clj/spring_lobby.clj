@@ -1404,16 +1404,25 @@
 (defn music-files [music-dir]
   (when (fs/exists? music-dir)
     (->> (fs/list-files music-dir)
-         (sort-by fs/filename)
          (remove (comp #(string/starts-with? % ".") fs/filename))
-         (remove (comp #(string/ends-with? % ".ini") fs/filename))
+         (filter
+           (comp
+             (fn [filename]
+               (some
+                 (partial string/ends-with? filename)
+                 [".aif" ".aiff" ".fxm" ".flv" ".m3u8" ".mp3" ".mp4" ".m4a" ".m4v" ".wav"]))
+             fs/filename))
+         (sort-by fs/filename)
          (into []))))
 
 (defn music-player
   [{:keys [music-file music-volume]}]
   (if music-file
     (let [media-url (-> music-file .toURI .toURL)
-          media (Media. (str media-url))
+          media (try
+                  (Media. (str media-url))
+                  (catch Exception e
+                    (log/error e "Error playing media" music-file)))
           media-player (MediaPlayer. media)
           audio-equalizer (.getAudioEqualizer media-player)]
       (.setAutoPlay media-player true)
@@ -2442,7 +2451,7 @@
             :message (str "!joinas spec")})
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
-        (spring/start-game state)
+        (spring/start-game *state state)
         @(event-handler
            {:event/type ::send-message
             :channel-name channel-name

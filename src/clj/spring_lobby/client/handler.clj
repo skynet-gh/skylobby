@@ -108,7 +108,7 @@
   (re-find #"\w+ ([^\s]+) (\w+)" m))
 
 (defn start-game-if-synced
-  [{:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
+  [state-atom {:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
   (let [{:keys [battle battles]} server-data
         spring-root (or (-> servers (get (-> server-data :client-data :server-url)) :spring-isolation-dir)
                         spring-isolation-dir)
@@ -122,6 +122,7 @@
       (do
         (log/info "Starting game to join host")
         (spring/start-game
+          state-atom
           (merge
             state
             server-data
@@ -167,7 +168,7 @@
       (and (not auto-launch) am-spec)
       (log/info "Not auto starting game" (pr-str {:spec am-spec :auto-launch auto-launch}))
       :else
-      (start-game-if-synced prev-state server-data))))
+      (start-game-if-synced state-atom prev-state server-data))))
 
 (defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
