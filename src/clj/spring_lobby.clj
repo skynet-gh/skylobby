@@ -1444,9 +1444,10 @@
                        {:music-file music-file
                         :music-volume music-volume})]
     (swap! *state assoc
-           :music-paused false
            :media-player media-player
-           :music-now-playing music-file)))
+           :music-now-playing music-file
+           :music-paused false
+           :music-stopped false)))
 
 (defn next-value
   "Returns the value in the given list immediately following the given value, wrapping around if
@@ -1492,10 +1493,10 @@
   (when media-player
     (if music-paused
       (.play media-player)
-      (.pause media-player))
-    (swap! *state assoc
-           :music-paused (not music-paused)
-           :music-stopped false)))
+      (.pause media-player)))
+  (swap! *state assoc
+         :music-paused (not music-paused)
+         :music-stopped false))
 
 (defmethod event-handler ::on-change-music-volume
   [{:fx/keys [event] :keys [media-player]}]
@@ -1511,7 +1512,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
-            (java-time/duration 30 :seconds))
+            (java-time/duration 5 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
             (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
@@ -1519,7 +1520,8 @@
                 (let [music-files (music-files music-dir)]
                   (if (or media-player music-stopped)
                     (swap! state-atom assoc :music-queue music-files)
-                    (let [music-file (next-value music-files music-now-playing)
+                    (let [music-file (or (next-value music-files music-now-playing)
+                                         (first music-files))
                           media-player (music-player
                                          {:music-file music-file
                                           :music-volume music-volume})]
