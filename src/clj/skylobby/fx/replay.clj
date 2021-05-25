@@ -90,14 +90,13 @@
 
 
 (def replay-view-keys
-  (concat
-    [:battle-players-color-allyteam :copying :downloadables-by-url :extracting :file-cache :gitting
-     :http-download :importables-by-path :map-details :mod-details :rapid-data-by-version
-     :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
-     :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods]))
+  [:battle-players-color-type :copying :downloadables-by-url :extracting :file-cache :gitting
+   :http-download :importables-by-path :map-details :mod-details :rapid-data-by-version
+   :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
+   :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods])
 
 (defn replay-view
-  [{:keys [battle-players-color-allyteam download-tasks engines engines-by-version file-cache import-tasks
+  [{:keys [battle-players-color-type download-tasks engines engines-by-version file-cache import-tasks
            maps-by-version map-details mods-by-version mod-details mod-update-tasks replay-details
            replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
            tasks-by-type]
@@ -240,19 +239,21 @@
              :v-box/vgrow :always
              :am-host false
              :battle-modname gametype
-             :battle-players-color-allyteam battle-players-color-allyteam
+             :battle-players-color-type battle-players-color-type
              :players (concat players bots)
              :sides sides
              :singleplayer true}
             {:fx/type :h-box
              :alignment :center-left
              :children
-             [{:fx/type :check-box
-               :selected (boolean battle-players-color-allyteam)
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :battle-players-color-allyteam}}
+             [
               {:fx/type :label
-               :text " Color player name by allyteam"}]}]
+               :text " Color player name: "}
+              {:fx/type :combo-box
+               :value (or battle-players-color-type (first u/player-name-color-types))
+               :items u/player-name-color-types
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :battle-players-color-type}}]}]
            (when (and selected-matching-engine selected-matching-mod selected-matching-map)
              (let [watch-button {:fx/type :button
                                  :style {:-fx-font-size 24}
@@ -829,15 +830,17 @@
 
 
 (def replays-window-keys
-  [:bar-replays-page :battle-players-color-allyteam :by-spring-root :copying :css :downloadables-by-url
-   :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
-   :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
-   :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
-   :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download :replay-details
-   :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-   :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
-   :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id
-   :settings-button :show-replays :spring-isolation-dir :springfiles-search-results])
+  (concat
+    replay-view-keys
+    [:bar-replays-page :by-spring-root :copying :css :downloadables-by-url
+     :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
+     :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
+     :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
+     :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download :replay-details
+     :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
+     :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
+     :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id
+     :settings-button :show-replays :spring-isolation-dir :springfiles-search-results]))
 
 (defn replays-window-impl
   [{:keys [bar-replays-page by-spring-root css extra-replay-sources file-cache

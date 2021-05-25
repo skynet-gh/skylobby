@@ -192,7 +192,7 @@
 
 (defn battle-buttons
   [{:keys [am-host am-ingame am-spec auto-get-resources auto-launch battle battle-map-details
-           battle-mod-details battle-players-color-allyteam battle-map battle-modname bot-name
+           battle-mod-details battle-players-color-type battle-map battle-modname bot-name
            bot-names bot-username bot-version bot-versions bots channel-name channels
            chat-auto-scroll client-data downloadables-by-url engine-details engine-file
            engine-filter engine-update-tasks engine-version engines extract-tasks filter-host-replay
@@ -226,12 +226,14 @@
              {:fx/type :h-box
               :alignment :center-left
               :children
-              [{:fx/type :check-box
-                :selected (boolean battle-players-color-allyteam)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :battle-players-color-allyteam}}
+              [
                {:fx/type :label
-                :text " Color player name by allyteam"}]}]
+                :text " Color player name: "}
+               {:fx/type :combo-box
+                :value (or battle-players-color-type (first u/player-name-color-types))
+                :items u/player-name-color-types
+                :on-value-changed {:event/type :spring-lobby/assoc
+                                   :key :battle-players-color-type}}]}]
             (when (or singleplayer (not am-spec))
               [{:fx/type :flow-pane
                 :children
@@ -745,6 +747,13 @@
                              :users users
                              :username username}}
                 {:fx/type :button
+                 :text "5 teams"
+                 :on-action {:event/type :spring-lobby/battle-teams-5
+                             :battle battle
+                             :client-data (when-not singleplayer client-data)
+                             :users users
+                             :username username}}
+                {:fx/type :button
                  :text "Humans vs Bots"
                  :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
                              :battle battle
@@ -920,7 +929,7 @@
       (:bots battle))))
 
 (def battle-view-state-keys
-  [:archiving :auto-get-resources :battle-players-color-allyteam :bot-name
+  [:archiving :auto-get-resources :battle-players-color-type :bot-name
    :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
    :drag-team :engine-filter :engine-version
    :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :importables-by-path
@@ -937,7 +946,7 @@
      :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view-impl
-  [{:keys [battle battles battle-players-color-allyteam bot-name bot-username bot-version
+  [{:keys [battle battles battle-players-color-type bot-name bot-username bot-version
            client-data drag-allyteam drag-team engines file-cache map-input-prefix map-details
            maps minimap-type mod-details mods server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
@@ -1028,7 +1037,7 @@
          :v-box/vgrow :always
          :am-host singleplayer
          :battle-modname battle-modname
-         :battle-players-color-allyteam battle-players-color-allyteam
+         :battle-players-color-type battle-players-color-type
          :channel-name channel-name
          :client-data (when-not singleplayer client-data)
          :host-ingame host-ingame

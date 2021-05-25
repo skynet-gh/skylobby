@@ -190,7 +190,7 @@
 (defn initial-state []
   (merge
     {:auto-get-resources true
-     :battle-players-color-allyteam true
+     :battle-players-color-type "player"
      :disable-tasks-while-in-game true
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
@@ -1014,7 +1014,7 @@
              (let [{:keys [by-server disable-tasks-while-in-game]} @state-atom
                    in-any-game (some (comp :ingame my-client-status second) by-server)]
                (if (and disable-tasks-while-in-game in-any-game)
-                 (log/warn "Skipping task handler while in game")
+                 (log/debug "Skipping task handler while in game")
                  (handle-task! state-atom task-kind))))
            {:error-handler
             (fn [e]
@@ -1444,9 +1444,10 @@
                        {:music-file music-file
                         :music-volume music-volume})]
     (swap! *state assoc
-           :music-paused false
            :media-player media-player
-           :music-now-playing music-file)))
+           :music-now-playing music-file
+           :music-paused false
+           :music-stopped false)))
 
 (defn next-value
   "Returns the value in the given list immediately following the given value, wrapping around if
@@ -1492,10 +1493,10 @@
   (when media-player
     (if music-paused
       (.play media-player)
-      (.pause media-player))
-    (swap! *state assoc
-           :music-paused (not music-paused)
-           :music-stopped false)))
+      (.pause media-player)))
+  (swap! *state assoc
+         :music-paused (not music-paused)
+         :music-stopped false))
 
 (defmethod event-handler ::on-change-music-volume
   [{:fx/keys [event] :keys [media-player]}]
@@ -1511,7 +1512,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
-            (java-time/duration 30 :seconds))
+            (java-time/duration 5 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
             (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
@@ -1519,7 +1520,8 @@
                 (let [music-files (music-files music-dir)]
                   (if (or media-player music-stopped)
                     (swap! state-atom assoc :music-queue music-files)
-                    (let [music-file (next-value music-files music-now-playing)
+                    (let [music-file (or (next-value music-files music-now-playing)
+                                         (first music-files))
                           media-player (music-player
                                          {:music-file music-file
                                           :music-volume music-volume})]
@@ -1542,7 +1544,7 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
             (java-time/duration 1 :seconds))
           (fn [_chimestamp]
-            (log/info "Updating now")
+            (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))
           {:error-handler
            (fn [e]
@@ -2192,7 +2194,8 @@
                    (assoc-in [:by-server :local :battle]
                              {:battle-id :singleplayer
                               :scripttags {:game {:startpostype 0}}
-                              :users {username {:battle-status handler/default-battle-status}}}))))
+                              :users {username {:battle-status (assoc handler/default-battle-status :mode true)
+                                                :team-color (first color/ffa-colors-spring)}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
 
@@ -2395,7 +2398,7 @@
             bot-username (available-name existing-bots bot-username)
             status (assoc handler/default-battle-status
                           :ready true
-                          :mode 1
+                          :mode true
                           :sync 1
                           :id (battle/available-team-id battle)
                           :ally (battle/available-ally battle)
@@ -2650,7 +2653,7 @@
                  next-type (next-value fx.minimap/minimap-types minimap-type {:direction direction})]
              (assoc state minimap-type-key next-type)))))
 
-(defn- battle-players-and-bots
+(defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [{:keys [battle users]}]
   (concat
@@ -2738,7 +2741,7 @@
   [client-data id {:keys [is-me is-bot] :as opts} status-changes]
   (future
     (try
-      (if (or is-me is-bot)
+      (if (or (not client-data) is-me is-bot)
         (update-battle-status client-data (assoc opts :id id) (merge (:battle-status id) status-changes) (:team-color id))
         (doseq [[k v] status-changes]
           (let [msg (case k
@@ -2795,6 +2798,10 @@
 (defmethod event-handler ::battle-teams-4
   [e]
   (n-teams e 4))
+
+(defmethod event-handler ::battle-teams-5
+  [e]
+  (n-teams e 5))
 
 (defmethod event-handler ::battle-teams-humans-vs-bots
   [{:keys [battle client-data users username]}]
@@ -2995,17 +3002,24 @@
 (defmethod event-handler ::battle-fix-colors
   [{:keys [am-host client-data channel-name] :as e}]
   (if am-host
-    (->> e
-         battle-players-and-bots
-         (filter (comp :mode :battle-status)) ; remove spectators
-         (map-indexed
-           (fn [_i {:keys [battle-status] :as id}]
-             (let [is-bot (boolean (:bot-name id))
-                   is-me (= (:username e) (:username id))
-                   color (color/team-color battle-status)
-                   opts {:id id :is-me is-me :is-bot is-bot}]
-               (update-battle-status client-data opts battle-status color))))
-         doall)
+    (let [players-and-bots (filter
+                             (comp u/to-bool :mode :battle-status) ; remove spectators
+                             (battle-players-and-bots e))
+          by-allyteam (group-by (comp :ally :battle-status) players-and-bots)
+          teams-by-allyteam (->> by-allyteam
+                                 (map
+                                   (fn [[k vs]]
+                                     [k (vec (sort (map (comp :id :battle-status) vs)))]))
+                                 (into {}))]
+      (->> players-and-bots
+           (map-indexed
+             (fn [_i {:keys [battle-status] :as id}]
+               (let [is-bot (boolean (:bot-name id))
+                     is-me (= (:username e) (:username id))
+                     color (color/player-color battle-status teams-by-allyteam)
+                     opts {:id id :is-me is-me :is-bot is-bot}]
+                 (update-battle-status client-data opts battle-status color))))
+           doall))
     @(event-handler
        {:event/type ::send-message
         :channel-name channel-name
@@ -3618,7 +3632,7 @@
         (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
         (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
         (assoc :player-counts player-counts)
-        (assoc :game-type (replay/replay-game-type player-counts)))))
+        (assoc :game-type (u/game-type player-counts)))))
 
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})

@@ -34,6 +34,13 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.44]
+
+- Fix music auto play
+- Add battle players color names by their personal color
+- Fix singleplayer balance and fix colors
+- Add colors from SPADS for different setups
+
 ### [0.3.43]
 
 - Add battle run time display
