@@ -27,7 +27,7 @@
   {:ready true
    :ally 0
    :handicap 0
-   :mode 0
+   :mode false
    :sync 2 ; unsynced
    :id 0
    :side 0})

@@ -142,21 +142,6 @@
                        nil))))))))))
 
 
-(defn replay-game-type [allyteam-counts]
-  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
-        num-allyteams (count allyteam-counts)]
-    (cond
-      (= 2 num-allyteams)
-      (if one-per-allyteam?
-        :duel
-        :team)
-      (< 2 num-allyteams)
-      (if one-per-allyteam?
-        :ffa
-        :teamffa)
-      :else
-      :invalid)))
-
 (defn- replay-type-and-players [parsed-replay]
   (let [teams (->> parsed-replay
                    :body
@@ -166,7 +151,7 @@
         teams-by-allyteam (->> teams
                                (group-by (comp keyword (partial str "allyteam") :allyteam second)))
         allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
-    {:game-type (replay-game-type allyteam-counts)
+    {:game-type (u/game-type allyteam-counts)
      :player-counts allyteam-counts}))
 
 (defn parse-replay

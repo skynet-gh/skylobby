@@ -33,6 +33,11 @@
 (def minimap-types
   ["minimap" "metalmap" "heightmap"])
 
+(def player-name-color-types
+  ["none"
+   "team"
+   "player"])
+
 
 (defn manifest-attributes [url]
   (-> (str "jar:" url "!/META-INF/MANIFEST.MF")
@@ -242,7 +247,7 @@
 (defn spring-color-to-javafx
   "Returns the rgb int color represention for the given Spring bgr int color."
   [spring-color]
-  (let [spring-color-int (if spring-color (to-number spring-color) 0)
+  (let [spring-color-int (or (to-number spring-color) 0)
         [r g b _a] (:rgba (colors/create-color spring-color-int))
         reversed (colors/create-color
                    {:r b
@@ -261,6 +266,10 @@
          :b (Math/round (* 255 (.getRed color)))   ; switch red to blue
          :a 0}))
     0))
+
+(defn hex-color-to-css [color]
+  (string/replace color #"0x" "#"))
+
 
 (defn download-progress
   [{:keys [current total]}]
@@ -401,3 +410,22 @@
   "Convert hexadecimal encoded string to bytes array."
   [^String data]
   (Hex/decodeHex (.toCharArray data)))
+
+
+(defn game-type
+  "Returns a keyword describing the general type of game based on the team and player counts, :duel,
+  :team, :ffa, :teamffa."
+  [allyteam-counts]
+  (let [one-per-allyteam? (= #{1} (set allyteam-counts))
+        num-allyteams (count allyteam-counts)]
+    (cond
+      (= 2 num-allyteams)
+      (if one-per-allyteam?
+        :duel
+        :team)
+      (< 2 num-allyteams)
+      (if one-per-allyteam?
+        :ffa
+        :teamffa)
+      :else
+      :invalid)))

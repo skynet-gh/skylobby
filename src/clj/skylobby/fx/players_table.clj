@@ -1,6 +1,7 @@
 (ns skylobby.fx.players-table
   (:require
     [clojure.string :as string]
+    [skylobby.color :as color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -8,6 +9,7 @@
     [taoensso.timbre :as log]))
 
 
+#_
 (def allyteam-colors
   {0 "crimson"
    1 "royalblue"
@@ -22,8 +24,15 @@
    10 "purple"
    11 "goldenrod"})
 
+(def allyteam-colors
+  (->> color/ffa-colors-web
+       (map u/hex-color-to-css)
+       (map-indexed vector)
+       (into {})))
+
+
 (defn players-table
-  [{:keys [am-host battle-players-color-allyteam channel-name client-data host-ingame host-username
+  [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
            players scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
@@ -44,7 +53,7 @@
      :items
      (sort-by
        (juxt
-         (comp u/to-number not :mode :battle-status)
+         (comp u/to-number not u/to-bool :mode :battle-status)
          (comp u/to-number :bot :client-status :user)
          (comp u/to-number :ally :battle-status)
          (comp (fnil - 0) u/parse-skill :skill)
@@ -130,14 +139,18 @@
         {:fx/cell-type :table-cell
          :describe
          (fn [{:keys [owner] :as id}]
-           (let [not-spec (-> id :battle-status :mode)]
+           (let [not-spec (-> id :battle-status :mode u/to-bool)]
              (merge
                {:text (u/nickname id)
                 :style
                 (merge
-                  {:-fx-text-fill (if (and battle-players-color-allyteam not-spec)
-                                      (get allyteam-colors (-> id :battle-status :ally) "white")
+                  {:-fx-text-fill (if not-spec
+                                    (case battle-players-color-type
+                                      "team" (get allyteam-colors (-> id :battle-status :ally) "white")
+                                      "player" (-> id :team-color u/spring-color-to-javafx str u/hex-color-to-css)
+                                      ; else
                                       "white")
+                                    "white")
                    :-fx-alignment "CENTER"}
                   (when not-spec
                     {:-fx-font-weight "bold"}))}
@@ -276,7 +289,7 @@
                     (:bot client-status)
                     {:fx/type font-icon/lifecycle
                      :icon-literal "mdi-robot:16:grey"}
-                    (not (:mode battle-status))
+                    (not (u/to-bool (:mode battle-status)))
                     {:fx/type font-icon/lifecycle
                      :icon-literal "mdi-magnify:16:white"}
                     (:ready battle-status)
@@ -303,22 +316,23 @@
         {:fx/cell-type :table-cell
          :describe
          (fn [i]
-           {:text ""
-            :graphic
-            {:fx/type ext-recreate-on-key-changed
-             :key (u/nickname i)
-             :desc
-             {:fx/type :check-box
-              :selected (-> i :battle-status :mode not boolean)
-              :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                    :client-data (when-not singleplayer client-data)
-                                    :is-me (= (:username i) username)
-                                    :is-bot (-> i :user :client-status :bot)
-                                    :id i}
-              :disable (or (not username)
-                           (not (or (and am-host (:mode (:battle-status i)))
-                                    (= (:username i) username)
-                                    (= (:owner i) username))))}}})}}
+           (let [am-spec (-> i :battle-status :mode u/to-bool not boolean)]
+             {:text ""
+              :graphic
+              {:fx/type ext-recreate-on-key-changed
+               :key (u/nickname i)
+               :desc
+               {:fx/type :check-box
+                :selected am-spec
+                :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
+                                      :client-data (when-not singleplayer client-data)
+                                      :is-me (= (:username i) username)
+                                      :is-bot (-> i :user :client-status :bot)
+                                      :id i}
+                :disable (or (not username)
+                             (not (or (and am-host (not am-spec))
+                                      (= (:username i) username)
+                                      (= (:owner i) username))))}}}))}}
        {:fx/type :table-column
         :text "Faction"
         :resizable false
