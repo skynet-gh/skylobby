@@ -34,6 +34,10 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.46]
+
+- Release to test auto updates
+
 ### [0.3.45]
 
 - Add button to auto download updates and restart
