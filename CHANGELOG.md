@@ -34,6 +34,10 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.47]
+
+- Set per-user install for Windows
+
 ### [0.3.46]
 
 - Release to test auto updates
