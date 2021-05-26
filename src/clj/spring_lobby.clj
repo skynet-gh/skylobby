@@ -46,6 +46,7 @@
   (:import
     (java.awt Desktop Desktop$Action)
     (java.io File)
+    (java.lang ProcessBuilder)
     (java.net InetAddress InetSocketAddress URL)
     (java.util List)
     (javafx.event Event)
@@ -60,7 +61,7 @@
 (set! *warn-on-reflection* true)
 
 
-(declare limit-download-status)
+(declare limit-download-status download-http-resource)
 
 
 (def app-version (u/app-version))
@@ -214,6 +215,8 @@
 
 
 (def ^:dynamic disable-update-check false)
+
+(def ^:dynamic main-args nil)
 
 
 (defn- client-message [{:keys [client] :as client-data} message]
@@ -988,10 +991,10 @@
          task (-> after :current-tasks (get task-kind))]
      (try
        (handle-task task)
-       (catch Throwable t
-         (log/error t "Critical error running task"))
        (catch Exception e
          (log/error e "Error running task"))
+       (catch Throwable t
+         (log/error t "Critical error running task"))
        (finally
          (when task
            (swap! state-atom update :current-tasks assoc task-kind nil))))
@@ -1511,8 +1514,8 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
-            (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
             (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
@@ -1586,6 +1589,53 @@
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
+(defn restart-command [old-jar new-jar]
+  (when-let [java (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil))]
+    (let [vm-args (vec (u/vm-args))
+          i (.indexOf vm-args "-jar")
+          new-jar-path (fs/canonical-path new-jar)
+          with-new-jar (if (not= -1 i)
+                         (concat
+                           (subvec vm-args 0 (inc i))
+                           [new-jar-path]
+                           (subvec vm-args 0 (+ i 2)))
+                         (concat vm-args ["-jar" new-jar-path]))]
+      (concat
+        [java]
+        with-new-jar
+        [u/main-class-name]
+        main-args
+        ["--update-copy-jar" (fs/canonical-path old-jar)]))))
+
+(defmethod task-handler ::download-app-update-and-restart [{:keys [downloadable version]}]
+  (let [jar-file (or (u/jar-file)
+                     (fs/file "skylobby.jar")) ; TODO remove?
+        dest (fs/file (str (fs/canonical-path jar-file) "-to-" version ".jar"))]
+    (if dest
+      (do
+        (log/info "Downloading app update" (:download-url downloadable) "to" dest)
+        @(download-http-resource
+           {:downloadable downloadable
+            :dest dest})
+        (if (fs/exists? dest)
+          (do ; https://stackoverflow.com/a/5747843/984393
+            (log/info "Copying downloaded jar")
+            (log/info "Adding shutdown hook to run new jar")
+            (.addShutdownHook
+              (Runtime/getRuntime)
+              (Thread.
+                (fn []
+                  ; https://stackoverflow.com/a/48992863/984393
+                  (when-let [cmd (restart-command jar-file dest)]
+                    (log/info "Running" (pr-str cmd))
+                    (let [proc (ProcessBuilder. cmd)]
+                      (.inheritIO proc)
+                      (.start proc))))))
+            (log/info "Exiting for update")
+            (System/exit 0))
+          (log/error "Downloaded update file does not exist")))
+      (log/error "Could not determine download dest" {:jar-file jar-file}))))
+
 (defn- check-app-update [state-atom]
   (let [versions
         (->> (clj-http/get app-update-url {:as :auto})
@@ -1607,7 +1657,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 1 :hours))
           (fn [_chimestamp]
             (if disable-update-check
@@ -3200,13 +3250,14 @@
   [{:keys [dest url]}]
   (http/download-file *state url dest))
 
-(defn- download-http-resource [{:keys [downloadable spring-isolation-dir]}]
+(defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
   (log/info "Request to download" downloadable)
   (future
     (deref
       (event-handler
         {:event/type ::http-download
-         :dest (resource/resource-dest spring-isolation-dir downloadable)
+         :dest (or dest
+                   (resource/resource-dest spring-isolation-dir downloadable))
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
       ::map (reconcile-maps-all-spring-roots)

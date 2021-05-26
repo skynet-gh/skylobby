@@ -63,36 +63,64 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close-octagon:16:white"}}]))}))
 
+(defn app-update-button [{:keys [app-update-available http-download tasks-by-type]}]
+  (let [{:keys [latest]} app-update-available
+        color "gold"
+        version latest
+        url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
+                 "skylobby-" version "-"
+                 (if (fs/wsl-or-windows?) ; TODO mac
+                   "windows"
+                   "linux")
+                 ".jar")
+        download (get http-download url)
+        running (seq (get tasks-by-type :spring-lobby/download-app-update-and-restart))]
+    {:fx/type :h-box
+     :alignment :center-left
+     :children
+     [
+      {:fx/type :button
+       :text (if running
+               (u/download-progress download)
+               (str "Update to " latest))
+       :disable (boolean running)
+       :on-action {:event/type :spring-lobby/add-task
+                   :task {:spring-lobby/task-type :spring-lobby/download-app-update-and-restart
+                          :downloadable {:download-url url}
+                          :version version}}
+       :style {:-fx-base color
+               :-fx-background color}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-open-in-new:30:black"}}
+      {:fx/type :button
+       :text ""
+       :on-action {:event/type :spring-lobby/desktop-browse-url
+                   :url app-update-browseurl}
+       :style {:-fx-base color
+               :-fx-background color}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-open-in-new:30:black"}}
+      {:fx/type :button
+       :text ""
+       :on-action {:event/type :spring-lobby/dissoc
+                   :key :app-update-available}
+       :style {:-fx-base color
+               :-fx-background color}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-close:30:black"}}]}))
 
 (defn singleplayer-buttons
-  [{:keys [app-update-available spring-isolation-dir]}]
+  [{:keys [app-update-available spring-isolation-dir] :as state}]
   {:fx/type :v-box
    :children
    (concat
-     (when-let [{:keys [latest]} app-update-available]
-       (let [color "gold"]
-         [{:fx/type :h-box
-           :alignment :center-left
-           :children
-           [
-            {:fx/type :button
-             :text (str "Update to " latest)
-             :on-action {:event/type :spring-lobby/desktop-browse-url
-                         :url app-update-browseurl}
-             :style {:-fx-base color
-                     :-fx-background color}
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-open-in-new:30:black"}}
-            {:fx/type :button
-             :text ""
-             :on-action {:event/type :spring-lobby/dissoc
-                         :key :app-update-available}
-             :style {:-fx-base color
-                     :-fx-background color}
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-close:30:black"}}]}]))
+     (when app-update-available
+       [(merge
+          {:fx/type app-update-button}
+          state)])
      [
       {:fx/type :v-box
        :style {:-fx-font-size 16}
@@ -259,7 +287,8 @@
   (concat
     fx.battle/battle-view-keys
     fx.bottom-bar/bottom-bar-keys
-    [:app-update-available :by-spring-root :by-server :client-data :login-error :logins :password
+    [:app-update-available :by-spring-root :by-server :client-data :http-download
+     :login-error :logins :password
      :server :servers :spring-isolation-dir :tasks-by-type :username]))
 
 (defn welcome-view

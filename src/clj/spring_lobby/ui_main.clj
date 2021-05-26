@@ -38,6 +38,7 @@
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]
+   [nil "--update-copy-jar JAR_DEST" "Copy updated jar to the given location"]
    [nil "--window-maximized" "Start with the main window maximized"]])
 
 
@@ -54,6 +55,13 @@
                                  (string/ends-with? first-arg-filename ".sdfz")
                                  (fs/exists? first-arg-as-file))]
         (try
+          (when (:update-copy-jar options)
+            (when-let [jar-file (u/jar-file)]
+              (fs/copy jar-file (fs/file (:update-copy-jar options)))))
+          (catch Exception e
+            (log/error e "Error copying update jar")))
+        (try
+          (alter-var-root #'spring-lobby/main-args (constantly args))
           (when (:no-update-check options)
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
