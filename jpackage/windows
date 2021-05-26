@@ -2,3 +2,4 @@
 --type "msi"
 --icon "resources/icon.ico"
 --win-dir-chooser
+--win-per-user-install
