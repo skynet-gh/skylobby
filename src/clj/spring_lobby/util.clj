@@ -8,6 +8,7 @@
     [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
+    (java.lang.management ManagementFactory)
     (java.net ServerSocket URL URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.security MessageDigest)
@@ -23,6 +24,9 @@
 
 
 (def app-name "skylobby")
+
+(def main-class-name
+  "spring_lobby.main")
 
 
 (def max-messages 200) ; for chat and console
@@ -44,10 +48,24 @@
       URL. .openStream Manifest. .getMainAttributes))
       ;(.getValue "Build-Number")))
 
+; https://stackoverflow.com/a/320595/984393
+(defn jar-file
+  "Returns the file for the current running jar, or nil if it cannot be determined."
+  []
+  (try
+    (when-let [clazz (Class/forName main-class-name)]
+      (log/debug "Discovered class" clazz)
+      (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation .toURI)]
+        (io/file loc)))
+    (catch ClassNotFoundException _e
+      (log/info "Class not found, assuming running in dev and not as a jar"))
+    (catch Exception e
+      (log/debug e "Unable to discover jar file"))))
+
 ; https://stackoverflow.com/a/16431226/984393
 (defn manifest-version []
   (try
-    (when-let [clazz (Class/forName "spring_lobby")]
+    (when-let [clazz (Class/forName main-class-name)]
       (log/debug "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
         (log/debug "Discovered location" loc)
@@ -429,3 +447,26 @@
         :teamffa)
       :else
       :invalid)))
+
+
+; https://stackoverflow.com/a/48992863/984393
+(defn vm-args []
+  (let [vm-args (-> (ManagementFactory/getRuntimeMXBean) .getInputArguments)
+        java-tool-options (System/getenv "JAVA_TOOL_OPTIONS")]
+    (if java-tool-options
+      (let [_java-tool-options-list (string/split java-tool-options #" ")]
+        ; TODO remove java tool options from vm args
+        vm-args)
+      vm-args)))
+
+(defn classpath []
+  (-> (ManagementFactory/getRuntimeMXBean) .getClassPath))
+
+(defn entry-point []
+  (let [stack-trace (.getStackTrace (Throwable.))
+        stack-trace-element (last stack-trace)
+        fully-qualified-class (.getClassName stack-trace-element)
+        entry-method (.getMethodName stack-trace-element)]
+    (when (not= "main" entry-method)
+      (log/warn "Entry point is not a main" entry-method))
+    fully-qualified-class))

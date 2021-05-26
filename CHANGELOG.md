@@ -34,6 +34,10 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.45]
+
+- Add button to auto download updates and restart
+
 ### [0.3.44]
 
 - Fix music auto play

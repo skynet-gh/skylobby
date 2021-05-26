@@ -5,6 +5,7 @@
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.mods :refer [mods-view]]
+    [skylobby.fx.welcome :refer [app-update-button]]
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
@@ -12,15 +13,16 @@
 
 
 (def battles-buttons-state-keys
-  [:battle-password :battle-title :engines :engine-filter :engine-version :map-input-prefix
-   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :spring-isolation-dir
+  [:app-update-available :battle-password :battle-title :engines :engine-filter :engine-version
+   :http-download :map-input-prefix
+   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :spring-isolation-dir :tasks-by-type
    :use-springlobby-modname])
 
 (def battles-buttons-keys
   [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle])
 
 (defn battles-buttons-view
-  [{:keys [accepted battle battles battle-password battle-title client-data compflags engine-version
+  [{:keys [accepted app-update-available battle battles battle-password battle-title client-data compflags engine-version
            engines mod-name map-name maps mods map-input-prefix engine-filter mod-filter
            pop-out-battle selected-battle spring-isolation-dir]
     :as state}]
@@ -70,6 +72,10 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal (str "mdi-download:16:white")}}]
+       (when app-update-available
+         [(merge
+            {:fx/type app-update-button}
+            state)])
        (when-not battle
          [
           {:fx/type engines-view
