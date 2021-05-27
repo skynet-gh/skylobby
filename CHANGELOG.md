@@ -34,6 +34,11 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.48]
+
+- Fix mod update loop caused by re-scanning directories
+- Fix auto update for installed exe
+
 ### [0.3.47]
 
 - Set per-user install for Windows
