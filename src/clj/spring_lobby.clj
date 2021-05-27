@@ -1239,7 +1239,7 @@
                          (remove (comp known-file-paths fs/canonical-path) mod-files)
                          (map :file directory))) ; always scan dirs in case git changed
          to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
-         todo (concat to-add-file to-add-rapid)
+         todo (shuffle (concat to-add-file to-add-rapid))
          ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
@@ -1286,7 +1286,7 @@
                            (remove (comp missing-files fs/canonical-path :file))
                            set)))
                   (dissoc :update-mods))))
-     (when (seq next-round)
+     (when (seq (remove (comp known-file-paths fs/canonical-path) next-round))
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
        (add-task! state-atom {::task-type ::reconcile-mods
                               :todo (count next-round)}))
@@ -1336,7 +1336,7 @@
          map-files (fs/map-files spring-root)
          known-files (->> maps (map :file) set)
          known-paths (->> known-files (map fs/canonical-path) set)
-         todo (remove (comp known-paths fs/canonical-path) map-files)
+         todo (shuffle (remove (comp known-paths fs/canonical-path) map-files))
          battle-maps (->> state
                           :by-server
                           (map
@@ -1590,7 +1590,7 @@
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
 (defn restart-command [old-jar new-jar]
-  (when-let [java (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil))]
+  (when-let [java-or-exe (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil))]
     (let [vm-args (vec (u/vm-args))
           i (.indexOf vm-args "-jar")
           new-jar-path (fs/canonical-path new-jar)
@@ -1599,13 +1599,33 @@
                            (subvec vm-args 0 (inc i))
                            [new-jar-path]
                            (subvec vm-args 0 (+ i 2)))
-                         (concat vm-args ["-jar" new-jar-path]))]
+                         (concat vm-args ["-jar" new-jar-path]))
+          is-java (or (string/ends-with? java-or-exe "java")
+                      (string/ends-with? java-or-exe "java.exe"))]
+          ; java vs jpackage installer executable
       (concat
-        [java]
-        with-new-jar
-        [u/main-class-name]
+        [java-or-exe]
+        (when is-java with-new-jar)
+        (when is-java [u/main-class-name])
         main-args
-        ["--update-copy-jar" (fs/canonical-path old-jar)]))))
+        (when old-jar ["--update-copy-jar" (fs/canonical-path old-jar)])))))
+
+(defn restart-process [old-jar new-jar]
+  (when new-jar
+    (when-let [cmd (restart-command old-jar new-jar)]
+      (log/info "Adding shutdown hook to run new jar")
+      ; https://stackoverflow.com/a/5747843/984393
+      (.addShutdownHook
+        (Runtime/getRuntime)
+        (Thread.
+          (fn []
+            ; https://stackoverflow.com/a/48992863/984393
+            (log/info "Running" (pr-str cmd))
+            (let [proc (ProcessBuilder. cmd)]
+              (.inheritIO proc)
+              (.start proc)))))
+      (log/info "Exiting for update")
+      (System/exit 0))))
 
 (defmethod task-handler ::download-app-update-and-restart [{:keys [downloadable version]}]
   (let [jar-file (or (u/jar-file)
@@ -1618,21 +1638,7 @@
            {:downloadable downloadable
             :dest dest})
         (if (fs/exists? dest)
-          (do ; https://stackoverflow.com/a/5747843/984393
-            (log/info "Copying downloaded jar")
-            (log/info "Adding shutdown hook to run new jar")
-            (.addShutdownHook
-              (Runtime/getRuntime)
-              (Thread.
-                (fn []
-                  ; https://stackoverflow.com/a/48992863/984393
-                  (when-let [cmd (restart-command jar-file dest)]
-                    (log/info "Running" (pr-str cmd))
-                    (let [proc (ProcessBuilder. cmd)]
-                      (.inheritIO proc)
-                      (.start proc))))))
-            (log/info "Exiting for update")
-            (System/exit 0))
+          (restart-process jar-file dest)
           (log/error "Downloaded update file does not exist")))
       (log/error "Could not determine download dest" {:jar-file jar-file}))))
 

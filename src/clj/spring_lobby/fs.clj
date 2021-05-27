@@ -632,6 +632,8 @@
         :modinfo (try-file-lua "modinfo.lua")
         :git-commit-id (try
                          (git/latest-id file)
+                         (catch java.io.FileNotFoundException _e
+                           (log/warn "Not a git repository at" file))
                          (catch Exception e
                            (log/error e "Error loading git commit id")))
         ::source :directory}
