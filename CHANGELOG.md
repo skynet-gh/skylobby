@@ -34,6 +34,10 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.49]
+
+- Release to test auto updates
+
 ### [0.3.48]
 
 - Fix mod update loop caused by re-scanning directories
