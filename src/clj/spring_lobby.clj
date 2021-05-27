@@ -1239,7 +1239,7 @@
                          (remove (comp known-file-paths fs/canonical-path) mod-files)
                          (map :file directory))) ; always scan dirs in case git changed
          to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
-         todo (concat to-add-file to-add-rapid)
+         todo (shuffle (concat to-add-file to-add-rapid))
          ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
@@ -1286,7 +1286,7 @@
                            (remove (comp missing-files fs/canonical-path :file))
                            set)))
                   (dissoc :update-mods))))
-     (when (seq next-round)
+     (when (seq (remove (comp known-file-paths fs/canonical-path) next-round))
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
        (add-task! state-atom {::task-type ::reconcile-mods
                               :todo (count next-round)}))
@@ -1336,7 +1336,7 @@
          map-files (fs/map-files spring-root)
          known-files (->> maps (map :file) set)
          known-paths (->> known-files (map fs/canonical-path) set)
-         todo (remove (comp known-paths fs/canonical-path) map-files)
+         todo (shuffle (remove (comp known-paths fs/canonical-path) map-files))
          battle-maps (->> state
                           :by-server
                           (map
