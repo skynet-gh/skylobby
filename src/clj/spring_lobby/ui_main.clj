@@ -55,9 +55,11 @@
                                  (string/ends-with? first-arg-filename ".sdfz")
                                  (fs/exists? first-arg-as-file))]
         (try
-          (when (:update-copy-jar options)
+          (when-let [dest (fs/file (:update-copy-jar options))]
             (when-let [jar-file (u/jar-file)]
-              (fs/copy jar-file (fs/file (:update-copy-jar options)))))
+              (log/info "Copying update jar")
+              (fs/copy jar-file dest))
+            (spring-lobby/restart-process nil dest))
           (catch Exception e
             (log/error e "Error copying update jar")))
         (try
