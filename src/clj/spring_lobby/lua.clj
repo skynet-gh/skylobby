@@ -20,6 +20,12 @@ function getfenv()
     return t
 end
 
+Spring = {}
+
+function Spring.Log(x, level, message)
+    return {}
+end
+
 ")
 
 
