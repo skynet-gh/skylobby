@@ -34,6 +34,12 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.50]
+
+- Revert per-user install for Windows
+- Add jvm flags for dpi scaling on Windows
+- Fix factions for S44
+
 ### [0.3.49]
 
 - Release to test auto updates
