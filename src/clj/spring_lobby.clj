@@ -1590,7 +1590,7 @@
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
 (defn restart-command [old-jar new-jar]
-  (when-let [java-or-exe (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil))]
+  (when-let [java-or-exe (u/process-command)]
     (let [vm-args (vec (u/vm-args))
           i (.indexOf vm-args "-jar")
           new-jar-path (fs/canonical-path new-jar)
@@ -1600,8 +1600,7 @@
                            [new-jar-path]
                            (subvec vm-args 0 (+ i 2)))
                          (concat vm-args ["-jar" new-jar-path]))
-          is-java (or (string/ends-with? java-or-exe "java")
-                      (string/ends-with? java-or-exe "java.exe"))]
+          is-java (u/is-java? java-or-exe)]
           ; java vs jpackage installer executable
       (concat
         [java-or-exe]

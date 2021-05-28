@@ -73,8 +73,14 @@
                    "windows"
                    "linux")
                  ".jar")
+        installer-url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
+                           "skylobby-" version "_"
+                           (if (fs/wsl-or-windows?) ; TODO mac
+                             "windows.msi"
+                             "linux-amd64.deb"))
         download (get http-download url)
-        running (seq (get tasks-by-type :spring-lobby/download-app-update-and-restart))]
+        running (seq (get tasks-by-type :spring-lobby/download-app-update-and-restart))
+        is-java (u/is-java? (u/process-command))]
     {:fx/type :h-box
      :alignment :center-left
      :children
@@ -84,10 +90,14 @@
                (u/download-progress download)
                (str "Update to " latest))
        :disable (boolean running)
-       :on-action {:event/type :spring-lobby/add-task
-                   :task {:spring-lobby/task-type :spring-lobby/download-app-update-and-restart
-                          :downloadable {:download-url url}
-                          :version version}}
+       :on-action
+       (if is-java
+         {:event/type :spring-lobby/add-task
+          :task {:spring-lobby/task-type :spring-lobby/download-app-update-and-restart
+                 :downloadable {:download-url url}
+                 :version version}}
+         {:event/type :spring-lobby/desktop-browse-url
+          :url installer-url})
        :style {:-fx-base color
                :-fx-background color}
        :graphic
