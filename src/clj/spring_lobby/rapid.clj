@@ -178,7 +178,7 @@
        (if quiet
          (do
            (log/trace e "Error reading" filename "in" f)
-           (log/warn "Error reading" filename "in" f))
+           (log/warn e "Error reading" filename "in" f))
          (log/warn e "Error reading" filename "in" f))))))
 
 (defn- try-inner-script

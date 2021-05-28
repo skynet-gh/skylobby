@@ -68,7 +68,8 @@
     reply/reply {:mvn/version "0.4.4"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :jvm-opts ["-server" "-Xms128m" "-Xmx2g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
-              "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"]
+              "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
+              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]

@@ -2,4 +2,4 @@
 --type "msi"
 --icon "resources/icon.ico"
 --win-dir-chooser
---win-per-user-install
+--java-options "-server -Xms128m -Xmx1g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops -Dprism.allowhidpi=true -Dglass.win.minHiDPI=1"

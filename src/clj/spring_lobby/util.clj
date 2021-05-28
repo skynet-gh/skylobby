@@ -470,3 +470,11 @@
     (when (not= "main" entry-method)
       (log/warn "Entry point is not a main" entry-method))
     fully-qualified-class))
+
+
+(defn process-command []
+  (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil)))
+
+(defn is-java? [command]
+  (or (string/ends-with? command "java")
+      (string/ends-with? command "java.exe")))
