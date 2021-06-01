@@ -570,7 +570,8 @@
 
 (defn battle-tabs
   [{:keys [am-host am-spec battle battle-details channel-name client-data drag-allyteam drag-team
-           battle-map battle-map-details battle-mod-details file-cache map-input-prefix maps
+           battle-map battle-map-details battle-mod-details file-cache interleave-ally-player-ids
+           map-input-prefix maps
            minimap-type scripttags server-key singleplayer spring-isolation-dir spring-settings
            startpostype username users]}]
   {:fx/type :tab-pane
@@ -712,7 +713,17 @@
                            :channel-name channel-name
                            :client-data (when-not singleplayer client-data)
                            :users users
-                           :username username}}])}
+                           :username username}}]
+             (when am-host
+               [
+                {:fx/type :pane
+                 :style {:-fx-pref-width 8}}
+                {:fx/type :check-box
+                 :selected (boolean interleave-ally-player-ids)
+                 :on-selected-changed {:event/type :spring-lobby/assoc
+                                       :key :interleave-ally-player-ids}}
+                {:fx/type :label
+                 :text " Interleave Player IDs "}]))}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -721,43 +732,55 @@
                [{:fx/type :button
                  :text "FFA"
                  :on-action {:event/type :spring-lobby/battle-teams-ffa
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}
                 {:fx/type :button
                  :text "2 teams"
                  :on-action {:event/type :spring-lobby/battle-teams-2
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}
                 {:fx/type :button
                  :text "3 teams"
                  :on-action {:event/type :spring-lobby/battle-teams-3
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}
                 {:fx/type :button
                  :text "4 teams"
                  :on-action {:event/type :spring-lobby/battle-teams-4
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}
                 {:fx/type :button
                  :text "5 teams"
                  :on-action {:event/type :spring-lobby/battle-teams-5
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}
                 {:fx/type :button
                  :text "Humans vs Bots"
                  :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
+                             :am-host am-host
                              :battle battle
                              :client-data (when-not singleplayer client-data)
+                             :interleave-ally-player-ids interleave-ally-player-ids
                              :users users
                              :username username}}]))}]}]}}}
     {:fx/type :tab
@@ -932,7 +955,8 @@
   [:archiving :auto-get-resources :battle-players-color-type :bot-name
    :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
    :drag-team :engine-filter :engine-version
-   :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :importables-by-path
+   :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :interleave-ally-player-ids
+   :importables-by-path
    :map-input-prefix :map-details :media-player :message-drafts :minimap-type :mod-details :mod-filter
    :music-paused
    :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
@@ -947,7 +971,8 @@
 
 (defn battle-view-impl
   [{:keys [battle battles battle-players-color-type bot-name bot-username bot-version
-           client-data drag-allyteam drag-team engines file-cache map-input-prefix map-details
+           client-data drag-allyteam drag-team engines file-cache interleave-ally-player-ids
+           map-input-prefix map-details
            maps minimap-type mod-details mods server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
@@ -1101,6 +1126,7 @@
        :drag-allyteam drag-allyteam
        :drag-team drag-team
        :file-cache file-cache
+       :interleave-ally-player-ids interleave-ally-player-ids
        :map-input-prefix map-input-prefix
        :maps maps
        :minimap-type minimap-type
