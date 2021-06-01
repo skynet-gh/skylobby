@@ -34,6 +34,11 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.51]
+
+- Add shadow around player names
+- Add option to interleave player ids in balance
+
 ### [0.3.50]
 
 - Revert per-user install for Windows
