@@ -2808,27 +2808,50 @@
         (log/error e "Error applying battle status changes")))))
 
 
-(defn balance-teams [battle-players-and-bots teams-count]
-  (let [nonspec (->> battle-players-and-bots
-                     (filter (comp u/to-bool :mode :battle-status)))] ; remove spectators
-    (->> nonspec
-         shuffle
-         (map-indexed
-           (fn [i id]
-             (let [ally (mod i teams-count)]
-               {:id id
-                :opts {:is-bot (boolean (:bot-name id))}
-                :status-changes {:ally ally}})))
-         (sort-by (comp :ally :status-changes))
-         (map-indexed
-           (fn [i data]
-             (assoc-in data [:status-changes :id] i))))))
+(defn balance-teams
+  ([battle-players-and-bots teams-count]
+   (balance-teams battle-players-and-bots teams-count nil))
+  ([battle-players-and-bots teams-count opts]
+   (let [nonspec (->> battle-players-and-bots
+                      (filter (comp u/to-bool :mode :battle-status))) ; remove spectators
+         changes (->> nonspec
+                      shuffle
+                      (map-indexed
+                        (fn [i id]
+                          (let [ally (mod i teams-count)]
+                            {:id id
+                             :opts {:is-bot (boolean (:bot-name id))}
+                             :status-changes {:ally ally}}))))]
+     (if (:interleave opts)
+       (let [by-ally (->> changes
+                          (group-by (comp :ally :status-changes)))
+             largest-team (reduce
+                            (fnil min 0)
+                            0
+                            (map count (vals by-ally)))
+             changes (->> by-ally
+                          (map
+                            (fn [[ally changes]]
+                              [ally (concat changes (take (- largest-team (count changes)) (repeat nil)))]))
+                              ; pad for interleave
+                          (sort-by first)
+                          (map second))]
+         (->> changes
+              (apply interleave)
+              (map-indexed
+                (fn [i data]
+                  (assoc-in data [:status-changes :id] i)))))
+       (->> changes
+            (sort-by (comp :ally :status-changes))
+            (map-indexed
+              (fn [i data]
+                (assoc-in data [:status-changes :id] i))))))))
 
 
-(defn- n-teams [{:keys [client-data] :as e} n]
+(defn- n-teams [{:keys [client-data interleave-ally-player-ids] :as e} n]
   (future
     (try
-      (let [new-teams (balance-teams (battle-players-and-bots e) n)]
+      (let [new-teams (balance-teams (battle-players-and-bots e) n {:interleave interleave-ally-player-ids})]
         (->> new-teams
              (map
                (fn [{:keys [id opts status-changes]}]

@@ -6,7 +6,9 @@
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log]))
+    [taoensso.timbre :as log])
+  (:import
+    (javafx.scene.paint Color)))
 
 
 #_
@@ -27,6 +29,12 @@
 (def allyteam-colors
   (->> color/ffa-colors-web
        (map u/hex-color-to-css)
+       (map-indexed vector)
+       (into {})))
+
+(def allyteam-javafx-colors
+  (->> color/ffa-colors-web
+       (map #(Color/web %))
        (map-indexed vector)
        (into {})))
 
@@ -139,36 +147,55 @@
         {:fx/cell-type :table-cell
          :describe
          (fn [{:keys [owner] :as id}]
-           (let [not-spec (-> id :battle-status :mode u/to-bool)]
-             (merge
-               {:text (u/nickname id)
-                :style
-                (merge
-                  {:-fx-text-fill (if not-spec
-                                    (case battle-players-color-type
-                                      "team" (get allyteam-colors (-> id :battle-status :ally) "white")
-                                      "player" (-> id :team-color u/spring-color-to-javafx str u/hex-color-to-css)
-                                      ; else
-                                      "white")
-                                    "white")
-                   :-fx-alignment "CENTER"}
-                  (when not-spec
-                    {:-fx-font-weight "bold"}))}
-               (when (and username
-                          (not= username (:username id))
-                          (or am-host
-                              (= owner username)))
-                 {:graphic
-                  {:fx/type :button
-                   :on-action
-                   (merge
-                     {:event/type :spring-lobby/kick-battle
-                      :client-data client-data
-                      :singleplayer singleplayer}
-                     (select-keys id [:bot-name :username]))
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-account-remove:16:white"}}}))))}}
+           (let [not-spec (-> id :battle-status :mode u/to-bool)
+                 text-color-javafx (or
+                                     (when not-spec
+                                       (case battle-players-color-type
+                                         "team" (get allyteam-javafx-colors (-> id :battle-status :ally))
+                                         "player" (-> id :team-color u/spring-color-to-javafx)
+                                         ; else
+                                         nil))
+                                     Color/WHITE)
+                 text-color-css (-> text-color-javafx str u/hex-color-to-css)]
+             {:text ""
+              :graphic
+              {:fx/type :h-box
+               :alignment :center
+               :children
+               (concat
+                 (when (and username
+                            (not= username (:username id))
+                            (or am-host
+                                (= owner username)))
+                   [
+                    {:fx/type :button
+                     :on-action
+                     (merge
+                       {:event/type :spring-lobby/kick-battle
+                        :client-data client-data
+                        :singleplayer singleplayer}
+                       (select-keys id [:bot-name :username]))
+                     :graphic
+                     {:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-account-remove:16:white"}}])
+                 [{:fx/type :pane
+                   :style {:-fx-pref-width 8}}
+                  (merge
+                    {:fx/type :text
+                     :effect {:fx/type :drop-shadow
+                              :color (if (color/dark? text-color-javafx)
+                                       "white"
+                                       "black")
+                              :radius 2
+                              :spread 1}
+                     :text (u/nickname id)
+                     :fill text-color-css
+                     :style
+                     (merge
+                       {:-fx-font-size "16"
+                        :-fx-font-smoothing-type :gray}
+                       (when not-spec
+                         {:-fx-font-weight "bold"}))})])}}))}}
        {:fx/type :table-column
         :text "Skill"
         :resizable false
