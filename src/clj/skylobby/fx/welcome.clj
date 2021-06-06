@@ -102,7 +102,7 @@
                :-fx-background color}
        :graphic
        {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-open-in-new:30:black"}}
+        :icon-literal "mdi-download:30:black"}}
       {:fx/type :button
        :text ""
        :on-action {:event/type :spring-lobby/desktop-browse-url

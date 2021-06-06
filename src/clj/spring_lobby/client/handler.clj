@@ -420,6 +420,13 @@
            :battle-map-details nil
            :battle-mod-details nil)))
 
+(defmethod handle "JOINBATTLEREQUEST" [state-atom server-url m]
+  (let [[_all user-name _ip] (re-find #"\w+ (\w+) (\w+)" m)
+        state @state-atom
+        client (-> state :by-server (get server-url) :client-data :client)]
+    (message/send-message client (str "JOINBATTLEACCEPT " user-name))))
+
+
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
   (let [{:keys [map-details mod-details servers spring-isolation-dir] :as state} @state-atom
         {:keys [battle client-data preferred-color] :as server-data} (-> state :by-server (get server-url))

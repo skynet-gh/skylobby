@@ -22,6 +22,7 @@
     [skylobby.color :as color]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.download :as fx.download]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.replay :as fx.replay]
@@ -3441,40 +3442,6 @@
     importables-by-path))
 
 
-(def springfiles-maps-download-source
-  {:download-source-name "SpringFiles Maps"
-   :url http/springfiles-maps-url
-   :resources-fn http/html-downloadables})
-
-(def hakora-maps-download-source
-  {:download-source-name "Hakora Maps"
-   :url "http://www.hakora.xyz/files/springrts/maps"
-   :resources-fn http/html-downloadables})
-
-(def download-sources
-  [springfiles-maps-download-source
-   hakora-maps-download-source
-   {:download-source-name "BAR GitHub spring"
-    :url http/bar-spring-releases-url
-    :browse-url "https://github.com/beyond-all-reason/spring/releases"
-    :resources-fn http/get-github-release-engine-downloadables}
-   {:download-source-name "SpringFightClub Maps"
-    :url (str http/springfightclub-root "/maps")
-    :resources-fn http/html-downloadables}
-   {:download-source-name "SpringFightClub Games"
-    :url http/springfightclub-root
-    :resources-fn (partial http/html-downloadables
-                           (fn [url]
-                             (when (and url (string/ends-with? url ".sdz"))
-                               ::mod)))}
-   {:download-source-name "SpringLauncher"
-    :url http/springlauncher-root
-    :resources-fn http/get-springlauncher-downloadables}
-   {:download-source-name "SpringRTS buildbot"
-    :url http/springrts-buildbot-root
-    :resources-fn http/crawl-springrts-engine-downloadables}])
-
-
 (def downloadable-update-cooldown
   (* 1000 60 60 24)) ; 1 day
 
@@ -3609,9 +3576,9 @@
   (swap! *state assoc :download-source-name (:download-source-name event)))
 
 
-(defmethod event-handler ::update-downloadables
+(defmethod event-handler ::update-all-downloadables
   [opts]
-  (doseq [download-source download-sources]
+  (doseq [download-source fx.download/download-sources]
     (add-task! *state (merge
                         {::task-type ::update-downloadables
                          :force (:force opts)}
@@ -3923,7 +3890,7 @@
        (add-task! state-atom {::task-type ::reconcile-maps})
        (add-task! state-atom {::task-type ::refresh-replays})
        (add-task! state-atom {::task-type ::update-rapid})
-       (event-handler {:event/type ::update-downloadables})
+       (event-handler {:event/type ::update-all-downloadables})
        (event-handler {:event/type ::scan-imports}))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
@@ -3953,7 +3920,7 @@
     (add-task! state-atom {::task-type ::reconcile-mods})
     (add-task! state-atom {::task-type ::reconcile-maps})
     (add-task! state-atom {::task-type ::update-rapid})
-    (event-handler {:event/type ::update-downloadables})
+    (event-handler {:event/type ::update-all-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished standalone replay init")
     {:chimers

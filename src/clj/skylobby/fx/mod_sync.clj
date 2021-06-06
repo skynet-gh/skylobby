@@ -10,6 +10,10 @@
 (def no-springfiles
   [#"Beyond All Reason"])
 
+(def no-rapid
+  [#"Evolution RTS"
+   #"Total Annihilation Prime"])
+
 
 (defn mod-sync-pane
   [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file
@@ -115,65 +119,66 @@
                          :spring-isolation-dir spring-isolation-dir}
                         {:spring-lobby/task-type :spring-lobby/search-springfiles
                          :springname springname})})}])))
-           (let [rapid-data (get rapid-data-by-version battle-modname)
-                 rapid-id (:id rapid-data)
-                 rapid-download (get rapid-download rapid-id)
-                 running (some? (get rapid-tasks-by-id rapid-id))
-                 sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
-                 package-exists (fs/file-exists? file-cache sdp-file)
-                 rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
-                                  (map :rapid-id)
-                                  set)
-                 rapid-update-tasks (->> tasks-by-type
-                                         (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
-                                         (mapcat second)
-                                         seq)
-                 in-progress (or running
-                                 rapid-update-tasks
-                                 (contains? rapid-tasks rapid-id))]
-             [{:severity 2
-               :text "rapid"
-               :human-text
-                           (if engine-file
-                             (if rapid-update-tasks
-                               "Updating rapid packages..."
-                               (if rapid-id
-                                 (if in-progress
-                                   (str (u/download-progress rapid-download))
-                                   (str "Download rapid " rapid-id))
-                                 "No rapid download found, update packages"))
-                             "Needs engine first to download with rapid")
-               :tooltip (if rapid-id
-                          (if engine-file
-                            (if package-exists
-                              (str sdp-file)
-                              (str "Use rapid downloader to get resource id " rapid-id
-                                   " using engine " (:engine-version engine-details)))
-                            "Rapid requires an engine to work, get engine first")
-                          (str "No rapid download found for" battle-modname))
-               :in-progress in-progress
-               :action
-               (cond
-                 (not engine-file) nil
-                 (and rapid-id engine-file)
-                 {:event/type :spring-lobby/add-task
-                  :task
-                  {:spring-lobby/task-type :spring-lobby/rapid-download
-                   :rapid-id rapid-id
-                   :engine-file engine-file
-                   :spring-isolation-dir spring-isolation-dir}}
-                 package-exists
-                 {:event/type :spring-lobby/add-task
-                  :task
-                  {:spring-lobby/task-type :spring-lobby/update-file-cache
-                   :file sdp-file}}
-                 :else
-                 {:event/type :spring-lobby/add-task
-                  :task {:spring-lobby/task-type :spring-lobby/update-rapid
-                         :engine-version (:engine-version engine-details)
-                         :force true
-                         :mod-name battle-modname
-                         :spring-isolation-dir spring-isolation-dir}})}])
+           (when (and battle-modname (not (some #(re-find % battle-modname) no-rapid)))
+             (let [rapid-data (get rapid-data-by-version battle-modname)
+                   rapid-id (:id rapid-data)
+                   rapid-download (get rapid-download rapid-id)
+                   running (some? (get rapid-tasks-by-id rapid-id))
+                   sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
+                   package-exists (fs/file-exists? file-cache sdp-file)
+                   rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
+                                    (map :rapid-id)
+                                    set)
+                   rapid-update-tasks (->> tasks-by-type
+                                           (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
+                                           (mapcat second)
+                                           seq)
+                   in-progress (or running
+                                   rapid-update-tasks
+                                   (contains? rapid-tasks rapid-id))]
+               [{:severity 2
+                 :text "rapid"
+                 :human-text
+                             (if engine-file
+                               (if rapid-update-tasks
+                                 "Updating rapid packages..."
+                                 (if rapid-id
+                                   (if in-progress
+                                     (str (u/download-progress rapid-download))
+                                     (str "Download rapid " rapid-id))
+                                   "No rapid download found, update packages"))
+                               "Needs engine first to download with rapid")
+                 :tooltip (if rapid-id
+                            (if engine-file
+                              (if package-exists
+                                (str sdp-file)
+                                (str "Use rapid downloader to get resource id " rapid-id
+                                     " using engine " (:engine-version engine-details)))
+                              "Rapid requires an engine to work, get engine first")
+                            (str "No rapid download found for " battle-modname))
+                 :in-progress in-progress
+                 :action
+                 (cond
+                   (not engine-file) nil
+                   (and rapid-id engine-file)
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/rapid-download
+                     :rapid-id rapid-id
+                     :engine-file engine-file
+                     :spring-isolation-dir spring-isolation-dir}}
+                   package-exists
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/update-file-cache
+                     :file sdp-file}}
+                   :else
+                   {:event/type :spring-lobby/add-task
+                    :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                           :engine-version (:engine-version engine-details)
+                           :force true
+                           :mod-name battle-modname
+                           :spring-isolation-dir spring-isolation-dir}})}]))
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/mod} :resource-type))

@@ -27,6 +27,11 @@
    "14" "rgb(127,127,127)"
    "15" "rgb(210,210,210)"})
 
+(def text-style
+  {:-fx-font-family monospace-font-family
+   :-fx-font-size 17})
+
+
 (defn channel-texts [messages]
   (let [last-message-index (dec (count messages))]
     (->> messages
@@ -74,7 +79,7 @@
          {:fx/type :text-area
           :editable false
           :wrap-text true
-          :style {:-fx-font-family monospace-font-family}
+          :style text-style
           :context-menu
           {:fx/type :context-menu
            :items
@@ -103,7 +108,7 @@
           :content
           {:fx/type :text-flow
            :on-scroll {:event/type :spring-lobby/disable-auto-scroll}
-           :style {:-fx-font-family monospace-font-family}
+           :style text-style
            :children texts}}}))))
 
 (defn channel-view-history

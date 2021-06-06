@@ -197,7 +197,7 @@
            chat-auto-scroll client-data downloadables-by-url engine-details engine-file
            engine-filter engine-update-tasks engine-version engines extract-tasks filter-host-replay
            http-download host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
-           map-update-tasks maps me message-drafts mod-filter mod-update-tasks
+           map-update-tasks maps me message-drafts mod-dependencies mod-filter mod-update-tasks
            mods my-battle-status my-client-status my-player parsed-replays-by-path rapid-data-by-id
            rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key singleplayer
            spring-isolation-dir tasks-by-type team-counts username]
@@ -369,7 +369,34 @@
                   :maps maps
                   :tasks-by-type tasks-by-type
                   :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
-                  :spring-isolation-dir spring-isolation-dir}]}
+                  :spring-isolation-dir spring-isolation-dir}
+                 {:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [
+                   {:fx/type :label
+                    :text " Resources: "}
+                   {:fx/type :button
+                    :text "Import"
+                    :on-action {:event/type :spring-lobby/toggle
+                                :key :show-importer}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (str "mdi-file-import:16:white")}}
+                   {:fx/type :button
+                    :text "HTTP"
+                    :on-action {:event/type :spring-lobby/toggle
+                                :key :show-downloader}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (str "mdi-download:16:white")}}
+                   {:fx/type :button
+                    :text "Rapid"
+                    :on-action {:event/type :spring-lobby/toggle
+                                :key :show-rapid-downloader}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (str "mdi-download:16:white")}}]}]}
                {:fx/type :flow-pane
                 :vgap 5
                 :hgap 5
@@ -415,33 +442,47 @@
                         :suggest true
                         :on-value-changed {:event/type :spring-lobby/assoc-in
                                            :path [:by-server :local :battles :singleplayer :battle-map]}}]}])
-                  [
-                   (merge
-                     {:fx/type engine-sync-pane
-                      :engine-details engine-details
-                      :engine-file engine-file
-                      :engine-version engine-version
-                      :extract-tasks extract-tasks
-                      :engine-update-tasks engine-update-tasks}
-                     (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-engines]))
-                   (merge
-                     {:fx/type mod-sync-pane
-                      :battle-modname battle-modname
-                      :battle-mod-details battle-mod-details
-                      :engine-details engine-details
-                      :engine-file engine-file
-                      :indexed-mod indexed-mod
-                      :mod-update-tasks mod-update-tasks
-                      :rapid-tasks-by-id rapid-tasks-by-id}
-                     (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))
-                   (merge
-                     {:fx/type map-sync-pane
-                      :battle-map battle-map
-                      :battle-map-details battle-map-details
-                      :indexed-map indexed-map
-                      :import-tasks import-tasks
-                      :map-update-tasks map-update-tasks}
-                     (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))])})])}}
+                  (concat
+                    [
+                     (merge
+                       {:fx/type engine-sync-pane
+                        :engine-details engine-details
+                        :engine-file engine-file
+                        :engine-version engine-version
+                        :extract-tasks extract-tasks
+                        :engine-update-tasks engine-update-tasks}
+                       (select-keys state [:copying :downloadables-by-url :extracting :file-cache :http-download :importables-by-path :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-engines]))
+                     (merge
+                       {:fx/type mod-sync-pane
+                        :battle-modname battle-modname
+                        :battle-mod-details battle-mod-details
+                        :engine-details engine-details
+                        :engine-file engine-file
+                        :indexed-mod indexed-mod
+                        :mod-update-tasks mod-update-tasks
+                        :rapid-tasks-by-id rapid-tasks-by-id}
+                       (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods]))]
+                    (map
+                      (fn [{:keys [mod-name indexed details]}]
+                        (merge
+                          {:fx/type mod-sync-pane
+                           :battle-modname mod-name
+                           :battle-mod-details details
+                           :engine-details engine-details
+                           :engine-file engine-file
+                           :indexed-mod indexed
+                           :mod-update-tasks mod-update-tasks
+                           :rapid-tasks-by-id rapid-tasks-by-id}
+                          (select-keys state [:copying :downloadables-by-url :file-cache :gitting :http-download :importables-by-path :mods :rapid-data-by-version :rapid-download :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-mods])))
+                      mod-dependencies)
+                    [(merge
+                       {:fx/type map-sync-pane
+                        :battle-map battle-map
+                        :battle-map-details battle-map-details
+                        :indexed-map indexed-map
+                        :import-tasks import-tasks
+                        :map-update-tasks map-update-tasks}
+                       (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))]))})])}}
         {:fx/type :pane
          :v-box/vgrow :always}]
        [{:fx/type :h-box
@@ -1003,8 +1044,16 @@
         battle-map-details (resource/cached-details map-details indexed-map)
         indexed-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
         battle-mod-details (resource/cached-details mod-details indexed-mod)
+        mod-dependencies (->> battle-modname
+                              resource/mod-dependencies
+                              (map (fn [mod-name]
+                                     (let [indexed-mod (->> mods (filter (comp #{mod-name} :mod-name)) first)]
+                                       {:mod-name mod-name
+                                        :indexed indexed-mod
+                                        :details indexed-mod}))))
         in-sync (boolean (and (resource/details? battle-map-details)
                               (resource/details? battle-mod-details)
+                              (every? resource/details? (map :details mod-dependencies))
                               (seq engine-details)))
         engine-file (:file engine-details)
         bots (fs/bots engine-file)
@@ -1104,6 +1153,7 @@
            :indexed-mod indexed-mod
            :map-update-tasks map-update-tasks
            :me me
+           :mod-dependencies mod-dependencies
            :mod-update-tasks mod-update-tasks
            :my-battle-status my-battle-status
            :my-client-status my-client-status

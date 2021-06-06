@@ -7,6 +7,7 @@ Notable changes and todo list.
 Current Annoyances:
 
 - Ally/team numbers start at 0 instead of 1, different from SPADS
+- Save last faction and restore per battle
 - Downloads and other tasks cannot be cancelled
 - Replace 7Zip with Apache commons-compress to fix concurrency issue
 
@@ -33,6 +34,15 @@ Future Features:
 
 ## Actual changelog
 
+
+### [0.3.52]
+
+- Add download source for EvoRTS TAP GitHub release artifacts
+- Add handler for `JOINBATTLEREQUEST`
+- Add mod dependency for EvoRTS on its music mod
+- Lighten shadow around player names
+- Increase font size in chat
+- Add resource buttons to singleplayer battle
 
 ### [0.3.51]
 
