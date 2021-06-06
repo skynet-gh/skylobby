@@ -184,7 +184,7 @@
                     {:fx/type :text
                      :effect {:fx/type :drop-shadow
                               :color (if (color/dark? text-color-javafx)
-                                       "white"
+                                       "#d5d5d5"
                                        "black")
                               :radius 2
                               :spread 1}
