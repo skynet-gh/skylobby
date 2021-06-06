@@ -15,6 +15,13 @@
   [:spring-lobby/engine :spring-lobby/map :spring-lobby/mod :spring-lobby/sdp])
   ; TODO split out packaging type from resource type...
 
+
+(defn mod-dependencies [mod-name]
+  (if (and mod-name (string/starts-with? mod-name "Evolution RTS"))
+    ["Evolution RTS Music Addon v2"]
+    nil))
+
+
 (defn resource-dest
   [root {:keys [resource-filename resource-name resource-file resource-type]}]
   (let [filename (or resource-filename
@@ -77,14 +84,23 @@
       (string/replace #"-" "_")
       (string/replace #"\.sd[7z]$" "")))
 
+(defn normalize-mod-harder [mod-name-or-filename]
+  (-> mod-name-or-filename
+      string/lower-case
+      (string/replace #"\.sd[7z]$" "")
+      (string/replace #"[-_\.\s+]" "")))
+
 (defn could-be-this-mod?
   "Returns true if this resource might be the mod with the given name, by magic, false otherwise."
   [mod-name {:keys [resource-filename resource-name]}]
   (and mod-name
        (or (= mod-name resource-name)
            (when (and mod-name resource-filename)
-             (= (normalize-mod mod-name)
-                (normalize-mod resource-filename))))))
+             (or
+               (= (normalize-mod mod-name)
+                  (normalize-mod resource-filename))
+               (= (normalize-mod-harder mod-name)
+                  (normalize-mod-harder resource-filename)))))))
 
 (defn same-resource-file? [resource1 resource2]
   (boolean

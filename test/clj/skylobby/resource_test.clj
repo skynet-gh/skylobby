@@ -90,6 +90,18 @@
            :resource-type :spring-lobby/map}))))
 
 
+(deftest normalize-mod
+  (is (= "evolution_rts___v16.11"
+         (resource/normalize-mod "Evolution RTS - v16.11")))
+  (is (= "evolution_rtsv1611"
+         (resource/normalize-mod "Evolution-RTSv1611.sdz"))))
+
+(deftest normalize-mod-harder
+  (is (= "evolutionrtsv1611"
+         (resource/normalize-mod-harder "Evolution RTS - v16.11")))
+  (is (= "evolutionrtsv1611"
+         (resource/normalize-mod-harder "Evolution-RTSv1611.sdz"))))
+
 (deftest could-be-this-mod?
   (is (true?
         (resource/could-be-this-mod?
@@ -106,7 +118,11 @@
   (is (true?
         (resource/could-be-this-mod?
           "Beyond All Reason test-16091-cc46531"
-          {:resource-name "Beyond All Reason test-16091-cc46531"}))))
+          {:resource-name "Beyond All Reason test-16091-cc46531"})))
+  (is (true?
+        (resource/could-be-this-mod?
+          "Evolution RTS - v16.11"
+          {:resource-filename "Evolution-RTSv1611.sdz"}))))
 
 
 (deftest same-resource-file?

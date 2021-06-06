@@ -43,6 +43,9 @@
 (def bar-spring-releases-url
   "https://api.github.com/repos/beyond-all-reason/spring/releases")
 
+(def evo-rts-github-releases-url
+  "https://api.github.com/repos/EvolutionRTS/Evolution-RTS/releases")
+
 (def bar-replays-api-url
   "https://bar-rts.com/api/replays/")
 
@@ -388,6 +391,45 @@
                 :resource-date created-at
                 :download-source-name download-source-name
                 :resource-updated now}))))))
+
+(def evo-rts-re
+  #"^Evolution-RTSv([0-9a-z]+)\.sdz$")
+
+(defn evo-rts-filename?
+  [filename]
+  (boolean
+    (re-find evo-rts-re filename)))
+
+(defn get-evo-rts-github-release-downloadables
+  [{:keys [download-source-name url]}]
+  (let [now (u/curr-millis)]
+    (concat
+      (->> (http/get url {:as :auto})
+           :body
+           (mapcat
+             (fn [{:keys [assets html_url]}]
+               (map
+                 (fn [{:keys [browser_download_url created_at]}]
+                   {:release-url html_url
+                    :asset-url browser_download_url
+                    :created-at created_at})
+                 assets)))
+           (map
+             (fn [{:keys [asset-url created-at]}]
+               (let [decoded-url (u/decode asset-url)
+                     filename (filename decoded-url)]
+                 {:download-url asset-url
+                  :resource-filename filename
+                  :resource-type (when (evo-rts-filename? filename)
+                                   :spring-lobby/mod)
+                  :resource-date created-at
+                  :download-source-name download-source-name
+                  :resource-updated now}))))
+      [{:resource-type :spring-lobby/mod
+        :resource-name "Evolution RTS Music Addon v2"
+        :download-url "https://github.com/EvolutionRTS/Evolution-RTS/releases/download/v16.00/Evolution-RTSMusicAddon.sdz"
+        :resource-filename "Evolution-RTSMusicAddon.sdz"
+        :download-source-name download-source-name}])))
 
 
 (defn get-bar-replays

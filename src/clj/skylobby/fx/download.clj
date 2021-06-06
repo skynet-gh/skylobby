@@ -12,10 +12,6 @@
     [taoensso.tufte :as tufte]))
 
 
-(def downloadable-update-cooldown
-  (* 1000 60 60 24)) ; 1 day
-
-
 (def download-window-width 1600)
 (def download-window-height 800)
 
@@ -37,6 +33,10 @@
     :url http/bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"
     :resources-fn http/get-github-release-engine-downloadables}
+   {:download-source-name "Evolution-RTS GitHub releases"
+    :url http/evo-rts-github-releases-url
+    :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
+    :resources-fn http/get-evo-rts-github-release-downloadables}
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
     :resources-fn http/html-downloadables}
@@ -169,7 +169,7 @@
                     {:spring-lobby/task-type :spring-lobby/update-downloadables
                      :force true}
                     download-source)}
-                 {:event/type :spring-lobby/update-downloadables
+                 {:event/type :spring-lobby/update-all-downloadables
                   :force true})
                :graphic
                {:fx/type font-icon/lifecycle
