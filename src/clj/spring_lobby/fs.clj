@@ -383,16 +383,18 @@
                    subdirs)))
        files))))
 
+(defn spring-archive? [filename]
+  (and filename
+    (or (string/ends-with? filename ".sd7")
+        (string/ends-with? filename ".sdz"))))
+
 (defn map-files
   [root]
   (->> (io/file root "maps")
        list-files
        (filter
          (some-fn
-           (every-pred
-             is-file?
-             #(or (string/ends-with? (filename %) ".sd7")
-                  (string/ends-with? (filename %) ".sdz")))
+           (every-pred is-file? (comp spring-archive? filename))
            (every-pred
              is-directory?
              #(string/ends-with? (filename %) ".sdd"))))))

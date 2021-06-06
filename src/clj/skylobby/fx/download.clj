@@ -33,6 +33,10 @@
     :url http/bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"
     :resources-fn http/get-github-release-engine-downloadables}
+   {:download-source-name "BAR GitHub maps"
+    :url http/bar-maps-github-releases-url
+    :browse-url "https://github.com/beyond-all-reason/Maps/releases"
+    :resources-fn http/get-bar-maps-github-release-downloadables}
    {:download-source-name "Evolution-RTS GitHub releases"
     :url http/evo-rts-github-releases-url
     :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
@@ -121,7 +125,7 @@
                :text " Filter source: "}
               {:fx/type :combo-box
                :value download-source
-               :items download-sources
+               :items (sort-by :download-source-name download-sources)
                :button-cell download-source-cell
                :prompt-text " < pick a source > "
                :cell-factory
