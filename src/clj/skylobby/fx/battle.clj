@@ -199,7 +199,7 @@
            http-download host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
            map-update-tasks maps me message-drafts mod-dependencies mod-filter mod-update-tasks
            mods my-battle-status my-client-status my-player parsed-replays-by-path rapid-data-by-id
-           rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key singleplayer
+           rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key sides singleplayer
            spring-isolation-dir tasks-by-type team-counts username]
     :as state}]
   {:fx/type :h-box
@@ -249,6 +249,7 @@
                               :bot-name bot-name
                               :bot-version bot-version
                               :client-data client-data
+                              :side-indices (keys sides)
                               :singleplayer singleplayer
                               :username username}}
                  #_
@@ -1116,6 +1117,7 @@
          :client-data (when-not singleplayer client-data)
          :host-ingame host-ingame
          :host-username host-username
+         :indexed-mod indexed-mod
          :players players
          :server-key server-key
          :scripttags scripttags
@@ -1160,6 +1162,7 @@
            :my-player my-player
            :rapid-tasks-by-id rapid-tasks-by-id
            :scripttags scripttags
+           :sides sides
            :singleplayer singleplayer
            :tasks-by-type tasks-by-type
            :team-counts team-counts})]}

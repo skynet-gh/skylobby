@@ -41,7 +41,7 @@
 
 (defn players-table
   [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
-           players scripttags server-key sides singleplayer username]}]
+           indexed-mod players scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -369,24 +369,29 @@
         {:fx/cell-type :table-cell
          :describe
          (fn [i]
-           {:text ""
-            :graphic
-            {:fx/type ext-recreate-on-key-changed
-             :key (u/nickname i)
-             :desc
-             {:fx/type :combo-box
-              :value (->> i :battle-status :side (get sides) str)
-              :on-value-changed {:event/type :spring-lobby/battle-side-changed
-                                 :client-data (when-not singleplayer client-data)
-                                 :is-me (= (:username i) username)
-                                 :is-bot (-> i :user :client-status :bot)
-                                 :id i
-                                 :sides sides}
-              :items (->> sides seq (sort-by first) (map second))
-              :disable (or (not username)
-                           (not (or am-host
-                                    (= (:username i) username)
-                                    (= (:owner i) username))))}}})}}
+           (let [items (->> sides seq (sort-by first) (map second))]
+             {:text ""
+              :graphic
+              (if (seq items)
+                {:fx/type ext-recreate-on-key-changed
+                 :key (u/nickname i)
+                 :desc
+                 {:fx/type :combo-box
+                  :value (->> i :battle-status :side (get sides) str)
+                  :on-value-changed {:event/type :spring-lobby/battle-side-changed
+                                     :client-data (when-not singleplayer client-data)
+                                     :is-me (= (:username i) username)
+                                     :is-bot (-> i :user :client-status :bot)
+                                     :id i
+                                     :indexed-mod indexed-mod
+                                     :sides sides}
+                  :items items
+                  :disable (or (not username)
+                               (not (or am-host
+                                        (= (:username i) username)
+                                        (= (:owner i) username))))}}
+                {:fx/type :label
+                 :text "loading..."})}))}}
        #_
        {:fx/type :table-column
         :editable false
