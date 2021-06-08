@@ -35,6 +35,11 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.54]
+
+- Update BAR server url
+- Add BAR SSL server
+
 ### [0.3.53]
 
 - Save and set preferred faction by game type
