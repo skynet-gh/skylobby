@@ -121,6 +121,7 @@
         {:fx/type fx.matchmaking/matchmaking-window
          :screen-bounds screen-bounds}
         server-data
+        (select-keys state fx.matchmaking/matchmaking-window-keys)
         {:show-matchmaking-window
          (and show-matchmaking-window
               (not= selected-server-tab "local")

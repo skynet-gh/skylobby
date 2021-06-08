@@ -43,6 +43,9 @@
 (def bar-spring-releases-url
   "https://api.github.com/repos/beyond-all-reason/spring/releases")
 
+(def bar-maps-github-releases-url
+  "https://api.github.com/repos/beyond-all-reason/Maps/releases")
+
 (def evo-rts-github-releases-url
   "https://api.github.com/repos/EvolutionRTS/Evolution-RTS/releases")
 
@@ -430,6 +433,31 @@
         :download-url "https://github.com/EvolutionRTS/Evolution-RTS/releases/download/v16.00/Evolution-RTSMusicAddon.sdz"
         :resource-filename "Evolution-RTSMusicAddon.sdz"
         :download-source-name download-source-name}])))
+
+(defn get-bar-maps-github-release-downloadables
+  [{:keys [download-source-name url]}]
+  (let [now (u/curr-millis)]
+    (->> (http/get url {:as :auto})
+         :body
+         (mapcat
+           (fn [{:keys [assets html_url]}]
+             (map
+               (fn [{:keys [browser_download_url created_at]}]
+                 {:release-url html_url
+                  :asset-url browser_download_url
+                  :created-at created_at})
+               assets)))
+         (map
+           (fn [{:keys [asset-url created-at]}]
+             (let [decoded-url (u/decode asset-url)
+                   filename (filename decoded-url)]
+               {:download-url asset-url
+                :resource-filename filename
+                :resource-type (when (fs/spring-archive? filename)
+                                 :spring-lobby/map)
+                :resource-date created-at
+                :download-source-name download-source-name
+                :resource-updated now}))))))
 
 
 (defn get-bar-replays

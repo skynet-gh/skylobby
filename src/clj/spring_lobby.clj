@@ -137,7 +137,7 @@
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :rapid-repo :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :username])
 
@@ -270,8 +270,8 @@
            (if (string/ends-with? (fs/filename f) ".sdp")
              (rapid/read-sdp-mod f opts)
              (fs/read-mod-file f opts))
-           mod-name (u/mod-name mod-data)]
-       (assoc mod-data :mod-name mod-name))
+           name-and-version (u/mod-name-and-version mod-data)]
+       (merge mod-data name-and-version))
      (catch Exception e
        (log/warn e "Error reading mod details")))))
 
@@ -282,7 +282,7 @@
                    (read-mod-data file {:modinfo-only false})
                    (catch Exception e
                      (log/error e "Error reading mod data for" file)))
-        mod-details (select-keys mod-data [:file :mod-name ::fs/source :git-commit-id])
+        mod-details (select-keys mod-data [:file :mod-name :mod-name-only :mod-version ::fs/source :git-commit-id])
         mod-details (assoc mod-details
                            :is-game
                            (boolean
@@ -1283,6 +1283,7 @@
                     (fn [mods]
                       (->> mods
                            (filter #(contains? % :is-game))
+                           (filter #(contains? % :mod-name-only))
                            (remove (comp string/blank? :mod-name))
                            (remove (comp missing-files fs/canonical-path :file))
                            set)))
@@ -2447,7 +2448,7 @@
         (str desired-name 0)))))
 
 (defmethod event-handler ::add-bot
-  [{:keys [battle bot-username bot-name bot-version client-data singleplayer username]}]
+  [{:keys [battle bot-username bot-name bot-version client-data side-indices singleplayer username]}]
   (future
     (try
       (let [existing-bots (keys (:bots battle))
@@ -2458,7 +2459,9 @@
                           :sync 1
                           :id (battle/available-team-id battle)
                           :ally (battle/available-ally battle)
-                          :side (rand-nth [0 1]))
+                          :side (if (seq side-indices)
+                                  (rand-nth side-indices)
+                                  0))
             bot-status (handler/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
@@ -3005,10 +3008,11 @@
         (log/error e "Error updating battle spectate")))))
 
 (defmethod event-handler ::battle-side-changed
-  [{:keys [client-data id sides] :fx/keys [event] :as data}]
+  [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]
   (future
     (try
       (let [side (get (clojure.set/map-invert sides) event)]
+        (swap! *state assoc-in [:preferred-factions (:mod-name-only indexed-mod)] side)
         (if (not= side (-> id :battle-status :side))
           (let [old-side (-> id :battle-status :side)]
             (log/info "Updating side for" id "from" old-side "(" (get sides old-side) ") to" side "(" event ")")

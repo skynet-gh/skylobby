@@ -8,6 +8,9 @@
 (def matchmaking-window-width 600)
 (def matchmaking-window-height 700)
 
+(def matchmaking-window-keys
+  [:css])
+
 
 (defn matchmaking-window-impl [{:keys [client-data css matchmaking-queues screen-bounds show-matchmaking-window]}]
   {:fx/type :stage

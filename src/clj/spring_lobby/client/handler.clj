@@ -229,10 +229,11 @@
         parts (string/split remaining #"\s+")
         channel-name (first parts)
         clients (rest parts)]
-    (swap! state-atom update-in [:by-server server-url :channels channel-name :users]
-           (fn [users]
-             (apply assoc users
-                    (mapcat (fn [client] [client {}]) clients))))))
+    (when (seq clients)
+      (swap! state-atom update-in [:by-server server-url :channels channel-name :users]
+             (fn [users]
+               (apply assoc users
+                      (mapcat (fn [client] [client {}]) clients)))))))
 
 (defmethod handle "CLIENTSFROM" [state-atom server-url m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
@@ -428,17 +429,21 @@
 
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [map-details mod-details servers spring-isolation-dir] :as state} @state-atom
-        {:keys [battle client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
+  (let [{:keys [map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
+        {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-root)
         spring (-> state :by-spring-root (get spring-root-path))
         my-username (:username client-data)
         {:keys [battle-status]} (-> battle :users (get my-username))
+        battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
+        battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
         new-battle-status (assoc (or battle-status default-battle-status)
                             :id (battle/available-team-id battle)
-                            :ally (battle/available-ally battle)
+                            :ally 0 ; (battle/available-ally battle)
+                            :side (or (get preferred-factions (:mod-name-only battle-mod-index))
+                                      0)
                             :sync (sync-number
                                     (resource/sync-status server-data spring mod-details map-details)))
         color (or preferred-color (u/random-color))
@@ -504,7 +509,7 @@
 
 
 (defmethod handle "CHANNEL" [state-atom server-url m]
-  (let [[_all channel-name user-count topic] (re-find #"\w+ ([^\s]+) (\w+) (.+)?" m)]
+  (let [[_all channel-name user-count _ topic] (re-find #"\w+ ([^\s]+) (\w+)(?: (.+))?" m)]
     (swap! state-atom update-in [:by-server server-url :channels channel-name]
            merge {:channel-name channel-name
                   :user-count user-count
