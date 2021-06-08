@@ -35,6 +35,16 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.53]
+
+- Save and set preferred faction by game type
+- Default ally to 0
+- Add BAR GitHub maps download source
+- Fix CSS for matchmaking window
+- Add mod version and name without version to index
+- Fix `CHANNEL` handler when no trailing whitespace
+- Fix `CLIENTS` handler when no clients
+
 ### [0.3.52]
 
 - Add download source for EvoRTS TAP GitHub release artifacts
