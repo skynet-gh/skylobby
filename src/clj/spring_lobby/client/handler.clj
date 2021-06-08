@@ -229,10 +229,11 @@
         parts (string/split remaining #"\s+")
         channel-name (first parts)
         clients (rest parts)]
-    (swap! state-atom update-in [:by-server server-url :channels channel-name :users]
-           (fn [users]
-             (apply assoc users
-                    (mapcat (fn [client] [client {}]) clients))))))
+    (when (seq clients)
+      (swap! state-atom update-in [:by-server server-url :channels channel-name :users]
+             (fn [users]
+               (apply assoc users
+                      (mapcat (fn [client] [client {}]) clients)))))))
 
 (defmethod handle "CLIENTSFROM" [state-atom server-url m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
@@ -508,7 +509,7 @@
 
 
 (defmethod handle "CHANNEL" [state-atom server-url m]
-  (let [[_all channel-name user-count topic] (re-find #"\w+ ([^\s]+) (\w+) (.+)?" m)]
+  (let [[_all channel-name user-count _ topic] (re-find #"\w+ ([^\s]+) (\w+)(?: (.+))?" m)]
     (swap! state-atom update-in [:by-server server-url :channels channel-name]
            merge {:channel-name channel-name
                   :user-count user-count
