@@ -89,7 +89,9 @@
           "67"
           " SpringLobby 0.270-49-gab254fe7d (windows64)"
           "SpringLobby 0.270-49-gab254fe7d (windows64)"]
-         (rest (handler/parse-adduser "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)")))))
+         (rest (handler/parse-adduser "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)"))))
+  (is (= ["ChanServ" "US" nil nil "None" " ChanServ" "ChanServ"]
+         (rest (handler/parse-adduser "ADDUSER ChanServ US None ChanServ")))))
 
 (deftest handle-ADDUSER
   (let [state-atom (atom {})
