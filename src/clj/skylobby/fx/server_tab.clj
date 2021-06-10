@@ -22,36 +22,14 @@
     server-tab-state-keys))
 
 (defn server-tab
-  [{:keys [agreement battle client-data console-auto-scroll password pop-out-battle
-           selected-tab-channel selected-tab-main tasks-by-type username verification-code]
+  [{:keys [battle console-auto-scroll pop-out-battle selected-tab-channel selected-tab-main
+           tasks-by-type]
     :as state}]
   {:fx/type :v-box
    :style {:-fx-font-size 14}
    :alignment :top-left
    :children
    (concat
-     (when agreement
-       [{:fx/type :label
-         :style {:-fx-font-size 20}
-         :text " Server agreement: "}
-        {:fx/type :text-area
-         :editable false
-         :text (str agreement)}
-        {:fx/type :h-box
-         :style {:-fx-font-size 20}
-         :children
-         [{:fx/type :text-field
-           :prompt-text "Email Verification Code"
-           :text verification-code
-           :on-text-changed {:event/type :spring-lobby/assoc
-                             :key :verification-code}}
-          {:fx/type :button
-           :text "Confirm"
-           :on-action {:event/type :spring-lobby/confirm-agreement
-                       :client-data client-data
-                       :password password
-                       :username username
-                       :verification-code verification-code}}]}])
      (let [main-tab [
                      (merge
                        {:fx/type fx.main-tabs/main-tab-view
