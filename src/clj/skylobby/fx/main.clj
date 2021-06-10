@@ -55,7 +55,7 @@
               (-> by-server
                   (get (u/server-key {:server-url (first server)
                                       :username username}))
-                  (select-keys [:accepted :client-data]))
+                  (select-keys fx.welcome/welcome-view-server-keys))
               {:selected-tab-channel selected-tab-channel
                :selected-tab-main selected-tab-main})}]
           (map

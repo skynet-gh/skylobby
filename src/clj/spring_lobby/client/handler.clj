@@ -87,7 +87,7 @@
 
 
 (defn parse-adduser [m]
-  (re-find #"\w+ ([^\s]+) ([^\s]+)( ([\d]+))? ([\d]+)( (.+))?" m))
+  (re-find #"\w+ ([^\s]+) ([^\s]+)( ([\d]+))? ([\d]+|None)( (.+))?" m))
 
 (defmethod handle "ADDUSER" [state-atom server-url m]
   (if-let [[_all username country _cpu cpu user-id _user-agent user-agent] (parse-adduser m)]

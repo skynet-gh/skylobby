@@ -35,6 +35,10 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.55]
+
+- Fix agreement display and confirm
+
 ### [0.3.54]
 
 - Update BAR server url

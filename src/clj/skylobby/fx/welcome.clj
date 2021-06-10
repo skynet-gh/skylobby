@@ -166,7 +166,8 @@
                    :key :show-settings-window}}])})
 
 (defn multiplayer-buttons
-  [{:keys [by-server client-data login-error logins password server servers username]
+  [{:keys [agreement by-server client-data login-error logins password server servers username
+           verification-code]
     :as state}]
   {:fx/type :v-box
    :children
@@ -290,7 +291,28 @@
                    "All auto-connect servers connected"
                    (str "Connect to " (count auto-servers-not-connected) " auto-connect servers"))
            :disable (empty? auto-servers-not-connected)
-           :on-action {:event/type :spring-lobby/auto-connect-servers}}])))})
+           :on-action {:event/type :spring-lobby/auto-connect-servers}}]))
+     (when agreement
+       [{:fx/type :label
+         :style {:-fx-font-size 20}
+         :text " Server agreement: "}
+        {:fx/type :text-area
+         :editable false
+         :text (str agreement)}
+        {:fx/type :h-box
+         :style {:-fx-font-size 20}
+         :children
+         [{:fx/type :text-field
+           :prompt-text "Email Verification Code"
+           :text verification-code
+           :on-text-changed {:event/type :spring-lobby/assoc
+                             :key :verification-code}}
+          {:fx/type :button
+           :text "Confirm"
+           :on-action {:event/type :spring-lobby/confirm-agreement
+                       :client-data client-data
+                       :server-key (u/server-key client-data)
+                       :verification-code verification-code}}]}]))})
 
 
 (def welcome-view-keys
@@ -299,7 +321,10 @@
     fx.bottom-bar/bottom-bar-keys
     [:app-update-available :by-spring-root :by-server :client-data :http-download
      :login-error :logins :password
-     :server :servers :spring-isolation-dir :tasks-by-type :username]))
+     :server :servers :spring-isolation-dir :tasks-by-type :username :verification-code]))
+
+(def welcome-view-server-keys
+  [:accepted :agreement :client-data])
 
 (defn welcome-view
   [{:keys [by-spring-root by-server spring-isolation-dir]

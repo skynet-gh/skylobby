@@ -2062,12 +2062,12 @@
       (catch Exception e
         (log/error e "Error registering with" server "as" username)))))
 
-(defmethod event-handler ::confirm-agreement [{:keys [client-data password username verification-code]}]
+(defmethod event-handler ::confirm-agreement
+  [{:keys [client-data server-key verification-code]}]
   (future
     (try
       (client-message client-data (str "CONFIRMAGREEMENT " verification-code))
-      (swap! *state dissoc :agreement :verification-code)
-      (client/login client-data username password)
+      (swap! *state update-in [:by-server server-key] dissoc :agreement :verification-code)
       (catch Exception e
         (log/error e "Error confirming agreement")))))
 
