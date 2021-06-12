@@ -19,12 +19,12 @@
    :use-springlobby-modname])
 
 (def battles-buttons-keys
-  [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle])
+  [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle :server-key])
 
 (defn battles-buttons-view
   [{:keys [accepted app-update-available battle battles battle-password battle-title client-data compflags engine-version
            engines mod-name map-name maps mods map-input-prefix engine-filter mod-filter
-           pop-out-battle selected-battle spring-isolation-dir]
+           pop-out-battle selected-battle server-key spring-isolation-dir]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -160,7 +160,8 @@
          [{:fx/type :button
            :text "Leave Battle"
            :on-action {:event/type :spring-lobby/leave-battle
-                       :client-data client-data}}
+                       :client-data client-data
+                       :server-key server-key}}
           {:fx/type :pane
            :h-box/margin 8}
           (if pop-out-battle
