@@ -52,75 +52,80 @@
              :tries 0}}}])
        (when (and no-map-details (not indexed-map))
          (concat
-           (let [downloadable (->> downloadables-by-url
-                                   vals
-                                   (filter (comp #{:spring-lobby/map} :resource-type))
-                                   (filter (partial resource/could-be-this-map? battle-map))
-                                   first)
-                 url (:download-url downloadable)
-                 download (get http-download url)
+           (let [
                  http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
                                           (map (comp :download-url :downloadable))
                                           set)
-                 in-progress (or (:running download) (contains? http-download-tasks url))
-                 dest (resource/resource-dest spring-isolation-dir downloadable)
-                 dest-exists (fs/file-exists? file-cache dest)
-                 severity (if dest-exists -1 2)
-                 springname battle-map
-                 springfiles-searched (contains? springfiles-search-results springname)
-                 springfiles-search-result (get springfiles-search-results springname)
-                 springfiles-mirror-set (set (:mirrors springfiles-search-result))
-                 springfiles-download (->> http-download
-                                           (filter (comp springfiles-mirror-set first))
-                                           first
-                                           second)
-                 springfiles-in-progress (or (:running springfiles-download)
-                                             (some springfiles-mirror-set http-download-tasks))]
-             (if downloadable
-               [{:severity severity
-                 :text "download"
-                 :human-text (if in-progress
-                               (u/download-progress download)
-                               (if downloadable
+                 downloadables (->> downloadables-by-url
+                                    vals
+                                    (filter (comp #{:spring-lobby/map} :resource-type))
+                                    (filter (partial resource/could-be-this-map? battle-map)))]
+             (if (seq downloadables)
+               (map
+                 (fn [downloadable]
+                   (let [
+                         url (:download-url downloadable)
+                         download (get http-download url)
+                         in-progress (or (:running download) (contains? http-download-tasks url))
+                         dest (resource/resource-dest spring-isolation-dir downloadable)
+                         dest-exists (fs/file-exists? file-cache dest)
+                         severity (if dest-exists -1 2)]
+                     {:severity severity
+                      :text "download"
+                      :human-text (if in-progress
+                                    (u/download-progress download)
+                                    (if downloadable
+                                      (if dest-exists
+                                        (str "Downloaded " (fs/filename dest))
+                                        (str "Download from " (:download-source-name downloadable)))
+                                      (str "No download for " battle-map)))
+                      :tooltip (if in-progress
+                                 (str "Downloading " (u/download-progress download))
                                  (if dest-exists
-                                   (str "Downloaded " (fs/filename dest))
-                                   (str "Download from " (:download-source-name downloadable)))
-                                 (str "No download for " battle-map)))
-                 :tooltip (if in-progress
-                            (str "Downloading " (u/download-progress download))
-                            (if dest-exists
-                              (str "Downloaded to " (fs/canonical-path dest))
-                              (str "Download " url)))
-                 :in-progress in-progress
-                 :action (when (and downloadable (not dest-exists))
-                           {:event/type :spring-lobby/add-task
-                            :task
-                            {:spring-lobby/task-type :spring-lobby/http-downloadable
-                             :downloadable downloadable
-                             :spring-isolation-dir spring-isolation-dir}})}]
-               (when springname
-                 [{:severity 2
-                   :text "springfiles"
-                   :human-text (if springfiles-in-progress
-                                 (u/download-progress springfiles-download)
-                                 (if springfiles-searched
-                                   (if springfiles-search-result
-                                     "Download from springfiles"
-                                     "Not found on springfiles")
-                                   "Search springfiles"))
-                   :in-progress springfiles-in-progress
-                   :action
-                   (when (or (not springfiles-searched) springfiles-search-result)
-                     {:event/type :spring-lobby/add-task
-                      :task
-                      (if springfiles-searched
-                        {:spring-lobby/task-type :spring-lobby/download-springfiles
-                         :resource-type :spring-lobby/map
-                         :search-result springfiles-search-result
-                         :springname springname
-                         :spring-isolation-dir spring-isolation-dir}
-                        {:spring-lobby/task-type :spring-lobby/search-springfiles
-                         :springname springname})})}])))
+                                   (str "Downloaded to " (fs/canonical-path dest))
+                                   (str "Download " url)))
+                      :in-progress in-progress
+                      :action (when (and downloadable (not dest-exists))
+                                {:event/type :spring-lobby/add-task
+                                 :task
+                                 {:spring-lobby/task-type :spring-lobby/http-downloadable
+                                  :downloadable downloadable
+                                  :spring-isolation-dir spring-isolation-dir}})}))
+                 downloadables)
+               (let [
+                     springname battle-map
+                     springfiles-searched (contains? springfiles-search-results springname)
+                     springfiles-search-result (get springfiles-search-results springname)
+                     springfiles-mirror-set (set (:mirrors springfiles-search-result))
+                     springfiles-download (->> http-download
+                                               (filter (comp springfiles-mirror-set first))
+                                               first
+                                               second)
+                     springfiles-in-progress (or (:running springfiles-download)
+                                                 (some springfiles-mirror-set http-download-tasks))]
+                 (when springname
+                   [{:severity 2
+                     :text "springfiles"
+                     :human-text (if springfiles-in-progress
+                                   (u/download-progress springfiles-download)
+                                   (if springfiles-searched
+                                     (if springfiles-search-result
+                                       "Download from springfiles"
+                                       "Not found on springfiles")
+                                     "Search springfiles"))
+                     :in-progress springfiles-in-progress
+                     :action
+                     (when (or (not springfiles-searched) springfiles-search-result)
+                       {:event/type :spring-lobby/add-task
+                        :task
+                        (if springfiles-searched
+                          {:spring-lobby/task-type :spring-lobby/download-springfiles
+                           :resource-type :spring-lobby/map
+                           :search-result springfiles-search-result
+                           :springname springname
+                           :spring-isolation-dir spring-isolation-dir}
+                          {:spring-lobby/task-type :spring-lobby/search-springfiles
+                           :springname springname})})}]))))
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/map} :resource-type))
