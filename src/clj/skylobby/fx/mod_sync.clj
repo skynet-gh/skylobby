@@ -135,7 +135,9 @@
                                            seq)
                    in-progress (or running
                                    rapid-update-tasks
-                                   (contains? rapid-tasks rapid-id))]
+                                   (contains? rapid-tasks rapid-id)
+                                   (and package-exists
+                                        (seq mod-update-tasks)))]
                [{:severity 2
                  :text "rapid"
                  :human-text
