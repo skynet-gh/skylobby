@@ -35,6 +35,11 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.56]
+
+- Display multiple download sources for maps
+- Separate bot and human user counts
+
 ### [0.3.55]
 
 - Fix agreement display and confirm
