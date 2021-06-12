@@ -94,6 +94,9 @@
   (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
+        bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
+        bot-count (count (get bot-or-human true))
+        human-count (count (get bot-or-human false))
         users-view {:fx/type :v-box
                     :children
                     [{:fx/type :h-box
@@ -102,7 +105,7 @@
                       (concat
                         [
                          {:fx/type :label
-                          :text (str "Users (" (count users) ")")}
+                          :text (str "Users (" human-count ")  Bots (" bot-count ")")}
                          {:fx/type :pane
                           :h-box/hgrow :always}
                          {:fx/type :label
