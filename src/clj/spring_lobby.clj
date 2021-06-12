@@ -2214,12 +2214,11 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data server-key]}]
   (future
     (try
       (client-message client-data "LEAVEBATTLE")
-      (let [server-key (u/server-key client-data)]
-        (swap! *state update-in [:by-server server-key] dissoc :battle))
+      (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
@@ -3502,7 +3501,9 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (add-task! *state {::task-type ::reconcile-engines})))
+    (add-tasks! *state [{::task-type ::reconcile-engines}
+                        {::task-type ::reconcile-mods}
+                        {::task-type ::reconcile-maps}])))
 
 
 (defmethod event-handler ::import-source-change
