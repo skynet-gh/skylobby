@@ -1094,7 +1094,7 @@
                                  :invalid-replay-paths invalid-replay-paths))))
           invalid-replay-paths (set (:invalid-replay-paths new-state))
           valid-next-round (remove
-                             (comp invalid-replay-paths fs/canonical-path)
+                             (comp invalid-replay-paths fs/canonical-path second)
                              todo)]
       (if (seq valid-next-round)
         (add-task! state-atom {::task-type ::refresh-replays
