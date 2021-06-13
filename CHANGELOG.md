@@ -35,6 +35,12 @@ Future Features:
 ## Actual changelog
 
 
+### [0.3.57]
+
+- Fix replay loading stuck on invalid files
+- Fix map directories not being reloaded
+- Fix duplicate maps not being removed
+
 ### [0.3.56]
 
 - Display multiple download sources for maps
