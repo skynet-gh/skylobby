@@ -1042,8 +1042,8 @@
     (and
       (contains? all-paths-set path) ; remove missing files
       (-> replay :header :game-id) ; re-parse if no game id
-      (-> replay :file-size zero?) ; remove empty files
-      (-> replay :game-type #{:invalid})))) ; remove invalid
+      (not (-> replay :file-size zero?)) ; remove empty files
+      (not (-> replay :game-type #{:invalid}))))) ; remove invalid
 
 (defn- refresh-replays
   [state-atom]
@@ -1078,7 +1078,7 @@
                       (fn [state]
                         (let [old-replays (:parsed-replays-by-path state)
                               replays-by-path (if (map? old-replays) old-replays {})
-                              all-replays (concat replays-by-path parsed-replays)
+                              all-replays (into {} (concat replays-by-path parsed-replays))
                               valid-replays (->> all-replays
                                                  (filter valid-replay?)
                                                  (into {}))
@@ -1092,8 +1092,8 @@
                           (assoc state
                                  :parsed-replays-by-path valid-replays
                                  :invalid-replay-paths invalid-replay-paths))))
-          invalid-replay-paths (:invalid-replay-paths new-state)
-          valid-next-round (filter
+          invalid-replay-paths (set (:invalid-replay-paths new-state))
+          valid-next-round (remove
                              (comp invalid-replay-paths fs/canonical-path)
                              todo)]
       (if (seq valid-next-round)
@@ -1103,7 +1103,7 @@
           (log/info "No valid replays left to parse")
           (when (seq this-round)
             (spit-app-edn
-              (select-keys new-state [:parsed-replays-by-path])
+              (select-keys new-state [:invalid-replay-paths :parsed-replays-by-path])
               "parsed-replays.edn"))
           (add-task! state-atom {::task-type ::refresh-replay-resources}))))))
 
