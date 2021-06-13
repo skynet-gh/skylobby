@@ -1037,6 +1037,14 @@
      (fn [] (.close chimer)))))
 
 
+(defn- valid-replay-fn [all-paths-set]
+  (fn [[path replay]]
+    (and
+      (contains? all-paths-set path) ; remove missing files
+      (-> replay :header :game-id) ; re-parse if no game id
+      (-> replay :file-size zero?) ; remove empty files
+      (-> replay :game-type #{:invalid})))) ; remove invalid
+
 (defn- refresh-replays
   [state-atom]
   (log/info "Refreshing replays")
@@ -1053,11 +1061,9 @@
                     (fx.replay/replay-sources state))
         todo (->> all-files
                   (remove (comp existing-paths fs/canonical-path second))
-                  (sort-by (comp fs/filename second))
-                  reverse)
+                  shuffle)
         all-paths (set (map (comp fs/canonical-path second) all-files))
         this-round (take replays-batch-size todo)
-        next-round (drop replays-batch-size todo)
         parsed-replays (->> this-round
                             (map
                               (fn [[source f]]
@@ -1067,20 +1073,34 @@
                                    {:source-name source})]))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
-    (let [new-state (swap! state-atom update :parsed-replays-by-path
-                           (fn [old-replays]
-                             (let [replays-by-path (if (map? old-replays) old-replays {})]
-                               (->> replays-by-path
-                                    (filter (comp all-paths first)) ; remove missing files
-                                    (filter (comp :game-id :header second)) ; re-parse if no game id
-                                    (remove (comp zero? :file-size second)) ; remove empty files
-                                    (remove (comp #{:invalid} :game-type second)) ; remove invalid
-                                    (concat parsed-replays)
-                                    (into {})))))]
-      (if (seq next-round)
+    (let [valid-replay? (valid-replay-fn all-paths)
+          new-state (swap! state-atom
+                      (fn [state]
+                        (let [old-replays (:parsed-replays-by-path state)
+                              replays-by-path (if (map? old-replays) old-replays {})
+                              all-replays (concat replays-by-path parsed-replays)
+                              valid-replays (->> all-replays
+                                                 (filter valid-replay?)
+                                                 (into {}))
+                              valid-replay-paths (set (keys valid-replays))
+                              invalid-replay-paths (->> all-replays
+                                                        (remove valid-replay?)
+                                                        keys
+                                                        (concat (:invalid-replay-paths state))
+                                                        (remove valid-replay-paths)
+                                                        set)]
+                          (assoc state
+                                 :parsed-replays-by-path valid-replays
+                                 :invalid-replay-paths invalid-replay-paths))))
+          invalid-replay-paths (:invalid-replay-paths new-state)
+          valid-next-round (filter
+                             (comp invalid-replay-paths fs/canonical-path)
+                             todo)]
+      (if (seq valid-next-round)
         (add-task! state-atom {::task-type ::refresh-replays
-                               :todo (count next-round)})
+                               :todo (count todo)})
         (do
+          (log/info "No valid replays left to parse")
           (when (seq this-round)
             (spit-app-edn
               (select-keys new-state [:parsed-replays-by-path])
