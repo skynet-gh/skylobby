@@ -34,6 +34,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.59]
+
+- Fix replay refresh for real
+
 ### [0.3.58]
 
 - Fix replay refresh
