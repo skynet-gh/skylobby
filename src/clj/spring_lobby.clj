@@ -1232,26 +1232,12 @@
       :to-remove-count (count to-remove)})))
 
 
-(defn- remove-all-duplicate-mods
-  "Removes all copies of any mod that shares canonical-path with another mod."
-  [state-atom]
-  (log/info "Removing duplicate mods")
-  (swap! state-atom update :mods
-         (fn [mods]
-           (let [path-fn (comp fs/canonical-path :file)
-                 freqs (frequencies (map path-fn mods))]
-             (->> mods
-                  (remove (comp pos? dec freqs path-fn))
-                  set)))))
-
 (defn- reconcile-mods
   "Reads mod details and updates missing mods in :mods in state."
   ([state-atom]
    (reconcile-mods state-atom nil))
   ([state-atom spring-root]
-   (swap! state-atom assoc :update-mods true) ; TODO remove
    (log/info "Reconciling mods")
-   (remove-all-duplicate-mods state-atom)
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
@@ -1289,7 +1275,6 @@
                                {:resource-filename (fs/filename f)}))))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
          this-round (concat priorities (take mods-batch-size todo))
-         next-round (drop mods-batch-size todo)
          all-paths (filter some? (concat known-file-paths known-rapid-paths))
          missing-files (set
                          (concat
@@ -1318,10 +1303,13 @@
                            (remove (comp missing-files fs/canonical-path :file))
                            set)))
                   (dissoc :update-mods))))
-     (when (seq (remove (comp known-file-paths fs/canonical-path) next-round))
-       (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
+     (when (->> (drop mods-batch-size todo)
+                (remove (comp known-file-paths fs/canonical-path))
+                (remove fs/is-directory?)
+                seq)
+       (log/info "Scheduling mod load since there are" (count todo) "mods left to load")
        (add-task! state-atom {::task-type ::reconcile-mods
-                              :todo (count next-round)}))
+                              :todo (count todo)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
 
@@ -1352,12 +1340,12 @@
        (add-task! *state {::task-type ::update-cached-minimaps
                           :todo (count next-round)})))))
 
+
 (defn- reconcile-maps
   "Reads map details and caches for maps missing from :maps in state."
   ([state-atom]
    (reconcile-maps state-atom nil))
   ([state-atom spring-root]
-   (swap! state-atom assoc :update-maps true)
    (log/info "Reconciling maps")
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
@@ -1368,7 +1356,13 @@
          map-files (fs/map-files spring-root)
          known-files (->> maps (map :file) set)
          known-paths (->> known-files (map fs/canonical-path) set)
-         todo (shuffle (remove (comp known-paths fs/canonical-path) map-files))
+         todo (->> map-files
+                   (remove
+                     (fn [file]
+                       (and
+                         (not (fs/is-directory? file))
+                         (contains? known-paths (fs/canonical-path file)))))
+                   shuffle)
          battle-maps (->> state
                           :by-server
                           (map
@@ -1387,6 +1381,7 @@
          _ (log/info "Prioritizing maps in battles" (pr-str priorities))
          this-round (concat priorities (take maps-batch-size todo))
          next-round (drop maps-batch-size todo)
+         next-round-count (count next-round)
          missing-paths (set
                          (concat
                            (->> known-files
@@ -1406,7 +1401,10 @@
          (if map-name
            (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
                   (fn [maps]
-                    (set (conj maps (select-keys map-data [:file :map-name])))))
+                    (set
+                      (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
+                        map-data
+                        (conj (select-keys map-data [:file :map-name]))))))
            (log/warn "No map name found for" map-file))))
      (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
      (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
@@ -1416,14 +1414,13 @@
                    (remove (comp string/blank? :map-name))
                    (remove (comp missing-paths fs/canonical-path :file))
                    set)))
-     (swap! state-atom assoc :update-maps false)
-     (if (seq next-round)
+     (if (seq (remove (comp known-paths fs/canonical-path) next-round))
        (do
-         (log/info "Scheduling map load since there are" (count next-round) "maps left to load")
+         (log/info "Scheduling map load since there are" next-round-count "maps left to load")
          (add-task! state-atom {::task-type ::reconcile-maps
-                                :todo (count next-round)}))
+                                :todo next-round-count}))
        (add-task! state-atom {::task-type ::update-cached-minimaps}))
-     {:todo-count (count todo)})))
+     {:todo-count next-round-count})))
 
 
 (defmethod event-handler ::stop-music
