@@ -485,3 +485,11 @@
 (defn is-java? [command]
   (or (string/ends-with? command "java")
       (string/ends-with? command "java.exe")))
+
+
+(defn matchmaking? [server-data]
+  (->> server-data
+       :compflags
+       (filter #{"matchmaking"})
+       seq
+       boolean))

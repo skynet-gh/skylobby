@@ -125,10 +125,7 @@
         {:show-matchmaking-window
          (and show-matchmaking-window
               (not= selected-server-tab "local")
-              (->> server-data
-                   :compflags
-                   (filter #{"matchmaking"})
-                   seq))})
+              (u/matchmaking? server-data))})
       (merge
         {:fx/type fx.server/servers-window
          :screen-bounds screen-bounds}

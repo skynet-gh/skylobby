@@ -3814,13 +3814,21 @@
   (client-message client-data "c.matchmaking.list_my_queues"))
 
 (defmethod event-handler ::matchmaking-leave-all [{:keys [client-data]}]
-  (client-message client-data "c.matchmaking.leave_all_queues"))
+  (client-message client-data "c.matchmaking.leave_all_queues")
+  (swap! *state update-in [:by-server (u/server-key client-data) :matchmaking-queues]
+    (fn [matchmaking-queues]
+      (into {}
+        (map
+          (fn [[k v]]
+            [k (assoc v :am-in false)])
+          matchmaking-queues)))))
 
-(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id queue-name]}]
-  (client-message client-data (str "c.matchmaking.join_queue " (str queue-id ":" queue-name))))
+(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id]}]
+  (client-message client-data (str "c.matchmaking.join_queue " queue-id)))
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
-  (client-message client-data (str "c.matchmaking.leave_queue " queue-id)))
+  (client-message client-data (str "c.matchmaking.leave_queue " queue-id))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :am-in] false))
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
   (client-message client-data (str "c.matchmaking.ready"))
