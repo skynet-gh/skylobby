@@ -205,5 +205,6 @@
        (when (contains? (set compflags) matchmaking-compflag)
          [{:fx/type :button
            :text "Matchmaking"
-           :on-action {:event/type :spring-lobby/toggle
-                       :key :show-matchmaking-window}}]))}]})
+           :on-action {:event/type :spring-lobby/assoc
+                       :key :selected-tab-main
+                       :value "matchmaking"}}]))}]})

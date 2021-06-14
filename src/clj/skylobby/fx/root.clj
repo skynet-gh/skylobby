@@ -7,7 +7,6 @@
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
     [skylobby.fx.maps :as fx.maps]
-    [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.rapid :as fx.rapid]
     [skylobby.fx.register :as fx.register]
     [skylobby.fx.replay :as fx.replay]
@@ -31,7 +30,7 @@
 
 (defn root-view-impl
   [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
-            show-matchmaking-window spring-isolation-dir standalone tasks-by-kind window-maximized]
+            spring-isolation-dir standalone tasks-by-kind window-maximized]
      :as state}
     :state}]
   (let [{:keys [width height] :as screen-bounds} (skylobby.fx/screen-bounds)
@@ -117,15 +116,6 @@
          :screen-bounds screen-bounds
          :tasks-by-type tasks-by-type}
         (select-keys state fx.replay/replays-window-keys))
-      (merge
-        {:fx/type fx.matchmaking/matchmaking-window
-         :screen-bounds screen-bounds}
-        server-data
-        (select-keys state fx.matchmaking/matchmaking-window-keys)
-        {:show-matchmaking-window
-         (and show-matchmaking-window
-              (not= selected-server-tab "local")
-              (u/matchmaking? server-data))})
       (merge
         {:fx/type fx.server/servers-window
          :screen-bounds screen-bounds}
