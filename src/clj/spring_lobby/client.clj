@@ -241,7 +241,10 @@
                                (handler state-atom server-key m)
                                (u/append-console-log state-atom server-key :server m)
                                (catch Exception e
-                                 (log/error e "Error handling message")))
+                                 (log/error e "Error handling message" (str "'" m "'")))
+                               (catch Throwable t
+                                 (log/error t "Critical error handling message" (str "'" m "'"))
+                                 (throw t)))
                              (when-not (Thread/interrupted)
                                (recur)))))
                        (log/info "print loop ended")
