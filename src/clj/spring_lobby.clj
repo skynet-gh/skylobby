@@ -779,8 +779,10 @@
       (let [{:keys [spring-isolation-dir]} new-state]
         (when-not (and spring-isolation-dir
                        (instance? File spring-isolation-dir))
-          (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-          (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
+          (let [fixed (or (fs/file spring-isolation-dir)
+                          (fs/default-isolation-dir))]
+            (log/info "Fixed spring isolation dir, was" spring-isolation-dir "now" fixed)
+            (swap! state-atom assoc :spring-isolation-dir fixed))))
       (catch Exception e
         (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
 
