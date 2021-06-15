@@ -13,10 +13,11 @@
 
 
 (defn engines-view
-  [{:keys [downloadables-by-url engine-filter engine-version engines http-download on-value-changed
-           spring-isolation-dir suggest tasks-by-type]}]
-  {:fx/type :h-box
-   :alignment :center-left
+  [{:keys [downloadables-by-url engine-filter engine-version engines flow http-download on-value-changed
+           spring-isolation-dir suggest tasks-by-type]
+    :or {flow true}}]
+  {:fx/type (if flow :flow-pane :h-box)
+   ;:alignment :center-left
    :children
    (concat
      [{:fx/type :label

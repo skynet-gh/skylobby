@@ -23,11 +23,12 @@
 
 
 (defn mods-view
-  [{:keys [downloadables-by-url engine-file http-download mod-filter mod-name mods on-value-changed
-           rapid-data-by-id rapid-download spring-isolation-dir suggest tasks-by-type]}]
+  [{:keys [downloadables-by-url engine-file flow http-download mod-filter mod-name mods on-value-changed
+           rapid-data-by-id rapid-download spring-isolation-dir suggest tasks-by-type]
+    :or {flow true}}]
   (let [games (filter :is-game mods)]
-    {:fx/type :h-box
-     :alignment :center-left
+    {:fx/type (if flow :flow-pane :h-box)
+     ;:alignment :center-left
      :children
      (concat
        [{:fx/type :label

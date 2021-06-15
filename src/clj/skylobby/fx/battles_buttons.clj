@@ -81,13 +81,16 @@
           {:fx/type engines-view
            :engine-filter engine-filter
            :engines engines
-           :engine-version engine-version}
+           :engine-version engine-version
+           :flow false}
           {:fx/type mods-view
+           :flow false
            :mod-filter mod-filter
            :mod-name mod-name
            :mods mods
            :spring-isolation-dir spring-isolation-dir}
           {:fx/type maps-view
+           :flow false
            :map-name map-name
            :maps maps
            :map-input-prefix map-input-prefix

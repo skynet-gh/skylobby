@@ -217,13 +217,13 @@
            spring-isolation-dir tasks-by-type team-counts username]
     :as state}]
   {:fx/type :v-box
-   ;:-fx-pref-height 400
-   ;:-fx-max-height 400
+   :style {:-fx-min-width 400}
    :children
    [
     {:fx/type :scroll-pane
      :fit-to-width true
      :hbar-policy :never
+     :v-box/vgrow :always
      :content
      {:fx/type :v-box
       :children
@@ -665,18 +665,12 @@
            :singleplayer singleplayer}
           {:fx/type :v-box
            :children
-           [{:fx/type :h-box
-             :alignment :center-left
+           [{:fx/type :flow-pane
+             ;:alignment :center-left
              :children
-             [{:fx/type :label
-               :text (str " Size: "
-                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
-                            (str
-                              (when map-width (quot map-width 64))
-                              " x "
-                              (when map-height (quot map-height 64)))))}
-              {:fx/type :pane
-               :h-box/hgrow :always}
+             [
+              {:fx/type :label
+               :text (str " Display (px): ")}
               {:fx/type :combo-box
                :value minimap-size
                :items minimap-sizes
@@ -686,7 +680,14 @@
                :value minimap-type
                :items minimap-types
                :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :minimap-type}}]}
+                                  :key :minimap-type}}
+              {:fx/type :label
+               :text (str " Size: "
+                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
+                            (str
+                              (when map-width (quot map-width 64))
+                              " x "
+                              (when map-height (quot map-height 64)))))}]}
             {:fx/type :label
              :text (str
                      (when-let [description (-> battle-map-details :mapinfo :description)]
@@ -715,8 +716,8 @@
                     :battle-status battle-status
                     :channel-name channel-name
                     :client-data client-data})}])}
-            {:fx/type :h-box
-             :alignment :center-left
+            {:fx/type :flow-pane
+             ;:alignment :center-left
              :children
              (concat
                [{:fx/type :label
@@ -787,8 +788,8 @@
                                          :key :interleave-ally-player-ids}}
                   {:fx/type :label
                    :text " Interleave Player IDs "}]))}
-            {:fx/type :h-box
-             :alignment :center-left
+            {:fx/type :flow-pane
+             ;:alignment :center-left
              :children
              (concat
                (when am-host
@@ -1227,28 +1228,44 @@
      :children
      (case battle-layout
        "vertical"
-       [{:fx/type :split-pane
-         :h-box/hgrow :always
-         :divider-positions [0.35]
-         :items
-         [
+       [
+        (if singleplayer
           {:fx/type :v-box
+           :h-box/hgrow :always
            :children
            [players-table
             battle-buttons]}
-          battle-chat]}
+          {:fx/type :split-pane
+           :h-box/hgrow :always
+           :divider-positions [0.35]
+           :items
+           [
+            {:fx/type :v-box
+             :children
+             [players-table
+              battle-buttons]}
+            battle-chat]})
         battle-tabs]
        ; else
-       [{:fx/type :split-pane
-         :h-box/hgrow :always
-         :orientation :vertical
-         :items
-         [players-table
+       [(if singleplayer
           {:fx/type :h-box
+           :h-box/hgrow :always
            :children
            [
             battle-buttons
-            battle-chat]}]}
+            players-table]}
+          {:fx/type :split-pane
+           :h-box/hgrow :always
+           :orientation :vertical
+           :items
+           [players-table
+            (if singleplayer
+              battle-buttons
+              {:fx/type :h-box
+               :children
+               [
+                battle-buttons
+                battle-chat]})]})
         battle-tabs])}))
 
 (defn battle-view

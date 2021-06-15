@@ -13,6 +13,7 @@
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
+    [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -47,7 +48,7 @@
         spring-root-data (get by-spring-root (fs/canonical-path spring-root))
         server-data (merge server-data
                       {:server-key selected-server-tab}
-                      (fx.main/spring-root-resources spring-root by-spring-root))
+                      (resource/spring-root-resources spring-root by-spring-root))
         show-battle-window (boolean (and pop-out-battle battle))
         stylesheet-urls (skylobby.fx/stylesheet-urls css)]
     {:fx/type fx/ext-many
