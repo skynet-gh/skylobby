@@ -34,6 +34,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.60]
+
+- Add battle layout select for vertical or horizontal chat
+- Add minimap size select
+- Fix some render performance issues
+- Fix matchmaking protocol
+- Move matchmaking to a tab
+
 ### [0.3.59]
 
 - Fix replay refresh for real
