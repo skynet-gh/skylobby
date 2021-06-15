@@ -2165,6 +2165,10 @@
                                               :recursive extra-replay-recursive})
           (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
 
+(defmethod event-handler ::spring-root-focused-changed [{:fx/keys [event]}]
+  (when-not event
+    (swap! *state dissoc :spring-isolation-dir-draft)))
+
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future
     (try
