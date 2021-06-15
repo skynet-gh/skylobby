@@ -12,6 +12,12 @@
     (javafx.scene.text Font FontWeight)))
 
 
+(def minimap-sizes
+  [256 384 512])
+(def default-minimap-size
+  (last minimap-sizes))
+
+
 (defn minimap-start-boxes
   [scale minimap-width minimap-height scripttags drag-allyteam]
   (let [game (:game scripttags)
@@ -49,7 +55,7 @@
            :height (int (* scale (Math/abs (double (- endy starty)))))})))))
 
 (defn minimap-starting-points
-  [battle-details map-details scripttags minimap-width minimap-height]
+  [battle-details map-details scripttags scale minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         teams (spring/teams battle-details)
         team-by-key (->> teams
@@ -87,10 +93,14 @@
                      x (or scriptx x midx)
                      z (or scriptz scripty z midz)]
                  (when (and (number? x) (number? z))
-                   {:x (- (* (/ x (* spring/map-multiplier map-width)) minimap-width)
-                          (/ u/start-pos-r 2))
-                    :y (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
-                          (/ u/start-pos-r 2))
+                   {:x (int
+                         (* scale
+                           (- (* (/ x (* spring/map-multiplier map-width)) minimap-width)
+                             (/ u/start-pos-r 2))))
+                    :y (int
+                         (* scale
+                           (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
+                              (/ u/start-pos-r 2))))
                     :team team
                     :color (or (-> team-by-key team-kw :team-color u/spring-color-to-javafx)
                                Color/WHITE)}))))
@@ -104,9 +114,11 @@
         {:keys [minimap-height minimap-width]
          :or {minimap-height smf/minimap-display-size
               minimap-width smf/minimap-display-size}} smf
-        starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
         max-width-or-height (max minimap-width minimap-height)
+        minimap-size (or (u/to-number minimap-size)
+                         default-minimap-size)
         minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
+        starting-points (minimap-starting-points battle-details map-details scripttags minimap-scale minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)

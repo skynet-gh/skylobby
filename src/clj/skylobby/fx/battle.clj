@@ -9,7 +9,7 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.maps :refer [maps-view]]
-    [skylobby.fx.minimap :refer [minimap-pane]]
+    [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
@@ -22,11 +22,6 @@
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
-
-(def minimap-sizes
-  [256 384 512])
-(def default-minimap-size
-  (last minimap-sizes))
 
 (def minimap-types
   ["minimap" "metalmap" "heightmap"])
@@ -630,7 +625,7 @@
            minimap-type scripttags server-key singleplayer spring-isolation-dir spring-settings
            startpostype username users]}]
   (let [minimap-size (or (u/to-number minimap-size)
-                         default-minimap-size)]
+                         fx.minimap/default-minimap-size)]
     {:fx/type :tab-pane
      :style {:-fx-min-width (+ minimap-size 20)
              :-fx-pref-width (+ minimap-size 20)
@@ -650,7 +645,7 @@
         {:fx/type :v-box
          :alignment :top-left
          :children
-         [{:fx/type minimap-pane
+         [{:fx/type fx.minimap/minimap-pane
            :am-spec am-spec
            :battle-details battle-details
            :client-data client-data
@@ -673,7 +668,7 @@
                :text (str " Display (px): ")}
               {:fx/type :combo-box
                :value minimap-size
-               :items minimap-sizes
+               :items fx.minimap/minimap-sizes
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :minimap-size}}
               {:fx/type :combo-box
@@ -1125,7 +1120,7 @@
                          vals
                          sort)
         minimap-size (or (u/to-number minimap-size)
-                         default-minimap-size)
+                         fx.minimap/default-minimap-size)
         players-table {:fx/type players-table
                        :v-box/vgrow :always
                        :am-host singleplayer
