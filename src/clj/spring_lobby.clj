@@ -24,7 +24,6 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.download :as fx.download]
     [skylobby.fx.import :as fx.import]
-    [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
@@ -215,8 +214,8 @@
     {:tasks-by-kind {}
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      :file-events (initial-file-events)
-     :minimap-type (first fx.minimap/minimap-types)
-     :replay-minimap-type (first fx.minimap/minimap-types)
+     :minimap-type (first fx.battle/minimap-types)
+     :replay-minimap-type (first fx.battle/minimap-types)
      :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
      :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
      :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)}))
@@ -2758,7 +2757,7 @@
                  direction (if (pos? (.getDeltaY event))
                              dec
                              inc)
-                 next-type (next-value fx.minimap/minimap-types minimap-type {:direction direction})]
+                 next-type (next-value fx.battle/minimap-types minimap-type {:direction direction})]
              (assoc state minimap-type-key next-type)))))
 
 (defn battle-players-and-bots

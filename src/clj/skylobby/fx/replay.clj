@@ -7,6 +7,7 @@
     clojure.set
     java-time
     skylobby.fx
+    [skylobby.fx.battle :refer [minimap-types]]
     [skylobby.fx.download :refer [springfiles-maps-download-source]]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
@@ -334,7 +335,7 @@
                :h-box/hgrow :always}
               {:fx/type :combo-box
                :value replay-minimap-type
-               :items fx.minimap/minimap-types
+               :items minimap-types
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :replay-minimap-type}}]}]
            (when show-sync
