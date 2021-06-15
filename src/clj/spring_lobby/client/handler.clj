@@ -176,11 +176,15 @@
     (log/info "Updating status of" username "to" decoded "with color" team-color)
     (swap! state-atom update-in [:by-server server-url]
       (fn [server]
-        (-> server
-            (update-in [:battle :users username]
-              assoc
-              :battle-status decoded
-              :team-color team-color))))))
+        (if (:battle server)
+          (-> server
+              (update-in [:battle :users username]
+                assoc
+                :battle-status decoded
+                :team-color team-color))
+          (do
+            (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
+            server))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
