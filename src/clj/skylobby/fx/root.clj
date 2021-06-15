@@ -7,7 +7,6 @@
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
     [skylobby.fx.maps :as fx.maps]
-    [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.rapid :as fx.rapid]
     [skylobby.fx.register :as fx.register]
     [skylobby.fx.replay :as fx.replay]
@@ -20,6 +19,7 @@
 
 
 (def app-version (u/app-version))
+(def screen-bounds (skylobby.fx/screen-bounds))
 
 
 (def battle-window-width 1740)
@@ -31,10 +31,10 @@
 
 (defn root-view-impl
   [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
-            show-matchmaking-window spring-isolation-dir standalone tasks-by-kind window-maximized]
+            spring-isolation-dir standalone tasks-by-kind window-maximized]
      :as state}
     :state}]
-  (let [{:keys [width height] :as screen-bounds} (skylobby.fx/screen-bounds)
+  (let [{:keys [width height]} screen-bounds
         all-tasks (->> tasks-by-kind
                        (mapcat second)
                        (concat (vals current-tasks))
@@ -45,14 +45,11 @@
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
         spring-root-data (get by-spring-root (fs/canonical-path spring-root))
-          ; TODO remove duplication with main-window
-        server-data (assoc server-data
-                      :server-key selected-server-tab
-                      :spring-isolation-dir spring-root
-                      :engines (:engines spring-root-data)
-                      :maps (:maps spring-root-data)
-                      :mods (:mods spring-root-data))
-        show-battle-window (boolean (and pop-out-battle battle))]
+        server-data (merge server-data
+                      {:server-key selected-server-tab}
+                      (fx.main/spring-root-resources spring-root by-spring-root))
+        show-battle-window (boolean (and pop-out-battle battle))
+        stylesheet-urls (skylobby.fx/stylesheet-urls css)]
     {:fx/type fx/ext-many
      :desc
      [
@@ -69,7 +66,7 @@
                           :standalone standalone}
        :scene
        {:fx/type :scene
-        :stylesheets (skylobby.fx/stylesheet-urls css)
+        :stylesheets stylesheet-urls
         :root (merge
                 {:fx/type fx.main/main-window}
                 state
@@ -84,7 +81,7 @@
        :height (min battle-window-height height)
        :scene
        {:fx/type :scene
-        :stylesheets (skylobby.fx/stylesheet-urls css)
+        :stylesheets stylesheet-urls
         :root
         (if show-battle-window
           (merge
@@ -111,24 +108,12 @@
         {:fx/type fx.rapid/rapid-download-window
          :screen-bounds screen-bounds}
         (select-keys state fx.rapid/rapid-download-window-keys)
-        (get by-spring-root (fs/canonical-path spring-isolation-dir)))
+        spring-root-data)
       (merge
         {:fx/type fx.replay/replays-window
          :screen-bounds screen-bounds
          :tasks-by-type tasks-by-type}
         (select-keys state fx.replay/replays-window-keys))
-      (merge
-        {:fx/type fx.matchmaking/matchmaking-window
-         :screen-bounds screen-bounds}
-        server-data
-        (select-keys state fx.matchmaking/matchmaking-window-keys)
-        {:show-matchmaking-window
-         (and show-matchmaking-window
-              (not= selected-server-tab "local")
-              (->> server-data
-                   :compflags
-                   (filter #{"matchmaking"})
-                   seq))})
       (merge
         {:fx/type fx.server/servers-window
          :screen-bounds screen-bounds}

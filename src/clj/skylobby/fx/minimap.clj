@@ -5,7 +5,6 @@
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.spring :as spring]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.embed.swing SwingFXUtils)
@@ -13,11 +12,8 @@
     (javafx.scene.text Font FontWeight)))
 
 
-(def minimap-types
-  ["minimap" "metalmap" "heightmap"])
-
-
-(defn minimap-start-boxes [minimap-width minimap-height scripttags drag-allyteam]
+(defn minimap-start-boxes
+  [scale minimap-width minimap-height scripttags drag-allyteam]
   (let [game (:game scripttags)
         allyteams (->> game
                        (filter (comp #(string/starts-with? % "allyteam") name first))
@@ -29,30 +25,28 @@
     (conj
       (->> allyteams
            (map
-             (fn [[id {:keys [startrectbottom startrectleft startrectright startrecttop]
-                       :as at}]]
-               (if (and id
-                        (number? startrectleft)
-                        (number? startrecttop)
-                        (number? startrectright)
-                        (number? startrectbottom)
-                        (number? minimap-width)
-                        (number? minimap-height))
+             (fn [[id {:keys [startrectbottom startrectleft startrectright startrecttop]}]]
+               (when (and id
+                          (number? startrectleft)
+                          (number? startrecttop)
+                          (number? startrectright)
+                          (number? startrectbottom)
+                          (number? minimap-width)
+                          (number? minimap-height))
                  (merge
                    {:allyteam id
-                    :x (* startrectleft minimap-width)
-                    :y (* startrecttop minimap-height)
-                    :width (* (- startrectright startrectleft) minimap-width)
-                    :height (* (- startrectbottom startrecttop) minimap-height)})
-                 (log/warn "Invalid allyteam:" id at))))
+                    :x (int (* scale (* startrectleft minimap-width)))
+                    :y (int (* scale (* startrecttop minimap-height)))
+                    :width (int (* scale (* (- startrectright startrectleft) minimap-width)))
+                    :height (int (* scale (* (- startrectbottom startrecttop) minimap-height)))}))))
            (filter some?))
       (when drag-allyteam
         (let [{:keys [startx starty endx endy]} drag-allyteam]
           {:allyteam (str (:allyteam-id drag-allyteam))
-           :x (min startx endx)
-           :y (min starty endy)
-           :width (Math/abs (double (- endx startx)))
-           :height (Math/abs (double (- endy starty)))})))))
+           :x (int (* scale (min startx endx)))
+           :y (int (* scale (min starty endy)))
+           :width (int (* scale (Math/abs (double (- endx startx)))))
+           :height (int (* scale (Math/abs (double (- endy starty)))))})))))
 
 (defn minimap-starting-points
   [battle-details map-details scripttags minimap-width minimap-height]
@@ -104,13 +98,16 @@
            doall))))
 
 (defn minimap-pane-impl
-  [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name minimap-type minimap-type-key scripttags singleplayer]}]
+  [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name
+           minimap-size minimap-type minimap-type-key scripttags singleplayer]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-height minimap-width]
          :or {minimap-height smf/minimap-display-size
               minimap-width smf/minimap-display-size}} smf
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-width minimap-height)
-        start-boxes (minimap-start-boxes minimap-width minimap-height scripttags drag-allyteam)
+        max-width-or-height (max minimap-width minimap-height)
+        minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
+        start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type
                         "metalmap" (:metalmap-image smf)
                         "heightmap" (:heightmap-image smf)
@@ -119,14 +116,13 @@
         startpostype (->> scripttags
                           :game
                           :startpostype
-                          spring/startpostype-name)
-        max-width-or-height (max minimap-width minimap-height)]
+                          spring/startpostype-name)]
     {:fx/type :stack-pane
      :style
-     {:-fx-min-width max-width-or-height
-      :-fx-max-width max-width-or-height
-      :-fx-min-height max-width-or-height
-      :-fx-max-height max-width-or-height}
+     {:-fx-min-width minimap-size
+      :-fx-max-width minimap-size
+      :-fx-min-height minimap-size
+      :-fx-max-height minimap-size}
      :on-scroll {:event/type :spring-lobby/minimap-scroll
                  :minimap-type-key minimap-type-key}
      :children
@@ -135,8 +131,8 @@
          (let [image (SwingFXUtils/toFXImage minimap-image nil)]
            [{:fx/type :image-view
              :image image
-             :fit-width minimap-width
-             :fit-height minimap-height
+             :fit-width minimap-size
+             :fit-height minimap-size
              :preserve-ratio true}])
          [{:fx/type :v-box
            :alignment :center
@@ -166,8 +162,8 @@
                                  :minimap-height minimap-height
                                  :singleplayer singleplayer}})
           {:fx/type :canvas
-           :width minimap-width
-           :height minimap-height
+           :width (int (* minimap-scale minimap-width))
+           :height (int (* minimap-scale minimap-height))
            :draw
            (fn [^javafx.scene.canvas.Canvas canvas]
              (let [gc (.getGraphicsContext2D canvas)

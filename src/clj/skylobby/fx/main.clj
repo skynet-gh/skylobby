@@ -13,6 +13,17 @@
        (remove (comp string/blank? first))
        (filter (comp :accepted second))))
 
+(defn spring-root-resources [spring-root by-spring-root]
+  (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
+        {:keys [engines maps mods]} spring-root-data]
+    {:spring-isolation-dir spring-root
+     :engines engines
+     :engines-by-version (into {} (map (juxt :engine-version identity) engines))
+     :maps maps
+     :maps-by-name (into {} (map (juxt :map-name identity) maps))
+     :mods mods
+     :mods-by-name (into {} (map (juxt :mod-name identity) mods))}))
+
 
 (defn main-window
   [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main
@@ -77,12 +88,8 @@
                   :server-key server-key}
                  (let [server-url (-> server-data :client-data :server-url)
                        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                       spring-isolation-dir)
-                       spring-root-data (get by-spring-root (fs/canonical-path spring-root))]
-                   {:spring-isolation-dir spring-root
-                    :engines (:engines spring-root-data)
-                    :maps (:maps spring-root-data)
-                    :mods (:mods spring-root-data)}))})
+                                       spring-isolation-dir)]
+                   (spring-root-resources spring-root by-spring-root)))})
             valid-servers)
           #_
           (when (seq valid-servers)

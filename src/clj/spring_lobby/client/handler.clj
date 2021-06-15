@@ -421,10 +421,10 @@
            :battle-map-details nil
            :battle-mod-details nil)))
 
-(defmethod handle "JOINBATTLEREQUEST" [state-atom server-url m]
+(defmethod handle "JOINBATTLEREQUEST" [state-atom server-key m]
   (let [[_all user-name _ip] (re-find #"\w+ (\w+) (\w+)" m)
         state @state-atom
-        client (-> state :by-server (get server-url) :client-data :client)]
+        client (-> state :by-server (get server-key) :client-data :client)]
     (message/send-message client (str "JOINBATTLEACCEPT " user-name))))
 
 
@@ -548,3 +548,22 @@
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
     (log/info "Playing ring sound from" username)
     (sound/play-ring)))
+
+(defmethod handle "CHANNELS" [_state-atom _server-url]
+  (log/info "Ignoring unused CHANNELS command"))
+
+
+(defmethod handle "OK" [state-atom server-key m]
+  (let [[_all command] (re-find #"[^\s]+ cmd=(.*)" m)]
+    (if (string/blank? command)
+      (log/error "Error parsing OK response" m)
+      (let [[_all action args] (re-find #"([^\s]+)\s+(.*)" command)]
+        (if (string/blank? action)
+          (log/error "Unable to parse OK response command" command)
+          (case action
+            "c.matchmaking.join_queue"
+            (let [queue-id (string/trim args)
+                  state (swap! state-atom assoc-in [:by-server server-key :matchmaking-queues queue-id :am-in] true)
+                  client (-> state :by-server (get server-key) :client-data :client)]
+              (message/send-message client (str "c.matchmaking.get_queue_info\t" queue-id)))
+            nil))))))

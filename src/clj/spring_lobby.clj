@@ -24,7 +24,6 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.download :as fx.download]
     [skylobby.fx.import :as fx.import]
-    [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
@@ -215,8 +214,8 @@
     {:tasks-by-kind {}
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      :file-events (initial-file-events)
-     :minimap-type (first fx.minimap/minimap-types)
-     :replay-minimap-type (first fx.minimap/minimap-types)
+     :minimap-type (first fx.battle/minimap-types)
+     :replay-minimap-type (first fx.battle/minimap-types)
      :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
      :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
      :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)}))
@@ -1538,6 +1537,29 @@
     (swap! *state assoc :music-volume volume)))
 
 
+(defn- update-matchmaking-chimer-fn [state-atom]
+  (log/info "Starting update matchmaking chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/duration 60 :seconds))
+          (fn [_chimestamp]
+            (log/debug "Updating matchmaking")
+            (let [state @state-atom]
+              (doseq [[server-key server-data] (:by-server state)]
+                (if (u/matchmaking? server-data)
+                  (let [client (-> server-data :client-data :client)]
+                    (message/send-message client "c.matchmaking.list_all_queues")
+                    (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
+                      (message/send-message client (str "c.matchmaking.get_queue_info\t" queue-id))))
+                  (log/info "Matchmaking not enabled for server" server-key)))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating matchmaking")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- update-music-queue-chimer-fn [state-atom]
   (log/info "Starting update music queue chimer")
   (let [chimer
@@ -2735,7 +2757,7 @@
                  direction (if (pos? (.getDeltaY event))
                              dec
                              inc)
-                 next-type (next-value fx.minimap/minimap-types minimap-type {:direction direction})]
+                 next-type (next-value fx.battle/minimap-types minimap-type {:direction direction})]
              (assoc state minimap-type-key next-type)))))
 
 (defn battle-players-and-bots
@@ -3814,13 +3836,21 @@
   (client-message client-data "c.matchmaking.list_my_queues"))
 
 (defmethod event-handler ::matchmaking-leave-all [{:keys [client-data]}]
-  (client-message client-data "c.matchmaking.leave_all_queues"))
+  (client-message client-data "c.matchmaking.leave_all_queues")
+  (swap! *state update-in [:by-server (u/server-key client-data) :matchmaking-queues]
+    (fn [matchmaking-queues]
+      (into {}
+        (map
+          (fn [[k v]]
+            [k (assoc v :am-in false)])
+          matchmaking-queues)))))
 
-(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id queue-name]}]
-  (client-message client-data (str "c.matchmaking.join_queue " (str queue-id ":" queue-name))))
+(defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id]}]
+  (client-message client-data (str "c.matchmaking.join_queue " queue-id)))
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
-  (client-message client-data (str "c.matchmaking.leave_queue " queue-id)))
+  (client-message client-data (str "c.matchmaking.leave_queue " queue-id))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :am-in] false))
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
   (client-message client-data (str "c.matchmaking.ready"))
@@ -3913,6 +3943,7 @@
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)]
      (add-watchers state-atom)
@@ -3935,6 +3966,7 @@
          profile-print-chimer
          spit-app-config-chimer
          truncate-messages-chimer
+         update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer])})))
 

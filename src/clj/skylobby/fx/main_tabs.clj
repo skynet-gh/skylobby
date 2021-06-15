@@ -6,6 +6,7 @@
     [skylobby.fx.console :as fx.console]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.channels :as fx.channels]
+    [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.user :as fx.user]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
@@ -69,9 +70,10 @@
       {:fx/type :pane})))
 
 
-(def main-tab-ids
+(def no-matchmaking-tab-ids
   ["battles" "chat" "console"])
-(def main-tab-id-set (set main-tab-ids))
+(def matchmaking-tab-ids
+  ["battles" "matchmaking" "chat" "console"])
 
 
 (def main-tab-view-state-keys
@@ -84,14 +86,20 @@
     fx.battles-table/battles-table-keys
     fx.console/console-view-keys
     fx.user/users-table-keys
-    [:battles :client-data :channels :filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main
+    [:battles :client-data :channels :compflags :filter-battles :filter-users :join-channel-name
+     :matchmaking-queues
+     :selected-tab-channel :selected-tab-main
      :server :users]))
 
 (defn main-tab-view
   [{:keys [battles client-data channels filter-battles filter-users join-channel-name
            selected-tab-main server-key users]
     :as state}]
-  (let [selected-index (if (contains? (set main-tab-ids) selected-tab-main)
+  (let [matchmaking (u/matchmaking? state)
+        main-tab-ids (if matchmaking
+                       matchmaking-tab-ids
+                       no-matchmaking-tab-ids)
+        selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
         bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
@@ -138,93 +146,108 @@
               :-fx-min-height 164
               :-fx-pref-height 164}
       :tabs
-      [
-       {:fx/type :tab
-        :graphic {:fx/type :label
-                  :text "Battles"}
-        :closable false
-        :id "battles"
-        :content
-        {:fx/type :split-pane
-         :divider-positions [0.75]
-         :items
-         [
-          {:fx/type :v-box
-           :children
-           [{:fx/type :h-box
-             :alignment :center-left
+      (concat
+        [{:fx/type :tab
+          :graphic {:fx/type :label
+                    :text "Battles"}
+          :closable false
+          :id "battles"
+          :content
+          {:fx/type :split-pane
+           :divider-positions [0.75]
+           :items
+           [
+            {:fx/type :v-box
              :children
-             (concat
-               [
-                {:fx/type :label
-                 :text (str "Battles (" (count battles) ")")}
-                {:fx/type :pane
-                 :h-box/hgrow :always}
-                {:fx/type :label
-                 :text (str " Filter: ")}
-                {:fx/type :text-field
-                 :text (str filter-battles)
-                 :on-text-changed {:event/type :spring-lobby/assoc
-                                   :key :filter-battles}}]
-               (when-not (string/blank? filter-battles)
-                 [{:fx/type :button
-                   :on-action {:event/type :spring-lobby/dissoc
-                               :key :filter-battles}
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-close:16:white"}}]))}
-            (merge
-              {:fx/type fx.battles-table/battles-table
-               :v-box/vgrow :always}
-              (select-keys state fx.battles-table/battles-table-keys))]}
-          users-view]}}
-       {:fx/type :tab
-        :graphic {:fx/type :label
-                  :text "Chat"}
-        :closable false
-        :id "chat"
-        :content
-        {:fx/type :split-pane
-         :divider-positions [0.70 0.9]
-         :items
-         [(merge
-            {:fx/type my-channels-view}
-            (select-keys state my-channels-view-keys))
-          users-view
-          {:fx/type :v-box
-           :children
-           [{:fx/type :label
-             :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
-            (merge
-              {:fx/type fx.channels/channels-table
-               :v-box/vgrow :always}
-              (select-keys state fx.channels/channels-table-keys))
-            {:fx/type :h-box
-             :alignment :center-left
-             :children
+             [{:fx/type :h-box
+               :alignment :center-left
+               :children
+               (concat
+                 [
+                  {:fx/type :label
+                   :text (str "Battles (" (count battles) ")")}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :label
+                   :text (str " Filter: ")}
+                  {:fx/type :text-field
+                   :text (str filter-battles)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :filter-battles}}]
+                 (when-not (string/blank? filter-battles)
+                   [{:fx/type :button
+                     :on-action {:event/type :spring-lobby/dissoc
+                                 :key :filter-battles}
+                     :graphic
+                     {:fx/type font-icon/lifecycle
+                      :icon-literal "mdi-close:16:white"}}]))}
+              (merge
+                {:fx/type fx.battles-table/battles-table
+                 :v-box/vgrow :always}
+                (select-keys state fx.battles-table/battles-table-keys))]}
+            users-view]}}]
+        (when matchmaking
+          [{:fx/type :tab
+            :graphic {:fx/type :label
+                      :text "Matchmaking"}
+            :closable false
+            :id "matchmaking"
+            :content
+            {:fx/type :split-pane
+             :divider-positions [0.75]
+             :items
              [
-              {:fx/type :button
-               :text ""
-               :on-action {:event/type :spring-lobby/join-channel
-                           :channel-name join-channel-name
-                           :client-data client-data}
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-plus:20:white"}}
-              {:fx/type :text-field
-               :text join-channel-name
-               :prompt-text "New Channel"
-               :on-text-changed {:event/type :spring-lobby/assoc-in
-                                 :path [:by-server server-key :join-channel-name]}
-               :on-action {:event/type :spring-lobby/join-channel
-                           :channel-name join-channel-name
-                           :client-data client-data}}]}]}]}}
-       {:fx/type :tab
-        :graphic {:fx/type :label
-                  :text "Console"}
-        :closable false
-        :id "console"
-        :content
-        (merge
-          {:fx/type fx.console/console-view}
-          (select-keys state fx.console/console-view-keys))}]}}))
+              (merge
+                {:fx/type fx.matchmaking/matchmaking-view}
+                state)
+              users-view]}}])
+        [{:fx/type :tab
+          :graphic {:fx/type :label
+                    :text "Chat"}
+          :closable false
+          :id "chat"
+          :content
+          {:fx/type :split-pane
+           :divider-positions [0.70 0.9]
+           :items
+           [(merge
+              {:fx/type my-channels-view}
+              (select-keys state my-channels-view-keys))
+            users-view
+            {:fx/type :v-box
+             :children
+             [{:fx/type :label
+               :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
+              (merge
+                {:fx/type fx.channels/channels-table
+                 :v-box/vgrow :always}
+                (select-keys state fx.channels/channels-table-keys))
+              {:fx/type :h-box
+               :alignment :center-left
+               :children
+               [
+                {:fx/type :button
+                 :text ""
+                 :on-action {:event/type :spring-lobby/join-channel
+                             :channel-name join-channel-name
+                             :client-data client-data}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-plus:20:white"}}
+                {:fx/type :text-field
+                 :text join-channel-name
+                 :prompt-text "New Channel"
+                 :on-text-changed {:event/type :spring-lobby/assoc-in
+                                   :path [:by-server server-key :join-channel-name]}
+                 :on-action {:event/type :spring-lobby/join-channel
+                             :channel-name join-channel-name
+                             :client-data client-data}}]}]}]}}
+         {:fx/type :tab
+          :graphic {:fx/type :label
+                    :text "Console"}
+          :closable false
+          :id "console"
+          :content
+          (merge
+            {:fx/type fx.console/console-view}
+            (select-keys state fx.console/console-view-keys))}])}}))

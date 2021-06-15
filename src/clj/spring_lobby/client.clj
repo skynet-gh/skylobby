@@ -142,11 +142,14 @@
                              :username username
                              :accepted true)
                         (update :login-error dissoc server-url)))))
-        client (-> state :by-server (get server-key) :client-data :client)
+        server-data (-> state :by-server (get server-key))
+        client (-> server-data :client-data :client)
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
     (message/send-message client "CHANNELS")
+    (when (u/matchmaking? server-data)
+      (message/send-message client "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
         (when-not (or (u/battle-channel-name? channel-name)

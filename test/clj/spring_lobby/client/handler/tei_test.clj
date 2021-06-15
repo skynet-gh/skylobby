@@ -10,12 +10,18 @@
     (let [state-atom (atom
                        {:by-server
                         {:server1
-                         {:matchmaking-queues {:bleh {:blah :blah}}}}})]
+                         {:matchmaking-queues
+                          {:bleh {:blah :blah}
+                           "0" {:queue-name "1v1"
+                                :current-search-time 0
+                                :current-size 1}}}}})]
       (handler/handle state-atom :server1 "s.matchmaking.full_queue_list 0:1v1\t1:2v2\t2:3v3\t3:ffa")
       (is (= {:by-server
               {:server1
                {:matchmaking-queues
-                {"0" {:queue-name "1v1"}
+                {"0" {:queue-name "1v1"
+                      :current-search-time 0
+                      :current-size 1}
                  "1" {:queue-name "2v2"}
                  "2" {:queue-name "3v3"}
                  "3" {:queue-name "ffa"}}}}}
@@ -30,7 +36,9 @@
                           {"0" {:queue-name "1v1"
                                 :am-in true}
                            "1" {:queue-name "2v2"
-                                :am-in true}
+                                :am-in true
+                                :current-search-time 0
+                                :current-size 1}
                            "2" {:queue-name "3v3"
                                 :am-in false}
                            "3" {:queue-name "ffa"}}}}})]
@@ -41,7 +49,9 @@
                 {"0" {:queue-name "1v1"
                       :am-in false}
                  "1" {:queue-name "2v2"
-                      :am-in true}
+                      :am-in true
+                      :current-search-time 0
+                      :current-size 1}
                  "2" {:queue-name "3v3"
                       :am-in true}
                  "3" {:queue-name "ffa"
@@ -62,13 +72,13 @@
                                 :am-in true}
                            "3" {:queue-name "ffa"
                                 :am-in false}}}}})]
-      (handler/handle state-atom :server1 "s.matchmaking.queue_info 1\t12345\t987")
+      (handler/handle state-atom :server1 "s.matchmaking.queue_info 1\tqueue name\t12345\t987")
       (is (= {:by-server
               {:server1
                {:matchmaking-queues
                 {"0" {:queue-name "1v1"
                       :am-in false}
-                 "1" {:queue-name "2v2"
+                 "1" {:queue-name "queue name"
                       :am-in true
                       :current-search-time 12345
                       :current-size 987}
