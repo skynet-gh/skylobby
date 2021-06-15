@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.chat :as fx.chat]
     [skylobby.fx.download :as fx.download]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
@@ -31,7 +32,7 @@
 
 
 (defn root-view-impl
-  [{{:keys [by-server by-spring-root css current-tasks pop-out-battle selected-server-tab servers
+  [{{:keys [by-server by-spring-root css current-tasks pop-out-battle pop-out-chat selected-server-tab servers
             spring-isolation-dir standalone tasks-by-kind window-maximized]
      :as state}
     :state}]
@@ -50,6 +51,7 @@
                       {:server-key selected-server-tab}
                       (resource/spring-root-resources spring-root by-spring-root))
         show-battle-window (boolean (and pop-out-battle battle))
+        show-chat-window (boolean (and pop-out-chat battle))
         stylesheet-urls (skylobby.fx/stylesheet-urls css)]
     {:fx/type fx/ext-many
      :desc
@@ -130,7 +132,20 @@
       (merge
         {:fx/type fx.tasks/tasks-window
          :screen-bounds screen-bounds}
-        (select-keys state fx.tasks/tasks-window-keys))]}))
+        (select-keys state fx.tasks/tasks-window-keys))
+      (merge
+        (let [{:keys [battle battles]} server-data
+              {:keys [battle-id]} battle
+              {:keys [channel-name]} (get battles battle-id)
+              channel-name (or channel-name
+                               (str "__battle__" battle-id))]
+          ; TODO dedupe with battle
+          {:fx/type fx.chat/chat-window
+           :channel-name channel-name
+           :screen-bounds screen-bounds
+           :show-chat-window show-chat-window})
+        (select-keys state fx.chat/chat-window-keys)
+        server-data)]}))
 
 (defn root-view [state]
   (tufte/profile {:dynamic? true

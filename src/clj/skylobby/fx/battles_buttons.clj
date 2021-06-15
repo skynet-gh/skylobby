@@ -15,7 +15,7 @@
 (def battles-buttons-state-keys
   [:app-update-available :battle-password :battle-title :engines :engine-filter :engine-version
    :http-download :map-input-prefix
-   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :spring-isolation-dir :tasks-by-type
+   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :pop-out-chat :spring-isolation-dir :tasks-by-type
    :use-springlobby-modname])
 
 (def battles-buttons-keys
@@ -24,7 +24,7 @@
 (defn battles-buttons-view
   [{:keys [accepted app-update-available battle battles battle-password battle-title client-data compflags engine-version
            engines mod-name map-name maps mods map-input-prefix engine-filter mod-filter
-           pop-out-battle selected-battle server-key spring-isolation-dir]
+           pop-out-battle pop-out-chat selected-battle server-key spring-isolation-dir]
     :as state}]
   {:fx/type :v-box
    :alignment :top-left
@@ -166,7 +166,7 @@
                        :client-data client-data
                        :server-key server-key}}
           {:fx/type :pane
-           :h-box/margin 8}
+           :h-box/margin 4}
           (if pop-out-battle
             {:fx/type :button
              :text "Pop In Battle "
@@ -182,6 +182,24 @@
               :icon-literal "mdi-open-in-new:16:white"}
              :on-action {:event/type :spring-lobby/assoc
                          :key :pop-out-battle
+                         :value true}})
+          {:fx/type :pane
+           :h-box/margin 4}
+          (if pop-out-chat
+            {:fx/type :button
+             :text "Pop In Chat "
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-window-maximize:16:white"}
+             :on-action {:event/type :spring-lobby/dissoc
+                         :key :pop-out-chat}}
+            {:fx/type :button
+             :text "Pop Out Chat "
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-open-in-new:16:white"}
+             :on-action {:event/type :spring-lobby/assoc
+                         :key :pop-out-chat
                          :value true}})])
        (when (and (empty? battle)
                   selected-battle
