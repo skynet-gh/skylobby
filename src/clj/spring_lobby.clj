@@ -1550,6 +1550,8 @@
             (let [state @state-atom]
               (doseq [[server-key server-data] (:by-server state)]
                 (if (u/matchmaking? server-data)
+                  (log/warn "Skipping matchmaking queue update until server is fixed")
+                  #_
                   (let [client (-> server-data :client-data :client)]
                     (message/send-message client "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
