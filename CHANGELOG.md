@@ -34,6 +34,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.61]
+
+- Add battle chat window popout option
+- Fix singleplayer battle
+- Fix engine AIs
+- Fix minimap scale issues
+- Allow text input for spring root
+- Disable matchmaking update until server is fixed
+
 ### [0.3.60]
 
 - Add battle layout select for vertical or horizontal chat
