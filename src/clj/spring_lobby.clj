@@ -1538,6 +1538,29 @@
     (swap! *state assoc :music-volume volume)))
 
 
+(defn- update-matchmaking-chimer-fn [state-atom]
+  (log/info "Starting update matchmaking chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/duration 60 :seconds))
+          (fn [_chimestamp]
+            (log/debug "Updating matchmaking")
+            (let [state @state-atom]
+              (doseq [[server-key server-data] (:by-server state)]
+                (if (u/matchmaking? server-data)
+                  (let [client (-> server-data :client-data :client)]
+                    (message/send-message client "c.matchmaking.list_all_queues")
+                    (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
+                      (message/send-message client (str "c.matchmaking.get_queue_info\t" queue-id))))
+                  (log/info "Matchmaking not enabled for server" server-key)))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating matchmaking")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- update-music-queue-chimer-fn [state-atom]
   (log/info "Starting update music queue chimer")
   (let [chimer
@@ -3921,6 +3944,7 @@
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)]
      (add-watchers state-atom)
@@ -3943,6 +3967,7 @@
          profile-print-chimer
          spit-app-config-chimer
          truncate-messages-chimer
+         update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer])})))
 
