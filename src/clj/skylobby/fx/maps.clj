@@ -31,10 +31,11 @@
 
 
 (defn maps-view-impl
-  [{:keys [disable downloadables-by-url http-download map-name maps on-value-changed
-           map-input-prefix spring-isolation-dir suggest tasks-by-type]}]
-  {:fx/type :h-box
-   :alignment :center-left
+  [{:keys [disable downloadables-by-url flow http-download map-name maps on-value-changed
+           map-input-prefix spring-isolation-dir suggest tasks-by-type]
+    :or {flow true}}]
+  {:fx/type (if flow :flow-pane :h-box)
+   ;:alignment :center-left
    :children
    (concat
      [{:fx/type :label

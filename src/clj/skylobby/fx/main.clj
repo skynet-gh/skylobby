@@ -4,7 +4,7 @@
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
-    [spring-lobby.fs :as fs]
+    [skylobby.resource :as resource]
     [spring-lobby.util :as u]))
 
 
@@ -12,17 +12,6 @@
   (->> (dissoc by-server :local)
        (remove (comp string/blank? first))
        (filter (comp :accepted second))))
-
-(defn spring-root-resources [spring-root by-spring-root]
-  (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
-        {:keys [engines maps mods]} spring-root-data]
-    {:spring-isolation-dir spring-root
-     :engines engines
-     :engines-by-version (into {} (map (juxt :engine-version identity) engines))
-     :maps maps
-     :maps-by-name (into {} (map (juxt :map-name identity) maps))
-     :mods mods
-     :mods-by-name (into {} (map (juxt :mod-name identity) mods))}))
 
 
 (defn main-window
@@ -89,7 +78,7 @@
                  (let [server-url (-> server-data :client-data :server-url)
                        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                                        spring-isolation-dir)]
-                   (spring-root-resources spring-root by-spring-root)))})
+                   (resource/spring-root-resources spring-root by-spring-root)))})
             valid-servers)
           #_
           (when (seq valid-servers)

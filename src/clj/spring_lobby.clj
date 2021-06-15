@@ -779,8 +779,10 @@
       (let [{:keys [spring-isolation-dir]} new-state]
         (when-not (and spring-isolation-dir
                        (instance? File spring-isolation-dir))
-          (log/info "Fixed spring isolation dir, was" spring-isolation-dir)
-          (swap! state-atom assoc :spring-isolation-dir (fs/default-isolation-dir))))
+          (let [fixed (or (fs/file spring-isolation-dir)
+                          (fs/default-isolation-dir))]
+            (log/info "Fixed spring isolation dir, was" spring-isolation-dir "now" fixed)
+            (swap! state-atom assoc :spring-isolation-dir fixed))))
       (catch Exception e
         (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
 
@@ -1184,7 +1186,6 @@
   ([state-atom]
    (reconcile-engines state-atom nil))
   ([state-atom spring-root]
-   (swap! state-atom assoc :update-engines true) ; TODO remove
    (log/info "Reconciling engines")
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
@@ -1224,9 +1225,9 @@
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
+                   (filter #(contains? % :engine-bots))
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
-     (swap! state-atom assoc :update-engines false) ; TODO remove
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 
@@ -1549,6 +1550,8 @@
             (let [state @state-atom]
               (doseq [[server-key server-data] (:by-server state)]
                 (if (u/matchmaking? server-data)
+                  (log/warn "Skipping matchmaking queue update until server is fixed")
+                  #_
                   (let [client (-> server-data :client-data :client)]
                     (message/send-message client "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
@@ -2163,6 +2166,10 @@
                                               :file (io/file extra-replay-path)
                                               :recursive extra-replay-recursive})
           (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
+
+(defmethod event-handler ::spring-root-focused-changed [{:fx/keys [event]}]
+  (when-not event
+    (swap! *state dissoc :spring-isolation-dir-draft)))
 
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future

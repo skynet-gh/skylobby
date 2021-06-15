@@ -7,7 +7,10 @@
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
+  (:import
+    (java.nio.file Paths)))
 
 
 (def settings-window-width 800)
@@ -23,7 +26,7 @@
 (defn settings-window-impl
   [{:keys [css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
-           music-volume screen-bounds show-settings-window spring-isolation-dir]
+           music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -44,248 +47,267 @@
        {:fx/type :v-box
         :style {:-fx-font-size 16}
         :children
-        [
-         {:fx/type :label
-          :text " Default Spring Dir"
-          :style {:-fx-font-size 24}}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
+        (concat
           [
-           {:fx/type :text-field
-            :disable true
-            :text (str (fs/canonical-path spring-isolation-dir))
-            :style {:-fx-min-width 600}
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :spring-isolation-dir-draft}}
-           {:fx/type :button
-            :style-class ["button" "skylobby-normal"]
-            :on-action {:event/type :spring-lobby/file-chooser-spring-root}
-            :text ""
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-file-find:16"}}]}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [{:fx/type :label
-            :text " Preset: "}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/assoc
-                        :key :spring-isolation-dir
-                        :value (fs/default-isolation-dir)}
-            :text "Skylobby"}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/assoc
-                        :key :spring-isolation-dir
-                        :value (fs/bar-root)}
-            :text "Beyond All Reason"}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/assoc
-                        :key :spring-isolation-dir
-                        :value (fs/spring-root)}
-            :text "Spring"}]}
-         {:fx/type :label
-          :text " Performance"
-          :style {:-fx-font-size 24}}
-         {:fx/type :h-box
-          :style {:-fx-font-size 18}
-          :children
-          [
-           {:fx/type :check-box
-            :selected (boolean disable-tasks-while-in-game)
-            :on-selected-changed {:event/type :spring-lobby/assoc
-                                  :key :disable-tasks-while-in-game}}
            {:fx/type :label
-            :text " Disable tasks while in game"}]}
-         {:fx/type :label
-          :text " Import Sources"
-          :style {:-fx-font-size 24}}
-         {:fx/type :v-box
-          :children
-          (map
-            (fn [{:keys [builtin file import-source-name]}]
-              {:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :button
-                 :style-class ["button" "skylobby-normal"]
-                 :on-action {:event/type :spring-lobby/delete-extra-import-source
-                             :file file}
-                 :disable (boolean builtin)
-                 :text ""
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-delete:16"}}
-                {:fx/type :v-box
+            :text " Default Spring Dir"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :text-field
+              :on-focused-changed {:event/type :spring-lobby/spring-root-focused-changed}
+              :text (str
+                      (or
+                        spring-isolation-dir-draft
+                        (fs/canonical-path spring-isolation-dir)
+                        spring-isolation-dir))
+              :style {:-fx-min-width 600}
+              :on-text-changed {:event/type :spring-lobby/assoc
+                                :key :spring-isolation-dir-draft}}
+             {:fx/type :button
+              :style-class ["button" "skylobby-normal"]
+              :on-action {:event/type :spring-lobby/file-chooser-spring-root}
+              :text ""
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-file-find:16"}}]}]
+          (when-not (string/blank? spring-isolation-dir-draft)
+            (let [valid (try
+                          (Paths/get (some-> spring-isolation-dir-draft fs/file .toURI))
+                          (catch Exception e
+                            (log/trace e "Invalid spring path" spring-isolation-dir-draft)))]
+              [{:fx/type :button
+                :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
+                :disable (boolean (not valid))
+                :text (if valid
+                        "Save new spring dir"
+                        "Invalid spring dir")
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-content-save:16:white"}}]))
+          [{:fx/type :h-box
+            :alignment :center-left
+            :children
+            [{:fx/type :label
+              :text " Preset: "}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/assoc
+                          :key :spring-isolation-dir
+                          :value (fs/default-isolation-dir)}
+              :text "Skylobby"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/assoc
+                          :key :spring-isolation-dir
+                          :value (fs/bar-root)}
+              :text "Beyond All Reason"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/assoc
+                          :key :spring-isolation-dir
+                          :value (fs/spring-root)}
+              :text "Spring"}]}
+           {:fx/type :label
+            :text " Performance"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean disable-tasks-while-in-game)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :disable-tasks-while-in-game}}
+             {:fx/type :label
+              :text " Disable tasks while in game"}]}
+           {:fx/type :label
+            :text " Import Sources"
+            :style {:-fx-font-size 24}}
+           {:fx/type :v-box
+            :children
+            (map
+              (fn [{:keys [builtin file import-source-name]}]
+                {:fx/type :h-box
+                 :alignment :center-left
                  :children
-                 [{:fx/type :label
-                   :text (str " " import-source-name)}
-                  {:fx/type :label
-                   :text (str " " (fs/canonical-path file))
-                   :style {:-fx-font-size 14}}]}]})
-            (fx.import/import-sources extra-import-sources))}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [{:fx/type :button
-            :style-class ["button" "skylobby-normal"]
-            :text ""
-            :disable (or (string/blank? extra-import-name)
-                         (string/blank? extra-import-path))
-            :on-action {:event/type :spring-lobby/add-extra-import-source
-                        :extra-import-path extra-import-path
-                        :extra-import-name extra-import-name}
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-plus:16"}}
-           {:fx/type :label
-            :text " Name: "}
-           {:fx/type :text-field
-            :text (str extra-import-name)
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :extra-import-name}}
-           {:fx/type :label
-            :text " Path: "}
-           {:fx/type :text-field
-            :text (str extra-import-path)
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :extra-import-path}}]}
-         {:fx/type :label
-          :text " Replay Sources"
-          :style {:-fx-font-size 24}}
-         {:fx/type :v-box
-          :children
-          (map
-            (fn [{:keys [builtin file recursive replay-source-name]}]
-              {:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :button
-                 :style-class ["button" "skylobby-normal"]
-                 :on-action {:event/type :spring-lobby/delete-extra-replay-source
-                             :file file}
-                 :disable (boolean builtin)
-                 :text ""
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-delete:16"}}
-                {:fx/type :v-box
-                 :children
-                 [{:fx/type :h-box
+                 [{:fx/type :button
+                   :style-class ["button" "skylobby-normal"]
+                   :on-action {:event/type :spring-lobby/delete-extra-import-source
+                               :file file}
+                   :disable (boolean builtin)
+                   :text ""
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-delete:16"}}
+                  {:fx/type :v-box
                    :children
-                   (concat
-                     [{:fx/type :label
-                       :text (str " " replay-source-name)
-                       :style {:-fx-font-size 18}}]
-                     (when recursive
+                   [{:fx/type :label
+                     :text (str " " import-source-name)}
+                    {:fx/type :label
+                     :text (str " " (fs/canonical-path file))
+                     :style {:-fx-font-size 14}}]}]})
+              (fx.import/import-sources extra-import-sources))}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [{:fx/type :button
+              :style-class ["button" "skylobby-normal"]
+              :text ""
+              :disable (or (string/blank? extra-import-name)
+                           (string/blank? extra-import-path))
+              :on-action {:event/type :spring-lobby/add-extra-import-source
+                          :extra-import-path extra-import-path
+                          :extra-import-name extra-import-name}
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-plus:16"}}
+             {:fx/type :label
+              :text " Name: "}
+             {:fx/type :text-field
+              :text (str extra-import-name)
+              :on-text-changed {:event/type :spring-lobby/assoc
+                                :key :extra-import-name}}
+             {:fx/type :label
+              :text " Path: "}
+             {:fx/type :text-field
+              :text (str extra-import-path)
+              :on-text-changed {:event/type :spring-lobby/assoc
+                                :key :extra-import-path}}]}
+           {:fx/type :label
+            :text " Replay Sources"
+            :style {:-fx-font-size 24}}
+           {:fx/type :v-box
+            :children
+            (map
+              (fn [{:keys [builtin file recursive replay-source-name]}]
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :button
+                   :style-class ["button" "skylobby-normal"]
+                   :on-action {:event/type :spring-lobby/delete-extra-replay-source
+                               :file file}
+                   :disable (boolean builtin)
+                   :text ""
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-delete:16"}}
+                  {:fx/type :v-box
+                   :children
+                   [{:fx/type :h-box
+                     :children
+                     (concat
                        [{:fx/type :label
-                         :text " (recursive)"
-                         :style {:-fx-text-fill :red}}]))}
-                  {:fx/type :label
-                   :text (str " " (fs/canonical-path file))
-                   :style {:-fx-font-size 14}}]}]})
-            (fx.replay/replay-sources state))}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [
-           {:fx/type :button
-            :style-class ["button" "skylobby-normal"]
-            :disable (or (string/blank? extra-replay-name)
-                         (string/blank? extra-replay-path))
-            :on-action {:event/type :spring-lobby/add-extra-replay-source
-                        :extra-replay-path extra-replay-path
-                        :extra-replay-name extra-replay-name
-                        :extra-replay-recursive extra-replay-recursive}
-            :text ""
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-plus:16"}}
+                         :text (str " " replay-source-name)
+                         :style {:-fx-font-size 18}}]
+                       (when recursive
+                         [{:fx/type :label
+                           :text " (recursive)"
+                           :style {:-fx-text-fill :red}}]))}
+                    {:fx/type :label
+                     :text (str " " (fs/canonical-path file))
+                     :style {:-fx-font-size 14}}]}]})
+              (fx.replay/replay-sources state))}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :button
+              :style-class ["button" "skylobby-normal"]
+              :disable (or (string/blank? extra-replay-name)
+                           (string/blank? extra-replay-path))
+              :on-action {:event/type :spring-lobby/add-extra-replay-source
+                          :extra-replay-path extra-replay-path
+                          :extra-replay-name extra-replay-name
+                          :extra-replay-recursive extra-replay-recursive}
+              :text ""
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-plus:16"}}
+             {:fx/type :label
+              :text " Name: "}
+             {:fx/type :text-field
+              :text (str extra-replay-name)
+              :on-text-changed {:event/type :spring-lobby/assoc
+                                :key :extra-replay-name}}
+             {:fx/type :label
+              :text " Path: "}
+             {:fx/type :text-field
+              :text (str extra-replay-path)
+              :on-text-changed {:event/type :spring-lobby/assoc
+                                :key :extra-replay-path}}
+             {:fx/type :label
+              :text " Recursive: "}
+             {:fx/type :check-box
+              :selected (boolean extra-replay-recursive)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :extra-replay-recursive}}]}
            {:fx/type :label
-            :text " Name: "}
-           {:fx/type :text-field
-            :text (str extra-replay-name)
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :extra-replay-name}}
+            :text " Appearance"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :label
+              :text " Preset: "}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/default-style-data}
+              :text "Default"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/black-style-data}
+              :text "Black"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/javafx-style-data}
+              :text "JavaFX"}]}
+           (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/load-custom-css
+                          :file custom-file}
+              :text (str "Custom from " custom-file)})
+           (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/assoc
+                          :key :css
+                          :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
+              :text (str "Custom from " custom-css-file)})
            {:fx/type :label
-            :text " Path: "}
-           {:fx/type :text-field
-            :text (str extra-replay-path)
-            :on-text-changed {:event/type :spring-lobby/assoc
-                              :key :extra-replay-path}}
-           {:fx/type :label
-            :text " Recursive: "}
-           {:fx/type :check-box
-            :selected (boolean extra-replay-recursive)
-            :on-selected-changed {:event/type :spring-lobby/assoc
-                                  :key :extra-replay-recursive}}]}
-         {:fx/type :label
-          :text " Appearance"
-          :style {:-fx-font-size 24}}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [
-           {:fx/type :label
-            :text " Preset: "}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/update-css
-                        :css skylobby.fx/default-style-data}
-            :text "Default"}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/update-css
-                        :css skylobby.fx/black-style-data}
-            :text "Black"}
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/update-css
-                        :css skylobby.fx/javafx-style-data}
-            :text "JavaFX"}]}
-         (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/load-custom-css
-                        :file custom-file}
-            :text (str "Custom from " custom-file)})
-         (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
-           {:fx/type :button
-            :on-action {:event/type :spring-lobby/assoc
-                        :key :css
-                        :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
-            :text (str "Custom from " custom-css-file)})
-         {:fx/type :label
-          :text " Music"
-          :style {:-fx-font-size 24}}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [
-           {:fx/type :text-field
-            :disable true
-            :text (str (fs/canonical-path music-dir))
-            :style {:-fx-min-width 600}}
-           {:fx/type :button
-            :style-class ["button" "skylobby-normal"]
-            :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                        :target [:music-dir]}
-            :text ""
-            :graphic
-            {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-file-find:16"}}]}
-         {:fx/type :h-box
-          :alignment :center-left
-          :children
-          [
-           {:fx/type :label
-            :text " Music Volume: "
-            :style {:-fx-font-size 18}}
-           {:fx/type :slider
-            :min 0.0
-            :max 1.0
-            :value (if (number? music-volume)
-                     music-volume
-                     1.0)
-            :on-value-changed {:event/type :spring-lobby/on-change-music-volume
-                               :media-player media-player}}]}]}}
+            :text " Music"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :text-field
+              :disable true
+              :text (str (fs/canonical-path music-dir))
+              :style {:-fx-min-width 600}}
+             {:fx/type :button
+              :style-class ["button" "skylobby-normal"]
+              :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                          :target [:music-dir]}
+              :text ""
+              :graphic
+              {:fx/type font-icon/lifecycle
+               :icon-literal "mdi-file-find:16"}}]}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :label
+              :text " Music Volume: "
+              :style {:-fx-font-size 18}}
+             {:fx/type :slider
+              :min 0.0
+              :max 1.0
+              :value (if (number? music-volume)
+                       music-volume
+                       1.0)
+              :on-value-changed {:event/type :spring-lobby/on-change-music-volume
+                                 :media-player media-player}}]}])}}
      {:fx/type :pane})}})
 
 (defn settings-window [state]

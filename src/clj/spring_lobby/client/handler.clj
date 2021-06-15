@@ -176,11 +176,15 @@
     (log/info "Updating status of" username "to" decoded "with color" team-color)
     (swap! state-atom update-in [:by-server server-url]
       (fn [server]
-        (-> server
-            (update-in [:battle :users username]
-              assoc
-              :battle-status decoded
-              :team-color team-color))))))
+        (if (:battle server)
+          (-> server
+              (update-in [:battle :users username]
+                assoc
+                :battle-status decoded
+                :team-color team-color))
+          (do
+            (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
+            server))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -442,7 +446,7 @@
         new-battle-status (assoc (or battle-status default-battle-status)
                             :id (battle/available-team-id battle)
                             :ally 0 ; (battle/available-ally battle)
-                            :side (or (get preferred-factions (:mod-name-only battle-mod-index))
+                            :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
                                       0)
                             :sync (sync-number
                                     (resource/sync-status server-data spring mod-details map-details)))
@@ -549,7 +553,7 @@
     (log/info "Playing ring sound from" username)
     (sound/play-ring)))
 
-(defmethod handle "CHANNELS" [_state-atom _server-url]
+(defmethod handle "CHANNELS" [_state-atom _server-url _m]
   (log/info "Ignoring unused CHANNELS command"))
 
 

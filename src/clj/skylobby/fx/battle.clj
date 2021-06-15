@@ -9,7 +9,7 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.maps :refer [maps-view]]
-    [skylobby.fx.minimap :refer [minimap-pane]]
+    [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
@@ -22,11 +22,6 @@
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
-
-(def minimap-sizes
-  [256 384 512])
-(def default-minimap-size
-  (last minimap-sizes))
 
 (def minimap-types
   ["minimap" "metalmap" "heightmap"])
@@ -217,13 +212,13 @@
            spring-isolation-dir tasks-by-type team-counts username]
     :as state}]
   {:fx/type :v-box
-   ;:-fx-pref-height 400
-   ;:-fx-max-height 400
+   :style {:-fx-min-width 400}
    :children
    [
     {:fx/type :scroll-pane
      :fit-to-width true
      :hbar-policy :never
+     :v-box/vgrow :always
      :content
      {:fx/type :v-box
       :children
@@ -630,7 +625,7 @@
            minimap-type scripttags server-key singleplayer spring-isolation-dir spring-settings
            startpostype username users]}]
   (let [minimap-size (or (u/to-number minimap-size)
-                         default-minimap-size)]
+                         fx.minimap/default-minimap-size)]
     {:fx/type :tab-pane
      :style {:-fx-min-width (+ minimap-size 20)
              :-fx-pref-width (+ minimap-size 20)
@@ -650,7 +645,7 @@
         {:fx/type :v-box
          :alignment :top-left
          :children
-         [{:fx/type minimap-pane
+         [{:fx/type fx.minimap/minimap-pane
            :am-spec am-spec
            :battle-details battle-details
            :client-data client-data
@@ -665,28 +660,29 @@
            :singleplayer singleplayer}
           {:fx/type :v-box
            :children
-           [{:fx/type :h-box
-             :alignment :center-left
+           [{:fx/type :flow-pane
+             ;:alignment :center-left
              :children
-             [{:fx/type :label
-               :text (str " Size: "
-                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
-                            (str
-                              (when map-width (quot map-width 64))
-                              " x "
-                              (when map-height (quot map-height 64)))))}
-              {:fx/type :pane
-               :h-box/hgrow :always}
+             [
+              {:fx/type :label
+               :text (str " Display (px): ")}
               {:fx/type :combo-box
                :value minimap-size
-               :items minimap-sizes
+               :items fx.minimap/minimap-sizes
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :minimap-size}}
               {:fx/type :combo-box
                :value minimap-type
                :items minimap-types
                :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :minimap-type}}]}
+                                  :key :minimap-type}}
+              {:fx/type :label
+               :text (str " Size: "
+                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
+                            (str
+                              (when map-width (quot map-width 64))
+                              " x "
+                              (when map-height (quot map-height 64)))))}]}
             {:fx/type :label
              :text (str
                      (when-let [description (-> battle-map-details :mapinfo :description)]
@@ -715,8 +711,8 @@
                     :battle-status battle-status
                     :channel-name channel-name
                     :client-data client-data})}])}
-            {:fx/type :h-box
-             :alignment :center-left
+            {:fx/type :flow-pane
+             ;:alignment :center-left
              :children
              (concat
                [{:fx/type :label
@@ -787,8 +783,8 @@
                                          :key :interleave-ally-player-ids}}
                   {:fx/type :label
                    :text " Interleave Player IDs "}]))}
-            {:fx/type :h-box
-             :alignment :center-left
+            {:fx/type :flow-pane
+             ;:alignment :center-left
              :children
              (concat
                (when am-host
@@ -1022,7 +1018,7 @@
    :importables-by-path
    :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
    :music-paused
-   :parsed-replays-by-path :rapid-data-by-id :rapid-data-by-version
+   :parsed-replays-by-path :pop-out-chat :rapid-data-by-id :rapid-data-by-version
    :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
    :tasks-by-type :username])
 
@@ -1037,7 +1033,7 @@
            channels chat-auto-scroll
            client-data drag-allyteam drag-team engines-by-version file-cache interleave-ally-player-ids
            map-input-prefix map-details
-           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name server-key spring-isolation-dir spring-settings
+           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name pop-out-chat server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -1079,8 +1075,8 @@
                               (every? resource/details? (map :details mod-dependencies))
                               (seq engine-details)))
         engine-file (:file engine-details)
-        bots [] ;(fs/bots engine-file)
-        bots (concat bots
+        engine-bots (:engine-bots engine-details)
+        bots (concat engine-bots
                      (->> battle-mod-details :luaai
                           (map second)
                           (map (fn [ai]
@@ -1124,7 +1120,7 @@
                          vals
                          sort)
         minimap-size (or (u/to-number minimap-size)
-                         default-minimap-size)
+                         fx.minimap/default-minimap-size)
         players-table {:fx/type players-table
                        :v-box/vgrow :always
                        :am-host singleplayer
@@ -1227,28 +1223,44 @@
      :children
      (case battle-layout
        "vertical"
-       [{:fx/type :split-pane
-         :h-box/hgrow :always
-         :divider-positions [0.35]
-         :items
-         [
+       [
+        (if (or singleplayer pop-out-chat)
           {:fx/type :v-box
+           :h-box/hgrow :always
            :children
            [players-table
             battle-buttons]}
-          battle-chat]}
+          {:fx/type :split-pane
+           :h-box/hgrow :always
+           :divider-positions [0.35]
+           :items
+           [
+            {:fx/type :v-box
+             :children
+             [players-table
+              battle-buttons]}
+            battle-chat]})
         battle-tabs]
        ; else
-       [{:fx/type :split-pane
-         :h-box/hgrow :always
-         :orientation :vertical
-         :items
-         [players-table
+       [(if (or singleplayer pop-out-chat)
           {:fx/type :h-box
+           :h-box/hgrow :always
            :children
            [
             battle-buttons
-            battle-chat]}]}
+            players-table]}
+          {:fx/type :split-pane
+           :h-box/hgrow :always
+           :orientation :vertical
+           :items
+           [players-table
+            (if singleplayer
+              battle-buttons
+              {:fx/type :h-box
+               :children
+               [
+                battle-buttons
+                battle-chat]})]})
         battle-tabs])}))
 
 (defn battle-view

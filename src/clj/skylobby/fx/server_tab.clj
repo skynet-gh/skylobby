@@ -53,7 +53,7 @@
                     (not pop-out-battle)))
          [{:fx/type :split-pane
            :orientation :vertical
-           :divider-positions [0.35]
+           :divider-positions [0.20]
            :v-box/vgrow :always
            :items
            [{:fx/type :v-box

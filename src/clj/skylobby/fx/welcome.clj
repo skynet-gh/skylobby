@@ -4,6 +4,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
+    [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]))
@@ -334,25 +335,36 @@
    :style {:-fx-font-size 20}
    :children
    (concat
+     (when-not (-> by-server :local :battle :battle-id)
+       [{:fx/type :pane
+         :v-box/vgrow :always}])
      [
-      {:fx/type :pane
-       :v-box/vgrow :always}
       (if (-> by-server :local :battle :battle-id)
-        {:fx/type :v-box
-         :children
-         [{:fx/type :h-box
+        {:fx/type :split-pane
+         :divider-positions [0]
+         :orientation :vertical
+         :v-box/vgrow :always
+         :items
+         [{:fx/type :v-box
            :children
            [
             {:fx/type :pane
-             :h-box/hgrow :always}
-            (merge
-              {:fx/type singleplayer-buttons}
-              state)
-            (merge
-              {:fx/type multiplayer-buttons}
-              state)
+             :v-box/vgrow :always}
+            {:fx/type :h-box
+             :children
+             [
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              (merge
+                {:fx/type singleplayer-buttons}
+                state)
+              (merge
+                {:fx/type multiplayer-buttons}
+                state)
+              {:fx/type :pane
+               :h-box/hgrow :always}]}
             {:fx/type :pane
-             :h-box/hgrow :always}]}
+             :v-box/vgrow :always}]}
           {:fx/type :v-box
            :children
            [{:fx/type :h-box
@@ -363,10 +375,11 @@
                :on-action {:event/type :spring-lobby/dissoc-in
                            :path [:by-server :local :battle]}}]}
             (merge
-              {:fx/type fx.battle/battle-view}
+              {:fx/type fx.battle/battle-view
+               :v-box/vgrow :always}
               (select-keys state fx.battle/battle-view-keys)
               (:local by-server)
-              (get by-spring-root (fs/canonical-path spring-isolation-dir)))]}]}
+              (resource/spring-root-resources spring-isolation-dir by-spring-root))]}]}
         {:fx/type :h-box
          :children
          [
