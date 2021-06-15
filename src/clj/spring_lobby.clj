@@ -1184,7 +1184,6 @@
   ([state-atom]
    (reconcile-engines state-atom nil))
   ([state-atom spring-root]
-   (swap! state-atom assoc :update-engines true) ; TODO remove
    (log/info "Reconciling engines")
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
@@ -1224,9 +1223,9 @@
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
+                   (filter #(contains? % :engine-bots))
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
-     (swap! state-atom assoc :update-engines false) ; TODO remove
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
 

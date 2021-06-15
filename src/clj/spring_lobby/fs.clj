@@ -555,11 +555,34 @@
         engines-folder)
       (filter spring-engine-dir? engines-folder))))
 
+(defn engine-bots
+  ([engine-file]
+   (or
+     (try
+       (when engine-file
+         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
+               ai-dirs (some->> (list-files ai-skirmish-dir)
+                                seq
+                                (filter is-directory?))]
+           (mapcat
+             (fn [^java.io.File ai-dir]
+               (->> (list-files ai-dir)
+                    (filter is-directory?)
+                    (map
+                      (fn [^java.io.File version-dir]
+                        {:bot-name (filename ai-dir)
+                         :bot-version (filename version-dir)}))))
+             ai-dirs)))
+       (catch Exception e
+         (log/error e "Error loading bots")))
+     [])))
+
 (defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]
     {:file engine-dir
      :sync-version sync-version
-     :engine-version (sync-version-to-engine-version sync-version)}))
+     :engine-version (sync-version-to-engine-version sync-version)
+     :engine-bots (engine-bots engine-dir)}))
 
 
 (defn slurp-zip-entry [^ZipFile zip-file entries entry-filename-lowercase]
@@ -947,28 +970,6 @@
            nil))
        (catch Exception e
          (log/warn e "Error reading map data for" filename))))))
-
-(defn bots
-  ([engine-file]
-   (or
-     (try
-       (when engine-file
-         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
-               ai-dirs (some->> (list-files ai-skirmish-dir)
-                                seq
-                                (filter is-directory?))]
-           (mapcat
-             (fn [^java.io.File ai-dir]
-               (->> (list-files ai-dir)
-                    (filter is-directory?)
-                    (map
-                      (fn [^java.io.File version-dir]
-                        {:bot-name (filename ai-dir)
-                         :bot-version (filename version-dir)}))))
-             ai-dirs)))
-       (catch Exception e
-         (log/error e "Error loading bots")))
-     [])))
 
 
 (defn springlobby-map-minimap [map-name]

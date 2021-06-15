@@ -1079,8 +1079,8 @@
                               (every? resource/details? (map :details mod-dependencies))
                               (seq engine-details)))
         engine-file (:file engine-details)
-        bots [] ;(fs/bots engine-file)
-        bots (concat bots
+        engine-bots (:engine-bots engine-details)
+        bots (concat engine-bots
                      (->> battle-mod-details :luaai
                           (map second)
                           (map (fn [ai]
