@@ -1924,10 +1924,10 @@
             (assoc :selected-tab-channel channel-name))))))
 
 (defmethod event-handler ::on-mouse-clicked-users-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
+  [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [username] :as e}]
   (future
     (when (< 1 (.getClickCount event))
-      (when (:username e)
+      (when username
         (event-handler (merge e {:event/type ::join-direct-message}))))))
 
 
