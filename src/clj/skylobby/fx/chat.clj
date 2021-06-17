@@ -9,7 +9,7 @@
 (def chat-window-height 1000)
 
 (def chat-window-keys
-  [:css :screen-bounds :show-chat-window])
+  [:chat-auto-scroll :css :screen-bounds :show-chat-window])
 
 (defn chat-window
   [{:keys [channel-name channels chat-auto-scroll client-data css message-drafts screen-bounds
