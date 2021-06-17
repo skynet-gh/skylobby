@@ -34,6 +34,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.62]
+
+- Fix double click to open chat with user
+- Fix auto scroll in popout chat window
+
 ### [0.3.61]
 
 - Add battle chat window popout option

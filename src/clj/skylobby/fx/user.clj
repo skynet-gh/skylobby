@@ -46,6 +46,7 @@
                      (merge
                        {:on-mouse-clicked
                         {:event/type :spring-lobby/on-mouse-clicked-users-row
+                         :server-key server-key
                          :username username}
                         :context-menu
                         {:fx/type :context-menu
