@@ -1550,8 +1550,6 @@
             (let [state @state-atom]
               (doseq [[server-key server-data] (:by-server state)]
                 (if (u/matchmaking? server-data)
-                  (log/warn "Skipping matchmaking queue update until server is fixed")
-                  #_
                   (let [client (-> server-data :client-data :client)]
                     (message/send-message client "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
@@ -3857,6 +3855,7 @@
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
   (client-message client-data (str "c.matchmaking.leave_queue " queue-id))
+  (client-message client-data (str "c.matchmaking.get_queue_info\t" queue-id))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :am-in] false))
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
