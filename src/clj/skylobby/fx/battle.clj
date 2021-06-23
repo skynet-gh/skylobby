@@ -510,7 +510,7 @@
          [{:fx/type :button
            :text (str
                    " "
-                   (if (= 1 (:sync my-battle-status))
+                   (if in-sync
                      "synced"
                      "unsynced")
                    " ")
@@ -1072,10 +1072,7 @@
                                        {:mod-name mod-name
                                         :indexed indexed-mod
                                         :details indexed-mod}))))
-        in-sync (boolean (and (resource/details? battle-map-details)
-                              (resource/details? battle-mod-details)
-                              (every? resource/details? (map :details mod-dependencies))
-                              (seq engine-details)))
+        in-sync (= 1 (:sync my-battle-status))
         engine-file (:file engine-details)
         engine-bots (:engine-bots engine-details)
         bots (concat engine-bots
