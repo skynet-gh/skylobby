@@ -315,7 +315,12 @@
           (case action
             "c.user.get_token_by_name"
             (let [msg (string/trim args)
-                  state (swap! state-atom assoc-in [:by-server server-key :login-error] msg)
-                  client (-> state :by-server (get server-key) :client-data :client)]
+                  [old-state] (swap-vals! state-atom
+                                 (fn [state]
+                                    (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
+                                      (-> state
+                                          (update-in [:by-server server-key] dissoc :accepted :client-data)
+                                          (assoc-in [:login-error server-url] msg)))))
+                  client (-> old-state :by-server (get server-key) :client-data :client)]
               (disconnect client))
             nil))))))

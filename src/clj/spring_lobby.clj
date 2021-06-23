@@ -2095,7 +2095,7 @@
           (when-let [d (s/take! client)]
             (when-let [m @d]
               (log/info "(register) <" (str "'" m "'"))
-              (swap! *state assoc-in [:by-server server-key :register-response] m)
+              (swap! *state assoc :register-response m)
               (when-not (Thread/interrupted)
                 (recur)))))
         (s/close! client))
