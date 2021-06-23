@@ -276,7 +276,7 @@
         accepted (-> state :by-server (get server-key) :accepted)
         {:keys [client ssl username password]} (-> state :by-server (get server-key) :client-data)]
     (if (and ssl (contains? compflags "token-auth"))
-      (message/send-message client (str "c.user.get_token_by_name " username "\t" (u/base64-md5 password)))
+      (message/send-message client (str "c.user.get_token_by_name " username "\t" password))
       (when (not accepted)
         (login client username password)))))
 
@@ -304,3 +304,18 @@
                               (assoc-in [:login-error server-url] m)))))
         client (-> old-state :by-server (get server-key) :client-data :client)]
     (disconnect client)))
+
+(defmethod handler/handle "NO" [state-atom server-key m]
+  (let [[_all command] (re-find #"[^\s]+ cmd=(.*)" m)]
+    (if (string/blank? command)
+      (log/error "Error parsing NO response" m)
+      (let [[_all action args] (re-find #"([^\s]+)\s+(.*)" command)]
+        (if (string/blank? action)
+          (log/error "Unable to parse NO response command" command)
+          (case action
+            "c.user.get_token_by_name"
+            (let [msg (string/trim args)
+                  state (swap! state-atom assoc-in [:by-server server-key :login-error] msg)
+                  client (-> state :by-server (get server-key) :client-data :client)]
+              (disconnect client))
+            nil))))))
