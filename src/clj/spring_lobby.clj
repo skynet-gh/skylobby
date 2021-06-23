@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll
+  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name

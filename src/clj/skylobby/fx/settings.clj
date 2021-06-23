@@ -2,6 +2,7 @@
   (:require
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [spring-lobby.fs :as fs]
@@ -14,17 +15,17 @@
 
 
 (def settings-window-width 800)
-(def settings-window-height 1000)
+(def settings-window-height 1100)
 
 
 (def settings-window-keys
-  [:css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:chat-font-size :css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
    :music-dir :music-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
 
 (defn settings-window-impl
-  [{:keys [css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
+  [{:keys [chat-font-size css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
            music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft]
     :as state}]
@@ -274,6 +275,19 @@
                           :key :css
                           :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
               :text (str "Custom from " custom-css-file)})
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [{:fx/type :label
+              :text " Chat font size: "}
+             {:fx/type :text-field
+              :text-formatter
+              {:fx/type :text-formatter
+               :value-converter :integer
+               :value (int (or (when (number? chat-font-size) chat-font-size)
+                               fx.channel/default-font-size))
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :chat-font-size}}}]}
            {:fx/type :label
             :text " Music"
             :style {:-fx-font-size 24}}

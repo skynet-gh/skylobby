@@ -9,6 +9,12 @@
     [taoensso.tufte :as tufte]))
 
 
+(def default-font-size 18)
+
+(defn font-size-or-default [font-size]
+  (int (or (when (number? font-size) font-size)
+           default-font-size)))
+
 (def irc-colors
   {"00" "rgb(255,255,255)"
    "01" "rgb(255,255,255)" ; use white for black since dark theme "rgb(0,0,0)"
@@ -27,9 +33,9 @@
    "14" "rgb(127,127,127)"
    "15" "rgb(210,210,210)"})
 
-(def text-style
+(defn text-style [font-size]
   {:-fx-font-family monospace-font-family
-   :-fx-font-size 17})
+   :-fx-font-size (font-size-or-default font-size)})
 
 
 (defn channel-texts [messages]
@@ -61,7 +67,7 @@
                    :text "\n"}])))))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-auto-scroll channel-name messages select-mode server-key]}]
+  [{:keys [chat-auto-scroll channel-name chat-font-size messages select-mode server-key]}]
   (let [messages (reverse messages)]
     (if select-mode
       (let [text (->> messages
@@ -79,7 +85,7 @@
          {:fx/type :text-area
           :editable false
           :wrap-text true
-          :style text-style
+          :style (text-style chat-font-size)
           :context-menu
           {:fx/type :context-menu
            :items
@@ -108,7 +114,7 @@
           :content
           {:fx/type :text-flow
            :on-scroll {:event/type :spring-lobby/disable-auto-scroll}
-           :style text-style
+           :style (text-style chat-font-size)
            :children texts}}}))))
 
 (defn channel-view-history
@@ -184,8 +190,12 @@
      {:fx/cell-type :table-cell
       :describe (fn [i] {:text (-> i str)})}}]})
 
+(def channel-state-keys
+  [:chat-font-size])
+
 (defn channel-view-impl
-  [{:keys [channel-name channels chat-auto-scroll client-data hide-users message-draft server-key]}]
+  [{:keys [channel-name channels hide-users]
+    :as state}]
   (let [{:keys [users] :as channel-data} (get channels channel-name)]
     {:fx/type :h-box
      :children
@@ -196,17 +206,12 @@
          :children
          [(merge
             {:fx/type channel-view-history
-             :v-box/vgrow :always
-             :chat-auto-scroll chat-auto-scroll
-             :channel-name channel-name
-             :server-key server-key}
+             :v-box/vgrow :always}
+            state
             channel-data)
-          {:fx/type channel-view-input
-           :channel-name channel-name
-           :chat-auto-scroll chat-auto-scroll
-           :client-data client-data
-           :message-draft message-draft
-           :server-key server-key}]}]
+          (merge
+            {:fx/type channel-view-input}
+            state)]}]
        (when (and (not hide-users)
                   channel-name
                   (not (string/starts-with? channel-name "@")))
