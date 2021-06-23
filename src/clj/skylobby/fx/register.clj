@@ -45,6 +45,7 @@
          [{:fx/type :label
            :text " Username: "}
           {:fx/type :text-field
+           :h-box/hgrow :always
            :text username
            :on-text-changed {:event/type :spring-lobby/username-change
                              :server-url (first server)}}]}
@@ -54,6 +55,7 @@
          [{:fx/type :label
            :text " Password: "}
           {:fx/type :password-field
+           :h-box/hgrow :always
            :text password
            :on-text-changed {:event/type :spring-lobby/password-change
                              :server-url (first server)}}]}
@@ -63,6 +65,7 @@
          [{:fx/type :label
            :text " Confirm: "}
           {:fx/type :password-field
+           :h-box/hgrow :always
            :text password-confirm
            :on-text-changed {:event/type :spring-lobby/assoc
                              :key :password-confirm}}]}
@@ -72,6 +75,7 @@
          [{:fx/type :label
            :text " Email: "}
           {:fx/type :text-field
+           :h-box/hgrow :always
            :text email
            :on-text-changed {:event/type :spring-lobby/assoc
                              :key :email}}]}
