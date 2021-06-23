@@ -34,6 +34,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.64]
+
+- Fix register response message display
+- Fix login error message for token auth
+
 ### [0.3.63]
 
 - Add setting for chat font size
