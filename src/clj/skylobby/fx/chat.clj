@@ -9,11 +9,14 @@
 (def chat-window-height 1000)
 
 (def chat-window-keys
-  [:chat-auto-scroll :css :screen-bounds :show-chat-window])
+  (concat
+    [:chat-auto-scroll :css :screen-bounds :show-chat-window]
+    fx.channel/channel-state-keys))
 
 (defn chat-window
   [{:keys [channel-name channels chat-auto-scroll client-data css message-drafts screen-bounds
-           server-key show-chat-window]}]
+           server-key show-chat-window]
+    :as state}]
   (let [{:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing show-chat-window
@@ -27,12 +30,14 @@
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)
       :root
-      {:fx/type fx.channel/channel-view
-       :h-box/hgrow :always
-       :channel-name channel-name
-       :channels channels
-       :chat-auto-scroll chat-auto-scroll
-       :client-data client-data
-       :hide-users true
-       :message-draft (get message-drafts channel-name)
-       :server-key server-key}}}))
+      (merge
+        {:fx/type fx.channel/channel-view
+         :h-box/hgrow :always
+         :channel-name channel-name
+         :channels channels
+         :chat-auto-scroll chat-auto-scroll
+         :client-data client-data
+         :hide-users true
+         :message-draft (get message-drafts channel-name)
+         :server-key server-key}
+        (select-keys state fx.channel/channel-state-keys))}}))

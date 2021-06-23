@@ -3,7 +3,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    [skylobby.fx.channel :refer [channel-view]]
+    [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
@@ -510,7 +510,7 @@
          [{:fx/type :button
            :text (str
                    " "
-                   (if (= 1 (:sync my-battle-status))
+                   (if in-sync
                      "synced"
                      "unsynced")
                    " ")
@@ -1011,16 +1011,18 @@
       (:bots battle))))
 
 (def battle-view-state-keys
-  [:archiving :auto-get-resources :battle-layout :battle-players-color-type :bot-name
-   :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
-   :drag-team :engine-filter :engine-version
-   :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :interleave-ally-player-ids
-   :importables-by-path
-   :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
-   :music-paused
-   :parsed-replays-by-path :pop-out-chat :rapid-data-by-id :rapid-data-by-version
-   :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
-   :tasks-by-type :username])
+  (concat
+    [:archiving :auto-get-resources :battle-layout :battle-players-color-type :bot-name
+     :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
+     :drag-team :engine-filter :engine-version
+     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :interleave-ally-player-ids
+     :importables-by-path
+     :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
+     :music-paused
+     :parsed-replays-by-path :pop-out-chat :rapid-data-by-id :rapid-data-by-version
+     :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
+     :tasks-by-type :username]
+    fx.channel/channel-state-keys))
 
 (def battle-view-keys
   (concat
@@ -1070,10 +1072,7 @@
                                        {:mod-name mod-name
                                         :indexed indexed-mod
                                         :details indexed-mod}))))
-        in-sync (boolean (and (resource/details? battle-map-details)
-                              (resource/details? battle-mod-details)
-                              (every? resource/details? (map :details mod-dependencies))
-                              (seq engine-details)))
+        in-sync (= 1 (:sync my-battle-status))
         engine-file (:file engine-details)
         engine-bots (:engine-bots engine-details)
         bots (concat engine-bots
@@ -1183,15 +1182,17 @@
                           :singleplayer singleplayer
                           :tasks-by-type tasks-by-type
                           :team-counts team-counts})
-        battle-chat {:fx/type channel-view
-                     :h-box/hgrow :always
-                     :channel-name channel-name
-                     :channels channels
-                     :chat-auto-scroll chat-auto-scroll
-                     :client-data client-data
-                     :hide-users true
-                     :message-draft (get message-drafts channel-name)
-                     :server-key server-key}
+        battle-chat (merge
+                      {:fx/type fx.channel/channel-view
+                       :h-box/hgrow :always
+                       :channel-name channel-name
+                       :channels channels
+                       :chat-auto-scroll chat-auto-scroll
+                       :client-data client-data
+                       :hide-users true
+                       :message-draft (get message-drafts channel-name)
+                       :server-key server-key}
+                      (select-keys state fx.channel/channel-state-keys))
         battle-tabs {:fx/type battle-tabs
                      :am-host am-host
                      :am-spec am-spec

@@ -24,12 +24,15 @@
           (.requestFocus text-field))))))
 
 (def my-channels-view-keys
-  [:channels :chat-auto-scroll :client-data :message-drafts :my-channels :selected-tab-channel
-   :server-key])
+  (concat
+    fx.channel/channel-state-keys
+    [:channels :chat-auto-scroll :client-data :message-drafts :my-channels :selected-tab-channel
+     :server-key]))
 
 (defn- my-channels-view
   [{:keys [channels chat-auto-scroll client-data message-drafts my-channels selected-tab-channel
-           server-key]}]
+           server-key]
+    :as state}]
   (let [my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
@@ -59,13 +62,15 @@
                                 :client-data client-data}
              :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
              :content
-             {:fx/type fx.channel/channel-view
-              :channel-name channel-name
-              :channels channels
-              :chat-auto-scroll chat-auto-scroll
-              :client-data client-data
-              :message-draft (get message-drafts channel-name)
-              :server-key server-key}})
+             (merge
+               {:fx/type fx.channel/channel-view
+                :channel-name channel-name
+                :channels channels
+                :chat-auto-scroll chat-auto-scroll
+                :client-data client-data
+                :message-draft (get message-drafts channel-name)
+                :server-key server-key}
+               (select-keys state fx.channel/channel-state-keys))})
           my-channel-names)}}
       {:fx/type :pane})))
 
@@ -79,6 +84,7 @@
 (def main-tab-view-state-keys
   (concat
     fx.battles-table/battles-table-state-keys
+    fx.channel/channel-state-keys
     [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
 
 (def main-tab-view-keys
