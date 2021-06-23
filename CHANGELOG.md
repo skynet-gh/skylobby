@@ -34,6 +34,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.63]
+
+- Add setting for chat font size
+- Make start game sync match protocol sync status
+- Re-enable matchmaking queue updates
+- Fix token auth for SSL servers
+
 ### [0.3.62]
 
 - Fix double click to open chat with user
