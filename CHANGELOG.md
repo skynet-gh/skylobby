@@ -34,6 +34,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.3.65]
+
+- Add setting for git mod versioning
+
 ### [0.3.64]
 
 - Fix register response message display

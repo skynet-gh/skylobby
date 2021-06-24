@@ -314,18 +314,17 @@
   (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
     git))
 
-(defn mod-name [{:keys [git-commit-id modinfo]}]
-  (str (:name modinfo) " "
-       (or (when git-commit-id
-             (str "git:" (short-git-commit git-commit-id)))
-           (:version modinfo))))
-
-(defn mod-name-and-version [{:keys [git-commit-id modinfo] :as data}]
-  {:mod-name (mod-name data)
-   :mod-version (or (when git-commit-id
-                      (str "git:" (short-git-commit git-commit-id)))
-                    (:version modinfo))
-   :mod-name-only (:name modinfo)})
+(defn mod-name-and-version
+  ([mod-data]
+   (mod-name-and-version mod-data nil))
+  ([{:keys [git-commit-id modinfo]} {:keys [use-git-mod-version]}]
+   (let [mod-name-only (:name modinfo)
+         mod-version (or (when (and use-git-mod-version git-commit-id)
+                           (str "git:" (short-git-commit git-commit-id)))
+                         (:version modinfo))]
+     {:mod-name (str mod-name-only " " mod-version)
+      :mod-version mod-version
+      :mod-name-only (:name modinfo)})))
 
 (defn mod-name-fix-git
   "Replace git commit with $VERSION for Spring"
