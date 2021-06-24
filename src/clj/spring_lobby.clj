@@ -138,7 +138,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :username])
+   :spring-settings :uikeys :use-git-mod-version :username])
 
 
 (defn- select-config [state]
@@ -279,31 +279,34 @@
            (if (string/ends-with? (fs/filename f) ".sdp")
              (rapid/read-sdp-mod f opts)
              (fs/read-mod-file f opts))
-           name-and-version (u/mod-name-and-version mod-data)]
+           name-and-version (u/mod-name-and-version mod-data opts)]
        (merge mod-data name-and-version))
      (catch Exception e
        (log/warn e "Error reading mod details")))))
 
 
-(defn- update-mod [state-atom spring-root-path file]
-  (let [path (fs/canonical-path file)
-        mod-data (try
-                   (read-mod-data file {:modinfo-only false})
-                   (catch Exception e
-                     (log/error e "Error reading mod data for" file)))
-        mod-details (select-keys mod-data [:file :mod-name :mod-name-only :mod-version ::fs/source :git-commit-id])
-        mod-details (assoc mod-details
-                           :is-game
-                           (boolean
-                             (or (:engineoptions mod-data)
-                                 (:modoptions mod-data))))]
-    (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
-           (fn [mods]
-             (set
-               (cond->
-                 (remove (comp #{path} fs/canonical-path :file) mods)
-                 mod-details (conj mod-details)))))
-    mod-data))
+(defn- update-mod
+  ([state-atom spring-root-path file]
+   (update-mod state-atom spring-root-path file nil))
+  ([state-atom spring-root-path file opts]
+   (let [path (fs/canonical-path file)
+         mod-data (try
+                    (read-mod-data file (assoc opts :modinfo-only false))
+                    (catch Exception e
+                      (log/error e "Error reading mod data for" file)))
+         mod-details (select-keys mod-data [:file :mod-name :mod-name-only :mod-version ::fs/source :git-commit-id])
+         mod-details (assoc mod-details
+                            :is-game
+                            (boolean
+                              (or (:engineoptions mod-data)
+                                  (:modoptions mod-data))))]
+     (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
+            (fn [mods]
+              (set
+                (cond->
+                  (remove (comp #{path} fs/canonical-path :file) mods)
+                  mod-details (conj mod-details)))))
+     mod-data)))
 
 
 (defmulti event-handler :event/type)
@@ -651,7 +654,8 @@
               {::task-type ::mod-details
                :mod-name new-mod
                :mod-file (:file mod-exists)
-               :source :battle-mod-details-watcher}))))
+               :source :battle-mod-details-watcher
+               :use-git-mod-version (:use-git-mod-version new-state)}))))
       (catch Exception e
         (log/error e "Error in :battle-mod-details state watcher")))))
 
@@ -715,7 +719,8 @@
                                mod-exists))
                      {::task-type ::mod-details
                       :mod-name new-mod
-                      :mod-file (:file mod-exists)})
+                      :mod-file (:file mod-exists)
+                      :use-git-mod-version (:use-git-mod-version new-state)})
                    (when (or (and (or (not= old-replay-path new-replay-path)
                                       (not= old-map new-map))
                                   (and (not (string/blank? new-map))
@@ -1239,7 +1244,7 @@
   ([state-atom spring-root]
    (log/info "Reconciling mods")
    (let [before (u/curr-millis)
-         {:keys [spring-isolation-dir] :as state} @state-atom
+         {:keys [spring-isolation-dir use-git-mod-version] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
          _ (log/info "Updating mods in" spring-root)
          spring-root-path (fs/canonical-path spring-root)
@@ -1289,7 +1294,7 @@
        (log/info "Adding" (count this-round) "mods this iteration"))
      (doseq [file this-round]
        (log/info "Reading mod from" file)
-       (update-mod *state spring-root-path file)) ; TODO inline?
+       (update-mod *state spring-root-path file {:use-git-mod-version use-git-mod-version})) ; TODO inline?
      (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
      (swap! state-atom
             (fn [state]
@@ -1847,7 +1852,8 @@
         (throw t)))))
 
 
-(defmethod task-handler ::mod-details [{:keys [mod-name mod-file]}]
+(defmethod task-handler ::mod-details
+  [{:keys [mod-name mod-file use-git-mod-version]}]
   (let [error-data {:mod-name mod-name
                     :file mod-file
                     :error true
@@ -1857,7 +1863,7 @@
       (if mod-file
         (do
           (log/info "Updating mod details for" mod-name)
-          (let [mod-details (or (read-mod-data mod-file) error-data)]
+          (let [mod-details (or (read-mod-data mod-file {:use-git-mod-version use-git-mod-version}) error-data)]
             (log/info "Got mod details for" mod-name mod-file (keys mod-details))
             (swap! *state update :mod-details cache/miss cache-key mod-details)))
         (do
@@ -2086,8 +2092,7 @@
             client @client-deferred
             client-data {:client client
                          :client-deferred client-deferred
-                         :server-url server-url}
-            server-key (u/server-key client-data)]
+                         :server-url server-url}]
         (swap! *state dissoc :password-confirm)
         (client-message client-data
           (str "REGISTER " username " " (u/base64-md5 password) " " email))
@@ -2241,16 +2246,16 @@
 
 
 (defmethod event-handler ::host-battle
-  [{:keys [client-data scripttags host-battle-state use-springlobby-modname]}]
+  [{:keys [client-data scripttags host-battle-state use-git-mod-version]}]
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)
                   (string/blank? map-name))
       (future
         (try
-          (let [adjusted-modname (if use-springlobby-modname
-                                   (u/mod-name-fix-git mod-name)
-                                   mod-name)]
+          (let [adjusted-modname (if use-git-mod-version
+                                   mod-name
+                                   (u/mod-name-fix-git mod-name))]
             (open-battle client-data (assoc host-battle-state :mod-name adjusted-modname)))
           (when (seq scripttags)
             (client-message client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
@@ -2413,10 +2418,6 @@
 (defmethod event-handler ::battle-title-change
   [{:fx/keys [event]}]
   (swap! *state assoc :battle-title event))
-
-(defmethod event-handler ::use-springlobby-modname-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :use-springlobby-modname event))
 
 
 (defmethod event-handler ::version-change

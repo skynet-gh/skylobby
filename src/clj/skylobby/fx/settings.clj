@@ -22,12 +22,14 @@
   [:chat-font-size :css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
    :music-dir :music-volume
-   :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft])
+   :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
+   :use-git-mod-version])
 
 (defn settings-window-impl
   [{:keys [chat-font-size css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
-           music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft]
+           music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
+           use-git-mod-version]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -108,6 +110,16 @@
                           :key :spring-isolation-dir
                           :value (fs/spring-root)}
               :text "Spring"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-git-mod-version)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-git-mod-version}}
+             {:fx/type :label
+              :text " Use git to version .sdd games"}]}
            {:fx/type :label
             :text " Performance"
             :style {:-fx-font-size 24}}
