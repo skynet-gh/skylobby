@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
+  [:auto-get-resources :auto-refresh-replays :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
@@ -1606,6 +1606,25 @@
           (fn [_chimestamp]
             (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
+(defn- update-replays-chimer-fn [state-atom]
+  (log/info "Starting update replays chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
+            (java-time/duration 5 :minutes))
+          (fn [_chimestamp]
+            (log/debug "Updating now")
+            (let [{:keys [auto-refresh-replays]} @state-atom]
+              (if auto-refresh-replays
+                (add-task! state-atom {::task-type ::refresh-replays})
+                (log/info "Auto replay refresh disabled"))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating now")
@@ -3993,7 +4012,8 @@
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
-         update-now-chimer (update-now-chimer-fn state-atom)]
+         update-now-chimer (update-now-chimer-fn state-atom)
+         update-replays-chimer (update-replays-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -4016,7 +4036,8 @@
          truncate-messages-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
-         update-now-chimer])})))
+         update-now-chimer
+         update-replays-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]
