@@ -3784,10 +3784,17 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
+(def default-history-index -1)
+
 (defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
   (future
     (try
-      (swap! *state update-in [:by-server server-key :message-drafts] dissoc channel-name)
+      (swap! *state update-in [:by-server server-key]
+        (fn [server-data]
+          (-> server-data
+              (update :message-drafts dissoc channel-name)
+              (update-in [:channels channel-name :sent-messages] conj message)
+              (assoc-in [:channels channel-name :history-index] default-history-index))))
       (cond
         (string/blank? channel-name)
         (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
@@ -3822,6 +3829,26 @@
                   (client-message client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
+
+(defmethod event-handler ::on-channel-key-pressed [{:fx/keys [event] :keys [channel-name server-key]}]
+  (let [code (.getCode event)]
+    (when-let [dir (cond
+                     (= KeyCode/UP code) inc
+                     (= KeyCode/DOWN code) dec
+                     :else nil)]
+      (try
+        (swap! *state update-in [:by-server server-key]
+          (fn [server-data]
+            (let [{:keys [history-index sent-messages]} (-> server-data :channels (get channel-name))
+                  new-history-index (max default-history-index
+                                         (min (dec (count sent-messages))
+                                              (dir (or history-index default-history-index))))
+                  history-message (nth sent-messages new-history-index "")]
+              (-> server-data
+                  (assoc-in [:message-drafts channel-name] history-message)
+                  (assoc-in [:channels channel-name :history-index] new-history-index)))))
+        (catch Exception e
+          (log/error e "Error setting chat history message"))))))
 
 
 (defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]

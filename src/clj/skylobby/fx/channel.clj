@@ -144,7 +144,10 @@
                  :channel-name channel-name
                  :client-data client-data
                  :message message-draft
-                 :server-key server-key}}
+                 :server-key server-key}
+     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                      :channel-name channel-name
+                      :server-key server-key}}
     {:fx/type fx.ext.node/with-tooltip-props
      :props
      {:tooltip
