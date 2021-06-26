@@ -87,6 +87,18 @@
             :total 1234567890}))))
 
 
+(deftest mod-name-git-no-ref
+  (is (= "Beyond All Reason git:"
+         (u/mod-name-git-no-ref "Beyond All Reason git:f0cf2cb")))
+  (is (= nil
+         (u/mod-name-git-no-ref "Balanced Annihilation V10.24"))))
+
+(deftest mod-git-ref
+  (is (= "f0cf2cb"
+         (u/mod-git-ref "Beyond All Reason git:f0cf2cb")))
+  (is (= nil
+         (u/mod-git-ref "Balanced Annihilation V10.24"))))
+
 (deftest mod-name-fix-git
   (is (= "Balanced Annihilation V10.24"
          (u/mod-name-fix-git "Balanced Annihilation V10.24")))

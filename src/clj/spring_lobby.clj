@@ -2753,6 +2753,8 @@
           (finally
             (swap! *state assoc-in [:gitting canonical-path] {:status false})))))))
 
+(defmethod task-handler ::git-mod [task]
+  (event-handler (assoc task :event/type ::git-mod)))
 
 (defmethod event-handler ::minimap-scroll
   [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]

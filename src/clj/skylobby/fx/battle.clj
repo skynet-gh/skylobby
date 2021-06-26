@@ -1063,7 +1063,8 @@
         engine-details (get engines-by-version engine-version)
         indexed-map (get maps-by-name battle-map)
         battle-map-details (resource/cached-details map-details indexed-map)
-        indexed-mod (get mods-by-name battle-modname)
+        indexed-mod (or (get mods-by-name battle-modname)
+                        (get mods-by-name (u/mod-name-git-no-ref battle-modname)))
         battle-mod-details (resource/cached-details mod-details indexed-mod)
         mod-dependencies (->> battle-modname
                               resource/mod-dependencies

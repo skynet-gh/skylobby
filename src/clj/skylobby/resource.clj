@@ -161,11 +161,20 @@
 
 (defn spring-root-resources [spring-root by-spring-root]
   (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
-        {:keys [engines maps mods]} spring-root-data]
+        {:keys [engines maps mods]} spring-root-data
+        git-mods (->> mods
+                      (filter (comp #(string/includes? % "git:") :mod-name))
+                      (map (juxt (comp u/mod-name-git-no-ref :mod-name) identity))
+                      (filter first)
+                      (into {}))
+        mods-by-name (->> mods
+                          (map (juxt :mod-name identity))
+                          (into {})
+                          (merge git-mods))]
     {:spring-isolation-dir spring-root
      :engines engines
      :engines-by-version (into {} (map (juxt :engine-version identity) engines))
      :maps maps
      :maps-by-name (into {} (map (juxt :map-name identity) maps))
      :mods mods
-     :mods-by-name (into {} (map (juxt :mod-name identity) mods))}))
+     :mods-by-name mods-by-name}))

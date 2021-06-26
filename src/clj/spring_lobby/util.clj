@@ -308,11 +308,17 @@
       mod-prefix
       mod-name)))
 
+(defn mod-name-git-no-ref [mod-name]
+  (when mod-name
+    (when-let [[_all mod-prefix _git] (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)]
+      (str mod-prefix " git:"))))
+
 (defn mod-git-ref
   "Returns the git ref from the given mod name, or nil if it does not parse."
   [mod-name]
-  (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
-    git))
+  (when mod-name
+    (when-let [[_all _mod-prefix git] (parse-mod-name-git mod-name)]
+      git)))
 
 (defn mod-name-and-version
   ([mod-data]
