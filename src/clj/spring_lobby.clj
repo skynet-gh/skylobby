@@ -2814,6 +2814,13 @@
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
   (client-message client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
 
+(defmethod event-handler ::on-change-away [{:keys [client-status] :fx/keys [event] :as e}]
+  (let [away (= "Away" event)]
+    (event-handler
+      (assoc e
+             :event/type ::update-client-status
+             :client-status (assoc client-status :away away)))))
+
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future
     (try
@@ -3062,6 +3069,11 @@
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
+
+(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :as e}]
+  (event-handler (assoc e
+                        :event/type ::battle-spectate-change
+                        :value (= "Playing" event))))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]

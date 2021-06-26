@@ -544,25 +544,22 @@
        (when (not singleplayer)
          [(let [am-away (:away my-client-status)]
             (merge
-              {:fx/type :button
-               :text (if am-away "Away" "Here")
-               :on-action {:event/type :spring-lobby/update-client-status
-                           :client-data (when-not singleplayer client-data)
-                           :client-status (assoc my-client-status :away (not am-away))}}
-              (when am-away
-                {:graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-sleep:16:grey"}})))])
-       [{:fx/type :button
-         :text (if am-spec
-                 "Spectating"
-                 "Playing")
-         :on-action {:event/type :spring-lobby/battle-spectate-change
-                     :client-data (when-not singleplayer client-data)
-                     :is-me true
-                     :is-bot false
-                     :id my-player
-                     :value am-spec}}])}
+              {:fx/type :combo-box
+               :value (if am-away "Away" "Here")
+               :items ["Away" "Here"]
+               :on-value-changed {:event/type :spring-lobby/on-change-away
+                                  :client-data (when-not singleplayer client-data)
+                                  :client-status (assoc my-client-status :away (not am-away))}}))])
+       [{:fx/type :combo-box
+         :value (if am-spec
+                  "Spectating"
+                  "Playing")
+         :items ["Spectating" "Playing"]
+         :on-value-changed {:event/type :spring-lobby/on-change-spectate
+                            :client-data (when-not singleplayer client-data)
+                            :is-me true
+                            :is-bot false
+                            :id my-player}}])}
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 24}
