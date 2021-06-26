@@ -41,12 +41,22 @@
    ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"
-     {:-fx-icon-color "white"}}}})
+     {:-fx-icon-color "white"}}
+    "-chat"
+    {"-user-list"
+     {:-fx-text-fill "lightgrey"}}}})
 (def javafx-style-data
-  {".skylobby"
+  {
+   ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"
-     {:-fx-icon-color "dimgrey"}}}})
+     {:-fx-icon-color "dimgrey"}}
+    "-chat"
+    {
+     "-message"
+     {:-fx-fill "black"}
+     "-user-list"
+     {:-fx-text-fill "black"}}}})
 
 
 (def style-presets
@@ -58,8 +68,29 @@
 (def default-style
   (css/register ::default default-style-data))
 
+; so that themes can override
+(def default-classes
+  {".skylobby"
+   {"-normal"
+    {"> .ikonli-font-icon"
+     {:-fx-icon-color "dimgrey"}}
+    "-chat"
+    {
+     "-time"
+     {:-fx-fill "grey"}
+     "-username"
+     {:-fx-fill "royalblue"}
+     "-username-ex"
+     {:-fx-fill "cyan"}
+     "-message"
+     {:-fx-fill "white"}}}})
+(def default-classes-css
+  (css/register ::default default-classes))
+
+
 (defn stylesheet-urls [css]
-  [(str (::css/url (or css default-style)))])
+  [(str (::css/url default-classes-css))
+   (str (::css/url (or css default-style)))])
 
 
 (def icons
