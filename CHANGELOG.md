@@ -37,6 +37,8 @@ Future Features:
 - Fix git mod version sync
 - Change here/away and play/spec to dropdowns
 - Add up/down to fill previous chat messages
+- Add CSS classes for some parts of chat
+- Add setting to auto refresh replays
 
 ### [0.3.65]
 
