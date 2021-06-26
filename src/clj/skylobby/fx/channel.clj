@@ -47,20 +47,20 @@
              (concat
                [{:fx/type :text
                  :text (str "[" (u/format-hours timestamp) "] ")
-                 :fill :grey}
+                 :style-class ["text" "skylobby-chat-time"]}
                 {:fx/type :text
                  :text
                  (str
                    (if ex
                      (str "* " username " " text)
                      (str username ": ")))
-                 :fill (if ex :cyan :royalblue)}]
+                 :style-class ["text" (str "skylobby-chat-username" (when ex "-ex"))]}]
                (when-not ex
                  (map
-                   (fn [[_all _ irc-color-code text-segment]]
+                   (fn [[_all _ _irc-color-code text-segment]]
                      {:fx/type :text
                       :text (str text-segment)
-                      :fill (get irc-colors irc-color-code :white)})
+                      :style-class ["text" "skylobby-chat-message"]})
                    (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))
                (when-not (= i last-message-index)
                  [{:fx/type :text
@@ -144,7 +144,10 @@
                  :channel-name channel-name
                  :client-data client-data
                  :message message-draft
-                 :server-key server-key}}
+                 :server-key server-key}
+     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                      :channel-name channel-name
+                      :server-key server-key}}
     {:fx/type fx.ext.node/with-tooltip-props
      :props
      {:tooltip
@@ -188,7 +191,10 @@
      :cell-value-factory identity
      :cell-factory
      {:fx/cell-type :table-cell
-      :describe (fn [i] {:text (-> i str)})}}]})
+      :describe
+      (fn [i]
+        {:text (-> i str)
+         :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
   [:chat-font-size])

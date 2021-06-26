@@ -69,15 +69,15 @@
                            "sync"
                            "exclamation"))
                        ":16:"
-                       (if (= 1 worst-severity) "black" "white"))}}
-                {:fx/type :v-box
-                 :style (merge
-                          (get severity-styles severity)
-                          font-style)
-                 :children
-                 [{:fx/type :button
-                   :v-box/margin 8
-                   :text display-text
-                   :disable (boolean in-progress)
-                   :on-action action}]})}))
+                       "black")}}
+                (let [style (get severity-styles severity)]
+                  {:fx/type :v-box
+                   :style (merge style font-style)
+                   :children
+                   [{:fx/type :button
+                     :style (dissoc style :-fx-background-color)
+                     :v-box/margin 8
+                     :text display-text
+                     :disable (boolean in-progress)
+                     :on-action action}]}))}))
          issues))}))

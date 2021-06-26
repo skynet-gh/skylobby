@@ -17,7 +17,7 @@
 
 (defn mod-sync-pane
   [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file
-           file-cache gitting http-download importables-by-path indexed-mod mod-update-tasks
+           file-cache http-download importables-by-path indexed-mod mod-update-tasks
            rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir
            springfiles-search-results tasks-by-type]}]
   (let [no-mod-details (not (resource/details? battle-mod-details))
@@ -36,11 +36,12 @@
      :refresh-in-progress (seq mod-update-tasks)
      :issues
      (concat
-       (let [severity (cond
-                        no-mod-details
+       (let [severity (if no-mod-details
                         (if indexed-mod
                           -1 2)
-                        :else 0)]
+                        (if (= battle-modname
+                               (:mod-name indexed-mod))
+                          0 1))]
          [{:severity severity
            :text "info"
            :human-text battle-modname
@@ -206,16 +207,22 @@
                            :importable importable
                            :spring-isolation-dir spring-isolation-dir}})}])))
        (when (and (= :directory
-                     (::fs/source battle-mod-details)))
+                     (::fs/source indexed-mod)))
          (let [battle-mod-git-ref (u/mod-git-ref battle-modname)
                severity (if (= battle-modname
-                               (:mod-name battle-mod-details))
-                          0 1)]
+                               (:mod-name indexed-mod))
+                          0 1)
+               in-progress (->> (get tasks-by-type :spring-lobby/git-mod)
+                                (filter (comp #{(fs/canonical-path mod-file)} fs/canonical-path :file))
+                                seq
+                                boolean)]
            (concat
-             [(merge
+             [{:severity severity
+               :human-text (str "You have " (:mod-name indexed-mod))}
+              (merge
                 {:severity severity
                  :text "git"
-                 :in-progress (-> gitting (get canonical-path) :status)}
+                 :in-progress (or in-progress (seq mod-update-tasks))}
                 (if (= battle-mod-git-ref "$VERSION")
                   ; unspecified git commit ^
                   {:human-text (str "Unspecified git ref " battle-mod-git-ref)
@@ -223,12 +230,17 @@
                                  "yours may not be compatible")}
                   {:human-text (if (zero? severity)
                                  (str "git at ref " battle-mod-git-ref)
-                                 (str "Reset " (fs/filename (:file battle-mod-details))
-                                      " git to ref " battle-mod-git-ref))
+                                 (if in-progress
+                                   (str "Resetting " (fs/filename (:file battle-mod-details))
+                                        " git to ref " battle-mod-git-ref)
+                                   (str "Reset " (fs/filename (:file battle-mod-details))
+                                        " git to ref " battle-mod-git-ref)))
                    :action
-                   {:event/type :spring-lobby/git-mod
-                    :file mod-file
-                    :battle-mod-git-ref battle-mod-git-ref}}))]
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/git-mod
+                     :file mod-file
+                     :battle-mod-git-ref battle-mod-git-ref}}}))]
              (when (and (not (zero? severity))
                         (not= battle-mod-git-ref "$VERSION"))
                [(merge

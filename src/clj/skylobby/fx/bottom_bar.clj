@@ -17,7 +17,7 @@
    :children
    (concat
      [{:fx/type :label
-       :text (str last-failed-message)
+       :text (str " " last-failed-message)
        :style {:-fx-text-fill "#FF0000"}}
       {:fx/type :pane
        :h-box/hgrow :always}]

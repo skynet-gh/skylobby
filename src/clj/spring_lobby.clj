@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
+  [:auto-get-resources :auto-refresh-replays :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
@@ -1612,6 +1612,25 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn- update-replays-chimer-fn [state-atom]
+  (log/info "Starting update replays chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
+            (java-time/duration 5 :minutes))
+          (fn [_chimestamp]
+            (log/debug "Updating now")
+            (let [{:keys [auto-refresh-replays]} @state-atom]
+              (if auto-refresh-replays
+                (add-task! state-atom {::task-type ::refresh-replays})
+                (log/info "Auto replay refresh disabled"))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
@@ -2753,6 +2772,8 @@
           (finally
             (swap! *state assoc-in [:gitting canonical-path] {:status false})))))))
 
+(defmethod task-handler ::git-mod [task]
+  (event-handler (assoc task :event/type ::git-mod)))
 
 (defmethod event-handler ::minimap-scroll
   [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]
@@ -2811,6 +2832,13 @@
 
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
   (client-message client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
+
+(defmethod event-handler ::on-change-away [{:keys [client-status] :fx/keys [event] :as e}]
+  (let [away (= "Away" event)]
+    (event-handler
+      (assoc e
+             :event/type ::update-client-status
+             :client-status (assoc client-status :away away)))))
 
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (future
@@ -3060,6 +3088,11 @@
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
+
+(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :as e}]
+  (event-handler (assoc e
+                        :event/type ::battle-spectate-change
+                        :value (= "Playing" event))))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]
@@ -3770,10 +3803,17 @@
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))
 
+(def default-history-index -1)
+
 (defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
   (future
     (try
-      (swap! *state update-in [:by-server server-key :message-drafts] dissoc channel-name)
+      (swap! *state update-in [:by-server server-key]
+        (fn [server-data]
+          (-> server-data
+              (update :message-drafts dissoc channel-name)
+              (update-in [:channels channel-name :sent-messages] conj message)
+              (assoc-in [:channels channel-name :history-index] default-history-index))))
       (cond
         (string/blank? channel-name)
         (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
@@ -3808,6 +3848,26 @@
                   (client-message client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
+
+(defmethod event-handler ::on-channel-key-pressed [{:fx/keys [event] :keys [channel-name server-key]}]
+  (let [code (.getCode event)]
+    (when-let [dir (cond
+                     (= KeyCode/UP code) inc
+                     (= KeyCode/DOWN code) dec
+                     :else nil)]
+      (try
+        (swap! *state update-in [:by-server server-key]
+          (fn [server-data]
+            (let [{:keys [history-index sent-messages]} (-> server-data :channels (get channel-name))
+                  new-history-index (max default-history-index
+                                         (min (dec (count sent-messages))
+                                              (dir (or history-index default-history-index))))
+                  history-message (nth sent-messages new-history-index "")]
+              (-> server-data
+                  (assoc-in [:message-drafts channel-name] history-message)
+                  (assoc-in [:channels channel-name :history-index] new-history-index)))))
+        (catch Exception e
+          (log/error e "Error setting chat history message"))))))
 
 
 (defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]
@@ -3952,7 +4012,8 @@
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
-         update-now-chimer (update-now-chimer-fn state-atom)]
+         update-now-chimer (update-now-chimer-fn state-atom)
+         update-replays-chimer (update-replays-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -3975,7 +4036,8 @@
          truncate-messages-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
-         update-now-chimer])})))
+         update-now-chimer
+         update-replays-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]

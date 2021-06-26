@@ -15,18 +15,18 @@
 
 
 (def settings-window-width 800)
-(def settings-window-height 1100)
+(def settings-window-height 1200)
 
 
 (def settings-window-keys
-  [:chat-font-size :css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:auto-refresh-replays :chat-font-size :css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
    :music-dir :music-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :use-git-mod-version])
 
 (defn settings-window-impl
-  [{:keys [chat-font-size css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
+  [{:keys [auto-refresh-replays chat-font-size css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
            music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
            use-git-mod-version]
@@ -189,6 +189,16 @@
            {:fx/type :label
             :text " Replay Sources"
             :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean auto-refresh-replays)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :auto-refresh-replays}}
+             {:fx/type :label
+              :text " Auto refresh replays"}]}
            {:fx/type :v-box
             :children
             (map

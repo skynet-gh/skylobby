@@ -16,7 +16,7 @@
   [:app-update-available :battle-password :battle-title :engines :engine-filter :engine-version
    :http-download :map-input-prefix
    :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :pop-out-chat :spring-isolation-dir :tasks-by-type
-   :use-springlobby-modname])
+   :use-git-mod-version])
 
 (def battles-buttons-keys
   [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle :server-key])
@@ -113,7 +113,7 @@
                host-battle-action (merge
                                     {:event/type :spring-lobby/host-battle
                                      :host-battle-state host-battle-state}
-                                    (select-keys state [:client-data :scripttags :use-springlobby-modname]))]
+                                    (select-keys state [:client-data :scripttags :use-git-mod-version]))]
            [{:fx/type :button
              :text "Host Battle"
              :disable (boolean
@@ -135,25 +135,7 @@
              :text (str battle-password)
              :prompt-text "Battle Password"
              :on-action host-battle-action
-             :on-text-changed {:event/type :spring-lobby/battle-password-change}}
-            #_
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
-               :style {:-fx-font-size 14}
-               :text "If using git, set version to $VERSION so SpringLobby is happier"}}
-             :desc
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :check-box
-                :selected (boolean use-springlobby-modname)
-                :h-box/margin 8
-                :on-selected-changed {:event/type :spring-lobby/use-springlobby-modname-change}}
-               {:fx/type :label
-                :text "Use SpringLobby Game Name"}]}}])))}
+             :on-text-changed {:event/type :spring-lobby/battle-password-change}}])))}
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 16}

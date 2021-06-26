@@ -7,20 +7,18 @@ Notable changes and todo list.
 Current Annoyances:
 
 - Ally/team numbers start at 0 instead of 1, different from SPADS
-- Save last faction and restore per battle
 - Downloads and other tasks cannot be cancelled
 - Replace 7Zip with Apache commons-compress to fix concurrency issue
 
 Future Features:
 
-- Track and display game running time
+- Query auto hosts for battle details
 - Friends list support
 - Parse autohost messages and display in UI
 - Visually group teams in players table
 - Track and display player away time
 - Arbitrary engine directories
 - Open battle links
-- Up arrow in chat and console box should fill in last message
 - First run intro window
 - Highlight window and tabs when rang or new direct message
 - Add new butler downloader system
@@ -33,6 +31,14 @@ Future Features:
 
 
 ## Actual changelog
+
+### [0.3.66]
+
+- Fix git mod version sync
+- Change here/away and play/spec to dropdowns
+- Add up/down to fill previous chat messages
+- Add CSS classes for some parts of chat
+- Add setting to auto refresh replays
 
 ### [0.3.65]
 
