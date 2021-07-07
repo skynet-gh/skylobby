@@ -62,7 +62,11 @@
      "-message"
      {:-fx-fill "black"}
      "-user-list"
-     {:-fx-text-fill "black"}}}})
+     {:-fx-text-fill "black"}}
+    "-console"
+    {
+     "-message"
+     {:-fx-fill "black"}}}})
 
 
 (def style-presets
@@ -91,6 +95,16 @@
      {:-fx-fill "royalblue"}
      "-username-ex"
      {:-fx-fill "cyan"}
+     "-message"
+     {:-fx-fill "white"}}
+    "-console"
+    {
+     "-time"
+     {:-fx-fill "grey"}
+     "-source-server"
+     {:-fx-fill "goldenrod"}
+     "-source-client"
+     {:-fx-fill "royalblue"}
      "-message"
      {:-fx-fill "white"}}}})
 (def default-classes-css
