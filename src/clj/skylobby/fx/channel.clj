@@ -1,12 +1,14 @@
 (ns skylobby.fx.channel
   (:require
-    [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [with-scroll-text-prop with-scroll-text-flow-prop]]
-    [spring-lobby.fx.font-icon :as font-icon]
+    [skylobby.fx.ext :refer [ext-with-auto-scroll-virtual-prop with-scroll-text-prop with-scroll-text-flow-prop]]
+    [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
 (def default-font-size 18)
@@ -38,7 +40,7 @@
    :-fx-font-size (font-size-or-default font-size)})
 
 
-(defn channel-texts [messages]
+(defn old-channel-texts [messages]
   (let [last-message-index (dec (count messages))]
     (->> messages
          (map-indexed vector)
@@ -66,7 +68,7 @@
                  [{:fx/type :text
                    :text "\n"}])))))))
 
-(defn- channel-view-history-impl
+(defn old-channel-view-history-impl
   [{:keys [chat-auto-scroll channel-name chat-font-size messages select-mode server-key]}]
   (let [messages (reverse messages)]
     (if select-mode
@@ -94,7 +96,7 @@
              :on-action {:event/type :spring-lobby/assoc-in
                          :path [:by-server server-key :channels channel-name :select-mode]
                          :value false}}]}}})
-      (let [texts (channel-texts messages)]
+      (let [texts (old-channel-texts messages)]
         {:fx/type with-scroll-text-flow-prop
          :props {:auto-scroll [texts chat-auto-scroll]}
          :desc
@@ -117,6 +119,54 @@
            :style (text-style chat-font-size)
            :children texts}}}))))
 
+(defn segment
+  [text style]
+  (StyledSegment. text style))
+
+(defn channel-document
+  [messages]
+  (let [builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+    (doseq [message messages]
+      (let [{:keys [ex text timestamp username]} message]
+        (.addParagraph builder
+          ^java.util.List
+          (vec
+            (concat
+              [
+               (segment
+                 (str "[" (u/format-hours timestamp) "] ")
+                 ["text" "skylobby-chat-time"])
+               (segment
+                 (str
+                   (if ex
+                     (str "* " username " " text)
+                     (str username ": ")))
+                 ["text" (str "skylobby-chat-username" (when ex "-ex"))])]
+              (when-not ex
+                (map
+                  (fn [[_all _ _irc-color-code text-segment]]
+                    (segment
+                      (str text-segment)
+                      ["text" "skylobby-chat-message"]))
+                  (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
+          ^java.util.List
+          [])))
+    (when (seq messages)
+      (.build builder))))
+
+(defn- channel-view-history-impl
+  [{:keys [chat-font-size messages]}]
+  {:fx/type ext-with-auto-scroll-virtual-prop
+   :props {:auto-scroll messages}
+   :desc
+   {:fx/type fx.virtualized-scroll-pane/lifecycle
+    :content
+    {:fx/type fx.rich-text/lifecycle
+     :editable false
+     :style (text-style chat-font-size)
+     :wrap-text true
+     :document (channel-document (reverse messages))}}})
+
 (defn channel-view-history
   [state]
   (tufte/profile {:dynamic? true
@@ -124,7 +174,7 @@
     (tufte/p :channel-view-history
       (channel-view-history-impl state))))
 
-(defn- channel-view-input [{:keys [channel-name chat-auto-scroll client-data message-draft server-key]}]
+(defn- channel-view-input [{:keys [channel-name client-data message-draft server-key]}]
   {:fx/type :h-box
    :children
    [{:fx/type :button
@@ -147,24 +197,7 @@
                  :server-key server-key}
      :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
                       :channel-name channel-name
-                      :server-key server-key}}
-    {:fx/type fx.ext.node/with-tooltip-props
-     :props
-     {:tooltip
-      {:fx/type :tooltip
-       :show-delay [10 :ms]
-       :text "Auto scroll"}}
-     :desc
-     {:fx/type :h-box
-      :alignment :center-left
-      :children
-      [
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-autorenew:20:white"}
-       {:fx/type :check-box
-        :selected (boolean chat-auto-scroll)
-        :on-selected-changed {:event/type :spring-lobby/assoc
-                              :key :chat-auto-scroll}}]}}]})
+                      :server-key server-key}}]})
 
 (defn- channel-view-users [{:keys [users]}]
   {:fx/type :table-view

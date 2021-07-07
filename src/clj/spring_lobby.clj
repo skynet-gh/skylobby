@@ -1640,6 +1640,28 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn truncate-messages!
+  ([state-atom]
+   (truncate-messages! state-atom u/max-messages))
+  ([state-atom max-messages]
+   (log/info "Truncating message logs")
+   (swap! state-atom update :by-server
+     (fn [by-server]
+       (reduce-kv
+         (fn [m k v]
+           (assoc m k
+             (-> v
+                 (update :console-log (partial take max-messages))
+                 (update :channels
+                   (fn [channels]
+                     (reduce-kv
+                       (fn [m k v]
+                         (assoc m k (update v :messages (partial take max-messages))))
+                       {}
+                       channels))))))
+         {}
+         by-server)))))
+
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
@@ -1648,23 +1670,7 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
-            (log/info "Truncating message logs")
-            (swap! state-atom update :by-server
-              (fn [by-server]
-                (reduce-kv
-                  (fn [m k v]
-                    (assoc m k
-                      (-> v
-                          (update :console-log (partial take u/max-messages))
-                          (update :channels
-                            (fn [channels]
-                              (reduce-kv
-                                (fn [m k v]
-                                  (assoc m k (update v :messages (partial take u/max-messages))))
-                                {}
-                                channels))))))
-                  {}
-                  by-server))))
+            (truncate-messages! state-atom))
           {:error-handler
            (fn [e]
              (log/error e "Error truncating messages")

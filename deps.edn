@@ -39,6 +39,8 @@
   org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.6.3"}
+  org.fxmisc.richtext/richtextfx {:mvn/version "0.10.6"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.2.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.2.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2

@@ -22,6 +22,8 @@
     ;:-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
     :-fx-control-inner-background "rgb(50, 50, 50)"
     :-fx-selection-bar-non-focused "rgb(60, 60, 60)"}
+   ".styled-text-area"
+   {:-fx-background-color "rgb(50, 50, 50)"}
    ".text-field"
    {:-fx-prompt-text-fill "rgb(180, 180, 180)"}
    ".skylobby"
@@ -36,6 +38,8 @@
     ;:-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
     :-fx-control-inner-background "rgb(30, 30, 30)"
     :-fx-selection-bar-non-focused "rgb(40, 40, 40)"}
+   ".styled-text-area"
+   {:-fx-background-color "rgb(0, 0, 0)"}
    ".text-field"
    {:-fx-prompt-text-fill "rgb(180, 180, 180)"}
    ".skylobby"
@@ -47,6 +51,8 @@
      {:-fx-text-fill "lightgrey"}}}})
 (def javafx-style-data
   {
+   ".styled-text-area"
+   {:-fx-background-color "rgb(255, 255, 255)"}
    ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"
@@ -70,7 +76,10 @@
 
 ; so that themes can override
 (def default-classes
-  {".skylobby"
+  {
+   ".styled-text-area"
+   {:-fx-background-color "rgb(50, 50, 50)"}
+   ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"
      {:-fx-icon-color "dimgrey"}}
