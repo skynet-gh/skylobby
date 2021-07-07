@@ -8,7 +8,8 @@
   (:import
     (javafx.beans.value ChangeListener)
     (javafx.scene Node)
-    (javafx.scene.control ScrollPane TableView TextArea)))
+    (javafx.scene.control ScrollPane TableView TextArea)
+    (org.fxmisc.flowless VirtualizedScrollPane)))
 
 
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
@@ -46,7 +47,7 @@
                            (some-> .getParent .layout)
                            (.setScrollTop scroll-pos)))))
                    fx.lifecycle/scalar
-                   :default ["" 0])}))
+                   :default ["" true])}))
 
 (def with-scroll-text-flow-prop
   (fx.lifecycle/make-ext-with-props
@@ -62,7 +63,19 @@
                              (some-> .getParent .layout)
                              (.setVvalue scroll-pos))))))
                    fx.lifecycle/scalar
-                   :default [[] 0])}))
+                   :default [[] true])}))
+
+(def ext-with-auto-scroll-virtual-prop
+  (fx.lifecycle/make-ext-with-props
+   fx.lifecycle/dynamic
+   {:auto-scroll (fx.prop/make
+                   (fx.mutator/setter
+                     (fn [^VirtualizedScrollPane scroll-pane _content]
+                       (let [ybar (nth (vec (.getChildrenUnmodifiable scroll-pane)) 2)]
+                         (when (> (.getValue ybar) (- (.getMax ybar) 100)) ; TODO fix
+                           (.scrollYBy scroll-pane ##Inf)))))
+                   fx.lifecycle/scalar
+                   :default ["" true])}))
 
 (defn fix-table-columns [^TableView table-view]
   (when table-view

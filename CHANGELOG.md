@@ -22,7 +22,7 @@ Future Features:
 - First run intro window
 - Highlight window and tabs when rang or new direct message
 - Add new butler downloader system
-- Chat URL highlighting, text selection
+- Chat URL highlighting and clicking
 - Zero-K server protocol
 - Merged view of multiple servers
 - Auto switch spring settings per server or per game
@@ -31,6 +31,14 @@ Future Features:
 
 
 ## Actual changelog
+
+### [0.4.0]
+
+- Select text in chat without mode change
+- Auto scroll chat when at bottom, lock when scrolling up
+- Add setting to hide player table columns
+- Unready after game ends
+- Add color to console
 
 ### [0.3.66]
 

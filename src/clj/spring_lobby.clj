@@ -136,7 +136,7 @@
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :use-git-mod-version :username])
 
@@ -203,6 +203,15 @@
     {:auto-get-resources true
      :battle-players-color-type "player"
      :disable-tasks-while-in-game true
+     :players-table-columns {:skill true
+                             :ally true
+                             :team true
+                             :color true
+                             :status true
+                             :spectator true
+                             :faction true
+                             :country true
+                             :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
@@ -909,7 +918,7 @@
                       "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
               (client-message client-data
-                (str "MYBATTLESTATUS " (handler/encode-battle-status new-battle-status) " " team-color))))))
+                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
@@ -1631,6 +1640,28 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn truncate-messages!
+  ([state-atom]
+   (truncate-messages! state-atom u/max-messages))
+  ([state-atom max-messages]
+   (log/info "Truncating message logs")
+   (swap! state-atom update :by-server
+     (fn [by-server]
+       (reduce-kv
+         (fn [m k v]
+           (assoc m k
+             (-> v
+                 (update :console-log (partial take max-messages))
+                 (update :channels
+                   (fn [channels]
+                     (reduce-kv
+                       (fn [m k v]
+                         (assoc m k (update v :messages (partial take max-messages))))
+                       {}
+                       channels))))))
+         {}
+         by-server)))))
+
 (defn- truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
@@ -1639,23 +1670,7 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
-            (log/info "Truncating message logs")
-            (swap! state-atom update :by-server
-              (fn [by-server]
-                (reduce-kv
-                  (fn [m k v]
-                    (assoc m k
-                      (-> v
-                          (update :console-log (partial take u/max-messages))
-                          (update :channels
-                            (fn [channels]
-                              (reduce-kv
-                                (fn [m k v]
-                                  (assoc m k (update v :messages (partial take u/max-messages))))
-                                {}
-                                channels))))))
-                  {}
-                  by-server))))
+            (truncate-messages! state-atom))
           {:error-handler
            (fn [e]
              (log/error e "Error truncating messages")
@@ -2328,7 +2343,7 @@
                    (assoc-in [:by-server :local :battle]
                              {:battle-id :singleplayer
                               :scripttags {:game {:startpostype 0}}
-                              :users {username {:battle-status (assoc handler/default-battle-status :mode true)
+                              :users {username {:battle-status (assoc cu/default-battle-status :mode true)
                                                 :team-color (first color/ffa-colors-spring)}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -2526,7 +2541,7 @@
     (try
       (let [existing-bots (keys (:bots battle))
             bot-username (available-name existing-bots bot-username)
-            status (assoc handler/default-battle-status
+            status (assoc cu/default-battle-status
                           :ready true
                           :mode true
                           :sync 1
@@ -2535,7 +2550,7 @@
                           :side (if (seq side-indices)
                                   (rand-nth side-indices)
                                   0))
-            bot-status (handler/encode-battle-status status)
+            bot-status (cu/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
         (if singleplayer
@@ -2814,7 +2829,7 @@
         (client-message client-data
           (str prefix
                " "
-               (handler/encode-battle-status battle-status)
+               (cu/encode-battle-status battle-status)
                " "
                team-color)))
       (let [data {:battle-status battle-status

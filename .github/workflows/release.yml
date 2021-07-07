@@ -14,9 +14,9 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.3
+      - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.849'
+          cli: '1.10.3.882'
       - run: clojure -M:uberjar:headless
       - uses: actions/upload-release-asset@v1.0.2
         env:
@@ -63,9 +63,9 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.3
+      - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.849'
+          cli: '1.10.3.882'
       - run: clojure -M:uberjar:headless
         #      - uses: actions/upload-release-asset@v1.0.2
         #        env:
