@@ -220,6 +220,10 @@
              (-> state
                  (assoc-in [:my-channels channel-name] {:server server}))))))
 
+(defmethod handle "JOINFAILED" [state-atom server-key m]
+  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
+    (swap! state-atom update-in [:by-server server-key :my-channels] dissoc channel-name)))
+
 (defmethod handle "JOINED" [state-atom server-url m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
     (swap! state-atom assoc-in [:by-server server-url :channels channel-name :users username] {})))
