@@ -21,14 +21,14 @@
 (def settings-window-keys
   [:auto-refresh-replays :chat-font-size :css :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
-   :music-dir :music-volume
+   :music-dir :music-volume :players-table-columns
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :use-git-mod-version])
 
 (defn settings-window-impl
   [{:keys [auto-refresh-replays chat-font-size css disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
-           music-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
+           music-volume players-table-columns screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
            use-git-mod-version]
     :as state}]
   {:fx/type :stage
@@ -310,6 +310,102 @@
                                fx.channel/default-font-size))
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :chat-font-size}}}]}
+           {:fx/type :label
+            :text " Battle Players Columns"
+            :style {:-fx-font-size 24}}
+           {:fx/type :v-box
+            :children
+            (let [{:keys [skill ally team color status spectator faction rank country bonus]} players-table-columns]
+              [{:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean skill)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :skill]}}
+                 {:fx/type :label
+                  :text " Skill"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean ally)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :ally]}}
+                 {:fx/type :label
+                  :text " Ally"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean team)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :team]}}
+                 {:fx/type :label
+                  :text " Team"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean color)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :color]}}
+                 {:fx/type :label
+                  :text " Color"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean status)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :status]}}
+                 {:fx/type :label
+                  :text " Status"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean spectator)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :spectator]}}
+                 {:fx/type :label
+                  :text " Spectator"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean faction)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :faction]}}
+                 {:fx/type :label
+                  :text " Faction"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean rank)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :rank]}}
+                 {:fx/type :label
+                  :text " Rank"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean country)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :country]}}
+                 {:fx/type :label
+                  :text " Country"}]}
+               {:fx/type :h-box
+                :children
+                [
+                 {:fx/type :check-box
+                  :selected (boolean bonus)
+                  :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                        :path [:players-table-columns :bonus]}}
+                 {:fx/type :label
+                  :text " Bonus"}]}])}
            {:fx/type :label
             :text " Music"
             :style {:-fx-font-size 24}}

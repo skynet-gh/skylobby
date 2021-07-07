@@ -1016,7 +1016,7 @@
      :importables-by-path
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
-     :parsed-replays-by-path :pop-out-chat :rapid-data-by-id :rapid-data-by-version
+     :parsed-replays-by-path :players-table-columns :pop-out-chat :rapid-data-by-id :rapid-data-by-version
      :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
      :tasks-by-type :username]
     fx.channel/channel-state-keys))
@@ -1032,7 +1032,7 @@
            channels chat-auto-scroll
            client-data drag-allyteam drag-team engines-by-version file-cache interleave-ally-player-ids
            map-input-prefix map-details
-           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name pop-out-chat server-key spring-isolation-dir spring-settings
+           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-chat server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -1129,6 +1129,7 @@
                        :host-username host-username
                        :indexed-mod indexed-mod
                        :players players
+                       :players-table-columns players-table-columns
                        :server-key server-key
                        :scripttags scripttags
                        :sides sides

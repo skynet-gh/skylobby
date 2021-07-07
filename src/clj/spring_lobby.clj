@@ -136,7 +136,7 @@
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :use-git-mod-version :username])
 
@@ -203,6 +203,15 @@
     {:auto-get-resources true
      :battle-players-color-type "player"
      :disable-tasks-while-in-game true
+     :players-table-columns {:skill true
+                             :ally true
+                             :team true
+                             :color true
+                             :status true
+                             :spectator true
+                             :faction true
+                             :country true
+                             :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers}
     (apply
