@@ -3,8 +3,6 @@
     byte-streams
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
-    [gloss.core :as gloss]
-    [gloss.io :as gio]
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
@@ -14,69 +12,20 @@
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
-  (:import
-    (java.nio ByteBuffer)))
+    [taoensso.timbre :as log]))
 
 
 (set! *warn-on-reflection* true)
 
 
-; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html#MYBATTLESTATUS:client
-(def default-battle-status
-  {:ready true
-   :ally 0
-   :handicap 0
-   :mode false
-   :sync 2 ; unsynced
-   :id 0
-   :side 0})
-
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
-
-(def battle-status-protocol
-  (gloss/compile-frame
-    (gloss/bit-map
-      :prefix 5
-      :side 3
-      :sync 2
-      :pad 4
-      :handicap 7
-      :mode 1
-      :ally 4
-      :id 4
-      :ready 1
-      :suffix 1)))
 
 
 (def default-scripttags ; TODO read these from lua in map, mod/game, and engine
   {:game
    {:startpostype 1
     :modoptions {}}})
-
-(defn decode-battle-status [status-str]
-  (dissoc
-    (gio/decode battle-status-protocol
-      (byte-streams/convert
-        (.array
-          (.putInt
-            (ByteBuffer/allocate (quot Integer/SIZE Byte/SIZE))
-            (Integer/parseInt status-str)))
-        ByteBuffer))
-    :prefix :pad :suffix))
-
-(defn encode-battle-status [battle-status]
-  (str
-    (.getInt
-      ^ByteBuffer
-      (gio/to-byte-buffer
-        (gio/encode battle-status-protocol
-          (assoc
-            (merge default-battle-status battle-status)
-            :prefix 0
-            :pad 0
-            :suffix 0))))))
 
 
 (defmulti handle
@@ -172,7 +121,7 @@
 
 (defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
-        decoded (decode-battle-status battle-status)]
+        decoded (cu/decode-battle-status battle-status)]
     (log/info "Updating status of" username "to" decoded "with color" team-color)
     (swap! state-atom update-in [:by-server server-url]
       (fn [server]
@@ -189,7 +138,7 @@
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
   (let [[_all battle-id username battle-status team-color] (re-find #"\w+ (\w+) ([^\s]+) (\w+) (\w+)" m)
-        decoded-status (decode-battle-status battle-status)
+        decoded-status (cu/decode-battle-status battle-status)
         bot-data {:battle-status decoded-status
                   :team-color team-color}]
     (swap! state-atom update-in [:by-server server-url]
@@ -388,7 +337,7 @@
         [_all ai-name _ ai-version] (parse-ai ai)
         bot {:bot-name bot-name
              :owner owner
-             :battle-status (decode-battle-status battle-status)
+             :battle-status (cu/decode-battle-status battle-status)
              :team-color team-color
              :ai-name ai-name
              :ai-version ai-version}]
@@ -447,7 +396,7 @@
         {:keys [battle-status]} (-> battle :users (get my-username))
         battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
         battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
-        new-battle-status (assoc (or battle-status default-battle-status)
+        new-battle-status (assoc (or battle-status cu/default-battle-status)
                             :id (battle/available-team-id battle)
                             :ally 0 ; (battle/available-ally battle)
                             :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
@@ -456,7 +405,7 @@
                                     (resource/sync-status server-data spring mod-details map-details)))
         color (or preferred-color (u/random-color))
         client (:client client-data)
-        msg (str "MYBATTLESTATUS " (encode-battle-status new-battle-status) " " color)]
+        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " color)]
     (message/send-message client msg)))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]

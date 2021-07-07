@@ -918,7 +918,7 @@
                       "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
               (client-message client-data
-                (str "MYBATTLESTATUS " (handler/encode-battle-status new-battle-status) " " team-color))))))
+                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
@@ -2343,7 +2343,7 @@
                    (assoc-in [:by-server :local :battle]
                              {:battle-id :singleplayer
                               :scripttags {:game {:startpostype 0}}
-                              :users {username {:battle-status (assoc handler/default-battle-status :mode true)
+                              :users {username {:battle-status (assoc cu/default-battle-status :mode true)
                                                 :team-color (first color/ffa-colors-spring)}}}))))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -2541,7 +2541,7 @@
     (try
       (let [existing-bots (keys (:bots battle))
             bot-username (available-name existing-bots bot-username)
-            status (assoc handler/default-battle-status
+            status (assoc cu/default-battle-status
                           :ready true
                           :mode true
                           :sync 1
@@ -2550,7 +2550,7 @@
                           :side (if (seq side-indices)
                                   (rand-nth side-indices)
                                   0))
-            bot-status (handler/encode-battle-status status)
+            bot-status (cu/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
         (if singleplayer
@@ -2829,7 +2829,7 @@
         (client-message client-data
           (str prefix
                " "
-               (handler/encode-battle-status battle-status)
+               (cu/encode-battle-status battle-status)
                " "
                team-color)))
       (let [data {:battle-status battle-status

@@ -357,7 +357,13 @@
                        (:client client-data)
                        (str "MYSTATUS "
                             (cu/encode-client-status
-                              (assoc my-client-status :ingame ingame)))))]
+                              (assoc my-client-status :ingame ingame))))
+                     (when-not ingame
+                       (when-let [me (-> state :battle :users (get username))]
+                         (let [{:keys [battle-status team-color]} me]
+                           (client/send-message
+                             (:client client-data)
+                             (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready false)) " " team-color))))))]
     (try
       (when (:auto-backup spring-settings)
         (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
