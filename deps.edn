@@ -7,8 +7,8 @@
   byte-streams/byte-streams {:mvn/version "0.2.4"}
   cheshire/cheshire {:mvn/version  "5.10.0"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
-  clj-http/clj-http {:mvn/version "3.12.1"}
-  cljfx/cljfx {:mvn/version "1.7.13"}
+  clj-http/clj-http {:mvn/version "3.12.3"}
+  cljfx/cljfx {:mvn/version "1.7.14"}
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
@@ -17,7 +17,7 @@
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
   com.taoensso/timbre {:mvn/version "5.1.2"}
   com.taoensso/tufte {:mvn/version "2.2.0"}
-  commons-io/commons-io {:mvn/version "2.8.0"}
+  commons-io/commons-io {:mvn/version "2.10.0"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
   diehard/diehard {:mvn/version "0.10.3"}
@@ -43,9 +43,9 @@
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.2.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-swing {:mvn/version "15.0.1"}
-  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.30"}
-  org.slf4j/jul-to-slf4j {:mvn/version "1.7.30"}
-  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.30"}
+  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.31"}
+  org.slf4j/jul-to-slf4j {:mvn/version "1.7.31"}
+  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.31"}
   ring/ring-core {:mvn/version "1.9.3"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
@@ -62,7 +62,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.935"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -82,7 +82,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.935"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -99,7 +99,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.11.922"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.11.935"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -126,5 +126,5 @@
   {:extra-deps
    {com.cognitect/test-runner
     {:git/url "https://github.com/cognitect-labs/test-runner"
-     :sha "2d69f33d7980c3353b246c28f72ffeafbd9f2fab"}}
+     :sha "f597341b6ca7bb4cf027e0a34a6710ca9cb969da"}}
    :main-opts ["-m" "cognitect.test-runner" "-d" "test/clj"]}}}
