@@ -32,6 +32,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.1]
+
+- Scroll chat and console to bottom on create
+- Make auto scroll threshold based on component height
+- Fix replay players table columns
+- Add color to replay chat log
+
 ### [0.4.0]
 
 - Select text in chat without mode change

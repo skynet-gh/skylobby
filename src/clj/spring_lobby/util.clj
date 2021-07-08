@@ -498,3 +498,8 @@
        (filter #{"matchmaking"})
        seq
        boolean))
+
+
+(defn remove-nonprintable [s]
+  (when s
+    (string/replace s #"\P{Print}" "")))

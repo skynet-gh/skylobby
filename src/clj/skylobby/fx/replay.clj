@@ -15,6 +15,8 @@
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.players-table :as fx.players-table]
+    [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -25,7 +27,9 @@
     [taoensso.tufte :as tufte])
   (:import
     (java.time LocalDateTime)
-    (java.util TimeZone)))
+    (java.util TimeZone)
+    (javafx.scene.paint Color)
+    (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
 (def replay-window-width 1600)
@@ -75,30 +79,87 @@
   (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
 
 ; https://github.com/Jazcash/sdfz-demo-parser/blob/a4391f14ee4bc08aedb5434d66cf99ad94913597/src/demo-parser.ts#L233
-(defn- format-chat-dest [dest]
-  (let [dest-type (case dest
-                    252 :ally
-                    253 :spec
-                    254 :global
-                    :self)]
-    (when (and (not= :global dest-type)
-               (not= :self dest-type))
-      (str " ("
-           (if (= :ally dest-type)
-             "a"
-             "s")
-           ")"))))
+(defn- format-chat-dest [dest-type]
+  (when (and (not= :global dest-type)
+             (not= :self dest-type))
+    (str " ("
+         (if (= :ally dest-type)
+           "a"
+           "s")
+         ")")))
+
+(defn- chat-dest-color [dest-type]
+  (case dest-type
+    :ally "green"
+    :spec "yellow"
+    :global "white"
+    "grey"))
+
+
+(defn segment
+  [text style]
+  (StyledSegment.
+    (or text "")
+    (or style "")))
+
+(defn chat-log-document [chat-log {:keys [player-name-to-color player-num-to-name]}]
+  (let [
+        builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+    (doseq [chat chat-log]
+      (let [{:keys [from dest message]} chat
+            player (get player-num-to-name from)
+            color (get player-name-to-color player)
+            javafx-color (if color
+                           (u/spring-color-to-javafx color)
+                           Color/YELLOW)
+            css-color (some-> javafx-color str u/hex-color-to-css)
+            is-spec (and (not (string/blank? player)) (not color))
+            dest-type (case dest
+                        252 :ally
+                        253 :spec
+                        254 :global
+                        :self)
+            dest-type (if (and is-spec (= :ally dest-type)) :spec dest-type)]
+        (.addParagraph builder
+          ^java.util.List
+          (vec
+            (concat
+              [
+               (segment
+                 (str
+                   (when is-spec
+                     "(s) ")
+                   player)
+                 (str "-fx-fill: " css-color ";"))
+               (segment
+                 (format-chat-dest dest-type)
+                 (str "-fx-fill: " (chat-dest-color dest-type) ";"))
+               (segment
+                 (str
+                   (if (string/blank? player) "*" ":")
+                   " "
+                   message)
+                 (str "-fx-fill: "
+                      (if (string/blank? player)
+                        "cyan"
+                        (if (= :spec dest-type)
+                          "yellow"
+                          "white"))
+                      ";"))]))
+          "")))
+    (when (seq chat-log)
+      (.build builder))))
 
 
 (def replay-view-keys
   [:battle-players-color-type :copying :downloadables-by-url :extracting :file-cache :gitting
-   :http-download :importables-by-path :map-details :mod-details :rapid-data-by-version
+   :http-download :importables-by-path :map-details :mod-details :players-table-columns :rapid-data-by-version
    :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
    :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods])
 
 (defn replay-view
   [{:keys [battle-players-color-type download-tasks engines engines-by-version file-cache import-tasks
-           maps-by-version map-details mods-by-version mod-details mod-update-tasks replay-details
+           maps-by-version map-details mods-by-version mod-details mod-update-tasks players-table-columns replay-details
            replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
            tasks-by-type]
     :as state}]
@@ -165,6 +226,12 @@
                                     :side (get side-id-by-name side)
                                     :ally allyteam}
                                    :team-color team-color))))))
+        players-and-bots (concat players bots)
+        player-name-to-color (->> players-and-bots
+                                  (filter :username)
+                                  (filter :team-color)
+                                  (map (juxt (comp string/trim :username) :team-color))
+                                  (into {}))
         indexed-map (get maps-by-version mapname)
         replay-map-details (resource/cached-details map-details indexed-map)
         engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
@@ -230,10 +297,12 @@
     {:fx/type :h-box
      :alignment :center-left
      :children
-     (concat
+     [{:fx/type :split-pane
+       :h-box/hgrow :always
+       :divider-positions [0.70]
+       :items
        [
         {:fx/type :v-box
-         :h-box/hgrow :always
          :children
          (concat
            [{:fx/type fx.players-table/players-table
@@ -241,7 +310,8 @@
              :am-host false
              :battle-modname gametype
              :battle-players-color-type battle-players-color-type
-             :players (concat players bots)
+             :players players-and-bots
+             :players-table-columns players-table-columns
              :sides sides
              :singleplayer true}
             {:fx/type :h-box
@@ -273,8 +343,8 @@
                  [watch-button
                   {:fx/type :pane
                    :h-box/hgrow :always}
-                  watch-button]}])))}]
-       [{:fx/type :v-box
+                  watch-button]}])))}
+        {:fx/type :v-box
          :children
          (concat
            (when show-sync-left
@@ -286,60 +356,60 @@
                                            (map (comp :demo-stream-chunk :body))
                                            (filter (comp #{6} :command :header))
                                            (map :body)
-                                           (map (juxt :player-num :player-name))
+                                           (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
                                            (into {}))]
                [{:fx/type :label
-                 :text "Chat log"}
-                {:fx/type :text-area
+                 :text "Chat log"
+                 :style {:-fx-font-size 20}}
+                {:fx/type fx.virtualized-scroll-pane/lifecycle
                  :v-box/vgrow :always
-                 :editable false
-                 :text
-                 (->> details
-                      :body
-                      :demo-stream
-                      (map (comp :demo-stream-chunk :body))
-                      (filter (comp #{7} :command :header))
-                      (map :body)
-                      (remove (comp #(string/starts-with? % "My player ID is") :message))
-                      (map
-                        (fn [{:keys [from dest message]}]
+                 :content
+                 {:fx/type fx.rich-text/lifecycle-inline
+                  :editable false
+                  :style {:-fx-font-family skylobby.fx/monospace-font-family
+                          :-fx-font-size 18}
+                  :wrap-text true
+                  :document (chat-log-document
+                              (->> details
+                                   :body
+                                   :demo-stream
+                                   (map (comp :demo-stream-chunk :body))
+                                   (filter (comp #{7} :command :header))
+                                   (map :body)
+                                   (remove (comp #(string/starts-with? % "My player ID is") :message)))
+                              {:player-name-to-color player-name-to-color
+                               :player-num-to-name player-num-to-name})}}])
+             [{:fx/type :label
+               :text "Loading replay stream..."}]))}]}
+      {:fx/type :v-box
+       :children
+       (concat
+         [
+          {:fx/type fx.minimap/minimap-pane
+           :map-name mapname
+           :map-details replay-map-details
+           :minimap-type replay-minimap-type
+           :minimap-type-key :replay-minimap-type
+           :scripttags script-data}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text (str " Size: "
+                        (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
                           (str
-                            (get player-num-to-name from)
-                            (format-chat-dest dest)
-                            ": "
-                            message)))
-                      (string/join "\n"))}])
-             [{:fx/type :label
-               :text "Loading replay stream..."}]))}]
-       [{:fx/type :v-box
-         :children
-         (concat
-           [
-            {:fx/type fx.minimap/minimap-pane
-             :map-name mapname
-             :map-details replay-map-details
-             :minimap-type replay-minimap-type
-             :minimap-type-key :replay-minimap-type
-             :scripttags script-data}
-            {:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text (str " Size: "
-                          (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
-                            (str
-                              (when map-width (quot map-width 64))
-                              " x "
-                              (when map-height (quot map-height 64)))))}
-              {:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type :combo-box
-               :value replay-minimap-type
-               :items minimap-types
-               :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :replay-minimap-type}}]}]
-           (when show-sync
-             [sync-pane]))}])}))
+                            (when map-width (quot map-width 64))
+                            " x "
+                            (when map-height (quot map-height 64)))))}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :combo-box
+             :value replay-minimap-type
+             :items minimap-types
+             :on-value-changed {:event/type :spring-lobby/assoc
+                                :key :replay-minimap-type}}]}]
+         (when show-sync
+           [sync-pane]))}]}))
 
 
 (def replay-id

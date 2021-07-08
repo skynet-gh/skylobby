@@ -71,11 +71,22 @@
    {:auto-scroll (fx.prop/make
                    (fx.mutator/setter
                      (fn [^VirtualizedScrollPane scroll-pane _content]
-                       (let [ybar (nth (vec (.getChildrenUnmodifiable scroll-pane)) 2)]
-                         (when (> (.getValue ybar) (- (.getMax ybar) 100)) ; TODO fix
+                       (let [[_ _ ybar] (vec (.getChildrenUnmodifiable scroll-pane))
+                             threshold (quot (.getHeight ybar) 2)]
+                         (when (> (.getValue ybar) (- (.getMax ybar) threshold))
                            (.scrollYBy scroll-pane ##Inf)))))
                    fx.lifecycle/scalar
                    :default ["" true])}))
+
+; figure out layout on create
+(defn ext-scroll-on-create [{:keys [desc]}]
+  {:fx/type fx/ext-on-instance-lifecycle
+   :on-created (fn [^VirtualizedScrollPane scroll-pane]
+                 (.layout scroll-pane)
+                 (some-> scroll-pane .getParent .layout)
+                 (.scrollYBy scroll-pane ##Inf))
+   :desc desc})
+
 
 (defn fix-table-columns [^TableView table-view]
   (when table-view
@@ -100,14 +111,6 @@
   {:fx/type with-layout-on-items-prop
    :props {:items items}
    :desc desc})
-
-
-; figure out layout on create
-#_
-{:fx/type fx/ext-on-instance-lifecycle
- :on-created (fn [^TableView table-view]
-               (Platform/runLater (fn [] (fix-table-columns table-view))))
- :desc desc}
 
 
 ; https://github.com/cljfx/cljfx/issues/94#issuecomment-691708477
