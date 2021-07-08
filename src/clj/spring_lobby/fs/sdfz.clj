@@ -112,7 +112,7 @@
          (into (sorted-map)))))
 
 (defn sanitize-replay-engine [replay-engine-version]
-  (some-> replay-engine-version (string/replace #"\P{Print}" "") string/trim fs/sync-version-to-engine-version))
+  (some-> replay-engine-version u/remove-nonprintable string/trim fs/sync-version-to-engine-version))
 
 (defn decode-replay
   ([^java.io.File f]
