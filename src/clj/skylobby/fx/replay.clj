@@ -92,13 +92,13 @@
 
 (def replay-view-keys
   [:battle-players-color-type :copying :downloadables-by-url :extracting :file-cache :gitting
-   :http-download :importables-by-path :map-details :mod-details :rapid-data-by-version
+   :http-download :importables-by-path :map-details :mod-details :players-table-columns :rapid-data-by-version
    :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
    :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods])
 
 (defn replay-view
   [{:keys [battle-players-color-type download-tasks engines engines-by-version file-cache import-tasks
-           maps-by-version map-details mods-by-version mod-details mod-update-tasks replay-details
+           maps-by-version map-details mods-by-version mod-details mod-update-tasks players-table-columns replay-details
            replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
            tasks-by-type]
     :as state}]
@@ -242,6 +242,7 @@
              :battle-modname gametype
              :battle-players-color-type battle-players-color-type
              :players (concat players bots)
+             :players-table-columns players-table-columns
              :sides sides
              :singleplayer true}
             {:fx/type :h-box
