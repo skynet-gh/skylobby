@@ -2,7 +2,7 @@
   (:require
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-with-auto-scroll-virtual-prop with-scroll-text-prop with-scroll-text-flow-prop]]
+    [skylobby.fx.ext :refer [ext-scroll-on-create ext-with-auto-scroll-virtual-prop with-scroll-text-prop with-scroll-text-flow-prop]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
@@ -159,13 +159,15 @@
   {:fx/type ext-with-auto-scroll-virtual-prop
    :props {:auto-scroll messages}
    :desc
-   {:fx/type fx.virtualized-scroll-pane/lifecycle
-    :content
-    {:fx/type fx.rich-text/lifecycle
-     :editable false
-     :style (text-style chat-font-size)
-     :wrap-text true
-     :document (channel-document (reverse messages))}}})
+   {:fx/type ext-scroll-on-create
+    :desc
+    {:fx/type fx.virtualized-scroll-pane/lifecycle
+     :content
+     {:fx/type fx.rich-text/lifecycle
+      :editable false
+      :style (text-style chat-font-size)
+      :wrap-text true
+      :document (channel-document (reverse messages))}}}})
 
 (defn channel-view-history
   [state]

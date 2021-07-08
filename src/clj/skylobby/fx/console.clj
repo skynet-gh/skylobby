@@ -3,7 +3,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.ext :refer [ext-with-auto-scroll-virtual-prop with-scroll-text-prop]]
+    [skylobby.fx.ext :refer [ext-scroll-on-create ext-with-auto-scroll-virtual-prop with-scroll-text-prop]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -121,14 +121,16 @@
      :v-box/vgrow :always
      :props {:auto-scroll console-log}
      :desc
-     {:fx/type fx.virtualized-scroll-pane/lifecycle
-      :content
-      {:fx/type fx.rich-text/lifecycle
-       :editable false
-       :style {:-fx-font-family skylobby.fx/monospace-font-family
-               :-fx-font-size default-font-size}
-       :wrap-text true
-       :document (console-document (reverse console-log))}}}
+     {:fx/type ext-scroll-on-create
+      :desc
+      {:fx/type fx.virtualized-scroll-pane/lifecycle
+       :content
+       {:fx/type fx.rich-text/lifecycle
+        :editable false
+        :style {:-fx-font-family skylobby.fx/monospace-font-family
+                :-fx-font-size default-font-size}
+        :wrap-text true
+        :document (console-document (reverse console-log))}}}}
     {:fx/type :h-box
      :alignment :center-left
      :children
