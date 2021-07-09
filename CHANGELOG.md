@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.3]
+
+- Fix game specific settings backup and restore
+- Fix replay chat spec player colors
+
 ### [0.4.2]
 
 - Add option to auto backup/restore Spring settings by game type
