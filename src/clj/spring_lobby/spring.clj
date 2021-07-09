@@ -325,7 +325,10 @@
         :does-not-exist))
     (catch Exception e
       (log/warn e "Error copying spring settings" path "from" source-dir "to" dest-dir)
-      :error)))
+      :error)
+    (catch Throwable t
+      (log/warn t "Error copying spring settings" path "from" source-dir "to" dest-dir)
+      (throw t))))
 
 (defn delete-spring-setting [dir path]
   (try
@@ -343,6 +346,7 @@
 (defn copy-spring-settings [source-dir dest-dir]
   (->> spring-settings-paths
        (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
+       doall
        (into {})))
 
 (defn delete-spring-settings [dir]
@@ -389,16 +393,21 @@
         (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
               dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
           (log/info "Backing up Spring settings to" dest-dir)
-          (copy-spring-settings spring-isolation-dir dest-dir)))
+          (let [res (copy-spring-settings spring-isolation-dir dest-dir)]
+            (log/info "Copied Spring settings" res))))
       (when (:game-specific spring-settings)
         (log/info "Backing up game specific settings")
         (if-let [game-type (-> state :battle-mod-details :mod-name-only)]
           (do
             (log/info "Game type" game-type)
-            (delete-spring-settings spring-isolation-dir)
             (let [source-dir (fs/file (fs/spring-settings-root) game-type)]
-              (log/info "Restoring game Spring settings from" source-dir)
-              (copy-spring-settings source-dir spring-isolation-dir)))
+              (if (fs/exists? source-dir)
+                (do
+                  (delete-spring-settings spring-isolation-dir)
+                  (log/info "Restoring game Spring settings from" source-dir)
+                  (let [res (copy-spring-settings source-dir spring-isolation-dir)]
+                    (log/info "Copied Spring settings" res)))
+                (log/info "Game specific settings do not exist, skipping"))))
           (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state))))))
       (log/info "Starting game")
       (set-ingame true)
@@ -443,13 +452,23 @@
                       (recur))
                     (log/info "Spring stderr stream closed")))))
             (future
-              (.waitFor process)
-              (set-ingame false)
-              (when (:game-specific spring-settings)
-                (when-let [game-type (-> state :battle-mod-details :mod-name-only)]
-                  (let [dest-dir (fs/file (fs/spring-settings-root) game-type)]
-                    (log/info "Backing up Spring settings to" dest-dir)
-                    (copy-spring-settings spring-isolation-dir dest-dir))))))))
+              (try
+                (.waitFor process)
+                (set-ingame false)
+                (when (:game-specific spring-settings)
+                  (if-let [game-type (-> state :battle-mod-details :mod-name-only)]
+                    (do
+                      (log/info "Game type" game-type)
+                      (let [dest-dir (fs/file (fs/spring-settings-root) game-type)]
+                        (log/info "Backing up Spring settings to" dest-dir)
+                        (let [res (copy-spring-settings spring-isolation-dir dest-dir)]
+                          (log/info "Copied Spring settings" res))))
+                    (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state))))))
+                (catch Exception e
+                  (log/error e "Error waiting for Spring to close"))
+                (catch Throwable t
+                  (log/error t "Fatal error waiting for Spring to close")
+                  (throw t)))))))
       (catch Exception e
         (log/error e "Error starting game")
         (set-ingame false)))))
