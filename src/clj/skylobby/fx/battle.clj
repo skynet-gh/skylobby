@@ -860,14 +860,19 @@
                  :text "Spring settings"}
        :closable false
        :content
-       (let [{:keys [auto-backup backup-name confirmed results]} spring-settings
+       (let [{:keys [auto-backup backup-name confirmed game-specific results]} spring-settings
              spring-settings-dir (fs/spring-settings-root)
              dest-dir (when-not (string/blank? backup-name)
                         (fs/file spring-settings-dir backup-name))]
          {:fx/type :v-box
           :children
-          [{:fx/type :label
-            :text (str spring-isolation-dir)}
+          [
+           {:fx/type :label
+            :text " Auto Manage "
+            :style {:-fx-font-size 20}}
+           {:fx/type :pane
+            :style {:-fx-min-height 20
+                    :-fx-pref-height 20}}
            {:fx/type :label
             :text " Includes springsettings.cfg, LuiUI/Config, and uikeys.txt"}
            {:fx/type :h-box
@@ -881,6 +886,7 @@
              {:fx/type :label
               :text " Auto Backup "}]}
            {:fx/type :label
+            :min-height :use-pref-size
             :wrap-text true
             :text (str " If enabled, will copy these files into a backup folder in "
                        spring-settings-dir
@@ -888,8 +894,29 @@
            {:fx/type :pane
             :style {:-fx-margin-top 8
                     :-fx-margin-bottom 8}}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean game-specific)
+              :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                    :path [:spring-settings :game-specific]}}
+             {:fx/type :label
+              :text " Game specific settings"}]}
            {:fx/type :label
-            :text " Manual Backup: "}
+            :min-height :use-pref-size
+            :wrap-text true
+            :text (str " If enabled, will copy these files from a game specific folder in "
+                       spring-settings-dir
+                       " before Spring is run, and save them there after Spring exits."
+                       " May cause issues running multiple instances of Spring at once.")}
+           {:fx/type :pane
+            :style {:-fx-min-height 40
+                    :-fx-pref-height 40}}
+           {:fx/type :label
+            :text " Manual Backup "
+            :style {:-fx-font-size 20}}
            {:fx/type :h-box
             :alignment :center-left
             :children
@@ -930,8 +957,11 @@
                               :error "errored"
                               "unknown"))})
               (get results (fs/canonical-path spring-isolation-dir)))}
+           {:fx/type :pane
+            :style {:-fx-min-height 40
+                    :-fx-pref-height 40}}
            {:fx/type :label
-            :text " Restore"
+            :text " Restore "
             :style {:-fx-font-size 20}}
            {:fx/type :h-box
             :alignment :center-left
