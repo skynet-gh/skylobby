@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.2]
+
+- Add option to auto backup/restore Spring settings by game type
+
 ### [0.4.1]
 
 - Scroll chat and console to bottom on create
