@@ -230,6 +230,7 @@
         player-name-to-color (->> players-and-bots
                                   (filter :username)
                                   (filter :team-color)
+                                  (filter (comp :mode :battle-status))
                                   (map (juxt (comp string/trim :username) :team-color))
                                   (into {}))
         indexed-map (get maps-by-version mapname)
