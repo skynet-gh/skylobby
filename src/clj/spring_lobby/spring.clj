@@ -8,6 +8,7 @@
     [clojure.string :as string]
     [clojure.walk]
     [com.evocomputing.colors :as colors]
+    [me.raynes.fs :as raynes-fs]
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
@@ -326,9 +327,28 @@
       (log/warn e "Error copying spring settings" path "from" source-dir "to" dest-dir)
       :error)))
 
+(defn delete-spring-setting [dir path]
+  (try
+    (log/info "Deleting spring setting" path "in" dir)
+    (let [f (apply io/file dir path)]
+      (if (fs/exists? f)
+        (do
+          (raynes-fs/delete f)
+          :deleted)
+        :does-not-exist))
+    (catch Exception e
+      (log/warn e "Error deleting spring settings" path "from" dir)
+      :error)))
+
 (defn copy-spring-settings [source-dir dest-dir]
   (->> spring-settings-paths
        (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
+       (into {})))
+
+(defn delete-spring-settings [dir]
+  (log/info "Deleting spring settings in" dir)
+  (->> spring-settings-paths
+       (map (juxt identity (partial delete-spring-setting dir)))
        (into {})))
 
 (defn start-game
@@ -370,6 +390,16 @@
               dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
           (log/info "Backing up Spring settings to" dest-dir)
           (copy-spring-settings spring-isolation-dir dest-dir)))
+      (when (:game-specific spring-settings)
+        (log/info "Backing up game specific settings")
+        (if-let [game-type (-> state :battle-mod-details :mod-name-only)]
+          (do
+            (log/info "Game type" game-type)
+            (delete-spring-settings spring-isolation-dir)
+            (let [source-dir (fs/file (fs/spring-settings-root) game-type)]
+              (log/info "Restoring game Spring settings from" source-dir)
+              (copy-spring-settings source-dir spring-isolation-dir)))
+          (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state))))))
       (log/info "Starting game")
       (set-ingame true)
       (let [{:keys [battle-version]} (battle-details state)
@@ -414,7 +444,12 @@
                     (log/info "Spring stderr stream closed")))))
             (future
               (.waitFor process)
-              (set-ingame false)))))
+              (set-ingame false)
+              (when (:game-specific spring-settings)
+                (when-let [game-type (-> state :battle-mod-details :mod-name-only)]
+                  (let [dest-dir (fs/file (fs/spring-settings-root) game-type)]
+                    (log/info "Backing up Spring settings to" dest-dir)
+                    (copy-spring-settings spring-isolation-dir dest-dir))))))))
       (catch Exception e
         (log/error e "Error starting game")
         (set-ingame false)))))
