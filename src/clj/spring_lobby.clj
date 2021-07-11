@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-refresh-replays :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
+  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
@@ -1670,7 +1670,9 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
-            (truncate-messages! state-atom))
+            (if false
+              (truncate-messages! state-atom)
+              (log/info "Skipping message truncate")))
           {:error-handler
            (fn [e]
              (log/error e "Error truncating messages")
