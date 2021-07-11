@@ -138,7 +138,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :use-git-mod-version :username])
+   :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
 
 
 (defn- select-config [state]
