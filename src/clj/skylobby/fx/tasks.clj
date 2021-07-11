@@ -11,10 +11,10 @@
 (def tasks-window-height 1000)
 
 (def tasks-window-keys
-  [:css :current-tasks :disable-tasks-while-in-game :show-tasks-window :tasks-by-kind])
+  [:css :current-tasks :disable-tasks :disable-tasks-while-in-game :show-tasks-window :tasks-by-kind])
 
 (defn tasks-window-impl
-  [{:keys [css current-tasks disable-tasks-while-in-game screen-bounds show-tasks-window tasks-by-kind]}]
+  [{:keys [css current-tasks disable-tasks disable-tasks-while-in-game screen-bounds show-tasks-window tasks-by-kind]}]
   (let [{:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-tasks-window)
@@ -33,6 +33,16 @@
          :style {:-fx-font-size 16}
          :children
          [
+          {:fx/type :h-box
+           :style {:-fx-font-size 18}
+           :children
+           [
+            {:fx/type :check-box
+             :selected (boolean disable-tasks)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :disable-tasks}}
+            {:fx/type :label
+             :text " Disable tasks"}]}
           {:fx/type :h-box
            :style {:-fx-font-size 18}
            :children

@@ -1040,9 +1040,9 @@
              (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (let [{:keys [by-server disable-tasks-while-in-game]} @state-atom
+             (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
                    in-any-game (some (comp :ingame my-client-status second) by-server)]
-               (if (and disable-tasks-while-in-game in-any-game)
+               (if (or disable-tasks (and disable-tasks-while-in-game in-any-game))
                  (log/debug "Skipping task handler while in game")
                  (handle-task! state-atom task-kind))))
            {:error-handler
