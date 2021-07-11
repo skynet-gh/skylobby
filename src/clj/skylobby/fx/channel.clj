@@ -125,7 +125,8 @@
 
 (defn channel-document
   [messages]
-  (let [builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+  (let [
+        builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
     (doseq [message messages]
       (let [{:keys [ex text timestamp username]} message]
         (.addParagraph builder

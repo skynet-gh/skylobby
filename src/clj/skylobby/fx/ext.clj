@@ -72,7 +72,7 @@
                    (fx.mutator/setter
                      (fn [^VirtualizedScrollPane scroll-pane _content]
                        (let [[_ _ ybar] (vec (.getChildrenUnmodifiable scroll-pane))
-                             threshold (quot (.getHeight ybar) 2)]
+                             threshold (.getHeight ybar)]
                          (when (> (.getValue ybar) (- (.getMax ybar) threshold))
                            (.scrollYBy scroll-pane ##Inf)))))
                    fx.lifecycle/scalar

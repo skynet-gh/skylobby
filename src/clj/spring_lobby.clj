@@ -132,13 +132,13 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-refresh-replays :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
+  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :use-git-mod-version :username])
+   :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
 
 
 (defn- select-config [state]
@@ -1040,9 +1040,9 @@
              (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
-             (let [{:keys [by-server disable-tasks-while-in-game]} @state-atom
+             (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
                    in-any-game (some (comp :ingame my-client-status second) by-server)]
-               (if (and disable-tasks-while-in-game in-any-game)
+               (if (or disable-tasks (and disable-tasks-while-in-game in-any-game))
                  (log/debug "Skipping task handler while in game")
                  (handle-task! state-atom task-kind))))
            {:error-handler
@@ -1670,7 +1670,9 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
-            (truncate-messages! state-atom))
+            (if false
+              (truncate-messages! state-atom)
+              (log/info "Skipping message truncate")))
           {:error-handler
            (fn [e]
              (log/error e "Error truncating messages")
