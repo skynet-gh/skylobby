@@ -32,6 +32,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.4]
+
+- Fix performance issue with chat and console
+- Make unready after game a setting
+- Fix battle layout and player colors settings not saved
+
 ### [0.4.3]
 
 - Fix game specific settings backup and restore
