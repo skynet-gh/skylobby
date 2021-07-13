@@ -377,13 +377,12 @@
                            (swap! state-atom assoc :music-paused false))
                          (when (and ingame (not media-player))
                            (log/info "No media player to resume"))))
-                     (when (:unready-after-game state)
-                       (client/send-message
-                         (:client client-data)
-                         (str "MYSTATUS "
-                              (cu/encode-client-status
-                                (assoc my-client-status :ingame ingame)))))
-                     (when-not ingame
+                     (client/send-message
+                       (:client client-data)
+                       (str "MYSTATUS "
+                            (cu/encode-client-status
+                              (assoc my-client-status :ingame ingame))))
+                     (when (and (not ingame) (:unready-after-game state))
                        (when-let [me (-> state :battle :users (get username))]
                          (let [{:keys [battle-status team-color]} me]
                            (client/send-message
