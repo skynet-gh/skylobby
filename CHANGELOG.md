@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.5]
+
+- Fix unready after game setting
+- Stop sending !joinas spec for most servers
+
 ### [0.4.4]
 
 - Fix performance issue with chat and console
