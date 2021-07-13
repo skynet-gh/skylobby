@@ -2596,11 +2596,14 @@
   (future
     (try
       (when-not (:mode battle-status)
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!joinas spec")})
+        (if (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
+                (string/starts-with? (:server-url client-data) "road-flag.bnr.la"))
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!joinas spec")})
+          (log/info "Skipping !joinas spec for this server"))
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
         (spring/start-game *state state)
