@@ -5,7 +5,7 @@
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
   byte-streams/byte-streams {:mvn/version "0.2.4"}
-  cheshire/cheshire {:mvn/version  "5.10.0"}
+  cheshire/cheshire {:mvn/version  "5.10.1"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
   cljfx/cljfx {:mvn/version "1.7.14"}
@@ -32,26 +32,26 @@
   me.raynes/fs {:mvn/version "1.4.6"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-  org.clojure/core.cache {:mvn/version "1.0.207"}
+  org.clojure/core.cache {:mvn/version "1.0.217"}
   org.clojure/clojure {:mvn/version "1.10.3"}
   org.clojure/core.async {:mvn/version "1.3.618"}
   org.clojure/spec.alpha {:mvn/version "0.2.194"}
   org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
-  org.fxmisc.flowless/flowless {:mvn/version "0.6.4"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.6.5"}
   org.fxmisc.richtext/richtextfx {:mvn/version "0.10.6"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.2.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.2.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
   org.openjfx/javafx-swing {:mvn/version "15.0.1"}
-  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.31"}
-  org.slf4j/jul-to-slf4j {:mvn/version "1.7.31"}
-  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.31"}
-  ring/ring-core {:mvn/version "1.9.3"}
+  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
+  org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
+  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}
+  ring/ring-core {:mvn/version "1.9.4"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
-  version-clj/version-clj {:mvn/version "2.0.1"}}
+  version-clj/version-clj {:mvn/version "2.0.2"}}
  :aliases
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
@@ -64,7 +64,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.985"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1019"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
@@ -84,12 +84,12 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.985"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1019"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.4.4"}
     seancorfield/depstar {:mvn/version "1.1.136"}
-    vlaaad/reveal {:mvn/version "1.3.209"}}
+    vlaaad/reveal {:mvn/version "1.3.212"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-refresh
@@ -101,7 +101,7 @@
   {:extra-paths ["dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.985"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1019"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha

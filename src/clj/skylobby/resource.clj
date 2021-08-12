@@ -77,18 +77,34 @@
              (= (normalize-map map-name)
                 (normalize-map resource-filename))))))
 
+(defn remove-v-before-number [s]
+  (when s
+    (string/replace s #"v(\d+)" "$1")))
+
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
       string/lower-case
       (string/replace #"\s+" "_")
       (string/replace #"-" "_")
-      (string/replace #"\.sd[7z]$" "")))
+      (string/replace #"\.sd[7z]$" "")
+      remove-v-before-number))
 
 (defn normalize-mod-harder [mod-name-or-filename]
   (-> mod-name-or-filename
       string/lower-case
       (string/replace #"\.sd[7z]$" "")
-      (string/replace #"[-_\.\s+]" "")))
+      (string/replace #"[-_\.\s+]" "")
+      remove-v-before-number))
+
+(def mod-aliases
+  {"Total Atomization Prime" "TAPrime"})
+
+(defn replace-all [s rs]
+  (reduce
+    (fn [s [k v]]
+      (string/replace s k v))
+    s
+    rs))
 
 (defn could-be-this-mod?
   "Returns true if this resource might be the mod with the given name, by magic, false otherwise."
@@ -100,7 +116,9 @@
                (= (normalize-mod mod-name)
                   (normalize-mod resource-filename))
                (= (normalize-mod-harder mod-name)
-                  (normalize-mod-harder resource-filename)))))))
+                  (normalize-mod-harder resource-filename))
+               (= (normalize-mod (replace-all mod-name mod-aliases))
+                  (normalize-mod (replace-all resource-filename mod-aliases))))))))
 
 (defn same-resource-file? [resource1 resource2]
   (boolean
