@@ -25,11 +25,11 @@ jobs:
       - uses: actions/checkout@v2
       - uses: DeLaGuardo/setup-graalvm@4.0
         with:
-          graalvm-version: '21.1.0'
+          graalvm-version: 'vm-21.2.0'
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.905'
+          cli: '1.10.3.943'
 
       - run: clojure -M:test:headless:runner
 
@@ -43,11 +43,11 @@ jobs:
       - uses: actions/checkout@v2
       - uses: DeLaGuardo/setup-graalvm@4.0
         with:
-          graalvm-version: '21.1.0'
+          graalvm-version: 'vm-21.2.0'
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.905'
+          cli: '1.10.3.943'
 
       - run: clojure -M:coverage:headless
       - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json
