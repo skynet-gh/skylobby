@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.6]
+
+- Add download sources for Total Atomization Prime releases and maps
+
 ### [0.4.5]
 
 - Fix unready after game setting
