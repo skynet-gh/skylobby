@@ -40,7 +40,8 @@
    {:download-source-name "Evolution-RTS GitHub releases"
     :url http/evo-rts-github-releases-url
     :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
-    :resources-fn http/get-evo-rts-github-release-downloadables}
+    :resources-fn http/get-evo-rts-github-release-downloadables
+    :resource-type-fn #(when (http/evo-rts-filename? %) :spring-lobby/mod)}
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
     :resources-fn http/html-downloadables}
@@ -55,7 +56,16 @@
     :resources-fn http/get-springlauncher-downloadables}
    {:download-source-name "SpringRTS buildbot"
     :url http/springrts-buildbot-root
-    :resources-fn http/crawl-springrts-engine-downloadables}])
+    :resources-fn http/crawl-springrts-engine-downloadables}
+   {:download-source-name "TAP GitHub releases"
+    :url http/tap-github-releases-url
+    :browse-url "https://github.com/FluidPlay/TAPrime_v2/releases"
+    :resources-fn http/get-github-release-downloadables
+    :resource-type-fn #(when (string/ends-with? % ".sdz") :spring-lobby/mod)}
+   {:download-source-name "TAP GitHub maps"
+    :url http/tap-maps-github-releases-url
+    :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
+    :resources-fn http/get-bar-maps-github-release-downloadables}])
 
 
 (defn- download-type-cell

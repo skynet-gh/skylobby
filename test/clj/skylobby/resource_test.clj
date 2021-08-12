@@ -91,15 +91,15 @@
 
 
 (deftest normalize-mod
-  (is (= "evolution_rts___v16.11"
+  (is (= "evolution_rts___16.11"
          (resource/normalize-mod "Evolution RTS - v16.11")))
-  (is (= "evolution_rtsv1611"
+  (is (= "evolution_rts1611"
          (resource/normalize-mod "Evolution-RTSv1611.sdz"))))
 
 (deftest normalize-mod-harder
-  (is (= "evolutionrtsv1611"
+  (is (= "evolutionrts1611"
          (resource/normalize-mod-harder "Evolution RTS - v16.11")))
-  (is (= "evolutionrtsv1611"
+  (is (= "evolutionrts1611"
          (resource/normalize-mod-harder "Evolution-RTSv1611.sdz"))))
 
 (deftest could-be-this-mod?
@@ -122,7 +122,11 @@
   (is (true?
         (resource/could-be-this-mod?
           "Evolution RTS - v16.11"
-          {:resource-filename "Evolution-RTSv1611.sdz"}))))
+          {:resource-filename "Evolution-RTSv1611.sdz"})))
+  (is (true?
+        (resource/could-be-this-mod?
+          "Total Atomization Prime 2.6RC5"
+          {:resource-filename "TAPrime_v2.6RC5.sdz"}))))
 
 
 (deftest same-resource-file?

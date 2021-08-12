@@ -8,11 +8,12 @@
 
 
 (def no-springfiles
-  [#"Beyond All Reason"])
+  [#"Beyond All Reason"
+   #"Total Atomization Prime"])
 
 (def no-rapid
   [#"Evolution RTS"
-   #"Total Annihilation Prime"])
+   #"Total Atomization Prime"])
 
 
 (defn mod-sync-pane
