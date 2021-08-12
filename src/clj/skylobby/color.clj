@@ -37,7 +37,7 @@
     "0x00d5ffff"
     "0x00b386ff"
     "0x3df200ff"]])
-(def colors-8v8
+(def colors-11v11
   [["0xcc0000ff"
     "0xd900b5ff"
     "0xe67a00ff"
@@ -45,7 +45,10 @@
     "0xff6666ff"
     "0xff80eaff"
     "0xffb259ff"
-    "0xbaba00ff"]
+    "0xbaba00ff"
+    "0xa50000ff"
+    "0xab5a00ff"
+    "0xa5008aff"]
    ["0x0049dbff"
     "0x26dbffff"
     "0x00d9a3ff"
@@ -53,17 +56,47 @@
     "0x6699ffff"
     "0x0095b3ff"
     "0x008060ff"
-    "0x29a600ff"]])
+    "0x29a600ff"
+    "0x7faaffff"
+    "0x006a7fff"
+    "0x003bb2ff"]])
+
+(def bar-team-colors
+  [["rgb(0, 80, 255)"
+    "rgb(10, 232, 18)"
+    "rgb(147, 226, 251)"
+    "rgb(41, 166, 176)"
+    "rgb(191, 169, 255)"
+    "rgb(0, 170, 99)"
+    "rgb(117, 253, 147)"
+    "rgb(39, 63, 84)"
+    "0x7faaffff"
+    "0x006a7fff"
+    "0x28a500ff"
+    "0x003bb2ff"]
+   ["rgb(255, 16, 5)"
+    "rgb(255, 232, 22)"
+    "rgb(255, 125, 32)"
+    "rgb(229, 18, 120)"
+    "rgb(255, 243, 135)"
+    "rgb(72, 9, 24)"
+    "rgb(251, 167, 120)"
+    "rgb(118, 39, 6)"
+    "0xa50000ff"
+    "0xb9b900ff"
+    "0xab5a00ff"
+    "0xa5008aff"]])
+
 
 (def team-colors-by-min-size
-  {5 colors-8v8
+  {5 colors-11v11
    4 colors-4v4
    3 colors-3v3
    2 colors-2v2
    1 colors-1v1})
 
 (def colors-by-team-count
-  {2 colors-8v8
+  {2 colors-11v11
    3
    [["0xcc0000ff"
      "0xd900b5ff"

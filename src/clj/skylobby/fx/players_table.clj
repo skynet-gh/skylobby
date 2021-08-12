@@ -9,6 +9,7 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.input Clipboard ClipboardContent)
     (javafx.scene.paint Color)))
 
 
@@ -79,7 +80,7 @@
        :row-factory
        {:fx/cell-type :table-row
         :describe
-        (fn [{:keys [owner username user]}]
+        (fn [{:keys [owner team-color username user]}]
           (tufte/profile {:dynamic? true
                           :id :skylobby/player-table}
             (tufte/p :row
@@ -143,7 +144,15 @@
                                   :message (str "!whois " username)
                                   :server-key server-key}}])
                   [{:fx/type :menu-item
-                    :text (str "User ID: " (-> user :user-id))}])}})))}
+                    :text (str "User ID: " (-> user :user-id))}
+                   {:fx/type :menu-item
+                    :text (str "Copy color")
+                    :on-action (fn [_event]
+                                 (let [clipboard (Clipboard/getSystemClipboard)
+                                       content (ClipboardContent.)
+                                       color (u/spring-color-to-javafx team-color)]
+                                   (.putString content (str color))
+                                   (.setContent clipboard content)))}])}})))}
        :columns
        (concat
          [{:fx/type :table-column
