@@ -31,8 +31,11 @@
 (def springrts-buildbot-root
   "https://springrts.com/dl/buildbot/default")
 
-(def springfiles-maps-url
+(def old-springfiles-maps-url
   "http://api.springfiles.com/files/maps")
+
+(def springfiles-maps-url
+  "http://springfiles.springrts.com/files/maps")
 
 (def springfightclub-root
   "https://www.springfightclub.com/data")
