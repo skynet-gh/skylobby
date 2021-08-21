@@ -27,7 +27,7 @@
    :resources-fn http/html-downloadables})
 
 (def download-sources
-  [springfiles-maps-download-source
+  [;springfiles-maps-download-source gone now
    hakora-maps-download-source
    {:download-source-name "BAR GitHub spring"
     :url http/bar-spring-releases-url

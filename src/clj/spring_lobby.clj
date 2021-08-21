@@ -3439,7 +3439,7 @@
   or nil if not found."
   [{:keys [category springname]}]
   (log/info "Searching springfiles for" springname)
-  (let [result (->> (clj-http/get "https://api.springfiles.com/json.php"
+  (let [result (->> (clj-http/get "https://springfiles.springrts.com/json.php"
                       {:query-params
                        (merge
                          {:springname springname

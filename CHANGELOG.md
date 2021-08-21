@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.7]
+
+- Update springfiles url to springfiles.springrts.com
+
 ### [0.4.6]
 
 - Add download sources for Total Atomization Prime releases and maps
