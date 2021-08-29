@@ -235,6 +235,55 @@
                           " "
                           (when (number? skilluncertainty)
                             (apply str (repeat skilluncertainty "?"))))})))}}])
+         (when (:status players-table-columns)
+           [{:fx/type :table-column
+             :text "Status"
+             :resizable false
+             :pref-width 82
+             :cell-value-factory identity
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [{:keys [battle-status user username]}]
+                (tufte/profile {:dynamic? true
+                                :id :skylobby/player-table}
+                  (tufte/p :status
+                    (let [client-status (:client-status user)
+                          am-host (= username host-username)]
+                      {:text ""
+                       :graphic
+                       {:fx/type :h-box
+                        :children
+                        (concat
+                          (when-not singleplayer
+                            [
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal
+                              (if (= 1 (:sync battle-status))
+                                "mdi-sync:16:green"
+                                "mdi-sync-off:16:red")}])
+                          [(cond
+                             (:bot client-status)
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-robot:16:grey"}
+                             (not (u/to-bool (:mode battle-status)))
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-magnify:16:white"}
+                             (:ready battle-status)
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-account-check:16:green"}
+                             am-host
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-account-key:16:orange"}
+                             :else
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-account:16:white"})]
+                          (when (:ingame client-status)
+                            [{:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-sword:16:red"}])
+                          (when (:away client-status)
+                            [{:fx/type font-icon/lifecycle
+                              :icon-literal "mdi-sleep:16:grey"}]))}}))))}}])
          (when (:ally players-table-columns)
            [{:fx/type :table-column
              :text "Ally"
@@ -326,55 +375,6 @@
                                     (not (or am-host
                                              (= (:username i) username)
                                              (= (:owner i) username))))}}})))}}])
-         (when (:status players-table-columns)
-           [{:fx/type :table-column
-             :text "Status"
-             :resizable false
-             :pref-width 82
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [{:keys [battle-status user username]}]
-                (tufte/profile {:dynamic? true
-                                :id :skylobby/player-table}
-                  (tufte/p :status
-                    (let [client-status (:client-status user)
-                          am-host (= username host-username)]
-                      {:text ""
-                       :graphic
-                       {:fx/type :h-box
-                        :children
-                        (concat
-                          (when-not singleplayer
-                            [
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal
-                              (if (= 1 (:sync battle-status))
-                                "mdi-sync:16:green"
-                                "mdi-sync-off:16:red")}])
-                          [(cond
-                             (:bot client-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-robot:16:grey"}
-                             (not (u/to-bool (:mode battle-status)))
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-magnify:16:white"}
-                             (:ready battle-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-check:16:green"}
-                             am-host
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-key:16:orange"}
-                             :else
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account:16:white"})]
-                          (when (:ingame client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sword:16:red"}])
-                          (when (:away client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sleep:16:grey"}]))}}))))}}])
          (when (:spectator players-table-columns)
            [{:fx/type :table-column
              :text "Spectator"
