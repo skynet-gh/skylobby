@@ -197,6 +197,9 @@
   (and channel-name
        (string/starts-with? channel-name "__battle__")))
 
+(defn battle-channel-name [battle-id]
+  (str "__battle__" battle-id))
+
 (defn user-channel-name? [channel-name]
   (and channel-name
        (string/starts-with? channel-name "@")))
@@ -243,7 +246,7 @@
      (conj messages {:text message
                      :timestamp (curr-millis)
                      :username username
-                     :ex ex}))))
+                     :message-type (when ex :ex)}))))
 
 (defn parse-skill [skill]
   (cond

@@ -45,7 +45,7 @@
     (->> messages
          (map-indexed vector)
          (mapcat
-           (fn [[i {:keys [ex text timestamp username]}]]
+           (fn [[i {:keys [message-type text timestamp username]}]]
              (concat
                [{:fx/type :text
                  :text (str "[" (u/format-hours timestamp) "] ")
@@ -53,11 +53,14 @@
                 {:fx/type :text
                  :text
                  (str
-                   (if ex
-                     (str "* " username " " text)
+                   (case message-type
+                     :ex (str "* " username " " text)
+                     :join (str username " has joined")
+                     :leave (str username " has left")
+                     ; else
                      (str username ": ")))
-                 :style-class ["text" (str "skylobby-chat-username" (when ex "-ex"))]}]
-               (when-not ex
+                 :style-class ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))]}]
+               (when-not message-type
                  (map
                    (fn [[_all _ _irc-color-code text-segment]]
                      {:fx/type :text
@@ -128,7 +131,7 @@
   (let [
         builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
     (doseq [message messages]
-      (let [{:keys [ex text timestamp username]} message]
+      (let [{:keys [message-type text timestamp username]} message]
         (.addParagraph builder
           ^java.util.List
           (vec
@@ -139,11 +142,14 @@
                  ["text" "skylobby-chat-time"])
                (segment
                  (str
-                   (if ex
-                     (str "* " username " " text)
+                   (case message-type
+                     :ex (str "* " username " " text)
+                     :join (str username " has joined")
+                     :leave (str username " has left")
+                     ; else
                      (str username ": ")))
-                 ["text" (str "skylobby-chat-username" (when ex "-ex"))])]
-              (when-not ex
+                 ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))])]
+              (when-not message-type
                 (map
                   (fn [[_all _ _irc-color-code text-segment]]
                     (segment
