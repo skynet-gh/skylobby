@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.8]
+
+- Add ignore user to context menu
+- Add join and leave to chat
+
 ### [0.4.7]
 
 - Update springfiles url to springfiles.springrts.com

@@ -95,6 +95,10 @@
      {:-fx-fill "royalblue"}
      "-username-ex"
      {:-fx-fill "cyan"}
+     "-username-join"
+     {:-fx-fill "grey"}
+     "-username-leave"
+     {:-fx-fill "grey"}
      "-message"
      {:-fx-fill "white"}}
     "-console"

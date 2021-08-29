@@ -135,7 +135,8 @@
   [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :logins :map-name
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
+   :friend-users :ignore-users :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
@@ -3020,6 +3021,15 @@
         :channel-name channel-name
         :client-data client-data
         :message (str "!ring " username)})))
+
+
+(defmethod event-handler ::ignore-user
+  [{:keys [server-key username]}]
+  (swap! *state assoc-in [:ignore-users server-key username] true))
+
+(defmethod event-handler ::unignore-user
+  [{:keys [server-key username]}]
+  (swap! *state assoc-in [:ignore-users server-key username] false))
 
 
 (defmethod event-handler ::battle-startpostype-change

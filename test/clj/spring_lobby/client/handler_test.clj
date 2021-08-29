@@ -174,7 +174,7 @@
               :channels
               {"__battle__1"
                {:messages
-                [{:ex true
+                [{:message-type :ex
                   :text "* Hi [Z]kynet! Current battle type is team."
                   :timestamp now
                   :username "[teh]cluster1[01]"}]}}}}}
@@ -192,7 +192,7 @@
              {:channels
               {"evolution"
                {:messages
-                [{:ex false
+                [{:message-type nil
                   :text ":)"
                   :timestamp now
                   :username "user:springrts.com"}]}}}}}

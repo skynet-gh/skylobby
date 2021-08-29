@@ -151,14 +151,24 @@
 (defmethod handle "LEFTBATTLE" [state-atom server-url m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
     (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
+      (fn [{:keys [client-data] :as state}]
         (let [this-battle (when-let [battle (:battle state)]
                             (= battle-id (:battle-id battle)))
-              is-me (= username (:username state))]
+              is-me (= username (:username state))
+              unified (-> client-data :compflags (contains? "u"))]
           (update-in
             (cond
               (and this-battle is-me) (dissoc state :battle)
-              this-battle (update-in state [:battle :users] dissoc username)
+              this-battle
+              (cond-> state
+                      true
+                      (update-in [:battle :users] dissoc username)
+                      (not unified)
+                      (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                        conj {:text ""
+                              :timestamp (u/curr-millis)
+                              :message-type :leave
+                              :username username}))
               :else state)
             [:battles battle-id :users] dissoc username))))))
 
@@ -175,7 +185,14 @@
 
 (defmethod handle "JOINED" [state-atom server-url m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
-    (swap! state-atom assoc-in [:by-server server-url :channels channel-name :users username] {})))
+    (swap! state-atom update-in [:by-server server-url :channels channel-name]
+      (fn [channel]
+        (-> channel
+            (assoc-in [:users username] {})
+            (update :messages conj {:text ""
+                                    :timestamp (u/curr-millis)
+                                    :message-type :join
+                                    :username username}))))))
 
 (defmethod handle "JOINEDFROM" [state-atom server-url m]
   (let [[_all channel-name bridge username] (re-find #"\w+\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)" m)]
@@ -288,22 +305,40 @@
 (defmethod handle "JOINEDBATTLE" [state-atom server-url m]
   (let [[_all battle-id username _ script-password] (re-find #"\w+ (\w+) ([^\s]+)( (.+))?" m)]
     (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
+      (fn [{:keys [client-data] :as state}]
         (let [initial-status {}
+              unified (-> client-data :compflags (contains? "u"))
               next-state (assoc-in state [:battles battle-id :users username] initial-status)]
           (cond-> next-state
                   (= battle-id (-> next-state :battle :battle-id))
                   (assoc-in [:battle :users username] initial-status)
                   script-password
-                  (assoc-in [:battle :script-password] script-password)))))))
+                  (assoc-in [:battle :script-password] script-password)
+                  (not unified)
+                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                    conj {:text ""
+                          :timestamp (u/curr-millis)
+                          :message-type :join
+                          :username username})))))))
 
-(defn- left [state-atom server-key channel-name username]
-  (swap! state-atom update-in [:by-server server-key]
-         (fn [state]
-           (let [next-state (update-in state [:channels channel-name :users] dissoc username)]
-             (if (= (:username state) username) ; me
-               (update next-state :my-channels dissoc channel-name)
-               next-state)))))
+(defn- left
+  ([state-atom server-key channel-name username]
+   (left state-atom server-key channel-name username nil))
+  ([state-atom server-key channel-name username {:keys [bridge]}]
+   (swap! state-atom update-in [:by-server server-key]
+          (fn [state]
+            (let [next-state (cond-> state
+                                     true
+                                     (update-in [:channels channel-name :users] dissoc username)
+                                     (not bridge)
+                                     (update-in [:channels channel-name :messages] conj
+                                       {:text ""
+                                        :timestamp (u/curr-millis)
+                                        :message-type :leave
+                                        :username username}))]
+              (if (= (:username state) username) ; me
+                (update next-state :my-channels dissoc channel-name)
+                next-state))))))
 
 (defmethod handle "LEFT" [state-atom server-key m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
@@ -311,7 +346,7 @@
 
 (defmethod handle "LEFTFROM" [state-atom server-key m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
-    (left state-atom server-key channel-name username)))
+    (left state-atom server-key channel-name username {:bridge true})))
 
 (defmethod handle "REMOVESCRIPTTAGS" [state-atom server-url m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)

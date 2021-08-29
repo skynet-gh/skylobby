@@ -33,7 +33,7 @@
     (is (= [{:text "m"
              :timestamp now
              :username "me"
-             :ex true}]
+             :message-type :ex}]
            (with-redefs [u/curr-millis (constantly now)]
              ((u/update-chat-messages-fn "me" "m" true) []))))))
 

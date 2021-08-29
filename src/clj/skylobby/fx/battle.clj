@@ -1042,8 +1042,8 @@
     [:archiving :auto-get-resources :battle-layout :battle-players-color-type :bot-name
      :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
      :drag-team :engine-filter :engine-version
-     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :interleave-ally-player-ids
-     :importables-by-path
+     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :ignore-users
+     :interleave-ally-player-ids :importables-by-path
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
      :parsed-replays-by-path :players-table-columns :pop-out-chat :rapid-data-by-id :rapid-data-by-version
@@ -1060,7 +1060,7 @@
 (defn battle-view-impl
   [{:keys [battle battle-layout battles battle-players-color-type bot-name bot-username bot-version
            channels chat-auto-scroll
-           client-data drag-allyteam drag-team engines-by-version file-cache interleave-ally-player-ids
+           client-data drag-allyteam drag-team engines-by-version file-cache ignore-users interleave-ally-player-ids
            map-input-prefix map-details
            maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-chat server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
@@ -1157,6 +1157,7 @@
                        :client-data (when-not singleplayer client-data)
                        :host-ingame host-ingame
                        :host-username host-username
+                       :ignore-users ignore-users
                        :indexed-mod indexed-mod
                        :players players
                        :players-table-columns players-table-columns
