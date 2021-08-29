@@ -60,6 +60,27 @@
     "0x7faaffff"
     "0x006a7fff"
     "0x003bb2ff"]])
+(def colors-4-team-ffa
+  [["0xff0000ff"
+    "0xd800b4ff"
+    "0xff7272ff"
+    "0xff7feaff"
+    "0xa50000ff"]
+   ["0x0054ffff"
+    "0x26daffff"
+    "0x7faaffff"
+    "0x0094b2ff"
+    "0x003bb2ff"]
+   ["0x3aec00ff"
+    "0x00d8a3ff"
+    "0xa5ff86ff"
+    "0x007f5fff"
+    "0x28a500ff"]
+   ["0xffff00ff"
+    "0xff8700ff"
+    "0xb9b900ff"
+    "0xffbe72ff"
+    "0xab5a00ff"]])
 
 (def bar-team-colors
   [["rgb(0, 80, 255)"
@@ -116,23 +137,7 @@
      "0xf2f200ff"
      "0x29a600ff"]]
    4
-   [["0xff0000ff"
-     "0xd900b5ff"
-     "0xff7373ff"
-     "0xff80eaff"
-     "0xa60000ff"]
-    ["0x0049dbff"
-     "0x26dbffff"
-     "0x6699ffff"
-     "0x0095b3ff"]
-    ["0x40ff00ff"
-     "0x00d9a3ff"
-     "0x29a600ff"
-     "0x008060ff"]
-    ["0xffb259ff"
-     "0xffff00ff"
-     "0xe67a00ff"
-     "0xbaba00ff"]]
+   colors-4-team-ffa
    5
    [["0xcc0000ff"
      "0xd900b5ff"
