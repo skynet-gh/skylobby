@@ -7,9 +7,14 @@
     [spring-lobby.util :as u]))
 
 
-(def users-table-keys [:battles :client-data :filter-users :server-key :users])
+(def users-table-state-keys [:ignore-users])
 
-(defn users-table [{:keys [battles client-data filter-users server-key users]}]
+(def users-table-keys
+  (concat
+    users-table-state-keys
+    [:battles :client-data :filter-users :server-key :users]))
+
+(defn users-table [{:keys [battles client-data filter-users ignore-users server-key users]}]
   (let [battles-by-users (->> battles
                               vals
                               (mapcat
@@ -83,7 +88,18 @@
                                            :client-data client-data
                                            :channel-name (u/user-channel username)
                                            :message "!set privacyMode 0"}}])
-                           [{:fx/type :menu-item
+                           [(if (-> ignore-users (get server-key) (get username))
+                              {:fx/type :menu-item
+                               :text "Unignore"
+                               :on-action {:event/type :spring-lobby/unignore-user
+                                           :server-key server-key
+                                           :username username}}
+                              {:fx/type :menu-item
+                               :text "Ignore"
+                               :on-action {:event/type :spring-lobby/ignore-user
+                                           :server-key server-key
+                                           :username username}})
+                            {:fx/type :menu-item
                              :text (str "User ID: " user-id)}])}}
                        {:tooltip
                         {:fx/type :tooltip

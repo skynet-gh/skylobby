@@ -85,6 +85,7 @@
   (concat
     fx.battles-table/battles-table-state-keys
     fx.channel/channel-state-keys
+    fx.user/users-table-state-keys
     [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
 
 (def main-tab-view-keys

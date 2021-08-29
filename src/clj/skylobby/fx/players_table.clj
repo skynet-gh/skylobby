@@ -43,6 +43,7 @@
 
 (defn players-table-impl
   [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
+           ignore-users
            indexed-mod players players-table-columns scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
@@ -134,16 +135,26 @@
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
                                       :message "!stats"
-                                      :server-key server-key}}])))
-                  (when (-> user :client-status :bot)
-                    [{:fx/type :menu-item
-                      :text "!whois"
-                      :on-action {:event/type :spring-lobby/send-message
-                                  :client-data client-data
-                                  :channel-name (u/user-channel host-username)
-                                  :message (str "!whois " username)
-                                  :server-key server-key}}])
-                  [{:fx/type :menu-item
+                                      :server-key server-key}}])
+                      [{:fx/type :menu-item
+                        :text "!whois"
+                        :on-action {:event/type :spring-lobby/send-message
+                                    :client-data client-data
+                                    :channel-name (u/user-channel host-username)
+                                    :message (str "!whois " username)
+                                    :server-key server-key}}]))
+                  [(if (-> ignore-users (get server-key) (get username))
+                     {:fx/type :menu-item
+                      :text "Unignore"
+                      :on-action {:event/type :spring-lobby/unignore-user
+                                  :server-key server-key
+                                  :username username}}
+                     {:fx/type :menu-item
+                      :text "Ignore"
+                      :on-action {:event/type :spring-lobby/ignore-user
+                                  :server-key server-key
+                                  :username username}})
+                   {:fx/type :menu-item
                     :text (str "User ID: " (-> user :user-id))}
                    {:fx/type :menu-item
                     :text (str "Copy color")

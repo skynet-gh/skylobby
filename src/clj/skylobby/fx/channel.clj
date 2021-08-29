@@ -156,19 +156,26 @@
       (.build builder))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-font-size messages]}]
-  {:fx/type ext-with-auto-scroll-virtual-prop
-   :props {:auto-scroll messages}
-   :desc
-   {:fx/type ext-scroll-on-create
-    :desc
-    {:fx/type fx.virtualized-scroll-pane/lifecycle
-     :content
-     {:fx/type fx.rich-text/lifecycle
-      :editable false
-      :style (text-style chat-font-size)
-      :wrap-text true
-      :document (channel-document (reverse messages))}}}})
+  [{:keys [chat-font-size ignore-users messages server-key]}]
+  (let [ignore-users-set (->> (get ignore-users server-key)
+                              (filter second)
+                              (map first)
+                              set)]
+    {:fx/type ext-with-auto-scroll-virtual-prop
+     :props {:auto-scroll messages}
+     :desc
+     {:fx/type ext-scroll-on-create
+      :desc
+      {:fx/type fx.virtualized-scroll-pane/lifecycle
+       :content
+       {:fx/type fx.rich-text/lifecycle
+        :editable false
+        :style (text-style chat-font-size)
+        :wrap-text true
+        :document (channel-document
+                    (->> messages
+                         (remove (comp ignore-users-set :username))
+                         reverse))}}}}))
 
 (defn channel-view-history
   [state]
@@ -233,7 +240,7 @@
          :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
-  [:chat-font-size])
+  [:chat-font-size :ignore-users])
 
 (defn channel-view-impl
   [{:keys [channel-name channels hide-users]
