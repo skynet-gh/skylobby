@@ -86,6 +86,13 @@
      [{:fx/type :pane
        :style {:-fx-pref-width "200px"}}
       {:fx/type :button
+       :style {:-fx-font-size 14}
+       :text "Settings"
+       :graphic {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-settings:16:white"}
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-settings-window}}
+      {:fx/type :button
        :text (str (count tasks-by-type) " tasks")
        :on-action {:event/type :spring-lobby/toggle
                    :key :show-tasks-window}}])})
