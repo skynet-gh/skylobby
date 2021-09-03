@@ -2,10 +2,10 @@
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url>
 <loc>
-https://skynet-gh.github.io/skylobby/skylobby/404.html
+https://skynet-gh.github.io/skylobby/skylobby/pages/development/index.html
 </loc>
 <lastmod>
-2021-08-29
+2021-09-03
 </lastmod>
 </url>
 <url>
@@ -13,7 +13,7 @@ https://skynet-gh.github.io/skylobby/skylobby/404.html
 https://skynet-gh.github.io/skylobby/skylobby/archives/index.html
 </loc>
 <lastmod>
-2021-08-29
+2021-09-03
 </lastmod>
 </url>
 <url>
@@ -21,7 +21,7 @@ https://skynet-gh.github.io/skylobby/skylobby/archives/index.html
 https://skynet-gh.github.io/skylobby/skylobby/index.html
 </loc>
 <lastmod>
-2021-08-29
+2021-09-03
 </lastmod>
 </url>
 <url>
@@ -29,15 +29,15 @@ https://skynet-gh.github.io/skylobby/skylobby/index.html
 https://skynet-gh.github.io/skylobby/skylobby/tags/index.html
 </loc>
 <lastmod>
-2021-08-29
+2021-09-03
 </lastmod>
 </url>
 <url>
 <loc>
-https://skynet-gh.github.io/skylobby/skylobby/pages/development/index.html
+https://skynet-gh.github.io/skylobby/skylobby/404.html
 </loc>
 <lastmod>
-2021-08-29
+2021-09-03
 </lastmod>
 </url>
 </urlset>
