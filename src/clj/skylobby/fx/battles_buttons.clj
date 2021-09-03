@@ -36,13 +36,6 @@
      (concat
        [
         {:fx/type :button
-         :text "Settings"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-settings-window}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-settings:16:white"}}
-        {:fx/type :button
          :text "Replays"
          :on-action {:event/type :spring-lobby/toggle
                      :key :show-replays}

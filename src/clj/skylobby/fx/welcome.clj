@@ -126,6 +126,7 @@
 (defn singleplayer-buttons
   [{:keys [app-update-available spring-isolation-dir] :as state}]
   {:fx/type :v-box
+   :spacing 10
    :children
    (concat
      (when app-update-available
@@ -133,44 +134,25 @@
           {:fx/type app-update-button}
           state)])
      [
-      {:fx/type :v-box
-       :style {:-fx-font-size 16}
-       :children
-       [
-        {:fx/type :label
-         :text " Default Spring Dir"
-         :style {:-fx-font-size 20}}
-        {:fx/type :h-box
-         :alignment :center-left
-         :children
-         [
-          {:fx/type :text-field
-           :disable true
-           :text (str spring-isolation-dir)
-           :style {:-fx-min-width 400}}
-          {:fx/type :button
-           :on-action {:event/type :spring-lobby/file-chooser-spring-root}
-           :text ""
-           :graphic
-           {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-file-find:16:white"}}]}]}
-      {:fx/type :button
-       :text "Singleplayer Battle"
-       :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
-      {:fx/type :button
-       :text "Watch Replays"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-replays}}
-      {:fx/type :button
-       :text "Settings"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-settings-window}}])})
+       {:fx/type :label
+        :text "Offline:"}
+       {:fx/type :button
+        :text "Singleplayer Battle"
+        :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
+       {:fx/type :button
+        :text "Watch Replays"
+        :on-action {:event/type :spring-lobby/toggle
+                    :key :show-replays}}
+       {:fx/type :pane
+        :v-box/vgrow :always }])})
+
 
 (defn multiplayer-buttons
   [{:keys [agreement by-server client-data login-error logins password server servers username
            verification-code]
     :as state}]
   {:fx/type :v-box
+   :spacing 10
    :children
    (concat
      [{:fx/type :label
@@ -189,40 +171,7 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal "mdi-plus:30:white"}}]}
-      (let [[server-url server-details] server
-            spring-isolation-dir (:spring-isolation-dir server-details)]
-        {:fx/type :v-box
-         :style {:-fx-font-size 16}
-         :children
-         [
-          {:fx/type :label
-           :text " Server-specific Spring Dir"
-           :style {:-fx-font-size 20}}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           (concat
-             [
-              {:fx/type :text-field
-               :disable true
-               :text (str (or spring-isolation-dir
-                              " < use default >"))
-               :style {:-fx-min-width 400}}]
-             (when spring-isolation-dir
-               [{:fx/type :button
-                 :text ""
-                 :on-action {:event/type :spring-lobby/dissoc-in
-                             :path [:servers server-url :spring-isolation-dir]}
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-close:16:white"}}])
-             [{:fx/type :button
-               :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                           :target [:servers server-url :spring-isolation-dir]}
-               :text ""
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-file-find:16:white"}}])}]})]
+     ]
      (when-let [login-error (str " " (get login-error (first server)))]
        [{:fx/type :label
          :text (str " " login-error)
@@ -263,15 +212,57 @@
          :on-action {:event/type :spring-lobby/assoc
                      :key :selected-server-tab
                      :value (str username "@" (first server))}}])
-     [{:fx/type :h-box
+     [
+       {:fx/type :pane
+        :style {:-fx-min-height 20
+                :-fx-pref-height 20}}
+       (let [[server-url server-details] server
+             spring-isolation-dir (:spring-isolation-dir server-details)]
+         {:fx/type :v-box
+          :style {:-fx-font-size 16}
+          :children
+          [
+            {:fx/type :label
+             :text " Server-specific Spring Dir"
+             :style {:-fx-font-size 20}}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             (concat
+              [
+                {:fx/type :text-field
+                 :disable true
+                 :text (str (or spring-isolation-dir
+                                " < use default >"))
+                 :style {:-fx-min-width 400}}]
+              (when spring-isolation-dir
+                    [{:fx/type :button
+                      :text ""
+                      :on-action {:event/type :spring-lobby/dissoc-in
+                                  :path [:servers server-url :spring-isolation-dir]}
+                      :graphic
+                      {:fx/type font-icon/lifecycle
+                       :icon-literal "mdi-close:16:white"}}])
+              [{:fx/type :button
+                :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                            :target [:servers server-url :spring-isolation-dir]}
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-file-find:16:white"}}])}]})
+;       {:fx/type :pane
+;        :style {:-fx-min-height 20
+;                :-fx-pref-height 20}}
+       {:fx/type :h-box
+       :spacing 10
        :children
        (concat
-         [(merge
+         [{:fx/type :pane
+           :h-box/hgrow :always}
+           (merge
             {:fx/type connect-button
              :server-key (u/server-key client-data)}
-            (select-keys state connect-button-keys))
-          {:fx/type :pane
-           :h-box/hgrow :always}]
+            (select-keys state connect-button-keys))]
          (when-not client-data
            [{:fx/type :button
              :text "Register"
@@ -355,12 +346,8 @@
              [
               {:fx/type :pane
                :h-box/hgrow :always}
-              (merge
-                {:fx/type singleplayer-buttons}
-                state)
-              (merge
-                {:fx/type multiplayer-buttons}
-                state)
+               {:fx/type singleplayer-buttons}
+               {:fx/type multiplayer-buttons}
               {:fx/type :pane
                :h-box/hgrow :always}]}
             {:fx/type :pane
@@ -385,10 +372,11 @@
          [
           {:fx/type :pane
            :h-box/hgrow :always}
-          {:fx/type :v-box
+          {:fx/type :h-box
+           :spacing 100
            :children
            [{:fx/type :pane
-             :v-box/vgrow :always}
+             :h-box/hgrow :always}
             (merge
               {:fx/type singleplayer-buttons}
               state)
@@ -396,7 +384,7 @@
               {:fx/type multiplayer-buttons}
               state)
             {:fx/type :pane
-             :v-box/vgrow :always}]}
+             :h-box/hgrow :always}]}
           {:fx/type :pane
            :h-box/hgrow :always}]})]
      (when-not (-> by-server :local :battle :battle-id)
