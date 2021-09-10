@@ -46,11 +46,11 @@
     extra-replay-sources))
 
 
-(defn- replay-player-count
+(defn replay-player-count
   [{:keys [player-counts]}]
   (reduce (fnil + 0) 0 player-counts))
 
-(defn- replay-skills
+(defn replay-skills
   [{:keys [body]}]
   (let [skills (some->> body :script-data :game
                         (filter (comp #(string/starts-with? % "player") name first))
@@ -64,7 +64,7 @@
   (when (seq coll)
     (reduce min Long/MAX_VALUE coll)))
 
-(defn- average-skill [coll]
+(defn average-skill [coll]
   (when (seq coll)
     (with-precision 3
       (/ (bigdec (reduce + coll))
@@ -75,7 +75,7 @@
     (reduce max 0 coll)))
 
 
-(defn- sanitize-replay-filter [s]
+(defn sanitize-replay-filter [s]
   (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
 
 ; https://github.com/Jazcash/sdfz-demo-parser/blob/a4391f14ee4bc08aedb5434d66cf99ad94913597/src/demo-parser.ts#L233
@@ -907,7 +907,7 @@
     [:bar-replays-page :by-spring-root :copying :css :downloadables-by-url
      :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
      :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
-     :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
+     :filtered-replays :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
      :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download :replay-details
      :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
      :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
@@ -917,8 +917,8 @@
 (defn replays-window-impl
   [{:keys [bar-replays-page by-spring-root css extra-replay-sources file-cache
            filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-source filter-replay-type map-details mod-details new-online-replays-count
-           on-close-request online-bar-replays replays-filter-specs replays-tags replays-window-dedupe
+           filter-replay-source filter-replay-type filtered-replays map-details mod-details new-online-replays-count
+           on-close-request online-bar-replays replays-filter-specs replays-window-dedupe
            replays-window-details parsed-replays-by-path screen-bounds selected-replay-file
            selected-replay-id show-replays spring-isolation-dir tasks-by-type title]
     :as state}]
@@ -958,81 +958,7 @@
                              (map replay-player-count)
                              set
                              sort)
-            filter-terms (->> (string/split (or filter-replay "") #"\s+")
-                              (remove string/blank?)
-                              (map string/lower-case))
-            includes-term? (fn [s term]
-                             (let [lc (string/lower-case (or s ""))]
-                               (string/includes? lc term)))
-            replays (->> all-replays
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-source
-                               (= filter-replay-source (:source-name replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-type
-                               (= filter-replay-type (:game-type replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-players
-                               (<= filter-replay-min-players (replay-player-count replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-max-players
-                               (<= (replay-player-count replay) filter-replay-max-players)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-skill
-                               (if-let [avg (average-skill (replay-skills replay))]
-                                 (<= filter-replay-min-skill avg)
-                                 false)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if (empty? filter-terms)
-                               true
-                               (every?
-                                 (some-fn
-                                   (partial includes-term? (replay-id replay))
-                                   (partial includes-term? (get replays-tags (replay-id replay)))
-                                   (partial includes-term? (-> replay :header :engine-version))
-                                   (partial includes-term? (-> replay :body :script-data :game :gametype))
-                                   (partial includes-term? (-> replay :body :script-data :game :mapname))
-                                   (fn [term]
-                                     (let [players (some->> replay :body :script-data :game
-                                                            (filter (comp #(string/starts-with? % "player") name first))
-                                                            (filter
-                                                              (if replays-filter-specs
-                                                                (constantly true)
-                                                                (some-fn
-                                                                  (comp #{0 "0"} :spectator second)
-                                                                  (comp not #(contains? % :spectator) second))))
-                                                            (map (comp #(some % [:name :username]) second))
-                                                            (map sanitize-replay-filter))]
-                                       (some #(includes-term? % term) players))))
-                                 filter-terms)))))
-            replays (if replays-window-dedupe
-                      (:replays
-                        (reduce ; dedupe by id
-                          (fn [agg curr]
-                            (let [id (replay-id curr)]
-                              (cond
-                                (not id)
-                                (update agg :replays conj curr)
-                                (contains? (:seen-ids agg) id) agg
-                                :else
-                                (-> agg
-                                    (update :replays conj curr)
-                                    (update :seen-ids conj id)))))
-                          {:replays []
-                           :seen-ids #{}}
-                          replays))
-                      replays)
+            replays filtered-replays
             selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
                                 (get online-bar-replays selected-replay-id))
             engines-by-version (into {} (map (juxt :engine-version identity) engines))

@@ -200,7 +200,7 @@
 
 
 (defn battle-buttons
-  [{:keys [am-host am-ingame am-spec auto-get-resources auto-launch battle battle-layout battle-map-details
+  [{:keys [am-host am-ingame am-spec auto-get-resources auto-launch auto-unspec battle battle-layout battle-map-details
            battle-mod-details battle-players-color-type battle-map battle-modname bot-name
            bot-names bot-username bot-version bot-versions bots channel-name
            client-data downloadables-by-url engine-details engine-file
@@ -559,13 +559,14 @@
                             :client-data (when-not singleplayer client-data)
                             :is-me true
                             :is-bot false
-                            :id my-player}}])}
+                            :id my-player
+                            :server-key server-key}}])}
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 24}
      :children
      (concat
-       (when-not am-spec
+       (if-not am-spec
          [{:fx/type :check-box
            :selected (-> my-battle-status :ready boolean)
            :style {:-fx-padding "10px"}
@@ -574,7 +575,21 @@
                                    :client-data (when-not singleplayer client-data)
                                    :username username})}
           {:fx/type :label
-           :text " Ready"}])
+           :text " Ready"}]
+         [{:fx/type :check-box
+           :selected (boolean auto-unspec)
+           :style {:-fx-padding "10px"
+                   :-fx-font-size 15}
+           :on-selected-changed
+           {:event/type :spring-lobby/auto-unspec
+            :client-data (when-not singleplayer client-data)
+            :is-me true
+            :is-bot false
+            :id my-player
+            :server-key server-key}}
+          {:fx/type :label
+           :style {:-fx-font-size 15}
+           :text "Auto Unspec "}])
        [
         {:fx/type :pane
          :h-box/hgrow :always}
@@ -769,7 +784,14 @@
                              :channel-name channel-name
                              :client-data (when-not singleplayer client-data)
                              :users users
-                             :username username}}]
+                             :username username}}
+                {:fx/type :button
+                 :text "Ring Specs"
+                 :on-action {:event/type :spring-lobby/ring-specs
+                             :battle-users (:users battle)
+                             :channel-name channel-name
+                             :client-data client-data
+                             :users users}}]
                (when am-host
                  [
                   {:fx/type :pane
@@ -1054,7 +1076,7 @@
 (def battle-view-keys
   (concat
     battle-view-state-keys
-    [:auto-launch :battles :battle :channels :client-data :engines :engines-by-version :maps :maps-by-name :mods :mods-by-name
+    [:auto-launch :auto-unspec :battles :battle :channels :client-data :engines :engines-by-version :maps :maps-by-name :mods :mods-by-name
      :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view-impl
@@ -1221,7 +1243,8 @@
                        :client-data client-data
                        :hide-users true
                        :message-draft (get message-drafts channel-name)
-                       :server-key server-key}
+                       :server-key server-key
+                       :username username}
                       (select-keys state fx.channel/channel-state-keys))
         battle-tabs {:fx/type battle-tabs
                      :am-host am-host
@@ -1247,6 +1270,7 @@
                      :spring-isolation-dir spring-isolation-dir
                      :spring-settings spring-settings
                      :startpostype startpostype
+                     :users users
                      :username username}]
     {:fx/type :h-box
      :style {:-fx-font-size 15}

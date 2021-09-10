@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size
+  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
    :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
@@ -203,6 +203,7 @@
   (merge
     {:auto-get-resources true
      :battle-players-color-type "player"
+     :chat-highlight-username true
      :disable-tasks-while-in-game true
      :players-table-columns {:skill true
                              :ally true
@@ -214,7 +215,8 @@
                              :country true
                              :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
-     :servers default-servers}
+     :servers default-servers
+     :unready-after-game true}
     (apply
       merge
       (doall
@@ -853,7 +855,7 @@
 (defn fix-selected-replay-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
                   :id ::state-watcher}
-    (tufte/p :fix-selected-replay-watcher
+    (tufte/p :fix-replays-watcher
       (when (not= (fix-selected-replay-relevant-keys old-state)
                   (fix-selected-replay-relevant-keys new-state))
         (try
@@ -923,6 +925,118 @@
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
+(defn- filter-replays-relevant-keys [state]
+  (select-keys
+    state
+    [:filter-replay :filter-replay-max-players :filter-replay-min-players :filter-replay-min-skill
+     :filter-replay-source :filter-replay-type :online-bar-replays :parsed-replays-by-path
+     :replays-filter-specs :replays-tags :replays-window-dedupe]))
+
+(defn filter-replays-watcher [_k state-atom old-state new-state]
+  (when
+    (or (not (:filtered-replays new-state))
+        (and (not= old-state new-state)
+             (not= (filter-replays-relevant-keys old-state)
+                   (filter-replays-relevant-keys new-state))))
+    (try
+      (let [{:keys [filter-replay filter-replay-max-players filter-replay-min-players
+                    filter-replay-min-skill filter-replay-source filter-replay-type
+                    online-bar-replays parsed-replays-by-path replays-filter-specs replays-tags
+                    replays-window-dedupe]} new-state
+            local-filenames (->> parsed-replays-by-path
+                                 vals
+                                 (map :filename)
+                                 (filter some?)
+                                 set)
+            online-only-replays (->> online-bar-replays
+                                     vals
+                                     (remove (comp local-filenames :filename)))
+            all-replays (->> parsed-replays-by-path
+                             vals
+                             (concat online-only-replays)
+                             (sort-by (comp str :unix-time :header))
+                             reverse
+                             doall)
+            filter-terms (->> (string/split (or filter-replay "") #"\s+")
+                              (remove string/blank?)
+                              (map string/lower-case))
+            includes-term? (fn [s term]
+                             (let [lc (string/lower-case (or s ""))]
+                               (string/includes? lc term)))
+            replays (->> all-replays
+                         (filter
+                           (fn [replay]
+                             (if filter-replay-source
+                               (= filter-replay-source (:source-name replay))
+                               true)))
+                         (filter
+                           (fn [replay]
+                             (if filter-replay-type
+                               (= filter-replay-type (:game-type replay))
+                               true)))
+                         (filter
+                           (fn [replay]
+                             (if filter-replay-min-players
+                               (<= filter-replay-min-players (fx.replay/replay-player-count replay))
+                               true)))
+                         (filter
+                           (fn [replay]
+                             (if filter-replay-max-players
+                               (<= (fx.replay/replay-player-count replay) filter-replay-max-players)
+                               true)))
+                         (filter
+                           (fn [replay]
+                             (if filter-replay-min-skill
+                               (if-let [avg (fx.replay/average-skill (fx.replay/replay-skills replay))]
+                                 (<= filter-replay-min-skill avg)
+                                 false)
+                               true)))
+                         (filter
+                           (fn [replay]
+                             (if (empty? filter-terms)
+                               true
+                               (every?
+                                 (some-fn
+                                   (partial includes-term? (fx.replay/replay-id replay))
+                                   (partial includes-term? (get replays-tags (fx.replay/replay-id replay)))
+                                   (partial includes-term? (-> replay :header :engine-version))
+                                   (partial includes-term? (-> replay :body :script-data :game :gametype))
+                                   (partial includes-term? (-> replay :body :script-data :game :mapname))
+                                   (fn [term]
+                                     (let [players (some->> replay :body :script-data :game
+                                                            (filter (comp #(string/starts-with? % "player") name first))
+                                                            (filter
+                                                              (if replays-filter-specs
+                                                                (constantly true)
+                                                                (some-fn
+                                                                  (comp #{0 "0"} :spectator second)
+                                                                  (comp not #(contains? % :spectator) second))))
+                                                            (map (comp #(some % [:name :username]) second))
+                                                            (map fx.replay/sanitize-replay-filter))]
+                                       (some #(includes-term? % term) players))))
+                                 filter-terms))))
+                         doall)
+            replays (if replays-window-dedupe
+                      (:replays
+                        (reduce ; dedupe by id
+                          (fn [agg curr]
+                            (let [id (fx.replay/replay-id curr)]
+                              (cond
+                                (not id)
+                                (update agg :replays conj curr)
+                                (contains? (:seen-ids agg) id) agg
+                                :else
+                                (-> agg
+                                    (update :replays conj curr)
+                                    (update :seen-ids conj id)))))
+                          {:replays []
+                           :seen-ids #{}}
+                          replays))
+                      replays)]
+        (swap! state-atom assoc :filtered-replays replays))
+      (catch Exception e
+        (log/error e "Error in :filter-replays state watcher")))))
+
 
 (defn- add-watchers
   "Adds all *state watchers."
@@ -938,6 +1052,7 @@
   (remove-watch state-atom :auto-get-resources)
   (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
+  (remove-watch state-atom :filter-replays)
   (remove-watch state-atom :update-battle-status-sync)
   #_
   (add-watch state-atom :battle-map-details
@@ -982,6 +1097,7 @@
                       :id ::state-watcher}
         (tufte/p :auto-get-resources-watcher
           (auto-get-resources-watcher _k state-atom old-state new-state)))))
+  (add-watch state-atom :filter-replays filter-replays-watcher)
   (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
   (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
   #_
@@ -1641,6 +1757,67 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn- write-chat-logs-chimer-fn [state-atom]
+  (log/info "Starting write chat logs chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 1 :minutes))
+          (fn [_chimestamp]
+            (log/debug "Writing chat logs")
+            (let [
+                  chat-logs-dir (fs/file (fs/app-root) "chat-logs")
+                  _ (fs/make-dirs chat-logs-dir)
+                  [{:keys [by-server]}] (swap-vals! state-atom update :by-server
+                                          (fn [by-server]
+                                            (reduce-kv
+                                              (fn [m k v]
+                                                (assoc m k
+                                                  (update v :channels
+                                                    (fn [channels]
+                                                      (reduce-kv
+                                                        (fn [m k v]
+                                                          (assoc m k
+                                                            (update v :messages
+                                                              (fn [messages]
+                                                                (map
+                                                                  #(assoc % :logged true)
+                                                                  messages)))))
+                                                        {}
+                                                        channels)))))
+                                              {}
+                                              by-server)))]
+              (doseq [[server-key server-data] by-server]
+                (doseq [[channel-key channel-data] (:channels server-data)]
+                  (let [to-log (remove :logged (:messages channel-data))
+                        filename (str
+                                   (string/replace (str server-key "-" channel-key) #"[^a-zA-Z0-9\\.\\-\\@\[\]\\_]" "__")
+                                   ".txt")
+                        log-file (io/file chat-logs-dir filename)]
+                    (when (seq to-log)
+                      (log/info "Logging" (count to-log) "messages from" channel-key "on" server-key "to" log-file)
+                      (spit log-file
+                            (str
+                              (string/join "\n"
+                                (map
+                                  (fn [{:keys [message-type text timestamp username]}]
+                                    (str "[" (u/format-datetime timestamp) "] "
+                                      (case message-type
+                                        :ex (str "* " username " " text)
+                                        :join (str username " has joined")
+                                        :leave (str username " has left")
+                                        ; else
+                                        (str username ": " text))))
+                                  to-log))
+                              "\n")
+                            :append true)))))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn truncate-messages!
   ([state-atom]
    (truncate-messages! state-atom u/max-messages))
@@ -1791,26 +1968,28 @@
 
 (defn- state-change-chimer-fn
   "Creates a chimer that runs a state watcher fn periodically."
-  [state-atom k watcher-fn]
-  (let [old-state-atom (atom {})
-        chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/instant)
-            (java-time/duration 3 :seconds))
-          (fn [_chimestamp]
-            (let [old-state @old-state-atom
-                  new-state @state-atom]
-              (tufte/profile {:dynamic? true
-                              :id ::chimer}
-                (tufte/p k
-                  (watcher-fn k state-atom old-state new-state)))
-              (reset! old-state-atom new-state)))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error in" k "state change chimer")
-             true)})]
-    (fn [] (.close chimer))))
+  ([state-atom k watcher-fn]
+   (state-change-chimer-fn state-atom k watcher-fn 3))
+  ([state-atom k watcher-fn duration]
+   (let [old-state-atom (atom {})
+         chimer
+         (chime/chime-at
+           (chime/periodic-seq
+             (java-time/instant)
+             (java-time/duration (or duration 3) :seconds))
+           (fn [_chimestamp]
+             (let [old-state @old-state-atom
+                   new-state @state-atom]
+               (tufte/profile {:dynamic? true
+                               :id ::chimer}
+                 (tufte/p k
+                   (watcher-fn k state-atom old-state new-state)))
+               (reset! old-state-atom new-state)))
+           {:error-handler
+            (fn [e]
+              (log/error e "Error in" k "state change chimer")
+              true)})]
+     (fn [] (.close chimer)))))
 
 
 ; https://github.com/ptaoussanis/tufte/blob/master/examples/clj/src/example/server.clj
@@ -1866,6 +2045,32 @@
   (fs/update-file-cache! *state file))
 
 
+(defn update-battle-sync-statuses [state-atom]
+  (let [state @state-atom]
+    (doseq [[server-key server-data] (-> state :by-server seq)]
+      (let [server-url (-> server-data :client-data :server-url)
+            {:keys [servers spring-isolation-dir]} state
+            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                            spring-isolation-dir)
+            spring-root-path (fs/canonical-path spring-root)
+
+            spring (-> state :by-spring-root (get spring-root-path))
+
+            new-sync-status (resource/sync-status server-data spring (:mod-details state) (:map-details state))
+
+            new-sync-number (handler/sync-number new-sync-status)
+            {:keys [battle client-data username]} server-data
+            {:keys [battle-status team-color]} (-> battle :users (get username))
+            old-sync-number (-> battle :users (get username) :battle-status :sync)]
+        (when (and (:battle-id battle)
+                   (not= old-sync-number new-sync-number))
+          (log/info "Updating battle sync status for" server-key "from" old-sync-number
+                    "to" new-sync-number)
+          (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+            (client-message client-data
+              (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))))
+
+
 (defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
   (let [new-tries ((fnil inc 0) tries)
         error-data {:error true
@@ -1886,7 +2091,8 @@
       (catch Throwable t
         (log/error t "Error updating map details")
         (swap! *state update :map-details cache/miss cache-key error-data)
-        (throw t)))))
+        (throw t)))
+    (update-battle-sync-statuses *state)))
 
 
 (defmethod task-handler ::mod-details
@@ -1909,7 +2115,8 @@
       (catch Throwable t
         (log/error t "Error updating mod details")
         (swap! *state update :mod-details cache/miss cache-key error-data)
-        (throw t)))))
+        (throw t)))
+    (update-battle-sync-statuses *state)))
 
 
 (defmethod task-handler ::replay-details [{:keys [replay-file]}]
@@ -2837,7 +3044,7 @@
                " "
                (cu/encode-battle-status battle-status)
                " "
-               team-color)))
+               (or team-color "0"))))
       (let [data {:battle-status battle-status
                   :team-color team-color}]
         (log/info "No client, assuming singleplayer")
@@ -3022,6 +3229,19 @@
         :client-data client-data
         :message (str "!ring " username)})))
 
+(defmethod event-handler ::ring-specs
+  [{:keys [battle-users channel-name client-data users]}]
+  (when channel-name
+    (doseq [[username user-data] battle-users]
+      (when (and (-> user-data :battle-status :mode not)
+                 (-> users (get username) :client-status :bot not))
+        @(event-handler
+           {:event/type ::send-message
+            :channel-name channel-name
+            :client-data client-data
+            :message (str "!ring " username)})
+        (async/<!! (async/timeout 1000))))))
+
 
 (defmethod event-handler ::ignore-user
   [{:keys [server-key username]}]
@@ -3119,10 +3339,17 @@
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
 
-(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :as e}]
+(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
   (event-handler (assoc e
                         :event/type ::battle-spectate-change
-                        :value (= "Playing" event))))
+                        :value (= "Playing" event)))
+  (swap! *state assoc-in [:by-server server-key :auto-unspec] false))
+
+(defmethod event-handler ::auto-unspec [{:keys [server-key] :as e}]
+  (swap! *state assoc-in [:by-server server-key :auto-unspec] true)
+  (event-handler (assoc e
+                        :event/type ::battle-spectate-change
+                        :value true)))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]
@@ -3962,11 +4189,11 @@
   [
    [:auto-get-resources-watcher auto-get-resources-watcher]
    [:battle-map-details-watcher battle-map-details-watcher]
-   [:battle-mod-details-watcher battle-mod-details-watcher]
-   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher]
+   [:battle-mod-details-watcher battle-mod-details-watcher 15]
+   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
    [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
-   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher]
-   [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
+   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
+   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 15]])
 
 
 (defn ipc-handler
@@ -4033,8 +4260,8 @@
                            (map (partial tasks-chimer-fn state-atom))
                            doall)
          state-chimers (->> state-watch-chimers
-                            (map (fn [[k watcher-fn]]
-                                   (state-change-chimer-fn state-atom k watcher-fn)))
+                            (map (fn [[k watcher-fn duration]]
+                                   (state-change-chimer-fn state-atom k watcher-fn duration)))
                             doall)
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
@@ -4043,16 +4270,28 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
-         update-replays-chimer (update-replays-chimer-fn state-atom)]
+         update-replays-chimer (update-replays-chimer-fn state-atom)
+         write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
-       (add-task! state-atom {::task-type ::reconcile-engines})
-       (add-task! state-atom {::task-type ::reconcile-mods})
-       (add-task! state-atom {::task-type ::reconcile-maps})
-       (add-task! state-atom {::task-type ::refresh-replays})
-       (add-task! state-atom {::task-type ::update-rapid})
-       (event-handler {:event/type ::update-all-downloadables})
-       (event-handler {:event/type ::scan-imports}))
+       (future
+         (try
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-engines})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-mods})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-maps})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::refresh-replays})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::update-rapid})
+           (async/<!! (async/timeout 10000))
+           (event-handler {:event/type ::update-all-downloadables})
+           (async/<!! (async/timeout 10000))
+           (event-handler {:event/type ::scan-imports})
+           (catch Exception e
+             (log/error e "Error adding initial tasks")))))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
      {:chimers
@@ -4067,7 +4306,8 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
-         update-replays-chimer])})))
+         update-replays-chimer
+         write-chat-logs-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]

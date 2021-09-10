@@ -124,7 +124,7 @@
         :icon-literal "mdi-close:30:black"}}]}))
 
 (defn singleplayer-buttons
-  [{:keys [app-update-available spring-isolation-dir] :as state}]
+  [{:keys [app-update-available] :as state}]
   {:fx/type :v-box
    :spacing 10
    :children
@@ -144,7 +144,7 @@
         :on-action {:event/type :spring-lobby/toggle
                     :key :show-replays}}
        {:fx/type :pane
-        :v-box/vgrow :always }])})
+        :v-box/vgrow :always}])})
 
 
 (defn multiplayer-buttons
@@ -170,8 +170,8 @@
                      :key :show-servers-window}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-plus:30:white"}}]}
-     ]
+          :icon-literal "mdi-plus:30:white"}}]}]
+
      (when-let [login-error (str " " (get login-error (first server)))]
        [{:fx/type :label
          :text (str " " login-error)
@@ -254,20 +254,20 @@
 ;        :style {:-fx-min-height 20
 ;                :-fx-pref-height 20}}
        {:fx/type :h-box
-       :spacing 10
-       :children
-       (concat
-         [{:fx/type :pane
-           :h-box/hgrow :always}
+        :spacing 10
+        :children
+        (concat
+          [{:fx/type :pane
+            :h-box/hgrow :always}
            (merge
             {:fx/type connect-button
              :server-key (u/server-key client-data)}
             (select-keys state connect-button-keys))]
-         (when-not client-data
-           [{:fx/type :button
-             :text "Register"
-             :on-action {:event/type :spring-lobby/toggle
-                         :key :show-register-window}}]))}]
+          (when-not client-data
+            [{:fx/type :button
+              :text "Register"
+              :on-action {:event/type :spring-lobby/toggle
+                          :key :show-register-window}}]))}]
      (let [auto-servers (->> servers
                              (filter (comp :auto-connect second)))
            auto-servers-not-connected (->> auto-servers
@@ -346,8 +346,8 @@
              [
               {:fx/type :pane
                :h-box/hgrow :always}
-               {:fx/type singleplayer-buttons}
-               {:fx/type multiplayer-buttons}
+              {:fx/type singleplayer-buttons}
+              {:fx/type multiplayer-buttons}
               {:fx/type :pane
                :h-box/hgrow :always}]}
             {:fx/type :pane

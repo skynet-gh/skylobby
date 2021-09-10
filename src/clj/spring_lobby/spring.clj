@@ -383,7 +383,7 @@
                             (cu/encode-client-status
                               (assoc my-client-status :ingame ingame))))
                      (when (and (not ingame) (:unready-after-game state))
-                       (when-let [me (-> state :battle :users (get username))]
+                       (when-let [me (-> state-atom deref :battle :users (get username))]
                          (let [{:keys [battle-status team-color]} me]
                            (client/send-message
                              (:client client-data)

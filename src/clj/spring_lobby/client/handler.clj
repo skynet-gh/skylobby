@@ -18,6 +18,10 @@
 (set! *warn-on-reflection* true)
 
 
+(def last-auto-unspec-atom (atom 0))
+(def auto-unspec-cooldown 5000)
+
+
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
 
@@ -123,17 +127,44 @@
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (cu/decode-battle-status battle-status)]
     (log/info "Updating status of" username "to" decoded "with color" team-color)
-    (swap! state-atom update-in [:by-server server-url]
-      (fn [server]
-        (if (:battle server)
-          (-> server
-              (update-in [:battle :users username]
-                assoc
-                :battle-status decoded
-                :team-color team-color))
-          (do
-            (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
-            server))))))
+    (let [[prev curr]
+          (swap-vals! state-atom update-in [:by-server server-url]
+            (fn [server]
+              (if (:battle server)
+                (-> server
+                    (update-in [:battle :users username]
+                      assoc
+                      :battle-status decoded
+                      :team-color team-color))
+                (do
+                  (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
+                  server))))
+          {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
+          my-username (:username server-data)
+          client (:client client-data)
+          me (-> battle :users (get my-username))]
+      (when (and auto-unspec
+                 (-> me :battle-status :mode not)
+                 (not= username my-username)
+                 (-> battle :users (get username) :battle-status :mode)
+                 (-> curr :by-server (get server-url) :battle :users (get username) :battle-status :mode not))
+        (try
+          (let [last-auto-unspec @last-auto-unspec-atom
+                now (u/curr-millis)]
+            (if (< 5000 (- now last-auto-unspec))
+              (do
+                (log/info "Auto-unspeccing")
+                (message/send-message
+                  client
+                  (str "MYBATTLESTATUS "
+                       (cu/encode-battle-status
+                         (assoc (:battle-status me) :mode true))
+                       " "
+                       (or (:team-color me) 0)))
+                (reset! last-auto-unspec-atom now))
+              (log/info "Too soon to auto unspec")))
+          (catch Exception e
+            (log/warn e "Error auto unspeccing")))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -308,13 +339,14 @@
       (fn [{:keys [client-data] :as state}]
         (let [initial-status {}
               unified (-> client-data :compflags (contains? "u"))
-              next-state (assoc-in state [:battles battle-id :users username] initial-status)]
+              next-state (assoc-in state [:battles battle-id :users username] initial-status)
+              my-battle (= battle-id (-> next-state :battle :battle-id))]
           (cond-> next-state
-                  (= battle-id (-> next-state :battle :battle-id))
+                  my-battle
                   (assoc-in [:battle :users username] initial-status)
                   script-password
                   (assoc-in [:battle :script-password] script-password)
-                  (not unified)
+                  (and (not unified) my-battle)
                   (update-in [:channels (u/battle-channel-name battle-id) :messages]
                     conj {:text ""
                           :timestamp (u/curr-millis)
@@ -440,7 +472,7 @@
                                     (resource/sync-status server-data spring mod-details map-details)))
         color (or preferred-color (u/random-color))
         client (:client client-data)
-        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " color)]
+        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
     (message/send-message client msg)))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]

@@ -1,7 +1,9 @@
 (ns spring-lobby.client.handler-test
   (:require
+    [clojure.core.async :as async]
     [clojure.test :refer [deftest is testing]]
     [spring-lobby.client.handler :as handler]
+    [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
     [spring-lobby.util :as u]))
 
@@ -319,3 +321,92 @@
                   :game-start-time now}}}}}
              @state-atom))
       (is (true? @game-started)))))
+
+(deftest handle-CLIENTBATTLESTATUS
+  (testing "add user"
+    (let [
+          server-key :server1
+          state-atom (atom
+                       {:by-server
+                        {server-key
+                         {:battle {}}}})
+          messages-atom (atom [])]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))]
+        (handler/handle state-atom server-key "CLIENTBATTLESTATUS skynet 0 0"))
+      (is (= {:by-server
+              {server-key
+               {:battle
+                {:users
+                 {"skynet"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}
+                   :team-color "0"}}}}}}
+             @state-atom))
+      (is (= []
+             @messages-atom))))
+  (testing "auto unspec"
+    (let [
+          server-key :server1
+          state-atom (atom
+                       {:by-server
+                        {server-key
+                         {:auto-unspec true
+                          :battle
+                          {:users
+                           {"skynet"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 0
+                              :mode false
+                              :ready false
+                              :side 0
+                              :sync 0}}
+                            "other"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 1
+                              :mode true
+                              :ready false
+                              :side 0
+                              :sync 0}}}}
+                          :username "skynet"}}})
+          messages-atom (atom [])]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))]
+        (handler/handle state-atom server-key "CLIENTBATTLESTATUS other 0 0"))
+      (async/<!! (async/timeout 100))
+      (is (= {:by-server
+              {server-key
+               {:auto-unspec true
+                :battle
+                {:users
+                 {"skynet"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}}
+                  "other"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}
+                   :team-color "0"}}}
+                :username "skynet"}}}
+             @state-atom))
+      (is (= ["MYBATTLESTATUS 1024 0"]
+             @messages-atom)))))

@@ -100,7 +100,9 @@
      "-username-leave"
      {:-fx-fill "grey"}
      "-message"
-     {:-fx-fill "white"}}
+     {:-fx-fill "white"}
+     "-message-highlight"
+     {:-fx-fill "red"}}
     "-console"
     {
      "-time"
