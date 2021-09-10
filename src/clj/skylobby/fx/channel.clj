@@ -181,6 +181,11 @@
         :document (channel-document
                     (->> messages
                          (remove (comp ignore-users-set :username))
+                         (remove
+                           (fn [{:keys [message-type text]}]
+                             (and (= :ex message-type)
+                                  text
+                                  (string/starts-with? text "* BarManager|"))))
                          reverse))}}}}))
 
 (defn channel-view-history
