@@ -4116,13 +4116,24 @@
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
-       (add-task! state-atom {::task-type ::reconcile-engines})
-       (add-task! state-atom {::task-type ::reconcile-mods})
-       (add-task! state-atom {::task-type ::reconcile-maps})
-       (add-task! state-atom {::task-type ::refresh-replays})
-       (add-task! state-atom {::task-type ::update-rapid})
-       (event-handler {:event/type ::update-all-downloadables})
-       (event-handler {:event/type ::scan-imports}))
+       (future
+         (try
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-engines})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-mods})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::reconcile-maps})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::refresh-replays})
+           (async/<!! (async/timeout 10000))
+           (add-task! state-atom {::task-type ::update-rapid})
+           (async/<!! (async/timeout 10000))
+           (event-handler {:event/type ::update-all-downloadables})
+           (async/<!! (async/timeout 10000))
+           (event-handler {:event/type ::scan-imports})
+           (catch Exception e
+             (log/error e "Error adding initial tasks")))))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
      {:chimers
