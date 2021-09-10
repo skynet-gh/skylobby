@@ -214,47 +214,51 @@
           :closable false
           :id "chat"
           :content
-          {:fx/type :split-pane
-           :divider-positions [0.70 0.9]
-           :items
-           [(merge
-              {:fx/type my-channels-view}
-              (select-keys state my-channels-view-keys))
-            users-view
-            {:fx/type :v-box
-             :children
-             [{:fx/type :label
-               :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
-              (merge
-                {:fx/type fx.channels/channels-table
-                 :v-box/vgrow :always}
-                (select-keys state fx.channels/channels-table-keys))
-              {:fx/type :h-box
-               :alignment :center-left
+          (if (= "chat" selected-tab-main)
+            {:fx/type :split-pane
+             :divider-positions [0.70 0.9]
+             :items
+             [(merge
+                {:fx/type my-channels-view}
+                (select-keys state my-channels-view-keys))
+              users-view
+              {:fx/type :v-box
                :children
-               [
-                {:fx/type :button
-                 :text ""
-                 :on-action {:event/type :spring-lobby/join-channel
-                             :channel-name join-channel-name
-                             :client-data client-data}
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-plus:20:white"}}
-                {:fx/type :text-field
-                 :text join-channel-name
-                 :prompt-text "New Channel"
-                 :on-text-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:by-server server-key :join-channel-name]}
-                 :on-action {:event/type :spring-lobby/join-channel
-                             :channel-name join-channel-name
-                             :client-data client-data}}]}]}]}}
+               [{:fx/type :label
+                 :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
+                (merge
+                  {:fx/type fx.channels/channels-table
+                   :v-box/vgrow :always}
+                  (select-keys state fx.channels/channels-table-keys))
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [
+                  {:fx/type :button
+                   :text ""
+                   :on-action {:event/type :spring-lobby/join-channel
+                               :channel-name join-channel-name
+                               :client-data client-data}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-plus:20:white"}}
+                  {:fx/type :text-field
+                   :text join-channel-name
+                   :prompt-text "New Channel"
+                   :on-text-changed {:event/type :spring-lobby/assoc-in
+                                     :path [:by-server server-key :join-channel-name]}
+                   :on-action {:event/type :spring-lobby/join-channel
+                               :channel-name join-channel-name
+                               :client-data client-data}}]}]}]}
+            {:fx/type :pane})}
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text "Console"}
           :closable false
           :id "console"
           :content
-          (merge
-            {:fx/type fx.console/console-view}
-            (select-keys state fx.console/console-view-keys))}])}}))
+          (if (= "console" selected-tab-main)
+            (merge
+              {:fx/type fx.console/console-view}
+              (select-keys state fx.console/console-view-keys))
+            {:fx/type :pane})}])}}))

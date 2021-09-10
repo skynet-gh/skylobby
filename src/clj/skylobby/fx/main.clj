@@ -68,17 +68,19 @@
                :on-close-request {:event/type :spring-lobby/disconnect
                                   :server-key server-key}
                :content
-               (merge
-                 {:fx/type fx.server-tab/server-tab}
-                 (select-keys state fx.server-tab/server-tab-state-keys)
-                 server-data
-                 {:selected-tab-channel selected-tab-channel
-                  :selected-tab-main selected-tab-main
-                  :server-key server-key}
-                 (let [server-url (-> server-data :client-data :server-url)
-                       spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                       spring-isolation-dir)]
-                   (resource/spring-root-resources spring-root by-spring-root)))})
+               (if (= (str server-key) selected-server-tab)
+                 (merge
+                   {:fx/type fx.server-tab/server-tab}
+                   (select-keys state fx.server-tab/server-tab-state-keys)
+                   server-data
+                   {:selected-tab-channel selected-tab-channel
+                    :selected-tab-main selected-tab-main
+                    :server-key server-key}
+                   (let [server-url (-> server-data :client-data :server-url)
+                         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                         spring-isolation-dir)]
+                     (resource/spring-root-resources spring-root by-spring-root)))
+                 {:fx/type :pane})})
             valid-servers)
           #_
           (when (seq valid-servers)
