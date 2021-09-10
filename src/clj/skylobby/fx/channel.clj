@@ -127,42 +127,55 @@
   (StyledSegment. text style))
 
 (defn channel-document
-  [messages]
-  (let [
-        builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
-    (doseq [message messages]
-      (let [{:keys [message-type text timestamp username]} message]
-        (.addParagraph builder
-          ^java.util.List
-          (vec
-            (concat
-              [
-               (segment
-                 (str "[" (u/format-hours timestamp) "] ")
-                 ["text" "skylobby-chat-time"])
-               (segment
-                 (str
-                   (case message-type
-                     :ex (str "* " username " " text)
-                     :join (str username " has joined")
-                     :leave (str username " has left")
-                     ; else
-                     (str username ": ")))
-                 ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))])]
-              (when-not message-type
-                (map
-                  (fn [[_all _ _irc-color-code text-segment]]
-                    (segment
-                      (str text-segment)
-                      ["text" "skylobby-chat-message"]))
-                  (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
-          ^java.util.List
-          [])))
-    (when (seq messages)
-      (.build builder))))
+  ([messages]
+   (channel-document messages nil))
+  ([messages {:keys [highlight]}]
+   (let [highlight (->> highlight
+                        (filter some?)
+                        (map string/trim)
+                        (remove string/blank?))
+         builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+     (doseq [message messages]
+       (let [{:keys [message-type text timestamp username]} message]
+         (.addParagraph builder
+           ^java.util.List
+           (vec
+             (concat
+               [
+                (segment
+                  (str "[" (u/format-hours timestamp) "] ")
+                  ["text" "skylobby-chat-time"])
+                (segment
+                  (str
+                    (case message-type
+                      :ex (str "* " username " " text)
+                      :join (str username " has joined")
+                      :leave (str username " has left")
+                      ; else
+                      (str username ": ")))
+                  ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))])]
+               (when-not message-type
+                 (map
+                   (fn [[_all _ _irc-color-code text-segment]]
+                     (segment
+                       (str text-segment)
+                       ["text"
+                        (if (and (seq highlight)
+                                 (some (fn [substr]
+                                         (and text-segment substr
+                                              (string/includes? (string/lower-case text-segment)
+                                                                (string/lower-case substr))))
+                                       highlight))
+                          "skylobby-chat-message-highlight"
+                          "skylobby-chat-message")]))
+                   (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
+           ^java.util.List
+           [])))
+     (when (seq messages)
+       (.build builder)))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-font-size ignore-users messages server-key]}]
+  [{:keys [chat-font-size chat-highlight-username chat-highlight-words ignore-users messages server-key username]}]
   (let [ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
@@ -186,7 +199,13 @@
                              (and (= :ex message-type)
                                   text
                                   (string/starts-with? text "* BarManager|"))))
-                         reverse))}}}}))
+                         reverse)
+                    {:highlight
+                     (concat
+                       (when chat-highlight-words
+                         (string/split chat-highlight-words #"[\s,]+"))
+                       (when chat-highlight-username
+                         [username]))})}}}}))
 
 (defn channel-view-history
   [state]
@@ -251,7 +270,7 @@
          :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
-  [:chat-font-size :ignore-users])
+  [:chat-font-size :chat-highlight-username :chat-highlight-words :ignore-users])
 
 (defn channel-view-impl
   [{:keys [channel-name channels hide-users]

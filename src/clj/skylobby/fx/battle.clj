@@ -1236,7 +1236,8 @@
                        :client-data client-data
                        :hide-users true
                        :message-draft (get message-drafts channel-name)
-                       :server-key server-key}
+                       :server-key server-key
+                       :username username}
                       (select-keys state fx.channel/channel-state-keys))
         battle-tabs {:fx/type battle-tabs
                      :am-host am-host

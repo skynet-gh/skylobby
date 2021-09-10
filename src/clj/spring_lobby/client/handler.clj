@@ -471,7 +471,7 @@
                                     (resource/sync-status server-data spring mod-details map-details)))
         color (or preferred-color (u/random-color))
         client (:client client-data)
-        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " color)]
+        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
     (message/send-message client msg)))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]

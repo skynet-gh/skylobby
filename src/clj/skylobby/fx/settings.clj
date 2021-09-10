@@ -19,14 +19,15 @@
 
 
 (def settings-window-keys
-  [:auto-refresh-replays :chat-font-size :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:auto-refresh-replays :chat-font-size :chat-highlight-words :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
    :music-dir :music-volume :players-table-columns
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-git-mod-version])
 
 (defn settings-window-impl
-  [{:keys [auto-refresh-replays chat-font-size css disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
+  [{:keys [auto-refresh-replays chat-font-size chat-highlight-username chat-highlight-words css
+           disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
            music-volume players-table-columns screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
            unready-after-game use-git-mod-version]
@@ -120,6 +121,29 @@
                                     :key :use-git-mod-version}}
              {:fx/type :label
               :text " Use git to version .sdd games"}]}
+           {:fx/type :label
+            :text " Chat"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean chat-highlight-username)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :chat-highlight-username}}
+             {:fx/type :label
+              :text " Highlight username"}]}
+           {:fx/type :label
+            :text "Highlight words (comma or space separated): "}
+           {:fx/type :text-field
+            :text (str chat-highlight-words)
+            :style {
+                    :-fx-min-width 500
+                    :-fx-pref-width 500
+                    :-fx-max-width 500}
+            :on-text-changed {:event/type :spring-lobby/assoc
+                              :key :chat-highlight-words}}
            {:fx/type :label
             :text " Battle"
             :style {:-fx-font-size 24}}
