@@ -200,7 +200,7 @@
 
 
 (defn battle-buttons
-  [{:keys [am-host am-ingame am-spec auto-get-resources auto-launch battle battle-layout battle-map-details
+  [{:keys [am-host am-ingame am-spec auto-get-resources auto-launch auto-unspec battle battle-layout battle-map-details
            battle-mod-details battle-players-color-type battle-map battle-modname bot-name
            bot-names bot-username bot-version bot-versions bots channel-name
            client-data downloadables-by-url engine-details engine-file
@@ -559,13 +559,14 @@
                             :client-data (when-not singleplayer client-data)
                             :is-me true
                             :is-bot false
-                            :id my-player}}])}
+                            :id my-player
+                            :server-key server-key}}])}
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 24}
      :children
      (concat
-       (when-not am-spec
+       (if-not am-spec
          [{:fx/type :check-box
            :selected (-> my-battle-status :ready boolean)
            :style {:-fx-padding "10px"}
@@ -574,7 +575,21 @@
                                    :client-data (when-not singleplayer client-data)
                                    :username username})}
           {:fx/type :label
-           :text " Ready"}])
+           :text " Ready"}]
+         [{:fx/type :check-box
+           :selected (boolean auto-unspec)
+           :style {:-fx-padding "10px"
+                   :-fx-font-size 15}
+           :on-selected-changed
+           {:event/type :spring-lobby/auto-unspec
+            :client-data (when-not singleplayer client-data)
+            :is-me true
+            :is-bot false
+            :id my-player
+            :server-key server-key}}
+          {:fx/type :label
+           :style {:-fx-font-size 15}
+           :text "Auto Unspec "}])
        [
         {:fx/type :pane
          :h-box/hgrow :always}
@@ -1054,7 +1069,7 @@
 (def battle-view-keys
   (concat
     battle-view-state-keys
-    [:auto-launch :battles :battle :channels :client-data :engines :engines-by-version :maps :maps-by-name :mods :mods-by-name
+    [:auto-launch :auto-unspec :battles :battle :channels :client-data :engines :engines-by-version :maps :maps-by-name :mods :mods-by-name
      :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view-impl

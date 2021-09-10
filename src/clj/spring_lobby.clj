@@ -2837,7 +2837,7 @@
                " "
                (cu/encode-battle-status battle-status)
                " "
-               team-color)))
+               (or team-color "0"))))
       (let [data {:battle-status battle-status
                   :team-color team-color}]
         (log/info "No client, assuming singleplayer")
@@ -3119,10 +3119,17 @@
       (catch Exception e
         (log/error e "Error updating battle spectate")))))
 
-(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :as e}]
+(defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
   (event-handler (assoc e
                         :event/type ::battle-spectate-change
-                        :value (= "Playing" event))))
+                        :value (= "Playing" event)))
+  (swap! *state assoc-in [:by-server server-key :auto-unspec] false))
+
+(defmethod event-handler ::auto-unspec [{:keys [server-key] :as e}]
+  (swap! *state assoc-in [:by-server server-key :auto-unspec] true)
+  (event-handler (assoc e
+                        :event/type ::battle-spectate-change
+                        :value true)))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]
