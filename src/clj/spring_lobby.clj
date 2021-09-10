@@ -1642,6 +1642,67 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn- write-chat-logs-chimer-fn [state-atom]
+  (log/info "Starting write chat logs chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 1 :minutes))
+          (fn [_chimestamp]
+            (log/debug "Writing chat logs")
+            (let [
+                  chat-logs-dir (fs/file (fs/app-root) "chat-logs")
+                  _ (fs/make-dirs chat-logs-dir)
+                  [{:keys [by-server]}] (swap-vals! state-atom update :by-server
+                                          (fn [by-server]
+                                            (reduce-kv
+                                              (fn [m k v]
+                                                (assoc m k
+                                                  (update v :channels
+                                                    (fn [channels]
+                                                      (reduce-kv
+                                                        (fn [m k v]
+                                                          (assoc m k
+                                                            (update v :messages
+                                                              (fn [messages]
+                                                                (map
+                                                                  #(assoc % :logged true)
+                                                                  messages)))))
+                                                        {}
+                                                        channels)))))
+                                              {}
+                                              by-server)))]
+              (doseq [[server-key server-data] by-server]
+                (doseq [[channel-key channel-data] (:channels server-data)]
+                  (let [to-log (remove :logged (:messages channel-data))
+                        filename (str
+                                   (string/replace (str server-key "-" channel-key) #"[^a-zA-Z0-9\\.\\-\\@\[\]\\_]" "__")
+                                   ".txt")
+                        log-file (io/file chat-logs-dir filename)]
+                    (when (seq to-log)
+                      (log/info "Logging" (count to-log) "messages from" channel-key "on" server-key "to" log-file)
+                      (spit log-file
+                            (str
+                              (string/join "\n"
+                                (map
+                                  (fn [{:keys [message-type text timestamp username]}]
+                                    (str "[" (u/format-datetime timestamp) "] "
+                                      (case message-type
+                                        :ex (str "* " username " " text)
+                                        :join (str username " has joined")
+                                        :leave (str username " has left")
+                                        ; else
+                                        (str username ": " text))))
+                                  to-log))
+                              "\n")
+                            :append true)))))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn truncate-messages!
   ([state-atom]
    (truncate-messages! state-atom u/max-messages))
@@ -4051,7 +4112,8 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
-         update-replays-chimer (update-replays-chimer-fn state-atom)]
+         update-replays-chimer (update-replays-chimer-fn state-atom)
+         write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
        (add-task! state-atom {::task-type ::reconcile-engines})
@@ -4075,7 +4137,8 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
-         update-replays-chimer])})))
+         update-replays-chimer
+         write-chat-logs-chimer])})))
 
 
 (defn standalone-replay-init [state-atom]

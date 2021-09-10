@@ -339,13 +339,14 @@
       (fn [{:keys [client-data] :as state}]
         (let [initial-status {}
               unified (-> client-data :compflags (contains? "u"))
-              next-state (assoc-in state [:battles battle-id :users username] initial-status)]
+              next-state (assoc-in state [:battles battle-id :users username] initial-status)
+              my-battle (= battle-id (-> next-state :battle :battle-id))]
           (cond-> next-state
-                  (= battle-id (-> next-state :battle :battle-id))
+                  my-battle
                   (assoc-in [:battle :users username] initial-status)
                   script-password
                   (assoc-in [:battle :script-password] script-password)
-                  (not unified)
+                  (and (not unified) my-battle)
                   (update-in [:channels (u/battle-channel-name battle-id) :messages]
                     conj {:text ""
                           :timestamp (u/curr-millis)
