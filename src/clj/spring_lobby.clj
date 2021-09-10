@@ -215,7 +215,8 @@
                              :country true
                              :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
-     :servers default-servers}
+     :servers default-servers
+     :unready-after-game true}
     (apply
       merge
       (doall
