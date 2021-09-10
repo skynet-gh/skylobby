@@ -784,7 +784,14 @@
                              :channel-name channel-name
                              :client-data (when-not singleplayer client-data)
                              :users users
-                             :username username}}]
+                             :username username}}
+                {:fx/type :button
+                 :text "Ring Specs"
+                 :on-action {:event/type :spring-lobby/ring-specs
+                             :battle-users (:users battle)
+                             :channel-name channel-name
+                             :client-data client-data
+                             :users users}}]
                (when am-host
                  [
                   {:fx/type :pane
@@ -1263,6 +1270,7 @@
                      :spring-isolation-dir spring-isolation-dir
                      :spring-settings spring-settings
                      :startpostype startpostype
+                     :users users
                      :username username}]
     {:fx/type :h-box
      :style {:-fx-font-size 15}
