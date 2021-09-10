@@ -32,6 +32,18 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.9]
+
+- Add auto unspec checkbox
+- Add highlight of username and custom words in chat
+- Add logging of chat to files in `.skylobby/chat-logs`
+- Fix unready after game using state when game started
+- Add Ring Specs button
+- Improve rendering performance of replays window
+- General performance improvements
+- Lower threshold for chat auto scroll
+- Filter BarManager messages from chat
+
 ### [0.4.8]
 
 - Add ignore user to context menu
