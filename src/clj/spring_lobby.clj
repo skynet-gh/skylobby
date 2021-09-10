@@ -1853,26 +1853,28 @@
 
 (defn- state-change-chimer-fn
   "Creates a chimer that runs a state watcher fn periodically."
-  [state-atom k watcher-fn]
-  (let [old-state-atom (atom {})
-        chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/instant)
-            (java-time/duration 3 :seconds))
-          (fn [_chimestamp]
-            (let [old-state @old-state-atom
-                  new-state @state-atom]
-              (tufte/profile {:dynamic? true
-                              :id ::chimer}
-                (tufte/p k
-                  (watcher-fn k state-atom old-state new-state)))
-              (reset! old-state-atom new-state)))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error in" k "state change chimer")
-             true)})]
-    (fn [] (.close chimer))))
+  ([state-atom k watcher-fn]
+   (state-change-chimer-fn state-atom k watcher-fn 3))
+  ([state-atom k watcher-fn duration]
+   (let [old-state-atom (atom {})
+         chimer
+         (chime/chime-at
+           (chime/periodic-seq
+             (java-time/instant)
+             (java-time/duration (or duration 3) :seconds))
+           (fn [_chimestamp]
+             (let [old-state @old-state-atom
+                   new-state @state-atom]
+               (tufte/profile {:dynamic? true
+                               :id ::chimer}
+                 (tufte/p k
+                   (watcher-fn k state-atom old-state new-state)))
+               (reset! old-state-atom new-state)))
+           {:error-handler
+            (fn [e]
+              (log/error e "Error in" k "state change chimer")
+              true)})]
+     (fn [] (.close chimer)))))
 
 
 ; https://github.com/ptaoussanis/tufte/blob/master/examples/clj/src/example/server.clj
@@ -4031,11 +4033,11 @@
   [
    [:auto-get-resources-watcher auto-get-resources-watcher]
    [:battle-map-details-watcher battle-map-details-watcher]
-   [:battle-mod-details-watcher battle-mod-details-watcher]
-   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher]
+   [:battle-mod-details-watcher battle-mod-details-watcher 15]
+   [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
    [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
-   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher]
-   [:update-battle-status-sync-watcher update-battle-status-sync-watcher]])
+   [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
+   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 15]])
 
 
 (defn ipc-handler
@@ -4102,8 +4104,8 @@
                            (map (partial tasks-chimer-fn state-atom))
                            doall)
          state-chimers (->> state-watch-chimers
-                            (map (fn [[k watcher-fn]]
-                                   (state-change-chimer-fn state-atom k watcher-fn)))
+                            (map (fn [[k watcher-fn duration]]
+                                   (state-change-chimer-fn state-atom k watcher-fn duration)))
                             doall)
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
