@@ -2045,6 +2045,32 @@
   (fs/update-file-cache! *state file))
 
 
+(defn update-battle-sync-statuses [state-atom]
+  (let [state @state-atom]
+    (doseq [[server-key server-data] (-> state :by-server seq)]
+      (let [server-url (-> server-data :client-data :server-url)
+            {:keys [servers spring-isolation-dir]} state
+            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                            spring-isolation-dir)
+            spring-root-path (fs/canonical-path spring-root)
+
+            spring (-> state :by-spring-root (get spring-root-path))
+
+            new-sync-status (resource/sync-status server-data spring (:mod-details state) (:map-details state))
+
+            new-sync-number (handler/sync-number new-sync-status)
+            {:keys [battle client-data username]} server-data
+            {:keys [battle-status team-color]} (-> battle :users (get username))
+            old-sync-number (-> battle :users (get username) :battle-status :sync)]
+        (when (and (:battle-id battle)
+                   (not= old-sync-number new-sync-number))
+          (log/info "Updating battle sync status for" server-key "from" old-sync-number
+                    "to" new-sync-number)
+          (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+            (client-message client-data
+              (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))))
+
+
 (defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
   (let [new-tries ((fnil inc 0) tries)
         error-data {:error true
@@ -2065,7 +2091,8 @@
       (catch Throwable t
         (log/error t "Error updating map details")
         (swap! *state update :map-details cache/miss cache-key error-data)
-        (throw t)))))
+        (throw t)))
+    (update-battle-sync-statuses *state)))
 
 
 (defmethod task-handler ::mod-details
@@ -2088,7 +2115,8 @@
       (catch Throwable t
         (log/error t "Error updating mod details")
         (swap! *state update :mod-details cache/miss cache-key error-data)
-        (throw t)))))
+        (throw t)))
+    (update-battle-sync-statuses *state)))
 
 
 (defmethod task-handler ::replay-details [{:keys [replay-file]}]
