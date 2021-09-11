@@ -133,7 +133,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
-   :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :logins :map-name
