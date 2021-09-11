@@ -99,8 +99,7 @@
      :server :users]))
 
 (defn main-tab-view
-  [{:keys [battles client-data channels filter-battles filter-users join-channel-name
-           selected-tab-main server-key users]
+  [{:keys [battles client-data channels filter-battles join-channel-name selected-tab-main server-key]
     :as state}]
   (let [matchmaking (u/matchmaking? state)
         main-tab-ids (if matchmaking
@@ -109,37 +108,10 @@
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
-        bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
-        bot-count (count (get bot-or-human true))
-        human-count (count (get bot-or-human false))
-        users-view {:fx/type :v-box
-                    :children
-                    [{:fx/type :h-box
-                      :alignment :center-left
-                      :children
-                      (concat
-                        [
-                         {:fx/type :label
-                          :text (str "Users (" human-count ")  Bots (" bot-count ")")}
-                         {:fx/type :pane
-                          :h-box/hgrow :always}
-                         {:fx/type :label
-                          :text (str " Filter: ")}
-                         {:fx/type :text-field
-                          :text (str filter-users)
-                          :on-text-changed {:event/type :spring-lobby/assoc
-                                            :key :filter-users}}]
-                        (when-not (string/blank? filter-users)
-                          [{:fx/type :button
-                            :on-action {:event/type :spring-lobby/dissoc
-                                        :key :filter-users}
-                            :graphic
-                            {:fx/type font-icon/lifecycle
-                             :icon-literal "mdi-close:16:white"}}]))}
-                     (merge
-                       {:fx/type fx.user/users-table
-                        :v-box/vgrow :always}
-                       (select-keys state fx.user/users-table-keys))]}]
+        users-view (merge
+                     {:fx/type fx.user/users-view
+                      :v-box/vgrow :always}
+                     (select-keys state fx.user/users-table-keys))]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props
      (merge

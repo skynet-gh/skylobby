@@ -14,7 +14,7 @@
     users-table-state-keys
     [:battles :client-data :filter-users :server-key :users]))
 
-(defn users-table [{:keys [battles client-data filter-users ignore-users server-key users]}]
+(defn users-table [{:keys [battles client-data ignore-users server-key users]}]
   (let [battles-by-users (->> battles
                               vals
                               (mapcat
@@ -23,19 +23,9 @@
                                     (fn [[username _status]]
                                       [username battle])
                                     (:users battle))))
-                              (into {}))
-        filter-lc (when-not (string/blank? filter-users)
-                    (string/lower-case filter-users))
-        filtered-users (->> users
-                            (filter
-                              (fn [[username _]]
-                                (if filter-lc
-                                  (if (string/blank? username)
-                                    false
-                                    (string/includes? (string/lower-case username) filter-lc))
-                                  true))))]
+                              (into {}))]
     {:fx/type ext-table-column-auto-size
-     :items (->> filtered-users
+     :items (->> users
                  vals
                  (filter :username)
                  (sort-by :username String/CASE_INSENSITIVE_ORDER)
@@ -189,3 +179,52 @@
         :cell-factory
         {:fx/cell-type :table-cell
          :describe (fn [user-agent] {:text (str user-agent)})}}]}}))
+
+
+(defn users-view [{:keys [filter-users users] :as state}]
+  (let [
+        bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
+        bot-count (count (get bot-or-human true))
+        human-count (count (get bot-or-human false))
+        filter-lc (when-not (string/blank? filter-users)
+                    (string/lower-case filter-users))
+        filtered-users (->> users
+                            (filter
+                              (fn [[username {:keys [user-agent]}]]
+                                (if filter-lc
+                                  (or (and (not (string/blank? username))
+                                           (string/includes? (string/lower-case username) filter-lc))
+                                      (and (not (string/blank? user-agent))
+                                           (string/includes? (string/lower-case user-agent) filter-lc)))
+                                  true))))]
+    {:fx/type :v-box
+     :children
+     [{:fx/type :h-box
+       :alignment :center-left
+       :children
+       (concat
+         [
+          {:fx/type :label
+           :text (str "Users (" human-count ")  Bots (" bot-count ")")}
+          {:fx/type :pane
+           :h-box/hgrow :always}
+          {:fx/type :label
+           :text (str " Filter"
+                      (when-not (string/blank? filter-users)
+                        (str " (" (count filtered-users) ")"))
+                      ": ")}
+          {:fx/type :text-field
+           :text (str filter-users)
+           :on-text-changed {:event/type :spring-lobby/assoc
+                             :key :filter-users}}]
+         (when-not (string/blank? filter-users)
+           [{:fx/type :button
+             :on-action {:event/type :spring-lobby/dissoc
+                         :key :filter-users}
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-close:16:white"}}]))}
+      (merge
+        {:fx/type users-table}
+        state
+        {:users filtered-users})]}))
