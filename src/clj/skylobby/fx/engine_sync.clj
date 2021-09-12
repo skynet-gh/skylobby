@@ -13,7 +13,7 @@
    :h-box/margin 8
    :resource "Engine"
    :refresh-action {:event/type :spring-lobby/add-task
-                    :task {:spring-lobby/task-type :spring-lobby/reconcile-engines}}
+                    :task {:spring-lobby/task-type :spring-lobby/refresh-engines}}
    :refresh-in-progress (seq engine-update-tasks)
    :browse-action {:event/type :spring-lobby/desktop-browse-dir
                    :file (or engine-file

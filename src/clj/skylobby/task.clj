@@ -2,9 +2,9 @@
 
 
 (def index-tasks
-  #{:spring-lobby/reconcile-engines
-    :spring-lobby/reconcile-mods
-    :spring-lobby/reconcile-maps})
+  #{:spring-lobby/refresh-engines
+    :spring-lobby/refresh-mods
+    :spring-lobby/refresh-maps})
 
 (def resource-tasks
   #{:spring-lobby/import

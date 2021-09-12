@@ -1144,14 +1144,14 @@
         import-tasks (->> (get tasks-by-type :spring-lobby/import)
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
-        engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
                                  set)
         map-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
+                              (filter (comp #{:spring-lobby/map-details :spring-lobby/refresh-maps} first))
                               (mapcat second)
                               set)
         mod-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/mod-details :spring-lobby/reconcile-mods} first))
+                              (filter (comp #{:spring-lobby/mod-details :spring-lobby/refresh-mods} first))
                               (mapcat second)
                               set)
         rapid-tasks-by-id (->> (get tasks-by-type :spring-lobby/rapid-download)
