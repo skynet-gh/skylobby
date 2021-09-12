@@ -379,9 +379,10 @@
                               :sync 0}}}}
                           :username "skynet"}}})
           messages-atom (atom [])]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+                    handler/auto-unspec-ready? (constantly true)]
         (handler/handle state-atom server-key "CLIENTBATTLESTATUS other 0 0"))
-      (async/<!! (async/timeout 100))
+      (async/<!! (async/timeout 200))
       (is (= {:by-server
               {server-key
                {:auto-unspec true
@@ -407,6 +408,65 @@
                     :sync 0}
                    :team-color "0"}}}
                 :username "skynet"}}}
+             @state-atom))
+      (is (= ["MYBATTLESTATUS 1024 0"]
+             @messages-atom)))))
+
+
+(deftest handle-LEFTBATTLE
+  (testing "auto unspec"
+    (let [
+          server-key :server1
+          state-atom (atom
+                       {:by-server
+                        {server-key
+                         {:auto-unspec true
+                          :battle
+                          {:battle-id "0"
+                           :users
+                           {"skynet"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 0
+                              :mode false
+                              :ready false
+                              :side 0
+                              :sync 0}}
+                            "other"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 1
+                              :mode true
+                              :ready false
+                              :side 0
+                              :sync 0}}}}
+                          :username "skynet"
+                          :client-data {:compflags #{"u"}}}}})
+          messages-atom (atom [])]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+                    handler/auto-unspec-ready? (constantly true)]
+        (handler/handle state-atom server-key "LEFTBATTLE 0 other"))
+      (async/<!! (async/timeout 200))
+      (is (= {:by-server
+              {server-key
+               {:auto-unspec true
+                :battle
+                {:battle-id "0"
+                 :users
+                 {"skynet"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}}}}
+                :battles {"0" {:users nil}}
+                :username "skynet"
+                :client-data {:compflags #{"u"}}}}}
              @state-atom))
       (is (= ["MYBATTLESTATUS 1024 0"]
              @messages-atom)))))

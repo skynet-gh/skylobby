@@ -960,9 +960,9 @@
   ([^java.io.File file opts]
    (let [filename (filename file)]
      (log/info "Loading map" file)
-     (try
-       (merge
-         {:file file}
+     (merge
+       {:file file}
+       (try
          (cond
            (and (is-file? file) (string/ends-with? filename ".sdz"))
            (read-zip-map file opts)
@@ -971,9 +971,10 @@
            (and (is-directory? file) (string/ends-with? filename ".sdd"))
            (read-map-directory file opts)
            :else
-           nil))
-       (catch Exception e
-         (log/warn e "Error reading map data for" filename))))))
+           {:error true})
+         (catch Exception e
+           (log/warn e "Error reading map data for" filename)
+           {:error true}))))))
 
 
 (defn springlobby-map-minimap [map-name]
