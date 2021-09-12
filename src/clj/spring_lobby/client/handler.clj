@@ -3,6 +3,7 @@
     byte-streams
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
+    hashp.core
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
@@ -20,6 +21,11 @@
 
 (def last-auto-unspec-atom (atom 0))
 (def auto-unspec-cooldown 5000)
+
+
+(defn auto-unspec-ready?  []
+  (let [last-auto-unspec @last-auto-unspec-atom]
+    (< 5000 (- (u/curr-millis) last-auto-unspec))))
 
 
 (defn sync-number [sync-bool]
@@ -149,20 +155,18 @@
                  (-> battle :users (get username) :battle-status :mode)
                  (-> curr :by-server (get server-url) :battle :users (get username) :battle-status :mode not))
         (try
-          (let [last-auto-unspec @last-auto-unspec-atom
-                now (u/curr-millis)]
-            (if (< 5000 (- now last-auto-unspec))
-              (do
-                (log/info "Auto-unspeccing")
-                (message/send-message
-                  client
-                  (str "MYBATTLESTATUS "
-                       (cu/encode-battle-status
-                         (assoc (:battle-status me) :mode true))
-                       " "
-                       (or (:team-color me) 0)))
-                (reset! last-auto-unspec-atom now))
-              (log/info "Too soon to auto unspec")))
+          (if (auto-unspec-ready?)
+            (do
+              (log/info "Auto-unspeccing")
+              (message/send-message
+                client
+                (str "MYBATTLESTATUS "
+                     (cu/encode-battle-status
+                       (assoc (:battle-status me) :mode true))
+                     " "
+                     (or (:team-color me) 0)))
+              (reset! last-auto-unspec-atom (u/curr-millis)))
+            (log/info "Too soon to auto unspec"))
           (catch Exception e
             (log/warn e "Error auto unspeccing")))))))
 
@@ -180,28 +184,54 @@
             state))))))
 
 (defmethod handle "LEFTBATTLE" [state-atom server-url m]
-  (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)]
-    (swap! state-atom update-in [:by-server server-url]
-      (fn [{:keys [client-data] :as state}]
-        (let [this-battle (when-let [battle (:battle state)]
-                            (= battle-id (:battle-id battle)))
-              is-me (= username (:username state))
-              unified (-> client-data :compflags (contains? "u"))]
-          (update-in
-            (cond
-              (and this-battle is-me) (dissoc state :battle)
-              this-battle
-              (cond-> state
-                      true
-                      (update-in [:battle :users] dissoc username)
-                      (not unified)
-                      (update-in [:channels (u/battle-channel-name battle-id) :messages]
-                        conj {:text ""
-                              :timestamp (u/curr-millis)
-                              :message-type :leave
-                              :username username}))
-              :else state)
-            [:battles battle-id :users] dissoc username))))))
+  (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)
+        [prev _curr] (swap-vals! state-atom update-in [:by-server server-url]
+                       (fn [{:keys [client-data] :as state}]
+                         (let [this-battle (when-let [battle (:battle state)]
+                                             (= battle-id (:battle-id battle)))
+                               is-me (= username (:username state))
+                               unified (-> client-data :compflags (contains? "u"))]
+                           client-data
+                           (update-in
+                             (cond
+                               (and this-battle is-me) (dissoc state :battle)
+                               this-battle
+                               (cond-> state
+                                       true
+                                       (update-in [:battle :users] dissoc username)
+                                       (not unified)
+                                       (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                                         conj {:text ""
+                                               :timestamp (u/curr-millis)
+                                               :message-type :leave
+                                               :username username}))
+                               :else state)
+                             [:battles battle-id :users] dissoc username))))
+          {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
+          my-username (:username server-data)
+          client (:client client-data)
+          me (-> battle :users (get my-username))]
+      (when (and auto-unspec
+                 (= battle-id (:battle-id battle))
+                 (-> me :battle-status :mode not)
+                 (not= username my-username)
+                 (-> battle :users (get username) :battle-status :mode))
+        (try
+          (if (auto-unspec-ready?)
+            (do
+              (log/info "Auto-unspeccing")
+              (message/send-message
+                client
+                (str "MYBATTLESTATUS "
+                     (cu/encode-battle-status
+                       (assoc (:battle-status me) :mode true))
+                     " "
+                     (or (:team-color me) 0)))
+              (reset! last-auto-unspec-atom (u/curr-millis)))
+            (log/info "Too soon to auto unspec"))
+          (catch Exception e
+            (log/warn e "Error auto unspeccing"))))))
+
 
 (defmethod handle "JOIN" [state-atom server-url m]
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
