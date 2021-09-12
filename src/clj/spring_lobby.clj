@@ -1545,7 +1545,10 @@
                    (remove (comp string/blank? :map-name))
                    (remove (comp missing-paths fs/canonical-path :file))
                    set)))
-     (if (seq (remove (comp known-paths fs/canonical-path) next-round))
+     (if (->> next-round
+              (remove (comp known-paths fs/canonical-path))
+              (remove fs/is-directory?)
+              seq)
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
          (add-task! state-atom {::task-type ::reconcile-maps
