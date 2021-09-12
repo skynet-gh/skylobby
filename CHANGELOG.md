@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.11]
+
+- Fix infinite loop in map and mod refresh when errors reading
+- Fix auto unspec when a player leaves a battle
+
 ### [0.4.10]
 
 - Fix infinite loop in map refresh with .sdd dirs
