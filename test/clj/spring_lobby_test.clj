@@ -11,7 +11,7 @@
     (let [state (atom {})]
       (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/fake-task})
       (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/fake-task})
-      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/reconcile-engines})
+      (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/refresh-engines})
       (spring-lobby/add-task! state {:spring-lobby/task-type :spring-lobby/update-rapid})
       (is (= {:tasks-by-kind
               {:spring-lobby/other-task
@@ -19,7 +19,7 @@
                :spring-lobby/download-task
                #{{:spring-lobby/task-type :spring-lobby/update-rapid}}
                :spring-lobby/index-task
-               #{{:spring-lobby/task-type :spring-lobby/reconcile-engines}}}}
+               #{{:spring-lobby/task-type :spring-lobby/refresh-engines}}}}
              @state)))))
 
 

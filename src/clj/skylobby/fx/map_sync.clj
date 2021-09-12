@@ -21,7 +21,7 @@
      :browse-action {:event/type :spring-lobby/desktop-browse-dir
                      :file (fs/maps-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/reconcile-maps}}
+                      :task {:spring-lobby/task-type :spring-lobby/refresh-maps}}
      :refresh-in-progress (seq map-update-tasks)
      :issues
      (concat

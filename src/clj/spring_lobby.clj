@@ -133,7 +133,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
-   :console-auto-scroll :css :disable-tasks-while-in-game :engine-version :extra-import-sources
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :logins :map-name
@@ -818,9 +818,9 @@
               (-> state
                   (update :tasks-by-kind
                     add-multiple-tasks
-                    [{::task-type ::reconcile-engines}
-                     {::task-type ::reconcile-mods}
-                     {::task-type ::reconcile-maps}
+                    [{::task-type ::refresh-engines}
+                     {::task-type ::refresh-mods}
+                     {::task-type ::refresh-maps}
                      {::task-type ::scan-imports
                       :sources (fx.import/import-sources extra-import-sources)}
                      {::task-type ::update-rapid}
@@ -1310,12 +1310,12 @@
            :replay-downloads-by-map replay-map-downloads
            :replay-imports-by-map replay-map-imports)))
 
-(defn- reconcile-engines
+(defn- refresh-engines
   "Reads engine details and updates missing engines in :engines in state."
   ([]
-   (reconcile-engines *state))
+   (refresh-engines *state))
   ([state-atom]
-   (reconcile-engines state-atom nil))
+   (refresh-engines state-atom nil))
   ([state-atom spring-root]
    (log/info "Reconciling engines")
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
@@ -1363,10 +1363,10 @@
       :to-remove-count (count to-remove)})))
 
 
-(defn- reconcile-mods
+(defn- refresh-mods
   "Reads mod details and updates missing mods in :mods in state."
   ([state-atom]
-   (reconcile-mods state-atom nil))
+   (refresh-mods state-atom nil))
   ([state-atom spring-root]
    (log/info "Reconciling mods")
    (let [before (u/curr-millis)
@@ -1439,7 +1439,7 @@
                 (remove fs/is-directory?)
                 seq)
        (log/info "Scheduling mod load since there are" (count todo) "mods left to load")
-       (add-task! state-atom {::task-type ::reconcile-mods
+       (add-task! state-atom {::task-type ::refresh-mods
                               :todo (count todo)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
@@ -1472,10 +1472,10 @@
                           :todo (count next-round)})))))
 
 
-(defn- reconcile-maps
+(defn- refresh-maps
   "Reads map details and caches for maps missing from :maps in state."
   ([state-atom]
-   (reconcile-maps state-atom nil))
+   (refresh-maps state-atom nil))
   ([state-atom spring-root]
    (log/info "Reconciling maps")
    (let [before (u/curr-millis)
@@ -1545,10 +1545,13 @@
                    (remove (comp string/blank? :map-name))
                    (remove (comp missing-paths fs/canonical-path :file))
                    set)))
-     (if (seq (remove (comp known-paths fs/canonical-path) next-round))
+     (if (->> next-round
+              (remove (comp known-paths fs/canonical-path))
+              (remove fs/is-directory?)
+              seq)
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-         (add-task! state-atom {::task-type ::reconcile-maps
+         (add-task! state-atom {::task-type ::refresh-maps
                                 :todo next-round-count}))
        (add-task! state-atom {::task-type ::update-cached-minimaps}))
      {:todo-count next-round-count})))
@@ -2012,33 +2015,33 @@
     (fn [] (.close chimer))))
 
 
-(defn reconcile-engines-all-spring-roots []
+(defn refresh-engines-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
-      (reconcile-engines *state spring-root))))
+      (refresh-engines *state spring-root))))
 
-(defmethod task-handler ::reconcile-engines [_]
-  (reconcile-engines-all-spring-roots))
+(defmethod task-handler ::refresh-engines [_]
+  (refresh-engines-all-spring-roots))
 
 
-(defn reconcile-mods-all-spring-roots []
+(defn refresh-mods-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
-      (reconcile-mods *state spring-root))))
+      (refresh-mods *state spring-root))))
 
-(defmethod task-handler ::reconcile-mods [_]
-  (reconcile-mods-all-spring-roots))
+(defmethod task-handler ::refresh-mods [_]
+  (refresh-mods-all-spring-roots))
 
-(defn reconcile-maps-all-spring-roots []
+(defn refresh-maps-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
     (log/info "Reconciling maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
-      (reconcile-maps *state spring-root))))
+      (refresh-maps *state spring-root))))
 
-(defmethod task-handler ::reconcile-maps [_]
-  (reconcile-maps-all-spring-roots))
+(defmethod task-handler ::refresh-maps [_]
+  (refresh-maps-all-spring-roots))
 
 
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
@@ -2976,9 +2979,9 @@
         (update-copying dest {:status false})
         (fs/update-file-cache! *state source dest)
         (case (:resource-type importable)
-          ::map (reconcile-maps-all-spring-roots)
-          ::mod (reconcile-mods-all-spring-roots)
-          ::engine (reconcile-engines-all-spring-roots)
+          ::map (refresh-maps-all-spring-roots)
+          ::mod (refresh-mods-all-spring-roots)
+          ::engine (refresh-engines-all-spring-roots)
           nil)))))
 
 (defmethod task-handler ::import [e]
@@ -2994,7 +2997,7 @@
         (try
           (git/fetch file)
           (git/reset-hard file battle-mod-git-ref)
-          (reconcile-mods-all-spring-roots)
+          (refresh-mods-all-spring-roots)
           (catch Exception e
             (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
           (finally
@@ -3611,7 +3614,7 @@
           (.waitFor process)
           (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))
           (add-tasks! *state [{::task-type ::update-rapid-packages}
-                              {::task-type ::reconcile-mods}])))
+                              {::task-type ::refresh-mods}])))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
@@ -3637,9 +3640,9 @@
                    (resource/resource-dest spring-isolation-dir downloadable))
          :url (:download-url downloadable)}))
     (case (:resource-type downloadable)
-      ::map (reconcile-maps-all-spring-roots)
-      ::mod (reconcile-mods-all-spring-roots)
-      ::engine (reconcile-engines-all-spring-roots)
+      ::map (refresh-maps-all-spring-roots)
+      ::mod (refresh-mods-all-spring-roots)
+      ::engine (refresh-engines-all-spring-roots)
       nil)))
 
 (defmethod task-handler ::http-downloadable
@@ -3725,7 +3728,7 @@
         (if dest
           (fs/extract-7z-fast file dest)
           (fs/extract-7z-fast file))
-        (reconcile-engines-all-spring-roots)
+        (refresh-engines-all-spring-roots)
         (catch Exception e
           (log/error e "Error extracting 7z" file))
         (finally
@@ -3836,9 +3839,9 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (add-tasks! *state [{::task-type ::reconcile-engines}
-                        {::task-type ::reconcile-mods}
-                        {::task-type ::reconcile-maps}])))
+    (add-tasks! *state [{::task-type ::refresh-engines}
+                        {::task-type ::refresh-mods}
+                        {::task-type ::refresh-maps}])))
 
 
 (defmethod event-handler ::import-source-change
@@ -4277,11 +4280,11 @@
        (future
          (try
            (async/<!! (async/timeout 10000))
-           (add-task! state-atom {::task-type ::reconcile-engines})
+           (add-task! state-atom {::task-type ::refresh-engines})
            (async/<!! (async/timeout 10000))
-           (add-task! state-atom {::task-type ::reconcile-mods})
+           (add-task! state-atom {::task-type ::refresh-mods})
            (async/<!! (async/timeout 10000))
-           (add-task! state-atom {::task-type ::reconcile-maps})
+           (add-task! state-atom {::task-type ::refresh-maps})
            (async/<!! (async/timeout 10000))
            (add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout 10000))
@@ -4319,9 +4322,9 @@
                                   (state-change-chimer-fn state-atom k watcher-fn)))
                            doall)]
     (add-watchers state-atom)
-    (add-task! state-atom {::task-type ::reconcile-engines})
-    (add-task! state-atom {::task-type ::reconcile-mods})
-    (add-task! state-atom {::task-type ::reconcile-maps})
+    (add-task! state-atom {::task-type ::refresh-engines})
+    (add-task! state-atom {::task-type ::refresh-mods})
+    (add-task! state-atom {::task-type ::refresh-maps})
     (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-all-downloadables})
     (event-handler {:event/type ::scan-imports})

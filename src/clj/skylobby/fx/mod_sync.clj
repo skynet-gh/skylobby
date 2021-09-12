@@ -33,7 +33,7 @@
      :browse-action {:event/type :spring-lobby/desktop-browse-dir
                      :file (fs/mods-dir spring-isolation-dir)}
      :refresh-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/reconcile-mods}}
+                      :task {:spring-lobby/task-type :spring-lobby/refresh-mods}}
      :refresh-in-progress (seq mod-update-tasks)
      :issues
      (concat

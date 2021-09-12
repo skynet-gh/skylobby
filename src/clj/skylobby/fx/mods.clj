@@ -138,7 +138,7 @@
          :desc
          {:fx/type :button
           :on-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/reconcile-mods}}
+                      :task {:spring-lobby/task-type :spring-lobby/refresh-mods}}
           :graphic
           {:fx/type font-icon/lifecycle
            :icon-literal "mdi-refresh:16:white"}}}])}))

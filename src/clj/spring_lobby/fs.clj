@@ -388,9 +388,8 @@
     (or (string/ends-with? filename ".sd7")
         (string/ends-with? filename ".sdz"))))
 
-(defn map-files
-  [root]
-  (->> (io/file root "maps")
+(defn spring-files-and-dirs [f]
+  (->> f
        list-files
        (filter
          (some-fn
@@ -398,6 +397,10 @@
            (every-pred
              is-directory?
              #(string/ends-with? (filename %) ".sdd"))))))
+
+(defn map-files
+  [root]
+  (spring-files-and-dirs (io/file root "maps")))
 
 (defn- extract-7z
   ([^File f]
@@ -604,7 +607,8 @@
 
 (defn mod-files
   [root]
-  (seq (list-files (io/file root "games"))))
+  (spring-files-and-dirs (io/file root "games")))
+
 
 (defn read-mod-zip-file
   ([^java.io.File file]

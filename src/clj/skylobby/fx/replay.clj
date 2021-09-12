@@ -235,13 +235,13 @@
                                   (into {}))
         indexed-map (get maps-by-version mapname)
         replay-map-details (resource/cached-details map-details indexed-map)
-        engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
                                  set)
         extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
                            (map (comp fs/canonical-path :file))
                            set)
         map-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
+                              (filter (comp #{:spring-lobby/map-details :spring-lobby/refresh-maps} first))
                               (mapcat second)
                               set)
         rapid-tasks-by-id (->> (get tasks-by-type :spring-lobby/rapid-download)
@@ -428,11 +428,11 @@
            time-zone-id]}]
   (let [
         map-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/reconcile-maps} first))
+                              (filter (comp #{:spring-lobby/refresh-maps} first))
                               (mapcat second)
                               seq)
         mod-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/reconcile-mods} first))
+                              (filter (comp #{:spring-lobby/refresh-mods} first))
                               (mapcat second)
                               seq)]
     {:fx/type fx.ext.table-view/with-selection-props
@@ -983,14 +983,14 @@
                              set)
             rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
                                     seq)
-            engine-update-tasks (->> (get tasks-by-type :spring-lobby/reconcile-engines)
+            engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
                                      seq)
             map-update-tasks (->> tasks-by-type
-                                  (filter (comp #{:spring-lobby/map-details :spring-lobby/reconcile-maps} first))
+                                  (filter (comp #{:spring-lobby/map-details :spring-lobby/refresh-maps} first))
                                   (mapcat second)
                                   seq)
             mod-update-tasks (->> tasks-by-type
-                                  (filter (comp #{:spring-lobby/mod-details :spring-lobby/reconcile-mods} first))
+                                  (filter (comp #{:spring-lobby/mod-details :spring-lobby/refresh-mods} first))
                                   (mapcat second)
                                   seq)
             time-zone-id (.toZoneId (TimeZone/getDefault))

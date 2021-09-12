@@ -94,7 +94,7 @@
        :desc
        {:fx/type :button
         :on-action {:event/type :spring-lobby/add-task
-                    :task {:spring-lobby/task-type :spring-lobby/reconcile-engines}}
+                    :task {:spring-lobby/task-type :spring-lobby/refresh-engines}}
         :graphic
         {:fx/type font-icon/lifecycle
          :icon-literal "mdi-refresh:16:white"}}}])})
