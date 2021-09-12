@@ -180,7 +180,10 @@
 (defn spring-root-resources [spring-root by-spring-root]
   (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
         {:keys [engines maps mods]} spring-root-data
+        maps (filter :map-name maps)
+        mods (filter :mod-name mods)
         git-mods (->> mods
+                      (filter :mod-name)
                       (filter (comp #(string/includes? % "git:") :mod-name))
                       (map (juxt (comp u/mod-name-git-no-ref :mod-name) identity))
                       (filter first)
