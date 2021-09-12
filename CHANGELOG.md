@@ -32,6 +32,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.10]
+
+- Fix infinite loop in map refresh with .sdd dirs
+- Fix non-.sdd dirs in games being scanned
+- Fix disable-tasks setting not being persisted
+
 ### [0.4.9]
 
 - Add auto unspec checkbox
