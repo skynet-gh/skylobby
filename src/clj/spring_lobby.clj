@@ -2099,7 +2099,10 @@
       (if map-file
         (do
           (log/info "Updating battle map details for" map-name)
-          (let [map-details (or (read-map-details map-data) error-data)]
+          (let [map-details (read-map-details map-data)
+                map-details (if (or (not map-details) (:error map-details))
+                              error-data
+                              map-details)]
             (log/info "Got map details for" map-name map-file (keys map-details))
             (swap! *state update :map-details cache/miss cache-key map-details)))
         (do
