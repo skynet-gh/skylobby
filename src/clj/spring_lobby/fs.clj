@@ -27,8 +27,12 @@
 (def ^:dynamic replay-sources-override nil)
 
 
+(def lock (Object.))
+
+
 (defn init-7z! []
-  (SevenZip/initSevenZipFromPlatformJAR))
+  (locking lock
+    (SevenZip/initSevenZipFromPlatformJAR)))
 
 
 (def config-filename "config.edn")
