@@ -300,7 +300,7 @@
      :children
      [{:fx/type :split-pane
        :h-box/hgrow :always
-       :divider-positions [0.70]
+       :divider-positions [0.60]
        :items
        [
         {:fx/type :v-box
@@ -1221,30 +1221,38 @@
                 {:fx/type :label
                  :style {:-fx-font-size 24}
                  :text " No replays"}
-                (merge
-                  {:fx/type replays-table
-                   :v-box/vgrow :always}
-                  state
-                  {:download-tasks download-tasks
-                   :engine-update-tasks engine-update-tasks
-                   :engines-by-version engines-by-version
-                   :engines engines
-                   :extract-tasks extract-tasks
-                   :http-download-tasks http-download-tasks
-                   :import-tasks import-tasks
-                   :map-update-tasks map-update-tasks
-                   :maps-by-version maps-by-version
-                   :mod-update-tasks mod-update-tasks
-                   :mods-by-version mods-by-version
-                   :rapid-update-tasks rapid-update-tasks
-                   :rapid-tasks rapid-tasks
-                   :replays replays
-                   :selected-replay selected-replay
-                   :tasks-by-type tasks-by-type
-                   :time-zone-id time-zone-id}))
-             {:fx/type :label
-              :style {:-fx-font-size 24}
-              :text " Loading replays..."})]
+                {:fx/type :v-box
+                 :v-box/vgrow :always
+                 :children
+                 [{:fx/type :label
+                   :text
+                   (let [ac (count all-replays)
+                         fc (count replays)]
+                     (str ac " replays" (when (not= ac fc) (str ", " fc " match filters"))))}
+                  (merge
+                    {:fx/type replays-table
+                     :v-box/vgrow :always}
+                    state
+                    {:download-tasks download-tasks
+                     :engine-update-tasks engine-update-tasks
+                     :engines-by-version engines-by-version
+                     :engines engines
+                     :extract-tasks extract-tasks
+                     :http-download-tasks http-download-tasks
+                     :import-tasks import-tasks
+                     :map-update-tasks map-update-tasks
+                     :maps-by-version maps-by-version
+                     :mod-update-tasks mod-update-tasks
+                     :mods-by-version mods-by-version
+                     :rapid-update-tasks rapid-update-tasks
+                     :rapid-tasks rapid-tasks
+                     :replays replays
+                     :selected-replay selected-replay
+                     :tasks-by-type tasks-by-type
+                     :time-zone-id time-zone-id})]})
+              {:fx/type :label
+               :style {:-fx-font-size 24}
+               :text " Loading replays..."})]
            (when selected-replay
              [{:fx/type ext-recreate-on-key-changed
                :key (str (or (fs/canonical-path selected-replay-file)
