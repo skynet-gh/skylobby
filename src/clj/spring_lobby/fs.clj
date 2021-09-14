@@ -933,7 +933,7 @@
 
 (defn read-map-directory
   ([file]
-   ([file nil]))
+   (read-map-directory [file nil]))
   ([file opts]
    (let [all-files (file-seq file)]
      (merge
