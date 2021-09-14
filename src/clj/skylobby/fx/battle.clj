@@ -208,7 +208,7 @@
            http-download host-ingame import-tasks in-sync indexed-map indexed-mod map-input-prefix
            map-update-tasks maps me mod-dependencies mod-filter mod-update-tasks
            mods my-battle-status my-client-status my-player parsed-replays-by-path rapid-data-by-id
-           rapid-data-by-version rapid-download rapid-tasks-by-id scripttags server-key sides singleplayer
+           rapid-data-by-version rapid-download rapid-tasks-by-id ready-on-unspec scripttags server-key sides singleplayer
            spring-isolation-dir tasks-by-type team-counts username]
     :as state}]
   {:fx/type :v-box
@@ -560,6 +560,7 @@
                             :is-me true
                             :is-bot false
                             :id my-player
+                            :ready-on-unspec ready-on-unspec
                             :server-key server-key}}])}
     {:fx/type :h-box
      :alignment :center-left
@@ -1069,7 +1070,7 @@
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
      :parsed-replays-by-path :players-table-columns :pop-out-chat :rapid-data-by-id :rapid-data-by-version
-     :rapid-download :rapid-update :spring-isolation-dir :spring-settings :springfiles-search-results
+     :rapid-download :rapid-update :ready-on-unspec :spring-isolation-dir :spring-settings :springfiles-search-results
      :tasks-by-type :username]
     fx.channel/channel-state-keys))
 
@@ -1084,7 +1085,7 @@
            channels chat-auto-scroll
            client-data drag-allyteam drag-team engines-by-version file-cache ignore-users interleave-ally-player-ids
            map-input-prefix map-details
-           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-chat server-key spring-isolation-dir spring-settings
+           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-chat ready-on-unspec server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -1183,6 +1184,7 @@
                        :indexed-mod indexed-mod
                        :players players
                        :players-table-columns players-table-columns
+                       :ready-on-unspec ready-on-unspec
                        :server-key server-key
                        :scripttags scripttags
                        :sides sides
@@ -1229,6 +1231,7 @@
                           :my-client-status my-client-status
                           :my-player my-player
                           :rapid-tasks-by-id rapid-tasks-by-id
+                          :ready-on-unspec ready-on-unspec
                           :scripttags scripttags
                           :sides sides
                           :singleplayer singleplayer
