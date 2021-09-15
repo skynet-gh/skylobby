@@ -3252,15 +3252,19 @@
 (defmethod event-handler ::ring-specs
   [{:keys [battle-users channel-name client-data users]}]
   (when channel-name
-    (doseq [[username user-data] battle-users]
-      (when (and (-> user-data :battle-status :mode not)
-                 (-> users (get username) :client-status :bot not))
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!ring " username)})
-        (async/<!! (async/timeout 1000))))))
+    (future
+      (try
+        (doseq [[username user-data] battle-users]
+          (when (and (-> user-data :battle-status :mode not)
+                     (-> users (get username) :client-status :bot not))
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :client-data client-data
+                :message (str "!ring " username)})
+            (async/<!! (async/timeout 1000))))
+        (catch Exception e
+          (log/error e "Error ringing specs"))))))
 
 
 (defmethod event-handler ::ignore-user
