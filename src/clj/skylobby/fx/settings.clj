@@ -21,7 +21,7 @@
 (def settings-window-keys
   [:auto-refresh-replays :chat-font-size :chat-highlight-words :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
-   :music-dir :music-volume :players-table-columns
+   :music-dir :music-volume :players-table-columns :ready-on-unspec
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-git-mod-version])
 
@@ -29,7 +29,7 @@
   [{:keys [auto-refresh-replays chat-font-size chat-highlight-username chat-highlight-words css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
-           music-volume players-table-columns screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
+           music-volume players-table-columns ready-on-unspec screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
            unready-after-game use-git-mod-version]
     :as state}]
   {:fx/type :stage
@@ -157,6 +157,16 @@
                                     :key :unready-after-game}}
              {:fx/type :label
               :text " Unready after game"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean ready-on-unspec)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :ready-on-unspec}}
+             {:fx/type :label
+              :text " Ready on unspec"}]}
            {:fx/type :label
             :text " Performance"
             :style {:-fx-font-size 24}}

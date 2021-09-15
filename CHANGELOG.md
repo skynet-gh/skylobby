@@ -32,6 +32,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.12]
+
+- Add engine BAR105 special case
+- Add setting for ready on unspec
+- Fix ring specs happening on render thread
+- Add count to replays view
+
 ### [0.4.11]
 
 - Fix infinite loop in map and mod refresh when errors reading

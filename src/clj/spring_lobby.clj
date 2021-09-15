@@ -137,7 +137,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
 
@@ -620,7 +620,7 @@
                                     (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
                                     map-exists)))
                          (and
-                           (or (not (some (comp #{new-map} :map-name) old-maps)))
+                           (not (some (comp #{new-map} :map-name) old-maps))
                            map-exists)))
             (log/info "Mod details update for" server-key)
             (add-task! state-atom
@@ -663,7 +663,7 @@
                              (and
                                (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
                                mod-exists)))
-                    (and (or (not (some filter-fn old-mods)))
+                    (and (not (some filter-fn old-mods))
                          mod-exists))
             (log/info "Mod details update for" server-key)
             (add-task! state-atom
@@ -731,7 +731,7 @@
                                        (or (not (resource/details? mod-details))
                                            mod-changed)))
                              (and
-                               (or (not (some filter-fn old-mods)))
+                               (not (some filter-fn old-mods))
                                mod-exists))
                      {::task-type ::mod-details
                       :mod-name new-mod
@@ -743,7 +743,7 @@
                                        (or (not (resource/details? map-details))
                                            map-changed)))
                              (and
-                               (or (not (some (comp #{new-map} :map-name) old-maps)))
+                               (not (some (comp #{new-map} :map-name) old-maps))
                                map-exists))
                      {::task-type ::map-details
                       :map-name new-map
@@ -2099,7 +2099,10 @@
       (if map-file
         (do
           (log/info "Updating battle map details for" map-name)
-          (let [map-details (or (read-map-details map-data) error-data)]
+          (let [map-details (read-map-details map-data)
+                map-details (if (or (not map-details) (:error map-details))
+                              error-data
+                              map-details)]
             (log/info "Got map details for" map-name map-file (keys map-details))
             (swap! *state update :map-details cache/miss cache-key map-details)))
         (do
@@ -3249,15 +3252,19 @@
 (defmethod event-handler ::ring-specs
   [{:keys [battle-users channel-name client-data users]}]
   (when channel-name
-    (doseq [[username user-data] battle-users]
-      (when (and (-> user-data :battle-status :mode not)
-                 (-> users (get username) :client-status :bot not))
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!ring " username)})
-        (async/<!! (async/timeout 1000))))))
+    (future
+      (try
+        (doseq [[username user-data] battle-users]
+          (when (and (-> user-data :battle-status :mode not)
+                     (-> users (get username) :client-status :bot not))
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :client-data client-data
+                :message (str "!ring " username)})
+            (async/<!! (async/timeout 1000))))
+        (catch Exception e
+          (log/error e "Error ringing specs"))))))
 
 
 (defmethod event-handler ::ignore-user
@@ -3340,7 +3347,7 @@
 
 
 (defmethod event-handler ::battle-spectate-change
-  [{:keys [client-data id is-me is-bot] :fx/keys [event] :as data}]
+  [{:keys [client-data id is-me is-bot ready-on-unspec] :fx/keys [event] :as data}]
   (future
     (try
       (if (or is-me is-bot)
@@ -3349,7 +3356,7 @@
                      (not event))
               battle-status (assoc (:battle-status id) :mode mode)
               battle-status (if (and (not is-bot) (:mode battle-status))
-                              (assoc battle-status :ready true)
+                              (assoc battle-status :ready (boolean ready-on-unspec))
                               battle-status)]
           (update-battle-status client-data data battle-status (:team-color id)))
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))

@@ -44,7 +44,7 @@
 (defn players-table-impl
   [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
            ignore-users
-           indexed-mod players players-table-columns scripttags server-key sides singleplayer username]}]
+           indexed-mod players players-table-columns ready-on-unspec scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
@@ -90,7 +90,7 @@
                {:fx/type :context-menu
                 :items
                 (concat []
-                  (when (and (not owner))
+                  (when (not owner)
                     [
                      {:fx/type :menu-item
                       :text "Message"
@@ -411,7 +411,8 @@
                                                :client-data (when-not singleplayer client-data)
                                                :is-me (= (:username i) username)
                                                :is-bot (-> i :user :client-status :bot)
-                                               :id i}
+                                               :id i
+                                               :ready-on-unspec ready-on-unspec}
                          :disable (or (not username)
                                       (not (or (and am-host (not am-spec))
                                                (= (:username i) username)

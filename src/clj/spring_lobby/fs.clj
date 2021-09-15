@@ -27,8 +27,12 @@
 (def ^:dynamic replay-sources-override nil)
 
 
+(def lock (Object.))
+
+
 (defn init-7z! []
-  (SevenZip/initSevenZipFromPlatformJAR))
+  (locking lock
+    (SevenZip/initSevenZipFromPlatformJAR)))
 
 
 (def config-filename "config.edn")
@@ -929,7 +933,7 @@
 
 (defn read-map-directory
   ([file]
-   ([file nil]))
+   (read-map-directory [file nil]))
   ([file opts]
    (let [all-files (file-seq file)]
      (merge
