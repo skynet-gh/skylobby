@@ -359,11 +359,15 @@
 
 (def bar-engine-re
   #"^spring_bar_\.BAR\.([^_]*)_([0-9a-z\-]+)\.7z$")
+(def bar-105-engine-re
+  #"^spring_bar_\.BAR105\.([^_]*)_([0-9a-z\-]+)\.7z$")
 
 (defn bar-engine-filename?
   [filename]
   (boolean
-    (re-find bar-engine-re filename)))
+    (or
+      (re-find bar-engine-re filename)
+      (re-find bar-105-engine-re filename))))
 
 (def bar-platforms
   {"linux64" "linux-64"
@@ -374,9 +378,13 @@
   ([version]
    (bar-engine-filename version (fs/platform)))
   ([version platform]
-   (let [bar-platform (get bar-platforms platform)]
-     (str "spring_bar_.BAR." (first (string/split version #"\s"))
-          "_" bar-platform "-minimal-portable.7z"))))
+   (when version
+     (let [bar-platform (get bar-platforms platform)]
+       (if (string/includes? version "BAR105")
+         (str "spring_bar_.BAR105." (first (string/split version #"\s"))
+              "_" bar-platform "-minimal-portable.7z")
+         (str "spring_bar_.BAR." (first (string/split version #"\s"))
+              "_" bar-platform "-minimal-portable.7z"))))))
 
 
 (defn get-github-release-engine-downloadables
