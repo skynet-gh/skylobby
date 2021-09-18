@@ -1,6 +1,5 @@
 (ns spring-lobby.client.handler-test
   (:require
-    [clojure.core.async :as async]
     [clojure.test :refer [deftest is testing]]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
@@ -165,22 +164,74 @@
 
 
 (deftest handle-SAIDBATTLEEX
-  (let [state-atom (atom {:by-server {:server1 {:battle {:battle-id "1"}}}})
-        server-key :server1
-        now 12345]
-    (with-redefs [u/curr-millis (constantly now)]
-      (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi [Z]kynet! Current battle type is team."))
-    (is (= {:by-server
-            {:server1
-             {:battle {:battle-id "1"}
-              :channels
-              {"__battle__1"
-               {:messages
-                [{:message-type :ex
-                  :text "* Hi [Z]kynet! Current battle type is team."
-                  :timestamp now
-                  :username "[teh]cluster1[01]"}]}}}}}
-           @state-atom))))
+  (testing "message"
+    (let [state-atom (atom {:by-server {:server1 {:battle {:battle-id "1"}}}})
+          server-key :server1
+          now 12345]
+      (with-redefs [u/curr-millis (constantly now)]
+        (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi [Z]kynet! Current battle type is team."))
+      (is (= {:by-server
+              {:server1
+               {:battle {:battle-id "1"}
+                :channels
+                {"__battle__1"
+                 {:messages
+                  [{:message-type :ex
+                    :text "* Hi [Z]kynet! Current battle type is team."
+                    :timestamp now
+                    :username "[teh]cluster1[01]"}]}}}}}
+             @state-atom))))
+  (testing "auto unspec"
+    (let [
+          server-key :server1
+          state-atom (atom
+                       {:by-server
+                        {server-key
+                         {:auto-unspec true
+                          :battle
+                          {:battle-id "0"
+                           :users
+                           {"skynet"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 0
+                              :mode false
+                              :ready false
+                              :side 0
+                              :sync 0}}}}
+                          :username "skynet"
+                          :client-data {:compflags #{"u"}}}}})
+          messages-atom (atom [])
+          now 1631909524841]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+                    handler/auto-unspec-ready? (constantly true)
+                    u/curr-millis (constantly now)]
+        (handler/handle state-atom server-key "SAIDBATTLEEX host1 * Global setting changed by skynet (teamSize=16)"))
+      (is (= {:by-server
+              {server-key
+               {:auto-unspec true
+                :battle
+                {:battle-id "0"
+                 :users
+                 {"skynet"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}}}}
+                :channels {"__battle__0" {:messages [{:message-type :ex
+                                                      :text "* Global setting changed by skynet (teamSize=16)"
+                                                      :timestamp now
+                                                      :username "host1"}]}}
+                :username "skynet"
+                :client-data {:compflags #{"u"}}}}}
+             @state-atom))
+      (is (= ["MYBATTLESTATUS 1024 0"]
+             @messages-atom)))))
 
 
 (deftest handle-SAIDFROM
@@ -382,7 +433,6 @@
       (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)]
         (handler/handle state-atom server-key "CLIENTBATTLESTATUS other 0 0"))
-      (async/<!! (async/timeout 200))
       (is (= {:by-server
               {server-key
                {:auto-unspec true
@@ -448,7 +498,6 @@
       (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)]
         (handler/handle state-atom server-key "LEFTBATTLE 0 other"))
-      (async/<!! (async/timeout 200))
       (is (= {:by-server
               {server-key
                {:auto-unspec true
@@ -465,6 +514,64 @@
                     :side 0
                     :sync 0}}}}
                 :battles {"0" {:users nil}}
+                :username "skynet"
+                :client-data {:compflags #{"u"}}}}}
+             @state-atom))
+      (is (= ["MYBATTLESTATUS 1024 0"]
+             @messages-atom)))))
+
+
+(deftest teamsize-changed-message?
+  (is (false? (handler/teamsize-changed-message? "")))
+  (is (true? (handler/teamsize-changed-message? "* Global setting changed by skynet (teamSize=16)"))))
+
+(deftest handle-SAIDEX
+  (testing "auto unspec"
+    (let [
+          server-key :server1
+          state-atom (atom
+                       {:by-server
+                        {server-key
+                         {:auto-unspec true
+                          :battle
+                          {:channel-name "__battle__0"
+                           :users
+                           {"skynet"
+                            {:battle-status
+                             {:ally 0
+                              :handicap 0
+                              :id 0
+                              :mode false
+                              :ready false
+                              :side 0
+                              :sync 0}}}}
+                          :username "skynet"
+                          :client-data {:compflags #{"u"}}}}})
+          messages-atom (atom [])
+          now 1631909524841]
+      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+                    handler/auto-unspec-ready? (constantly true)
+                    u/curr-millis (constantly now)]
+        (handler/handle state-atom server-key "SAIDEX __battle__0 host1 * Global setting changed by skynet (teamSize=16)"))
+      (is (= {:by-server
+              {server-key
+               {:auto-unspec true
+                :battle
+                {:channel-name "__battle__0"
+                 :users
+                 {"skynet"
+                  {:battle-status
+                   {:ally 0
+                    :handicap 0
+                    :id 0
+                    :mode false
+                    :ready false
+                    :side 0
+                    :sync 0}}}}
+                :channels {"__battle__0" {:messages [{:message-type :ex
+                                                      :text "* Global setting changed by skynet (teamSize=16)"
+                                                      :timestamp now
+                                                      :username "host1"}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}}
              @state-atom))
