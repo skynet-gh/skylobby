@@ -3,7 +3,6 @@
     byte-streams
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
-    hashp.core
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
@@ -129,6 +128,24 @@
       :else
       (start-game-if-synced state-atom prev-state server-data))))
 
+(defn do-auto-unspec [client me]
+  (try
+    (if (auto-unspec-ready?)
+      (do
+        (log/info "Auto-unspeccing")
+        (message/send-message
+          client
+          (str "MYBATTLESTATUS "
+               (cu/encode-battle-status
+                 (assoc (:battle-status me) :mode true))
+               " "
+               (or (:team-color me) 0)))
+        (reset! last-auto-unspec-atom (u/curr-millis)))
+      (log/info "Too soon to auto unspec"))
+    (catch Exception e
+      (log/warn e "Error auto unspeccing"))))
+
+
 (defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (cu/decode-battle-status battle-status)]
@@ -154,21 +171,7 @@
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode)
                  (-> curr :by-server (get server-url) :battle :users (get username) :battle-status :mode not))
-        (try
-          (if (auto-unspec-ready?)
-            (do
-              (log/info "Auto-unspeccing")
-              (message/send-message
-                client
-                (str "MYBATTLESTATUS "
-                     (cu/encode-battle-status
-                       (assoc (:battle-status me) :mode true))
-                     " "
-                     (or (:team-color me) 0)))
-              (reset! last-auto-unspec-atom (u/curr-millis)))
-            (log/info "Too soon to auto unspec"))
-          (catch Exception e
-            (log/warn e "Error auto unspeccing")))))))
+        (do-auto-unspec client me)))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -216,21 +219,7 @@
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (try
-          (if (auto-unspec-ready?)
-            (do
-              (log/info "Auto-unspeccing")
-              (message/send-message
-                client
-                (str "MYBATTLESTATUS "
-                     (cu/encode-battle-status
-                       (assoc (:battle-status me) :mode true))
-                     " "
-                     (or (:team-color me) 0)))
-              (reset! last-auto-unspec-atom (u/curr-millis)))
-            (log/info "Too soon to auto unspec"))
-          (catch Exception e
-            (log/warn e "Error auto unspeccing"))))))
+        (do-auto-unspec client me))))
 
 
 (defmethod handle "JOIN" [state-atom server-url m]
@@ -283,10 +272,24 @@
     (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
       (u/update-chat-messages-fn username message))))
 
-(defmethod handle "SAIDEX" [state-atom server-url m]
-  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
-    (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
-      (u/update-chat-messages-fn username message true))))
+(defn teamsize-changed-message? [message]
+  (boolean
+    (re-find #"Global setting changed by (.+) \(teamSize=(.+)\)" message)))
+
+(defmethod handle "SAIDEX" [state-atom server-key m]
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
+        state (swap! state-atom update-in [:by-server server-key :channels channel-name :messages]
+                (u/update-chat-messages-fn username message true))
+        {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
+        my-username (:username server-data)
+        client (:client client-data)
+        me (-> battle :users (get my-username))]
+    (when (and (= channel-name (:channel-name battle))
+               auto-unspec
+               (teamsize-changed-message? message)
+               (-> me :battle-status :mode not))
+      (do-auto-unspec client me))))
+
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
@@ -306,15 +309,24 @@
           server)))))
 
 (defmethod handle "SAIDBATTLEEX" [state-atom server-key m]
-  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
-    (swap! state-atom update-in [:by-server server-key]
-      (fn [server]
-        (if-let [battle-id (-> server :battle :battle-id)]
-          (let [channel-name (str "__battle__" battle-id)]
-            (-> server
-                (update-in [:channels channel-name :messages]
-                  (u/update-chat-messages-fn username message true))))
-          server)))))
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        state (swap! state-atom update-in [:by-server server-key]
+                (fn [server]
+                  (if-let [battle-id (-> server :battle :battle-id)]
+                    (let [channel-name (str "__battle__" battle-id)]
+                      (-> server
+                          (update-in [:channels channel-name :messages]
+                            (u/update-chat-messages-fn username message true))))
+                    server)))
+        {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
+        my-username (:username server-data)
+        client (:client client-data)
+        me (-> battle :users (get my-username))]
+    (when (and battle
+               auto-unspec
+               (-> me :battle-status :mode not)
+               (teamsize-changed-message? message))
+      (do-auto-unspec client me))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]

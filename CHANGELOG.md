@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.13]
+
+- Add autounspec when teamsize is changed
+
 ### [0.4.12]
 
 - Add engine BAR105 special case
