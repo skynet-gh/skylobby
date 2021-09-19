@@ -132,7 +132,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
@@ -2531,6 +2531,7 @@
 (defmethod event-handler ::leave-battle [{:keys [client-data server-key]}]
   (future
     (try
+      (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e

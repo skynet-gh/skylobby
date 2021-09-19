@@ -21,6 +21,36 @@
   (is (= ["BARb" nil nil]
          (rest (handler/parse-ai "BARb")))))
 
+(deftest parse-battleopened
+  (is (= ["1"
+          "0"
+          "0"
+          "skynet"
+          "192.168.1.6"
+          "8452"
+          "8"
+          "1"
+          "0"
+          "-1706632985"
+          "Spring"
+          "104.0.1-1510-g89bb8e3 maintenance"
+          "Mini_SuperSpeedMetal"
+          "deth"
+          "Balanced Annihilation V10.24"
+          "\t__battle__8"
+          "__battle__8"]
+         (rest
+           (handler/parse-battleopened "BATTLEOPENED 1 0 0 skynet 192.168.1.6 8452 8 1 0 -1706632985 Spring	104.0.1-1510-g89bb8e3 maintenance	Mini_SuperSpeedMetal	deth	Balanced Annihilation V10.24	__battle__8")))))
+
+(deftest parse-updatebattleinfo
+  (is (= ["1"
+          "0"
+          "0"
+          "1465550451"
+          "Archers_Valley_v6"]
+         (rest
+           (handler/parse-updatebattleinfo "UPDATEBATTLEINFO 1 0 0 1465550451 Archers_Valley_v6")))))
+
 (deftest parse-joinbattle
   (is (= ["32" "-1706632985" " __battle__1" "__battle__1"]
          (rest

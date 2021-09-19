@@ -3,6 +3,7 @@
     byte-streams
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
+    crypto.random
     [skylobby.resource :as resource]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
@@ -476,16 +477,22 @@
 (defn parse-joinbattle [m]
   (re-find #"\w+ ([^\s]+) ([^\s]+)( ([^\s]+))?" m))
 
-(defmethod handle "JOINBATTLE" [state-atom server-url m]
+(defmethod handle "JOINBATTLE" [state-atom server-key m]
   (let [[_all battle-id hash-code _ channel-name] (parse-joinbattle m)]
-    (swap! state-atom update-in [:by-server server-url]
-           assoc
-           :battle {:battle-id battle-id
-                    :hash-code hash-code
-                    :channel-name channel-name
-                    :scripttags default-scripttags}
-           :battle-map-details nil
-           :battle-mod-details nil)))
+    (swap! state-atom
+      (fn [state]
+        (let [server-data (-> state :by-server (get server-key))]
+          (-> state
+              (update-in [:by-server server-key]
+                assoc :battle {:battle-id battle-id
+                               :hash-code hash-code
+                               :channel-name channel-name
+                               :scripttags default-scripttags}
+                      :battle-map-details nil
+                      :battle-mod-details nil)
+              (assoc-in [:last-battle server-key]
+                {:host-username (:host-username (get (:battles server-data) battle-id))
+                 :should-rejoin true})))))))
 
 (defmethod handle "JOINBATTLEREQUEST" [state-atom server-key m]
   (let [[_all user-name _ip] (re-find #"\w+ (\w+) (\w+)" m)
@@ -516,6 +523,65 @@
         client (:client client-data)
         msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
     (message/send-message client msg)))
+
+(defn parse-battleopened [m]
+  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
+
+(defmethod handle "BATTLEOPENED" [state-atom server-key m]
+  (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname _ channel-name] (parse-battleopened m)]
+    (let [battle {:battle-id battle-id
+                  :battle-type battle-type
+                  :battle-nat-type battle-nat-type
+                  :host-username host-username
+                  :battle-ip battle-ip
+                  :battle-port battle-port
+                  :battle-maxplayers battle-maxplayers
+                  :battle-passworded battle-passworded
+                  :battle-rank battle-rank
+                  :battle-maphash battle-maphash
+                  :battle-engine battle-engine
+                  :battle-version battle-version
+                  :battle-map battle-map
+                  :battle-title battle-title
+                  :battle-modname battle-modname
+                  :channel-name channel-name
+                  :users {host-username {}}}
+          {:keys [last-battle] :as state} (swap! state-atom assoc-in [:by-server server-key :battles battle-id] battle)
+          last-battle (get last-battle server-key)
+          {:keys [client-data username]} (-> state :by-server (get server-key))]
+      (when (and (:auto-rejoin-battle state)
+                 (not= host-username username)
+                 (= host-username (:host-username last-battle))
+                 (:should-rejoin last-battle))
+        (message/send-message (:client client-data)
+          (str "JOINBATTLE " battle-id
+               (if battle-passworded
+                 (str " " (:battle-password state))
+                 (str " *"))
+               " " (crypto.random/hex 6)))))
+    (log/warn "Unable to parse BATTLEOPENED" (pr-str m))))
+
+(defn parse-updatebattleinfo [m]
+  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
+
+(defmethod handle "UPDATEBATTLEINFO" [state-atom server-url m]
+  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
+    (swap! state-atom update-in [:by-server server-url]
+      (fn [state]
+        (let [my-battle-id (-> state :battle :battle-id)
+              old-battle-map (-> state (get :battles) (get battle-id) :battle-map)
+              my-battle (= my-battle-id battle-id)
+              map-changed (not= old-battle-map battle-map)]
+          (cond-> state
+                  true
+                  (update-in [:battles battle-id] assoc
+                    :battle-id battle-id
+                    :battle-spectators battle-spectators
+                    :battle-locked battle-locked
+                    :battle-maphash battle-maphash
+                    :battle-map battle-map)
+                  (and my-battle map-changed)
+                  (assoc :battle-map-details nil)))))))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
