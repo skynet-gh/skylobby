@@ -7,6 +7,7 @@
     [skylobby.fx.replay :as fx.replay]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.sound :as sound]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -21,16 +22,16 @@
 (def settings-window-keys
   [:auto-refresh-replays :chat-font-size :chat-highlight-words :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
-   :music-dir :music-volume :players-table-columns :ready-on-unspec
+   :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
-   :unready-after-game :use-git-mod-version])
+   :unready-after-game :use-default-ring-sound :use-git-mod-version])
 
 (defn settings-window-impl
   [{:keys [auto-refresh-replays chat-font-size chat-highlight-username chat-highlight-words css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
-           music-volume players-table-columns ready-on-unspec screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
-           unready-after-game use-git-mod-version]
+           music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
+           unready-after-game use-default-ring-sound use-git-mod-version]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -464,8 +465,63 @@
                  {:fx/type :label
                   :text " Bonus"}]}])}
            {:fx/type :label
+            :text " Sound"
+            :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-default-ring-sound)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-default-ring-sound}}
+             {:fx/type :label
+              :text " Use default ring sound"}]}]
+          (when-not use-default-ring-sound
+            [
+             {:fx/type :label
+              :text " Ring Sound File: "
+              :style {:-fx-font-size 18}}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :text-field
+                :disable true
+                :text (str (fs/canonical-path ring-sound-file))
+                :style {:-fx-min-width 600}}
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :on-action {:event/type :spring-lobby/file-chooser-ring-sound}
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-file-find:16"}}]}])
+          [{:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :label
+              :text " Ring Volume: "
+              :style {:-fx-font-size 18}}
+             {:fx/type :slider
+              :min 0.0
+              :max 1.0
+              :value (if (number? ring-volume)
+                       ring-volume
+                       1.0)
+              :on-value-changed {:event/type :spring-lobby/assoc
+                                 :key :ring-volume}}]}
+           {:fx/type :button
+            :on-action (fn [_event]
+                         (sound/play-ring state))
+            :text "Test Ring"}
+           {:fx/type :label
             :text " Music"
             :style {:-fx-font-size 24}}
+           {:fx/type :label
+            :text " Music Folder: "
+            :style {:-fx-font-size 18}}
            {:fx/type :h-box
             :alignment :center-left
             :children

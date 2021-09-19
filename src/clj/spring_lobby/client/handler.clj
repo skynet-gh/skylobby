@@ -610,10 +610,11 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [_state-atom _server-url m]
-  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
+(defmethod handle "RING" [state-atom _server-url m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
+        state @state-atom]
     (log/info "Playing ring sound from" username)
-    (sound/play-ring)))
+    (sound/play-ring state)))
 
 (defmethod handle "CHANNELS" [_state-atom _server-url _m]
   (log/info "Ignoring unused CHANNELS command"))

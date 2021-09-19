@@ -53,7 +53,7 @@
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
-    (javafx.stage DirectoryChooser)
+    (javafx.stage DirectoryChooser FileChooser)
     (manifold.stream SplicedStream))
   (:gen-class))
 
@@ -138,8 +138,8 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
-   :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
+   :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username])
 
 
 (defn- select-config [state]
@@ -216,6 +216,7 @@
                              :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers
+     :use-default-ring-sound true
      :unready-after-game true}
     (apply
       merge
@@ -2652,13 +2653,29 @@
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
 (defmethod event-handler ::file-chooser-spring-root
   [{:fx/keys [event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
-  (let [window (.getWindow (.getScene (.getTarget event)))
-        chooser (doto (DirectoryChooser.)
-                  (.setTitle "Select Spring Directory")
-                  (.setInitialDirectory spring-isolation-dir))]
-    (when-let [file (.showDialog chooser window)]
-      (log/info "Setting spring isolation dir at" target "to" file)
-      (swap! *state assoc-in target file))))
+  (try
+    (let [window (.getWindow (.getScene (.getTarget event)))
+          chooser (doto (DirectoryChooser.)
+                    (.setTitle "Select Spring Directory")
+                    (.setInitialDirectory spring-isolation-dir))]
+      (when-let [file (.showDialog chooser window)]
+        (log/info "Setting spring isolation dir at" target "to" file)
+        (swap! *state assoc-in target file)))
+    (catch Exception e
+      (log/error e "Error showing spring directory chooser"))))
+
+(defmethod event-handler ::file-chooser-ring-sound
+  [{:fx/keys [event] :keys [target] :or {target [:ring-sound-file]}}]
+  (try
+    (let [window (.getWindow (.getScene (.getTarget event)))
+          chooser (doto (FileChooser.)
+                    (.setTitle "Select Ring Sound File")
+                    (.setInitialDirectory (fs/app-root)))]
+      (when-let [file (.showOpenDialog chooser window)]
+        (log/info "Setting ring sound file at" target "to" file)
+        (swap! *state assoc-in target file)))
+    (catch Exception e
+      (log/error e "Error showing ring sound file chooser"))))
 
 
 (defmethod event-handler ::update-css
