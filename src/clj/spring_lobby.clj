@@ -136,7 +136,7 @@
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
-   :friend-users :ignore-users :logins :map-name
+   :friend-users :ignore-users :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username])
@@ -205,6 +205,7 @@
      :battle-players-color-type "player"
      :chat-highlight-username true
      :disable-tasks-while-in-game true
+     :leave-battle-on-close-window true
      :players-table-columns {:skill true
                              :ally true
                              :team true
@@ -2512,6 +2513,7 @@
 
 (defmethod event-handler ::host-battle
   [{:keys [client-data scripttags host-battle-state use-git-mod-version]}]
+  (swap! *state assoc :show-host-battle-window false)
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)

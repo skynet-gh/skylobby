@@ -21,7 +21,7 @@
 
 (def settings-window-keys
   [:auto-refresh-replays :auto-rejoin-battle :chat-font-size :chat-highlight-words :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
-   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :media-player
+   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-default-ring-sound :use-git-mod-version])
@@ -29,7 +29,7 @@
 (defn settings-window-impl
   [{:keys [auto-refresh-replays auto-rejoin-battle chat-font-size chat-highlight-username chat-highlight-words css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
-           extra-replay-name extra-replay-path extra-replay-recursive media-player music-dir
+           extra-replay-name extra-replay-path extra-replay-recursive leave-battle-on-close-window media-player music-dir
            music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
            unready-after-game use-default-ring-sound use-git-mod-version]
     :as state}]
@@ -178,6 +178,16 @@
                                     :key :auto-rejoin-battle}}
              {:fx/type :label
               :text " Rejoin battle on rehost or reconnect"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean leave-battle-on-close-window)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :leave-battle-on-close-window}}
+             {:fx/type :label
+              :text " Leave battle on close window"}]}
            {:fx/type :label
             :text " Performance"
             :style {:-fx-font-size 24}}

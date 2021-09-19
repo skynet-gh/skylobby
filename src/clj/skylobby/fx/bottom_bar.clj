@@ -86,6 +86,14 @@
      [{:fx/type :pane
        :style {:-fx-pref-width "200px"}}
       {:fx/type :button
+       :text "Replays"
+       :style {:-fx-font-size 14}
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-replays}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-open-in-new:16:white"}}
+      {:fx/type :button
        :style {:-fx-font-size 14}
        :text "Settings"
        :graphic {:fx/type font-icon/lifecycle

@@ -5,6 +5,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.chat :as fx.chat]
     [skylobby.fx.download :as fx.download]
+    [skylobby.fx.host-battle :as fx.host-battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
     [skylobby.fx.maps :as fx.maps]
@@ -32,7 +33,7 @@
 
 
 (defn root-view-impl
-  [{{:keys [by-server by-spring-root css current-tasks pop-out-battle pop-out-chat selected-server-tab servers
+  [{{:keys [by-server by-spring-root css current-tasks leave-battle-on-close-window pop-out-battle pop-out-chat selected-server-tab servers
             spring-isolation-dir standalone tasks-by-kind window-maximized]
      :as state}
     :state}]
@@ -78,8 +79,11 @@
        :showing show-battle-window
        :title (str u/app-name " Battle")
        :icons skylobby.fx/icons
-       :on-close-request {:event/type :spring-lobby/dissoc
-                          :key :pop-out-battle}
+       :on-close-request (if leave-battle-on-close-window
+                           {:event/type :spring-lobby/leave-battle
+                            :client-data (:client-data server-data)}
+                           {:event/type :spring-lobby/dissoc
+                            :key :pop-out-battle})
        :width (min battle-window-width width)
        :height (min battle-window-height height)
        :scene
@@ -97,6 +101,10 @@
         {:fx/type fx.download/download-window
          :screen-bounds screen-bounds}
         (select-keys state fx.download/download-window-keys))
+      (merge
+        {:fx/type fx.host-battle/host-battle-window
+         :screen-bounds screen-bounds}
+        (select-keys state fx.host-battle/host-battle-window-keys))
       (merge
         {:fx/type fx.import/import-window
          :screen-bounds screen-bounds

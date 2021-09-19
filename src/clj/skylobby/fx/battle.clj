@@ -1074,7 +1074,7 @@
      :interleave-ally-player-ids :importables-by-path
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
-     :parsed-replays-by-path :players-table-columns :pop-out-chat :rapid-data-by-id :rapid-data-by-version
+     :parsed-replays-by-path :players-table-columns :pop-out-battle :pop-out-chat :rapid-data-by-id :rapid-data-by-version
      :rapid-download :rapid-update :ready-on-unspec :spring-isolation-dir :spring-settings :springfiles-search-results
      :tasks-by-type :username]
     fx.channel/channel-state-keys))
@@ -1090,7 +1090,7 @@
            channels chat-auto-scroll
            client-data drag-allyteam drag-team engines-by-version file-cache ignore-users interleave-ally-player-ids
            map-input-prefix map-details
-           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-chat ready-on-unspec server-key spring-isolation-dir spring-settings
+           maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-battle pop-out-chat ready-on-unspec server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -1280,51 +1280,102 @@
                      :startpostype startpostype
                      :users users
                      :username username}]
-    {:fx/type :h-box
-     :style {:-fx-font-size 15}
-     :alignment :top-left
+    {:fx/type :v-box
      :children
-     (case battle-layout
-       "vertical"
-       [
-        (if (or singleplayer pop-out-chat)
-          {:fx/type :v-box
-           :h-box/hgrow :always
-           :children
-           [players-table
-            battle-buttons]}
-          {:fx/type :split-pane
-           :h-box/hgrow :always
-           :divider-positions [0.35]
-           :items
-           [
+     [
+      {:fx/type :h-box
+       :alignment :center-left
+       :style {:-fx-font-size 16}
+       :children
+       (concat
+         (when (seq battle)
+           [{:fx/type :button
+             :text "Leave Battle"
+             :on-action {:event/type :spring-lobby/leave-battle
+                         :client-data client-data
+                         :server-key server-key}}
+            {:fx/type :pane
+             :h-box/margin 4}
+            (if pop-out-battle
+              {:fx/type :button
+               :text "Pop In Battle "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-window-maximize:16:white"}
+               :on-action {:event/type :spring-lobby/dissoc
+                           :key :pop-out-battle}}
+              {:fx/type :button
+               :text "Pop Out Battle "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-open-in-new:16:white"}
+               :on-action {:event/type :spring-lobby/assoc
+                           :key :pop-out-battle
+                           :value true}})
+            {:fx/type :pane
+             :h-box/margin 4}
+            (if pop-out-chat
+              {:fx/type :button
+               :text "Pop In Chat "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-window-maximize:16:white"}
+               :on-action {:event/type :spring-lobby/dissoc
+                           :key :pop-out-chat}}
+              {:fx/type :button
+               :text "Pop Out Chat "
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-open-in-new:16:white"}
+               :on-action {:event/type :spring-lobby/assoc
+                           :key :pop-out-chat
+                           :value true}})]))}
+      {:fx/type :h-box
+       :v-box/vgrow :always
+       :style {:-fx-font-size 15}
+       :alignment :top-left
+       :children
+       (case battle-layout
+         "vertical"
+         [
+          (if (or singleplayer pop-out-chat)
             {:fx/type :v-box
+             :h-box/hgrow :always
              :children
              [players-table
               battle-buttons]}
-            battle-chat]})
-        battle-tabs]
-       ; else
-       [(if (or singleplayer pop-out-chat)
-          {:fx/type :h-box
-           :h-box/hgrow :always
-           :children
-           [
-            battle-buttons
-            players-table]}
-          {:fx/type :split-pane
-           :h-box/hgrow :always
-           :orientation :vertical
-           :items
-           [players-table
-            (if singleplayer
-              battle-buttons
-              {:fx/type :h-box
+            {:fx/type :split-pane
+             :h-box/hgrow :always
+             :divider-positions [0.35]
+             :items
+             [
+              {:fx/type :v-box
                :children
-               [
+               [players-table
+                battle-buttons]}
+              battle-chat]})
+          battle-tabs]
+         ; else
+         [(if (or singleplayer pop-out-chat)
+            {:fx/type :h-box
+             :h-box/hgrow :always
+             :children
+             [
+              battle-buttons
+              players-table]}
+            {:fx/type :split-pane
+             :h-box/hgrow :always
+             :orientation :vertical
+             :items
+             [players-table
+              (if singleplayer
                 battle-buttons
-                battle-chat]})]})
-        battle-tabs])}))
+                {:fx/type :h-box
+                 :children
+                 [
+                  battle-buttons
+                  battle-chat]})]})
+          battle-tabs])}]}))
 
 (defn battle-view
   [state]
