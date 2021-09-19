@@ -270,9 +270,11 @@
                             [
                              {:fx/type font-icon/lifecycle
                               :icon-literal
-                              (if (= 1 (:sync battle-status))
-                                "mdi-sync:16:green"
-                                "mdi-sync-off:16:red")}])
+                              (case (:sync battle-status)
+                                1 "mdi-sync:16:green"
+                                2 "mdi-sync-off:16:red"
+                                ; else
+                                "mdi-sync-alert:16:yellow")}])
                           [(cond
                              (:bot client-status)
                              {:fx/type font-icon/lifecycle

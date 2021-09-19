@@ -912,7 +912,7 @@
      :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
      :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
      :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id
-     :settings-button :show-replays :spring-isolation-dir :springfiles-search-results]))
+     :settings-button :show-replays :spring-isolation-dir :springfiles-search-results :window-states]))
 
 (defn replays-window-impl
   [{:keys [bar-replays-page by-spring-root css extra-replay-sources file-cache
@@ -920,7 +920,7 @@
            filter-replay-source filter-replay-type filtered-replays map-details mod-details new-online-replays-count
            on-close-request online-bar-replays replays-filter-specs replays-window-dedupe
            replays-window-details parsed-replays-by-path screen-bounds selected-replay-file
-           selected-replay-id show-replays spring-isolation-dir tasks-by-type title]
+           selected-replay-id show-replays spring-isolation-dir tasks-by-type title window-states]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-replays)
@@ -931,8 +931,18 @@
      on-close-request
      {:event/type :spring-lobby/dissoc
       :key :show-replays})
-   :width ((fnil min replays-window-width) (:width screen-bounds) replays-window-width)
-   :height ((fnil min replays-window-height) (:height screen-bounds) replays-window-height)
+   :x (get-in window-states [:replays :x] Double/NaN)
+   :y (get-in window-states [:replays :y] Double/NaN)
+   :width ((fnil min replays-window-width) (:width screen-bounds) (get-in window-states [:replays :width] replays-window-width))
+   :height ((fnil min replays-window-height) (:height screen-bounds) (get-in window-states [:replays :height] replays-window-height))
+   :on-width-changed {:event/type :spring-lobby/assoc-in
+                      :path [:window-states :replays :width]}
+   :on-height-changed {:event/type :spring-lobby/assoc-in
+                       :path [:window-states :replays :height]}
+   :on-x-changed {:event/type :spring-lobby/assoc-in
+                  :path [:window-states :replays :x]}
+   :on-y-changed {:event/type :spring-lobby/assoc-in
+                  :path [:window-states :replays :y]}
    :scene
    {:fx/type :scene
     :stylesheets (skylobby.fx/stylesheet-urls css)

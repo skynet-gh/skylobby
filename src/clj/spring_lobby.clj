@@ -53,7 +53,7 @@
     (javafx.scene.control Tab)
     (javafx.scene.input KeyCode ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
-    (javafx.stage DirectoryChooser)
+    (javafx.stage DirectoryChooser FileChooser)
     (manifold.stream SplicedStream))
   (:gen-class))
 
@@ -132,14 +132,14 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
-   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
-   :friend-users :ignore-users :logins :map-name
+   :friend-users :ignore-users :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
-   :replays-watched :replays-window-dedupe :replays-window-details :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-git-mod-version :username])
+   :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username :window-states])
 
 
 (defn- select-config [state]
@@ -205,6 +205,7 @@
      :battle-players-color-type "player"
      :chat-highlight-username true
      :disable-tasks-while-in-game true
+     :leave-battle-on-close-window true
      :players-table-columns {:skill true
                              :ally true
                              :team true
@@ -216,6 +217,7 @@
                              :bonus true}
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers
+     :use-default-ring-sound true
      :unready-after-game true}
     (apply
       merge
@@ -2511,6 +2513,7 @@
 
 (defmethod event-handler ::host-battle
   [{:keys [client-data scripttags host-battle-state use-git-mod-version]}]
+  (swap! *state assoc :show-host-battle-window false)
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
     (when-not (or (string/blank? engine-version)
                   (string/blank? mod-name)
@@ -2530,6 +2533,7 @@
 (defmethod event-handler ::leave-battle [{:keys [client-data server-key]}]
   (future
     (try
+      (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
@@ -2652,13 +2656,29 @@
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
 (defmethod event-handler ::file-chooser-spring-root
   [{:fx/keys [event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
-  (let [window (.getWindow (.getScene (.getTarget event)))
-        chooser (doto (DirectoryChooser.)
-                  (.setTitle "Select Spring Directory")
-                  (.setInitialDirectory spring-isolation-dir))]
-    (when-let [file (.showDialog chooser window)]
-      (log/info "Setting spring isolation dir at" target "to" file)
-      (swap! *state assoc-in target file))))
+  (try
+    (let [window (.getWindow (.getScene (.getTarget event)))
+          chooser (doto (DirectoryChooser.)
+                    (.setTitle "Select Spring Directory")
+                    (.setInitialDirectory spring-isolation-dir))]
+      (when-let [file (.showDialog chooser window)]
+        (log/info "Setting spring isolation dir at" target "to" file)
+        (swap! *state assoc-in target file)))
+    (catch Exception e
+      (log/error e "Error showing spring directory chooser"))))
+
+(defmethod event-handler ::file-chooser-ring-sound
+  [{:fx/keys [event] :keys [target] :or {target [:ring-sound-file]}}]
+  (try
+    (let [window (.getWindow (.getScene (.getTarget event)))
+          chooser (doto (FileChooser.)
+                    (.setTitle "Select Ring Sound File")
+                    (.setInitialDirectory (fs/app-root)))]
+      (when-let [file (.showOpenDialog chooser window)]
+        (log/info "Setting ring sound file at" target "to" file)
+        (swap! *state assoc-in target file)))
+    (catch Exception e
+      (log/error e "Error showing ring sound file chooser"))))
 
 
 (defmethod event-handler ::update-css

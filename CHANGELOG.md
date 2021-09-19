@@ -32,6 +32,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.14]
+
+- Add auto rejoin battle setting
+- Add ring sound and volume settings
+- Clean up battles buttons, host battle in its own window
+- Save most window sizes and locations
+
 ### [0.4.13]
 
 - Add autounspec when teamsize is changed

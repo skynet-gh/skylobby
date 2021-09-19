@@ -10,12 +10,12 @@
 
 (def chat-window-keys
   (concat
-    [:chat-auto-scroll :css :screen-bounds :show-chat-window]
+    [:chat-auto-scroll :css :screen-bounds :show-chat-window :window-states]
     fx.channel/channel-state-keys))
 
 (defn chat-window
   [{:keys [channel-name channels chat-auto-scroll client-data css message-drafts screen-bounds
-           server-key show-chat-window]
+           server-key show-chat-window window-states]
     :as state}]
   (let [{:keys [width height]} screen-bounds]
     {:fx/type :stage
@@ -24,8 +24,18 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :pop-out-chat}
-     :width (min chat-window-width width)
-     :height (min chat-window-height height)
+     :x (get-in window-states [:chat :x] Double/NaN)
+     :y (get-in window-states [:chat :y] Double/NaN)
+     :width ((fnil min chat-window-width) width (get-in window-states [:chat :width] chat-window-width))
+     :height ((fnil min chat-window-height) height (get-in window-states [:chat :height] chat-window-height))
+     :on-width-changed {:event/type :spring-lobby/assoc-in
+                        :path [:window-states :chat :width]}
+     :on-height-changed {:event/type :spring-lobby/assoc-in
+                         :path [:window-states :chat :height]}
+     :on-x-changed {:event/type :spring-lobby/assoc-in
+                    :path [:window-states :chat :x]}
+     :on-y-changed {:event/type :spring-lobby/assoc-in
+                    :path [:window-states :chat :y]}
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)

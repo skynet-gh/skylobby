@@ -163,55 +163,6 @@
 (defmethod handler/handle "LOGININFOEND" [_state-atom _server-url _m]
   (log/trace "end of login info"))
 
-
-(defn parse-battleopened [m]
-  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
-
-(defmethod handler/handle "BATTLEOPENED" [state-atom server-url m]
-  (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname _ channel-name] (parse-battleopened m)]
-    (let [battle {:battle-id battle-id
-                  :battle-type battle-type
-                  :battle-nat-type battle-nat-type
-                  :host-username host-username
-                  :battle-ip battle-ip
-                  :battle-port battle-port
-                  :battle-maxplayers battle-maxplayers
-                  :battle-passworded battle-passworded
-                  :battle-rank battle-rank
-                  :battle-maphash battle-maphash
-                  :battle-engine battle-engine
-                  :battle-version battle-version
-                  :battle-map battle-map
-                  :battle-title battle-title
-                  :battle-modname battle-modname
-                  :channel-name channel-name
-                  :users {host-username {}}}]
-      (swap! state-atom assoc-in [:by-server server-url :battles battle-id] battle))
-    (log/warn "Unable to parse BATTLEOPENED" (pr-str m))))
-
-(defn parse-updatebattleinfo [m]
-  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
-
-(defmethod handler/handle "UPDATEBATTLEINFO" [state-atom server-url m]
-  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
-    (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
-        (let [my-battle-id (-> state :battle :battle-id)
-              old-battle-map (-> state (get :battles) (get battle-id) :battle-map)
-              my-battle (= my-battle-id battle-id)
-              map-changed (not= old-battle-map battle-map)]
-          (cond-> state
-                  true
-                  (update-in [:battles battle-id] assoc
-                    :battle-id battle-id
-                    :battle-spectators battle-spectators
-                    :battle-locked battle-locked
-                    :battle-maphash battle-maphash
-                    :battle-map battle-map)
-                  (and my-battle map-changed)
-                  (assoc :battle-map-details nil)))))))
-
-
 (defn ping-loop [state-atom server-key client]
   (let [ping-loop (future
                     (try
