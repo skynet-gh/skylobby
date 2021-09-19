@@ -34,7 +34,7 @@
 
 (defn root-view-impl
   [{{:keys [by-server by-spring-root css current-tasks leave-battle-on-close-window pop-out-battle pop-out-chat selected-server-tab servers
-            spring-isolation-dir standalone tasks-by-kind window-maximized]
+            spring-isolation-dir standalone tasks-by-kind window-maximized window-states]
      :as state}
     :state}]
   (let [{:keys [width height]} screen-bounds
@@ -62,10 +62,18 @@
        :title (str "skylobby " app-version)
        :icons skylobby.fx/icons
        :maximized (boolean window-maximized)
-       :x 100
-       :y 100
-       :width (min main-window-width width)
-       :height (min main-window-height height)
+       :x (get-in window-states [:main :x] Double/NaN)
+       :y (get-in window-states [:main :y] Double/NaN)
+       :width (min (get-in window-states [:main :width] main-window-width) width)
+       :height (min (get-in window-states [:main :height] main-window-height) height)
+       :on-width-changed {:event/type :spring-lobby/assoc-in
+                          :path [:window-states :main :width]}
+       :on-height-changed {:event/type :spring-lobby/assoc-in
+                           :path [:window-states :main :height]}
+       :on-x-changed {:event/type :spring-lobby/assoc-in
+                      :path [:window-states :main :x]}
+       :on-y-changed {:event/type :spring-lobby/assoc-in
+                      :path [:window-states :main :y]}
        :on-close-request {:event/type :spring-lobby/main-window-on-close-request
                           :standalone standalone}
        :scene
@@ -84,8 +92,18 @@
                             :client-data (:client-data server-data)}
                            {:event/type :spring-lobby/dissoc
                             :key :pop-out-battle})
-       :width (min battle-window-width width)
-       :height (min battle-window-height height)
+       :width (min (get-in window-states [:battle :width] battle-window-width) width)
+       :height (min (get-in window-states [:battle :height] battle-window-height) height)
+       :x (get-in window-states [:battle :x] Double/NaN)
+       :y (get-in window-states [:battle :y] Double/NaN)
+       :on-width-changed {:event/type :spring-lobby/assoc-in
+                          :path [:window-states :battle :width]}
+       :on-height-changed {:event/type :spring-lobby/assoc-in
+                           :path [:window-states :battle :height]}
+       :on-x-changed {:event/type :spring-lobby/assoc-in
+                      :path [:window-states :battle :x]}
+       :on-y-changed {:event/type :spring-lobby/assoc-in
+                      :path [:window-states :battle :y]}
        :scene
        {:fx/type :scene
         :stylesheets stylesheet-urls

@@ -133,13 +133,13 @@
 
 (def config-keys
   [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
-   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :engine-version :extra-import-sources
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username])
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username :window-states])
 
 
 (defn- select-config [state]
