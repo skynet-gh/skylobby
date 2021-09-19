@@ -510,9 +510,11 @@
          [{:fx/type :button
            :text (str
                    " "
-                   (if in-sync
-                     "synced"
-                     "unsynced")
+                   (case (:sync my-battle-status)
+                     1 "synced"
+                     2 "unsynced"
+                     ; else
+                     "syncing")
                    " ")
            :on-action {:event/type :spring-lobby/clear-map-and-mod-details
                        :map-resource indexed-map
@@ -521,8 +523,11 @@
            (assoc
              (dissoc
                (get severity-styles
-                 (if (= 1 (:sync my-battle-status))
-                   0 2))
+                 (case (:sync my-battle-status)
+                   1 0
+                   2 2
+                   ; else
+                   1))
                :-fx-background-color)
              :-fx-font-size 14)}]
          [{:fx/type :button
