@@ -117,20 +117,16 @@
   {:fx/type :v-box
    :children
    [
-    {:fx/type ext-with-auto-scroll-virtual-prop
+    {:fx/type fx.virtualized-scroll-pane/lifecycle
      :v-box/vgrow :always
-     :props {:auto-scroll console-log}
-     :desc
-     {:fx/type ext-scroll-on-create
-      :desc
-      {:fx/type fx.virtualized-scroll-pane/lifecycle
-       :content
-       {:fx/type fx.rich-text/lifecycle
-        :editable false
-        :style {:-fx-font-family skylobby.fx/monospace-font-family
-                :-fx-font-size default-font-size}
-        :wrap-text true
-        :document (console-document (reverse console-log))}}}}
+     :content
+     {:fx/type fx.rich-text/lifecycle-fast
+      :editable false
+      :style {:-fx-font-family skylobby.fx/monospace-font-family
+              :-fx-font-size default-font-size}
+      :wrap-text true
+      :document
+      [(reverse console-log) console-document]}}
     {:fx/type :h-box
      :alignment :center-left
      :children

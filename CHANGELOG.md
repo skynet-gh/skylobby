@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.15]
+
+- Improve chat auto scroll
+- Improve performance of chat and console rendering
+
 ### [0.4.14]
 
 - Add auto rejoin battle setting
