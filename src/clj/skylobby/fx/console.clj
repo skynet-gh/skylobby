@@ -125,12 +125,13 @@
       :desc
       {:fx/type fx.virtualized-scroll-pane/lifecycle
        :content
-       {:fx/type fx.rich-text/lifecycle
+       {:fx/type fx.rich-text/lifecycle-fast
         :editable false
         :style {:-fx-font-family skylobby.fx/monospace-font-family
                 :-fx-font-size default-font-size}
         :wrap-text true
-        :document (console-document (reverse console-log))}}}}
+        :document
+        [(reverse console-log) console-document]}}}}
     {:fx/type :h-box
      :alignment :center-left
      :children

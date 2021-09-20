@@ -187,25 +187,29 @@
       :desc
       {:fx/type fx.virtualized-scroll-pane/lifecycle
        :content
-       {:fx/type fx.rich-text/lifecycle
+       {:fx/type fx.rich-text/lifecycle-fast
         :editable false
         :style (text-style chat-font-size)
         :wrap-text true
-        :document (channel-document
-                    (->> messages
-                         (remove (comp ignore-users-set :username))
-                         (remove
-                           (fn [{:keys [message-type text]}]
-                             (and (= :ex message-type)
-                                  text
-                                  (string/starts-with? text "* BarManager|"))))
-                         reverse)
-                    {:highlight
-                     (concat
-                       (when chat-highlight-words
-                         (string/split chat-highlight-words #"[\s,]+"))
-                       (when chat-highlight-username
-                         [username]))})}}}}))
+        :document
+        [
+         (->> messages
+              (remove (comp ignore-users-set :username))
+              (remove
+                (fn [{:keys [message-type text]}]
+                  (and (= :ex message-type)
+                       text
+                       (string/starts-with? text "* BarManager|"))))
+              reverse)
+         (fn [lines]
+           (channel-document
+             lines
+             {:highlight
+              (concat
+                (when chat-highlight-words
+                  (string/split chat-highlight-words #"[\s,]+"))
+                (when chat-highlight-username
+                  [username]))}))]}}}}))
 
 (defn channel-view-history
   [state]

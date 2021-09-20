@@ -43,6 +43,36 @@
     :props props))
 
 
+(def props-fast
+  (merge
+    fx.region/props
+    (composite/props StyleClassedTextArea
+      :document (prop/make
+                  (reify mutator/Mutator
+                    (assign! [_ instance _ value]
+                     (let [[lines document-fn] value
+                           length (.getLength instance)]
+                       (when-let [document (document-fn lines)]
+                         (.replace instance 0 length document))))
+                    (replace! [_ instance _ old-value new-value]
+                     (let [[old-lines _old-document-fn] old-value
+                           [new-lines new-document-fn] new-value
+                           diff-lines (drop (count old-lines) new-lines)]
+                       (when (seq diff-lines)
+                         (.appendText instance "\n")
+                         (.append instance (new-document-fn diff-lines)))))
+                    (retract! [_ instance _ _]
+                     (.deleteText instance 0 (.getLength instance))))
+                  lifecycle/scalar)
+      :editable [:setter lifecycle/scalar :default false]
+      :wrap-text [:setter lifecycle/scalar :default true])))
+
+(def lifecycle-fast
+  (composite/describe StyleClassedTextArea
+    :ctor []
+    :props props-fast))
+
+
 (def props-inline
   (merge
     fx.region/props
