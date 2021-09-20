@@ -180,36 +180,31 @@
                               (filter second)
                               (map first)
                               set)]
-    {:fx/type ext-with-auto-scroll-virtual-prop
-     :props {:auto-scroll messages}
-     :desc
-     {:fx/type ext-scroll-on-create
-      :desc
-      {:fx/type fx.virtualized-scroll-pane/lifecycle
-       :content
-       {:fx/type fx.rich-text/lifecycle-fast
-        :editable false
-        :style (text-style chat-font-size)
-        :wrap-text true
-        :document
-        [
-         (->> messages
-              (remove (comp ignore-users-set :username))
-              (remove
-                (fn [{:keys [message-type text]}]
-                  (and (= :ex message-type)
-                       text
-                       (string/starts-with? text "* BarManager|"))))
-              reverse)
-         (fn [lines]
-           (channel-document
-             lines
-             {:highlight
-              (concat
-                (when chat-highlight-words
-                  (string/split chat-highlight-words #"[\s,]+"))
-                (when chat-highlight-username
-                  [username]))}))]}}}}))
+    {:fx/type fx.virtualized-scroll-pane/lifecycle
+     :content
+     {:fx/type fx.rich-text/lifecycle-fast
+      :editable false
+      :style (text-style chat-font-size)
+      :wrap-text true
+      :document
+      [
+       (->> messages
+            (remove (comp ignore-users-set :username))
+            (remove
+              (fn [{:keys [message-type text]}]
+                (and (= :ex message-type)
+                     text
+                     (string/starts-with? text "* BarManager|"))))
+            reverse)
+       (fn [lines]
+         (channel-document
+           lines
+           {:highlight
+            (concat
+              (when chat-highlight-words
+                (string/split chat-highlight-words #"[\s,]+"))
+              (when chat-highlight-username
+                [username]))}))]}}))
 
 (defn channel-view-history
   [state]

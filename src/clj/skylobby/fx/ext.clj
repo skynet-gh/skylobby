@@ -69,14 +69,19 @@
   (fx.lifecycle/make-ext-with-props
    fx.lifecycle/dynamic
    {:auto-scroll (fx.prop/make
-                   (fx.mutator/setter
-                     (fn [^VirtualizedScrollPane scroll-pane _content]
-                       (let [[_ _ ybar] (vec (.getChildrenUnmodifiable scroll-pane))
-                             threshold (quot (.getHeight ybar) 2)]
-                         (when (> (.getValue ybar) (- (.getMax ybar) threshold))
-                           (.scrollYBy scroll-pane ##Inf)))))
+                   (reify fx.mutator/Mutator
+                     (assign! [_ instance _ _]
+                       (.scrollYBy instance ##Inf))
+                     (replace! [_ instance _ old-value new-value]
+                       (when (not= old-value new-value)
+                         (let [[_ _ ybar] (vec (.getChildrenUnmodifiable instance))
+                               threshold 80] ; (quot (.getHeight ybar) 4)]
+                           (when (< (- (.getMax ybar) (.getValue ybar)) threshold)
+                             (.scrollYBy instance ##Inf)))))
+                     (retract! [_ _ _ _]
+                       nil))
                    fx.lifecycle/scalar
-                   :default ["" true])}))
+                   :default [])}))
 
 ; figure out layout on create
 (defn ext-scroll-on-create [{:keys [desc]}]
