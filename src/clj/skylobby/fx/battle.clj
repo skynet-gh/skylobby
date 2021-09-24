@@ -633,7 +633,8 @@
              :battle-status my-battle-status
              :channel-name channel-name
              :client-data client-data
-             :host-ingame host-ingame})}}])}]})
+             :host-ingame host-ingame
+             :singleplayer singleplayer})}}])}]})
 
 
 (defn battle-tabs

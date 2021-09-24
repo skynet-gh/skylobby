@@ -417,6 +417,14 @@
       (log/info "Port is not available" port)
       false)))
 
+(defn open-port []
+  (try
+    (with-open [_server (ServerSocket. 0)]
+      true)
+    (catch Exception e
+      (log/error e "Error getting open port")
+      false)))
+
 
 ; https://stackoverflow.com/a/50889042/984393
 
