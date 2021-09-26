@@ -20,7 +20,7 @@
 
 
 (def last-auto-unspec-atom (atom 0))
-(def auto-unspec-cooldown 5000)
+(def auto-unspec-cooldown 2000)
 
 
 (defn auto-unspec-ready?  []

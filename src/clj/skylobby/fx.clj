@@ -7,6 +7,15 @@
     (javafx.stage Screen)))
 
 
+(def divider-positions
+  (atom {}))
+(def window-states
+  (atom {}))
+
+(defn window-changed [window k v]
+  (swap! window-states assoc-in [window k] v))
+
+
 (def monospace-font-family
   (if (fs/windows?)
     "Consolas"

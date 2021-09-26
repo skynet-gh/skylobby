@@ -29,6 +29,11 @@
 (def download-sources
   [;springfiles-maps-download-source gone now
    hakora-maps-download-source
+   {:download-source-name "Balanced Annihilation GitHub releases"
+    :url http/tap-github-releases-url
+    :browse-url "https://github.com/Balanced-Annihilation/Balanced-Annihilation/releases"
+    :resources-fn http/get-github-release-downloadables
+    :resource-type-fn #(when (string/ends-with? % ".sdz") :spring-lobby/mod)}
    {:download-source-name "BAR GitHub spring"
     :url http/bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"

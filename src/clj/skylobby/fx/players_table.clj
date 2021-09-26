@@ -13,21 +13,6 @@
     (javafx.scene.paint Color)))
 
 
-#_
-(def allyteam-colors
-  {0 "crimson"
-   1 "royalblue"
-   2 "goldenrod"
-   3 "limegreen"
-   4 "deeppink"
-   5 "darkturquoise"
-   6 "darkorange"
-   7 "forestgreen"
-   8 "brown"
-   9 "teal"
-   10 "purple"
-   11 "goldenrod"})
-
 (def allyteam-colors
   (->> color/ffa-colors-web
        (map u/hex-color-to-css)
@@ -169,7 +154,6 @@
          [{:fx/type :table-column
            :text "Nickname"
            :resizable true
-           :pref-width 480
            :min-width 200
            :cell-value-factory identity
            :cell-factory
@@ -190,6 +174,11 @@
                                             Color/WHITE)
                         text-color-css (-> text-color-javafx str u/hex-color-to-css)]
                     {:text ""
+                     :tooltip
+                     {:fx/type :tooltip
+                      :show-delay [10 :ms]
+                      :style {:-fx-font-size "16"}
+                      :text (u/nickname id)}
                      :graphic
                      {:fx/type :h-box
                       :alignment :center

@@ -114,7 +114,7 @@
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
-  ([battle {:keys [is-host map-details mod-details sides] :as opts}]
+  ([battle {:keys [is-host map-details mod-details sides singleplayer] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
                       (map
@@ -181,8 +181,10 @@
             (when-let [hostip (:battle-ip battle)]
               (when-not is-host
                 {:hostip hostip}))
-            (when-let [hostport (:battle-port battle)]
-              {:hostport hostport})
+            (if-let [hostport (:battle-port battle)]
+              {:hostport hostport}
+              (when singleplayer
+                {:hostport (u/open-port)}))
             (when-let [mapname (:battle-map battle)]
               {:mapname mapname}))
           (concat
@@ -288,14 +290,15 @@
        (map-indexed vector)
        (into {})))
 
-(defn battle-script-txt [{:keys [username battle-map-details battle-mod-details] :as state}]
+(defn battle-script-txt [{:keys [username battle-map-details battle-mod-details singleplayer] :as state}]
   (let [battle (battle-details state)
         script (script-data battle
                  {:is-host (= username (:host-username battle))
                   :game {:myplayername username}
                   :map-details battle-map-details
                   :mod-details battle-mod-details
-                  :sides (mod-sides battle-mod-details)})]
+                  :sides (mod-sides battle-mod-details)
+                  :singleplayer singleplayer})]
     (script-txt script)))
 
 (defn engine-details [engines engine-version]
@@ -383,8 +386,14 @@
                             (cu/encode-client-status
                               (assoc my-client-status :ingame ingame))))
                      (when (and (not ingame) (:unready-after-game state))
-                       (when-let [me (-> state-atom deref :battle :users (get username))]
-                         (let [{:keys [battle-status team-color]} me]
+                       (let [server-key (u/server-key client-data)
+                             state (swap! state-atom update-in [:by-server server-key]
+                                     (fn [server-data]
+                                       (if (:battle server-data)
+                                         (assoc-in server-data [:battle :desired-ready] false)
+                                         server-data)))
+                             me (-> state :by-server (get server-key) :battle :users (get username))]
+                         (when-let [{:keys [battle-status team-color]} me]
                            (client/send-message
                              (:client client-data)
                              (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready false)) " " team-color))))))]

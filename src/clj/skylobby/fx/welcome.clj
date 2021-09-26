@@ -171,7 +171,6 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal "mdi-plus:30:white"}}]}]
-
      (when-let [login-error (str " " (get login-error (first server)))]
        [{:fx/type :label
          :text (str " " login-error)
@@ -346,8 +345,12 @@
              [
               {:fx/type :pane
                :h-box/hgrow :always}
-              {:fx/type singleplayer-buttons}
-              {:fx/type multiplayer-buttons}
+              (merge
+                {:fx/type singleplayer-buttons}
+                state)
+              (merge
+                {:fx/type multiplayer-buttons}
+                state)
               {:fx/type :pane
                :h-box/hgrow :always}]}
             {:fx/type :pane
