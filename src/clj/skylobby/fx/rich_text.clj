@@ -62,16 +62,13 @@
                         (.scrollYBy (.getParent instance) ##Inf)))
                     (replace! [_ instance _ old-value new-value]
                       (let [[old-lines _old-document-fn] old-value
-                            [new-lines new-document-fn] new-value
+                            [new-lines new-document-fn auto-scroll] new-value
                             diff-lines (drop (count old-lines) new-lines)]
                         (when (seq diff-lines)
-                          (let [needs-auto-scroll (when (and (.getParent instance) (instance? VirtualizedScrollPane (.getParent instance)))
-                                                    (let [[_ _ ybar] (vec (.getChildrenUnmodifiable (.getParent instance)))]
-                                                      (< (- (.getMax ybar) (.getValue ybar)) auto-scroll-threshold)))]
-                            (.appendText instance "\n")
-                            (.append instance (new-document-fn diff-lines))
-                            (when needs-auto-scroll
-                              (.scrollYBy (.getParent instance) ##Inf))))))
+                          (.appendText instance "\n")
+                          (.append instance (new-document-fn diff-lines))
+                          (when auto-scroll
+                            (.scrollYBy (.getParent instance) ##Inf)))))
                     (retract! [_ instance _ _]
                       (.deleteText instance 0 (.getLength instance))))
                   lifecycle/scalar)

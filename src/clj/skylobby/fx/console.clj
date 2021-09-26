@@ -3,7 +3,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.ext :refer [ext-scroll-on-create ext-with-auto-scroll-virtual-prop with-scroll-text-prop]]
+    [skylobby.fx.ext :refer [ext-scroll-on-create with-scroll-text-prop]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -113,20 +113,22 @@
     (when (seq console-log)
       (.build builder))))
 
-(defn console-view-impl [{:keys [client-data console-log console-message-draft server-key]}]
+(defn console-view-impl [{:keys [client-data console-auto-scroll console-log console-message-draft server-key]}]
   {:fx/type :v-box
    :children
    [
-    {:fx/type fx.virtualized-scroll-pane/lifecycle
+    {:fx/type ext-scroll-on-create
      :v-box/vgrow :always
-     :content
-     {:fx/type fx.rich-text/lifecycle-fast
-      :editable false
-      :style {:-fx-font-family skylobby.fx/monospace-font-family
-              :-fx-font-size default-font-size}
-      :wrap-text true
-      :document
-      [(reverse console-log) console-document]}}
+     :desc
+     {:fx/type fx.virtualized-scroll-pane/lifecycle
+      :event-filter {:event/type :spring-lobby/filter-console-scroll}
+      :content
+      {:fx/type fx.rich-text/lifecycle-fast
+       :editable false
+       :style {:-fx-font-family skylobby.fx/monospace-font-family
+               :-fx-font-size default-font-size}
+       :wrap-text true
+       :document [(reverse console-log) console-document console-auto-scroll]}}}
     {:fx/type :h-box
      :alignment :center-left
      :children

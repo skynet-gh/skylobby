@@ -43,14 +43,10 @@
    :y (get-in window-states [:settings :y] Double/NaN)
    :width ((fnil min settings-window-width) (:width screen-bounds) (get-in window-states [:settings :width] settings-window-width))
    :height ((fnil min settings-window-height) (:height screen-bounds) (get-in window-states [:settings :height] settings-window-height))
-   :on-width-changed {:event/type :spring-lobby/assoc-in
-                      :path [:window-states :settings :width]}
-   :on-height-changed {:event/type :spring-lobby/assoc-in
-                       :path [:window-states :settings :height]}
-   :on-x-changed {:event/type :spring-lobby/assoc-in
-                  :path [:window-states :settings :x]}
-   :on-y-changed {:event/type :spring-lobby/assoc-in
-                  :path [:window-states :settings :y]}
+   :on-width-changed (partial skylobby.fx/window-changed :settings :width)
+   :on-height-changed (partial skylobby.fx/window-changed :settings :height)
+   :on-x-changed (partial skylobby.fx/window-changed :settings :x)
+   :on-y-changed (partial skylobby.fx/window-changed :settings :y)
    :scene
    {:fx/type :scene
     :stylesheets (skylobby.fx/stylesheet-urls css)

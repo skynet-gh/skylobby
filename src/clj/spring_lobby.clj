@@ -54,7 +54,8 @@
     (javafx.scene.input KeyCode ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.stage DirectoryChooser FileChooser)
-    (manifold.stream SplicedStream))
+    (manifold.stream SplicedStream)
+    (org.fxmisc.flowless VirtualizedScrollPane))
   (:gen-class))
 
 
@@ -232,7 +233,9 @@
      :replay-minimap-type (first fx.battle/minimap-types)
      :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
      :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
-     :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)}))
+     :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)
+     :chat-auto-scroll true
+     :console-auto-scroll true}))
 
 
 (def ^:dynamic *state (atom {}))
@@ -1833,7 +1836,29 @@
                             :append true)))))))
           {:error-handler
            (fn [e]
-             (log/error e "Error updating now")
+             (log/error e "Error writing chat logs")
+             true)})]
+    (fn [] (.close chimer))))
+
+(defn- update-window-and-divider-positions-chimer-fn [state-atom]
+  (log/info "Starting window and divider positions chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/duration 5 :seconds))
+          (fn [_chimestamp]
+            (log/debug "Updating window and divider positions")
+            (let [divider-positions @skylobby.fx/divider-positions
+                  window-states @skylobby.fx/window-states]
+              (swap! state-atom
+                (fn [state]
+                  (-> state
+                      (update :divider-positions merge divider-positions)
+                      (update :window-states merge window-states))))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating window and divider positions")
              true)})]
     (fn [] (.close chimer))))
 
@@ -4187,6 +4212,23 @@
         (log/error e "Error sending message" message "to server")))))
 
 
+(defmethod event-handler ::filter-channel-scroll [{:fx/keys [event]}]
+  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+    (let [source (.getSource event)
+          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                              (let [[_ _ ybar] (vec (.getChildrenUnmodifiable source))]
+                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY event))) 80)))]
+      (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
+
+(defmethod event-handler ::filter-console-scroll [{:fx/keys [event]}]
+  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+    (let [source (.getSource event)
+          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                              (let [[_ _ ybar] (vec (.getChildrenUnmodifiable source))]
+                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY event))) 80)))]
+      (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
+
+
 (defn multi-server-tab
   [state]
   (merge
@@ -4315,6 +4357,7 @@
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
+         update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (when-not skip-tasks
@@ -4351,6 +4394,7 @@
          update-music-queue-chimer
          update-now-chimer
          update-replays-chimer
+         update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))
 
 

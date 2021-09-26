@@ -89,7 +89,15 @@
    :on-created (fn [^VirtualizedScrollPane scroll-pane]
                  (.layout scroll-pane)
                  (some-> scroll-pane .getParent .layout)
-                 (.scrollYBy scroll-pane ##Inf))
+                 (.scrollYBy scroll-pane ##Inf)
+                 (let [
+                       scroll-on-change (reify javafx.beans.value.ChangeListener
+                                          (changed [this _observable _old-value _new-value]
+                                            (.scrollYBy scroll-pane ##Inf)))
+                       width-property (.widthProperty scroll-pane)
+                       height-property (.heightProperty scroll-pane)]
+                   (.addListener width-property scroll-on-change)
+                   (.addListener height-property scroll-on-change)))
    :desc desc})
 
 

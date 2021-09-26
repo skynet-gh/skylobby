@@ -1,8 +1,10 @@
 (ns skylobby.fx.battle
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
@@ -1069,7 +1071,7 @@
 (def battle-view-state-keys
   (concat
     [:archiving :auto-get-resources :battle-layout :battle-players-color-type :bot-name
-     :bot-username :bot-version :chat-auto-scroll :cleaning :copying :downloadables-by-url :drag-allyteam
+     :bot-username :bot-version :chat-auto-scroll :cleaning :copying :divider-positions :downloadables-by-url :drag-allyteam
      :drag-team :engine-filter :engine-version
      :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :ignore-users
      :interleave-ally-player-ids :importables-by-path
@@ -1089,7 +1091,7 @@
 (defn battle-view-impl
   [{:keys [battle battle-layout battles battle-players-color-type bot-name bot-username bot-version
            channels chat-auto-scroll
-           client-data drag-allyteam drag-team engines-by-version file-cache ignore-users interleave-ally-player-ids
+           client-data divider-positions drag-allyteam drag-team engines-by-version file-cache ignore-users interleave-ally-player-ids
            map-input-prefix map-details
            maps maps-by-name message-drafts minimap-size minimap-type mod-details mods-by-name players-table-columns pop-out-battle pop-out-chat ready-on-unspec server-key spring-isolation-dir spring-settings
            tasks-by-type users username]
@@ -1345,16 +1347,25 @@
              :children
              [players-table
               battle-buttons]}
-            {:fx/type :split-pane
+            {:fx/type fx/ext-on-instance-lifecycle
+             :on-created (fn [^javafx.scene.control.SplitPane node]
+                           (let [dividers (.getDividers node)
+                                 position-property (.positionProperty (first dividers))]
+                             (.addListener position-property
+                               (reify javafx.beans.value.ChangeListener
+                                 (changed [this _observable _old-value new-value]
+                                   (swap! skylobby.fx/divider-positions assoc :battle new-value))))))
              :h-box/hgrow :always
-             :divider-positions [0.35]
-             :items
-             [
-              {:fx/type :v-box
-               :children
-               [players-table
-                battle-buttons]}
-              battle-chat]})
+             :desc
+             {:fx/type :split-pane
+              :divider-positions [(or (:battle divider-positions) 0.35)]
+              :items
+              [
+               {:fx/type :v-box
+                :children
+                [players-table
+                 battle-buttons]}
+               battle-chat]}})
           battle-tabs]
          ; else
          [(if (or singleplayer pop-out-chat)

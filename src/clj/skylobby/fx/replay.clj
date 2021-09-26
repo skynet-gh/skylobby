@@ -935,14 +935,10 @@
    :y (get-in window-states [:replays :y] Double/NaN)
    :width ((fnil min replays-window-width) (:width screen-bounds) (get-in window-states [:replays :width] replays-window-width))
    :height ((fnil min replays-window-height) (:height screen-bounds) (get-in window-states [:replays :height] replays-window-height))
-   :on-width-changed {:event/type :spring-lobby/assoc-in
-                      :path [:window-states :replays :width]}
-   :on-height-changed {:event/type :spring-lobby/assoc-in
-                       :path [:window-states :replays :height]}
-   :on-x-changed {:event/type :spring-lobby/assoc-in
-                  :path [:window-states :replays :x]}
-   :on-y-changed {:event/type :spring-lobby/assoc-in
-                  :path [:window-states :replays :y]}
+   :on-width-changed (partial skylobby.fx/window-changed :replays :width)
+   :on-height-changed (partial skylobby.fx/window-changed :replays :height)
+   :on-x-changed (partial skylobby.fx/window-changed :replays :x)
+   :on-y-changed (partial skylobby.fx/window-changed :replays :y)
    :scene
    {:fx/type :scene
     :stylesheets (skylobby.fx/stylesheet-urls css)

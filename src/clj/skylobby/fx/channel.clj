@@ -2,7 +2,7 @@
   (:require
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-scroll-on-create ext-with-auto-scroll-virtual-prop with-scroll-text-prop with-scroll-text-flow-prop]]
+    [skylobby.fx.ext :refer [ext-scroll-on-create with-scroll-text-prop with-scroll-text-flow-prop]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
@@ -175,36 +175,40 @@
        (.build builder)))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-font-size chat-highlight-username chat-highlight-words ignore-users messages server-key username]}]
+  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words ignore-users messages server-key username]}]
   (let [ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
                               set)]
-    {:fx/type fx.virtualized-scroll-pane/lifecycle
-     :content
-     {:fx/type fx.rich-text/lifecycle-fast
-      :editable false
-      :style (text-style chat-font-size)
-      :wrap-text true
-      :document
-      [
-       (->> messages
-            (remove (comp ignore-users-set :username))
-            (remove
-              (fn [{:keys [message-type text]}]
-                (and (= :ex message-type)
-                     text
-                     (string/starts-with? text "* BarManager|"))))
-            reverse)
-       (fn [lines]
-         (channel-document
-           lines
-           {:highlight
-            (concat
-              (when chat-highlight-words
-                (string/split chat-highlight-words #"[\s,]+"))
-              (when chat-highlight-username
-                [username]))}))]}}))
+    {:fx/type ext-scroll-on-create
+     :desc
+     {:fx/type fx.virtualized-scroll-pane/lifecycle
+      :event-filter {:event/type :spring-lobby/filter-channel-scroll}
+      :content
+      {:fx/type fx.rich-text/lifecycle-fast
+       :editable false
+       :style (text-style chat-font-size)
+       :wrap-text true
+       :document
+       [
+        (->> messages
+             (remove (comp ignore-users-set :username))
+             (remove
+               (fn [{:keys [message-type text]}]
+                 (and (= :ex message-type)
+                      text
+                      (string/starts-with? text "* BarManager|"))))
+             reverse)
+        (fn [lines]
+          (channel-document
+            lines
+            {:highlight
+             (concat
+               (when chat-highlight-words
+                 (string/split chat-highlight-words #"[\s,]+"))
+               (when chat-highlight-username
+                 [username]))}))
+        chat-auto-scroll]}}}))
 
 (defn channel-view-history
   [state]
@@ -269,7 +273,7 @@
          :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
-  [:chat-font-size :chat-highlight-username :chat-highlight-words :ignore-users])
+  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :ignore-users])
 
 (defn channel-view-impl
   [{:keys [channel-name channels hide-users]

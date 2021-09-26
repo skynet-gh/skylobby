@@ -28,14 +28,10 @@
      :y (get-in window-states [:chat :y] Double/NaN)
      :width ((fnil min chat-window-width) width (get-in window-states [:chat :width] chat-window-width))
      :height ((fnil min chat-window-height) height (get-in window-states [:chat :height] chat-window-height))
-     :on-width-changed {:event/type :spring-lobby/assoc-in
-                        :path [:window-states :chat :width]}
-     :on-height-changed {:event/type :spring-lobby/assoc-in
-                         :path [:window-states :chat :height]}
-     :on-x-changed {:event/type :spring-lobby/assoc-in
-                    :path [:window-states :chat :x]}
-     :on-y-changed {:event/type :spring-lobby/assoc-in
-                    :path [:window-states :chat :y]}
+     :on-width-changed (partial skylobby.fx/window-changed :chat :width)
+     :on-height-changed (partial skylobby.fx/window-changed :chat :height)
+     :on-x-changed (partial skylobby.fx/window-changed :chat :x)
+     :on-y-changed (partial skylobby.fx/window-changed :chat :y)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)
