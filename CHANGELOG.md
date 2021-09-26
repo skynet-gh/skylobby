@@ -32,6 +32,18 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.16]
+
+- Fix issues with chat auto scroll
+- Fix issue with unready after game
+- Fix unready on unspec and auto unspec
+- Improve performance from window size and position saving
+- Add saving of battle divider position
+- Use random open port for singleplayer
+- Decrease auto unspec cooldown
+- Add BA github repo as games source
+- Fix multiplayer buttons when a singleplayer battle is open
+
 ### [0.4.15]
 
 - Improve chat auto scroll
