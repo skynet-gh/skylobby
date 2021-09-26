@@ -594,6 +594,7 @@
             :is-me true
             :is-bot false
             :id my-player
+            :ready-on-unspec ready-on-unspec
             :server-key server-key}}
           {:fx/type :label
            :style {:-fx-font-size 15}

@@ -386,8 +386,14 @@
                             (cu/encode-client-status
                               (assoc my-client-status :ingame ingame))))
                      (when (and (not ingame) (:unready-after-game state))
-                       (when-let [me (-> state-atom deref :battle :users (get username))]
-                         (let [{:keys [battle-status team-color]} me]
+                       (let [server-key (u/server-key client-data)
+                             state (swap! state-atom update-in [:by-server server-key]
+                                     (fn [server-data]
+                                       (if (:battle server-data)
+                                         (assoc-in server-data [:battle :desired-ready] false)
+                                         server-data)))
+                             me (-> state :by-server (get server-key) :battle :users (get username))]
+                         (when-let [{:keys [battle-status team-color]} me]
                            (client/send-message
                              (:client client-data)
                              (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready false)) " " team-color))))))]

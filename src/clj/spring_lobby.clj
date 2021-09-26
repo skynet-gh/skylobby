@@ -1691,6 +1691,33 @@
     (swap! *state assoc :music-volume volume)))
 
 
+(defn- fix-battle-ready-chimer-fn [state-atom]
+  (log/info "Starting fix battle ready chimer")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 3 :seconds))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (log/debug "Fixing battle ready if needed")
+            (let [state @state-atom]
+              (doseq [[server-key server-data] (:by-server state)]
+                (when-let [battle (:battle server-data)]
+                  (let [desired-ready (boolean (:desired-ready battle))
+                        username (:username server-data)]
+                    (when-let [me (-> server-data :battle :users (get username))]
+                      (let [{:keys [battle-status team-color]} me]
+                        (when (not= (:ready battle-status) desired-ready)
+                          (client-message
+                            (-> server-data :client-data :client)
+                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color)))))
+                    (log/info "Matchmaking not enabled for server" server-key))))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating matchmaking")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- update-matchmaking-chimer-fn [state-atom]
   (log/info "Starting update matchmaking chimer")
   (let [chimer
@@ -1704,9 +1731,9 @@
               (doseq [[server-key server-data] (:by-server state)]
                 (if (u/matchmaking? server-data)
                   (let [client (-> server-data :client-data :client)]
-                    (message/send-message client "c.matchmaking.list_all_queues")
+                    (client-message client "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
-                      (message/send-message client (str "c.matchmaking.get_queue_info\t" queue-id))))
+                      (client-message client (str "c.matchmaking.get_queue_info\t" queue-id))))
                   (log/info "Matchmaking not enabled for server" server-key)))))
           {:error-handler
            (fn [e]
@@ -3384,6 +3411,7 @@
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status client-data team-color] :as id}]
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean event))
   (future
     (try
       (update-battle-status client-data {:id id} (assoc battle-status :ready event) team-color)
@@ -3401,7 +3429,9 @@
                      (not event))
               battle-status (assoc (:battle-status id) :mode mode)
               battle-status (if (and (not is-bot) (:mode battle-status))
-                              (assoc battle-status :ready (boolean ready-on-unspec))
+                              (do
+                                (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
+                                (assoc battle-status :ready (boolean ready-on-unspec)))
                               battle-status)]
           (update-battle-status client-data data battle-status (:team-color id)))
         (client-message client-data (str "FORCESPECTATORMODE " (:username id))))
@@ -4353,6 +4383,7 @@
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
          truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
@@ -4390,6 +4421,7 @@
          profile-print-chimer
          spit-app-config-chimer
          truncate-messages-chimer
+         fix-battle-ready-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
