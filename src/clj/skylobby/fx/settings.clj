@@ -18,20 +18,30 @@
 (def settings-window-width 1200)
 (def settings-window-height 1200)
 
+(def user-agent-placeholder (u/agent-string))
+
+(def default-client-id-type "random")
+(def client-id-types
+  ["random"
+   "hardware"
+   "zero"])
+(def client-id-types-set
+  (set client-id-types))
+
 
 (def settings-window-keys
-  [:auto-refresh-replays :auto-rejoin-battle :chat-font-size :chat-highlight-words :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:auto-refresh-replays :auto-rejoin-battle :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
-   :unready-after-game :use-default-ring-sound :use-git-mod-version :window-states])
+   :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :window-states])
 
 (defn settings-window-impl
-  [{:keys [auto-refresh-replays auto-rejoin-battle chat-font-size chat-highlight-username chat-highlight-words css
+  [{:keys [auto-refresh-replays auto-rejoin-battle chat-font-size chat-highlight-username chat-highlight-words client-id-override client-id-type css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive leave-battle-on-close-window media-player music-dir
            music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
-           unready-after-game use-default-ring-sound use-git-mod-version window-states]
+           unready-after-game use-default-ring-sound use-git-mod-version user-agent-override window-states]
     :as state}]
   {:fx/type :stage
    :showing (boolean show-settings-window)
@@ -632,7 +642,48 @@
                          music-volume
                          1.0)
                 :on-value-changed {:event/type :spring-lobby/on-change-music-volume
-                                   :media-player media-player}}]}]}]}}
+                                   :media-player media-player}}]}]}
+         {:fx/type :v-box
+          :min-width 580
+          :max-width 580
+          :children
+          [
+           {:fx/type :label
+            :text " User Agent Override"
+            :style {:-fx-font-size 24}}
+           {:fx/type :text-field
+            :text (str user-agent-override)
+            :prompt-text (str user-agent-placeholder)
+            :on-text-changed {:event/type :spring-lobby/assoc
+                              :key :user-agent-override}}]}
+         (let [client-id-type (get client-id-types-set client-id-type default-client-id-type)]
+           {:fx/type :v-box
+            :min-width 580
+            :max-width 580
+            :children
+            [
+             {:fx/type :label
+              :text " Client ID"
+              :style {:-fx-font-size 24}}
+             {:fx/type :label
+              :text " Type: "}
+             {:fx/type :combo-box
+              :value client-id-type
+              :items client-id-types
+              :on-value-changed {:event/type :spring-lobby/assoc
+                                 :key :client-id-type}}
+             {:fx/type :label
+              :text " ID: "}
+             {:fx/type :text-field
+              :text (str (case client-id-type
+                           "zero" 0
+                           "hardware" (u/hardware-client-id)
+                           client-id-override))
+              :style {:-fx-max-width 240}
+              :disable true}
+             {:fx/type :button
+              :text "Generate"
+              :on-action {:event/type :spring-lobby/randomize-client-id}}]})]}}
      {:fx/type :pane})}})
 
 (defn settings-window [state]

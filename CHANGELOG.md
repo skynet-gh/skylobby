@@ -32,6 +32,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.17]
+
+- Add support for client id other than zero
+- Add backup of infologs
+- Add promote button in battle
+- Add support for user agent string override
+- Fix text selection in chat and console on new content
+- Fix issue with chat tab contents
+
 ### [0.4.16]
 
 - Fix issues with chat auto scroll

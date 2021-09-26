@@ -65,10 +65,12 @@
                             [new-lines new-document-fn auto-scroll] new-value
                             diff-lines (drop (count old-lines) new-lines)]
                         (when (seq diff-lines)
-                          (.appendText instance "\n")
-                          (.append instance (new-document-fn diff-lines))
-                          (when auto-scroll
-                            (.scrollYBy (.getParent instance) ##Inf)))))
+                          (let [index-range (.getSelection instance)]
+                            (.appendText instance "\n")
+                            (.append instance (new-document-fn diff-lines))
+                            (when auto-scroll
+                              (.scrollYBy (.getParent instance) ##Inf))
+                            (.selectRange instance (.getStart index-range) (.getEnd index-range))))))
                     (retract! [_ instance _ _]
                       (.deleteText instance 0 (.getLength instance))))
                   lifecycle/scalar)

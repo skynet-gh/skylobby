@@ -801,7 +801,14 @@
                              :battle-users (:users battle)
                              :channel-name channel-name
                              :client-data client-data
-                             :users users}}]
+                             :users users}}
+                {:fx/type :button
+                 :text "Promote"
+                 :on-action {:event/type :spring-lobby/send-message
+                             :channel-name channel-name
+                             :client-data client-data
+                             :message "!promote"
+                             :server-key server-key}}]
                (when am-host
                  [
                   {:fx/type :pane

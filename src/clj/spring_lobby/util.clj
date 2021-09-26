@@ -9,18 +9,22 @@
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
   (:import
     (java.lang.management ManagementFactory)
-    (java.net ServerSocket URL URLDecoder URLEncoder)
+    (java.net InetAddress NetworkInterface ServerSocket URL URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.security MessageDigest)
     (java.time LocalDateTime)
     (java.util Base64 TimeZone)
     (java.util.jar Manifest)
+    (java.util.zip CRC32)
     (javafx.scene.paint Color)
     (org.apache.commons.codec.binary Hex)
     (org.apache.commons.io FileUtils)))
 
 
 (set! *warn-on-reflection* true)
+
+
+(declare bytes->hex curr-millis to-number)
 
 
 (def app-name "skylobby")
@@ -92,6 +96,32 @@
         (catch Exception e
           (log/debug e "Error getting version from file")))
       "UNKNOWN"))
+
+(defn hardware-client-id []
+  (try
+    (let [ni (NetworkInterface/getByInetAddress (InetAddress/getLocalHost))
+          ha-bytes (.getHardwareAddress ni)
+          crc (CRC32.)]
+      (.update crc ha-bytes)
+      (.getValue crc))
+    (catch Exception e
+      (log/error e "Error getting client id from hardware"))))
+
+(defn random-client-id []
+  ; https://stackoverflow.com/a/12768366
+  (let [r (java.util.Random. (curr-millis))]
+    (bit-and (.nextLong r) 0xffffffff)))
+
+(defn client-id [state-atom {:keys [client-id-override client-id-type]}]
+  (case client-id-type
+    "zero" 0
+    "hardware" (hardware-client-id)
+    ; else random
+    (if-let [r (to-number client-id-override)]
+      r
+      (let [r (random-client-id)]
+        (swap! state-atom assoc :client-id-override r)
+        r))))
 
 
 ; https://stackoverflow.com/a/17328219/984393

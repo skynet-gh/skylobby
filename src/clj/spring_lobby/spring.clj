@@ -364,6 +364,7 @@
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
+        now (u/curr-millis)
         set-ingame (fn [ingame]
                      (if ingame
                        (if (and media-player (not music-paused))
@@ -385,6 +386,11 @@
                        (str "MYSTATUS "
                             (cu/encode-client-status
                               (assoc my-client-status :ingame ingame))))
+                     (let [infologs-dir (fs/file spring-isolation-dir "infologs")
+                           infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))]
+                       (fs/make-dirs infologs-dir)
+                       (log/info "Copying infolog to")
+                       (fs/copy (fs/file spring-isolation-dir "infolog.txt") infolog-dest))
                      (when (and (not ingame) (:unready-after-game state))
                        (let [server-key (u/server-key client-data)
                              state (swap! state-atom update-in [:by-server server-key]

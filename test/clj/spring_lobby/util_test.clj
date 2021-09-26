@@ -13,6 +13,18 @@
   (is (false? (u/battle-channel-name? "main"))))
 
 
+(deftest client-id
+  (is (= 0
+         (u/client-id (atom nil) {:client-id-type "zero"})))
+  (let [a (atom nil)
+        id (u/client-id a {:client-id-type "random"})]
+    (is (not= 0 id))
+    (is (= id
+           (:client-id-override @a))))
+  (is (not= 0
+        (u/client-id (atom nil) {:client-id-type "hardware"}))))
+
+
 (deftest append-console-log
   (let [state-atom (atom {:by-server {"skynet@localhost" {}
                                       "other" {}}})

@@ -133,14 +133,14 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :username :window-states])
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
 (defn- select-config [state]
@@ -247,6 +247,8 @@
 
 
 (defn- client-message [{:keys [client] :as client-data} message]
+  (when-not client
+    (log/error (ex-info "No client to send message" {})))
   (message/send-message client message)
   (u/append-console-log *state (u/server-key client-data) :client message))
 
@@ -1576,6 +1578,11 @@
      {:todo-count next-round-count})))
 
 
+(defmethod event-handler ::randomize-client-id
+  [_e]
+  (swap! *state assoc :client-id-override (u/random-client-id)))
+
+
 (defmethod event-handler ::stop-music
   [{:keys [media-player]}]
   (when media-player
@@ -1709,7 +1716,7 @@
                       (let [{:keys [battle-status team-color]} me]
                         (when (not= (:ready battle-status) desired-ready)
                           (client-message
-                            (-> server-data :client-data :client)
+                            (:client-data server-data)
                             (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color)))))
                     (log/info "Matchmaking not enabled for server" server-key))))))
           {:error-handler
@@ -1730,10 +1737,10 @@
             (let [state @state-atom]
               (doseq [[server-key server-data] (:by-server state)]
                 (if (u/matchmaking? server-data)
-                  (let [client (-> server-data :client-data :client)]
-                    (client-message client "c.matchmaking.list_all_queues")
+                  (let [client-data (:client-data server-data)]
+                    (client-message client-data "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
-                      (client-message client (str "c.matchmaking.get_queue_info\t" queue-id))))
+                      (client-message client-data (str "c.matchmaking.get_queue_info\t" queue-id))))
                   (log/info "Matchmaking not enabled for server" server-key)))))
           {:error-handler
            (fn [e]
@@ -3439,10 +3446,10 @@
         (log/error e "Error updating battle spectate")))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
+  (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
   (event-handler (assoc e
                         :event/type ::battle-spectate-change
-                        :value (= "Playing" event)))
-  (swap! *state assoc-in [:by-server server-key :auto-unspec] false))
+                        :value (= "Playing" event))))
 
 (defmethod event-handler ::auto-unspec [{:keys [server-key] :as e}]
   (swap! *state assoc-in [:by-server server-key :auto-unspec] true)

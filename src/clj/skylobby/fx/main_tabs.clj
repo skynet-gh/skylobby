@@ -6,6 +6,7 @@
     [skylobby.fx.console :as fx.console]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.channels :as fx.channels]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.user :as fx.user]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -62,15 +63,18 @@
                                 :client-data client-data}
              :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
              :content
-             (merge
-               {:fx/type fx.channel/channel-view
-                :channel-name channel-name
-                :channels channels
-                :chat-auto-scroll chat-auto-scroll
-                :client-data client-data
-                :message-draft (get message-drafts channel-name)
-                :server-key server-key}
-               (select-keys state fx.channel/channel-state-keys))})
+             {:fx/type ext-recreate-on-key-changed
+              :key channel-name
+              :desc
+              (merge
+                {:fx/type fx.channel/channel-view
+                 :channel-name channel-name
+                 :channels channels
+                 :chat-auto-scroll chat-auto-scroll
+                 :client-data client-data
+                 :message-draft (get message-drafts channel-name)
+                 :server-key server-key}
+                (select-keys state fx.channel/channel-state-keys))}})
           my-channel-names)}}
       {:fx/type :pane})))
 
