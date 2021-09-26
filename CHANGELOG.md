@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.4.18]
+
+- Fix client id not set
+
 ### [0.4.17]
 
 - Add support for client id other than zero
