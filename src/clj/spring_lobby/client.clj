@@ -204,16 +204,16 @@
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 (defn login
-  ([client username password]
-   (login client "*" username password))
-  ([client local-addr username password]
-   (when (string/blank? password)
-     (throw (ex-info "Password is blank" {:username username})))
-   (let [pw-md5-base64 (u/base64-md5 password)
-         user-id 0 ; (rand-int Integer/MAX_VALUE)
-         msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                  " " (u/agent-string) "\t" user-id "\t" compflags)]
-     (message/send-message client msg))))
+  [client username password {:keys [client-id local-addr user-agent]
+                             :or {client-id 0
+                                  local-addr "*"
+                                  user-agent (u/agent-string)}}]
+  (when (string/blank? password)
+    (throw (ex-info "Password is blank" {:username username})))
+  (let [pw-md5-base64 (u/base64-md5 password)
+        msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
+                 " " user-agent "\t" client-id "\t" compflags)]
+    (message/send-message client msg)))
 
 
 (defmethod handler/handle "COMPFLAGS" [state-atom server-key m]
@@ -229,7 +229,11 @@
     (if (and ssl (contains? compflags "token-auth"))
       (message/send-message client (str "c.user.get_token_by_name " username "\t" password))
       (when (not accepted)
-        (login client username password)))))
+        (let [client-id (u/client-id state-atom state)]
+          (login client username password (merge
+                                            {:client-id client-id}
+                                            (when-let [user-agent (:user-agent-override state)]
+                                              {:user-agent user-agent}))))))))
 
 
 (defn connect
