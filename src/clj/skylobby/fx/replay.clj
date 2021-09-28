@@ -931,8 +931,8 @@
      on-close-request
      {:event/type :spring-lobby/dissoc
       :key :show-replays})
-   :x (get-in window-states [:replays :x] Double/NaN)
-   :y (get-in window-states [:replays :y] Double/NaN)
+   :x (get-in window-states [:replays :x] 0)
+   :y (get-in window-states [:replays :y] 0)
    :width ((fnil min replays-window-width) (:width screen-bounds) (get-in window-states [:replays :width] replays-window-width))
    :height ((fnil min replays-window-height) (:height screen-bounds) (get-in window-states [:replays :height] replays-window-height))
    :on-width-changed (partial skylobby.fx/window-changed :replays :width)

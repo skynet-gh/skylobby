@@ -54,8 +54,8 @@
    :icons skylobby.fx/icons
    :on-close-request {:event/type :spring-lobby/dissoc
                       :key :show-settings-window}
-   :x (get-in window-states [:settings :x] Double/NaN)
-   :y (get-in window-states [:settings :y] Double/NaN)
+   :x (get-in window-states [:settings :x] 0)
+   :y (get-in window-states [:settings :y] 0)
    :width ((fnil min settings-window-width) (:width screen-bounds) (get-in window-states [:settings :width] settings-window-width))
    :height ((fnil min settings-window-height) (:height screen-bounds) (get-in window-states [:settings :height] settings-window-height))
    :on-width-changed (partial skylobby.fx/window-changed :settings :width)
