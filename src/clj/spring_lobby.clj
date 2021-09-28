@@ -443,7 +443,7 @@
     (try
       (when (:auto-get-resources new-state)
         (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
-                      rapid-data-by-version servers spring-isolation-dir tasks]} new-state
+                      rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
@@ -455,6 +455,7 @@
               rapid-data (get rapid-data-by-version battle-modname)
               rapid-id (:id rapid-data)
               all-tasks (concat tasks (vals current-tasks))
+              tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
                               (filter (comp #{::rapid-download} ::task-type))
                               (filter (comp #{rapid-id} :rapid-id))
@@ -482,6 +483,14 @@
                                      (filter (comp #{::http-downloadable} ::task-type))
                                      (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
                                      first)
+              search-springfiles-map-task (->> all-tasks
+                                               (filter (comp #{::search-springfiles} ::task-type))
+                                               (filter (comp #{battle-map} :springname))
+                                               first)
+              download-springfiles-map-task (->> all-tasks
+                                                 (filter (comp #{::download-springfiles :http-downloadable} ::task-type))
+                                                 (filter (comp #{battle-map} :springname))
+                                                 first)
               engine-details (spring/engine-details engines battle-version)
               engine-importable (some->> importables
                                          (filter (comp #{::engine} :resource-type))
@@ -555,8 +564,30 @@
                            {::task-type ::http-downloadable
                             :downloadable map-downloadable
                             :spring-isolation-dir spring-root})
+                         (and battle-map
+                              (not map-importable)
+                              (not map-downloadable)
+                              (not (contains? springfiles-search-results battle-map))
+                              (not search-springfiles-map-task))
+                         (do
+                           (log/info "Adding task to search springfiles for map" battle-map)
+                           {::task-type ::search-springfiles
+                            :springname battle-map})
+                         (and battle-map
+                              (not map-importable)
+                              (not map-downloadable)
+                              (get springfiles-search-results battle-map)
+                              (not download-springfiles-map-task)
+                              (not (::refresh-maps tasks-by-type)))
+                         (do
+                           (log/info "Adding task to search springfiles for map" battle-map)
+                           {::task-type ::download-springfiles
+                            :resource-type ::map
+                            :springname battle-map
+                            :search-result (get springfiles-search-results battle-map)
+                            :spring-isolation-dir spring-root})
                          :else
-                         nil))
+                         (log/info "Nothing to do to auto get map" battle-map)))
                      (when
                        (and (= battle-modname (:battle-modname old-battle-details))
                             no-mod)
@@ -3818,6 +3849,7 @@
          :downloadable {:download-url (rand-nth mirrors)
                         :resource-filename filename
                         :resource-type resource-type}
+         :springname springname
          :spring-isolation-dir spring-isolation-dir}))
     (log/info "No mirror to download" springname "on springfiles")))
 
