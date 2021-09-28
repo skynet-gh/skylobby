@@ -15,6 +15,13 @@
 (defn window-changed [window k v]
   (swap! window-states assoc-in [window k] v))
 
+(defn add-maximized-listener [window-key ^javafx.stage.Stage node]
+  (let [maximized-property (.maximizedProperty node)]
+    (.addListener maximized-property
+      (reify javafx.beans.value.ChangeListener
+        (changed [this _observable _old-value new-value]
+          (window-changed window-key :maximized new-value))))))
+
 
 (def monospace-font-family
   (if (fs/windows?)
