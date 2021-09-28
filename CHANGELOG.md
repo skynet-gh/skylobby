@@ -32,6 +32,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.0]
+
+- Improve battle layout
+- Add auto download maps from springfiles
+- Make battle a tab in main window
+- Add buttons to open windows for battles and chats
+- Add refresh download source for engine button
+
 ### [0.4.18]
 
 - Fix client id not set
