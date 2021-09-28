@@ -32,6 +32,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.2]
+
+- Save window maximized states
+- Reduce frequency of window state sync
+
 ### [0.5.1]
 
 - Fix unable to stop auto unspec

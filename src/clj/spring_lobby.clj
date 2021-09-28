@@ -1910,8 +1910,8 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
-            (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 1 :minutes))
           (fn [_chimestamp]
             (log/debug "Updating window and divider positions")
             (let [divider-positions @skylobby.fx/divider-positions

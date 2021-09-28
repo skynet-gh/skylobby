@@ -59,58 +59,67 @@
         stylesheet-urls (skylobby.fx/stylesheet-urls css)]
     {:fx/type fx/ext-many
      :desc
-     [
-      {:fx/type :stage
-       :showing true
-       :title (str "skylobby " app-version)
-       :icons skylobby.fx/icons
-       :maximized (boolean window-maximized)
-       :x (get-in window-states [:main :x] Double/NaN)
-       :y (get-in window-states [:main :y] Double/NaN)
-       :width (min (get-in window-states [:main :width] main-window-width) width)
-       :height (min (get-in window-states [:main :height] main-window-height) height)
-       :on-width-changed (partial skylobby.fx/window-changed :main :width)
-       :on-height-changed (partial skylobby.fx/window-changed :main :height)
-       :on-x-changed (partial skylobby.fx/window-changed :main :x)
-       :on-y-changed (partial skylobby.fx/window-changed :main :y)
-       :on-close-request {:event/type :spring-lobby/main-window-on-close-request
-                          :standalone standalone}
-       :scene
-       {:fx/type :scene
-        :stylesheets stylesheet-urls
-        :root (merge
-                {:fx/type fx.main/main-window}
-                state
-                {:tasks-by-type tasks-by-type})}}
-      {:fx/type :stage
-       :showing show-battle-window
-       :title (str u/app-name " Battle")
-       :icons skylobby.fx/icons
-       :on-close-request (if leave-battle-on-close-window
-                           {:event/type :spring-lobby/leave-battle
-                            :client-data (:client-data server-data)
-                            :server-key server-key}
-                           {:event/type :spring-lobby/dissoc
-                            :key :pop-out-battle})
-       :width (min (get-in window-states [:battle :width] battle-window-width) width)
-       :height (min (get-in window-states [:battle :height] battle-window-height) height)
-       :x (get-in window-states [:battle :x] Double/NaN)
-       :y (get-in window-states [:battle :y] Double/NaN)
-       :on-width-changed (partial skylobby.fx/window-changed :battle :width)
-       :on-height-changed (partial skylobby.fx/window-changed :battle :height)
-       :on-x-changed (partial skylobby.fx/window-changed :battle :x)
-       :on-y-changed (partial skylobby.fx/window-changed :battle :y)
-       :scene
-       {:fx/type :scene
-        :stylesheets stylesheet-urls
-        :root
-        (if show-battle-window
-          (merge
-            {:fx/type fx.battle/battle-view
-             :tasks-by-type tasks-by-type}
-            (select-keys state fx.battle/battle-view-keys)
-            server-data)
-          {:fx/type :pane})}}
+     [{:fx/type fx/ext-on-instance-lifecycle
+       :on-created (partial skylobby.fx/add-maximized-listener :main)
+       :desc
+       {:fx/type :stage
+        :showing true
+        :title (str "skylobby " app-version)
+        :icons skylobby.fx/icons
+        :maximized (boolean
+                     (if (contains? state :window-maximized)
+                       window-maximized
+                       (get-in window-states [:main :maximized] false)))
+        :x (get-in window-states [:main :x] Double/NaN)
+        :y (get-in window-states [:main :y] Double/NaN)
+        :width (min (get-in window-states [:main :width] main-window-width) width)
+        :height (min (get-in window-states [:main :height] main-window-height) height)
+        :on-width-changed (partial skylobby.fx/window-changed :main :width)
+        :on-height-changed (partial skylobby.fx/window-changed :main :height)
+        :on-x-changed (partial skylobby.fx/window-changed :main :x)
+        :on-y-changed (partial skylobby.fx/window-changed :main :y)
+        :on-close-request {:event/type :spring-lobby/main-window-on-close-request
+                           :standalone standalone}
+        :scene
+        {:fx/type :scene
+         :stylesheets stylesheet-urls
+         :root (merge
+                 {:fx/type fx.main/main-window}
+                 state
+                 {:tasks-by-type tasks-by-type})}}}
+      {:fx/type fx/ext-on-instance-lifecycle
+       :on-created (partial skylobby.fx/add-maximized-listener :battle)
+       :desc
+       {:fx/type :stage
+        :showing show-battle-window
+        :title (str u/app-name " Battle")
+        :icons skylobby.fx/icons
+        :on-close-request (if leave-battle-on-close-window
+                            {:event/type :spring-lobby/leave-battle
+                             :client-data (:client-data server-data)
+                             :server-key server-key}
+                            {:event/type :spring-lobby/dissoc
+                             :key :pop-out-battle})
+        :maximized (get-in window-states [:battle :maximzed] false)
+        :width (min (get-in window-states [:battle :width] battle-window-width) width)
+        :height (min (get-in window-states [:battle :height] battle-window-height) height)
+        :x (get-in window-states [:battle :x] Double/NaN)
+        :y (get-in window-states [:battle :y] Double/NaN)
+        :on-width-changed (partial skylobby.fx/window-changed :battle :width)
+        :on-height-changed (partial skylobby.fx/window-changed :battle :height)
+        :on-x-changed (partial skylobby.fx/window-changed :battle :x)
+        :on-y-changed (partial skylobby.fx/window-changed :battle :y)
+        :scene
+        {:fx/type :scene
+         :stylesheets stylesheet-urls
+         :root
+         (if show-battle-window
+           (merge
+             {:fx/type fx.battle/battle-view
+              :tasks-by-type tasks-by-type}
+             (select-keys state fx.battle/battle-view-keys)
+             server-data)
+           {:fx/type :pane})}}}
       (merge
         {:fx/type fx.download/download-window
          :screen-bounds screen-bounds}
