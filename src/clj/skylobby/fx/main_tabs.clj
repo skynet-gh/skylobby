@@ -92,7 +92,7 @@
     fx.battles-table/battles-table-state-keys
     fx.channel/channel-state-keys
     fx.user/users-table-state-keys
-    [:filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
+    [:battle-as-tab :filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
 
 (def main-tab-view-keys
   (concat
@@ -106,7 +106,7 @@
      :server :users]))
 
 (defn main-tab-view
-  [{:keys [battle battles client-data channels filter-battles join-channel-name selected-tab-main server-key pop-out-battle]
+  [{:keys [battle-as-tab battle battles client-data channels filter-battles join-channel-name selected-tab-main server-key pop-out-battle]
     :as state}]
   (let [matchmaking (u/matchmaking? state)
         main-tab-ids (if matchmaking
@@ -115,7 +115,8 @@
         in-battle (and (seq battle)
                        (or (not (:battle-id battle))
                            (not pop-out-battle)))
-        main-tab-ids (concat (when in-battle ["battle"]) main-tab-ids)
+        show-battle-tab (and in-battle battle-as-tab)
+        main-tab-ids (concat (when show-battle-tab ["battle"]) main-tab-ids)
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
@@ -137,7 +138,7 @@
               :-fx-pref-height 164}
       :tabs
       (concat
-        (when in-battle
+        (when show-battle-tab
           [{:fx/type :tab
             :graphic {:fx/type :label
                       :text (or (:battle-title (get battles (:battle-id battle)))
