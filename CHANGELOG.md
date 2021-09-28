@@ -32,6 +32,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.3]
+
+- Add setting to show battle below battles again
+- Attempt to fix dropdown position issue
+- Workaround for SSL login issue
+
 ### [0.5.2]
 
 - Save window maximized states
