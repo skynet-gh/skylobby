@@ -26,8 +26,8 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :pop-out-chat}
-     :x (get-in window-states [window-key :x] Double/NaN)
-     :y (get-in window-states [window-key :y] Double/NaN)
+     :x (get-in window-states [window-key :x] 0)
+     :y (get-in window-states [window-key :y] 0)
      :width ((fnil min battle-chat-window-width) width (get-in window-states [window-key :width] battle-chat-window-width))
      :height ((fnil min battle-chat-window-height) height (get-in window-states [window-key :height] battle-chat-window-height))
      :on-width-changed (partial skylobby.fx/window-changed window-key :width)

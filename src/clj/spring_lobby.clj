@@ -133,7 +133,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
@@ -203,6 +203,7 @@
 (defn initial-state []
   (merge
     {:auto-get-resources true
+     :battle-as-tab true
      :battle-players-color-type "player"
      :battle-resource-details true
      :chat-highlight-username true
