@@ -72,7 +72,7 @@
   (if-let [[_all _username auth-token] (re-find #"[^\s]+ ([^\t]+)\t([^\t]+)" m)]
     (let [state (swap! state-atom assoc-in [:by-server server-key :auth-token] auth-token)
           client (-> state :by-server (get server-key) :client-data :client)
-          user-agent (or (:user-agent-override state) (u/agent-string))
+          user-agent (u/user-agent (:user-agent-override state))
           client-id (u/client-id state-atom state)]
       (message/send-message client (str "c.user.login " auth-token "\t" user-agent "\t" client-id)))
     (log/error "Error parsing user token message")))

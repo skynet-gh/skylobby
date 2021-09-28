@@ -434,6 +434,11 @@
        "-"
        (app-version)))
 
+(defn user-agent [override]
+  (if-not (string/blank? override)
+    override
+    (agent-string)))
+
 
 (def ipc-port 12345)
 
