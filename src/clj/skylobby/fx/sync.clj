@@ -7,6 +7,10 @@
 (def ok-green "#008000")
 (def warn-yellow "#FFD700")
 (def error-red "#DD0000")
+(def error-severity
+  {:-fx-base error-red
+   :-fx-background error-red
+   :-fx-background-color error-red})
 (def severity-styles
   {0 {:-fx-base ok-green
       :-fx-background ok-green
@@ -14,9 +18,7 @@
    1 {:-fx-base warn-yellow
       :-fx-background warn-yellow
       :-fx-background-color warn-yellow}
-   2 {:-fx-base error-red
-      :-fx-background error-red
-      :-fx-background-color error-red}})
+   2 error-severity})
 
 (defn sync-pane
   [{:keys [issues resource]}]
@@ -70,7 +72,7 @@
                            "exclamation"))
                        ":16:"
                        "white")}}
-                (let [style (get severity-styles severity)]
+                (let [style (get severity-styles severity error-severity)]
                   {:fx/type :v-box
                    :style (merge style font-style)
                    :children

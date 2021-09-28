@@ -72,6 +72,10 @@
     :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
     :resources-fn http/get-bar-maps-github-release-downloadables}])
 
+(def download-sources-by-name
+  (into {}
+    (map (juxt :download-source-name identity) download-sources)))
+
 
 (defn- download-type-cell
   [download-type]
