@@ -2,6 +2,8 @@
   (:require
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [clojure.string :as string]
+    [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.battles-buttons :as fx.battles-buttons]
     [skylobby.fx.battles-table :as fx.battles-table]
     [skylobby.fx.console :as fx.console]
     [skylobby.fx.channel :as fx.channel]
@@ -30,7 +32,7 @@
     [:channels :chat-auto-scroll :client-data :message-drafts :my-channels :selected-tab-channel
      :server-key]))
 
-(defn- my-channels-view
+(defn my-channels-view
   [{:keys [channels chat-auto-scroll client-data message-drafts my-channels selected-tab-channel
            server-key]
     :as state}]
@@ -94,21 +96,26 @@
 
 (def main-tab-view-keys
   (concat
+    fx.battle/battle-view-keys
     fx.battles-table/battles-table-keys
     fx.console/console-view-keys
     fx.user/users-table-keys
     [:battles :client-data :channels :compflags :filter-battles :filter-users :join-channel-name
-     :matchmaking-queues
+     :matchmaking-queues :pop-out-battle
      :selected-tab-channel :selected-tab-main
      :server :users]))
 
 (defn main-tab-view
-  [{:keys [battles client-data channels filter-battles join-channel-name selected-tab-main server-key]
+  [{:keys [battle battles client-data channels filter-battles join-channel-name selected-tab-main server-key pop-out-battle]
     :as state}]
   (let [matchmaking (u/matchmaking? state)
         main-tab-ids (if matchmaking
                        matchmaking-tab-ids
                        no-matchmaking-tab-ids)
+        in-battle (and (seq battle)
+                       (or (not (:battle-id battle))
+                           (not pop-out-battle)))
+        main-tab-ids (concat (when in-battle ["battle"]) main-tab-ids)
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
@@ -130,45 +137,77 @@
               :-fx-pref-height 164}
       :tabs
       (concat
+        (when in-battle
+          [{:fx/type :tab
+            :graphic {:fx/type :label
+                      :text (or (:battle-title (get battles (:battle-id battle)))
+                                "Battle")}
+            :closable true
+            :on-close-request {:event/type :spring-lobby/leave-battle
+                               :client-data client-data}
+            :id "battle"
+            :content
+            (if (:battle-id battle)
+              (merge
+                {:fx/type fx.battle/battle-view}
+                (select-keys state fx.battle/battle-view-keys))
+              {:fx/type :h-box
+               :alignment :top-left
+               :children
+               [{:fx/type :v-box
+                 :h-box/hgrow :always
+                 :children
+                 [{:fx/type :label
+                   :style {:-fx-font-size 20}
+                   :text "Waiting for battle details from server..."}]}]})}])
         [{:fx/type :tab
           :graphic {:fx/type :label
                     :text "Battles"}
           :closable false
           :id "battles"
           :content
-          {:fx/type :split-pane
-           :divider-positions [0.75]
-           :items
+          {:fx/type :v-box
+           :children
            [
-            {:fx/type :v-box
-             :children
-             [{:fx/type :h-box
-               :alignment :center-left
+            {:fx/type :split-pane
+             :v-box/vgrow :always
+             :divider-positions [0.75]
+             :items
+             [
+              {:fx/type :v-box
                :children
-               (concat
-                 [
-                  {:fx/type :label
-                   :text (str "Battles (" (count battles) ")")}
-                  {:fx/type :pane
-                   :h-box/hgrow :always}
-                  {:fx/type :label
-                   :text (str " Filter: ")}
-                  {:fx/type :text-field
-                   :text (str filter-battles)
-                   :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :filter-battles}}]
-                 (when-not (string/blank? filter-battles)
-                   [{:fx/type :button
-                     :on-action {:event/type :spring-lobby/dissoc
-                                 :key :filter-battles}
-                     :graphic
-                     {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-close:16:white"}}]))}
-              (merge
-                {:fx/type fx.battles-table/battles-table
-                 :v-box/vgrow :always}
-                (select-keys state fx.battles-table/battles-table-keys))]}
-            users-view]}}]
+               [{:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 (concat
+                   [
+                    {:fx/type :label
+                     :text (str "Battles (" (count battles) ")")}
+                    {:fx/type :pane
+                     :h-box/hgrow :always}
+                    {:fx/type :label
+                     :text (str " Filter: ")}
+                    {:fx/type :text-field
+                     :text (str filter-battles)
+                     :on-text-changed {:event/type :spring-lobby/assoc
+                                       :key :filter-battles}}]
+                   (when-not (string/blank? filter-battles)
+                     [{:fx/type :button
+                       :on-action {:event/type :spring-lobby/dissoc
+                                   :key :filter-battles}
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-close:16:white"}}]))}
+                (merge
+                  {:fx/type fx.battles-table/battles-table
+                   :v-box/vgrow :always}
+                  (select-keys state fx.battles-table/battles-table-keys))]}
+              users-view]}
+            (merge
+              {:fx/type fx.battles-buttons/battles-buttons-view}
+              (select-keys state
+                (concat fx.battles-buttons/battles-buttons-state-keys
+                        fx.battles-buttons/battles-buttons-keys)))]}}]
         (when matchmaking
           [{:fx/type :tab
             :graphic {:fx/type :label

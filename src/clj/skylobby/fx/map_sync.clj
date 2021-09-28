@@ -148,10 +148,14 @@
                           (str "No local import found for map " battle-map))
                :in-progress in-progress
                :action
-               (when (and importable
-                          (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir importable))))
-                 {:event/type :spring-lobby/add-task
-                  :task
-                  {:spring-lobby/task-type :spring-lobby/import
-                   :importable importable
-                   :spring-isolation-dir spring-isolation-dir}})}]))))}))
+               (when importable
+                 (if (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir importable)))
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/import
+                     :importable importable
+                     :spring-isolation-dir spring-isolation-dir}}
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:spring-lobby/task-type :spring-lobby/update-file-cache
+                     :file (resource/resource-dest spring-isolation-dir importable)}}))}]))))}))

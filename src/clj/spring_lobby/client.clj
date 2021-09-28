@@ -230,10 +230,8 @@
       (message/send-message client (str "c.user.get_token_by_name " username "\t" password))
       (when (not accepted)
         (let [client-id (u/client-id state-atom state)]
-          (login client username password (merge
-                                            {:client-id client-id}
-                                            (when-let [user-agent (:user-agent-override state)]
-                                              {:user-agent user-agent}))))))))
+          (login client username password {:client-id client-id
+                                           :user-agent (u/user-agent (:user-agent-override state))}))))))
 
 
 (defn connect

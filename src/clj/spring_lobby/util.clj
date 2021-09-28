@@ -257,6 +257,12 @@
 (defn server-key [{:keys [server-url username]}]
   (str username "@" server-url))
 
+(defn valid-servers [by-server]
+  (->> (dissoc by-server :local)
+       (remove (comp string/blank? first))
+       (filter (comp :accepted second))))
+
+
 (defn append-console-log [state-atom server-key source message]
   (swap! state-atom
     (fn [state]
@@ -433,6 +439,11 @@
   (str app-name
        "-"
        (app-version)))
+
+(defn user-agent [override]
+  (if-not (string/blank? override)
+    override
+    (agent-string)))
 
 
 (def ipc-port 12345)

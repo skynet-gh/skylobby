@@ -54,7 +54,22 @@
          :text "Host Battle"
          :on-action {:event/type :spring-lobby/toggle
                      :key :show-host-battle-window}}
-        {:fx/type :label
+        {:fx/type :button
+         :text "Battles"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-battles-window}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-window-maximize:16:white"}}
+        {:fx/type :button
+         :text "Chat"
+         :on-action {:event/type :spring-lobby/toggle
+                     :key :show-chat-window}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-window-maximize:16:white"}}]
+       #_
+       [{:fx/type :label
          :text " Resources: "}
         {:fx/type :button
          :text "Import"

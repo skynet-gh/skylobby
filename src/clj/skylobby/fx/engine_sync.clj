@@ -1,10 +1,19 @@
 (ns skylobby.fx.engine-sync
   (:require
     [clojure.java.io :as io]
+    [clojure.string :as string]
+    [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]))
+
+
+(defn engine-download-source [engine-version]
+  (cond
+    (string/blank? engine-version) nil
+    (string/includes? engine-version "BAR") "BAR GitHub spring"
+    :else nil))
 
 
 (defn engine-sync-pane
@@ -46,7 +55,8 @@
              resource-filename (:resource-filename downloadable)
              extract-target (when (and spring-isolation-dir resource-filename)
                               (io/file spring-isolation-dir "engine" (fs/without-extension resource-filename)))
-             extract-exists (fs/file-exists? file-cache extract-target)]
+             extract-exists (fs/file-exists? file-cache extract-target)
+             download-source-name (engine-download-source engine-version)]
          (concat
            [{:severity severity
              :text "download"
@@ -56,19 +66,31 @@
                              (if dest-exists
                                (str "Downloaded " (fs/filename dest))
                                (str "Download from " (:download-source-name downloadable)))
-                             "No download found"))
+                             (if download-source-name
+                               (str "Update download source " download-source-name)
+                               "No download found")))
              :tooltip (if in-progress
                         (str "Downloading " (u/download-progress download))
                         (if dest-exists
                           (str "Downloaded to " dest-path)
                           (str "Download " url)))
              :in-progress in-progress
-             :action (when (and downloadable (not dest-exists))
-                       {:event/type :spring-lobby/add-task
-                        :task
-                        {:spring-lobby/task-type :spring-lobby/download-and-extract
-                         :downloadable downloadable
-                         :spring-isolation-dir spring-isolation-dir}})}]
+             :action (when-not dest-exists
+                       (cond
+                         downloadable
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          {:spring-lobby/task-type :spring-lobby/download-and-extract
+                           :downloadable downloadable
+                           :spring-isolation-dir spring-isolation-dir}}
+                         download-source-name
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          (merge
+                            {:spring-lobby/task-type :spring-lobby/update-downloadables
+                             :force true}
+                            (get download-sources-by-name download-source-name))}
+                         :else nil))}]
            (when dest-exists
              [{:severity (if extract-exists -1 2)
                :text "extract"
@@ -79,7 +101,7 @@
                :action {:event/type :spring-lobby/extract-7z
                         :file dest
                         :dest extract-target}}]))))
-     (when-not engine-details
+     (when (and (not engine-details) (not (engine-download-source engine-version)))
        (let [springname (str "Spring " engine-version)
              springfiles-searched (contains? springfiles-search-results springname)
              springfiles-search-result (get springfiles-search-results springname)

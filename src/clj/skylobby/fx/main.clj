@@ -1,6 +1,5 @@
 (ns skylobby.fx.main
   (:require
-    [clojure.string :as string]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
@@ -8,17 +7,11 @@
     [spring-lobby.util :as u]))
 
 
-(defn valid-servers [by-server]
-  (->> (dissoc by-server :local)
-       (remove (comp string/blank? first))
-       (filter (comp :accepted second))))
-
-
 (defn main-window
   [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main
            server servers spring-isolation-dir username]
     :as state}]
-  (let [valid-servers (valid-servers by-server)
+  (let [valid-servers (u/valid-servers by-server)
         tab-ids (concat ["local"]
                         (map first valid-servers)
                         #_(when (seq valid-servers) ["multi"]))

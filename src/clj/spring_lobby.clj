@@ -204,6 +204,7 @@
   (merge
     {:auto-get-resources true
      :battle-players-color-type "player"
+     :battle-resource-details true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :leave-battle-on-close-window true
@@ -442,7 +443,7 @@
     (try
       (when (:auto-get-resources new-state)
         (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
-                      rapid-data-by-version servers spring-isolation-dir tasks]} new-state
+                      rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
@@ -454,6 +455,7 @@
               rapid-data (get rapid-data-by-version battle-modname)
               rapid-id (:id rapid-data)
               all-tasks (concat tasks (vals current-tasks))
+              tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
                               (filter (comp #{::rapid-download} ::task-type))
                               (filter (comp #{rapid-id} :rapid-id))
@@ -481,6 +483,14 @@
                                      (filter (comp #{::http-downloadable} ::task-type))
                                      (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
                                      first)
+              search-springfiles-map-task (->> all-tasks
+                                               (filter (comp #{::search-springfiles} ::task-type))
+                                               (filter (comp #{battle-map} :springname))
+                                               first)
+              download-springfiles-map-task (->> all-tasks
+                                                 (filter (comp #{::download-springfiles :http-downloadable} ::task-type))
+                                                 (filter (comp #{battle-map} :springname))
+                                                 first)
               engine-details (spring/engine-details engines battle-version)
               engine-importable (some->> importables
                                          (filter (comp #{::engine} :resource-type))
@@ -554,8 +564,30 @@
                            {::task-type ::http-downloadable
                             :downloadable map-downloadable
                             :spring-isolation-dir spring-root})
+                         (and battle-map
+                              (not map-importable)
+                              (not map-downloadable)
+                              (not (contains? springfiles-search-results battle-map))
+                              (not search-springfiles-map-task))
+                         (do
+                           (log/info "Adding task to search springfiles for map" battle-map)
+                           {::task-type ::search-springfiles
+                            :springname battle-map})
+                         (and battle-map
+                              (not map-importable)
+                              (not map-downloadable)
+                              (get springfiles-search-results battle-map)
+                              (not download-springfiles-map-task)
+                              (not (::refresh-maps tasks-by-type)))
+                         (do
+                           (log/info "Adding task to search springfiles for map" battle-map)
+                           {::task-type ::download-springfiles
+                            :resource-type ::map
+                            :springname battle-map
+                            :search-result (get springfiles-search-results battle-map)
+                            :spring-isolation-dir spring-root})
                          :else
-                         nil))
+                         (log/info "Nothing to do to auto get map" battle-map)))
                      (when
                        (and (= battle-modname (:battle-modname old-battle-details))
                             no-mod)
@@ -1708,7 +1740,7 @@
           (fn [_chimestamp]
             (log/debug "Fixing battle ready if needed")
             (let [state @state-atom]
-              (doseq [[server-key server-data] (:by-server state)]
+              (doseq [[_server-key server-data] (u/valid-servers (:by-server state))]
                 (when-let [battle (:battle server-data)]
                   (let [desired-ready (boolean (:desired-ready battle))
                         username (:username server-data)]
@@ -1717,8 +1749,7 @@
                         (when (not= (:ready battle-status) desired-ready)
                           (client-message
                             (:client-data server-data)
-                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color)))))
-                    (log/info "Matchmaking not enabled for server" server-key))))))
+                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color))))))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating matchmaking")
@@ -2589,14 +2620,15 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data server-key]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data server-key] :fx/keys [event]}]
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
-        (log/error e "Error leaving battle")))))
+        (log/error e "Error leaving battle"))))
+  (.consume event))
 
 
 (defmethod event-handler ::join-battle
@@ -3817,6 +3849,7 @@
          :downloadable {:download-url (rand-nth mirrors)
                         :resource-filename filename
                         :resource-type resource-type}
+         :springname springname
          :spring-isolation-dir spring-isolation-dir}))
     (log/info "No mirror to download" springname "on springfiles")))
 
@@ -3953,8 +3986,8 @@
 
 
 (defmethod event-handler ::assoc
-  [{:fx/keys [event] :as e}]
-  (swap! *state assoc (:key e) (or (:value e) event)))
+  [{:fx/keys [event] :keys [value] :or {value event} :as e}]
+  (swap! *state assoc (:key e) value))
 
 (defmethod event-handler ::assoc-in
   [{:fx/keys [event] :keys [path value] :or {value event}}]
