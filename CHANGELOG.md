@@ -32,6 +32,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.1]
+
+- Fix unable to stop auto unspec
+
 ### [0.5.0]
 
 - Improve battle layout

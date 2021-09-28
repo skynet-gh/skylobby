@@ -3483,11 +3483,14 @@
                         :event/type ::battle-spectate-change
                         :value (= "Playing" event))))
 
-(defmethod event-handler ::auto-unspec [{:keys [server-key] :as e}]
-  (swap! *state assoc-in [:by-server server-key :auto-unspec] true)
-  (event-handler (assoc e
-                        :event/type ::battle-spectate-change
-                        :value true)))
+(defmethod event-handler ::auto-unspec [{:keys [server-key] :fx/keys [event] :as e}]
+  (if event
+    (do
+      (swap! *state assoc-in [:by-server server-key :auto-unspec] true)
+      (event-handler (assoc e
+                            :event/type ::battle-spectate-change
+                            :value true)))
+    (swap! *state assoc-in [:by-server server-key :auto-unspec] false)))
 
 (defmethod event-handler ::battle-side-changed
   [{:keys [client-data id indexed-mod sides] :fx/keys [event] :as data}]
