@@ -3,6 +3,8 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.battle-chat :as fx.battle-chat]
+    [skylobby.fx.battles-window :as fx.battles-window]
     [skylobby.fx.chat :as fx.chat]
     [skylobby.fx.download :as fx.download]
     [skylobby.fx.host-battle :as fx.host-battle]
@@ -34,7 +36,7 @@
 
 (defn root-view-impl
   [{{:keys [by-server by-spring-root css current-tasks leave-battle-on-close-window pop-out-battle pop-out-chat selected-server-tab servers
-            spring-isolation-dir standalone tasks-by-kind window-maximized window-states]
+            show-battles-window show-chat-window spring-isolation-dir standalone tasks-by-kind window-maximized window-states]
      :as state}
     :state}]
   (let [{:keys [width height]} screen-bounds
@@ -52,7 +54,7 @@
                       {:server-key selected-server-tab}
                       (resource/spring-root-resources spring-root by-spring-root))
         show-battle-window (boolean (and pop-out-battle battle))
-        show-chat-window (boolean (and pop-out-chat battle))
+        show-battle-chat-window (boolean (and pop-out-chat battle))
         stylesheet-urls (skylobby.fx/stylesheet-urls css)]
     {:fx/type fx/ext-many
      :desc
@@ -158,11 +160,32 @@
               channel-name (or channel-name
                                (str "__battle__" battle-id))]
           ; TODO dedupe with battle
+          {:fx/type fx.battle-chat/battle-chat-window
+           :channel-name channel-name
+           :screen-bounds screen-bounds
+           :show-battle-chat-window show-battle-chat-window})
+        (select-keys state fx.battle-chat/battle-chat-window-keys)
+        server-data)
+      (merge
+        (let [{:keys [battle battles]} server-data
+              {:keys [battle-id]} battle
+              {:keys [channel-name]} (get battles battle-id)
+              channel-name (or channel-name
+                               (str "__battle__" battle-id))]
+          ; TODO dedupe with battle
           {:fx/type fx.chat/chat-window
            :channel-name channel-name
            :screen-bounds screen-bounds
            :show-chat-window show-chat-window})
         (select-keys state fx.chat/chat-window-keys)
+        server-data)
+      (merge
+        (let [{:keys [battles]} server-data]
+          {:fx/type fx.battles-window/battles-window-view
+           :battles battles
+           :screen-bounds screen-bounds
+           :show-battles-window show-battles-window})
+        (select-keys state fx.battles-window/battles-window-keys)
         server-data)]}))
 
 (defn root-view [state]
