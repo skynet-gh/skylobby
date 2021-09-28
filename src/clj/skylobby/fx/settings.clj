@@ -28,16 +28,21 @@
 (def client-id-types-set
   (set client-id-types))
 
+(def battle-layouts
+  [
+   "vertical"
+   "horizontal"])
+
 
 (def settings-window-keys
-  [:auto-refresh-replays :auto-rejoin-battle :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:auto-refresh-replays :auto-rejoin-battle :battle-layout :battle-players-color-type :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :window-states])
 
 (defn settings-window-impl
-  [{:keys [auto-refresh-replays auto-rejoin-battle chat-font-size chat-highlight-username chat-highlight-words client-id-override client-id-type css
+  [{:keys [auto-get-resources auto-refresh-replays auto-rejoin-battle battle-layout battle-players-color-type chat-font-size chat-highlight-username chat-highlight-words client-id-override client-id-type css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
            extra-replay-name extra-replay-path extra-replay-recursive leave-battle-on-close-window media-player music-dir
            music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window spring-isolation-dir spring-isolation-dir-draft
@@ -218,7 +223,38 @@
                 :on-selected-changed {:event/type :spring-lobby/assoc
                                       :key :leave-battle-on-close-window}}
                {:fx/type :label
-                :text " Leave battle on close window"}]}]}
+                :text " Leave battle on close window"}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :label
+                :text " Color player name: "}
+               {:fx/type :combo-box
+                :value (or battle-players-color-type (first u/player-name-color-types))
+                :items u/player-name-color-types
+                :on-value-changed {:event/type :spring-lobby/assoc
+                                   :key :battle-players-color-type}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :label
+                :text " Layout: "}
+               {:fx/type :combo-box
+                :value battle-layout
+                :items battle-layouts
+                :on-value-changed {:event/type :spring-lobby/assoc
+                                   :key :battle-layout}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [{:fx/type :check-box
+                :selected (boolean auto-get-resources)
+                :on-selected-changed {:event/type :spring-lobby/assoc
+                                      :key :auto-get-resources}}
+               {:fx/type :label
+                :text " Auto import or download resources"}]}]}
          {:fx/type :v-box
           :min-width 580
           :max-width 580

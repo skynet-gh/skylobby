@@ -204,6 +204,7 @@
   (merge
     {:auto-get-resources true
      :battle-players-color-type "player"
+     :battle-resource-details true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :leave-battle-on-close-window true
@@ -1708,7 +1709,7 @@
           (fn [_chimestamp]
             (log/debug "Fixing battle ready if needed")
             (let [state @state-atom]
-              (doseq [[server-key server-data] (:by-server state)]
+              (doseq [[_server-key server-data] (u/valid-servers (:by-server state))]
                 (when-let [battle (:battle server-data)]
                   (let [desired-ready (boolean (:desired-ready battle))
                         username (:username server-data)]
@@ -1717,8 +1718,7 @@
                         (when (not= (:ready battle-status) desired-ready)
                           (client-message
                             (:client-data server-data)
-                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color)))))
-                    (log/info "Matchmaking not enabled for server" server-key))))))
+                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color))))))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating matchmaking")
@@ -2589,14 +2589,15 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data server-key]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data server-key] :fx/keys [event]}]
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
-        (log/error e "Error leaving battle")))))
+        (log/error e "Error leaving battle"))))
+  (.consume event))
 
 
 (defmethod event-handler ::join-battle
@@ -3953,8 +3954,8 @@
 
 
 (defmethod event-handler ::assoc
-  [{:fx/keys [event] :as e}]
-  (swap! *state assoc (:key e) (or (:value e) event)))
+  [{:fx/keys [event] :keys [value] :or {value event} :as e}]
+  (swap! *state assoc (:key e) value))
 
 (defmethod event-handler ::assoc-in
   [{:fx/keys [event] :keys [path value] :or {value event}}]

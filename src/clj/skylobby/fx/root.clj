@@ -45,7 +45,8 @@
                        (concat (vals current-tasks))
                        (filter some?))
         tasks-by-type (group-by :spring-lobby/task-type all-tasks)
-        {:keys [battle] :as server-data} (get by-server selected-server-tab)
+        server-key (if (= "local" selected-server-tab) :local selected-server-tab)
+        {:keys [battle] :as server-data} (get by-server server-key)
         server-url (-> server-data :client-data :server-url)
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
@@ -87,7 +88,8 @@
        :icons skylobby.fx/icons
        :on-close-request (if leave-battle-on-close-window
                            {:event/type :spring-lobby/leave-battle
-                            :client-data (:client-data server-data)}
+                            :client-data (:client-data server-data)
+                            :server-key server-key}
                            {:event/type :spring-lobby/dissoc
                             :key :pop-out-battle})
        :width (min (get-in window-states [:battle :width] battle-window-width) width)
