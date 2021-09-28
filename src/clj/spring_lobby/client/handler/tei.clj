@@ -73,6 +73,7 @@
     (let [state (swap! state-atom assoc-in [:by-server server-key :auth-token] auth-token)
           client (-> state :by-server (get server-key) :client-data :client)
           user-agent (u/user-agent (:user-agent-override state))
-          client-id (u/client-id state-atom state)]
-      (message/send-message client (str "c.user.login " auth-token "\t" user-agent "\t" client-id)))
+          client-id (u/client-id state-atom state)
+          flags "skylobby=true"]
+      (message/send-message client (str "c.user.login " auth-token "\t" user-agent "\t" client-id "\t" flags)))
     (log/error "Error parsing user token message")))
