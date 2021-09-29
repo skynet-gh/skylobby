@@ -2081,7 +2081,7 @@
   ([state-atom k watcher-fn]
    (state-change-chimer-fn state-atom k watcher-fn 3))
   ([state-atom k watcher-fn duration]
-   (let [old-state-atom (atom {})
+   (let [old-state-atom (atom @state-atom)
          chimer
          (chime/chime-at
            (chime/periodic-seq
@@ -4435,7 +4435,7 @@
          update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
-     (when-not skip-tasks
+     (if-not skip-tasks
        (future
          (try
            (async/<!! (async/timeout 10000))
@@ -4453,7 +4453,8 @@
            (async/<!! (async/timeout 10000))
            (event-handler {:event/type ::scan-imports})
            (catch Exception e
-             (log/error e "Error adding initial tasks")))))
+             (log/error e "Error adding initial tasks"))))
+       (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
      {:chimers
