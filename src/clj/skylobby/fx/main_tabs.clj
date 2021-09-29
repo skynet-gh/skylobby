@@ -145,7 +145,8 @@
                                 "Battle")}
             :closable true
             :on-close-request {:event/type :spring-lobby/leave-battle
-                               :client-data client-data}
+                               :client-data client-data
+                               :consume true}
             :id "battle"
             :content
             (if (:battle-id battle)

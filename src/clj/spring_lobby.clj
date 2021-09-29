@@ -2307,6 +2307,7 @@
 
 (defmethod event-handler ::leave-channel
   [{:keys [channel-name client-data] :fx/keys [^Event event]}]
+  (.consume event)
   (future
     (try
       (let [server-key (u/server-key client-data)]
@@ -2318,8 +2319,7 @@
       (when-not (string/starts-with? channel-name "@")
         (client-message client-data (str "LEAVE " channel-name)))
       (catch Exception e
-        (log/error e "Error leaving channel" channel-name))))
-  (.consume event))
+        (log/error e "Error leaving channel" channel-name)))))
 
 
 (defn- update-disconnected!
@@ -2621,15 +2621,16 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data server-key] :fx/keys [event]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [event]}]
+  (when consume
+    (.consume event))
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
-        (log/error e "Error leaving battle"))))
-  (.consume event))
+        (log/error e "Error leaving battle")))))
 
 
 (defmethod event-handler ::join-battle
@@ -2641,7 +2642,7 @@
         (async/<!! (async/timeout 500)))
       (if selected-battle
         (do
-          (swap! *state assoc :selected-battle nil :battle {})
+          (swap! *state assoc :selected-battle nil :battle {} :selected-tab-main "battle")
           (client-message client-data
             (str "JOINBATTLE " selected-battle
                  (if battle-passworded

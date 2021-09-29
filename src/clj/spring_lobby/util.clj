@@ -555,3 +555,10 @@
 (defn remove-nonprintable [s]
   (when s
     (string/replace s #"\P{Print}" "")))
+
+
+(defn enum->kw [e]
+  (keyword
+    (string/replace
+      (string/lower-case (str e))
+      #"[_\s]+" "-")))
