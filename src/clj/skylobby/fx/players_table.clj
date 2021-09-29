@@ -60,7 +60,7 @@
         players-with-skill)
       :desc
       {:fx/type :table-view
-       :column-resize-policy :constrained ; TODO auto resize
+       :column-resize-policy :unconstrained
        :style {:-fx-font-size 14
                :-fx-min-height 200}
        :row-factory
