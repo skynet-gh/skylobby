@@ -103,11 +103,10 @@
 
 (defn fix-table-columns [^TableView table-view]
   (when table-view
-    (when-let [items (.getItems table-view)]
-      (when (seq items)
-        (when-let [column (first (.getColumns table-view))]
-          (.resizeColumn table-view column -100.0)
-          (.resizeColumn table-view column 100.0))))))
+    (when (seq (.getItems table-view))
+      (when-let [column (first (.getColumns table-view))]
+        (.resizeColumn table-view column -100.0)
+        (.resizeColumn table-view column 100.0)))))
 
 (def with-layout-on-items-prop
   (fx.lifecycle/make-ext-with-props
@@ -115,8 +114,11 @@
    {:items (fx.prop/make
              (fx.mutator/setter
                (fn [^TableView table-view items]
-                 (.setAll (.getItems table-view) items)
-                 (fix-table-columns table-view)))
+                 (let [table-items (.getItems table-view)]
+                   (.clear table-items)
+                   (.setAll table-items items)
+                   (fix-table-columns table-view)
+                   (.sort table-view))))
              fx.lifecycle/scalar
              :default [])}))
 

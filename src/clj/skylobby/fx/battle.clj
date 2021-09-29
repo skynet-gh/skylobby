@@ -205,8 +205,8 @@
   [{:keys [am-host am-ingame am-spec auto-launch auto-unspec battle battle-resource-details bot-name
            bot-names bot-username bot-version bot-versions bots channel-name client-data filter-host-replay
            host-ingame in-sync indexed-map indexed-mod interleave-ally-player-ids me my-battle-status
-           my-client-status my-player parsed-replays-by-path ready-on-unspec scripttags server-key
-           sides singleplayer team-counts username users]
+           my-client-status my-player parsed-replays-by-path ready-on-unspec scripttags server-key show-team-skills
+           sides singleplayer team-counts team-skills username users]
     :as state}]
   (let [sync-button-style (assoc
                             (dissoc
@@ -490,7 +490,16 @@
          :style {:-fx-font-size 24}
          :text (str " "
                     (when (< 1 (count team-counts))
-                      (string/join "v" team-counts)))}])}))
+                      (string/join "v" team-counts)))}]
+       (when show-team-skills
+         [{:fx/type :label
+           :style {:-fx-font-size 16}
+           :text (str " "
+                      (when (< 1 (count team-skills))
+                        (str
+                          "("
+                          (string/join ", " team-skills)
+                          ")")))}]))}))
 
 
 (defn battle-tabs
@@ -892,7 +901,7 @@
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
      :parsed-replays-by-path :players-table-columns :pop-out-battle :pop-out-chat :rapid-data-by-id :rapid-data-by-version
-     :rapid-download :rapid-update :ready-on-unspec :spring-isolation-dir :spring-settings :springfiles-search-results
+     :rapid-download :rapid-update :ready-on-unspec :show-team-skills :spring-isolation-dir :spring-settings :springfiles-search-results
      :tasks-by-type :username]
     fx.channel/channel-state-keys))
 
@@ -985,12 +994,24 @@
                        (filter (comp #{username} :username))
                        first)
         team-counts (->> players
-                         (map :battle-status)
-                         (filter :mode)
-                         (map :ally)
-                         frequencies
-                         vals
-                         sort)
+                         (filter (comp :mode :battle-status))
+                         (group-by (comp :ally :battle-status))
+                         (sort-by first)
+                         (map (comp count second)))
+        team-skills (->> players
+                         (filter (comp :mode :battle-status))
+                         (group-by (comp :ally :battle-status))
+                         (sort-by first)
+                         (map (fn [[_ally players]]
+                                (reduce
+                                  (fnil + 0 0)
+                                  0
+                                  (mapv
+                                    (fn [{:keys [username]}]
+                                      (let [username-kw (when username (keyword (string/lower-case username)))
+                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill (Math/round))]
+                                        skill))
+                                    players)))))
         minimap-size (or (u/to-number minimap-size)
                          fx.minimap/default-minimap-size)
         players-table {:fx/type players-table
@@ -1058,7 +1079,8 @@
                           :sides sides
                           :singleplayer singleplayer
                           :tasks-by-type tasks-by-type
-                          :team-counts team-counts})
+                          :team-counts team-counts
+                          :team-skills team-skills})
         battle-chat (merge
                       {:fx/type fx.channel/channel-view
                        :h-box/hgrow :always

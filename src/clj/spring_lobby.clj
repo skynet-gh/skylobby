@@ -139,7 +139,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
    :friend-users :ignore-users :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
-   :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :spring-isolation-dir
+   :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -2081,7 +2081,7 @@
   ([state-atom k watcher-fn]
    (state-change-chimer-fn state-atom k watcher-fn 3))
   ([state-atom k watcher-fn duration]
-   (let [old-state-atom (atom {})
+   (let [old-state-atom (atom @state-atom)
          chimer
          (chime/chime-at
            (chime/periodic-seq
@@ -2307,6 +2307,7 @@
 
 (defmethod event-handler ::leave-channel
   [{:keys [channel-name client-data] :fx/keys [^Event event]}]
+  (.consume event)
   (future
     (try
       (let [server-key (u/server-key client-data)]
@@ -2318,8 +2319,7 @@
       (when-not (string/starts-with? channel-name "@")
         (client-message client-data (str "LEAVE " channel-name)))
       (catch Exception e
-        (log/error e "Error leaving channel" channel-name))))
-  (.consume event))
+        (log/error e "Error leaving channel" channel-name)))))
 
 
 (defn- update-disconnected!
@@ -2621,15 +2621,16 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data server-key] :fx/keys [event]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [event]}]
+  (when consume
+    (.consume event))
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (client-message client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key] dissoc :battle)
       (catch Exception e
-        (log/error e "Error leaving battle"))))
-  (.consume event))
+        (log/error e "Error leaving battle")))))
 
 
 (defmethod event-handler ::join-battle
@@ -2641,7 +2642,7 @@
         (async/<!! (async/timeout 500)))
       (if selected-battle
         (do
-          (swap! *state assoc :selected-battle nil :battle {})
+          (swap! *state assoc :selected-battle nil :battle {} :selected-tab-main "battle")
           (client-message client-data
             (str "JOINBATTLE " selected-battle
                  (if battle-passworded
@@ -4435,7 +4436,7 @@
          update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
-     (when-not skip-tasks
+     (if-not skip-tasks
        (future
          (try
            (async/<!! (async/timeout 10000))
@@ -4453,7 +4454,8 @@
            (async/<!! (async/timeout 10000))
            (event-handler {:event/type ::scan-imports})
            (catch Exception e
-             (log/error e "Error adding initial tasks")))))
+             (log/error e "Error adding initial tasks"))))
+       (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
      {:chimers
