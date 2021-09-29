@@ -32,6 +32,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.4]
+
+- Fix table sorting when items change
+- Make players table resizing unconstrained
+- Fix periodic state change watchers firing immediately
+- Add setting to show team skill sums
+
 ### [0.5.3]
 
 - Add setting to show battle below battles again
