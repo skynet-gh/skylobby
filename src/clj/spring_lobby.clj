@@ -976,110 +976,122 @@
      :filter-replay-source :filter-replay-type :online-bar-replays :parsed-replays-by-path
      :replays-filter-specs :replays-tags :replays-window-dedupe]))
 
-(defn filter-replays-watcher [_k state-atom old-state new-state]
+(def filter-replays-channel (async/chan (async/sliding-buffer 1)))
+
+(def process-filter-replays
+  (future
+    (loop []
+      (when-let [state (async/<!! filter-replays-channel)]
+        (try
+          (let [before (u/curr-millis)
+                {:keys [filter-replay filter-replay-max-players filter-replay-min-players
+                        filter-replay-min-skill filter-replay-source filter-replay-type
+                        online-bar-replays parsed-replays-by-path replays-filter-specs replays-tags
+                        replays-window-dedupe]} state
+                _ (log/info "Filtering replays with" filter-replay)
+                local-filenames (->> parsed-replays-by-path
+                                     vals
+                                     (map :filename)
+                                     (filter some?)
+                                     set)
+                online-only-replays (->> online-bar-replays
+                                         vals
+                                         (remove (comp local-filenames :filename)))
+                all-replays (->> parsed-replays-by-path
+                                 vals
+                                 (concat online-only-replays)
+                                 (sort-by (comp str :unix-time :header))
+                                 reverse
+                                 doall)
+                filter-terms (->> (string/split (or filter-replay "") #"\s+")
+                                  (remove string/blank?)
+                                  (map string/lower-case))
+                includes-term? (fn [s term]
+                                 (let [lc (string/lower-case (or s ""))]
+                                   (string/includes? lc term)))
+                replays (->> all-replays
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-source
+                                   (= filter-replay-source (:source-name replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-type
+                                   (= filter-replay-type (:game-type replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-min-players
+                                   (<= filter-replay-min-players (fx.replay/replay-player-count replay))
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-max-players
+                                   (<= (fx.replay/replay-player-count replay) filter-replay-max-players)
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if filter-replay-min-skill
+                                   (if-let [avg (fx.replay/average-skill (fx.replay/replay-skills replay))]
+                                     (<= filter-replay-min-skill avg)
+                                     false)
+                                   true)))
+                             (filter
+                               (fn [replay]
+                                 (if (empty? filter-terms)
+                                   true
+                                   (every?
+                                     (some-fn
+                                       (partial includes-term? (fx.replay/replay-id replay))
+                                       (partial includes-term? (get replays-tags (fx.replay/replay-id replay)))
+                                       (partial includes-term? (-> replay :header :engine-version))
+                                       (partial includes-term? (-> replay :body :script-data :game :gametype))
+                                       (partial includes-term? (-> replay :body :script-data :game :mapname))
+                                       (fn [term]
+                                         (let [players (some->> replay :body :script-data :game
+                                                                (filter (comp #(string/starts-with? % "player") name first))
+                                                                (filter
+                                                                  (if replays-filter-specs
+                                                                    (constantly true)
+                                                                    (some-fn
+                                                                      (comp #{0 "0"} :spectator second)
+                                                                      (comp not #(contains? % :spectator) second))))
+                                                                (map (comp #(some % [:name :username]) second))
+                                                                (map fx.replay/sanitize-replay-filter))]
+                                           (some #(includes-term? % term) players))))
+                                     filter-terms))))
+                             doall)
+                replays (if replays-window-dedupe
+                          (:replays
+                            (reduce ; dedupe by id
+                              (fn [agg curr]
+                                (let [id (fx.replay/replay-id curr)]
+                                  (cond
+                                    (not id)
+                                    (update agg :replays conj curr)
+                                    (contains? (:seen-ids agg) id) agg
+                                    :else
+                                    (-> agg
+                                        (update :replays conj curr)
+                                        (update :seen-ids conj id)))))
+                              {:replays []
+                               :seen-ids #{}}
+                              replays))
+                          replays)]
+            (swap! *state assoc :filtered-replays replays)
+            (log/info "Filtered replays in" (- (u/curr-millis) before) "ms"))
+          (catch Exception e
+            (log/error e "Error in :filter-replays state watcher")))
+       (recur)))))
+
+(defn filter-replays-watcher [_k _state-atom old-state new-state]
   (when
     (or (not (:filtered-replays new-state))
         (and (not= old-state new-state)
              (not= (filter-replays-relevant-keys old-state)
                    (filter-replays-relevant-keys new-state))))
-    (try
-      (let [{:keys [filter-replay filter-replay-max-players filter-replay-min-players
-                    filter-replay-min-skill filter-replay-source filter-replay-type
-                    online-bar-replays parsed-replays-by-path replays-filter-specs replays-tags
-                    replays-window-dedupe]} new-state
-            local-filenames (->> parsed-replays-by-path
-                                 vals
-                                 (map :filename)
-                                 (filter some?)
-                                 set)
-            online-only-replays (->> online-bar-replays
-                                     vals
-                                     (remove (comp local-filenames :filename)))
-            all-replays (->> parsed-replays-by-path
-                             vals
-                             (concat online-only-replays)
-                             (sort-by (comp str :unix-time :header))
-                             reverse
-                             doall)
-            filter-terms (->> (string/split (or filter-replay "") #"\s+")
-                              (remove string/blank?)
-                              (map string/lower-case))
-            includes-term? (fn [s term]
-                             (let [lc (string/lower-case (or s ""))]
-                               (string/includes? lc term)))
-            replays (->> all-replays
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-source
-                               (= filter-replay-source (:source-name replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-type
-                               (= filter-replay-type (:game-type replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-players
-                               (<= filter-replay-min-players (fx.replay/replay-player-count replay))
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-max-players
-                               (<= (fx.replay/replay-player-count replay) filter-replay-max-players)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if filter-replay-min-skill
-                               (if-let [avg (fx.replay/average-skill (fx.replay/replay-skills replay))]
-                                 (<= filter-replay-min-skill avg)
-                                 false)
-                               true)))
-                         (filter
-                           (fn [replay]
-                             (if (empty? filter-terms)
-                               true
-                               (every?
-                                 (some-fn
-                                   (partial includes-term? (fx.replay/replay-id replay))
-                                   (partial includes-term? (get replays-tags (fx.replay/replay-id replay)))
-                                   (partial includes-term? (-> replay :header :engine-version))
-                                   (partial includes-term? (-> replay :body :script-data :game :gametype))
-                                   (partial includes-term? (-> replay :body :script-data :game :mapname))
-                                   (fn [term]
-                                     (let [players (some->> replay :body :script-data :game
-                                                            (filter (comp #(string/starts-with? % "player") name first))
-                                                            (filter
-                                                              (if replays-filter-specs
-                                                                (constantly true)
-                                                                (some-fn
-                                                                  (comp #{0 "0"} :spectator second)
-                                                                  (comp not #(contains? % :spectator) second))))
-                                                            (map (comp #(some % [:name :username]) second))
-                                                            (map fx.replay/sanitize-replay-filter))]
-                                       (some #(includes-term? % term) players))))
-                                 filter-terms))))
-                         doall)
-            replays (if replays-window-dedupe
-                      (:replays
-                        (reduce ; dedupe by id
-                          (fn [agg curr]
-                            (let [id (fx.replay/replay-id curr)]
-                              (cond
-                                (not id)
-                                (update agg :replays conj curr)
-                                (contains? (:seen-ids agg) id) agg
-                                :else
-                                (-> agg
-                                    (update :replays conj curr)
-                                    (update :seen-ids conj id)))))
-                          {:replays []
-                           :seen-ids #{}}
-                          replays))
-                      replays)]
-        (swap! state-atom assoc :filtered-replays replays))
-      (catch Exception e
-        (log/error e "Error in :filter-replays state watcher")))))
+    (async/>!! filter-replays-channel new-state)))
 
 
 (defn- add-watchers
