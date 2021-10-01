@@ -129,13 +129,12 @@
       :else
       (start-game-if-synced state-atom prev-state server-data))))
 
-(defn do-auto-unspec [client me]
+(defn do-auto-unspec [state-atom client-data me]
   (try
     (if (auto-unspec-ready?)
       (do
         (log/info "Auto-unspeccing")
-        (message/send-message
-          client
+        (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
                  (assoc (:battle-status me) :mode true))
@@ -165,14 +164,13 @@
                   server))))
           {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
           my-username (:username server-data)
-          client (:client client-data)
           me (-> battle :users (get my-username))]
       (when (and auto-unspec
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode)
                  (-> curr :by-server (get server-url) :battle :users (get username) :battle-status :mode not))
-        (do-auto-unspec client me)))))
+        (do-auto-unspec state-atom client-data me)))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -220,7 +218,7 @@
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (do-auto-unspec client me))))
+        (do-auto-unspec state-atom client-data me))))
 
 
 (defmethod handle "JOIN" [state-atom server-url m]
@@ -289,7 +287,7 @@
                auto-unspec
                (teamsize-changed-message? message)
                (-> me :battle-status :mode not))
-      (do-auto-unspec client me))))
+      (do-auto-unspec state-atom client-data me))))
 
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
@@ -327,7 +325,7 @@
                auto-unspec
                (-> me :battle-status :mode not)
                (teamsize-changed-message? message))
-      (do-auto-unspec client me))))
+      (do-auto-unspec state-atom client-data me))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
@@ -497,8 +495,8 @@
 (defmethod handle "JOINBATTLEREQUEST" [state-atom server-key m]
   (let [[_all user-name _ip] (re-find #"\w+ (\w+) (\w+)" m)
         state @state-atom
-        client (-> state :by-server (get server-key) :client-data :client)]
-    (message/send-message client (str "JOINBATTLEACCEPT " user-name))))
+        client-data (-> state :by-server (get server-key) :client-data)]
+    (message/send-message state-atom client-data (str "JOINBATTLEACCEPT " user-name))))
 
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
@@ -520,9 +518,8 @@
                             :sync (sync-number
                                     (resource/sync-status server-data spring mod-details map-details)))
         color (or preferred-color (u/random-color))
-        client (:client client-data)
         msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
-    (message/send-message client msg)))
+    (message/send-message state-atom client-data msg)))
 
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
@@ -553,7 +550,7 @@
                  (not= host-username username)
                  (= host-username (:host-username last-battle))
                  (:should-rejoin last-battle))
-        (message/send-message (:client client-data)
+        (message/send-message state-atom client-data
           (str "JOINBATTLE " battle-id
                (if battle-passworded
                  (str " " (:battle-password state))
@@ -635,9 +632,9 @@
                        (-> state
                            (dissoc :battle)
                            (assoc :last-failed-message m))))
-        client (-> state :by-server (get server-url) :client-data :client)]
+        client-data (-> state :by-server (get server-url) :client-data)]
     (when (= m "JOINBATTLEFAILED You are already in a battle")
-      (message/send-message client "LEAVEBATTLE"))))
+      (message/send-message state-atom client-data "LEAVEBATTLE"))))
 
 
 (defmethod handle "CHANNEL" [state-atom server-url m]
@@ -697,6 +694,6 @@
             "c.matchmaking.join_queue"
             (let [queue-id (string/trim args)
                   state (swap! state-atom assoc-in [:by-server server-key :matchmaking-queues queue-id :am-in] true)
-                  client (-> state :by-server (get server-key) :client-data :client)]
-              (message/send-message client (str "c.matchmaking.get_queue_info\t" queue-id)))
+                  client-data (-> state :by-server (get server-key) :client-data)]
+              (message/send-message state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id)))
             nil))))))

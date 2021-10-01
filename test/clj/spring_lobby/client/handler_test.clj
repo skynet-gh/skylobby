@@ -234,7 +234,7 @@
                           :client-data {:compflags #{"u"}}}}})
           messages-atom (atom [])
           now 1631909524841]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+      (with-redefs [message/send-message (fn [_state-atom _client-data message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)
                     u/curr-millis (constantly now)]
         (handler/handle state-atom server-key "SAIDBATTLEEX host1 * Global setting changed by skynet (teamSize=16)"))
@@ -412,7 +412,7 @@
                         {server-key
                          {:battle {}}}})
           messages-atom (atom [])]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))]
+      (with-redefs [message/send-message (fn [_state-atom _client-data message] (swap! messages-atom conj message))]
         (handler/handle state-atom server-key "CLIENTBATTLESTATUS skynet 0 0"))
       (is (= {:by-server
               {server-key
@@ -460,7 +460,7 @@
                               :sync 0}}}}
                           :username "skynet"}}})
           messages-atom (atom [])]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+      (with-redefs [message/send-message (fn [_state-atom _client-data message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)]
         (handler/handle state-atom server-key "CLIENTBATTLESTATUS other 0 0"))
       (is (= {:by-server
@@ -525,7 +525,7 @@
                           :username "skynet"
                           :client-data {:compflags #{"u"}}}}})
           messages-atom (atom [])]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+      (with-redefs [message/send-message (fn [_state-atom _client-data message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)]
         (handler/handle state-atom server-key "LEFTBATTLE 0 other"))
       (is (= {:by-server
@@ -579,7 +579,7 @@
                           :client-data {:compflags #{"u"}}}}})
           messages-atom (atom [])
           now 1631909524841]
-      (with-redefs [message/send-message (fn [_client message] (swap! messages-atom conj message))
+      (with-redefs [message/send-message (fn [_state-atom _client-data message] (swap! messages-atom conj message))
                     handler/auto-unspec-ready? (constantly true)
                     u/curr-millis (constantly now)]
         (handler/handle state-atom server-key "SAIDEX __battle__0 host1 * Global setting changed by skynet (teamSize=16)"))

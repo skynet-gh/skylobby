@@ -1119,6 +1119,33 @@
                      :startpostype startpostype
                      :users users
                      :username username}
+          resources-buttons {:fx/type :h-box
+                             :alignment :center-left
+                             :children
+                             [
+                              {:fx/type :label
+                               :text " Resources: "}
+                              {:fx/type :button
+                               :text "Import"
+                               :on-action {:event/type :spring-lobby/toggle
+                                           :key :show-importer}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (str "mdi-file-import:16:white")}}
+                              {:fx/type :button
+                               :text "HTTP"
+                               :on-action {:event/type :spring-lobby/toggle
+                                           :key :show-downloader}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (str "mdi-download:16:white")}}
+                              {:fx/type :button
+                               :text "Rapid"
+                               :on-action {:event/type :spring-lobby/toggle
+                                           :key :show-rapid-downloader}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (str "mdi-download:16:white")}}]}
           resources-pane (if singleplayer
                            {:fx/type :v-box
                             :children
@@ -1156,33 +1183,7 @@
                               :tasks-by-type tasks-by-type
                               :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
                               :spring-isolation-dir spring-isolation-dir}
-                             {:fx/type :h-box
-                              :alignment :center-left
-                              :children
-                              [
-                               {:fx/type :label
-                                :text " Resources: "}
-                               {:fx/type :button
-                                :text "Import"
-                                :on-action {:event/type :spring-lobby/toggle
-                                            :key :show-importer}
-                                :graphic
-                                {:fx/type font-icon/lifecycle
-                                 :icon-literal (str "mdi-file-import:16:white")}}
-                               {:fx/type :button
-                                :text "HTTP"
-                                :on-action {:event/type :spring-lobby/toggle
-                                            :key :show-downloader}
-                                :graphic
-                                {:fx/type font-icon/lifecycle
-                                 :icon-literal (str "mdi-download:16:white")}}
-                               {:fx/type :button
-                                :text "Rapid"
-                                :on-action {:event/type :spring-lobby/toggle
-                                            :key :show-rapid-downloader}
-                                :graphic
-                                {:fx/type font-icon/lifecycle
-                                 :icon-literal (str "mdi-download:16:white")}}]}]}
+                             resources-buttons]}
                            {:fx/type :flow-pane
                             :vgap 5
                             :hgap 5
@@ -1268,7 +1269,8 @@
                                     :indexed-map indexed-map
                                     :import-tasks import-tasks
                                     :map-update-tasks map-update-tasks}
-                                   (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))]))})]
+                                   (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))
+                                 resources-buttons]))})]
     {:fx/type :v-box
      :children
      [
@@ -1367,12 +1369,13 @@
            [
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
-                           (let [dividers (.getDividers node)
-                                 position-property (.positionProperty (first dividers))]
-                             (.addListener position-property
-                               (reify javafx.beans.value.ChangeListener
-                                 (changed [this _observable _old-value new-value]
-                                   (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))
+                           (let [dividers (.getDividers node)]
+                             (when-let [divider (first dividers)]
+                               (let [position-property (.positionProperty divider)]
+                                 (.addListener position-property
+                                   (reify javafx.beans.value.ChangeListener
+                                     (changed [this _observable _old-value new-value]
+                                       (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))))
              :h-box/hgrow :always
              :desc
              {:fx/type :split-pane
