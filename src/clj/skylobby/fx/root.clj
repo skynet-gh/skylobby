@@ -7,6 +7,7 @@
     [skylobby.fx.battles-window :as fx.battles-window]
     [skylobby.fx.chat :as fx.chat]
     [skylobby.fx.download :as fx.download]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.host-battle :as fx.host-battle]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
@@ -114,11 +115,14 @@
          :stylesheets stylesheet-urls
          :root
          (if show-battle-window
-           (merge
-             {:fx/type fx.battle/battle-view
-              :tasks-by-type tasks-by-type}
-             (select-keys state fx.battle/battle-view-keys)
-             server-data)
+           {:fx/type ext-recreate-on-key-changed
+            :key server-key
+            :desc
+            (merge
+              {:fx/type fx.battle/battle-view
+               :tasks-by-type tasks-by-type}
+              (select-keys state fx.battle/battle-view-keys)
+              server-data)}
            {:fx/type :pane})}}}
       (merge
         {:fx/type fx.download/download-window

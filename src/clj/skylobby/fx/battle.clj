@@ -1367,12 +1367,13 @@
            [
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
-                           (let [dividers (.getDividers node)
-                                 position-property (.positionProperty (first dividers))]
-                             (.addListener position-property
-                               (reify javafx.beans.value.ChangeListener
-                                 (changed [this _observable _old-value new-value]
-                                   (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))
+                           (let [dividers (.getDividers node)]
+                             (when-let [divider (first dividers)]
+                               (let [position-property (.positionProperty divider)]
+                                 (.addListener position-property
+                                   (reify javafx.beans.value.ChangeListener
+                                     (changed [this _observable _old-value new-value]
+                                       (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))))
              :h-box/hgrow :always
              :desc
              {:fx/type :split-pane
