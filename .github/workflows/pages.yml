@@ -9,13 +9,13 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@4.0
+      - uses: DeLaGuardo/setup-graalvm@5.0
         with:
           graalvm-version: 'vm-21.2.0'
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.967'
+          cli: '1.10.3.986'
       - run: clojure -M:build
         working-directory: ./cryogen
       - uses: peaceiris/actions-gh-pages@v3
