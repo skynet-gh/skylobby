@@ -32,6 +32,17 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.5]
+
+- Add support for STARTTLS
+- Fix popout battle chat bleeding servers
+- Add resource buttons below sync panes on battle
+- Improve performance of replay filtering
+- Fix another case where state watchers ran immediately
+- Ensure all client-server messages are in console log
+- Fix battle popout chat divider position npe
+- Fix battle status sending empty color
+
 ### [0.5.4]
 
 - Fix table sorting when items change
