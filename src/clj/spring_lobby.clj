@@ -2058,7 +2058,7 @@
 
 (defn- spit-app-config-chimer-fn [state-atom]
   (log/info "Starting app config spit chimer")
-  (let [old-state-atom (atom {})
+  (let [old-state-atom (atom @state-atom)
         chimer
         (chime/chime-at
           (chime/periodic-seq
