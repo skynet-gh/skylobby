@@ -48,7 +48,8 @@
                        :server-key server-key
                        :password password
                        :username username})}]
-       (when (and client-deferred (or (not client) (not accepted)))
+       (when (or (and client-deferred (or (not client) (not accepted)))
+                 (and client (not client-deferred)))
          [{:fx/type :button
            :text ""
            :tooltip
@@ -170,7 +171,10 @@
                      :key :show-servers-window}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-plus:30:white"}}]}]
+          :icon-literal
+          (if server
+            "mdi-wrench:30:white"
+            "mdi-plus:30:white")}}]}]
      (when-let [login-error (str " " (get login-error (first server)))]
        [{:fx/type :label
          :text (str " " login-error)
