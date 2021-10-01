@@ -965,7 +965,7 @@
                       "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
               (client-message client-data
-                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))
+                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
@@ -1750,7 +1750,7 @@
                         (when (not= (:ready battle-status) desired-ready)
                           (client-message
                             (:client-data server-data)
-                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " team-color))))))))))
+                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0)))))))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating matchmaking")
@@ -2178,7 +2178,7 @@
                     "to" new-sync-number)
           (let [new-battle-status (assoc battle-status :sync new-sync-number)]
             (client-message client-data
-              (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " team-color))))))))
+              (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
