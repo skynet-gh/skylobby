@@ -144,7 +144,8 @@
         server-data)
       (merge
         {:fx/type fx.rapid/rapid-download-window
-         :screen-bounds screen-bounds}
+         :screen-bounds screen-bounds
+         :tasks-by-type tasks-by-type}
         (select-keys state fx.rapid/rapid-download-window-keys)
         spring-root-data)
       (merge

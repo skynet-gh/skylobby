@@ -3597,7 +3597,7 @@
 
 
 (defmethod task-handler ::update-rapid
-  [{:keys [engine-version mod-name spring-isolation-dir] :as e}]
+  [{:keys [engine-version mod-name rapid-repo spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
@@ -3617,7 +3617,9 @@
           (event-handler
             {:event/type ::rapid-download
              :rapid-id
-             (or (when mod-name
+             (or (when rapid-repo
+                   (str rapid-repo ":test"))
+                 (when mod-name
                    (cond
                      (string/includes? mod-name "Beyond All Reason") "byar:test"
                      :else nil))
