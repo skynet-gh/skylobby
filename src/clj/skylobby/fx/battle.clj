@@ -206,9 +206,11 @@
            bot-names bot-username bot-version bot-versions bots channel-name client-data filter-host-replay
            host-ingame in-sync indexed-map indexed-mod interleave-ally-player-ids me my-battle-status
            my-client-status my-player parsed-replays-by-path ready-on-unspec scripttags server-key show-team-skills
-           sides singleplayer team-counts team-skills username users]
+           sides singleplayer tasks-by-type team-counts team-skills username users]
     :as state}]
-  (let [sync-button-style (assoc
+  (let [
+        ringing-specs (seq (get tasks-by-type :spring-lobby/ring-specs))
+        sync-button-style (assoc
                             (dissoc
                               (get severity-styles
                                 (case (:sync my-battle-status)
@@ -272,11 +274,15 @@
                   (when-not singleplayer
                     [{:fx/type :button
                       :text "Ring Specs"
-                      :on-action {:event/type :spring-lobby/ring-specs
-                                  :battle-users (:users battle)
-                                  :channel-name channel-name
-                                  :client-data client-data
-                                  :users users}}
+                      :disable (boolean ringing-specs)
+                      :on-action
+                      {:event/type :spring-lobby/add-task
+                       :task
+                       {:spring-lobby/task-type :spring-lobby/ring-specs
+                        :battle-users (:users battle)
+                        :channel-name channel-name
+                        :client-data client-data
+                        :users users}}}
                      {:fx/type :button
                       :text "Promote"
                       :on-action {:event/type :spring-lobby/send-message

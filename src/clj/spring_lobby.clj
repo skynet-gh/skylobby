@@ -3363,8 +3363,8 @@
 
 (defmethod event-handler ::ring-specs
   [{:keys [battle-users channel-name client-data users]}]
-  (when channel-name
-    (future
+  (future
+    (when channel-name
       (try
         (doseq [[username user-data] battle-users]
           (when (and (-> user-data :battle-status :mode not)
@@ -3377,6 +3377,10 @@
             (async/<!! (async/timeout 1000))))
         (catch Exception e
           (log/error e "Error ringing specs"))))))
+
+(defmethod task-handler ::ring-specs
+  [task]
+  @(event-handler (assoc task :event/type ::ring-specs)))
 
 
 (defmethod event-handler ::ignore-user
