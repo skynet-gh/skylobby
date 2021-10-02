@@ -14,6 +14,9 @@
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def default-font-size 18)
 
 

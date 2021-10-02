@@ -9,6 +9,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn engine-download-source [engine-version]
   (cond
     (string/blank? engine-version) nil

@@ -50,9 +50,12 @@
     (java.net InetAddress InetSocketAddress URL)
     (java.util List)
     (javafx.event Event)
+    (javafx.scene Parent)
+    (javafx.scene.canvas Canvas)
     (javafx.scene.control Tab)
-    (javafx.scene.input KeyCode ScrollEvent)
+    (javafx.scene.input KeyCode KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
+    (javafx.scene Node)
     (javafx.stage DirectoryChooser FileChooser)
     (manifold.stream SplicedStream)
     (org.fxmisc.flowless VirtualizedScrollPane))
@@ -1623,7 +1626,7 @@
 
 
 (defmethod event-handler ::stop-music
-  [{:keys [media-player]}]
+  [{:keys [^MediaPlayer media-player]}]
   (when media-player
     (.dispose media-player))
   (swap! *state
@@ -1647,7 +1650,7 @@
          (into []))))
 
 (defn music-player
-  [{:keys [music-file music-volume]}]
+  [{:keys [^File music-file music-volume]}]
   (if music-file
     (let [media-url (-> music-file .toURI .toURL)
           media (try
@@ -1694,7 +1697,7 @@
          (count l))))))
 
 (defmethod event-handler ::prev-music
-  [{:keys [media-player music-now-playing music-queue music-volume]}]
+  [{:keys [^MediaPlayer media-player music-now-playing music-queue music-volume]}]
   (when media-player
     (.dispose media-player))
   (let [music-file (next-value music-queue music-now-playing {:direction dec})
@@ -1707,7 +1710,7 @@
            :music-now-playing music-file)))
 
 (defmethod event-handler ::next-music
-  [{:keys [media-player music-now-playing music-queue music-volume]}]
+  [{:keys [^MediaPlayer media-player music-now-playing music-queue music-volume]}]
   (when media-player
     (.dispose media-player))
   (let [music-file (next-value music-queue music-now-playing)
@@ -1720,7 +1723,7 @@
            :music-now-playing music-file)))
 
 (defmethod event-handler ::toggle-music-play
-  [{:keys [media-player music-paused]}]
+  [{:keys [^MediaPlayer media-player music-paused]}]
   (when media-player
     (if music-paused
       (.play media-player)
@@ -1730,7 +1733,7 @@
          :music-stopped false))
 
 (defmethod event-handler ::on-change-music-volume
-  [{:fx/keys [event] :keys [media-player]}]
+  [{:fx/keys [event] :keys [^MediaPlayer media-player]}]
   (let [volume event]
     (when media-player
       (.setVolume media-player volume))
@@ -1977,7 +1980,7 @@
 
 (defn restart-command [old-jar new-jar]
   (when-let [java-or-exe (u/process-command)]
-    (let [vm-args (vec (u/vm-args))
+    (let [^List vm-args (vec (u/vm-args))
           i (.indexOf vm-args "-jar")
           new-jar-path (fs/canonical-path new-jar)
           with-new-jar (if (not= -1 i)
@@ -1997,7 +2000,7 @@
 
 (defn restart-process [old-jar new-jar]
   (when new-jar
-    (when-let [cmd (restart-command old-jar new-jar)]
+    (when-let [^List cmd (restart-command old-jar new-jar)]
       (log/info "Adding shutdown hook to run new jar")
       ; https://stackoverflow.com/a/5747843/984393
       (.addShutdownHook
@@ -2620,7 +2623,7 @@
             (log/error e "Error opening battle")))))))
 
 
-(defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [event]}]
+(defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [^Event event]}]
   (when consume
     (.consume event))
   (future
@@ -2747,9 +2750,10 @@
 
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
 (defmethod event-handler ::file-chooser-spring-root
-  [{:fx/keys [event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
+  [{:fx/keys [^Event event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
   (try
-    (let [window (.getWindow (.getScene (.getTarget event)))
+    (let [^Node node (.getTarget event)
+          window (.getWindow (.getScene node))
           chooser (doto (DirectoryChooser.)
                     (.setTitle "Select Spring Directory")
                     (.setInitialDirectory spring-isolation-dir))]
@@ -2760,9 +2764,10 @@
       (log/error e "Error showing spring directory chooser"))))
 
 (defmethod event-handler ::file-chooser-ring-sound
-  [{:fx/keys [event] :keys [target] :or {target [:ring-sound-file]}}]
+  [{:fx/keys [^Event event] :keys [target] :or {target [:ring-sound-file]}}]
   (try
-    (let [window (.getWindow (.getScene (.getTarget event)))
+    (let [^Node node (.getTarget event)
+          window (.getWindow (.getScene node))
           chooser (doto (FileChooser.)
                     (.setTitle "Select Ring Sound File")
                     (.setInitialDirectory (fs/app-root)))]
@@ -3001,10 +3006,10 @@
 
 
 (defmethod event-handler ::minimap-mouse-dragged
-  [{:fx/keys [^javafx.scene.input.MouseEvent event]}]
+  [{:fx/keys [^MouseEvent event]}]
   (future
     (try
-      (let [canvas (.getTarget event)
+      (let [^Canvas canvas (.getTarget event)
             width (.getWidth canvas)
             height (.getHeight canvas)
             x (min width (max 0 (.getX event)))
@@ -4023,7 +4028,7 @@
     (swap! *state update-in (drop-last path) dissoc (last path))))
 
 (defmethod event-handler ::enable-auto-scroll-if-at-bottom
-  [{:fx/keys [event]}]
+  [{:fx/keys [^ScrollEvent event]}]
   (when (neg? (.getDeltaY event))
     (log/info "Scrolled to bottom of chat, enabling auto-scroll")
     (swap! *state assoc :chat-auto-scroll true)))
@@ -4255,7 +4260,7 @@
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
-(defmethod event-handler ::on-channel-key-pressed [{:fx/keys [event] :keys [channel-name server-key]}]
+(defmethod event-handler ::on-channel-key-pressed [{:fx/keys [^KeyEvent event] :keys [channel-name server-key]}]
   (let [code (.getCode event)]
     (when-let [dir (cond
                      (= KeyCode/UP code) inc
@@ -4292,20 +4297,22 @@
         (log/error e "Error sending message" message "to server")))))
 
 
-(defmethod event-handler ::filter-channel-scroll [{:fx/keys [event]}]
+(defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
   (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
-    (let [source (.getSource event)
+    (let [^ScrollEvent scroll-event event
+          ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY event))) 80)))]
+                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
 
-(defmethod event-handler ::filter-console-scroll [{:fx/keys [event]}]
+(defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
   (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
-    (let [source (.getSource event)
+    (let [^ScrollEvent scroll-event event
+          ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY event))) 80)))]
+                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
 
 
@@ -4399,8 +4406,8 @@
                          wrap-params)
                      {:socket-address
                       (InetSocketAddress.
-                        (InetAddress/getByName nil)
-                        u/ipc-port)})]
+                        ^InetAddress (InetAddress/getByName nil)
+                        ^int u/ipc-port)})]
         (swap! *state assoc :ipc-server server)))
     (log/warn "IPC port unavailable" u/ipc-port)))
 

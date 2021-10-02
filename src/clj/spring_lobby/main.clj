@@ -10,6 +10,9 @@
   (:gen-class))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def cli-options [])
 
 

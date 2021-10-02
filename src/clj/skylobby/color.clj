@@ -5,6 +5,9 @@
     (javafx.scene.paint Color)))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; taken from SPADS !fixcolors
 (def colors-coop-ai
   ["0xf700ffff"
@@ -184,7 +187,7 @@
 
 
 (defn player-color [{:keys [ally id]} teams-by-allyteam]
-  (let [allyteam-players (get teams-by-allyteam ally)
+  (let [^java.util.List allyteam-players (get teams-by-allyteam ally)
         player-index (.indexOf allyteam-players id)
         team-count (count teams-by-allyteam)
         web-color (or

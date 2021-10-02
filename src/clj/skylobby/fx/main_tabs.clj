@@ -18,6 +18,9 @@
     (javafx.application Platform)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn- focus-text-field [^javafx.scene.control.Tab tab]
   (when-let [content (.getContent tab)]
     (let [^javafx.scene.Node text-field (-> content (.lookupAll "#channel-text-field") first)]

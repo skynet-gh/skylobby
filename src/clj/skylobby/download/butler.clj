@@ -8,6 +8,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://github.com/gajop/spring-launcher/blob/master/src/nextgen_downloader.js
 
 
@@ -59,7 +62,7 @@
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp nil
-              ^java.lang.Process process (.exec runtime cmdarray envp (fs/app-root))]
+              ^java.lang.Process process (.exec runtime cmdarray envp ^java.io.File (fs/app-root))]
           (future
             (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
               (loop []

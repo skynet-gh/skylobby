@@ -12,6 +12,9 @@
     (javafx.scene.text Font FontWeight)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def minimap-sizes
   [256 384 512])
 (def default-minimap-size

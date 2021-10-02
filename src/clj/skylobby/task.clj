@@ -1,6 +1,9 @@
 (ns skylobby.task)
 
 
+(set! *warn-on-reflection* true)
+
+
 (def index-tasks
   #{:spring-lobby/refresh-engines
     :spring-lobby/refresh-mods

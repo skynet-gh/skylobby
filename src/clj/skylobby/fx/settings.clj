@@ -15,6 +15,9 @@
     (java.nio.file Paths)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def settings-window-width 1200)
 (def settings-window-height 1200)
 

@@ -24,6 +24,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def app-version (u/app-version))
 (def screen-bounds (skylobby.fx/screen-bounds))
 

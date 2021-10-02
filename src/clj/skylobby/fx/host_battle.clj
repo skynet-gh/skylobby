@@ -9,6 +9,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def host-battle-window-width 700)
 (def host-battle-window-height 400)
 

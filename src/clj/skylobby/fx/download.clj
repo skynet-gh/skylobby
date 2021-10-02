@@ -15,6 +15,9 @@
     (javafx.scene.input Clipboard ClipboardContent)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def download-window-width 1600)
 (def download-window-height 800)
 

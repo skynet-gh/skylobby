@@ -8,8 +8,12 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (javafx.application Platform))
+    (javafx.application Platform)
+    (javafx.event Event))
   (:gen-class))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def app-version
@@ -17,7 +21,7 @@
 
 
 (defn replays-on-close-request
-  [e]
+  [^Event e]
   (log/debug "Replays window close request" e)
   (System/exit 0)
   (.consume e))

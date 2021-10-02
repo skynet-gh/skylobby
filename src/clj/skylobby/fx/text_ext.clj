@@ -1,8 +1,7 @@
 (ns skylobby.fx.text-ext
   (:require
     [cljfx.composite :as composite]
-    [cljfx.fx.text :as fx.text]
-    [cljfx.lifecycle :as lifecycle])
+    [cljfx.fx.text :as fx.text])
   (:import
     (org.fxmisc.richtext TextExt)))
 
@@ -13,8 +12,7 @@
 (def props
   (merge
     fx.text/props
-    (composite/props TextExt
-      :children [:list lifecycle/dynamics])))
+    (composite/props TextExt)))
 
 (def lifecycle
   (composite/describe TextExt

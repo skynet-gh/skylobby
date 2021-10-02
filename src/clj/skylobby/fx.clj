@@ -7,6 +7,9 @@
     (javafx.stage Screen)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def divider-positions
   (atom {}))
 (def window-states

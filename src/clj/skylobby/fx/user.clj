@@ -7,6 +7,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def users-table-state-keys [:ignore-users])
 
 (def users-table-keys

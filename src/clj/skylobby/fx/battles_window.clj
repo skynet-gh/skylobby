@@ -7,6 +7,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def window-key :battles)
 
 (def battles-window-width 1600)

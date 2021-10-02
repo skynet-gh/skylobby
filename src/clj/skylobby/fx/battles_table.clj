@@ -9,6 +9,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def battles-table-state-keys
   [:battle-password :filter-battles :now])
 

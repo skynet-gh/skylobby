@@ -25,6 +25,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def minimap-types
   ["minimap" "metalmap" "heightmap"])
 
@@ -208,12 +211,12 @@
            my-client-status my-player parsed-replays-by-path ready-on-unspec scripttags server-key show-team-skills
            sides singleplayer tasks-by-type team-counts team-skills username users]
     :as state}]
-  (let [
+  (let [my-sync-status (int (or (:sync my-battle-status) 0))
         ringing-specs (seq (get tasks-by-type :spring-lobby/ring-specs))
         sync-button-style (assoc
                             (dissoc
                               (get severity-styles
-                                (case (:sync my-battle-status)
+                                (case my-sync-status
                                   1 0
                                   2 2
                                   ; else
@@ -227,7 +230,7 @@
                          [{:fx/type :button
                            :text (str
                                    " "
-                                   (case (:sync my-battle-status)
+                                   (case my-sync-status
                                      1 "synced"
                                      2 "unsynced"
                                      ; else
@@ -1015,7 +1018,7 @@
                                   (mapv
                                     (fn [{:keys [username]}]
                                       (let [username-kw (when username (keyword (string/lower-case username)))
-                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill (Math/round))]
+                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill u/round)]
                                         skill))
                                     players)))))
         minimap-size (or (u/to-number minimap-size)
@@ -1349,7 +1352,8 @@
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
                            (let [dividers (.getDividers node)
-                                 position-property (.positionProperty (first dividers))]
+                                 ^javafx.scene.control.SplitPane$Divider divider (first dividers)
+                                 position-property (.positionProperty divider)]
                              (.addListener position-property
                                (reify javafx.beans.value.ChangeListener
                                  (changed [this _observable _old-value new-value]
@@ -1376,7 +1380,7 @@
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
                            (let [dividers (.getDividers node)]
-                             (when-let [divider (first dividers)]
+                             (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
                                (let [position-property (.positionProperty divider)]
                                  (.addListener position-property
                                    (reify javafx.beans.value.ChangeListener

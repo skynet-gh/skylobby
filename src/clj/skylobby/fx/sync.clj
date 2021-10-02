@@ -4,6 +4,9 @@
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def ok-green "#008000")
 (def warn-yellow "#FFD700")
 (def error-red "#DD0000")

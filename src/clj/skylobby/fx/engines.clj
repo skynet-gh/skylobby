@@ -8,6 +8,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def known-engine-versions
   ["104.0.1-1828-g1f481b7 BAR"])
 

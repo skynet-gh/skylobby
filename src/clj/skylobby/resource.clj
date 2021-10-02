@@ -8,6 +8,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def max-tries 5)
 
 

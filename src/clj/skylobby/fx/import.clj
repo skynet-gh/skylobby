@@ -11,6 +11,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def import-window-width 1600)
 (def import-window-height 800)
 

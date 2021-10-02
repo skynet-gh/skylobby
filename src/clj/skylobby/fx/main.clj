@@ -7,6 +7,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn main-window
   [{:keys [by-server by-spring-root selected-server-tab selected-tab-channel selected-tab-main
            server servers spring-isolation-dir username]

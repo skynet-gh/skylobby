@@ -11,6 +11,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def rapid-download-window-width 1600)
 (def rapid-download-window-height 800)
 

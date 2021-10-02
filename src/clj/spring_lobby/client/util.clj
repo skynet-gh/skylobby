@@ -7,6 +7,9 @@
     (java.nio ByteBuffer)))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html#MYBATTLESTATUS:client
 (def default-battle-status
   {:ready true

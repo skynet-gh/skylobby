@@ -7,6 +7,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; matchmaking
 
 (defn parse-queue-id-name [queue-id-name]

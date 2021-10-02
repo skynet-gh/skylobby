@@ -11,6 +11,9 @@
     (javafx.scene.input KeyCode KeyEvent)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def bind-keycodes
   {"CTRL" KeyCode/CONTROL
    "ESC" KeyCode/ESCAPE

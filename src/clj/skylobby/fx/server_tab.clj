@@ -7,6 +7,9 @@
     [skylobby.fx.main-tabs :as fx.main-tabs]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def server-tab-state-keys
   (concat
     fx.battle/battle-view-state-keys

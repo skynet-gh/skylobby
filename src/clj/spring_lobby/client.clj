@@ -262,7 +262,7 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
-            (let [pipeline @pipeline-atom]
+            (let [^io.netty.channel.ChannelPipeline pipeline @pipeline-atom]
               (if pipeline
                 (let [; https://github.com/clj-commons/aleph/blob/master/src/aleph/netty.clj#L721-L724
                       ssl-context-builder (SslContextBuilder/forClient)
@@ -273,7 +273,7 @@
                       engine (.newEngine ssl-context (.alloc ch))
                       handler (SslHandler. engine false)
                       handshake-future (.handshakeFuture handler)]
-                  (.addFirst pipeline handler)
+                  (.addFirst pipeline "ssl" handler)
                   (log/info "Added SslHandler to TCP pipeline")
                   (log/info "Waiting for SSL handshake")
                   (let [handshake @handshake-future]

@@ -7,6 +7,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def uikeys-grammar
   (instaparse/parser
     "uikeys = line*
