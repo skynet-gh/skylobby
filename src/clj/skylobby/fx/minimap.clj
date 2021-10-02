@@ -111,7 +111,7 @@
            doall))))
 
 (defn minimap-pane-impl
-  [{:keys [am-spec battle-details client-data drag-team drag-allyteam map-details map-name
+  [{:keys [am-host am-spec battle-details client-data drag-team drag-allyteam map-details map-name
            minimap-size minimap-type minimap-type-key scripttags singleplayer]}]
   (let [{:keys [smf]} map-details
         {:keys [minimap-height minimap-width]
@@ -169,6 +169,7 @@
                                 :start-boxes start-boxes}
              :on-mouse-dragged {:event/type :spring-lobby/minimap-mouse-dragged}
              :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
+                                 :am-host am-host
                                  :am-spec am-spec
                                  :channel-name (:channel-name battle-details)
                                  :client-data client-data

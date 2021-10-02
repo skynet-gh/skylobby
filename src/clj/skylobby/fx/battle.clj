@@ -538,6 +538,7 @@
          :alignment :top-left
          :children
          [{:fx/type fx.minimap/minimap-pane
+           :am-host am-host
            :am-spec am-spec
            :battle-details battle-details
            :client-data client-data
