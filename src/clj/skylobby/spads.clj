@@ -3,7 +3,7 @@
 
 (def spads-message-types
   [
-   [:vote-progress #"Vote in progress: \"(.*)\" \[y:(.*)/(.*), n:(.*)/(.*)\] \((.*) remaining\)"]
+   [:vote-progress #"Vote in progress: \"(.*)\" \[y:(.*)/(.*), n:(.*)/(\d+)(.*)\] \((.*) remaining\)"]
    [:greeting #"Hi (.*)! Current battle type is (.*)\."]
    [:called-vote #"\* (.*) called a vote for command \"(.*)\" \[!vote y, !vote n, !vote b\]"]
    [:allowed-vote #"User\(s\) allowed to vote: (.*)"]
@@ -42,6 +42,10 @@
    [:no-one-to-ring #"There is no one to ring"]
    [:not-allowed #"(.*), you are not allowed to call command \"(.*)\" in current context\."]
    [:invalid #"Invalid command \"(.*)\""]])
+
+
+(def message-types
+  (sort (map first spads-message-types)))
 
 
 (defn parse-spads-message [text]
