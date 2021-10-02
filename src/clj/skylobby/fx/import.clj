@@ -3,6 +3,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
@@ -72,10 +73,12 @@
                          (filter (fn [{:keys [resource-type]}]
                                    (if import-type
                                      (= import-type resource-type)
-                                     true))))
+                                     true)))
+                         (sort-by :resource-filename String/CASE_INSENSITIVE_ORDER))
         import-tasks (->> (get tasks-by-type :spring-lobby/import)
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
+        refreshing-imports (seq (get tasks-by-type :spring-lobby/scan-imports))
         {:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-importer)
@@ -94,9 +97,13 @@
          :style {:-fx-font-size 16}
          :children
          [{:fx/type :button
-           :text "Refresh All Imports"
-           :on-action {:event/type :spring-lobby/scan-imports
-                       :sources import-sources}}
+           :text (if refreshing-imports "Refreshing..." "Refresh All Imports")
+           :disable (boolean refreshing-imports)
+           :on-action
+           {:event/type :spring-lobby/add-task
+            :task
+            {:spring-lobby/task-type :spring-lobby/scan-all-imports
+             :sources import-sources}}}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -208,72 +215,80 @@
                    :icon-literal "mdi-close:16:white"}}}]))}
           {:fx/type :label
            :text (str (count importables) " artifacts")}
-          {:fx/type :table-view
-           :column-resize-policy :constrained ; TODO auto resize
+          {:fx/type ext-table-column-auto-size
            :v-box/vgrow :always
            :items importables
-           :columns
-           [{:fx/type :table-column
-             :text "Source"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [i] {:text (str (:import-source-name i))})}}
-            {:fx/type :table-column
-             :text "Type"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (comp import-type-cell :resource-type)}}
-            {:fx/type :table-column
-             :text "Filename"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [i] {:text (str (:resource-filename i))})}}
-            {:fx/type :table-column
-             :text "Path"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [i] {:text (str (:resource-file i))})}}
-            {:fx/type :table-column
-             :text "Import"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [importable]
-                (let [source-path (some-> importable :resource-file fs/canonical-path)
-                      dest-path (some->> importable (resource/resource-dest spring-isolation-dir) fs/canonical-path)
-                      copying (or (-> copying (get source-path) :status)
-                                  (-> copying (get dest-path) :status))
-                      in-progress (boolean
-                                    (or (contains? import-tasks source-path)
-                                        copying))]
-                  {:text ""
-                   :graphic
-                   (if (fs/file-exists? file-cache dest-path)
-                     {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-check:16:white"}
-                     {:fx/type :button
-                      :text (cond
-                              (contains? import-tasks source-path) "queued"
-                              copying "copying"
-                              :else "")
-                      :disable in-progress
-                      :tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
-                       :text (str "Copy to " dest-path)}
-                      :on-action {:event/type :spring-lobby/add-task
-                                  :task
-                                  {:spring-lobby/task-type :spring-lobby/import
-                                   :importable importable
-                                   :spring-isolation-dir spring-isolation-dir}}
-                      :graphic
+           :desc
+           {:fx/type :table-view
+            :column-resize-policy :constrained
+            :items importables
+            :columns
+            [{:fx/type :table-column
+              :text "Source"
+              :pref-width 50
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (fn [i] {:text (str (:import-source-name i))})}}
+             {:fx/type :table-column
+              :text "Type"
+              :pref-width 20
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (comp import-type-cell :resource-type)}}
+             {:fx/type :table-column
+              :text "Filename"
+              :pref-width 200
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (fn [i] {:text (str (:resource-filename i))})}}
+             {:fx/type :table-column
+              :text "Path"
+              :pref-width 200
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (fn [i] {:text (str (:resource-file i))})}}
+             {:fx/type :table-column
+              :text "Import"
+              :pref-width 100
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [importable]
+                 (let [source-path (some-> importable :resource-file fs/canonical-path)
+                       dest-path (some->> importable (resource/resource-dest spring-isolation-dir) fs/canonical-path)
+                       copying (or (-> copying (get source-path) :status)
+                                   (-> copying (get dest-path) :status))
+                       in-progress (boolean
+                                     (or (contains? import-tasks source-path)
+                                         copying))]
+                   {:text ""
+                    :graphic
+                    (if (fs/file-exists? file-cache dest-path)
                       {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-content-copy:16:white"}})}))}}]}]}
+                       :icon-literal "mdi-check:16:white"}
+                      {:fx/type :button
+                       :text (cond
+                               (contains? import-tasks source-path) "queued"
+                               copying "copying"
+                               :else "")
+                       :disable in-progress
+                       :tooltip
+                       {:fx/type :tooltip
+                        :show-delay [10 :ms]
+                        :text (str "Copy to " dest-path)}
+                       :on-action {:event/type :spring-lobby/add-task
+                                   :task
+                                   {:spring-lobby/task-type :spring-lobby/import
+                                    :importable importable
+                                    :spring-isolation-dir spring-isolation-dir}}
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-content-copy:16:white"}})}))}}]}}]}
        {:fx/type :pane})}}))
 
 (defn import-window [state]

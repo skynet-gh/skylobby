@@ -4063,7 +4063,7 @@
                         import-source))))
 
 (defmethod task-handler ::scan-all-imports [task]
-  (event-handler (assoc task ::task-type ::scan-imports)))
+  (event-handler (assoc task :event/type ::scan-imports)))
 
 
 (defmethod event-handler ::download-source-change
