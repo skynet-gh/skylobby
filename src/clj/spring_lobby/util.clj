@@ -4,6 +4,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     java-time
+    [skylobby.spads :as spads]
     [spring-lobby.git :as git]
     [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
@@ -282,7 +283,8 @@
      (conj messages {:text message
                      :timestamp (curr-millis)
                      :username username
-                     :message-type (when ex :ex)}))))
+                     :message-type (when ex :ex)
+                     :spads (when ex (spads/parse-spads-message message))}))))
 
 (defn parse-skill [skill]
   (cond

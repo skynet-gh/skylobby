@@ -45,7 +45,8 @@
     (is (= [{:text "m"
              :timestamp now
              :username "me"
-             :message-type :ex}]
+             :message-type :ex
+             :spads nil}]
            (with-redefs [u/curr-millis (constantly now)]
              ((u/update-chat-messages-fn "me" "m" true) []))))))
 
