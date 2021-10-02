@@ -136,7 +136,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
@@ -2593,11 +2593,11 @@
     :or {battle-type 0
          nat-type 0
          battle-password "*"
-         host-port 8452
          max-players 8
          rank 0
          engine "Spring"}}]
-  (let [password (if (string/blank? battle-password) "*" battle-password)]
+  (let [password (if (string/blank? battle-password) "*" battle-password)
+        host-port (int (or (u/to-number host-port) 8452))]
     (message/send-message *state client-data
       (str "OPENBATTLE " battle-type " " nat-type " " password " " host-port " " max-players
            " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title

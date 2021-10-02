@@ -16,12 +16,12 @@
 (def host-battle-window-height 400)
 
 (def host-battle-window-keys
-  [:battle-password :battle-title :by-server :by-spring-root :css :engine-filter :engine-version
+  [:battle-password :battle-port :battle-title :by-server :by-spring-root :css :engine-filter :engine-version
    :map-input-prefix :map-name :mod-filter :mod-name :selected-server-tab :servers
    :show-host-battle-window :spring-isolation-dir])
 
 (defn host-battle-window
-  [{:keys [battle-password battle-title by-server by-spring-root css engine-filter engine-version
+  [{:keys [battle-password battle-port battle-title by-server by-spring-root css engine-filter engine-version
            map-input-prefix map-name mod-filter mod-name screen-bounds selected-server-tab servers
            show-host-battle-window spring-isolation-dir] :as state}]
   (let [server-data (get by-server selected-server-tab)
@@ -30,8 +30,8 @@
                         spring-isolation-dir)
         {:keys [engines maps mods]} (resource/spring-root-resources spring-root by-spring-root)
         host-battle-state (-> state
-                              (clojure.set/rename-keys {:battle-title :title})
-                              (select-keys [:battle-password :title :engine-version
+                              (clojure.set/rename-keys {:battle-port :host-port :battle-title :title})
+                              (select-keys [:battle-password :host-port :title :engine-version
                                             :mod-name :map-name])
                               (assoc :mod-hash -1
                                      :map-hash -1))
@@ -70,6 +70,20 @@
            :prompt-text "Battle Password"
            :on-action host-battle-action
            :on-text-changed {:event/type :spring-lobby/battle-password-change}}
+          {:fx/type :h-box
+           :children
+           [
+            {:fx/type :label
+             :text " Port: "}
+            {:fx/type :text-field
+             :text (str battle-port)
+             :prompt-text "8452"
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :battle-port}
+             :text-formatter
+             {:fx/type :text-formatter
+              :value-converter :integer
+              :value (int (or (u/to-number battle-port) 8452))}}]}
           {:fx/type engines-view
            :engine-filter engine-filter
            :engines engines
