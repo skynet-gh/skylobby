@@ -108,15 +108,15 @@
                                     :client-data client-data
                                     :channel-name (u/user-channel host-username)
                                     :message "!status battle"
-                                    :server-key server-key}}
-                       {:fx/type :menu-item
-                        :text "!status game"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel host-username)
-                                    :message "!status game"
                                     :server-key server-key}}]
-                      (when-not host-ingame
+                      (if host-ingame
+                        [{:fx/type :menu-item
+                          :text "!status game"
+                          :on-action {:event/type :spring-lobby/send-message
+                                      :client-data client-data
+                                      :channel-name (u/user-channel host-username)
+                                      :message "!status game"
+                                      :server-key server-key}}]
                         [{:fx/type :menu-item
                           :text "!stats"
                           :on-action {:event/type :spring-lobby/send-message

@@ -49,36 +49,55 @@
        :column-resize-policy :constrained ; TODO auto resize
        :row-factory
        {:fx/cell-type :table-row
-        :describe (fn [{:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version users]}]
-                    {:on-mouse-clicked
-                     {:event/type :spring-lobby/on-mouse-clicked-battles-row
-                      :battle battle
-                      :battle-password battle-password
-                      :client-data client-data
-                      :selected-battle selected-battle
-                      :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
-                     :tooltip
-                     {:fx/type :tooltip
-                      :style {:-fx-font-size 16}
-                      :show-delay [10 :ms]
-                      :text (str battle-title "\n\n"
-                                 "Map: " battle-map "\n"
-                                 "Game: " battle-modname "\n"
-                                 "Engine: " battle-engine " " battle-version "\n\n"
-                                 (->> users
-                                      keys
-                                      (sort String/CASE_INSENSITIVE_ORDER)
-                                      (string/join "\n")
-                                      (str "Players:\n\n")))}
-                     :context-menu
-                     {:fx/type :context-menu
-                      :items
-                      [{:fx/type :menu-item
-                        :text "Join Battle"
-                        :on-action {:event/type :spring-lobby/join-battle
-                                    :battle battle
-                                    :client-data client-data
-                                    :selected-battle battle-id}}]}})}
+        :describe (fn [{:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data}]
+                    (let [battle-users (:users battle-data)]
+                      {:on-mouse-clicked
+                       {:event/type :spring-lobby/on-mouse-clicked-battles-row
+                        :battle battle
+                        :battle-password battle-password
+                        :client-data client-data
+                        :selected-battle selected-battle
+                        :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
+                       :tooltip
+                       {:fx/type :tooltip
+                        :style {:-fx-font-size 16}
+                        :show-delay [10 :ms]
+                        :text (str battle-title "\n\n"
+                                   "Map: " battle-map "\n"
+                                   "Game: " battle-modname "\n"
+                                   "Engine: " battle-engine " " battle-version "\n\n"
+                                   (->> battle-users
+                                        keys
+                                        (sort String/CASE_INSENSITIVE_ORDER)
+                                        (string/join "\n")
+                                        (str "Players:\n\n")))}
+                       :context-menu
+                       {:fx/type :context-menu
+                        :items
+                        (concat
+                          [{:fx/type :menu-item
+                            :text "Join Battle"
+                            :on-action {:event/type :spring-lobby/join-battle
+                                        :battle battle
+                                        :client-data client-data
+                                        :selected-battle battle-id}}]
+                          (when (-> users (get host-username) :client-status :bot)
+                            (concat
+                              [{:fx/type :menu-item
+                                :text "!status battle"
+                                :on-action {:event/type :spring-lobby/send-message
+                                            :client-data client-data
+                                            :channel-name (u/user-channel host-username)
+                                            :message "!status battle"
+                                            :server-key server-key}}]
+                              (when (-> users (get host-username) :client-status :ingame)
+                                [{:fx/type :menu-item
+                                  :text "!status game"
+                                  :on-action {:event/type :spring-lobby/send-message
+                                              :client-data client-data
+                                              :channel-name (u/user-channel host-username)
+                                              :message "!status game"
+                                              :server-key server-key}}]))))}}))}
        :columns
        [
         {:fx/type :table-column
