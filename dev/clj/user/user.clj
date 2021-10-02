@@ -52,7 +52,7 @@
 (defn stop-chimer [chimer]
   (when chimer
     (try
-      (println "Stopping chimer" chimer)
+      ; (println "Stopping chimer" chimer) ; noisy
       (chimer)
       (catch Throwable e
         (println "error stopping chimer" chimer e)))))
@@ -61,10 +61,12 @@
   (try
     (require 'skylobby.fx.root)
     (require 'spring-lobby)
-    (if-let [new-view (var-get (find-var 'skylobby.fx.root/root-view))]
-      (when new-view
-        (alter-var-root #'old-view (constantly new-view)))
-      (println "no new view found"))
+    (if-let [v (find-var 'skylobby.fx.root/root-view)]
+      (if-let [new-view (var-get v)]
+        (when new-view
+          (alter-var-root #'old-view (constantly new-view)))
+        (println "no new view found"))
+      (println "unable to find var"))
     (catch Throwable e
       (println e)
       (.printStackTrace e)
@@ -148,7 +150,7 @@
         (let [res (refresh :after 'user/rerender)]
           (if (instance? Throwable res)
             (io.aviso.repl/pretty-pst res)
-            (println "Refresh finished:" res))))
+            (println "Refresh finished"))))
       (catch Throwable e
         (println e)
         (throw e))
