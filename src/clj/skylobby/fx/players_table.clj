@@ -123,14 +123,15 @@
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
                                       :message "!stats"
-                                      :server-key server-key}}])
-                      [{:fx/type :menu-item
-                        :text "!whois"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel host-username)
-                                    :message (str "!whois " username)
-                                    :server-key server-key}}]))
+                                      :server-key server-key}}])))
+                  (when (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
+                    [{:fx/type :menu-item
+                      :text "!whois"
+                      :on-action {:event/type :spring-lobby/send-message
+                                  :client-data client-data
+                                  :channel-name (u/user-channel host-username)
+                                  :message (str "!whois " username)
+                                  :server-key server-key}}])
                   [(if (-> ignore-users (get server-key) (get username))
                      {:fx/type :menu-item
                       :text "Unignore"
