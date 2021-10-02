@@ -4,12 +4,18 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.http :as http]
     [spring-lobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (javafx.scene.input Clipboard ClipboardContent)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def download-window-width 1600)
@@ -118,7 +124,8 @@
                            (filter (fn [{:keys [resource-type]}]
                                      (if download-type
                                        (= download-type resource-type)
-                                       true))))
+                                       true)))
+                           (sort-by :resource-filename String/CASE_INSENSITIVE_ORDER))
         {:keys [width height]} screen-bounds]
     {:fx/type :stage
      :showing (boolean show-downloader)
@@ -255,93 +262,124 @@
           {:fx/type :label
            :text (str (count downloadables) " artifacts")
            :style {:-fx-font-size 14}}
-          {:fx/type :table-view
-           :column-resize-policy :constrained ; TODO auto resize
+          {:fx/type ext-table-column-auto-size
            :v-box/vgrow :always
            :items downloadables
-           :style {:-fx-font-size 16}
-           :columns
-           [{:fx/type :table-column
-             :text "Source"
-             :cell-value-factory :download-source-name
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [source] {:text (str source)})}}
-            {:fx/type :table-column
-             :text "Type"
-             :cell-value-factory :resource-type
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe download-type-cell}}
-            {:fx/type :table-column
-             :text "File"
-             :cell-value-factory :resource-filename
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [resource-filename] {:text (str resource-filename)})}}
-            {:fx/type :table-column
-             :text "URL"
-             :cell-value-factory :download-url
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe (fn [download-url] {:text (str download-url)})}}
-            {:fx/type :table-column
-             :text "Download"
-             :sortable false
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [{:keys [download-url resource-filename] :as downloadable}]
-                (let [dest-file (resource/resource-dest spring-isolation-dir downloadable)
-                      dest-path (fs/canonical-path dest-file)
-                      download (get http-download download-url)
-                      in-progress (:running download)
-                      extract-file (when dest-file
-                                     (io/file spring-isolation-dir "engine" (fs/filename dest-file)))]
-                  {:text ""
-                   :graphic
-                   (cond
-                     in-progress
-                     {:fx/type :label
-                      :text (str (u/download-progress download))}
-                     (and (not in-progress)
-                          (not (fs/file-exists? file-cache dest-path)))
-                     {:fx/type :button
-                      :tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
-                       :text (str "Download to " dest-path)}
-                      :on-action {:event/type :spring-lobby/add-task
-                                  :task {:spring-lobby/task-type :spring-lobby/http-downloadable
-                                         :downloadable downloadable
-                                         :spring-isolation-dir spring-isolation-dir}}
-                      :graphic
+           :desc
+           {:fx/type :table-view
+            :column-resize-policy :constrained
+            :items downloadables
+            :style {:-fx-font-size 16}
+            :row-factory
+            {:fx/cell-type :table-row
+             :describe
+             (fn [{:keys [download-url]}]
+               {:context-menu
+                {:fx/type :context-menu
+                 :items
+                 (concat []
+                   (when-not (string/blank? download-url)
+                     [{:fx/type :menu-item
+                       :text "Copy URL"
+                       :on-action (fn [_event]
+                                    (let [clipboard (Clipboard/getSystemClipboard)
+                                          content (ClipboardContent.)]
+                                      (.putString content (str download-url))
+                                      (.setContent clipboard content)))}]))}})}
+            :columns
+            [{:fx/type :table-column
+              :text "Source"
+              :pref-width 50
+              :cell-value-factory :download-source-name
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (fn [source] {:text (str source)})}}
+             {:fx/type :table-column
+              :text "Type"
+              :pref-width 20
+              :cell-value-factory :resource-type
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe download-type-cell}}
+             {:fx/type :table-column
+              :text "File"
+              :pref-width 100
+              :cell-value-factory :resource-filename
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe (fn [resource-filename] {:text (str resource-filename)})}}
+             {:fx/type :table-column
+              :pref-width 100
+              :text "URL"
+              :cell-value-factory :download-url
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [download-url]
+                 {:text (str download-url)
+                  :tooltip
+                  {:fx/type :tooltip
+                   :show-delay [10 :ms]
+                   :style {:-fx-font-size 18}
+                   :text (str download-url)}})}}
+             {:fx/type :table-column
+              :text "Download"
+              :pref-width 50
+              :sortable false
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [{:keys [download-url resource-filename] :as downloadable}]
+                 (let [dest-file (resource/resource-dest spring-isolation-dir downloadable)
+                       dest-path (fs/canonical-path dest-file)
+                       download (get http-download download-url)
+                       in-progress (:running download)
+                       extract-file (when dest-file
+                                      (io/file spring-isolation-dir "engine" (fs/filename dest-file)))]
+                   {:text ""
+                    :graphic
+                    (cond
+                      in-progress
+                      {:fx/type :label
+                       :text (str (u/download-progress download))}
+                      (and (not in-progress)
+                           (not (fs/file-exists? file-cache dest-path)))
+                      {:fx/type :button
+                       :tooltip
+                       {:fx/type :tooltip
+                        :show-delay [10 :ms]
+                        :text (str "Download to " dest-path)}
+                       :on-action {:event/type :spring-lobby/add-task
+                                   :task {:spring-lobby/task-type :spring-lobby/http-downloadable
+                                          :downloadable downloadable
+                                          :spring-isolation-dir spring-isolation-dir}}
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-download:16:white"}}
+                      (and
+                           (fs/file-exists? file-cache dest-path)
+                           dest-file
+                           (or
+                             (http/engine-archive? resource-filename)
+                             (http/bar-engine-filename? resource-filename))
+                           extract-file
+                           (not (fs/file-exists? file-cache (fs/canonical-path extract-file))))
+                      {:fx/type :button
+                       :tooltip
+                       {:fx/type :tooltip
+                        :show-delay [10 :ms]
+                        :text (str "Extract to " extract-file)}
+                       :on-action
+                       {:event/type :spring-lobby/extract-7z
+                        :file dest-file
+                        :dest extract-file}
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-archive:16:white"}}
+                      :else
                       {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-download:16:white"}}
-                     (and
-                          (fs/file-exists? file-cache dest-path)
-                          dest-file
-                          (or
-                            (http/engine-archive? resource-filename)
-                            (http/bar-engine-filename? resource-filename))
-                          extract-file
-                          (not (fs/file-exists? file-cache (fs/canonical-path extract-file))))
-                     {:fx/type :button
-                      :tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
-                       :text (str "Extract to " extract-file)}
-                      :on-action
-                      {:event/type :spring-lobby/extract-7z
-                       :file dest-file
-                       :dest extract-file}
-                      :graphic
-                      {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-archive:16:white"}}
-                     :else
-                     {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-check:16:white"})}))}}]}]}
+                       :icon-literal "mdi-check:16:white"})}))}}]}}]}
        {:fx/type :pane})}}))
 
 

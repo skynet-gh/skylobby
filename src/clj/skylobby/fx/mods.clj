@@ -9,6 +9,9 @@
     [version-clj.core :as version]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def known-games
   [
    {:mod-name "Beyond All Reason"

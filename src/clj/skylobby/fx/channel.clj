@@ -2,13 +2,16 @@
   (:require
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-scroll-on-create with-scroll-text-prop with-scroll-text-flow-prop]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create with-scroll-text-prop with-scroll-text-flow-prop]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def default-font-size 18)
@@ -175,40 +178,48 @@
        (.build builder)))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words ignore-users messages server-key username]}]
+  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words hide-spads-messages ignore-users messages server-key username]}]
   (let [ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
-                              set)]
-    {:fx/type ext-scroll-on-create
+                              set)
+        hide-spads-set (->> hide-spads-messages
+                            (filter second)
+                            (map first)
+                            set)]
+    {:fx/type ext-recreate-on-key-changed
+     :key {:ignore ignore-users-set :spads hide-spads-set}
      :desc
-     {:fx/type fx.virtualized-scroll-pane/lifecycle
-      :event-filter {:event/type :spring-lobby/filter-channel-scroll}
-      :content
-      {:fx/type fx.rich-text/lifecycle-fast
-       :editable false
-       :style (text-style chat-font-size)
-       :wrap-text true
-       :document
-       [
-        (->> messages
-             (remove (comp ignore-users-set :username))
-             (remove
-               (fn [{:keys [message-type text]}]
-                 (and (= :ex message-type)
-                      text
-                      (string/starts-with? text "* BarManager|"))))
-             reverse)
-        (fn [lines]
-          (channel-document
-            lines
-            {:highlight
-             (concat
-               (when chat-highlight-words
-                 (string/split chat-highlight-words #"[\s,]+"))
-               (when chat-highlight-username
-                 [username]))}))
-        chat-auto-scroll]}}}))
+     {:fx/type ext-scroll-on-create
+      :desc
+      {:fx/type fx.virtualized-scroll-pane/lifecycle
+       :event-filter {:event/type :spring-lobby/filter-channel-scroll}
+       :content
+       {:fx/type fx.rich-text/lifecycle-fast
+        :editable false
+        :style (text-style chat-font-size)
+        :wrap-text true
+        :document
+        [
+         (->> messages
+              (remove (comp ignore-users-set :username))
+              (remove (comp hide-spads-set :spads-message-type :spads))
+              (remove
+                (fn [{:keys [message-type text]}]
+                  (and (= :ex message-type)
+                       text
+                       (string/starts-with? text "* BarManager|"))))
+              reverse)
+         (fn [lines]
+           (channel-document
+             lines
+             {:highlight
+              (concat
+                (when chat-highlight-words
+                  (string/split chat-highlight-words #"[\s,]+"))
+                (when chat-highlight-username
+                  [username]))}))
+         chat-auto-scroll]}}}}))
 
 (defn channel-view-history
   [state]
@@ -273,7 +284,7 @@
          :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
-  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :ignore-users])
+  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :hide-spads-messages :ignore-users])
 
 (defn channel-view-impl
   [{:keys [channel-name channels hide-users]

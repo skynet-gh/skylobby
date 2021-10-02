@@ -5,6 +5,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def window-key :battle-chat)
 
 (def battle-chat-window-width 1600)

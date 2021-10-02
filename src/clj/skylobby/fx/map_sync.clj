@@ -6,6 +6,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn map-sync-pane
   [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
            import-tasks importables-by-path indexed-map map-update-tasks spring-isolation-dir

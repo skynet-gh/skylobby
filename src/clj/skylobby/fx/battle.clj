@@ -4,7 +4,7 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
-    skylobby.fx
+    [skylobby.fx :refer [monospace-font-family]]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
@@ -15,7 +15,7 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
-    [skylobby.fx.sync :refer [severity-styles]]
+    [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -23,6 +23,9 @@
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def minimap-types
@@ -206,16 +209,17 @@
            bot-names bot-username bot-version bot-versions bots channel-name client-data filter-host-replay
            host-ingame in-sync indexed-map indexed-mod interleave-ally-player-ids me my-battle-status
            my-client-status my-player parsed-replays-by-path ready-on-unspec scripttags server-key show-team-skills
-           sides singleplayer team-counts team-skills username users]
+           sides singleplayer tasks-by-type team-counts team-skills username users]
     :as state}]
-  (let [sync-button-style (assoc
+  (let [my-sync-status (int (or (:sync my-battle-status) 0))
+        ringing-specs (seq (get tasks-by-type :spring-lobby/ring-specs))
+        sync-button-style (assoc
                             (dissoc
-                              (get severity-styles
-                                (case (:sync my-battle-status)
-                                  1 0
-                                  2 2
-                                  ; else
-                                  1))
+                              (case my-sync-status
+                                1 ok-severity
+                                2 error-severity
+                                ; else
+                                warn-severity)
                               :-fx-background-color)
                             :-fx-font-size 14)
         sync-buttons (if-not singleplayer
@@ -225,7 +229,7 @@
                          [{:fx/type :button
                            :text (str
                                    " "
-                                   (case (:sync my-battle-status)
+                                   (case my-sync-status
                                      1 "synced"
                                      2 "unsynced"
                                      ; else
@@ -272,11 +276,15 @@
                   (when-not singleplayer
                     [{:fx/type :button
                       :text "Ring Specs"
-                      :on-action {:event/type :spring-lobby/ring-specs
-                                  :battle-users (:users battle)
-                                  :channel-name channel-name
-                                  :client-data client-data
-                                  :users users}}
+                      :disable (boolean ringing-specs)
+                      :on-action
+                      {:event/type :spring-lobby/add-task
+                       :task
+                       {:spring-lobby/task-type :spring-lobby/ring-specs
+                        :battle-users (:users battle)
+                        :channel-name channel-name
+                        :client-data client-data
+                        :users users}}}
                      {:fx/type :button
                       :text "Promote"
                       :on-action {:event/type :spring-lobby/send-message
@@ -530,6 +538,7 @@
          :alignment :top-left
          :children
          [{:fx/type fx.minimap/minimap-pane
+           :am-host am-host
            :am-spec am-spec
            :battle-details battle-details
            :client-data client-data
@@ -877,6 +886,148 @@
                       :key :show-uikeys-window}}]}}]}))
 
 
+(defn battle-votes [{:keys [channel-name channels client-data host-username server-key show-vote-log]}]
+  (let [{:keys [messages]} (get channels channel-name)
+        host-messages (->> messages
+                           (filter (comp #{host-username} :username)))
+        host-ex-messages (->> host-messages
+                              (filter (comp #{:ex} :message-type)))
+        spads-messages (->> host-ex-messages
+                            (filter :spads))
+        vote-messages (->> spads-messages
+                           (filter (comp #{:called-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
+                           (map
+                             (fn [{:keys [spads] :as message}]
+                               (let [{:keys [spads-message-type spads-parsed]} spads]
+                                 (assoc-in message [:spads :vote-data]
+                                   (if (= :called-vote spads-message-type)
+                                     {:command (nth spads-parsed 2)
+                                      :caller (second spads-parsed)}
+                                     {:command (second spads-parsed)}))))))
+        current-vote (reduce
+                       (fn [prev {:keys [spads] :as curr}]
+                         (let [{:keys [spads-message-type spads-parsed]} spads]
+                           (cond
+                             (= :called-vote spads-message-type) curr
+                             (= :vote-progress spads-message-type)
+                             (let [[_all _command y yt n nt remaining] spads-parsed]
+                               (assoc-in prev [:spads :vote-progress] {:y y
+                                                                       :yt yt
+                                                                       :n n
+                                                                       :nt nt
+                                                                       :remaining remaining}))
+                             (#{:no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
+                             :else prev)))
+                       nil
+                       (reverse vote-messages))]
+    {:fx/type :v-box
+     :children
+     (concat
+       (when-let [{:keys [spads]} current-vote]
+         (let [{:keys [vote-data vote-progress]} spads
+               {:keys [y yt n nt remaining]} vote-progress]
+           [{:fx/type :v-box
+             :style {:-fx-font-size 18}
+             :children
+             [{:fx/type :label
+               :style {:-fx-font-size 24}
+               :text "Current Vote"}
+              {:fx/type :label
+               :text (str " " (:command vote-data))}
+              {:fx/type :label
+               :text (str " by " (:caller vote-data))}
+              {:fx/type :label
+               :text (str " "
+                          (when vote-progress
+                            (str "Y: (" y "/" yt ") N: (" n "/" nt ") " (when remaining (str remaining " left")))))}
+              {:fx/type :h-box
+               :children
+               [{:fx/type :button
+                 :style (assoc (dissoc ok-severity :-fx-background-color)
+                               :-fx-font-size 20)
+                 :text "Yes"
+                 :on-action {:event/type :spring-lobby/send-message
+                             :channel-name channel-name
+                             :client-data client-data
+                             :message "!vote y"
+                             :server-key server-key}}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type :button
+                 :style (assoc (dissoc error-severity :-fx-background-color)
+                               :-fx-font-size 20)
+                 :text "No"
+                 :on-action {:event/type :spring-lobby/send-message
+                             :channel-name channel-name
+                             :client-data client-data
+                             :message "!vote n"
+                             :server-key server-key}}
+                {:fx/type :pane
+                 :h-box/hgrow :always}
+                {:fx/type :button
+                 :text "Present"
+                 :style {:-fx-font-size 20}
+                 :on-action {:event/type :spring-lobby/send-message
+                             :channel-name channel-name
+                             :client-data client-data
+                             :message "!vote b"
+                             :server-key server-key}}]}]}]))
+       [{:fx/type :h-box
+         :children
+         (concat
+           (when-not show-vote-log
+             [{:fx/type :label
+               :text "Vote Log (newest to oldest)"
+               :style {:-fx-font-size 24}}])
+           [{:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :button
+             :text ""
+             :on-action {:event/type (if show-vote-log :spring-lobby/dissoc :spring-lobby/assoc)
+                         :key :show-vote-log}
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal (if show-vote-log
+                              "mdi-arrow-left:16:white"
+                              "mdi-arrow-right:16:white")}}])}]
+       (when-not show-vote-log
+         [{:fx/type :scroll-pane
+           :pref-width 400
+           :v-box/vgrow :always
+           :content
+           {:fx/type :v-box
+            :style {:-fx-font-size 18}
+            :children
+            (->> vote-messages
+                 (remove (comp #{:vote-progress} :spads-message-type :spads))
+                 (map
+                   (fn [{:keys [spads timestamp]}]
+                     (let [{:keys [spads-message-type vote-data]} spads]
+                       {:fx/type :h-box
+                        :alignment :center-left
+                        :children
+                        (concat
+                          [{:fx/type :label
+                            :style {:-fx-font-family monospace-font-family}
+                            :text (str (u/format-hours timestamp) " ")}
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal (case spads-message-type
+                                            :called-vote "mdi-phone:16:blue"
+                                            :vote-passed "mdi-phone-incoming:16:green"
+                                            :vote-failed "mdi-phone-missed:16:red"
+                                            :vote-cancelled "mdi-phone-minus:16:gold"
+                                            ; else
+                                            "mdi-phone:16:white")}]
+                          (when (= :called-vote spads-message-type)
+                            [
+                             {:fx/type :label
+                              :style {:-fx-font-family monospace-font-family}
+                              :text (str " " (:caller vote-data) ":")}])
+                          [{:fx/type :label
+                            :style {:-fx-font-family monospace-font-family}
+                            :text (str " " (:command vote-data))}])}))))}}]))}))
+
+
 (defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [{:keys [battle users]}]
@@ -901,7 +1052,7 @@
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
      :parsed-replays-by-path :players-table-columns :pop-out-battle :pop-out-chat :rapid-data-by-id :rapid-data-by-version
-     :rapid-download :rapid-update :ready-on-unspec :show-team-skills :spring-isolation-dir :spring-settings :springfiles-search-results
+     :rapid-download :rapid-update :ready-on-unspec :show-team-skills :show-vote-log :spring-isolation-dir :spring-settings :springfiles-search-results
      :tasks-by-type :username]
     fx.channel/channel-state-keys))
 
@@ -916,7 +1067,7 @@
            channels chat-auto-scroll
            client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download
            map-input-prefix map-details
-           maps maps-by-name message-drafts minimap-size minimap-type mod-details mod-filter mods mods-by-name players-table-columns pop-out-battle pop-out-chat rapid-data-by-id rapid-data-by-version rapid-download ready-on-unspec server-key spring-isolation-dir spring-settings
+           maps maps-by-name message-drafts minimap-size minimap-type mod-details mod-filter mods mods-by-name players-table-columns pop-out-battle pop-out-chat rapid-data-by-id rapid-data-by-version rapid-download ready-on-unspec server-key show-vote-log spring-isolation-dir spring-settings
            tasks-by-type users username]
     :as state}]
   (let [{:keys [battle-id scripttags]} battle
@@ -1009,7 +1160,7 @@
                                   (mapv
                                     (fn [{:keys [username]}]
                                       (let [username-kw (when username (keyword (string/lower-case username)))
-                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill (Math/round))]
+                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill u/round)]
                                         skill))
                                     players)))))
         minimap-size (or (u/to-number minimap-size)
@@ -1093,6 +1244,16 @@
                        :server-key server-key
                        :username username}
                       (select-keys state fx.channel/channel-state-keys))
+        battle-chat {:fx/type :h-box
+                     :children
+                     [(assoc battle-chat :h-box/hgrow :always)
+                      {:fx/type battle-votes
+                       :channel-name channel-name
+                       :channels channels
+                       :client-data client-data
+                       :host-username host-username
+                       :server-key server-key
+                       :show-vote-log show-vote-log}]}
         battle-tabs {:fx/type battle-tabs
                      :am-host am-host
                      :am-spec am-spec
@@ -1343,7 +1504,8 @@
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
                            (let [dividers (.getDividers node)
-                                 position-property (.positionProperty (first dividers))]
+                                 ^javafx.scene.control.SplitPane$Divider divider (first dividers)
+                                 position-property (.positionProperty divider)]
                              (.addListener position-property
                                (reify javafx.beans.value.ChangeListener
                                  (changed [this _observable _old-value new-value]
@@ -1370,7 +1532,7 @@
             {:fx/type fx/ext-on-instance-lifecycle
              :on-created (fn [^javafx.scene.control.SplitPane node]
                            (let [dividers (.getDividers node)]
-                             (when-let [divider (first dividers)]
+                             (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
                                (let [position-property (.positionProperty divider)]
                                  (.addListener position-property
                                    (reify javafx.beans.value.ChangeListener

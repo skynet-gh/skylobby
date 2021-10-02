@@ -7,6 +7,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def register-window-width 500)
 (def register-window-height 400)
 

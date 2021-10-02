@@ -9,7 +9,8 @@
   (:import
     (javafx.scene.control IndexRange)
     (org.fxmisc.flowless VirtualizedScrollPane)
-    (org.fxmisc.richtext InlineCssTextArea StyleClassedTextArea)))
+    (org.fxmisc.richtext InlineCssTextArea StyleClassedTextArea)
+    (org.fxmisc.richtext.model StyledDocument)))
 
 
 (set! *warn-on-reflection* true)
@@ -24,7 +25,7 @@
     (composite/props StyleClassedTextArea
       :document (prop/make
                   (mutator/setter
-                    (fn [area document]
+                    (fn [^StyleClassedTextArea area ^StyledDocument document]
                       (let [
                             length (.getLength area)]
                         (if document
@@ -54,25 +55,31 @@
       :document (prop/make
                   (reify mutator/Mutator
                     (assign! [_ instance _ value]
-                      (let [[lines document-fn] value
-                            length (.getLength instance)]
-                        (when-let [document (document-fn lines)]
-                          (.replace instance 0 length document)))
-                      (when (and (.getParent instance) (instance? VirtualizedScrollPane (.getParent instance)))
-                        (.scrollYBy (.getParent instance) ##Inf)))
+                      (let [^StyleClassedTextArea area instance
+                            [lines document-fn] value
+                            length (.getLength area)]
+                        (when-let [^StyledDocument document (document-fn lines)]
+                          (.replace area 0 length document))
+                        (when-let [^VirtualizedScrollPane parent (.getParent area)]
+                          (when (instance? VirtualizedScrollPane parent)
+                            (let [^VirtualizedScrollPane scroll-pane parent]
+                              (.scrollYBy scroll-pane ##Inf))))))
                     (replace! [_ instance _ old-value new-value]
-                      (let [[old-lines _old-document-fn] old-value
+                      (let [^StyleClassedTextArea area instance
+                            [old-lines _old-document-fn] old-value
                             [new-lines new-document-fn auto-scroll] new-value
                             diff-lines (drop (count old-lines) new-lines)]
                         (when (seq diff-lines)
-                          (let [index-range (.getSelection instance)]
-                            (.appendText instance "\n")
-                            (.append instance (new-document-fn diff-lines))
+                          (let [index-range (.getSelection area)]
+                            (.appendText area "\n")
+                            (.append area (new-document-fn diff-lines))
                             (when auto-scroll
-                              (.scrollYBy (.getParent instance) ##Inf))
-                            (.selectRange instance (.getStart index-range) (.getEnd index-range))))))
+                              (let [^VirtualizedScrollPane parent (.getParent area)]
+                                (.scrollYBy parent ##Inf)))
+                            (.selectRange area (.getStart index-range) (.getEnd index-range))))))
                     (retract! [_ instance _ _]
-                      (.deleteText instance 0 (.getLength instance))))
+                      (let [^StyleClassedTextArea area instance]
+                        (.deleteText area 0 (.getLength area)))))
                   lifecycle/scalar)
       :editable [:setter lifecycle/scalar :default false]
       :wrap-text [:setter lifecycle/scalar :default true])))
@@ -89,7 +96,7 @@
     (composite/props InlineCssTextArea
       :document (prop/make
                   (mutator/setter
-                    (fn [area document]
+                    (fn [^InlineCssTextArea area ^StyledDocument document]
                       (let [length (.getLength area)]
                         (if document
                           (.replace area 0 length document)
@@ -101,4 +108,4 @@
 (def lifecycle-inline
   (composite/describe InlineCssTextArea
     :ctor []
-    :props props))
+    :props props-inline))

@@ -13,6 +13,9 @@
     (javafx.scene.paint Color)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def allyteam-colors
   (->> color/ffa-colors-web
        (map u/hex-color-to-css)
@@ -105,29 +108,30 @@
                                     :client-data client-data
                                     :channel-name (u/user-channel host-username)
                                     :message "!status battle"
-                                    :server-key server-key}}
-                       {:fx/type :menu-item
-                        :text "!status game"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel host-username)
-                                    :message "!status game"
                                     :server-key server-key}}]
-                      (when-not host-ingame
+                      (if host-ingame
+                        [{:fx/type :menu-item
+                          :text "!status game"
+                          :on-action {:event/type :spring-lobby/send-message
+                                      :client-data client-data
+                                      :channel-name (u/user-channel host-username)
+                                      :message "!status game"
+                                      :server-key server-key}}]
                         [{:fx/type :menu-item
                           :text "!stats"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
                                       :channel-name (u/user-channel host-username)
                                       :message "!stats"
-                                      :server-key server-key}}])
-                      [{:fx/type :menu-item
-                        :text "!whois"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel host-username)
-                                    :message (str "!whois " username)
-                                    :server-key server-key}}]))
+                                      :server-key server-key}}])))
+                  (when (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
+                    [{:fx/type :menu-item
+                      :text "!whois"
+                      :on-action {:event/type :spring-lobby/send-message
+                                  :client-data client-data
+                                  :channel-name (u/user-channel host-username)
+                                  :message (str "!whois " username)
+                                  :server-key server-key}}])
                   [(if (-> ignore-users (get server-key) (get username))
                      {:fx/type :menu-item
                       :text "Unignore"
@@ -259,11 +263,12 @@
                             [
                              {:fx/type font-icon/lifecycle
                               :icon-literal
-                              (case (:sync battle-status)
-                                1 "mdi-sync:16:green"
-                                2 "mdi-sync-off:16:red"
-                                ; else
-                                "mdi-sync-alert:16:yellow")}])
+                              (let [sync-status (int (or (:sync battle-status) 0))]
+                                (case sync-status
+                                  1 "mdi-sync:16:green"
+                                  2 "mdi-sync-off:16:red"
+                                  ; else
+                                  "mdi-sync-alert:16:yellow"))}])
                           [(cond
                              (:bot client-status)
                              {:fx/type font-icon/lifecycle

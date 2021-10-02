@@ -10,6 +10,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def window-key :chat)
 
 

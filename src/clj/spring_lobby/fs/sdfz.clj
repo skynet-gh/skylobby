@@ -12,6 +12,9 @@
     (java.util.zip GZIPInputStream)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def replay-filename-re
   #"^(\d+)_(\d+)_(.*)_(.+).sdfz$")
 
@@ -62,7 +65,7 @@
     net-message-header
     (fn [{:keys [command]}]
       (let [l (dec length)]
-        (case command
+        (case (int command)
           6 (b/ordered-map
               :pad :byte
               :player-num :ubyte

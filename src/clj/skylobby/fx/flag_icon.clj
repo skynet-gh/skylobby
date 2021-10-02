@@ -8,7 +8,7 @@
 (set! *warn-on-reflection* true)
 
 
-(defn flag-image [country-code]
+(defn flag-image [^String country-code]
   (try
     (FlagIcon. country-code)
     (catch Exception e

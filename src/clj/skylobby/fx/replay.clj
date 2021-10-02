@@ -32,6 +32,9 @@
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def replay-window-width 1600)
 (def replay-window-height 900)
 
@@ -114,7 +117,7 @@
                            Color/YELLOW)
             css-color (some-> javafx-color str u/hex-color-to-css)
             is-spec (and (not (string/blank? player)) (not color))
-            dest-type (case dest
+            dest-type (case (int dest)
                         252 :ally
                         253 :spec
                         254 :global

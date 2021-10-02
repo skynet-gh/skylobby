@@ -10,6 +10,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
 

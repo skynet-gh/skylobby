@@ -7,6 +7,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def tasks-window-width 1600)
 (def tasks-window-height 1000)
 

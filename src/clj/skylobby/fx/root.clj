@@ -24,6 +24,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def app-version (u/app-version))
 (def screen-bounds (skylobby.fx/screen-bounds))
 
@@ -144,7 +147,8 @@
         server-data)
       (merge
         {:fx/type fx.rapid/rapid-download-window
-         :screen-bounds screen-bounds}
+         :screen-bounds screen-bounds
+         :tasks-by-type tasks-by-type}
         (select-keys state fx.rapid/rapid-download-window-keys)
         spring-root-data)
       (merge

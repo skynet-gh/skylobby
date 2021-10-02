@@ -4,6 +4,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     java-time
+    [skylobby.spads :as spads]
     [spring-lobby.git :as git]
     [taoensso.timbre :as log]
     [taoensso.timbre.appenders.3rd-party.rotor :as rotor])
@@ -12,7 +13,7 @@
     (java.net InetAddress NetworkInterface ServerSocket URL URLDecoder URLEncoder)
     (java.nio.charset StandardCharsets)
     (java.security MessageDigest)
-    (java.time LocalDateTime)
+    (java.time Duration LocalDateTime)
     (java.util Base64 TimeZone)
     (java.util.jar Manifest)
     (java.util.zip CRC32)
@@ -282,7 +283,8 @@
      (conj messages {:text message
                      :timestamp (curr-millis)
                      :username username
-                     :message-type (when ex :ex)}))))
+                     :message-type (when ex :ex)
+                     :spads (when ex (spads/parse-spads-message message))}))))
 
 (defn parse-skill [skill]
   (cond
@@ -295,6 +297,10 @@
         (catch Exception e
           (log/warn e "Error parsing skill" skill))))
     :else nil))
+
+(defn round [^double n]
+  (when n
+    (Math/round n)))
 
 (defn nickname [{:keys [ai-name bot-name owner username]}]
   (if bot-name
@@ -396,7 +402,7 @@
                                          time-zone-id))))
 
 
-(defn format-duration [duration]
+(defn format-duration [^Duration duration]
   (when duration
     (format "%d:%02d:%02d"
       (.toHours duration)
@@ -528,7 +534,7 @@
 
 (defn entry-point []
   (let [stack-trace (.getStackTrace (Throwable.))
-        stack-trace-element (last stack-trace)
+        ^StackTraceElement stack-trace-element (last stack-trace)
         fully-qualified-class (.getClassName stack-trace-element)
         entry-method (.getMethodName stack-trace-element)]
     (when (not= "main" entry-method)

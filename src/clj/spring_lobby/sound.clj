@@ -7,6 +7,9 @@
     (javafx.scene.media Media MediaPlayer)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def ring-resource-name
   "186669__fordps3__computer-boop.wav")
 

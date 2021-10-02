@@ -89,14 +89,14 @@
           nil
           nil]
          (rest (handler/parse-adduser "ADDUSER skynet ?? 8"))))
-  (is (= ["[Z]ecrus"
+  (is (= ["Zecrus"
           "US"
           " 0"
           "0"
           "67"
           " SpringLobby 0.270-49-gab254fe7d (windows64)"
           "SpringLobby 0.270-49-gab254fe7d (windows64)"]
-         (rest (handler/parse-adduser "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)"))))
+         (rest (handler/parse-adduser "ADDUSER Zecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)"))))
   (is (= ["ChanServ" "US" nil nil "None" " ChanServ" "ChanServ"]
          (rest (handler/parse-adduser "ADDUSER ChanServ US None ChanServ")))))
 
@@ -175,11 +175,11 @@
            @state-atom)))
   (let [state-atom (atom {})
         server-key :server1]
-    (handler/handle state-atom server-key "ADDUSER [Z]ecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)")
+    (handler/handle state-atom server-key "ADDUSER Zecrus US 0 67 SpringLobby 0.270-49-gab254fe7d (windows64)")
     (is (= {:by-server
             {:server1
              {:users
-              {"[Z]ecrus"
+              {"Zecrus"
                {:client-status {:access false
                                 :away false
                                 :bot false
@@ -189,7 +189,7 @@
                 :cpu "0"
                 :user-agent "SpringLobby 0.270-49-gab254fe7d (windows64)"
                 :user-id "67"
-                :username "[Z]ecrus"}}}}}
+                :username "Zecrus"}}}}}
            @state-atom))))
 
 
@@ -199,7 +199,7 @@
           server-key :server1
           now 12345]
       (with-redefs [u/curr-millis (constantly now)]
-        (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi [Z]kynet! Current battle type is team."))
+        (handler/handle state-atom server-key "SAIDBATTLEEX [teh]cluster1[01] * Hi skynet! Current battle type is team."))
       (is (= {:by-server
               {:server1
                {:battle {:battle-id "1"}
@@ -207,9 +207,14 @@
                 {"__battle__1"
                  {:messages
                   [{:message-type :ex
-                    :text "* Hi [Z]kynet! Current battle type is team."
+                    :text "* Hi skynet! Current battle type is team."
                     :timestamp now
-                    :username "[teh]cluster1[01]"}]}}}}}
+                    :username "[teh]cluster1[01]"
+                    :spads {:spads-message-type :greeting,
+                            :spads-parsed ["Hi skynet! Current battle type is team."
+                                           "skynet"
+                                           "team"],
+                            :text "* Hi skynet! Current battle type is team."}}]}}}}}
              @state-atom))))
   (testing "auto unspec"
     (let [
@@ -256,7 +261,8 @@
                 :channels {"__battle__0" {:messages [{:message-type :ex
                                                       :text "* Global setting changed by skynet (teamSize=16)"
                                                       :timestamp now
-                                                      :username "host1"}]}}
+                                                      :username "host1"
+                                                      :spads nil}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}}
              @state-atom))
@@ -278,7 +284,8 @@
                 [{:message-type nil
                   :text ":)"
                   :timestamp now
-                  :username "user:springrts.com"}]}}}}}
+                  :username "user:springrts.com"
+                  :spads nil}]}}}}}
            @state-atom))))
 
 (deftest handle-CLIENTSFROM
@@ -601,7 +608,8 @@
                 :channels {"__battle__0" {:messages [{:message-type :ex
                                                       :text "* Global setting changed by skynet (teamSize=16)"
                                                       :timestamp now
-                                                      :username "host1"}]}}
+                                                      :username "host1"
+                                                      :spads nil}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}}
              @state-atom))

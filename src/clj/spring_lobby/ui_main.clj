@@ -19,6 +19,9 @@
   (:gen-class))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def cli-options
   [[nil "--chat-channel CHANNEL_NAME" "Add a default chat channel to connect to"
     :assoc-fn (fn [m k v]

@@ -12,6 +12,9 @@
     (org.fxmisc.flowless VirtualizedScrollPane)))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://github.com/cljfx/cljfx/issues/76#issuecomment-645563116
 (def ext-recreate-on-key-changed
   "Extension lifecycle that recreates its component when lifecycle's key is changed
@@ -65,24 +68,6 @@
                    fx.lifecycle/scalar
                    :default [[] true])}))
 
-(def ext-with-auto-scroll-virtual-prop
-  (fx.lifecycle/make-ext-with-props
-   fx.lifecycle/dynamic
-   {:auto-scroll (fx.prop/make
-                   (reify fx.mutator/Mutator
-                     (assign! [_ instance _ _]
-                       (.scrollYBy instance ##Inf))
-                     (replace! [_ instance _ old-value new-value]
-                       (when (not= old-value new-value)
-                         (let [[_ _ ybar] (vec (.getChildrenUnmodifiable instance))
-                               threshold 80] ; (quot (.getHeight ybar) 4)]
-                           (when (< (- (.getMax ybar) (.getValue ybar)) threshold)
-                             (.scrollYBy instance ##Inf)))))
-                     (retract! [_ _ _ _]
-                       nil))
-                   fx.lifecycle/scalar
-                   :default [])}))
-
 ; figure out layout on create
 (defn ext-scroll-on-create [{:keys [desc]}]
   {:fx/type fx/ext-on-instance-lifecycle
@@ -113,7 +98,7 @@
    fx.lifecycle/dynamic
    {:items (fx.prop/make
              (fx.mutator/setter
-               (fn [^TableView table-view items]
+               (fn [^TableView table-view ^java.util.Collection items]
                  (let [table-items (.getItems table-view)]
                    (.clear table-items)
                    (.setAll table-items items)

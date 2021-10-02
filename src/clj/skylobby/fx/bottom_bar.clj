@@ -4,6 +4,9 @@
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def bottom-bar-keys
   [:last-failed-message :media-player :music-dir :music-now-playing :music-paused :music-queue
    :music-volume :tasks-by-type])

@@ -5,6 +5,7 @@
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
+    [skylobby.spads :as spads]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.sound :as sound]
@@ -13,6 +14,9 @@
     [taoensso.tufte :as tufte])
   (:import
     (java.nio.file Paths)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def settings-window-width 1200)
@@ -36,7 +40,7 @@
 
 (def settings-window-keys
   [:auto-refresh-replays :auto-rejoin-battle :battle-as-tab :battle-layout :battle-players-color-type :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
-   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :leave-battle-on-close-window :media-player
+   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :hide-spads-messages :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :show-team-skills :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :window-states])
@@ -45,7 +49,7 @@
   [{:keys [auto-get-resources auto-refresh-replays auto-rejoin-battle battle-as-tab battle-layout battle-players-color-type
            chat-font-size chat-highlight-username chat-highlight-words client-id-override client-id-type css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
-           extra-replay-name extra-replay-path extra-replay-recursive leave-battle-on-close-window media-player music-dir
+           extra-replay-name extra-replay-path extra-replay-recursive hide-spads-messages leave-battle-on-close-window media-player music-dir
            music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window show-team-skills spring-isolation-dir spring-isolation-dir-draft
            unready-after-game use-default-ring-sound use-git-mod-version user-agent-override window-states]
     :as state}]
@@ -739,7 +743,31 @@
               :disable true}
              {:fx/type :button
               :text "Generate"
-              :on-action {:event/type :spring-lobby/randomize-client-id}}]})]}}
+              :on-action {:event/type :spring-lobby/randomize-client-id}}]})
+         {:fx/type :v-box
+          :min-width 580
+          :max-width 580
+          :children
+          [{:fx/type :label
+            :text "SPADS Messages"
+            :style {:-fx-font-size 24}}
+           {:fx/type :label
+            :text "Hide message types:"
+            :style {:-fx-font-size 20}}
+           {:fx/type :v-box
+            :children
+            (map
+              (fn [message-type]
+                {:fx/type :h-box
+                 :children
+                 [
+                  {:fx/type :check-box
+                   :selected (boolean (get hide-spads-messages message-type))
+                   :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                         :path [:hide-spads-messages message-type]}}
+                  {:fx/type :label
+                   :text (str " " message-type)}]})
+              spads/message-types)}]}]}}
      {:fx/type :pane})}})
 
 (defn settings-window [state]

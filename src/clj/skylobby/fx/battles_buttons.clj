@@ -6,6 +6,9 @@
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def matchmaking-compflag "matchmaking")
 
 

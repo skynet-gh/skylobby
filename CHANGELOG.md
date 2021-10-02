@@ -32,6 +32,16 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.6]
+
+- Add parsing of battle host messages
+- Add battle votes panel
+- Add setting to hide battle host messages by type
+- Add port setting for battle hosting
+- Make ring specs a task and disable button when running
+- Improve rapid, download, and import windows
+- Fix a number of reflection issues (performance)
+
 ### [0.5.5]
 
 - Add support for STARTTLS

@@ -7,6 +7,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def no-springfiles
   [#"Beyond All Reason"
    #"Total Atomization Prime"])
@@ -207,8 +210,8 @@
                           {:spring-lobby/task-type :spring-lobby/import
                            :importable importable
                            :spring-isolation-dir spring-isolation-dir}})}])))
-       (when (and (= :directory
-                     (::fs/source indexed-mod)))
+       (when (= :directory
+                (::fs/source indexed-mod))
          (let [battle-mod-git-ref (u/mod-git-ref battle-modname)
                severity (if (= battle-modname
                                (:mod-name indexed-mod))

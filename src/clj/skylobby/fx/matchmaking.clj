@@ -5,6 +5,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def matchmaking-window-width 600)
 (def matchmaking-window-height 700)
 

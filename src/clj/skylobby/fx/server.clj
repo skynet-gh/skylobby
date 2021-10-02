@@ -9,6 +9,9 @@
     [taoensso.tufte :as tufte]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def default-server-port 8200)
 
 (def server-window-width 640)

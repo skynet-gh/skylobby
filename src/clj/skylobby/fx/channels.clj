@@ -3,6 +3,9 @@
     [spring-lobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def channels-table-keys
   [:channels :client-data :my-channels])
 

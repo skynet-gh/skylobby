@@ -48,7 +48,7 @@
       (catch Exception e
         (log/trace e "Error getting canonical path for" f)))))
 
-(defn file [^File f & args]
+(defn ^File file [^File f & args]
   (when f
     (try
       (apply io/file f args)

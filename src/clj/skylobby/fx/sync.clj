@@ -4,20 +4,27 @@
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def ok-green "#008000")
 (def warn-yellow "#FFD700")
 (def error-red "#DD0000")
+(def ok-severity
+  {:-fx-base ok-green
+   :-fx-background ok-green
+   :-fx-background-color ok-green})
+(def warn-severity
+  {:-fx-base warn-yellow
+   :-fx-background warn-yellow
+   :-fx-background-color warn-yellow})
 (def error-severity
   {:-fx-base error-red
    :-fx-background error-red
    :-fx-background-color error-red})
 (def severity-styles
-  {0 {:-fx-base ok-green
-      :-fx-background ok-green
-      :-fx-background-color ok-green}
-   1 {:-fx-base warn-yellow
-      :-fx-background warn-yellow
-      :-fx-background-color warn-yellow}
+  {0 ok-severity
+   1 warn-severity
    2 error-severity})
 
 (defn sync-pane

@@ -13,7 +13,9 @@
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log]))
+    [taoensso.timbre :as log])
+  (:import
+    (javafx.scene.media MediaPlayer)))
 
 
 (set! *warn-on-reflection* true)
@@ -360,7 +362,7 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data engines media-player music-paused ^java.io.File spring-isolation-dir
+   {:keys [client-data engines ^MediaPlayer media-player music-paused ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
