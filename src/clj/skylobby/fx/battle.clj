@@ -895,7 +895,7 @@
         spads-messages (->> host-ex-messages
                             (filter :spads))
         vote-messages (->> spads-messages
-                           (filter (comp #{:called-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
+                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
                            (map
                              (fn [{:keys [spads] :as message}]
                                (let [{:keys [spads-message-type spads-parsed]} spads]
@@ -910,13 +910,13 @@
                            (cond
                              (= :called-vote spads-message-type) curr
                              (= :vote-progress spads-message-type)
-                             (let [[_all _command y yt n nt remaining] spads-parsed]
+                             (let [[_all _command y yt n nt _ remaining] spads-parsed]
                                (assoc-in prev [:spads :vote-progress] {:y y
                                                                        :yt yt
                                                                        :n n
                                                                        :nt nt
                                                                        :remaining remaining}))
-                             (#{:no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
+                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
                              :else prev)))
                        nil
                        (reverse vote-messages))]
@@ -936,10 +936,19 @@
                :text (str " " (:command vote-data))}
               {:fx/type :label
                :text (str " by " (:caller vote-data))}
-              {:fx/type :label
-               :text (str " "
-                          (when vote-progress
-                            (str "Y: (" y "/" yt ") N: (" n "/" nt ") " (when remaining (str remaining " left")))))}
+              {:fx/type :h-box
+               :children
+               (concat
+                 [
+                  {:fx/type :label
+                   :text (str " "
+                              (when vote-progress
+                                (str "Y: " y " / " yt "  N: " n " / " nt)))}]
+                 (when remaining (str remaining " left")
+                   [{:fx/type :pane
+                     :h-box/hgrow :always}
+                    {:fx/type :label
+                     :text (str remaining " left")}]))}
               {:fx/type :h-box
                :children
                [{:fx/type :button
@@ -999,7 +1008,7 @@
             :style {:-fx-font-size 18}
             :children
             (->> vote-messages
-                 (remove (comp #{:vote-progress} :spads-message-type :spads))
+                 (filter (comp #{:called-vote :game-starting-cancel :vote-cancelled :vote-failed :vote-passed} :spads-message-type :spads))
                  (map
                    (fn [{:keys [spads timestamp]}]
                      (let [{:keys [spads-message-type vote-data]} spads]
@@ -1016,6 +1025,7 @@
                                             :vote-passed "mdi-phone-incoming:16:green"
                                             :vote-failed "mdi-phone-missed:16:red"
                                             :vote-cancelled "mdi-phone-minus:16:gold"
+                                            :game-starting-cancel "mdi-phone-minus:16:gold"
                                             ; else
                                             "mdi-phone:16:white")}]
                           (when (= :called-vote spads-message-type)

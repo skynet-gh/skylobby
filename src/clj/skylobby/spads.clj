@@ -3,7 +3,7 @@
 
 (def spads-message-types
   [
-   [:vote-progress #"Vote in progress: \"(.*)\" \[y:(.*)/(.*), n:(.*)/(\d+)(.*)\] \((.*) remaining\)"]
+   [:vote-progress #"Vote in progress: \"(.*)\" \[y:(.*)/(.*), n:(\d+)/([^,]+)(.*)\] \((.*) remaining\)"]
    [:greeting #"Hi (.*)! Current battle type is (.*)\."]
    [:called-vote #"\* (.*) called a vote for command \"(.*)\" \[!vote y, !vote n, !vote b\]"]
    [:allowed-vote #"User\(s\) allowed to vote: (.*)"]
@@ -19,17 +19,21 @@
    [:game-time #"A game is in progress since (.*)\."]
    [:promoting #"Promoting battle (.*)"]
    [:unable-to-ring #" Unable to ring (.*) \(ring spam protection, please wait (.*)\)"]
-   [:flood-protection #"(.*), please wait (.*) before calling another vote \(vote flood protection\)\."]
-   [:already-voted #"(.*), you have already voted for current vote\."]
+   [:flood-protection #"\* (.*), please wait (.*) before calling another vote \(vote flood protection\)\."]
+   [:already-voted #"\* (.*), you have already voted for current vote\."]
    [:allowed-to-vote #"(.*) users allowed to vote."]
-   [:not-allowed-vote #"(.*), you are not allowed to vote for current vote."]
+   [:not-allowed-vote #"\* (.*), you are not allowed to vote for current vote."]
    [:not-allowed-value #"Value \"(.*)\" for (.*) setting \"(.*)\" is not allowed in current preset"]
-   [:no-vote #"(.*), you cannot vote currently, there is no vote in progress."]
+   [:no-vote #"\* (.*), you cannot vote currently, there is no vote in progress."]
+   [:already-a-vote #"(.*), there is already a vote in progress, please wait for it to finish before calling another one\."]
    [:not-valid-setting #"\"(.*)\" is not a valid battle setting for current mod and map \(use \"!list bSettings\" to list available battle settings\)"]
+   [:not-allowed #"\* (.*), you are not allowed to call command \"(.*)\" in current context\."]
+   [:invalid #"Invalid command \"(.*)\""]
    [:force-spec #"Forcing spectator mode for (.*) \[(.*)\] \((.*)\)"]
    [:vote-cancelled #"Vote cancelled by (.*)"]
    [:bar-manager #"BarManager\|(.*)"]
    [:mute #"In-game mute added for (.*) by (.*) \((.*)\)"]
+   [:game-starting-cancel #"Game starting, cancelling \"(.*)\" vote"]
    [:stopped #"Server stopped \((.*)\)"]
    [:award #" (.*) award:\s+(.*)\s+\((.*)\)(.*)"]
    [:ally-team-won #"Ally team (.*) won! \((.*)\)"]
@@ -39,9 +43,7 @@
    [:random-map #"Automatic random map rotation: next map is \"(.*)\""]
    [:auto-forcing #"Auto-forcing game start \(only already in-game or unsynced spectators are missing\)"]
    [:map-changed #"Map changed by (.*): (.*)"]
-   [:no-one-to-ring #"There is no one to ring"]
-   [:not-allowed #"(.*), you are not allowed to call command \"(.*)\" in current context\."]
-   [:invalid #"Invalid command \"(.*)\""]])
+   [:no-one-to-ring #"There is no one to ring"]])
 
 
 (def message-types
