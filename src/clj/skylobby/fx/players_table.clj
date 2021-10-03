@@ -132,17 +132,7 @@
                                   :channel-name (u/user-channel host-username)
                                   :message (str "!whois " username)
                                   :server-key server-key}}])
-                  [(if (-> ignore-users (get server-key) (get username))
-                     {:fx/type :menu-item
-                      :text "Unignore"
-                      :on-action {:event/type :spring-lobby/unignore-user
-                                  :server-key server-key
-                                  :username username}}
-                     {:fx/type :menu-item
-                      :text "Ignore"
-                      :on-action {:event/type :spring-lobby/ignore-user
-                                  :server-key server-key
-                                  :username username}})
+                  [
                    {:fx/type :menu-item
                     :text (str "User ID: " (-> user :user-id))}
                    {:fx/type :menu-item
@@ -152,7 +142,18 @@
                                        content (ClipboardContent.)
                                        color (u/spring-color-to-javafx team-color)]
                                    (.putString content (str color))
-                                   (.setContent clipboard content)))}])}})))}
+                                   (.setContent clipboard content)))}
+                   (if (-> ignore-users (get server-key) (get username))
+                     {:fx/type :menu-item
+                      :text "Unignore"
+                      :on-action {:event/type :spring-lobby/unignore-user
+                                  :server-key server-key
+                                  :username username}}
+                     {:fx/type :menu-item
+                      :text "Ignore"
+                      :on-action {:event/type :spring-lobby/ignore-user
+                                  :server-key server-key
+                                  :username username}})])}})))}
        :columns
        (concat
          [{:fx/type :table-column
