@@ -485,7 +485,7 @@
                                                (filter (comp #{battle-map} :springname))
                                                first)
               download-springfiles-map-task (->> all-tasks
-                                                 (filter (comp #{::download-springfiles :http-downloadable} ::task-type))
+                                                 (filter (comp #{::download-springfiles ::http-downloadable} ::task-type))
                                                  (filter (comp #{battle-map} :springname))
                                                  first)
               engine-details (spring/engine-details engines battle-version)
@@ -577,7 +577,7 @@
                               (not download-springfiles-map-task)
                               (not (::refresh-maps tasks-by-type)))
                          (do
-                           (log/info "Adding task to search springfiles for map" battle-map)
+                           (log/info "Adding task to download map" battle-map "from springfiles")
                            {::task-type ::download-springfiles
                             :resource-type ::map
                             :springname battle-map
