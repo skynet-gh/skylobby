@@ -1057,7 +1057,7 @@
     [:archiving :auto-get-resources :battle-layout :battle-players-color-type :battle-resource-details :bot-name
      :bot-username :bot-version :chat-auto-scroll :cleaning :copying :divider-positions :downloadables-by-url :drag-allyteam
      :drag-team :engine-filter :engine-version
-     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :ignore-users
+     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :increment-ids :ignore-users
      :interleave-ally-player-ids :importables-by-path
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
@@ -1075,7 +1075,7 @@
 (defn battle-view-impl
   [{:keys [auto-get-resources battle battle-layout battles battle-players-color-type battle-resource-details bot-name bot-username bot-version
            channels chat-auto-scroll
-           client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download
+           client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download increment-ids
            map-input-prefix map-details
            maps maps-by-name message-drafts minimap-size minimap-type mod-details mod-filter mods mods-by-name players-table-columns pop-out-battle pop-out-chat rapid-data-by-id rapid-data-by-version rapid-download ready-on-unspec server-key show-vote-log spring-isolation-dir spring-settings
            tasks-by-type users username]
@@ -1185,6 +1185,7 @@
                        :host-ingame host-ingame
                        :host-username host-username
                        :ignore-users ignore-users
+                       :increment-ids increment-ids
                        :indexed-mod indexed-mod
                        :players players
                        :players-table-columns players-table-columns

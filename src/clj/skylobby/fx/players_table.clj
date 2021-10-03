@@ -31,7 +31,7 @@
 
 (defn players-table-impl
   [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
-           ignore-users
+           ignore-users increment-ids
            indexed-mod players players-table-columns ready-on-unspec scripttags server-key sides singleplayer username]}]
   (let [players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
@@ -47,7 +47,13 @@
                                  (assoc player
                                         :skill (or skill (:skill tags))
                                         :skilluncertainty uncertainty)))
-                             players)]
+                             players)
+        incrementing-cell (fn [id]
+                            {:text
+                             (if increment-ids
+                               (when-let [n (u/to-number id)]
+                                 (str (inc n)))
+                               (str id))})]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -308,7 +314,7 @@
                     {:text ""
                      :graphic
                      {:fx/type ext-recreate-on-key-changed
-                      :key (u/nickname i)
+                      :key [(u/nickname i) increment-ids]
                       :desc
                       {:fx/type :combo-box
                        :value (str (:ally (:battle-status i)))
@@ -318,6 +324,9 @@
                                           :is-bot (-> i :user :client-status :bot)
                                           :id i}
                        :items (map str (take 16 (iterate inc 0)))
+                       :button-cell incrementing-cell
+                       :cell-factory {:fx/cell-type :list-cell
+                                      :describe incrementing-cell}
                        :disable (or (not username)
                                     (not (or am-host
                                              (= (:username i) username)
@@ -340,7 +349,7 @@
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
-                        :key (u/nickname i)
+                        :key [(u/nickname i) increment-ids]
                         :desc
                         {:fx/type :combo-box
                          :value value
@@ -350,6 +359,9 @@
                                             :is-bot (-> i :user :client-status :bot)
                                             :id i}
                          :items items
+                         :button-cell incrementing-cell
+                         :cell-factory {:fx/cell-type :list-cell
+                                        :describe incrementing-cell}
                          :disable (or (not username)
                                       (not (or am-host
                                                (= (:username i) username)
