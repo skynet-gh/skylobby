@@ -62,8 +62,10 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-servers-window}
-     :width ((fnil min server-window-width) (:width screen-bounds) server-window-width)
-     :height ((fnil min server-window-height) (:height screen-bounds) server-window-height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds server-window-width)
+     :height (skylobby.fx/fitheight screen-bounds server-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)

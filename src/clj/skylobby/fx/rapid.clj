@@ -50,7 +50,6 @@
                                            true))))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         engine-file (:file (get engines-by-version engine-version))
-        {:keys [width height]} screen-bounds
         rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
         available-packages (or (->> filtered-rapid-versions
                                     seq
@@ -67,8 +66,10 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-rapid-downloader}
-     :width ((fnil min rapid-download-window-width) width rapid-download-window-width)
-     :height ((fnil min rapid-download-window-height) height rapid-download-window-height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds rapid-download-window-width)
+     :height (skylobby.fx/fitheight screen-bounds rapid-download-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)
@@ -271,7 +272,9 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [version] {:text (str version)})}}]}}]}
-       {:fx/type :pane})}}))
+       {:fx/type :pane
+        :pref-width rapid-download-window-width
+        :pref-height rapid-download-window-height})}}))
 
 (defn rapid-download-window [state]
   (tufte/profile {:dynamic? true

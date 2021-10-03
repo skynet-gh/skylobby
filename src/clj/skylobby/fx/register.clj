@@ -26,8 +26,10 @@
    :icons skylobby.fx/icons
    :on-close-request {:event/type :spring-lobby/dissoc
                       :key :show-register-window}
-   :width ((fnil min register-window-width) (:width screen-bounds) register-window-width)
-   :height ((fnil min register-window-height) (:height screen-bounds) register-window-height)
+   :x (skylobby.fx/fitx screen-bounds)
+   :y (skylobby.fx/fity screen-bounds)
+   :width (skylobby.fx/fitwidth screen-bounds register-window-width)
+   :height (skylobby.fx/fitheight screen-bounds register-window-height)
    :scene
    {:fx/type :scene
     :stylesheets (skylobby.fx/stylesheet-urls css)

@@ -111,6 +111,21 @@
     (alter-var-root #'renderer (constantly r)))
   (fx/mount-renderer *state renderer))
 
+(defn client-handler [state-atom server-url message]
+  (try
+    (require 'spring-lobby.client)
+    (require 'spring-lobby.client.handler)
+    (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
+      (when new-handler
+        (alter-var-root #'old-client-handler (constantly new-handler))))
+    (catch Throwable e
+      (println e "compile error, using old client handler")))
+  (try
+    (old-client-handler state-atom server-url message)
+    (catch Throwable e
+      (println e "exception in old client, probably unbound fn, fix asap")
+      (throw e))))
+
 (defn rerender []
   (try
     (println "Stopping old chimers")
@@ -121,6 +136,7 @@
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
     (require 'spring-lobby.client)
+    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (if renderer
       (do
         (println "Re-rendering")
@@ -184,22 +200,6 @@
     (old-task-handler task)
     (catch Throwable e
       (println e "exception in old task handler, probably unbound fn, fix asap")
-      (throw e))))
-
-
-(defn client-handler [state-atom server-url message]
-  (try
-    (require 'spring-lobby.client)
-    (require 'spring-lobby.client.handler)
-    (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
-      (when new-handler
-        (alter-var-root #'old-client-handler (constantly new-handler))))
-    (catch Throwable e
-      (println e "compile error, using old client handler")))
-  (try
-    (old-client-handler state-atom server-url message)
-    (catch Throwable e
-      (println e "exception in old client, probably unbound fn, fix asap")
       (throw e))))
 
 

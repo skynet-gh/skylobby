@@ -18,15 +18,17 @@
 
 (defn tasks-window-impl
   [{:keys [css current-tasks disable-tasks disable-tasks-while-in-game screen-bounds show-tasks-window tasks-by-kind]}]
-  (let [{:keys [width height]} screen-bounds]
+  (let [_ screen-bounds]
     {:fx/type :stage
      :showing (boolean show-tasks-window)
      :title (str u/app-name " Tasks")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-tasks-window}
-     :width ((fnil min tasks-window-width) width tasks-window-width)
-     :height ((fnil min tasks-window-height) height tasks-window-height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds tasks-window-width)
+     :height (skylobby.fx/fitheight screen-bounds tasks-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)

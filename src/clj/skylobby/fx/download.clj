@@ -125,16 +125,17 @@
                                      (if download-type
                                        (= download-type resource-type)
                                        true)))
-                           (sort-by :resource-filename String/CASE_INSENSITIVE_ORDER))
-        {:keys [width height]} screen-bounds]
+                           (sort-by :resource-filename String/CASE_INSENSITIVE_ORDER))]
     {:fx/type :stage
      :showing (boolean show-downloader)
      :title (str u/app-name " Downloader")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-downloader}
-     :width ((fnil min download-window-width) width download-window-width)
-     :height ((fnil min download-window-height) height download-window-height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds download-window-width)
+     :height (skylobby.fx/fitheight screen-bounds download-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)
@@ -380,7 +381,9 @@
                       :else
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-check:16:white"})}))}}]}}]}
-       {:fx/type :pane})}}))
+       {:fx/type :pane
+        :pref-width download-window-width
+        :pref-height download-window-height})}}))
 
 
 (defn download-window [state]

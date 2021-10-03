@@ -56,8 +56,8 @@
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.27.0"}
-    cider/orchard {:mvn/version "0.7.2"}
+   {cider/cider-nrepl {:mvn/version "0.27.1"}
+    cider/orchard {:mvn/version "0.7.3"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
     hawk/hawk {:mvn/version "0.2.11"}
@@ -76,8 +76,8 @@
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.27.0"}
-    cider/orchard {:mvn/version "0.7.2"}
+   {cider/cider-nrepl {:mvn/version "0.27.1"}
+    cider/orchard {:mvn/version "0.7.3"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
     hawk/hawk {:mvn/version "0.2.11"}
@@ -106,11 +106,11 @@
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.887"}}
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.902"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :test-once
   {:extra-paths ["test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.887"}}
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.902"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["test/clj"]}

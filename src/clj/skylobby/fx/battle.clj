@@ -895,7 +895,7 @@
         spads-messages (->> host-ex-messages
                             (filter :spads))
         vote-messages (->> spads-messages
-                           (filter (comp #{:called-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
+                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
                            (map
                              (fn [{:keys [spads] :as message}]
                                (let [{:keys [spads-message-type spads-parsed]} spads]
@@ -910,13 +910,13 @@
                            (cond
                              (= :called-vote spads-message-type) curr
                              (= :vote-progress spads-message-type)
-                             (let [[_all _command y yt n nt remaining] spads-parsed]
+                             (let [[_all _command y yt n nt _ remaining] spads-parsed]
                                (assoc-in prev [:spads :vote-progress] {:y y
                                                                        :yt yt
                                                                        :n n
                                                                        :nt nt
                                                                        :remaining remaining}))
-                             (#{:no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
+                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
                              :else prev)))
                        nil
                        (reverse vote-messages))]
@@ -936,10 +936,19 @@
                :text (str " " (:command vote-data))}
               {:fx/type :label
                :text (str " by " (:caller vote-data))}
-              {:fx/type :label
-               :text (str " "
-                          (when vote-progress
-                            (str "Y: (" y "/" yt ") N: (" n "/" nt ") " (when remaining (str remaining " left")))))}
+              {:fx/type :h-box
+               :children
+               (concat
+                 [
+                  {:fx/type :label
+                   :text (str " "
+                              (when vote-progress
+                                (str "Y: " y " / " yt "  N: " n " / " nt)))}]
+                 (when remaining (str remaining " left")
+                   [{:fx/type :pane
+                     :h-box/hgrow :always}
+                    {:fx/type :label
+                     :text (str remaining " left")}]))}
               {:fx/type :h-box
                :children
                [{:fx/type :button
@@ -999,7 +1008,7 @@
             :style {:-fx-font-size 18}
             :children
             (->> vote-messages
-                 (remove (comp #{:vote-progress} :spads-message-type :spads))
+                 (filter (comp #{:called-vote :game-starting-cancel :vote-cancelled :vote-failed :vote-passed} :spads-message-type :spads))
                  (map
                    (fn [{:keys [spads timestamp]}]
                      (let [{:keys [spads-message-type vote-data]} spads]
@@ -1016,6 +1025,7 @@
                                             :vote-passed "mdi-phone-incoming:16:green"
                                             :vote-failed "mdi-phone-missed:16:red"
                                             :vote-cancelled "mdi-phone-minus:16:gold"
+                                            :game-starting-cancel "mdi-phone-minus:16:gold"
                                             ; else
                                             "mdi-phone:16:white")}]
                           (when (= :called-vote spads-message-type)
@@ -1047,7 +1057,7 @@
     [:archiving :auto-get-resources :battle-layout :battle-players-color-type :battle-resource-details :bot-name
      :bot-username :bot-version :chat-auto-scroll :cleaning :copying :divider-positions :downloadables-by-url :drag-allyteam
      :drag-team :engine-filter :engine-version
-     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :ignore-users
+     :extracting :file-cache :filter-host-replay :git-clone :gitting :http-download :increment-ids :ignore-users
      :interleave-ally-player-ids :importables-by-path
      :map-input-prefix :map-details :media-player :message-drafts :minimap-size :minimap-type :mod-details :mod-filter
      :music-paused
@@ -1063,9 +1073,9 @@
      :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view-impl
-  [{:keys [battle battle-layout battles battle-players-color-type battle-resource-details bot-name bot-username bot-version
+  [{:keys [auto-get-resources battle battle-layout battles battle-players-color-type battle-resource-details bot-name bot-username bot-version
            channels chat-auto-scroll
-           client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download
+           client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download increment-ids
            map-input-prefix map-details
            maps maps-by-name message-drafts minimap-size minimap-type mod-details mod-filter mods mods-by-name players-table-columns pop-out-battle pop-out-chat rapid-data-by-id rapid-data-by-version rapid-download ready-on-unspec server-key show-vote-log spring-isolation-dir spring-settings
            tasks-by-type users username]
@@ -1175,6 +1185,7 @@
                        :host-ingame host-ingame
                        :host-username host-username
                        :ignore-users ignore-users
+                       :increment-ids increment-ids
                        :indexed-mod indexed-mod
                        :players players
                        :players-table-columns players-table-columns
@@ -1431,7 +1442,16 @@
                                     :import-tasks import-tasks
                                     :map-update-tasks map-update-tasks}
                                    (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))
-                                 resources-buttons]))})]
+                                 resources-buttons
+                                 {:fx/type :h-box
+                                  :alignment :center-left
+                                  :children
+                                  [{:fx/type :check-box
+                                    :selected (boolean auto-get-resources)
+                                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                                          :key :auto-get-resources}}
+                                   {:fx/type :label
+                                    :text " Auto import or download resources"}]}]))})]
     {:fx/type :v-box
      :children
      [

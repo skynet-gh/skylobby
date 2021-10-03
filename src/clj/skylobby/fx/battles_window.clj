@@ -24,17 +24,17 @@
 
 (defn battles-window-view
   [{:keys [battles css filter-battles screen-bounds server-key show-battles-window window-states] :as state}]
-  (let [{:keys [width height]} screen-bounds]
+  (let [_ screen-bounds]
     {:fx/type :stage
      :showing show-battles-window
      :title (str u/app-name " Chat " server-key)
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-battles-window}
-     :x (get-in window-states [window-key :x] 0)
-     :y (get-in window-states [window-key :y] 0)
-     :width ((fnil min battles-window-width) width (get-in window-states [window-key :width] battles-window-width))
-     :height ((fnil min battles-window-height) height (get-in window-states [window-key :height] battles-window-height))
+     :x (skylobby.fx/fitx screen-bounds (get-in window-states [window-key :x]))
+     :y (skylobby.fx/fity screen-bounds (get-in window-states [window-key :y]))
+     :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [window-key :width]) battles-window-width)
+     :height (skylobby.fx/fitheight screen-bounds (get-in window-states [window-key :height]) battles-window-height)
      :on-width-changed (partial skylobby.fx/window-changed window-key :width)
      :on-height-changed (partial skylobby.fx/window-changed window-key :height)
      :on-x-changed (partial skylobby.fx/window-changed window-key :x)

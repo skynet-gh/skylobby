@@ -158,15 +158,17 @@
 
 (defn maps-window-impl
   [{:keys [css filter-maps-name maps on-change-map screen-bounds show-maps]}]
-  (let [{:keys [width height]} screen-bounds]
+  (let [_ screen-bounds]
     {:fx/type :stage
      :showing (boolean show-maps)
      :title (str u/app-name " Maps")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-maps}
-     :width (min maps-window-width width)
-     :height (min maps-window-height height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds maps-window-width)
+     :height (skylobby.fx/fitheight screen-bounds maps-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)
