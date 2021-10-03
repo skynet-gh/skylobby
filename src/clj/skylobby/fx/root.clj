@@ -43,7 +43,7 @@
             show-battles-window show-chat-window spring-isolation-dir standalone tasks-by-kind window-maximized window-states]
      :as state}
     :state}]
-  (let [{:keys [width height]} screen-bounds
+  (let [
         all-tasks (->> tasks-by-kind
                        (mapcat second)
                        (concat (vals current-tasks))
@@ -74,10 +74,10 @@
                      (if (contains? state :window-maximized)
                        window-maximized
                        (get-in window-states [:main :maximized] false)))
-        :x (get-in window-states [:main :x] 0)
-        :y (get-in window-states [:main :y] 0)
-        :width (min (get-in window-states [:main :width] main-window-width) width)
-        :height (min (get-in window-states [:main :height] main-window-height) height)
+        :x (skylobby.fx/fitx screen-bounds (get-in window-states [:main :x]))
+        :y (skylobby.fx/fity screen-bounds (get-in window-states [:main :y]))
+        :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [:main :width]) main-window-width)
+        :height (skylobby.fx/fitheight screen-bounds (get-in window-states [:main :height]) main-window-height)
         :on-width-changed (partial skylobby.fx/window-changed :main :width)
         :on-height-changed (partial skylobby.fx/window-changed :main :height)
         :on-x-changed (partial skylobby.fx/window-changed :main :x)
@@ -105,10 +105,10 @@
                             {:event/type :spring-lobby/dissoc
                              :key :pop-out-battle})
         :maximized (get-in window-states [:battle :maximzed] false)
-        :width (min (get-in window-states [:battle :width] battle-window-width) width)
-        :height (min (get-in window-states [:battle :height] battle-window-height) height)
-        :x (get-in window-states [:battle :x] 0)
-        :y (get-in window-states [:battle :y] 0)
+        :x (skylobby.fx/fitx screen-bounds (get-in window-states [:battle :x]))
+        :y (skylobby.fx/fity screen-bounds (get-in window-states [:battle :y]))
+        :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [:battle :width]) battle-window-width)
+        :height (skylobby.fx/fitheight screen-bounds (get-in window-states [:battle :height]) battle-window-height)
         :on-width-changed (partial skylobby.fx/window-changed :battle :width)
         :on-height-changed (partial skylobby.fx/window-changed :battle :height)
         :on-x-changed (partial skylobby.fx/window-changed :battle :x)

@@ -28,7 +28,7 @@
   [{:keys [channels client-data css join-channel-name screen-bounds
            server-key show-chat-window window-states]
     :as state}]
-  (let [{:keys [width height]} screen-bounds
+  (let [
         users-view (merge
                      {:fx/type fx.user/users-view
                       :v-box/vgrow :always}
@@ -43,10 +43,10 @@
       :on-close-request {:event/type :spring-lobby/dissoc
                          :key :show-chat-window}
       :maximized (get-in window-states [window-key :maximized] false)
-      :x (get-in window-states [window-key :x] 0)
-      :y (get-in window-states [window-key :y] 0)
-      :width ((fnil min chat-window-width) width (get-in window-states [window-key :width] chat-window-width))
-      :height ((fnil min chat-window-height) height (get-in window-states [window-key :height] chat-window-height))
+      :x (skylobby.fx/fitx screen-bounds (get-in window-states [window-key :x]))
+      :y (skylobby.fx/fity screen-bounds (get-in window-states [window-key :y]))
+      :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [window-key :width]) chat-window-width)
+      :height (skylobby.fx/fitheight screen-bounds (get-in window-states [window-key :height]) chat-window-height)
       :on-width-changed (partial skylobby.fx/window-changed window-key :width)
       :on-height-changed (partial skylobby.fx/window-changed window-key :height)
       :on-x-changed (partial skylobby.fx/window-changed window-key :x)

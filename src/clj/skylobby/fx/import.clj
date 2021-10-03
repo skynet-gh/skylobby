@@ -81,16 +81,17 @@
         import-tasks (->> (get tasks-by-type :spring-lobby/import)
                           (map (comp fs/canonical-path :resource-file :importable))
                           set)
-        refreshing-imports (seq (get tasks-by-type :spring-lobby/scan-imports))
-        {:keys [width height]} screen-bounds]
+        refreshing-imports (seq (get tasks-by-type :spring-lobby/scan-imports))]
     {:fx/type :stage
      :showing (boolean show-importer)
      :title (str u/app-name " Importer")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
                         :key :show-importer}
-     :width ((fnil min import-window-width) width import-window-width)
-     :height ((fnil min import-window-height) height import-window-height)
+     :x (skylobby.fx/fitx screen-bounds)
+     :y (skylobby.fx/fity screen-bounds)
+     :width (skylobby.fx/fitwidth screen-bounds import-window-width)
+     :height (skylobby.fx/fitheight screen-bounds import-window-height)
      :scene
      {:fx/type :scene
       :stylesheets (skylobby.fx/stylesheet-urls css)

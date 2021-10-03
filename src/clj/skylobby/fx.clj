@@ -151,10 +151,62 @@
    (str (io/resource "icon1024.png"))])
 
 
+(def min-width 256)
+(def min-height 256)
+
+
 (defn screen-bounds []
-  (let [screen (Screen/getPrimary)
-        bounds (.getVisualBounds screen)]
-    {:min-x (.getMinX bounds)
-     :min-y (.getMinY bounds)
-     :width (.getWidth bounds)
-     :height (.getHeight bounds)}))
+  (let [screens (Screen/getScreens)
+        xy (reduce
+             (fn [{:keys [min-x min-y max-x max-y]} ^javafx.stage.Screen screen]
+               (let [bounds (.getVisualBounds screen)]
+                 {:min-x (if min-x (min (.getMinX bounds) min-x) (.getMinX bounds))
+                  :min-y (if min-y (min (.getMinY bounds) min-y) (.getMinY bounds))
+                  :max-x (if max-x (max (.getMaxX bounds) max-x) (.getMaxX bounds))
+                  :max-y (if max-y (max (.getMaxY bounds) max-y) (.getMaxY bounds))}))
+             {}
+             screens)]
+    (assoc xy
+           :width (if (and (:min-x xy) (:max-x xy))
+                    (- (:max-x xy) (:min-x xy))
+                    min-width)
+           :height (if (and (:min-y xy) (:max-y xy))
+                     (- (:max-y xy) (:min-y xy))
+                     min-height))))
+
+(defn fitx
+  ([screen-bounds]
+   (fitx screen-bounds nil))
+  ([screen-bounds setting]
+   (max
+     (min
+       (or setting Integer/MIN_VALUE)
+       (or (:max-x screen-bounds) 0))
+     (or (:min-x screen-bounds) 0))))
+(defn fity
+  ([screen-bounds]
+   (fity screen-bounds nil))
+  ([screen-bounds setting]
+   (max
+     (min
+       (or setting Integer/MIN_VALUE)
+       (or (:max-y screen-bounds) 0))
+     (or (:min-y screen-bounds) 0))))
+(defn fitwidth
+  ([screen-bounds default]
+   (fitwidth screen-bounds nil default))
+  ([screen-bounds setting default]
+   (max
+     (min
+       (or setting default 0)
+       (or (:width screen-bounds) min-width))
+     min-width)))
+(defn fitheight
+  ([screen-bounds default]
+   (fitheight screen-bounds nil default))
+  ([screen-bounds setting default]
+   (max
+     (min
+       (or setting default 0)
+       (or (:height screen-bounds) min-height))
+     min-height)))
