@@ -39,7 +39,7 @@
 
 
 (def settings-window-keys
-  [:auto-refresh-replays :auto-rejoin-battle :battle-as-tab :battle-layout :battle-players-color-type :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
+  [:auto-get-resources :auto-refresh-replays :auto-rejoin-battle :battle-as-tab :battle-layout :battle-players-color-type :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
    :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :hide-spads-messages :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :show-team-skills :spring-isolation-dir :spring-isolation-dir-draft

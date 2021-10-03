@@ -1063,7 +1063,7 @@
      :server-key :spring-isolation-dir :update-engines :update-maps :update-mods :users]))
 
 (defn battle-view-impl
-  [{:keys [battle battle-layout battles battle-players-color-type battle-resource-details bot-name bot-username bot-version
+  [{:keys [auto-get-resources battle battle-layout battles battle-players-color-type battle-resource-details bot-name bot-username bot-version
            channels chat-auto-scroll
            client-data divider-positions downloadables-by-url drag-allyteam drag-team engine-filter engines engines-by-version file-cache ignore-users interleave-ally-player-ids http-download
            map-input-prefix map-details
@@ -1431,7 +1431,16 @@
                                     :import-tasks import-tasks
                                     :map-update-tasks map-update-tasks}
                                    (select-keys state [:copying :downloadables-by-url :file-cache :http-download :importables-by-path :maps :spring-isolation-dir :springfiles-search-results :tasks-by-type :update-maps]))
-                                 resources-buttons]))})]
+                                 resources-buttons
+                                 {:fx/type :h-box
+                                  :alignment :center-left
+                                  :children
+                                  [{:fx/type :check-box
+                                    :selected (boolean auto-get-resources)
+                                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                                          :key :auto-get-resources}}
+                                   {:fx/type :label
+                                    :text " Auto import or download resources"}]}]))})]
     {:fx/type :v-box
      :children
      [
