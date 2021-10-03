@@ -4,17 +4,11 @@ Notable changes and todo list.
 
 ## TODO - future
 
-Current Annoyances:
-
-- Ally/team numbers start at 0 instead of 1, different from SPADS
-- Downloads and other tasks cannot be cancelled
-- Replace 7Zip with Apache commons-compress to fix concurrency issue
-
 Future Features:
 
+- Cancel downloads and other tasks
 - Query auto hosts for battle details
 - Friends list support
-- Parse autohost messages and display in UI
 - Visually group teams in players table
 - Track and display player away time
 - Arbitrary engine directories
@@ -31,6 +25,16 @@ Future Features:
 
 
 ## Actual changelog
+
+### [0.5.7]
+
+- Add setting to hide vote chat messages
+- Fix some host message and vote display issues
+- Fix windows sometimes getting zero size
+- Fix multiple auto download from springfiles
+- Move user ignore to bottom of context menu
+- Add setting to start numbering player and team ids at 1
+- Fix auto get resources setting and add to battle resources panel
 
 ### [0.5.6]
 
