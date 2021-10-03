@@ -1283,7 +1283,9 @@
                   :selected-replay selected-replay
                   :show-sync-left true
                   :tasks-by-type tasks-by-type})}]))})
-      {:fx/type :pane})}})
+      {:fx/type :pane
+       :pref-width replays-window-width
+       :pref-height replays-window-height})}})
 
 (defn replays-window [state]
   (tufte/profile {:dynamic? true

@@ -380,7 +380,9 @@
                       :else
                       {:fx/type font-icon/lifecycle
                        :icon-literal "mdi-check:16:white"})}))}}]}}]}
-       {:fx/type :pane})}}))
+       {:fx/type :pane
+        :pref-width download-window-width
+        :pref-height download-window-height})}}))
 
 
 (defn download-window [state]

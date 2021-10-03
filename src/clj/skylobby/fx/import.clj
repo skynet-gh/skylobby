@@ -292,7 +292,9 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-content-copy:16:white"}})}))}}]}}]}
-       {:fx/type :pane})}}))
+       {:fx/type :pane
+        :pref-width import-window-width
+        :pref-height import-window-height})}}))
 
 (defn import-window [state]
   (tufte/profile {:dynamic? true

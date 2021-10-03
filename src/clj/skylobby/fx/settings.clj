@@ -768,7 +768,9 @@
                   {:fx/type :label
                    :text (str " " message-type)}]})
               spads/message-types)}]}]}}
-     {:fx/type :pane})}})
+     {:fx/type :pane
+      :pref-width settings-window-width
+      :pref-height settings-window-height})}})
 
 (defn settings-window [state]
   (tufte/profile {:dynamic? true

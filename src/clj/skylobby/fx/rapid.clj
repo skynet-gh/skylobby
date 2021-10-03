@@ -271,7 +271,9 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [version] {:text (str version)})}}]}}]}
-       {:fx/type :pane})}}))
+       {:fx/type :pane
+        :pref-width rapid-download-window-width
+        :pref-height rapid-download-window-height})}}))
 
 (defn rapid-download-window [state]
   (tufte/profile {:dynamic? true

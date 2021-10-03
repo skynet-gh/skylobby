@@ -126,7 +126,9 @@
                :tasks-by-type tasks-by-type}
               (select-keys state fx.battle/battle-view-keys)
               server-data)}
-           {:fx/type :pane})}}}
+           {:fx/type :pane
+            :pref-width battle-window-width
+            :pref-height battle-window-height})}}}
       (merge
         {:fx/type fx.download/download-window
          :screen-bounds screen-bounds}
