@@ -214,7 +214,8 @@
                             :spads-parsed ["Hi skynet! Current battle type is team."
                                            "skynet"
                                            "team"],
-                            :text "* Hi skynet! Current battle type is team."}}]}}}}}
+                            :text "* Hi skynet! Current battle type is team."}
+                    :vote nil}]}}}}}
              @state-atom))))
   (testing "auto unspec"
     (let [
@@ -262,7 +263,8 @@
                                                       :text "* Global setting changed by skynet (teamSize=16)"
                                                       :timestamp now
                                                       :username "host1"
-                                                      :spads nil}]}}
+                                                      :spads nil
+                                                      :vote nil}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}}
              @state-atom))
@@ -285,7 +287,8 @@
                   :text ":)"
                   :timestamp now
                   :username "user:springrts.com"
-                  :spads nil}]}}}}}
+                  :spads nil
+                  :vote nil}]}}}}}
            @state-atom))))
 
 (deftest handle-CLIENTSFROM
@@ -609,7 +612,8 @@
                                                       :text "* Global setting changed by skynet (teamSize=16)"
                                                       :timestamp now
                                                       :username "host1"
-                                                      :spads nil}]}}
+                                                      :spads nil
+                                                      :vote nil}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}}
              @state-atom))

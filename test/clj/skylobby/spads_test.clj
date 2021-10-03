@@ -40,3 +40,12 @@
                          "25s"],
           :text "* Vote in progress: \"set map Altored Divide Bar Remake 1.55\" [y:4/5, n:2/4(5)] (25s remaining)"}
          (spads/parse-spads-message "* Vote in progress: \"set map Altored Divide Bar Remake 1.55\" [y:4/5, n:2/4(5)] (25s remaining)"))))
+
+
+(deftest parse-command-message
+  (is (= {:command "y"
+          :vote :y}
+         (spads/parse-command-message "!y")))
+  (is (= {:command "vote y"
+          :vote :y}
+         (spads/parse-command-message "!vote y"))))

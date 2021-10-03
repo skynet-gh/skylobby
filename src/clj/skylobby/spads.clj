@@ -1,4 +1,6 @@
-(ns skylobby.spads)
+(ns skylobby.spads
+  (:require
+    [clojure.string :as string]))
 
 
 (def spads-message-types
@@ -58,3 +60,22 @@
          :spads-parsed parsed
          :spads-message-type k}))
     spads-message-types))
+
+
+(defn parse-command-message [text]
+  (when text
+    (let [trimmed (string/trim text)]
+      (when (string/starts-with? trimmed "!")
+        (let [command (subs trimmed 1)
+              vote (cond
+                     (= command "y") :y
+                     (= command "n") :n
+                     (= command "b") :b
+                     (re-find #"vote\s+y" command) :y
+                     (re-find #"vote\s+n" command) :n
+                     (re-find #"vote\s+b" command) :b
+                     (re-find #"^cv" command) :cv
+                     (re-find #"^callvote" command) :cv
+                     :else nil)]
+          {:command command
+           :vote vote})))))

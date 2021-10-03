@@ -40,7 +40,7 @@
 
 (def settings-window-keys
   [:auto-get-resources :auto-refresh-replays :auto-rejoin-battle :battle-as-tab :battle-layout :battle-players-color-type :chat-font-size :chat-highlight-words :client-id-override :client-id-type :css :disable-tasks :disable-tasks-while-in-game :extra-import-name :extra-import-path :extra-import-sources
-   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :hide-spads-messages :leave-battle-on-close-window :media-player
+   :extra-replay-name :extra-replay-path :extra-replay-recursive :extra-replay-sources :hide-spads-messages :hide-vote-messages :leave-battle-on-close-window :media-player
    :music-dir :music-volume :players-table-columns :ready-on-unspec :ring-sound-file :ring-volume
    :screen-bounds :show-settings-window :show-team-skills :spring-isolation-dir :spring-isolation-dir-draft
    :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :window-states])
@@ -49,7 +49,7 @@
   [{:keys [auto-get-resources auto-refresh-replays auto-rejoin-battle battle-as-tab battle-layout battle-players-color-type
            chat-font-size chat-highlight-username chat-highlight-words client-id-override client-id-type css
            disable-tasks disable-tasks-while-in-game extra-import-name extra-import-path extra-import-sources
-           extra-replay-name extra-replay-path extra-replay-recursive hide-spads-messages leave-battle-on-close-window media-player music-dir
+           extra-replay-name extra-replay-path extra-replay-recursive hide-spads-messages hide-vote-messages leave-battle-on-close-window media-player music-dir
            music-volume players-table-columns ready-on-unspec ring-sound-file ring-volume screen-bounds show-settings-window show-team-skills spring-isolation-dir spring-isolation-dir-draft
            unready-after-game use-default-ring-sound use-git-mod-version user-agent-override window-states]
     :as state}]
@@ -751,6 +751,15 @@
           [{:fx/type :label
             :text "SPADS Messages"
             :style {:-fx-font-size 24}}
+           {:fx/type :h-box
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean hide-vote-messages)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :hide-vote-messages}}
+             {:fx/type :label
+              :text " Hide user vote messages"}]}
            {:fx/type :label
             :text "Hide message types:"
             :style {:-fx-font-size 20}}

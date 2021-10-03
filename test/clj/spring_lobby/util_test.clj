@@ -46,9 +46,19 @@
              :timestamp now
              :username "me"
              :message-type :ex
-             :spads nil}]
+             :spads nil
+             :vote nil}]
            (with-redefs [u/curr-millis (constantly now)]
-             ((u/update-chat-messages-fn "me" "m" true) []))))))
+             ((u/update-chat-messages-fn "me" "m" true) []))))
+    (is (= [{:text "!y"
+             :timestamp now
+             :username "me"
+             :message-type nil
+             :spads nil
+             :vote {:command "y"
+                    :vote :y}}]
+           (with-redefs [u/curr-millis (constantly now)]
+             ((u/update-chat-messages-fn "me" "!y" false) []))))))
 
 
 (deftest parse-skill

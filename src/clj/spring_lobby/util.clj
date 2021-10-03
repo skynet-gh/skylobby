@@ -284,7 +284,8 @@
                      :timestamp (curr-millis)
                      :username username
                      :message-type (when ex :ex)
-                     :spads (when ex (spads/parse-spads-message message))}))))
+                     :spads (when ex (spads/parse-spads-message message))
+                     :vote (when-not ex (spads/parse-command-message message))}))))
 
 (defn parse-skill [skill]
   (cond
