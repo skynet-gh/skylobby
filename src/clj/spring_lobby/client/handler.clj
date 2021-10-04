@@ -670,11 +670,16 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [state-atom _server-url m]
+(defmethod handle "RING" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        state @state-atom]
-    (log/info "Playing ring sound from" username)
-    (sound/play-ring state)))
+        {:keys [by-server prevent-non-host-rings] :as state} @state-atom
+        {:keys [battle battles]} (-> by-server (get server-key))
+        {:keys [host-username]} (get battles (:battle-id battle))]
+    (if (and prevent-non-host-rings (not= username host-username))
+      (log/info "Ignoring ring from non-host" username)
+      (do
+        (log/info "Playing ring sound from" username)
+        (sound/play-ring state)))))
 
 (defmethod handle "CHANNELS" [_state-atom _server-url _m]
   (log/info "Ignoring unused CHANNELS command"))
