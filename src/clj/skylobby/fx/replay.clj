@@ -1301,7 +1301,7 @@
   [{{:keys [by-spring-root css selected-replay spring-isolation-dir]
      :as state}
     :state}]
-  (let [{:keys [width height]} (skylobby.fx/screen-bounds)
+  (let [{:keys [width height]} (skylobby.fx/get-screen-bounds)
         {:keys [engines maps mods] :as spring-data} (get by-spring-root (fs/canonical-path spring-isolation-dir))
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         mods-by-version (into {} (map (juxt :mod-name identity) mods))

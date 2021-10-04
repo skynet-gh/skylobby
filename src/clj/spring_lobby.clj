@@ -1930,7 +1930,7 @@
                 (fn [state]
                   (-> state
                       (update :divider-positions merge divider-positions)
-                      (update :window-states merge window-states))))))
+                      (update :window-states u/deep-merge window-states))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating window and divider positions")
