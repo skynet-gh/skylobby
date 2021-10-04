@@ -31,6 +31,7 @@
    [:not-valid-setting #"\"(.*)\" is not a valid battle setting for current mod and map \(use \"!list bSettings\" to list available battle settings\)"]
    [:not-allowed #"\* (.*), you are not allowed to call command \"(.*)\" in current context\."]
    [:invalid #"Invalid command \"(.*)\""]
+   [:already-set #"\* Global setting \"(.*)\" is already set to value \"(.*)\""]
    [:force-spec #"Forcing spectator mode for (.*) \[(.*)\] \((.*)\)"]
    [:vote-cancelled #"Vote cancelled by (.*)"]
    [:bar-manager #"BarManager\|(.*)"]

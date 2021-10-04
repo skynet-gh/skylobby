@@ -2,7 +2,8 @@
   (:require
     [cljfx.css :as css]
     [clojure.java.io :as io]
-    [spring-lobby.fs :as fs])
+    [spring-lobby.fs :as fs]
+    [taoensso.timbre :as log])
   (:import
     (javafx.stage Screen)))
 
@@ -155,7 +156,7 @@
 (def min-height 256)
 
 
-(defn screen-bounds []
+(defn get-screen-bounds []
   (let [screens (Screen/getScreens)
         xy (reduce
              (fn [{:keys [min-x min-y max-x max-y]} ^javafx.stage.Screen screen]
@@ -174,39 +175,52 @@
                      (- (:max-y xy) (:min-y xy))
                      min-height))))
 
+(defn screen-bounds-fallback [screen-bounds]
+  (or screen-bounds
+      (do
+        (log/warn (ex-info "stacktrace" {}) "No screen-bounds, performance issue here")
+        (get-screen-bounds))))
+
 (defn fitx
   ([screen-bounds]
    (fitx screen-bounds nil))
   ([screen-bounds setting]
-   (max
-     (min
-       (or setting Integer/MIN_VALUE)
-       (or (:max-x screen-bounds) 0))
-     (or (:min-x screen-bounds) 0))))
+   (let [screen-bounds (screen-bounds-fallback screen-bounds)]
+     (max
+       (min
+         (or setting Integer/MIN_VALUE)
+         (or (:max-x screen-bounds) 0))
+       (or (:min-x screen-bounds) 0)))))
+
 (defn fity
   ([screen-bounds]
    (fity screen-bounds nil))
   ([screen-bounds setting]
-   (max
-     (min
-       (or setting Integer/MIN_VALUE)
-       (or (:max-y screen-bounds) 0))
-     (or (:min-y screen-bounds) 0))))
+   (let [screen-bounds (screen-bounds-fallback screen-bounds)]
+     (max
+       (min
+         (or setting Integer/MIN_VALUE)
+         (or (:max-y screen-bounds) 0))
+       (or (:min-y screen-bounds) 0)))))
+
 (defn fitwidth
   ([screen-bounds default]
    (fitwidth screen-bounds nil default))
   ([screen-bounds setting default]
-   (max
-     (min
-       (or setting default 0)
-       (or (:width screen-bounds) min-width))
-     min-width)))
+   (let [screen-bounds (screen-bounds-fallback screen-bounds)]
+     (max
+       (min
+         (or setting default 0)
+         (or (:width screen-bounds) min-width))
+       min-width))))
+
 (defn fitheight
   ([screen-bounds default]
    (fitheight screen-bounds nil default))
   ([screen-bounds setting default]
-   (max
-     (min
-       (or setting default 0)
-       (or (:height screen-bounds) min-height))
-     min-height)))
+   (let [screen-bounds (screen-bounds-fallback screen-bounds)]
+     (max
+       (min
+         (or setting default 0)
+         (or (:height screen-bounds) min-height))
+       min-height))))

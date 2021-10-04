@@ -198,9 +198,9 @@
      :appenders
      {:rotor (rotor/rotor-appender
                {:path log-path
-                :max-size 100000000
-                :backlog 9
-                :stacktrace-fonts {}})}})
+                :max-size 5000000
+                :backlog 5
+                :output-fn (partial log/default-output-fn {:stacktrace-fonts {}})})}})
   (log/handle-uncaught-jvm-exceptions!))
 
 

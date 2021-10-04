@@ -117,7 +117,13 @@
       (when (fs/exists? config-file)
         (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
           (if (map? data)
-            data
+            (do
+              (try
+                (log/info "Backing up config file that we could parse")
+                (fs/copy config-file (fs/config-file (str edn-filename ".known-good")))
+                (catch Exception e
+                  (log/error e "Error backing up config file")))
+              data)
             (do
               (log/warn "Config file data from" edn-filename "is not a map")
               {})))))
@@ -140,8 +146,8 @@
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
-   :friend-users :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :leave-battle-on-close-window :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :rapid-repo :ready-on-unspec :replays-tags
+   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :leave-battle-on-close-window :logins :map-name
+   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
@@ -257,15 +263,22 @@
   ([data filename]
    (spit-app-edn data filename nil))
   ([data filename {:keys [pretty]}]
-   (let [file (fs/config-file filename)]
+   (let [output (if pretty
+                  (with-out-str (pprint (if (map? data)
+                                          (into (sorted-map) data)
+                                          data)))
+                  (pr-str data))
+         parsable (try
+                    (edn/read-string output {:readers custom-readers})
+                    true
+                    (catch Exception e
+                      (log/error e "Config EDN for" filename "does not parse, keeping old file")))
+         file (fs/config-file (if parsable
+                                filename
+                                (str filename ".bad")))]
      (fs/make-parent-dirs file)
      (log/info "Spitting edn to" file)
-     (spit file
-       (if pretty
-         (with-out-str (pprint (if (map? data)
-                                 (into (sorted-map) data)
-                                 data)))
-         (pr-str data))))))
+     (spit file output))))
 
 
 (defn- spit-state-config-to-edn [old-state new-state]
@@ -1887,7 +1900,7 @@
                                               by-server)))]
               (doseq [[server-key server-data] by-server]
                 (doseq [[channel-key channel-data] (:channels server-data)]
-                  (let [to-log (remove :logged (:messages channel-data))
+                  (let [to-log (reverse (remove :logged (:messages channel-data)))
                         filename (str
                                    (string/replace (str server-key "-" channel-key) #"[^a-zA-Z0-9\\.\\-\\@\[\]\\_]" "__")
                                    ".txt")
@@ -1930,7 +1943,7 @@
                 (fn [state]
                   (-> state
                       (update :divider-positions merge divider-positions)
-                      (update :window-states merge window-states))))))
+                      (update :window-states u/deep-merge window-states))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating window and divider positions")
@@ -2631,7 +2644,7 @@
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (message/send-message *state client-data "LEAVEBATTLE")
-      (swap! *state update-in [:by-server server-key] dissoc :battle)
+      (swap! *state update-in [:by-server server-key] dissoc :auto-unspec :battle)
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
@@ -4002,11 +4015,11 @@
 
 
 (defmethod event-handler ::assoc
-  [{:fx/keys [event] :keys [value] :or {value event} :as e}]
+  [{:fx/keys [event] :keys [value] :or {value (if (instance? Event event) true event)} :as e}]
   (swap! *state assoc (:key e) value))
 
 (defmethod event-handler ::assoc-in
-  [{:fx/keys [event] :keys [path value] :or {value event}}]
+  [{:fx/keys [event] :keys [path value] :or {value (if (instance? Event event) true event)}}]
   (swap! *state assoc-in path value))
 
 (defmethod event-handler ::dissoc

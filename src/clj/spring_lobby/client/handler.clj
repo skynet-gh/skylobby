@@ -185,35 +185,33 @@
             (update-in state [:battle :bots username] merge bot-data)
             state))))))
 
-(defmethod handle "LEFTBATTLE" [state-atom server-url m]
+(defmethod handle "LEFTBATTLE" [state-atom server-key m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)
-        [prev _curr] (swap-vals! state-atom update-in [:by-server server-url]
-                       (fn [{:keys [client-data] :as state}]
-                         (let [this-battle (when-let [battle (:battle state)]
+        [prev curr] (swap-vals! state-atom update-in [:by-server server-key]
+                      (fn [{:keys [client-data] :as server-data}]
+                        (let [is-my-battle (when-let [battle (:battle server-data)]
                                              (= battle-id (:battle-id battle)))
-                               is-me (= username (:username state))
-                               unified (-> client-data :compflags (contains? "u"))]
-                           client-data
-                           (update-in
-                             (cond
-                               (and this-battle is-me) (dissoc state :battle)
-                               this-battle
-                               (cond-> state
-                                       true
-                                       (update-in [:battle :users] dissoc username)
-                                       (not unified)
-                                       (update-in [:channels (u/battle-channel-name battle-id) :messages]
-                                         conj {:text ""
-                                               :timestamp (u/curr-millis)
-                                               :message-type :leave
-                                               :username username}))
-                               :else state)
-                             [:battles battle-id :users] dissoc username))))
-          {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
+                              is-me (= username (:username server-data))
+                              unified (-> client-data :compflags (contains? "u"))]
+                          (cond-> server-data
+                                  true
+                                  (update-in [:battles battle-id :users] dissoc username)
+                                  is-my-battle
+                                  (update-in [:battle :users] dissoc username)
+                                  (and is-my-battle (not unified))
+                                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                                    conj {:text ""
+                                          :timestamp (u/curr-millis)
+                                          :message-type :leave
+                                          :username username})
+                                  is-me
+                                  (dissoc :battle :auto-unspec)))))
+          {:keys [battle client-data] :as server-data} (-> prev :by-server (get server-key))
           my-username (:username server-data)
-          client (:client client-data)
-          me (-> battle :users (get my-username))]
-      (when (and auto-unspec
+          me (-> battle :users (get my-username))
+          curr-server-data (-> curr :by-server (get server-key))]
+      (when (and (:auto-unspec curr-server-data)
+                 (:battle curr-server-data)
                  (= battle-id (:battle-id battle))
                  (-> me :battle-status :mode not)
                  (not= username my-username)
@@ -281,7 +279,6 @@
                 (u/update-chat-messages-fn username message true))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
-        client (:client client-data)
         me (-> battle :users (get my-username))]
     (when (and (= channel-name (:channel-name battle))
                auto-unspec
@@ -319,7 +316,6 @@
                     server)))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
-        client (:client client-data)
         me (-> battle :users (get my-username))]
     (when (and battle
                auto-unspec
@@ -673,11 +669,16 @@
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
-(defmethod handle "RING" [state-atom _server-url m]
+(defmethod handle "RING" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        state @state-atom]
-    (log/info "Playing ring sound from" username)
-    (sound/play-ring state)))
+        {:keys [by-server prevent-non-host-rings] :as state} @state-atom
+        {:keys [battle battles]} (-> by-server (get server-key))
+        {:keys [host-username]} (get battles (:battle-id battle))]
+    (if (and prevent-non-host-rings (not= username host-username))
+      (log/info "Ignoring ring from non-host" username)
+      (do
+        (log/info "Playing ring sound from" username)
+        (sound/play-ring state)))))
 
 (defmethod handle "CHANNELS" [_state-atom _server-url _m]
   (log/info "Ignoring unused CHANNELS command"))

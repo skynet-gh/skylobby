@@ -28,7 +28,7 @@
 
 
 (def app-version (u/app-version))
-(def screen-bounds (skylobby.fx/screen-bounds))
+(def screen-bounds (skylobby.fx/get-screen-bounds))
 
 
 (def battle-window-width 1740)
@@ -49,7 +49,11 @@
                        (concat (vals current-tasks))
                        (filter some?))
         tasks-by-type (group-by :spring-lobby/task-type all-tasks)
-        server-key (if (= "local" selected-server-tab) :local selected-server-tab)
+        server-key (or (->> by-server
+                            keys
+                            (filter #{selected-server-tab})
+                            first)
+                       :local)
         {:keys [battle] :as server-data} (get by-server server-key)
         server-url (-> server-data :client-data :server-url)
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)

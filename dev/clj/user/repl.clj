@@ -21,9 +21,8 @@
      :appenders
      {:rotor (rotor/rotor-appender
                {:path dev-log-path
-                :max-size 100000000
-                :backlog 1
-                :stacktrace-fonts {}})}}))
+                :max-size 10000000
+                :backlog 5})}}))
 
 (defn disable-print-log []
   (timbre/merge-config!

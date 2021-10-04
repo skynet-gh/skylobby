@@ -225,9 +225,11 @@
   (when (string/blank? password)
     (throw (ex-info "Password is blank" {:username username})))
   (let [pw-md5-base64 (u/base64-md5 password)
-        msg (str "LOGIN " username " " pw-md5-base64 " 0 " local-addr
-                 " " user-agent "\t" client-id "\t" compflags)]
-    (message/send-message state-atom client-data msg)))
+        prefix (str "LOGIN " username " ")
+        suffix (str " 0 " local-addr " " user-agent "\t" client-id "\t" compflags)
+        message (str prefix pw-md5-base64 suffix)
+        log-message (str prefix "<password>" suffix)] ; remove password
+    (message/send-message state-atom client-data message {:log-message log-message})))
 
 
 (defmethod handler/handle "COMPFLAGS" [state-atom server-key m]
