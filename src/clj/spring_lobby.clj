@@ -269,7 +269,7 @@
                                           data)))
                   (pr-str data))
          parsable (try
-                    (edn/read-string output {:readers custom-readers})
+                    (edn/read-string {:readers custom-readers} output)
                     true
                     (catch Exception e
                       (log/error e "Config EDN for" filename "does not parse, keeping old file")))
