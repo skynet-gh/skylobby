@@ -1887,7 +1887,7 @@
                                               by-server)))]
               (doseq [[server-key server-data] by-server]
                 (doseq [[channel-key channel-data] (:channels server-data)]
-                  (let [to-log (remove :logged (:messages channel-data))
+                  (let [to-log (reverse (remove :logged (:messages channel-data)))
                         filename (str
                                    (string/replace (str server-key "-" channel-key) #"[^a-zA-Z0-9\\.\\-\\@\[\]\\_]" "__")
                                    ".txt")
