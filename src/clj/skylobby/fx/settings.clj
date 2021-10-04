@@ -111,9 +111,9 @@
                 :graphic
                 {:fx/type font-icon/lifecycle
                  :icon-literal "mdi-file-find:16"}}]}]
-            (when-not (string/blank? spring-isolation-dir-draft)
+            (when-not (string/blank? (str spring-isolation-dir-draft))
               (let [valid (try
-                            (Paths/get (some-> spring-isolation-dir-draft fs/file .toURI))
+                            (Paths/get (some-> spring-isolation-dir-draft str fs/file .toURI))
                             (catch Exception e
                               (log/trace e "Invalid spring path" spring-isolation-dir-draft)))]
                 [{:fx/type :button

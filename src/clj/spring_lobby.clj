@@ -4002,11 +4002,11 @@
 
 
 (defmethod event-handler ::assoc
-  [{:fx/keys [event] :keys [value] :or {value event} :as e}]
+  [{:fx/keys [event] :keys [value] :or {value (if (instance? Event event) true event)} :as e}]
   (swap! *state assoc (:key e) value))
 
 (defmethod event-handler ::assoc-in
-  [{:fx/keys [event] :keys [path value] :or {value event}}]
+  [{:fx/keys [event] :keys [path value] :or {value (if (instance? Event event) true event)}}]
   (swap! *state assoc-in path value))
 
 (defmethod event-handler ::dissoc
