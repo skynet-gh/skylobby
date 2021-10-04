@@ -56,7 +56,7 @@
  {:nrepl
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.27.1"}
+   {cider/cider-nrepl {:mvn/version "0.27.2"}
     cider/orchard {:mvn/version "0.7.3"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
@@ -76,7 +76,7 @@
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.27.1"}
+   {cider/cider-nrepl {:mvn/version "0.27.2"}
     cider/orchard {:mvn/version "0.7.3"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
