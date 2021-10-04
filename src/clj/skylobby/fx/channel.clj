@@ -178,7 +178,7 @@
        (.build builder)))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words hide-spads-messages hide-vote-messages ignore-users messages server-key username]}]
+  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words hide-joinas-spec hide-spads-messages hide-vote-messages ignore-users messages server-key username]}]
   (let [ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
@@ -188,7 +188,7 @@
                             (map first)
                             set)]
     {:fx/type ext-recreate-on-key-changed
-     :key {:ignore ignore-users-set :spads hide-spads-set :vote hide-vote-messages}
+     :key {:ignore ignore-users-set :joinas-spec hide-joinas-spec :spads hide-spads-set :vote hide-vote-messages}
      :desc
      {:fx/type ext-scroll-on-create
       :desc
@@ -204,7 +204,8 @@
          (->> messages
               (remove (comp ignore-users-set :username))
               (remove (comp hide-spads-set :spads-message-type :spads))
-              (remove (if hide-vote-messages :vote (constantly false)))
+              (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
+              (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
               (remove
                 (fn [{:keys [message-type text]}]
                   (and (= :ex message-type)
@@ -285,7 +286,7 @@
          :style-class ["text" "skylobby-chat-user-list"]})}}]})
 
 (def channel-state-keys
-  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :hide-spads-messages :hide-vote-messages :ignore-users])
+  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users])
 
 (defn channel-view-impl
   [{:keys [channel-name channels hide-users]
