@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.9]
+
+- Fix issue with config validation
+
 ### [0.5.8]
 
 - Fix error in starting spring when no old infolog exists
