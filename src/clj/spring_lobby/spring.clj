@@ -15,7 +15,10 @@
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (javafx.scene.media MediaPlayer)))
+    (javafx.animation KeyFrame KeyValue Timeline)
+    (javafx.event EventHandler)
+    (javafx.scene.media MediaPlayer)
+    (javafx.util Duration)))
 
 
 (set! *warn-on-reflection* true)
@@ -368,13 +371,26 @@
   (let [my-client-status (-> users (get username) :client-status)
         now (u/curr-millis)
         pre-game-fn (fn []
-                      (if (and media-player (not music-paused))
-                        (do
-                          (log/info "Pausing media player")
-                          (.pause media-player)
-                          (swap! state-atom assoc :music-paused true))
-                        (when (not media-player)
-                          (log/info "No media player to pause")))
+                      (try
+                        (if (and media-player (not music-paused))
+                          (do
+                            (log/info "Pausing media player")
+                            (let [timeline (Timeline.
+                                             (into-array KeyFrame
+                                               [(KeyFrame.
+                                                  (Duration/seconds 3)
+                                                  (into-array KeyValue
+                                                    [(KeyValue. (.volumeProperty media-player) 0)]))]))]
+                              (.setOnFinished timeline
+                                (reify EventHandler
+                                  (handle [_this _e]
+                                    (.pause media-player)
+                                    (swap! state-atom assoc :music-paused true))))
+                              (.play timeline)))
+                          (when (not media-player)
+                            (log/info "No media player to pause")))
+                        (catch Exception e
+                          (log/error e "Error pausing music")))
                       (when (:auto-backup spring-settings)
                         (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
                               dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
@@ -428,7 +444,14 @@
                          (do
                            (log/info "Resuming media player")
                            (.play media-player)
-                           (swap! state-atom assoc :music-paused false))
+                           (let [{:keys [music-volume]} (swap! state-atom assoc :music-paused false)
+                                 timeline (Timeline.
+                                            (into-array KeyFrame
+                                              [(KeyFrame.
+                                                 (Duration/seconds 3)
+                                                 (into-array KeyValue
+                                                   [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))]))]
+                             (.play timeline)))
                          (when (not media-player)
                            (log/info "No media player to resume"))))
         set-ingame (fn [ingame]
