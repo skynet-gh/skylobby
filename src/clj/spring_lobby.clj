@@ -117,7 +117,13 @@
       (when (fs/exists? config-file)
         (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
           (if (map? data)
-            data
+            (do
+              (try
+                (log/info "Backing up config file that we could parse")
+                (fs/copy config-file (fs/config-file (str edn-filename ".known-good")))
+                (catch Exception e
+                  (log/error e "Error backing up config file")))
+              data)
             (do
               (log/warn "Config file data from" edn-filename "is not a map")
               {})))))
@@ -257,15 +263,22 @@
   ([data filename]
    (spit-app-edn data filename nil))
   ([data filename {:keys [pretty]}]
-   (let [file (fs/config-file filename)]
+   (let [output (if pretty
+                  (with-out-str (pprint (if (map? data)
+                                          (into (sorted-map) data)
+                                          data)))
+                  (pr-str data))
+         parsable (try
+                    (edn/read-string output {:readers custom-readers})
+                    true
+                    (catch Exception e
+                      (log/error e "Config EDN for" filename "does not parse, keeping old file")))
+         file (fs/config-file (if parsable
+                                filename
+                                (str filename ".bad")))]
      (fs/make-parent-dirs file)
      (log/info "Spitting edn to" file)
-     (spit file
-       (if pretty
-         (with-out-str (pprint (if (map? data)
-                                 (into (sorted-map) data)
-                                 data)))
-         (pr-str data))))))
+     (spit file output))))
 
 
 (defn- spit-state-config-to-edn [old-state new-state]
