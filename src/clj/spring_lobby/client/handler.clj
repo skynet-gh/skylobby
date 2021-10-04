@@ -211,7 +211,6 @@
                              [:battles battle-id :users] dissoc username))))
           {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
           my-username (:username server-data)
-          client (:client client-data)
           me (-> battle :users (get my-username))]
       (when (and auto-unspec
                  (= battle-id (:battle-id battle))
@@ -281,7 +280,6 @@
                 (u/update-chat-messages-fn username message true))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
-        client (:client client-data)
         me (-> battle :users (get my-username))]
     (when (and (= channel-name (:channel-name battle))
                auto-unspec
@@ -319,7 +317,6 @@
                     server)))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
-        client (:client client-data)
         me (-> battle :users (get my-username))]
     (when (and battle
                auto-unspec
