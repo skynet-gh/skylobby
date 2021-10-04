@@ -2644,7 +2644,7 @@
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (message/send-message *state client-data "LEAVEBATTLE")
-      (swap! *state update-in [:by-server server-key] dissoc :battle)
+      (swap! *state update-in [:by-server server-key] dissoc :auto-unspec :battle)
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
