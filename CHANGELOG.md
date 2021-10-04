@@ -26,6 +26,21 @@ Future Features:
 
 ## Actual changelog
 
+### [0.5.8]
+
+- Fix error in starting spring when no old infolog exists
+- Fix event objects sometimes ending up in config
+- Fix issues with constraining windows to screen
+- Add fade out/in for music on game start/end
+- Add setting to prevent non-host rings
+- Add setting to hide joinas spec messages
+- Turn off auto unspec when leaving battle
+- Fix all commands being hidden, not just votes
+- Fix chat messages being logged in reverse order
+- Fix colors in log file
+- Prevent credentials from getting logged
+- Attempt to parse new configs before writing, backup good configs
+
 ### [0.5.7]
 
 - Add setting to hide vote chat messages
