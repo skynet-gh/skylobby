@@ -12,7 +12,8 @@
 
 (def no-springfiles
   [#"Beyond All Reason"
-   #"Total Atomization Prime"])
+   #"Total Atomization Prime"
+   #"Tech Annihilation"])
 
 (def no-rapid
   [#"Evolution RTS"
