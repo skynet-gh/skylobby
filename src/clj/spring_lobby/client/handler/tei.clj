@@ -77,6 +77,9 @@
           client-data (-> state :by-server (get server-key) :client-data)
           user-agent (u/user-agent (:user-agent-override state))
           client-id (u/client-id state-atom state)
-          flags "skylobby=true"]
-      (message/send-message state-atom client-data (str "c.user.login " auth-token "\t" user-agent "\t" client-id "\t" flags)))
+          flags "skylobby=true"
+          suffix (str "\t" user-agent "\t" client-id "\t" flags)
+          message (str "c.user.login " auth-token suffix)
+          log-message (str "c.user.login " "<token>" suffix)]
+      (message/send-message state-atom client-data message {:log-message log-message}))
     (log/error "Error parsing user token message")))
