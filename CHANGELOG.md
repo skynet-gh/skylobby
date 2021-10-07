@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.0]
+
+- Switch UI to use context for better performance
+
 ### [0.5.9]
 
 - Fix issue with config validation
