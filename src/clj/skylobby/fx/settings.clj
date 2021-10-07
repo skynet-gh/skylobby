@@ -73,10 +73,12 @@
               extra-replay-path (fx/sub-val context :extra-replay-path)
               extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
               extra-replay-sources (fx/sub-val context :extra-replay-sources)
+              focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
               hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
               hide-spads-messages (fx/sub-val context :hide-spads-messages)
               hide-vote-messages (fx/sub-val context :hide-vote-messages)
               increment-ids (fx/sub-val context :increment-ids)
+              join-battle-as-player (fx/sub-val context :join-battle-as-player)
               leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
               media-player (fx/sub-val context :media-player)
               music-dir (fx/sub-val context :music-dir)
@@ -187,6 +189,15 @@
                  {:fx/type :h-box
                   :style {:-fx-font-size 18}
                   :children
+                  [{:fx/type :check-box
+                    :selected (boolean focus-chat-on-message)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :focus-chat-on-message}}
+                   {:fx/type :label
+                    :text " Focus chat on incoming message"}]}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
                   [
                    {:fx/type :check-box
                     :selected (boolean (fx/sub-val context :chat-highlight-username))
@@ -210,6 +221,16 @@
                  {:fx/type :label
                   :text " Battle"
                   :style {:-fx-font-size 24}}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
+                  [
+                   {:fx/type :check-box
+                    :selected (boolean join-battle-as-player)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :join-battle-as-player}}
+                   {:fx/type :label
+                    :text " Join battles as a player (not spec)"}]}
                  {:fx/type :h-box
                   :style {:-fx-font-size 18}
                   :children

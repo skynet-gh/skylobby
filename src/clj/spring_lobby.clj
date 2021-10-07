@@ -146,8 +146,8 @@
   [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
-   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :leave-battle-on-close-window :logins :map-name
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
+   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
@@ -167,6 +167,11 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
+(defn- select-rapid [state]
+  (select-keys state
+    [:rapid-data-by-hash :rapid-data-by-id :rapid-data-by-version :rapid-packages :rapid-repos
+     :rapid-updated :rapid-versions :sdp-files]))
+
 (defn- select-replays [state]
   (select-keys state
     [:online-bar-replays]))
@@ -181,6 +186,8 @@
     :filename "importables.edn"}
    {:select-fn select-downloadables
     :filename "downloadables.edn"}
+   {:select-fn select-rapid
+    :filename "rapid.edn"}
    {:select-fn select-replays
     :filename "replays.edn"}])
 
@@ -245,15 +252,24 @@
      :file-events (initial-file-events)
      :minimap-type (first fx.battle/minimap-types)
      :replay-minimap-type (first fx.battle/minimap-types)
-     :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
-     :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
-     :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)
+     :map-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
      :console-auto-scroll true}))
 
 
+(defn cache-factory-with-threshold [factory threshold]
+  (fn [data]
+    (factory data :threshold threshold)))
+
+
 (def ^:dynamic *state (atom {}))
-(def ^:dynamic *ui-state (atom (fx/create-context {})))
+(def ^:dynamic *ui-state
+  (atom
+    (fx/create-context
+      {}
+      (cache-factory-with-threshold cache/lru-cache-factory 16384))))
 
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
@@ -400,7 +416,7 @@
 
 (defn- battle-map-details-relevant-keys [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks])
+      (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks-by-kind])
       (update :by-server
         (fn [by-server]
           (reduce-kv
@@ -414,7 +430,7 @@
 
 (defn- battle-mod-details-relevant-data [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks])
+      (select-keys [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks-by-kind])
       (update :by-server
         (fn [by-server]
           (reduce-kv
@@ -443,7 +459,7 @@
     [:auto-get-resources
      :by-server :by-spring-root
      :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path
-     :rapid-data-by-version :servers :spring-isolation-dir :tasks]))
+     :rapid-data-by-version :servers :spring-isolation-dir :tasks-by-kind]))
 
 (defn- auto-get-resources-server-relevant-keys [state]
   (update
@@ -473,12 +489,16 @@
 
 
 (defn server-auto-resources [_old-state new-state old-server new-server]
-  (when (not= (auto-get-resources-server-relevant-keys old-server)
-              (auto-get-resources-server-relevant-keys new-server))
+  (when (:auto-get-resources new-state)
     (try
-      (when (:auto-get-resources new-state)
+      (when (or (not= (auto-get-resources-server-relevant-keys old-server)
+                      (auto-get-resources-server-relevant-keys new-server))
+                (let [username (:username new-server)
+                      in-sync (-> new-server :battle :users (get username) :battle-status :sync)]
+                  (not in-sync)))
+        (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
-                      rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks]} new-state
+                      rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
@@ -489,7 +509,7 @@
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
               rapid-data (get rapid-data-by-version battle-modname)
               rapid-id (:id rapid-data)
-              all-tasks (concat tasks (vals current-tasks))
+              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
                               (filter (comp #{::rapid-download} ::task-type))
@@ -660,7 +680,7 @@
                         :engine-version battle-version
                         :mod-name battle-modname
                         :spring-isolation-dir spring-root})]]
-         (filter some? tasks)))
+          (filter some? tasks)))
       (catch Exception e
         (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
 
@@ -672,7 +692,7 @@
       (doseq [[server-key new-server] (-> new-state :by-server seq)]
         (let [old-server (-> old-state :by-server (get server-key))
               server-url (-> new-server :client-data :server-url)
-              {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
+              {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                               spring-isolation-dir)
               spring-root-path (fs/canonical-path spring-root)
@@ -685,7 +705,7 @@
               map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
               map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
               tries (or (:tries map-details) resource/max-tries)
-              all-tasks (concat tasks (vals current-tasks))]
+              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
           (when (and (or (not (resource/details? map-details))
                          (< tries resource/max-tries))
                      (or (and (and (not (string/blank? new-map))
@@ -716,7 +736,7 @@
       (doseq [[server-key new-server] (-> new-state :by-server seq)]
         (let [old-server (-> old-state :by-server (get server-key))
               server-url (-> new-server :client-data :server-url)
-              {:keys [current-tasks servers spring-isolation-dir tasks]} new-state
+              {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                               spring-isolation-dir)
               spring-root-path (fs/canonical-path spring-root)
@@ -731,7 +751,7 @@
               filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
               mod-exists (->> new-mods (filter filter-fn) first)
               mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-              all-tasks (concat tasks (vals current-tasks))]
+              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
           (when (or (and (and (not (string/blank? new-mod))
                               (not (resource/details? mod-details)))
                          (or (not= old-battle-id new-battle-id)
@@ -916,8 +936,9 @@
     (try
       (when-let [tasks (->> new-state
                             :by-server
+                            (remove (comp #{:local} first))
                             (mapcat
-                              (fn [[server-key  new-server]]
+                              (fn [[server-key new-server]]
                                 (let [old-server (-> old-state :by-server (get server-key))]
                                   (server-auto-resources old-state new-state old-server new-server))))
                             (filter some?)
@@ -974,7 +995,7 @@
   (when (not= (update-battle-status-sync-relevant-data old-state)
               (update-battle-status-sync-relevant-data new-state))
     (try
-      (doseq [[server-key new-server] (-> new-state :by-server seq)]
+      (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
         (let [old-server (-> old-state :by-server (get server-key))
               server-url (-> new-server :client-data :server-url)
               {:keys [servers spring-isolation-dir]} new-state
@@ -1819,7 +1840,7 @@
           (fn [_chimestamp]
             (log/debug "Updating matchmaking")
             (let [state @state-atom]
-              (doseq [[server-key server-data] (:by-server state)]
+              (doseq [[server-key server-data] (u/valid-servers (:by-server state))]
                 (if (u/matchmaking? server-data)
                   (let [client-data (:client-data server-data)]
                     (message/send-message state-atom client-data "c.matchmaking.list_all_queues")
@@ -2209,7 +2230,7 @@
 
 (defn update-battle-sync-statuses [state-atom]
   (let [state @state-atom]
-    (doseq [[server-key server-data] (-> state :by-server seq)]
+    (doseq [[server-key server-data] (-> state :by-server u/valid-servers seq)]
       (let [server-url (-> server-data :client-data :server-url)
             {:keys [servers spring-isolation-dir]} state
             spring-root (or (-> servers (get server-url) :spring-isolation-dir)

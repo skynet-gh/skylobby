@@ -337,15 +337,19 @@
         channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
-        (-> state
-            (update-in [:by-server server-url]
-              (fn [state]
-                (-> state
-                    (update-in [:channels channel-name :messages]
-                      (u/update-chat-messages-fn username message))
-                    (assoc-in [:my-channels channel-name] {}))))
-            (assoc :selected-tab-main "chat")
-            (assoc :selected-tab-channel channel-name))))))
+        (let [focus-chat (:focus-chat-on-message state)]
+          (cond-> state
+                  true
+                  (update-in [:by-server server-url]
+                    (fn [state]
+                      (-> state
+                          (update-in [:channels channel-name :messages]
+                            (u/update-chat-messages-fn username message))
+                          (assoc-in [:my-channels channel-name] {}))))
+                  focus-chat
+                  (assoc :selected-tab-main "chat")
+                  focus-chat
+                  (assoc :selected-tab-channel channel-name)))))))
 
 (defmethod handle "SAYPRIVATEEX" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
@@ -496,7 +500,7 @@
 
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
+  (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
         {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
@@ -508,11 +512,14 @@
         battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
         new-battle-status (assoc (or battle-status cu/default-battle-status)
                             :id (battle/available-team-id battle)
-                            :ally 0 ; (battle/available-ally battle)
+                            :ally 0
                             :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
                                       0)
                             :sync (sync-number
                                     (resource/sync-status server-data spring mod-details map-details)))
+        new-battle-status (if join-battle-as-player
+                            (assoc new-battle-status :mode true)
+                            new-battle-status)
         color (or preferred-color (u/random-color))
         msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
     (message/send-message state-atom client-data msg)))

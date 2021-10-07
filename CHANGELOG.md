@@ -26,6 +26,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.1]
+
+- Add setting for focusing chat on new message
+- Fix auto resources sometimes not running
+- Add setting to join battles as a player
+- Add cache for ui context to prevent OOM issue
+- Lower cache sizes for maps, mods, replays
+- Increase max heap size to 1.5G
+
 ### [0.6.0]
 
 - Switch UI to use context for better performance
