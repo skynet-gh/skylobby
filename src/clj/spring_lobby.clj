@@ -167,6 +167,11 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
+(defn- select-rapid [state]
+  (select-keys state
+    [:rapid-data-by-hash :rapid-data-by-id :rapid-data-by-version :rapid-packages :rapid-repos
+     :rapid-updated :rapid-versions :sdp-files]))
+
 (defn- select-replays [state]
   (select-keys state
     [:online-bar-replays]))
@@ -181,6 +186,8 @@
     :filename "importables.edn"}
    {:select-fn select-downloadables
     :filename "downloadables.edn"}
+   {:select-fn select-rapid
+    :filename "rapid.edn"}
    {:select-fn select-replays
     :filename "replays.edn"}])
 
