@@ -26,6 +26,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.2]
+
+- Fix ready change in battle
+- Fix singleplayer battle
+- Fix some issues with auto get resources and sync status update
+- Increase max heap size to 2GB
+
 ### [0.6.1]
 
 - Add setting for focusing chat on new message
