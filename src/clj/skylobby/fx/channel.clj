@@ -1,8 +1,9 @@
 (ns skylobby.fx.channel
   (:require
+    [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create with-scroll-text-prop with-scroll-text-flow-prop]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
@@ -42,88 +43,6 @@
   {:-fx-font-family monospace-font-family
    :-fx-font-size (font-size-or-default font-size)})
 
-
-(defn old-channel-texts [messages]
-  (let [last-message-index (dec (count messages))]
-    (->> messages
-         (map-indexed vector)
-         (mapcat
-           (fn [[i {:keys [message-type text timestamp username]}]]
-             (concat
-               [{:fx/type :text
-                 :text (str "[" (u/format-hours timestamp) "] ")
-                 :style-class ["text" "skylobby-chat-time"]}
-                {:fx/type :text
-                 :text
-                 (str
-                   (case message-type
-                     :ex (str "* " username " " text)
-                     :join (str username " has joined")
-                     :leave (str username " has left")
-                     ; else
-                     (str username ": ")))
-                 :style-class ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))]}]
-               (when-not message-type
-                 (map
-                   (fn [[_all _ _irc-color-code text-segment]]
-                     {:fx/type :text
-                      :text (str text-segment)
-                      :style-class ["text" "skylobby-chat-message"]})
-                   (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))
-               (when-not (= i last-message-index)
-                 [{:fx/type :text
-                   :text "\n"}])))))))
-
-(defn old-channel-view-history-impl
-  [{:keys [chat-auto-scroll channel-name chat-font-size messages select-mode server-key]}]
-  (let [messages (reverse messages)]
-    (if select-mode
-      (let [text (->> messages
-                      (map
-                        (fn [{:keys [ex text timestamp username]}]
-                          (str
-                            "[" (u/format-hours timestamp) "] "
-                            (if ex
-                              (str "* " username " " text)
-                              (str username ": " text)))))
-                      (string/join "\n"))]
-        {:fx/type with-scroll-text-prop
-         :props {:scroll-text [text chat-auto-scroll]}
-         :desc
-         {:fx/type :text-area
-          :editable false
-          :wrap-text true
-          :style (text-style chat-font-size)
-          :context-menu
-          {:fx/type :context-menu
-           :items
-           [{:fx/type :menu-item
-             :text "Color mode"
-             :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:by-server server-key :channels channel-name :select-mode]
-                         :value false}}]}}})
-      (let [texts (old-channel-texts messages)]
-        {:fx/type with-scroll-text-flow-prop
-         :props {:auto-scroll [texts chat-auto-scroll]}
-         :desc
-         {:fx/type :scroll-pane
-          :style {:-fx-min-width 200
-                  :-fx-pref-width 200}
-          :fit-to-width true
-          :on-scroll {:event/type :spring-lobby/enable-auto-scroll-if-at-bottom}
-          :context-menu
-          {:fx/type :context-menu
-           :items
-           [{:fx/type :menu-item
-             :text "Select mode"
-             :on-action {:event/type :spring-lobby/assoc-in
-                         :path [:by-server server-key :channels channel-name :select-mode]
-                         :value true}}]}
-          :content
-          {:fx/type :text-flow
-           :on-scroll {:event/type :spring-lobby/disable-auto-scroll}
-           :style (text-style chat-font-size)
-           :children texts}}}))))
 
 (defn segment
   [text style]
@@ -178,8 +97,19 @@
        (.build builder)))))
 
 (defn- channel-view-history-impl
-  [{:keys [chat-auto-scroll chat-font-size chat-highlight-username chat-highlight-words hide-joinas-spec hide-spads-messages hide-vote-messages ignore-users messages server-key username]}]
-  (let [ignore-users-set (->> (get ignore-users server-key)
+  [{:fx/keys [context]
+    :keys [channel-name server-key]}]
+  (let [messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
+        username (fx/sub-val context get-in [:by-server server-key :username])
+        chat-auto-scroll (fx/sub-val context :chat-auto-scroll)
+        chat-font-size (fx/sub-val context :chat-font-size)
+        chat-highlight-username (fx/sub-val context :chat-highlight-username)
+        chat-highlight-words (fx/sub-val context :chat-highlight-words)
+        hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
+        hide-spads-messages (fx/sub-val context :hide-spads-messages)
+        hide-vote-messages (fx/sub-val context :hide-vote-messages)
+        ignore-users (fx/sub-val context :ignore-users)
+        ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
                               set)
@@ -230,88 +160,91 @@
     (tufte/p :channel-view-history
       (channel-view-history-impl state))))
 
-(defn- channel-view-input [{:keys [channel-name client-data message-draft server-key]}]
-  {:fx/type :h-box
-   :children
-   [{:fx/type :button
-     :text "Send"
-     :on-action {:event/type :spring-lobby/send-message
-                 :channel-name channel-name
-                 :client-data client-data
-                 :message message-draft
-                 :server-key server-key}}
-    {:fx/type :text-field
-     :id "channel-text-field"
-     :h-box/hgrow :always
-     :text (str message-draft)
-     :on-text-changed {:event/type :spring-lobby/assoc-in
-                       :path [:by-server server-key :message-drafts channel-name]}
-     :on-action {:event/type :spring-lobby/send-message
-                 :channel-name channel-name
-                 :client-data client-data
-                 :message message-draft
-                 :server-key server-key}
-     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                      :channel-name channel-name
-                      :server-key server-key}}]})
-
-(defn- channel-view-users [{:keys [users]}]
-  {:fx/type :table-view
-   :column-resize-policy :constrained ; TODO auto resize
-   :items (->> users
-               keys
-               (sort String/CASE_INSENSITIVE_ORDER)
-               vec)
-   :row-factory
-   {:fx/cell-type :table-row
-    :describe (fn [i]
-                {
-                 :context-menu
-                 {:fx/type :context-menu
-                  :items
-                  [
-                   {:fx/type :menu-item
-                    :text "Message"
-                    :on-action {:event/type :spring-lobby/join-direct-message
-                                :username i}}]}})}
-   :columns
-   [{:fx/type :table-column
-     :text "Username"
-     :cell-value-factory identity
-     :cell-factory
-     {:fx/cell-type :table-cell
-      :describe
-      (fn [i]
-        {:text (-> i str)
-         :style-class ["text" "skylobby-chat-user-list"]})}}]})
-
-(def channel-state-keys
-  [:chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users])
-
-(defn channel-view-impl
-  [{:keys [channel-name channels hide-users]
-    :as state}]
-  (let [{:keys [users] :as channel-data} (get channels channel-name)]
+(defn- channel-view-input
+  [{:fx/keys [context]
+    :keys [channel-name server-key]}]
+  (let [client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])]
     {:fx/type :h-box
      :children
-     (concat
-       [{:fx/type :v-box
-         :h-box/hgrow :always
-         :style {:-fx-font-size 16}
-         :children
-         [(merge
-            {:fx/type channel-view-history
-             :v-box/vgrow :always}
-            state
-            channel-data)
-          (merge
-            {:fx/type channel-view-input}
-            state)]}]
-       (when (and (not hide-users)
-                  channel-name
-                  (not (string/starts-with? channel-name "@")))
-         [{:fx/type channel-view-users
-           :users users}]))}))
+     [{:fx/type :button
+       :text "Send"
+       :on-action {:event/type :spring-lobby/send-message
+                   :channel-name channel-name
+                   :client-data client-data
+                   :message message-draft
+                   :server-key server-key}}
+      {:fx/type :text-field
+       :id "channel-text-field"
+       :h-box/hgrow :always
+       :text (str message-draft)
+       :on-text-changed {:event/type :spring-lobby/assoc-in
+                         :path [:by-server server-key :message-drafts channel-name]}
+       :on-action {:event/type :spring-lobby/send-message
+                   :channel-name channel-name
+                   :client-data client-data
+                   :message message-draft
+                   :server-key server-key}
+       :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                        :channel-name channel-name
+                        :server-key server-key}}]}))
+
+(defn- channel-view-users
+  [{:fx/keys [context]
+    :keys [channel-name server-key]}]
+  (let [users (fx/sub-val context get-in [:by-server server-key :channels channel-name :users])]
+    {:fx/type :table-view
+     :column-resize-policy :constrained
+     :items (->> users
+                 keys
+                 (sort String/CASE_INSENSITIVE_ORDER)
+                 vec)
+     :row-factory
+     {:fx/cell-type :table-row
+      :describe (fn [i]
+                  {
+                   :context-menu
+                   {:fx/type :context-menu
+                    :items
+                    [
+                     {:fx/type :menu-item
+                      :text "Message"
+                      :on-action {:event/type :spring-lobby/join-direct-message
+                                  :username i}}]}})}
+     :columns
+     [{:fx/type :table-column
+       :text "Username"
+       :cell-value-factory identity
+       :cell-factory
+       {:fx/cell-type :table-cell
+        :describe
+        (fn [i]
+          {:text (-> i str)
+           :style-class ["text" "skylobby-chat-user-list"]})}}]}))
+
+
+(defn channel-view-impl
+  [{:keys [channel-name hide-users server-key]}]
+  {:fx/type :h-box
+   :children
+   (concat
+     [{:fx/type :v-box
+       :h-box/hgrow :always
+       :style {:-fx-font-size 16}
+       :children
+       [{:fx/type channel-view-history
+         :v-box/vgrow :always
+         :channel-name channel-name
+         :server-key server-key}
+        {:fx/type channel-view-input
+         :channel-name channel-name
+         :server-key server-key}]}]
+     (when (and (not hide-users)
+                channel-name
+                (not (string/starts-with? channel-name "@")))
+       [{:fx/type channel-view-users
+         :channel-name channel-name
+         :server-key server-key}]))})
 
 
 (defn channel-view

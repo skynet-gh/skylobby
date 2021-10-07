@@ -1,9 +1,12 @@
 (ns skylobby.fx.battles-buttons
   (:require
+    [cljfx.api :as fx]
     clojure.set
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.fx.welcome :refer [app-update-button]]
-    [spring-lobby.fx.font-icon :as font-icon]))
+    [spring-lobby.fx.font-icon :as font-icon]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -12,90 +15,89 @@
 (def matchmaking-compflag "matchmaking")
 
 
-(def battles-buttons-state-keys
-  [:app-update-available :battle-password :battle-title :engines :engine-filter :engine-version
-   :http-download :map-input-prefix
-   :map-name :maps :mod-filter :mod-name :mods :pop-out-battle :pop-out-chat :spring-isolation-dir :tasks-by-type
-   :use-git-mod-version])
-
-(def battles-buttons-keys
-  [:accepted :battle :battles :client-data :compflags :scripttags :selected-battle :server-key])
-
-(defn battles-buttons-view
-  [{:keys [app-update-available battles battle-password client-data selected-battle] :as state}]
-  {:fx/type :v-box
-   :alignment :top-left
-   :children
-   [{:fx/type :flow-pane
-     :alignment :center-left
-     :style {:-fx-font-size 16}
+(defn- battles-buttons-view-impl
+  [{:fx/keys [context]}]
+  (let [app-update-available (fx/sub-val context :app-update-available)
+        battle-password (fx/sub-val context :battle-password)
+        server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
+        selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])]
+    {:fx/type :v-box
+     :alignment :top-left
      :children
-     (concat
-       (when (and selected-battle
-                  (-> battles (get selected-battle)))
-         (let [needs-password (= "1" (-> battles (get selected-battle) :battle-passworded))]
-           (concat
-             [{:fx/type :button
-               :text "Join Battle"
-               :disable (boolean (and needs-password (string/blank? battle-password)))
-               :on-action {:event/type :spring-lobby/join-battle
-                           :battle-password battle-password
-                           :client-data client-data
-                           :selected-battle selected-battle
-                           :battle-passworded
-                           (= "1" (-> battles (get selected-battle) :battle-passworded))}}] ; TODO
-             (when needs-password
-               [{:fx/type :label
-                 :text " Battle Password: "}
-                {:fx/type :text-field
-                 :text (str battle-password)
-                 :prompt-text "Battle Password"
-                 :on-action {:event/type :spring-lobby/host-battle}
-                 :on-text-changed {:event/type :spring-lobby/battle-password-change}}]))))
-       [
-        {:fx/type :button
-         :text "Host Battle"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-host-battle-window}}
-        {:fx/type :button
-         :text "Battles"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-battles-window}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-window-maximize:16:white"}}
-        {:fx/type :button
-         :text "Chat"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-chat-window}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-window-maximize:16:white"}}]
-       #_
-       [{:fx/type :label
-         :text " Resources: "}
-        {:fx/type :button
-         :text "Import"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-importer}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal (str "mdi-file-import:16:white")}}
-        {:fx/type :button
-         :text "HTTP"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-downloader}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal (str "mdi-download:16:white")}}
-        {:fx/type :button
-         :text "Rapid"
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-rapid-downloader}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal (str "mdi-download:16:white")}}]
-       (when app-update-available
-         [(merge
-            {:fx/type app-update-button}
-            state)]))}]})
+     [{:fx/type :flow-pane
+       :alignment :center-left
+       :style {:-fx-font-size 16}
+       :children
+       (concat
+         (when (and selected-battle selected-battle-details)
+           (let [needs-password (= "1" (:battle-passworded selected-battle-details))]
+             (concat
+               [{:fx/type :button
+                 :text "Join Battle"
+                 :disable (boolean (and needs-password (string/blank? battle-password)))
+                 :on-action {:event/type :spring-lobby/join-battle
+                             :battle-password battle-password
+                             :client-data client-data
+                             :selected-battle selected-battle
+                             :battle-passworded needs-password}}]
+               (when needs-password
+                 [{:fx/type :label
+                   :text " Battle Password: "}
+                  {:fx/type :text-field
+                   :text (str battle-password)
+                   :prompt-text "Battle Password"
+                   :on-action {:event/type :spring-lobby/host-battle}
+                   :on-text-changed {:event/type :spring-lobby/battle-password-change}}]))))
+         [
+          {:fx/type :button
+           :text "Host Battle"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-host-battle-window}}
+          {:fx/type :button
+           :text "Battles"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-battles-window}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-window-maximize:16:white"}}
+          {:fx/type :button
+           :text "Chat"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-chat-window}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-window-maximize:16:white"}}]
+         #_
+         [{:fx/type :label
+           :text " Resources: "}
+          {:fx/type :button
+           :text "Import"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-importer}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal (str "mdi-file-import:16:white")}}
+          {:fx/type :button
+           :text "HTTP"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-downloader}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal (str "mdi-download:16:white")}}
+          {:fx/type :button
+           :text "Rapid"
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-rapid-downloader}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal (str "mdi-download:16:white")}}]
+         (when app-update-available
+           [{:fx/type app-update-button}]))}]}))
+
+(defn battles-buttons-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :battles-buttons-view
+      (battles-buttons-view-impl state))))

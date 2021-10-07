@@ -1,11 +1,13 @@
 (ns skylobby.fx.rapid
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -18,48 +20,11 @@
 (def rapid-download-window-height 800)
 
 
-(def rapid-download-window-keys
-  [:css :engine-version :engines :rapid-data-by-hash :rapid-download :rapid-filter :rapid-repo
-   :rapid-repos :rapid-packages :rapid-versions :sdp-files :show-rapid-downloader :spring-isolation-dir
-   :tasks-by-type])
-
 (defn rapid-download-window-impl
-  [{:keys [css engine-version engines rapid-download rapid-filter rapid-repo rapid-repos rapid-versions
-           rapid-packages screen-bounds sdp-files show-rapid-downloader spring-isolation-dir tasks-by-type]}]
-  (let [sdp-files (or sdp-files [])
-        sdp-hashes (set (map rapid/sdp-hash sdp-files))
-        sorted-engine-versions (->> engines
-                                    (map :engine-version)
-                                    sort)
-        filtered-rapid-versions (->> rapid-versions
-                                     (filter
-                                       (fn [{:keys [id]}]
-                                         (if rapid-repo
-                                           (string/starts-with? id (str rapid-repo ":"))
-                                           true)))
-                                     (filter
-                                       (fn [{:keys [version] :as i}]
-                                         (if-not (string/blank? rapid-filter)
-                                           (or
-                                             (string/includes?
-                                               (string/lower-case version)
-                                               (string/lower-case rapid-filter))
-                                             (string/includes?
-                                               (:hash i)
-                                               (string/lower-case rapid-filter)))
-                                           true))))
-        engines-by-version (into {} (map (juxt :engine-version identity) engines))
-        engine-file (:file (get engines-by-version engine-version))
-        rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
-        available-packages (or (->> filtered-rapid-versions
-                                    seq
-                                    (sort-by :version String/CASE_INSENSITIVE_ORDER)
-                                    reverse)
-                               [])
-        local-packages (or (->> rapid-packages
-                                seq
-                                (sort-by :version String/CASE_INSENSITIVE_ORDER))
-                           [])]
+  [{:fx/keys [context]
+    :keys [screen-bounds]}]
+  (let [
+        show-rapid-downloader (fx/sub-val context :show-rapid-downloader)]
     {:fx/type :stage
      :showing (boolean show-rapid-downloader)
      :title (str u/app-name " Rapid Downloader")
@@ -72,206 +37,252 @@
      :height (skylobby.fx/fitheight screen-bounds rapid-download-window-height)
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show-rapid-downloader
-        {:fx/type :v-box
-         :children
-         [{:fx/type :h-box
-           :style {:-fx-font-size 16}
-           :alignment :center-left
+        (let [
+              engine-version (fx/sub-val context :engine-version)
+              rapid-download (fx/sub-val context :rapid-download)
+              rapid-filter (fx/sub-val context :rapid-filter)
+              rapid-repo (fx/sub-val context :rapid-repo)
+              rapid-repos (fx/sub-val context :rapid-repos)
+              rapid-versions (fx/sub-val context :rapid-versions)
+              rapid-packages (fx/sub-val context :rapid-packages)
+              sdp-files (fx/sub-val context :sdp-files)
+              spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+              engines (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :engines])
+              tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+              sdp-files (or sdp-files [])
+              sdp-hashes (set (map rapid/sdp-hash sdp-files))
+              sorted-engine-versions (->> engines
+                                          (map :engine-version)
+                                          sort)
+              filtered-rapid-versions (->> rapid-versions
+                                           (filter
+                                             (fn [{:keys [id]}]
+                                               (if rapid-repo
+                                                 (string/starts-with? id (str rapid-repo ":"))
+                                                 true)))
+                                           (filter
+                                             (fn [{:keys [version] :as i}]
+                                               (if-not (string/blank? rapid-filter)
+                                                 (or
+                                                   (string/includes?
+                                                     (string/lower-case version)
+                                                     (string/lower-case rapid-filter))
+                                                   (string/includes?
+                                                     (:hash i)
+                                                     (string/lower-case rapid-filter)))
+                                                 true))))
+              engines-by-version (into {} (map (juxt :engine-version identity) engines))
+              engine-file (:file (get engines-by-version engine-version))
+              rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
+              available-packages (or (->> filtered-rapid-versions
+                                          seq
+                                          (sort-by :version String/CASE_INSENSITIVE_ORDER)
+                                          reverse)
+                                     [])
+              local-packages (or (->> rapid-packages
+                                      seq
+                                      (sort-by :version String/CASE_INSENSITIVE_ORDER))
+                                 [])]
+          {:fx/type :v-box
            :children
-           [{:fx/type :label
-             :text " Engine for pr-downloader: "}
-            {:fx/type :combo-box
-             :value (str engine-version)
-             :items (or (seq sorted-engine-versions)
-                        [])
-             :on-value-changed {:event/type :spring-lobby/version-change}}
-            {:fx/type :button
-             :text (if rapid-updating " Refreshing..." " Refresh ")
-             :disable (boolean rapid-updating)
-             :on-action {:event/type :spring-lobby/add-task
-                         :task {:spring-lobby/task-type :spring-lobby/update-rapid
-                                :force true
-                                :rapid-repo rapid-repo}}
-             :graphic
-             {:fx/type font-icon/lifecycle
-              :icon-literal "mdi-refresh:16:white"}}]}
-          {:fx/type :h-box
-           :style {:-fx-font-size 16}
-           :alignment :center-left
-           :children
-           (concat
+           [{:fx/type :h-box
+             :style {:-fx-font-size 16}
+             :alignment :center-left
+             :children
              [{:fx/type :label
-               :text " Filter Repo: "}
+               :text " Engine for pr-downloader: "}
               {:fx/type :combo-box
-               :value (str rapid-repo)
-               :items (or (seq rapid-repos)
+               :value (str engine-version)
+               :items (or (seq sorted-engine-versions)
                           [])
-               :on-value-changed {:event/type :spring-lobby/rapid-repo-change}}]
-             (when rapid-repo
-               [{:fx/type fx.ext.node/with-tooltip-props
-                 :props
-                 {:tooltip
-                  {:fx/type :tooltip
-                   :show-delay [10 :ms]
-                   :text "Clear rapid repo filter"}}
-                 :desc
-                 {:fx/type :button
-                  :on-action {:event/type :spring-lobby/dissoc
-                              :key :rapid-repo}
-                  :graphic
-                  {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-close:16:white"}}}])
-             [{:fx/type :label
-               :text " Rapid Filter: "}
-              {:fx/type :text-field
-               :text rapid-filter
-               :prompt-text "Filter by name or path"
-               :on-text-changed {:event/type :spring-lobby/assoc
-                                 :key :rapid-filter}}]
-             (when-not (string/blank? rapid-filter)
-               [{:fx/type fx.ext.node/with-tooltip-props
-                 :props
-                 {:tooltip
-                  {:fx/type :tooltip
-                   :show-delay [10 :ms]
-                   :text "Clear filter"}}
-                 :desc
-                 {:fx/type :button
-                  :on-action {:event/type :spring-lobby/dissoc
-                              :key :rapid-filter}
-                  :graphic
-                  {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-close:16:white"}}}]))}
-          {:fx/type :label
-           :text " Available Packages"
-           :style {:-fx-font-size 16}}
-          {:fx/type ext-table-column-auto-size
-           :items available-packages
-           :desc
-           {:fx/type :table-view
-            :items available-packages
-            :column-resize-policy :constrained
-            :style {:-fx-font-size 16}
-            :columns
-            [{:fx/type :table-column
-              :sortable false
-              :text "ID"
-              :pref-width 100
-              :cell-value-factory identity
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [i]
-                 {:text (str (:id i))})}}
-             {:fx/type :table-column
-              :sortable false
-              :text "Hash"
-              :pref-width 100
-              :cell-value-factory identity
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [i]
-                 {:text (str (:hash i))})}}
-             {:fx/type :table-column
-              :text "Version"
-              :pref-width 100
-              :cell-value-factory :version
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [version]
-                 {:text (str version)})}}
-             {:fx/type :table-column
-              :text "Download"
-              :sortable false
-              :pref-width 20
-              :cell-value-factory identity
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [i]
-                 (let [download (get rapid-download (:id i))]
-                   (merge
-                     {:text (str (:message download))
-                      :style {:-fx-font-family skylobby.fx/monospace-font-family}}
-                     (cond
-                       (sdp-hashes (:hash i))
-                       {:graphic
-                        {:fx/type font-icon/lifecycle
-                         :icon-literal "mdi-check:16:white"}}
-                       (:running download)
-                       nil
-                       (not engine-file)
-                       {:text "Needs an engine"}
-                       :else
-                       {:graphic
-                        {:fx/type :button
-                         :on-action {:event/type :spring-lobby/add-task
-                                     :task
-                                     {:spring-lobby/task-type :spring-lobby/rapid-download
-                                      :engine-file engine-file
-                                      :rapid-id (:id i)
-                                      :spring-isolation-dir spring-isolation-dir}}
-                         :graphic
-                         {:fx/type font-icon/lifecycle
-                          :icon-literal "mdi-download:16:white"}}}))))}}]}}
-          {:fx/type :h-box
-           :alignment :center-left
-           :style {:-fx-font-size 16}
-           :children
-           [{:fx/type :label
-             :text " Packages"}
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
-               :text "Open rapid packages directory"}}
+               :on-value-changed {:event/type :spring-lobby/version-change}}
+              {:fx/type :button
+               :text (if rapid-updating " Refreshing..." " Refresh ")
+               :disable (boolean rapid-updating)
+               :on-action {:event/type :spring-lobby/add-task
+                           :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                                  :force true
+                                  :rapid-repo rapid-repo}}
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal "mdi-refresh:16:white"}}]}
+            {:fx/type :h-box
+             :style {:-fx-font-size 16}
+             :alignment :center-left
+             :children
+             (concat
+               [{:fx/type :label
+                 :text " Filter Repo: "}
+                {:fx/type :combo-box
+                 :value (str rapid-repo)
+                 :items (or (seq rapid-repos)
+                            [])
+                 :on-value-changed {:event/type :spring-lobby/rapid-repo-change}}]
+               (when rapid-repo
+                 [{:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text "Clear rapid repo filter"}}
+                   :desc
+                   {:fx/type :button
+                    :on-action {:event/type :spring-lobby/dissoc
+                                :key :rapid-repo}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-close:16:white"}}}])
+               [{:fx/type :label
+                 :text " Rapid Filter: "}
+                {:fx/type :text-field
+                 :text rapid-filter
+                 :prompt-text "Filter by name or path"
+                 :on-text-changed {:event/type :spring-lobby/assoc
+                                   :key :rapid-filter}}]
+               (when-not (string/blank? rapid-filter)
+                 [{:fx/type fx.ext.node/with-tooltip-props
+                   :props
+                   {:tooltip
+                    {:fx/type :tooltip
+                     :show-delay [10 :ms]
+                     :text "Clear filter"}}
+                   :desc
+                   {:fx/type :button
+                    :on-action {:event/type :spring-lobby/dissoc
+                                :key :rapid-filter}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-close:16:white"}}}]))}
+            {:fx/type :label
+             :text " Available Packages"
+             :style {:-fx-font-size 16}}
+            {:fx/type ext-table-column-auto-size
+             :items available-packages
              :desc
-             {:fx/type :button
-              :on-action {:event/type :spring-lobby/desktop-browse-dir
-                          :file (io/file spring-isolation-dir "packages")}
-              :graphic
-              {:fx/type font-icon/lifecycle
-               :icon-literal "mdi-folder:16:white"}}}]}
-          {:fx/type ext-table-column-auto-size
-           :items local-packages
-           :desc
-           {:fx/type :table-view
-            :column-resize-policy :constrained
-            :items local-packages
-            :style {:-fx-font-size 16}
-            :columns
-            [{:fx/type :table-column
-              :text "Filename"
-              :pref-width 100
-              :sortable false
-              :cell-value-factory identity
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [i] {:text (:filename i)})}}
-             {:fx/type :table-column
-              :sortable false
-              :text "ID"
-              :pref-width 100
-              :cell-value-factory identity
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [i] {:text (:id i)})}}
-             {:fx/type :table-column
-              :text "Version"
-              :pref-width 100
-              :cell-value-factory :version
-              :cell-factory
-              {:fx/cell-type :table-cell
-               :describe
-               (fn [version] {:text (str version)})}}]}}]}
+             {:fx/type :table-view
+              :items available-packages
+              :column-resize-policy :constrained
+              :style {:-fx-font-size 16}
+              :columns
+              [{:fx/type :table-column
+                :sortable false
+                :text "ID"
+                :pref-width 100
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i]
+                   {:text (str (:id i))})}}
+               {:fx/type :table-column
+                :sortable false
+                :text "Hash"
+                :pref-width 100
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i]
+                   {:text (str (:hash i))})}}
+               {:fx/type :table-column
+                :text "Version"
+                :pref-width 100
+                :cell-value-factory :version
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [version]
+                   {:text (str version)})}}
+               {:fx/type :table-column
+                :text "Download"
+                :sortable false
+                :pref-width 20
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i]
+                   (let [download (get rapid-download (:id i))]
+                     (merge
+                       {:text (str (:message download))
+                        :style {:-fx-font-family skylobby.fx/monospace-font-family}}
+                       (cond
+                         (sdp-hashes (:hash i))
+                         {:graphic
+                          {:fx/type font-icon/lifecycle
+                           :icon-literal "mdi-check:16:white"}}
+                         (:running download)
+                         nil
+                         (not engine-file)
+                         {:text "Needs an engine"}
+                         :else
+                         {:graphic
+                          {:fx/type :button
+                           :on-action {:event/type :spring-lobby/add-task
+                                       :task
+                                       {:spring-lobby/task-type :spring-lobby/rapid-download
+                                        :engine-file engine-file
+                                        :rapid-id (:id i)
+                                        :spring-isolation-dir spring-isolation-dir}}
+                           :graphic
+                           {:fx/type font-icon/lifecycle
+                            :icon-literal "mdi-download:16:white"}}}))))}}]}}
+            {:fx/type :h-box
+             :alignment :center-left
+             :style {:-fx-font-size 16}
+             :children
+             [{:fx/type :label
+               :text " Packages"}
+              {:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type :tooltip
+                 :show-delay [10 :ms]
+                 :text "Open rapid packages directory"}}
+               :desc
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/desktop-browse-dir
+                            :file (io/file spring-isolation-dir "packages")}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-folder:16:white"}}}]}
+            {:fx/type ext-table-column-auto-size
+             :items local-packages
+             :desc
+             {:fx/type :table-view
+              :column-resize-policy :constrained
+              :items local-packages
+              :style {:-fx-font-size 16}
+              :columns
+              [{:fx/type :table-column
+                :text "Filename"
+                :pref-width 100
+                :sortable false
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i] {:text (:filename i)})}}
+               {:fx/type :table-column
+                :sortable false
+                :text "ID"
+                :pref-width 100
+                :cell-value-factory identity
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [i] {:text (:id i)})}}
+               {:fx/type :table-column
+                :text "Version"
+                :pref-width 100
+                :cell-value-factory :version
+                :cell-factory
+                {:fx/cell-type :table-cell
+                 :describe
+                 (fn [version] {:text (str version)})}}]}}]})
        {:fx/type :pane
         :pref-width rapid-download-window-width
         :pref-height rapid-download-window-height})}}))

@@ -27,36 +27,28 @@
   (.consume e))
 
 (defn root-view
-  [{{:keys [current-tasks standalone tasks-by-kind] :as state} :state}]
-  (let [all-tasks (->> tasks-by-kind
-                       (mapcat second)
-                       (concat (vals current-tasks))
-                       (filter some?))
-        tasks-by-type (group-by :spring-lobby/task-type all-tasks)]
-    {:fx/type fx/ext-many
-     :desc
-     [
-      (merge
-        {:fx/type fx.replay/replays-window
-         :on-close-request (when standalone replays-on-close-request)
-         :settings-button true
-         :tasks-by-type tasks-by-type
-         :title (str "skyreplays " app-version)}
-        (select-keys state fx.replay/replays-window-keys))
-      (merge
-        {:fx/type fx.settings/settings-window}
-        (select-keys state fx.settings/settings-window-keys))]}))
+  [_]
+  {:fx/type fx/ext-many
+   :desc
+   [
+    {:fx/type fx.replay/replays-window
+     :on-close-request replays-on-close-request
+     :settings-button true
+     :title (str "skyreplays " app-version)}
+    {:fx/type fx.settings/settings-window}]})
+
 
 (defn create-renderer []
   (log/info "Creating renderer")
   (let [r (fx/create-renderer
-            :middleware (fx/wrap-map-desc
-                          (fn [state]
-                            {:fx/type root-view
-                             :state state}))
-            :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+            :middleware (comp
+                          fx/wrap-context-desc
+                          (fx/wrap-map-desc (fn [_] {:fx/type root-view})))
+            :opts {:fx.opt/map-event-handler spring-lobby/event-handler
+                   :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
+                                                (fx/fn->lifecycle-with-context %))})]
     (log/info "Mounting renderer")
-    (fx/mount-renderer spring-lobby/*state r)))
+    (fx/mount-renderer spring-lobby/*ui-state r)))
 
 (defn -main [& _args]
   (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))

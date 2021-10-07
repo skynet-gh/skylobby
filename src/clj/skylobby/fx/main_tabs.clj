@@ -1,7 +1,9 @@
 (ns skylobby.fx.main-tabs
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
     [skylobby.fx.battles-table :as fx.battles-table]
@@ -13,7 +15,8 @@
     [skylobby.fx.user :as fx.user]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
   (:import
     (javafx.application Platform)))
 
@@ -29,17 +32,15 @@
         (fn []
           (.requestFocus text-field))))))
 
-(def my-channels-view-keys
-  (concat
-    fx.channel/channel-state-keys
-    [:channels :chat-auto-scroll :client-data :message-drafts :my-channels :selected-tab-channel
-     :server-key]))
 
-(defn my-channels-view
-  [{:keys [channels chat-auto-scroll client-data message-drafts my-channels selected-tab-channel
-           server-key]
-    :as state}]
-  (let [my-channel-names (->> my-channels
+(defn- my-channels-view-impl
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
+        selected-tab-channel (fx/sub-val context :selected-tab-channel)
+        my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
                               sort)
@@ -48,9 +49,8 @@
                          0)]
     (if (seq my-channel-names)
       {:fx/type fx.ext.tab-pane/with-selection-props
-       :props
-       {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-channel-tabs}
-        :selected-index selected-index}
+       :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-channel-tabs}
+               :selected-index selected-index}
        :desc
        {:fx/type :tab-pane
         :on-tabs-changed {:event/type :spring-lobby/my-channels-tab-action}
@@ -69,19 +69,19 @@
              :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type ext-recreate-on-key-changed
-              :key channel-name
+              :key [server-key channel-name]
               :desc
-              (merge
-                {:fx/type fx.channel/channel-view
-                 :channel-name channel-name
-                 :channels channels
-                 :chat-auto-scroll chat-auto-scroll
-                 :client-data client-data
-                 :message-draft (get message-drafts channel-name)
-                 :server-key server-key}
-                (select-keys state fx.channel/channel-state-keys))}})
+              {:fx/type fx.channel/channel-view
+               :channel-name channel-name
+               :server-key server-key}}})
           my-channel-names)}}
       {:fx/type :pane})))
+
+(defn my-channels-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :my-channels-view
+      (my-channels-view-impl state))))
 
 
 (def no-matchmaking-tab-ids
@@ -90,49 +90,35 @@
   ["battles" "matchmaking" "chat" "console"])
 
 
-(def main-tab-view-state-keys
-  (concat
-    fx.battles-table/battles-table-state-keys
-    fx.channel/channel-state-keys
-    fx.user/users-table-state-keys
-    [:battle-as-tab :filter-battles :filter-users :join-channel-name :selected-tab-channel :selected-tab-main]))
-
-(def main-tab-view-keys
-  (concat
-    fx.battle/battle-view-keys
-    fx.battles-table/battles-table-keys
-    fx.console/console-view-keys
-    fx.user/users-table-keys
-    [:battles :client-data :channels :compflags :filter-battles :filter-users :join-channel-name
-     :matchmaking-queues :pop-out-battle
-     :selected-tab-channel :selected-tab-main
-     :server :users]))
-
-(defn main-tab-view
-  [{:keys [battle-as-tab battle battles client-data channels filter-battles join-channel-name selected-tab-main server-key pop-out-battle]
-    :as state}]
-  (let [matchmaking (u/matchmaking? state)
+(defn- main-tab-view-impl
+  [{:fx/keys [context] :keys [server-key]}]
+  (let [battle-as-tab (fx/sub-val context :battle-as-tab)
+        filter-battles (fx/sub-val context :filter-battles)
+        join-channel-name (fx/sub-val context :join-channel-name)
+        pop-out-battle (fx/sub-val context :pop-out-battle)
+        selected-tab-main (fx/sub-val context :selected-tab-main)
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        battles (fx/sub-val context get-in [:by-server server-key :battles])
+        channels (fx/sub-val context get-in [:by-server server-key :channels])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        compflags (fx/sub-val context get-in [:by-server server-key :compflags])
+        matchmaking (u/matchmaking? {:compflags compflags})
         main-tab-ids (if matchmaking
                        matchmaking-tab-ids
                        no-matchmaking-tab-ids)
-        in-battle (and (seq battle)
-                       (or (not (:battle-id battle))
-                           (not pop-out-battle)))
+        in-battle (and battle-id
+                       (not pop-out-battle))
         show-battle-tab (and in-battle battle-as-tab)
         main-tab-ids (concat (when show-battle-tab ["battle"]) main-tab-ids)
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
-        users-view (merge
-                     {:fx/type fx.user/users-view
-                      :v-box/vgrow :always}
-                     (select-keys state fx.user/users-table-keys))]
+        users-view {:fx/type fx.user/users-view
+                    :v-box/vgrow :always
+                    :server-key server-key}]
     {:fx/type fx.ext.tab-pane/with-selection-props
-     :props
-     (merge
-       {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs}}
-       (when (< selected-index (count main-tab-ids))
-         {:selected-index selected-index}))
+     :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs}
+             :selected-index (or selected-index 0)}
      :desc
      {:fx/type :tab-pane
       :tab-drag-policy :reorder
@@ -144,7 +130,7 @@
         (when show-battle-tab
           [{:fx/type :tab
             :graphic {:fx/type :label
-                      :text (or (:battle-title (get battles (:battle-id battle)))
+                      :text (or (:battle-title (get battles battle-id))
                                 "Battle")}
             :closable true
             :on-close-request {:event/type :spring-lobby/leave-battle
@@ -152,10 +138,9 @@
                                :consume true}
             :id "battle"
             :content
-            (if (:battle-id battle)
-              (merge
-                {:fx/type fx.battle/battle-view}
-                (select-keys state fx.battle/battle-view-keys))
+            (if battle-id
+              {:fx/type fx.battle/battle-view
+               :server-key server-key}
               {:fx/type :h-box
                :alignment :top-left
                :children
@@ -203,16 +188,12 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-close:16:white"}}]))}
-                (merge
-                  {:fx/type fx.battles-table/battles-table
-                   :v-box/vgrow :always}
-                  (select-keys state fx.battles-table/battles-table-keys))]}
+                {:fx/type fx.battles-table/battles-table
+                 :v-box/vgrow :always
+                 :server-key server-key}]}
               users-view]}
-            (merge
-              {:fx/type fx.battles-buttons/battles-buttons-view}
-              (select-keys state
-                (concat fx.battles-buttons/battles-buttons-state-keys
-                        fx.battles-buttons/battles-buttons-keys)))]}}]
+            {:fx/type fx.battles-buttons/battles-buttons-view
+             :server-key server-key}]}}]
         (when matchmaking
           [{:fx/type :tab
             :graphic {:fx/type :label
@@ -224,9 +205,8 @@
              :divider-positions [0.75]
              :items
              [
-              (merge
-                {:fx/type fx.matchmaking/matchmaking-view}
-                state)
+              {:fx/type fx.matchmaking/matchmaking-view
+               :server-key server-key}
               users-view]}}])
         [{:fx/type :tab
           :graphic {:fx/type :label
@@ -234,51 +214,50 @@
           :closable false
           :id "chat"
           :content
-          (if (= "chat" selected-tab-main)
-            {:fx/type :split-pane
-             :divider-positions [0.70 0.9]
-             :items
-             [(merge
-                {:fx/type my-channels-view}
-                (select-keys state my-channels-view-keys))
-              users-view
-              {:fx/type :v-box
+          {:fx/type :split-pane
+           :divider-positions [0.70 0.9]
+           :items
+           [{:fx/type my-channels-view
+             :server-key server-key}
+            users-view
+            {:fx/type :v-box
+             :children
+             [{:fx/type :label
+               :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
+              {:fx/type fx.channels/channels-table
+               :v-box/vgrow :always
+               :server-key server-key}
+              {:fx/type :h-box
+               :alignment :center-left
                :children
-               [{:fx/type :label
-                 :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
-                (merge
-                  {:fx/type fx.channels/channels-table
-                   :v-box/vgrow :always}
-                  (select-keys state fx.channels/channels-table-keys))
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type :button
-                   :text ""
-                   :on-action {:event/type :spring-lobby/join-channel
-                               :channel-name join-channel-name
-                               :client-data client-data}
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-plus:20:white"}}
-                  {:fx/type :text-field
-                   :text join-channel-name
-                   :prompt-text "New Channel"
-                   :on-text-changed {:event/type :spring-lobby/assoc-in
-                                     :path [:by-server server-key :join-channel-name]}
-                   :on-action {:event/type :spring-lobby/join-channel
-                               :channel-name join-channel-name
-                               :client-data client-data}}]}]}]}
-            {:fx/type :pane})}
+               [
+                {:fx/type :button
+                 :text ""
+                 :on-action {:event/type :spring-lobby/join-channel
+                             :channel-name join-channel-name
+                             :client-data client-data}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-plus:20:white"}}
+                {:fx/type :text-field
+                 :text join-channel-name
+                 :prompt-text "New Channel"
+                 :on-text-changed {:event/type :spring-lobby/assoc-in
+                                   :path [:by-server server-key :join-channel-name]}
+                 :on-action {:event/type :spring-lobby/join-channel
+                             :channel-name join-channel-name
+                             :client-data client-data}}]}]}]}}
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text "Console"}
           :closable false
           :id "console"
           :content
-          (if (= "console" selected-tab-main)
-            (merge
-              {:fx/type fx.console/console-view}
-              (select-keys state fx.console/console-view-keys))
-            {:fx/type :pane})}])}}))
+          {:fx/type fx.console/console-view
+           :server-key server-key}}])}}))
+
+(defn main-tab-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :main-tab-view
+      (main-tab-view-impl state))))

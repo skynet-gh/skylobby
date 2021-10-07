@@ -1,8 +1,11 @@
 (ns skylobby.fx
   (:require
+    [cljfx.api :as fx]
     [cljfx.css :as css]
     [clojure.java.io :as io]
+    [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
+    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (javafx.stage Screen)))
@@ -140,6 +143,99 @@
 (defn stylesheet-urls [css]
   [(str (::css/url default-classes-css))
    (str (::css/url (or css default-style)))])
+
+(defn stylesheet-urls-sub [context]
+  (stylesheet-urls (fx/sub-val context :css)))
+
+(defn all-tasks-sub [context]
+  (->> (fx/sub-val context :tasks-by-kind)
+       (mapcat second)
+       (concat (vals (fx/sub-val context :current-tasks)))
+       (filter some?)
+       doall))
+
+(defn tasks-by-type-sub [context]
+  (group-by :spring-lobby/task-type (fx/sub-ctx context all-tasks-sub)))
+
+(defn tasks-of-type-sub [context task-type]
+  (->> (fx/sub-ctx context all-tasks-sub)
+       (filter (comp #{task-type} :spring-lobby/task-type))))
+
+(defn valid-servers-sub [context]
+  (u/valid-servers (fx/sub-val context :by-server)))
+
+(defn valid-server-keys-sub [context]
+  (u/valid-server-keys (fx/sub-val context :by-server)))
+
+
+(defn welcome-server-key-sub [context]
+  (u/server-key {:server-url (fx/sub-val context (comp first :server))
+                 :username (fx/sub-val context :username)}))
+
+(defn selected-server-data-sub [context]
+  (get (fx/sub-val context :by-server)
+       (u/server-key {:server-url (first (fx/sub-val context :server))
+                      :username (fx/sub-val context :username)})))
+
+(defn selected-tab-server-key-sub [context]
+  (let [selected-server-tab (fx/sub-val context :selected-server-tab)
+        by-server-keys (fx/sub-val context (comp keys :by-server))]
+    (or (->> by-server-keys
+             (filter #{selected-server-tab})
+             first)
+        :local)))
+
+(defn auto-servers-sub [context]
+  (->> (fx/sub-val context :servers)
+       (filterv (comp :auto-connect second))))
+
+(defn server-key-set-sub [context]
+  (fx/sub-val context (comp set keys :by-server)))
+
+(defn auto-servers-not-connected-sub [context]
+  (let [server-keys (fx/sub-ctx context server-key-set-sub)
+        logins (fx/sub-val context :logins)]
+    (->> (fx/sub-ctx context auto-servers-sub)
+         (filter (comp :auto-connect second))
+         (map (fn [[server-url _server-data]]
+                (u/server-key
+                  {:server-url server-url
+                   :username (-> logins (get server-url) :username)})))
+         (filter some?)
+         (remove (fn [server-key] (contains? server-keys server-key)))
+         doall)))
+
+
+(defn map-details-sub [context map-key]
+  (resource/cached-details (fx/sub-val context :map-details) map-key))
+
+(defn mod-details-sub [context mod-key]
+  (resource/cached-details (fx/sub-val context :mod-details) mod-key))
+
+(defn replay-details-sub [context k]
+  (get (fx/sub-val context :replay-details) k))
+
+(defn spring-root-sub [context server-url]
+  (let [servers (fx/sub-val context :servers)]
+    (or (-> servers (get server-url) :spring-isolation-dir)
+        (fx/sub-val context :spring-isolation-dir))))
+
+(defn spring-root-resources-sub [context server-url]
+  (let [spring-root (fx/sub-ctx context spring-root-sub server-url)]
+    (resource/spring-root-resources spring-root (fx/sub-val context :by-spring-root))))
+
+(defn spring-resources-sub [context spring-root]
+  (resource/spring-root-resources spring-root (fx/sub-val context :by-spring-root)))
+
+(defn selected-replay-sub [context]
+  (or (get (fx/sub-val context :parsed-replays-by-path) (fs/canonical-path (fx/sub-val context :selected-replay-file)))
+      (get (fx/sub-val context :online-bar-replays) (fx/sub-val context :selected-replay-id))))
+
+(defn battle-channel-sub [context server-key]
+  (let [battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        channel-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :channel-name])]
+    (or channel-name
+        (str "__battle__" battle-id))))
 
 
 (def icons

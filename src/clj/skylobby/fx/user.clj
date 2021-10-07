@@ -1,24 +1,25 @@
 (ns skylobby.fx.user
   (:require
+    [cljfx.api :as fx]
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
 
 
-(def users-table-state-keys [:ignore-users])
-
-(def users-table-keys
-  (concat
-    users-table-state-keys
-    [:battles :client-data :filter-users :server-key :users]))
-
-(defn users-table [{:keys [battles client-data ignore-users server-key users]}]
-  (let [battles-by-users (->> battles
+(defn- users-table-impl
+  [{:fx/keys [context]
+    :keys [users server-key]}]
+  (let [ignore-users (fx/sub-val context :ignore-users)
+        battles (fx/sub-val context get-in [:by-server server-key :battles])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        battles-by-users (->> battles
                               vals
                               (mapcat
                                 (fn [battle]
@@ -183,9 +184,18 @@
         {:fx/cell-type :table-cell
          :describe (fn [user-agent] {:text (str user-agent)})}}]}}))
 
+(defn users-table [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :users-table
+      (users-table-impl state))))
 
-(defn users-view [{:keys [filter-users users] :as state}]
-  (let [
+
+(defn- users-view-impl
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [filter-users (fx/sub-val context :filter-users)
+        users (fx/sub-val context get-in [:by-server server-key :users])
         bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
         bot-count (count (get bot-or-human true))
         human-count (count (get bot-or-human false))
@@ -227,7 +237,12 @@
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-close:16:white"}}]))}
-      (merge
-        {:fx/type users-table}
-        state
-        {:users filtered-users})]}))
+      {:fx/type users-table
+       :v-box/vgrow :always
+       :users filtered-users}]}))
+
+(defn users-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :users-table
+      (users-view-impl state))))

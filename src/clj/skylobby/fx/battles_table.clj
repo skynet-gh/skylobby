@@ -1,30 +1,32 @@
 (ns skylobby.fx.battles-table
   (:require
     [clojure.string :as string]
+    [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
     java-time
+    skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
 
 
-(def battles-table-state-keys
-  [:battle-password :filter-battles :now])
-
-(def battles-table-keys
-  (concat
-    battles-table-state-keys
-    [:battle :battles :client-data :selected-battle :server-key :users]))
-
-(defn battles-table
-  [{:keys [battle battle-password battles client-data filter-battles now selected-battle server-key users]}]
-  (let [filter-lc (when-not (string/blank? filter-battles)
+(defn- battles-table-impl
+  [{:fx/keys [context] :keys [server-key]}]
+  (let [battle-password (fx/sub-val context :battle-password)
+        filter-battles (fx/sub-val context :filter-battles)
+        battle (fx/sub-val context get-in [:by-server server-key :battle])
+        battles (fx/sub-val context get-in [:by-server server-key :battles])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        users (fx/sub-val context get-in [:by-server server-key :users])
+        filter-lc (when-not (string/blank? filter-battles)
                     (string/lower-case filter-battles))
-        now (or now (u/curr-millis))]
+        now (fx/sub-val context :now)]
     {:fx/type fx.ext.table-view/with-selection-props
      :props {:selection-mode :single
              :on-selected-item-changed {:event/type :spring-lobby/select-battle
@@ -42,7 +44,8 @@
                             (string/includes? (string/lower-case battle-title) filter-lc))
                         true)))
                   (sort-by (juxt (comp count :users) :battle-spectators))
-                  reverse)
+                  reverse
+                  doall)
       :desc
       {:fx/type :table-view
        :style {:-fx-font-size 15}
@@ -135,12 +138,13 @@
                      {:fx/type font-icon/lifecycle
                       :icon-literal "mdi-checkbox-blank-circle-outline:16:green"})]
                   (when (and ingame game-start-time)
-                    [{:fx/type ext-recreate-on-key-changed
-                      :key (str now)
-                      :desc
-                      {:fx/type :label
-                       :text
-                       (str " " (u/format-duration (java-time/duration (- now game-start-time) :millis)))}}]))}}))}}
+                    (let [now (or now (u/curr-millis))]
+                      [{:fx/type ext-recreate-on-key-changed
+                        :key (str now)
+                        :desc
+                        {:fx/type :label
+                         :text
+                         (str " " (u/format-duration (java-time/duration (- now game-start-time) :millis)))}}])))}}))}}
         {:fx/type :table-column
          :text "Map"
          :pref-width 200
@@ -195,3 +199,9 @@
          :cell-factory
          {:fx/cell-type :table-cell
           :describe (fn [engine] {:text (str engine)})}}]}}}))
+
+(defn battles-table [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :battles-table
+      (battles-table-impl state))))

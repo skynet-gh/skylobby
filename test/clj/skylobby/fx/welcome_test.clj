@@ -1,23 +1,27 @@
 (ns skylobby.fx.welcome-test
   (:require
+    [cljfx.api :as fx]
     [clojure.test :refer [deftest is]]
-    [skylobby.fx.welcome :as fx]))
+    [skylobby.fx.welcome :as fx.welcome]))
 
 
 (deftest connect-button
   (is (map?
-        (fx/connect-button nil))))
+        (fx.welcome/connect-button {:fx/context (fx/create-context nil)}))))
 
 (deftest singleplayer-buttons
   (is (map?
-        (fx/singleplayer-buttons nil))))
+        (fx.welcome/singleplayer-buttons {:fx/context (fx/create-context nil)}))))
 
 (deftest multiplayer-buttons
   (is (map?
-        (fx/multiplayer-buttons nil))))
+        (fx.welcome/multiplayer-buttons {:fx/context (fx/create-context nil)}))))
 
 (deftest welcome-view
   (is (map?
-        (fx/welcome-view nil)))
+        (fx.welcome/welcome-view {:fx/context (fx/create-context nil)})))
   (is (map?
-        (fx/welcome-view {:by-server {:local {:battle {:battle-id :singleplayer}}}}))))
+        (fx.welcome/welcome-view
+          {:fx/context
+           (fx/create-context
+             {:by-server {:local {:battle {:battle-id :singleplayer}}}})}))))
