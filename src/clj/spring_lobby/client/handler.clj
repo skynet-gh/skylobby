@@ -337,15 +337,19 @@
         channel-name (u/user-channel username)]
     (swap! state-atom
       (fn [state]
-        (-> state
-            (update-in [:by-server server-url]
-              (fn [state]
-                (-> state
-                    (update-in [:channels channel-name :messages]
-                      (u/update-chat-messages-fn username message))
-                    (assoc-in [:my-channels channel-name] {}))))
-            (assoc :selected-tab-main "chat")
-            (assoc :selected-tab-channel channel-name))))))
+        (let [focus-chat (:focus-chat-on-message state)]
+          (cond-> state
+                  true
+                  (update-in [:by-server server-url]
+                    (fn [state]
+                      (-> state
+                          (update-in [:channels channel-name :messages]
+                            (u/update-chat-messages-fn username message))
+                          (assoc-in [:my-channels channel-name] {}))))
+                  focus-chat
+                  (assoc :selected-tab-main "chat")
+                  focus-chat
+                  (assoc :selected-tab-channel channel-name)))))))
 
 (defmethod handle "SAYPRIVATEEX" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]

@@ -146,7 +146,7 @@
   [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir

@@ -73,6 +73,7 @@
               extra-replay-path (fx/sub-val context :extra-replay-path)
               extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
               extra-replay-sources (fx/sub-val context :extra-replay-sources)
+              focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
               hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
               hide-spads-messages (fx/sub-val context :hide-spads-messages)
               hide-vote-messages (fx/sub-val context :hide-vote-messages)
@@ -184,6 +185,15 @@
                  {:fx/type :label
                   :text " Chat"
                   :style {:-fx-font-size 24}}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean focus-chat-on-message)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :focus-chat-on-message}}
+                   {:fx/type :label
+                    :text " Focus chat on incoming message"}]}
                  {:fx/type :h-box
                   :style {:-fx-font-size 18}
                   :children
