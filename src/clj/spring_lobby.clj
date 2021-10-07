@@ -245,15 +245,24 @@
      :file-events (initial-file-events)
      :minimap-type (first fx.battle/minimap-types)
      :replay-minimap-type (first fx.battle/minimap-types)
-     :map-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
-     :mod-details (cache/fifo-cache-factory (sorted-map) :threshold 16)
-     :replay-details (cache/fifo-cache-factory (sorted-map) :threshold 8)
+     :map-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
      :console-auto-scroll true}))
 
 
+(defn cache-factory-with-threshold [factory threshold]
+  (fn [data]
+    (factory data :threshold threshold)))
+
+
 (def ^:dynamic *state (atom {}))
-(def ^:dynamic *ui-state (atom (fx/create-context {})))
+(def ^:dynamic *ui-state
+  (atom
+    (fx/create-context
+      {}
+      (cache-factory-with-threshold cache/lru-cache-factory 16384))))
 
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
