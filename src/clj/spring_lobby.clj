@@ -493,9 +493,10 @@
     (try
       (when (or (not= (auto-get-resources-server-relevant-keys old-server)
                       (auto-get-resources-server-relevant-keys new-server))
-                (let [username (:username new-server)
-                      in-sync (-> new-server :battle :users (get username) :battle-status :sync)]
-                  (not in-sync)))
+                (and (-> new-server :battle :battle-id)
+                     (let [username (:username new-server)
+                           in-sync (-> new-server :battle :users (get username) :battle-status :sync)]
+                       (not in-sync))))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
                       rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
