@@ -30,6 +30,7 @@
   (cond
     (string/blank? mod-name) nil
     (string/includes? mod-name "Total Atomization Prime") "TAP GitHub releases"
+    (string/includes? mod-name "Balanced Annihilation") "Balanced Annihilation GitHub releases"
     :else nil))
 
 
