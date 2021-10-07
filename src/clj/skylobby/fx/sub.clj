@@ -33,6 +33,10 @@
   (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
     (:battle-status my-battle-state)))
 
+(defn my-team-color [context server-key]
+  (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
+    (:team-color my-battle-state)))
+
 (defn am-spec [context server-key]
   (let [my-battle-status (fx/sub-ctx context my-battle-status server-key)]
     (-> my-battle-status :mode not)))

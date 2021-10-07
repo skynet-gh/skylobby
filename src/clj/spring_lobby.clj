@@ -493,9 +493,10 @@
     (try
       (when (or (not= (auto-get-resources-server-relevant-keys old-server)
                       (auto-get-resources-server-relevant-keys new-server))
-                (let [username (:username new-server)
-                      in-sync (-> new-server :battle :users (get username) :battle-status :sync)]
-                  (not in-sync)))
+                (and (-> new-server :battle :battle-id)
+                     (let [username (:username new-server)
+                           sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
+                       (not= 1 sync-status))))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
                       rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
@@ -992,10 +993,19 @@
 
 
 (defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (not= (update-battle-status-sync-relevant-data old-state)
-              (update-battle-status-sync-relevant-data new-state))
+  (when (or (not= (update-battle-status-sync-relevant-data old-state)
+                  (update-battle-status-sync-relevant-data new-state))
+            (some
+              (fn [[_server-key server-data]]
+                (and (-> server-data :battle :battle-id)
+                     (let [username (:username server-data)
+                           sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
+                       (not= 1 sync-status))))
+              (->> new-state :by-server u/valid-servers seq)))
+    (log/info "Updating battle sync status")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
+        (log/info "Updating battle sync status for" server-key)
         (let [old-server (-> old-state :by-server (get server-key))
               server-url (-> new-server :client-data :server-url)
               {:keys [servers spring-isolation-dir]} new-state
@@ -1020,6 +1030,7 @@
                                    (-> old-server :battle :battle-id))]
           (when (and battle-id
                      (or (not= old-sync new-sync)
+                         (not= old-sync-number new-sync-number)
                          battle-changed))
             (if battle-changed
               (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
@@ -3239,7 +3250,7 @@
   (let [player-name (or (:bot-name id) (:username id))]
     (if client-data
       (let [prefix (if is-bot
-                     (str "UPDATEBOT " player-name) ; TODO normalize
+                     (str "UPDATEBOT " player-name)
                      "MYBATTLESTATUS")]
         (log/debug player-name (pr-str battle-status) team-color)
         (message/send-message *state client-data

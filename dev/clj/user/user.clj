@@ -136,7 +136,10 @@
         (stop-chimer chimer)))
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
-    (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
+    (let [new-state-var (find-var 'spring-lobby/*state)
+          new-state-atom (var-get new-state-var)]
+      (remove-watch new-state-atom :ui-state) ; to prevent leak
+      (alter-var-root new-state-var (constantly *state)))
     (alter-var-root (find-var 'spring-lobby/*ui-state) (constantly *ui-state))
     (require 'spring-lobby.client)
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))

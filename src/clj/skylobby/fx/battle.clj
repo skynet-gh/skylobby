@@ -213,8 +213,9 @@
 
 (defn battle-buttons
   [{:fx/keys [context]
-    :keys [server-key my-player singleplayer team-counts team-skills]}]
+    :keys [server-key my-player team-counts team-skills]}]
   (let [
+        singleplayer (= :local server-key)
         bot-name (fx/sub-val context :bot-name)
         bot-username (fx/sub-val context :bot-username)
         bot-username (if (string/blank? bot-username)
@@ -263,9 +264,9 @@
         am-ingame (fx/sub-ctx context sub/am-ingame server-key)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         username (fx/sub-val context get-in [:by-server server-key :username])
-        me (fx/sub-val context get-in [:by-server server-key :users username])
         my-client-status (fx/sub-ctx context sub/my-client-status server-key)
         my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
+        my-team-color (fx/sub-ctx context sub/my-team-color server-key)
         my-sync-status (int (or (:sync my-battle-status) 0))
         in-sync (= 1 (:sync my-battle-status))
         ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
@@ -489,10 +490,11 @@
              [{:fx/type :check-box
                :selected (-> my-battle-status :ready boolean)
                :style {:-fx-padding "10px"}
-               :on-selected-changed (merge me
-                                      {:event/type :spring-lobby/battle-ready-change
-                                       :client-data (when-not singleplayer client-data)
-                                       :username username})}
+               :on-selected-changed {:event/type :spring-lobby/battle-ready-change
+                                     :client-data client-data
+                                     :username username
+                                     :battle-status my-battle-status
+                                     :team-color my-team-color}}
               {:fx/type :label
                :text " Ready "}]
              [{:fx/type :check-box
