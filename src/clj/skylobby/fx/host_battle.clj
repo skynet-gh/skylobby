@@ -1,12 +1,14 @@
 (ns skylobby.fx.host-battle
   (:require
+    [cljfx.api :as fx]
     clojure.set
     skylobby.fx
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.mods :refer [mods-view]]
-    [skylobby.resource :as resource]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -20,27 +22,40 @@
    :map-input-prefix :map-name :mod-filter :mod-name :selected-server-tab :servers
    :show-host-battle-window :spring-isolation-dir])
 
-(defn host-battle-window
-  [{:keys [battle-password battle-port battle-title by-server by-spring-root css engine-filter engine-version
-           map-input-prefix map-name mod-filter mod-name screen-bounds selected-server-tab servers
-           show-host-battle-window spring-isolation-dir] :as state}]
-  (let [server-data (get by-server selected-server-tab)
-        server-url (-> server-data :client-data :server-url)
-        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                        spring-isolation-dir)
-        {:keys [engines maps mods]} (resource/spring-root-resources spring-root by-spring-root)
-        host-battle-state (-> state
-                              (clojure.set/rename-keys {:battle-port :host-port :battle-title :title})
-                              (select-keys [:battle-password :host-port :title :engine-version
-                                            :mod-name :map-name])
-                              (assoc :mod-hash -1
-                                     :map-hash -1))
-        host-battle-action (merge
-                             {:event/type :spring-lobby/host-battle
-                              :host-battle-state host-battle-state}
-                             (select-keys server-data [:client-data :scripttags :use-git-mod-version]))]
+(defn host-battle-window-impl
+  [{:fx/keys [context]
+    :keys [screen-bounds]}]
+  (let [
+        battle-password (fx/sub-val context :battle-password)
+        battle-port (fx/sub-val context :battle-port)
+        battle-title (fx/sub-val context :battle-title)
+        engine-filter (fx/sub-val context :engine-filter)
+        engine-version (fx/sub-val context :engine-version)
+        map-input-prefix (fx/sub-val context :map-input-prefix)
+        map-name (fx/sub-val context :map-name)
+        mod-filter (fx/sub-val context :mod-filter)
+        mod-name (fx/sub-val context :mod-name)
+        server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        scripttags (fx/sub-val context get-in [:by-server server-key :scripttags])
+        show-host-battle-window (fx/sub-val context :show-host-battle-window)
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        {:keys [engines maps mods]} (fx/sub-ctx context sub/spring-resources spring-root)
+        host-battle-action {:event/type :spring-lobby/host-battle
+                            :host-battle-state
+                            {:host-port battle-port
+                             :title battle-title
+                             :battle-password battle-password
+                             :engine-version engine-version
+                             :map-name map-name
+                             :mod-name mod-name
+                             :mod-hash -1
+                             :map-hash -1}
+                            :client-data client-data
+                            :scripttags scripttags
+                            :use-git-mod-version (fx/sub-val context :use-git-mod-version)}]
     {:fx/type :stage
-     :showing (boolean show-host-battle-window)
+     :showing (boolean (and client-data show-host-battle-window))
      :title (str u/app-name " Host Battle")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
@@ -51,7 +66,7 @@
      :height (skylobby.fx/fitheight screen-bounds host-battle-window-height)
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show-host-battle-window
         {:fx/type :v-box
@@ -96,7 +111,7 @@
            :mod-filter mod-filter
            :mod-name mod-name
            :mods mods
-           :spring-isolation-dir spring-isolation-dir}
+           :spring-isolation-dir spring-root}
           {:fx/type maps-view
            :flow false
            :map-name map-name
@@ -104,10 +119,16 @@
            :map-input-prefix map-input-prefix
            :on-value-changed {:event/type :spring-lobby/assoc
                               :key :map-name}
-           :spring-isolation-dir spring-isolation-dir}
+           :spring-isolation-dir spring-root}
           {:fx/type :pane
            :v-box/vgrow :always}
           {:fx/type :button
            :text "Host Battle"
            :on-action host-battle-action}]}
         {:fx/type :pane})}}))
+
+(defn host-battle-window [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :host-battle-window
+      (host-battle-window-impl state))))

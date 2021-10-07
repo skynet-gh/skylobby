@@ -1,5 +1,6 @@
 (ns skylobby.fx.server
   (:require
+    [cljfx.api :as fx]
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
@@ -25,8 +26,13 @@
              (str server-alias " (" server-url ")")
              (str server-url))}))
 
-(defn server-combo-box [{:keys [disable on-value-changed server servers]}]
-  (let [value (->> servers
+(defn server-combo-box
+  [{:fx/keys [context]
+    :keys [on-value-changed]}]
+  (let [
+        server (fx/sub-val context :server)
+        servers (fx/sub-val context :servers)
+        value (->> servers
                    (filter (comp #{(first server)} first))
                    first)
         items (sort-by (juxt (comp :alias second) first) servers)]
@@ -34,7 +40,6 @@
      :key items
      :desc
      {:fx/type :combo-box
-      :disable (boolean disable)
       :value value
       :items items
       :prompt-text "< choose a server >"
@@ -50,9 +55,18 @@
    :server-spring-root-draft :server-ssl :servers :show-servers-window])
 
 (defn servers-window-impl
-  [{:keys [css screen-bounds server-alias server-auto-connect server-edit server-host server-port
-           server-spring-root-draft server-ssl servers show-servers-window]}]
-  (let [url (first server-edit)
+  [{:fx/keys [context]
+    :keys [screen-bounds]}]
+  (let [server-alias (fx/sub-val context :server-alias)
+        server-auto-connect (fx/sub-val context :server-auto-connect)
+        server-edit (fx/sub-val context :server-edit)
+        server-host (fx/sub-val context :server-host)
+        server-port (fx/sub-val context :server-port)
+        server-spring-root-draft (fx/sub-val context :server-spring-root-draft)
+        server-ssl (fx/sub-val context :server-ssl)
+        servers (fx/sub-val context :servers)
+        show-servers-window (fx/sub-val context :show-servers-window)
+        url (first server-edit)
         port (if (string/blank? (str server-port))
                default-server-port (str server-port))
         server-url (str server-host ":" port)]
@@ -68,7 +82,7 @@
      :height (skylobby.fx/fitheight screen-bounds server-window-height)
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show-servers-window
         {:fx/type :v-box

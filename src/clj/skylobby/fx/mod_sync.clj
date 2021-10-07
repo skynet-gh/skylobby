@@ -1,10 +1,16 @@
 (ns skylobby.fx.mod-sync
   (:require
+    [cljfx.api :as fx]
+    [clojure.string :as string]
+    skylobby.fx
+    [skylobby.fx.download :refer [download-sources-by-name]]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -20,13 +26,41 @@
    #"Total Atomization Prime"])
 
 
-(defn mod-sync-pane
-  [{:keys [battle-modname battle-mod-details copying downloadables-by-url engine-details engine-file
-           file-cache http-download importables-by-path indexed-mod mod-update-tasks
-           rapid-data-by-version rapid-download rapid-tasks-by-id spring-isolation-dir
-           springfiles-search-results tasks-by-type]}]
-  (let [no-mod-details (not (resource/details? battle-mod-details))
-        mod-file (:file battle-mod-details)
+(defn mod-download-source [mod-name]
+  (cond
+    (string/blank? mod-name) nil
+    (string/includes? mod-name "Total Atomization Prime") "TAP GitHub releases"
+    :else nil))
+
+
+(defn- mod-sync-pane-impl
+  [{:fx/keys [context]
+    :keys [battle-modname engine-version mod-name spring-isolation-dir]}]
+  (let [copying (fx/sub-val context :copying)
+        downloadables-by-url (fx/sub-val context :downloadables-by-url)
+        file-cache (fx/sub-val context :file-cache)
+        http-download (fx/sub-val context :http-download)
+        importables-by-path (fx/sub-val context :importables-by-path)
+        rapid-data-by-version (fx/sub-val context :rapid-data-by-version)
+        rapid-download (fx/sub-val context :rapid-download)
+        springfiles-search-results (fx/sub-val context :springfiles-search-results)
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        mod-name (or mod-name battle-modname)
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)
+        mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        no-mod-details (not (resource/details? mod-details))
+        refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
+        mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
+        update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
+                                     (map :download-source-name)
+                                     set)
+        mod-update-tasks (concat refresh-mods-tasks mod-details-tasks)
+        rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+                               (map (juxt :rapid-id identity))
+                               (into {}))
+        mod-file (:file mod-details)
+        engine-details (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version)
+        engine-file (:file engine-details)
         canonical-path (fs/canonical-path mod-file)
         download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
                                    (map (juxt (comp :download-url :downloadable) identity))
@@ -44,31 +78,36 @@
        (let [severity (if no-mod-details
                         (if indexed-mod
                           -1 2)
-                        (if (= battle-modname
+                        (if (= mod-name
                                (:mod-name indexed-mod))
                           0 1))]
          [{:severity severity
            :text "info"
-           :human-text battle-modname
+           :human-text mod-name
            :tooltip (if (zero? severity)
                       canonical-path
                       (if indexed-mod
-                        (str "Loading mod details for '" battle-modname "'")
-                        (str "Game '" battle-modname "' not found locally")))}])
+                        (str "Loading mod details for '" mod-name "'")
+                        (str "Game '" mod-name "' not found locally")))}])
        (when (and no-mod-details (not indexed-mod))
          (concat
            (let [downloadable (->> downloadables-by-url
                                    vals
                                    (filter (comp #{:spring-lobby/mod} :resource-type))
-                                   (filter (partial resource/could-be-this-mod? battle-modname))
+                                   (filter (partial resource/could-be-this-mod? mod-name))
                                    first)
                  download-url (:download-url downloadable)
                  download (get http-download download-url)
-                 in-progress (or (:running download)
-                                 (contains? download-tasks-by-url download-url))
+                 possible-source-name (mod-download-source mod-name)
+                 in-progress (if downloadable
+                               (or (:running download)
+                                   (contains? download-tasks-by-url download-url))
+                               (get update-download-sources possible-source-name))
                  {:keys [download-source-name download-url]} downloadable
-                 file-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
-                 springname battle-modname
+                 dest (resource/resource-dest spring-isolation-dir downloadable)
+                 dest-path (fs/canonical-path dest)
+                 dest-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
+                 springname mod-name
                  springfiles-searched (contains? springfiles-search-results springname)
                  springfiles-search-result (get springfiles-search-results springname)
                  springfiles-mirror-set (set (:mirrors springfiles-search-result))
@@ -81,27 +120,46 @@
                                                   keys
                                                   (filter springfiles-mirror-set)
                                                   seq))]
-             (if downloadable
-               [{:severity (if file-exists -1 2)
+             (if (or downloadable possible-source-name)
+               [{:severity (if dest-exists -1 2)
                  :text "download"
                  :human-text (if in-progress
-                               (u/download-progress download)
+                               (if downloadable
+                                 (u/download-progress download)
+                                 (str "Refreshing " possible-source-name))
                                (if no-mod-details
                                  (if downloadable
                                    (str "Download from " download-source-name)
-                                   (str "No download for " battle-modname))
-                                 (:mod-name battle-mod-details)))
+                                   (if possible-source-name
+                                     (str "Update download source " possible-source-name)
+                                     (str "No download for " mod-name)))
+                                 (:mod-name mod-details)))
                  :in-progress in-progress
-                 :tooltip (if downloadable
-                            (str "Download from " download-source-name " at " download-url)
-                            (str "No http download found for " battle-modname))
+                 :tooltip (if in-progress
+                            (if downloadable
+                              (str "Downloading " (u/download-progress download))
+                              (str "Refreshing " possible-source-name))
+                            (if dest-exists
+                              (str "Downloaded to " dest-path)
+                              (if downloadable
+                                (str "Download from " download-source-name " at " download-url)
+                                (if possible-source-name
+                                  (str "Update download source " possible-source-name)
+                                  (str "No http download found for " mod-name)))))
                  :action
-                 (when downloadable
-                   {:event/type :spring-lobby/add-task
-                    :task
-                    {:spring-lobby/task-type :spring-lobby/http-downloadable
-                     :downloadable downloadable
-                     :spring-isolation-dir spring-isolation-dir}})}]
+                 (when-not dest-exists
+                   (if downloadable
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      {:spring-lobby/task-type :spring-lobby/http-downloadable
+                       :downloadable downloadable
+                       :spring-isolation-dir spring-isolation-dir}}
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      (merge
+                        {:spring-lobby/task-type :spring-lobby/update-downloadables
+                         :force true}
+                        (get download-sources-by-name possible-source-name))}))}]
                (when (and springname (not (some #(re-find % springname) no-springfiles)))
                  [{:severity 2
                    :text "springfiles"
@@ -125,8 +183,8 @@
                          :spring-isolation-dir spring-isolation-dir}
                         {:spring-lobby/task-type :spring-lobby/search-springfiles
                          :springname springname})})}])))
-           (when (and battle-modname (not (some #(re-find % battle-modname) no-rapid)))
-             (let [rapid-data (get rapid-data-by-version battle-modname)
+           (when (and mod-name (not (some #(re-find % mod-name) no-rapid)))
+             (let [rapid-data (get rapid-data-by-version mod-name)
                    rapid-id (:id rapid-data)
                    rapid-download (get rapid-download rapid-id)
                    running (some? (get rapid-tasks-by-id rapid-id))
@@ -163,7 +221,7 @@
                                 (str "Use rapid downloader to get resource id " rapid-id
                                      " using engine " (:engine-version engine-details)))
                               "Rapid requires an engine to work, get engine first")
-                            (str "No rapid download found for " battle-modname))
+                            (str "No rapid download found for " mod-name))
                  :in-progress in-progress
                  :action
                  (cond
@@ -185,12 +243,12 @@
                     :task {:spring-lobby/task-type :spring-lobby/update-rapid
                            :engine-version (:engine-version engine-details)
                            :force true
-                           :mod-name battle-modname
+                           :mod-name mod-name
                            :spring-isolation-dir spring-isolation-dir}})}]))
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/mod} :resource-type))
-                                     (filter (partial resource/could-be-this-mod? battle-modname))
+                                     (filter (partial resource/could-be-this-mod? mod-name))
                                      first)
                  resource-file (:resource-file importable)
                  dest (resource/resource-dest spring-isolation-dir importable)
@@ -203,7 +261,7 @@
                :tooltip (if importable
                           (str "Copy game from " (:import-source-name importable)
                                " at " resource-file)
-                          (str "No local import found for " battle-modname))
+                          (str "No local import found for " mod-name))
                :in-progress (get copying resource-file)
                :action (when importable
                          {:event/type :spring-lobby/add-task
@@ -213,8 +271,8 @@
                            :spring-isolation-dir spring-isolation-dir}})}])))
        (when (= :directory
                 (::fs/source indexed-mod))
-         (let [battle-mod-git-ref (u/mod-git-ref battle-modname)
-               severity (if (= battle-modname
+         (let [battle-mod-git-ref (u/mod-git-ref mod-name)
+               severity (if (= mod-name
                                (:mod-name indexed-mod))
                           0 1)
                in-progress (->> (get tasks-by-type :spring-lobby/git-mod)
@@ -236,9 +294,9 @@
                   {:human-text (if (zero? severity)
                                  (str "git at ref " battle-mod-git-ref)
                                  (if in-progress
-                                   (str "Resetting " (fs/filename (:file battle-mod-details))
+                                   (str "Resetting " (fs/filename (:file mod-details))
                                         " git to ref " battle-mod-git-ref)
-                                   (str "Reset " (fs/filename (:file battle-mod-details))
+                                   (str "Reset " (fs/filename (:file mod-details))
                                         " git to ref " battle-mod-git-ref)))
                    :action
                    {:event/type :spring-lobby/add-task
@@ -253,4 +311,10 @@
                    :text "rehost"
                    :human-text "Or rehost to change game version"
                    :tooltip (str "Leave battle and host again to use game "
-                                 (:mod-name battle-mod-details))})])))))}))
+                                 (:mod-name mod-details))})])))))}))
+
+(defn mod-sync-pane [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :mod-sync-pane
+      (mod-sync-pane-impl state))))

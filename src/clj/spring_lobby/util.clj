@@ -263,6 +263,12 @@
        (remove (comp string/blank? first))
        (filter (comp :accepted second))))
 
+(defn valid-server-keys [by-server]
+  (->> (dissoc by-server :local)
+       (remove (comp string/blank? first))
+       (filter (comp :accepted second))
+       (map first)))
+
 
 (defn append-console-log [state-atom server-key source message]
   (swap! state-atom

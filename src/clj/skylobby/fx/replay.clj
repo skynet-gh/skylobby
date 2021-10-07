@@ -5,6 +5,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     clojure.set
+    [cljfx.api :as fx]
     java-time
     skylobby.fx
     [skylobby.fx.battle :refer [minimap-types]]
@@ -154,26 +155,20 @@
       (.build builder))))
 
 
-(def replay-view-keys
-  [:battle-players-color-type :copying :downloadables-by-url :extracting :file-cache :gitting
-   :http-download :importables-by-path :map-details :mod-details :players-table-columns :rapid-data-by-version
-   :rapid-download :replay-details :replay-minimap-type :spring-isolation-dir
-   :springfiles-search-results :tasks-by-type :update-engines :update-maps :update-mods])
-
 (defn replay-view
-  [{:keys [battle-players-color-type download-tasks engines engines-by-version file-cache import-tasks
-           maps-by-version map-details mods-by-version mod-details mod-update-tasks players-table-columns replay-details
-           replay-minimap-type selected-replay show-sync show-sync-left spring-isolation-dir
-           tasks-by-type]
-    :as state}]
-  (let [script-data (-> selected-replay :body :script-data)
+  [{:fx/keys [context] :keys [show-sync show-sync-left]}]
+  (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+        replay-minimap-type (fx/sub-val context :replay-minimap-type)
+        {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
+        selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
+        script-data (-> selected-replay :body :script-data)
         {:keys [gametype mapname] :as game} (:game script-data)
         selected-engine-version (-> selected-replay :header :engine-version)
         selected-matching-engine (get engines-by-version selected-engine-version)
         mod-name gametype
-        selected-matching-mod (get mods-by-version mod-name)
+        selected-matching-mod (get mods-by-name mod-name)
         map-name mapname
-        selected-matching-map (get maps-by-version map-name)
+        selected-matching-map (get maps-by-name map-name)
         teams-by-id (->> game
                          (filter (comp #(string/starts-with? % "team") name first))
                          (mapv
@@ -181,8 +176,8 @@
                              (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                [id team])))
                          (into {}))
-        indexed-mod (get mods-by-version gametype)
-        replay-mod-details (resource/cached-details mod-details indexed-mod)
+        indexed-mod (get mods-by-name gametype)
+        replay-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         sides (spring/mod-sides replay-mod-details)
         players (->> game
                      (filter (comp #(string/starts-with? % "player") name first))
@@ -236,27 +231,18 @@
                                   (filter (comp :mode :battle-status))
                                   (map (juxt (comp string/trim :username) :team-color))
                                   (into {}))
-        indexed-map (get maps-by-version mapname)
-        replay-map-details (resource/cached-details map-details indexed-map)
-        engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
+        indexed-map (get maps-by-name mapname)
+        replay-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
+        replay-id-downloads (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replay)
+                                 (map :id)
                                  set)
-        extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
-                           (map (comp fs/canonical-path :file))
-                           set)
-        map-update-tasks (->> tasks-by-type
-                              (filter (comp #{:spring-lobby/map-details :spring-lobby/refresh-maps} first))
-                              (mapcat second)
-                              set)
-        rapid-tasks-by-id (->> (get tasks-by-type :spring-lobby/rapid-download)
-                               (map (juxt :rapid-id identity))
-                               (into {}))
         sync-pane {:fx/type :flow-pane
                    :vgap 5
                    :hgap 5
                    :padding 5
                    :children
                    [(if-let [id (:id selected-replay)]
-                      (let [in-progress (contains? download-tasks id)]
+                      (let [in-progress (contains? replay-id-downloads id)]
                         {:fx/type :button
                          :style {:-fx-font-size 20}
                          :text (if in-progress
@@ -267,37 +253,16 @@
                                      :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
                                             :id id
                                             :spring-isolation-dir spring-isolation-dir}}})
-                      (merge
-                        {:fx/type engine-sync-pane
-                         :engine-details selected-matching-engine
-                         :engine-file (:file selected-matching-engine)
-                         :engine-update-tasks engine-update-tasks
-                         :engine-version selected-engine-version
-                         :extract-tasks extract-tasks
-                         :tasks-by-type tasks-by-type}
-                        state))
-                    (merge
-                      {:fx/type mod-sync-pane
-                       :battle-modname mod-name
-                       :battle-mod-details replay-mod-details
-                       :engine-details selected-matching-engine
-                       :engine-file (:file selected-matching-engine)
-                       :file-cache file-cache
-                       :import-tasks import-tasks
-                       :indexed-mod indexed-mod
-                       :mod-update-tasks mod-update-tasks
-                       :rapid-tasks-by-id rapid-tasks-by-id
-                       :tasks-by-type tasks-by-type}
-                      state)
-                    (merge
-                      {:fx/type map-sync-pane
-                       :battle-map map-name
-                       :battle-map-details replay-map-details
-                       :import-tasks import-tasks
-                       :indexed-map indexed-map
-                       :map-update-tasks map-update-tasks
-                       :tasks-by-type tasks-by-type}
-                      state)]}]
+                      {:fx/type engine-sync-pane
+                       :engine-version selected-engine-version
+                       :spring-isolation-dir spring-isolation-dir})
+                    {:fx/type mod-sync-pane
+                     :engine-version selected-engine-version
+                     :mod-name mod-name
+                     :spring-isolation-dir spring-isolation-dir}
+                    {:fx/type map-sync-pane
+                     :map-name map-name
+                     :spring-isolation-dir spring-isolation-dir}]}]
     {:fx/type :h-box
      :alignment :center-left
      :children
@@ -313,9 +278,7 @@
              :v-box/vgrow :always
              :am-host false
              :battle-modname gametype
-             :battle-players-color-type battle-players-color-type
              :players players-and-bots
-             :players-table-columns players-table-columns
              :sides sides
              :singleplayer true}
             {:fx/type :h-box
@@ -325,7 +288,8 @@
               {:fx/type :label
                :text " Color player name: "}
               {:fx/type :combo-box
-               :value (or battle-players-color-type (first u/player-name-color-types))
+               :value (or (fx/sub-val context :battle-players-color-type)
+                          (first u/player-name-color-types))
                :items u/player-name-color-types
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :battle-players-color-type}}]}]
@@ -353,7 +317,7 @@
          (concat
            (when show-sync-left
              [sync-pane])
-           (if-let [details (get replay-details (fs/canonical-path (:file selected-replay)))]
+           (if-let [details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))]
              (let [player-num-to-name (->> details
                                            :body
                                            :demo-stream
@@ -391,8 +355,7 @@
          [
           {:fx/type fx.minimap/minimap-pane
            :map-name mapname
-           :map-details replay-map-details
-           :minimap-type replay-minimap-type
+           :server-key :local
            :minimap-type-key :replay-minimap-type
            :scripttags script-data}
           {:fx/type :h-box
@@ -420,16 +383,31 @@
   (some-fn :id (comp :game-id :header)))
 
 
+(def time-zone-id
+  (.toZoneId (TimeZone/getDefault)))
+
+
 (defn replays-table
-  [{:keys [copying download-tasks engines engines-by-version engine-update-tasks extract-tasks
-           extracting file-cache http-download http-download-tasks import-tasks
-           maps-by-version mods-by-version rapid-data-by-version rapid-download
-           rapid-update-tasks replay-downloads-by-engine replay-downloads-by-map
-           replay-downloads-by-mod rapid-tasks replay-imports-by-map replay-imports-by-mod
-           replays-window-details replays replays-tags replays-watched selected-replay spring-isolation-dir
-           tasks-by-type
-           time-zone-id]}]
-  (let [
+  [{:fx/keys [context]}]
+  (let [replay-downloads-by-engine (fx/sub-val context :replay-downloads-by-engine)
+        replay-downloads-by-map (fx/sub-val context :replay-downloads-by-map)
+        replay-downloads-by-mod (fx/sub-val context :replay-downloads-by-mod)
+        replay-imports-by-map (fx/sub-val context :replay-imports-by-map)
+        replay-imports-by-mod (fx/sub-val context :replay-imports-by-mod)
+        selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
+        replays (fx/sub-val context :filtered-replays)
+        spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+        {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
+        copying (fx/sub-val context :copying)
+        extracting (fx/sub-val context :extracting)
+        file-cache (fx/sub-val context :file-cache)
+        http-download (fx/sub-val context :http-download)
+        rapid-data-by-version (fx/sub-val context :rapid-data-by-version)
+        rapid-download (fx/sub-val context :rapid-download)
+        replays-tags (fx/sub-val context :replays-tags)
+        replays-watched (fx/sub-val context :replays-watched)
+        replays-window-details (fx/sub-val context :replays-window-details)
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
         map-update-tasks (->> tasks-by-type
                               (filter (comp #{:spring-lobby/refresh-maps} first))
                               (mapcat second)
@@ -437,7 +415,26 @@
         mod-update-tasks (->> tasks-by-type
                               (filter (comp #{:spring-lobby/refresh-mods} first))
                               (mapcat second)
-                              seq)]
+                              seq)
+        replay-id-downloads (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replay)
+                                 (map :id)
+                                 set)
+        engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
+                                 seq)
+        extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
+                           (map (comp fs/canonical-path :file))
+                           set)
+        http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                 (map (comp :download-url :downloadable))
+                                 set)
+        import-tasks (->> (get tasks-by-type :spring-lobby/import)
+                          (map (comp fs/canonical-path :resource-file :importable))
+                          set)
+        rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
+                         (map :rapid-id)
+                         set)
+        rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
+                                seq)]
     {:fx/type fx.ext.table-view/with-selection-props
      :v-box/vgrow :always
      :props {:selection-mode :single
@@ -686,12 +683,12 @@
                           matching-engine (get engines-by-version engine-version)
                           engine-downloadable (get replay-downloads-by-engine engine-version)
                           mod-version (-> i :body :script-data :game :gametype)
-                          matching-mod (get mods-by-version mod-version)
+                          matching-mod (get mods-by-name mod-version)
                           mod-downloadable (get replay-downloads-by-mod mod-version)
                           mod-importable (get replay-imports-by-mod mod-version)
                           mod-rapid (get rapid-data-by-version mod-version)
                           map-name (-> i :body :script-data :game :mapname)
-                          matching-map (get maps-by-version map-name)
+                          matching-map (get maps-by-name map-name)
                           map-downloadable (get replay-downloads-by-map map-name)
                           map-importable (get replay-imports-by-map map-name)
                           mod-rapid-download (get rapid-download (:id mod-rapid))]
@@ -701,7 +698,7 @@
                               download-url (when fileName (http/bar-replay-download-url fileName))
                               {:keys [running] :as download} (get http-download download-url)
                               in-progress (or running
-                                              (contains? download-tasks (:id i)))]
+                                              (contains? replay-id-downloads (:id i)))]
                           {:fx/type :button
                            :text
                            (if in-progress
@@ -904,388 +901,322 @@
                             springfiles-maps-download-source)}}))])}})}}])}}}}))
 
 
-(def replays-window-keys
-  (concat
-    replay-view-keys
-    [:bar-replays-page :by-spring-root :copying :css :downloadables-by-url
-     :extra-replay-sources :extracting :file-cache :filter-replay :filter-replay-max-players
-     :filter-replay-min-players :filter-replay-min-skill :filter-replay-source :filter-replay-type
-     :filtered-replays :http-download :importables-by-path :map-details :mod-details :new-online-replays-count :on-close-request
-     :online-bar-replays :parsed-replays-by-path :rapid-data-by-version :rapid-download :replay-details
-     :replay-downloads-by-engine :replay-downloads-by-map :replay-downloads-by-mod
-     :replay-imports-by-map :replay-imports-by-mod :replay-minimap-type :replays-filter-specs :replays-tags
-     :replays-watched :replays-window-dedupe :replays-window-details :selected-replay-file :selected-replay-id
-     :settings-button :show-replays :spring-isolation-dir :springfiles-search-results :window-states]))
-
 (defn replays-window-impl
-  [{:keys [bar-replays-page by-spring-root css extra-replay-sources file-cache
-           filter-replay filter-replay-max-players filter-replay-min-players filter-replay-min-skill
-           filter-replay-source filter-replay-type filtered-replays map-details mod-details new-online-replays-count
-           on-close-request online-bar-replays replays-filter-specs replays-window-dedupe
-           replays-window-details parsed-replays-by-path screen-bounds selected-replay-file
-           selected-replay-id show-replays spring-isolation-dir tasks-by-type title window-states]
-    :as state}]
-  {:fx/type :stage
-   :showing (boolean show-replays)
-   :title (or title (str u/app-name " Replays"))
-   :icons skylobby.fx/icons
-   :on-close-request
-   (or
-     on-close-request
-     {:event/type :spring-lobby/dissoc
-      :key :show-replays})
-   :x (skylobby.fx/fitx screen-bounds (get-in window-states [:replays :x]))
-   :y (skylobby.fx/fity screen-bounds (get-in window-states [:replays :y]))
-   :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [:replays :width]) replays-window-width)
-   :height (skylobby.fx/fitheight screen-bounds (get-in window-states [:replays :height]) replays-window-height)
-   :on-width-changed (partial skylobby.fx/window-changed :replays :width)
-   :on-height-changed (partial skylobby.fx/window-changed :replays :height)
-   :on-x-changed (partial skylobby.fx/window-changed :replays :x)
-   :on-y-changed (partial skylobby.fx/window-changed :replays :y)
-   :scene
-   {:fx/type :scene
-    :stylesheets (skylobby.fx/stylesheet-urls css)
-    :root
-    (if show-replays
-      (let [{:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
-            local-filenames (->> parsed-replays-by-path
-                                 vals
-                                 (map :filename)
-                                 (filter some?)
-                                 set)
-            online-only-replays (->> online-bar-replays
-                                     vals
-                                     (remove (comp local-filenames :filename)))
-            all-replays (->> parsed-replays-by-path
-                             vals
-                             (concat online-only-replays)
-                             (sort-by (comp str :unix-time :header))
-                             reverse
-                             doall)
-            replay-types (set (map :game-type all-replays))
-            num-players (->> all-replays
-                             (map replay-player-count)
-                             set
-                             sort)
-            replays filtered-replays
-            selected-replay (or (get parsed-replays-by-path (fs/canonical-path selected-replay-file))
-                                (get online-bar-replays selected-replay-id))
-            engines-by-version (into {} (map (juxt :engine-version identity) engines))
-            mods-by-version (into {} (map (juxt :mod-name identity) mods))
-            maps-by-version (into {} (map (juxt :map-name identity) maps))
-            extract-tasks (->> (get tasks-by-type :spring-lobby/extract-7z)
-                               (map (comp fs/canonical-path :file))
-                               set)
-            import-tasks (->> (get tasks-by-type :spring-lobby/import)
-                              (map (comp fs/canonical-path :resource-file :importable))
-                              set)
-            refresh-tasks (get tasks-by-type :spring-lobby/refresh-replays)
-            index-downloads-tasks (get tasks-by-type :spring-lobby/download-bar-replays)
-            download-tasks (->> (get tasks-by-type :spring-lobby/download-bar-replay)
-                                (map :id)
-                                set)
-            http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
-                                     (map (comp :download-url :downloadable))
-                                     set)
-            rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
-                             (map :rapid-id)
-                             set)
-            rapid-update-tasks (->> (get tasks-by-type :spring-lobby/update-rapid)
-                                    seq)
-            engine-update-tasks (->> (get tasks-by-type :spring-lobby/refresh-engines)
-                                     seq)
-            map-update-tasks (->> tasks-by-type
-                                  (filter (comp #{:spring-lobby/map-details :spring-lobby/refresh-maps} first))
-                                  (mapcat second)
-                                  seq)
-            mod-update-tasks (->> tasks-by-type
-                                  (filter (comp #{:spring-lobby/mod-details :spring-lobby/refresh-mods} first))
-                                  (mapcat second)
-                                  seq)
-            time-zone-id (.toZoneId (TimeZone/getDefault))
-            sources (replay-sources {:extra-replay-sources extra-replay-sources})]
-        {:fx/type :v-box
-         :style {:-fx-font-size 14}
-         :children
-         (concat
-           [{:fx/type :h-box
-             :alignment :top-left
-             :style {:-fx-font-size 16}
-             :children
-             [
-              {:fx/type :flow-pane
-               :h-box/hgrow :always
-               :style {:-fx-pref-width 200}
+  [{:fx/keys [context]
+    :keys [on-close-request screen-bounds title]}]
+  (let [bar-replays-page (fx/sub-val context :bar-replays-page)
+        extra-replay-sources (fx/sub-val context :extra-replay-sources)
+        filter-replay (fx/sub-val context :filter-replay)
+        filter-replay-max-players (fx/sub-val context :filter-replay-max-players)
+        filter-replay-min-players (fx/sub-val context :filter-replay-min-players)
+        filter-replay-min-skill (fx/sub-val context :filter-replay-min-skill)
+        filter-replay-source (fx/sub-val context :filter-replay-source)
+        filter-replay-type (fx/sub-val context :filter-replay-type)
+        filtered-replays (fx/sub-val context :filtered-replays)
+        new-online-replays-count (fx/sub-val context :new-online-replays-count)
+        online-bar-replays (fx/sub-val context :online-bar-replays)
+        parsed-replays-by-path (fx/sub-val context :parsed-replays-by-path)
+        replays-filter-specs (fx/sub-val context :replays-filter-specs)
+        replays-window-dedupe (fx/sub-val context :replays-window-dedupe)
+        selected-replay-file (fx/sub-val context :selected-replay-file)
+        selected-replay-id (fx/sub-val context :selected-replay-id)
+        window-states (fx/sub-val context :window-states)
+        show (boolean (fx/sub-val context :show-replays))]
+    {:fx/type :stage
+     :showing show
+     :title (or title (str u/app-name " Replays"))
+     :icons skylobby.fx/icons
+     :on-close-request (or
+                         on-close-request
+                         {:event/type :spring-lobby/dissoc
+                          :key :show-replays})
+     :x (skylobby.fx/fitx screen-bounds (get-in window-states [:replays :x]))
+     :y (skylobby.fx/fity screen-bounds (get-in window-states [:replays :y]))
+     :width (skylobby.fx/fitwidth screen-bounds (get-in window-states [:replays :width]) replays-window-width)
+     :height (skylobby.fx/fitheight screen-bounds (get-in window-states [:replays :height]) replays-window-height)
+     :on-width-changed (partial skylobby.fx/window-changed :replays :width)
+     :on-height-changed (partial skylobby.fx/window-changed :replays :height)
+     :on-x-changed (partial skylobby.fx/window-changed :replays :x)
+     :on-y-changed (partial skylobby.fx/window-changed :replays :y)
+     :scene
+     {:fx/type :scene
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root
+      (if show
+        (let [
+              local-filenames (->> parsed-replays-by-path
+                                   vals
+                                   (map :filename)
+                                   (filter some?)
+                                   set)
+              online-only-replays (->> online-bar-replays
+                                       vals
+                                       (remove (comp local-filenames :filename)))
+              all-replays (->> parsed-replays-by-path
+                               vals
+                               (concat online-only-replays)
+                               (sort-by (comp str :unix-time :header))
+                               reverse
+                               doall)
+              replay-types (set (map :game-type all-replays))
+              num-players (->> all-replays
+                               (map replay-player-count)
+                               set
+                               sort)
+              replays filtered-replays
+              selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
+              refresh-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-replays)
+              index-downloads-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replays)
+              sources (replay-sources {:extra-replay-sources extra-replay-sources})]
+          {:fx/type :v-box
+           :style {:-fx-font-size 14}
+           :children
+           (concat
+             [{:fx/type :h-box
+               :alignment :top-left
+               :style {:-fx-font-size 16}
                :children
-               (concat
-                 [{:fx/type :label
-                   :text " Filter: "}
-                  {:fx/type :text-field
-                   :style {:-fx-min-width 400}
-                   :text (str filter-replay)
-                   :prompt-text "Filter by filename, engine, map, game, player, or tag"
-                   :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :filter-replay}}]
-                 (when-not (string/blank? filter-replay)
-                   [{:fx/type fx.ext.node/with-tooltip-props
-                     :props
-                     {:tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
-                       :text "Clear filter"}}
-                     :desc
-                     {:fx/type :button
-                      :on-action {:event/type :spring-lobby/dissoc
-                                  :key :filter-replay}
+               [
+                {:fx/type :flow-pane
+                 :h-box/hgrow :always
+                 :style {:-fx-pref-width 200}
+                 :children
+                 (concat
+                   [{:fx/type :label
+                     :text " Filter: "}
+                    {:fx/type :text-field
+                     :style {:-fx-min-width 400}
+                     :text (str filter-replay)
+                     :prompt-text "Filter by filename, engine, map, game, player, or tag"
+                     :on-text-changed {:event/type :spring-lobby/assoc
+                                       :key :filter-replay}}]
+                   (when-not (string/blank? filter-replay)
+                     [{:fx/type fx.ext.node/with-tooltip-props
+                       :props
+                       {:tooltip
+                        {:fx/type :tooltip
+                         :show-delay [10 :ms]
+                         :text "Clear filter"}}
+                       :desc
+                       {:fx/type :button
+                        :on-action {:event/type :spring-lobby/dissoc
+                                    :key :filter-replay}
+                        :graphic
+                        {:fx/type font-icon/lifecycle
+                         :icon-literal "mdi-close:16:white"}}}])
+                   [{:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     [
+                      {:fx/type :label
+                       :text " Filter specs:"}
+                      {:fx/type :check-box
+                       :selected (boolean replays-filter-specs)
+                       :h-box/margin 8
+                       :on-selected-changed {:event/type :spring-lobby/assoc
+                                             :key :replays-filter-specs}}]}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     [
+                      {:fx/type :label
+                       :text " Dedupe: "}
+                      {:fx/type :check-box
+                       :selected (boolean replays-window-dedupe)
+                       :h-box/margin 8
+                       :on-selected-changed {:event/type :spring-lobby/assoc
+                                             :key :replays-window-dedupe}}]}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     (concat
+                       [{:fx/type :label
+                         :text " Source: "}
+                        {:fx/type :combo-box
+                         :value filter-replay-source
+                         :on-value-changed {:event/type :spring-lobby/assoc
+                                            :key :filter-replay-source}
+                         :items (concat [nil] (sort (map :replay-source-name sources)))}]
+                       (when filter-replay-source
+                         [{:fx/type fx.ext.node/with-tooltip-props
+                           :props
+                           {:tooltip
+                            {:fx/type :tooltip
+                             :show-delay [10 :ms]
+                             :text "Clear source"}}
+                           :desc
+                           {:fx/type :button
+                            :on-action {:event/type :spring-lobby/dissoc
+                                        :key :filter-replay-source}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-close:16:white"}}}]))}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     (concat
+                       [{:fx/type :label
+                         :text " Type: "}
+                        {:fx/type :combo-box
+                         :value filter-replay-type
+                         :on-value-changed {:event/type :spring-lobby/assoc
+                                            :key :filter-replay-type}
+                         :items (concat [nil] replay-types)}]
+                       (when filter-replay-type
+                         [{:fx/type fx.ext.node/with-tooltip-props
+                           :props
+                           {:tooltip
+                            {:fx/type :tooltip
+                             :show-delay [10 :ms]
+                             :text "Clear type"}}
+                           :desc
+                           {:fx/type :button
+                            :on-action {:event/type :spring-lobby/dissoc
+                                        :key :filter-replay-type}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-close:16:white"}}}]))}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     (concat
+                       [{:fx/type :label
+                         :text " Min Players: "}
+                        {:fx/type :combo-box
+                         :value filter-replay-min-players
+                         :on-value-changed {:event/type :spring-lobby/assoc
+                                            :key :filter-replay-min-players}
+                         :items (concat [nil] num-players)}]
+                       (when filter-replay-min-players
+                         [{:fx/type fx.ext.node/with-tooltip-props
+                           :props
+                           {:tooltip
+                            {:fx/type :tooltip
+                             :show-delay [10 :ms]
+                             :text "Clear min players"}}
+                           :desc
+                           {:fx/type :button
+                            :on-action {:event/type :spring-lobby/dissoc
+                                        :key :filter-replay-min-players}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-close:16:white"}}}]))}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     (concat
+                       [{:fx/type :label
+                         :text " Max Players: "}
+                        {:fx/type :combo-box
+                         :value filter-replay-max-players
+                         :on-value-changed {:event/type :spring-lobby/assoc
+                                            :key :filter-replay-max-players}
+                         :items (concat [nil] num-players)}]
+                       [{:fx/type :label
+                         :text " Min Avg Skill: "}
+                        {:fx/type :text-field
+                         :style {:-fx-max-width 60}
+                         :text-formatter
+                         {:fx/type :text-formatter
+                          :value-converter :integer
+                          :value (int (or filter-replay-min-skill 0))
+                          :on-value-changed {:event/type :spring-lobby/assoc
+                                             :key :filter-replay-min-skill}}}]
+                       (when filter-replay-max-players
+                         [{:fx/type fx.ext.node/with-tooltip-props
+                           :props
+                           {:tooltip
+                            {:fx/type :tooltip
+                             :show-delay [10 :ms]
+                             :text "Clear max players"}}
+                           :desc
+                           {:fx/type :button
+                            :on-action {:event/type :spring-lobby/dissoc
+                                        :key :filter-replay-max-players}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-close:16:white"}}}]))}
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     [{:fx/type :check-box
+                       :selected (boolean (fx/sub-val context :replays-window-details))
+                       :h-box/margin 8
+                       :on-selected-changed {:event/type :spring-lobby/assoc
+                                             :key :replays-window-details}}
+                      {:fx/type :label
+                       :text "Detailed table "}]}
+                    (let [refreshing (boolean (seq refresh-tasks))]
+                      {:fx/type :button
+                       :text (if refreshing
+                               " Refreshing... "
+                               " Refresh ")
+                       :on-action {:event/type :spring-lobby/add-task
+                                   :task {:spring-lobby/task-type :spring-lobby/refresh-replays}}
+                       :disable refreshing
+                       :graphic
+                       {:fx/type font-icon/lifecycle
+                        :icon-literal "mdi-refresh:16:white"}})]
+                  (let [downloading (boolean (seq index-downloads-tasks))
+                        page (u/to-number bar-replays-page)]
+                    [{:fx/type :button
+                      :text (if downloading
+                              " Getting Online BAR Replays... "
+                              " Get Online BAR Replays")
+                      :on-action {:event/type :spring-lobby/add-task
+                                  :task {:spring-lobby/task-type :spring-lobby/download-bar-replays
+                                         :page page}}
+                      :disable downloading
                       :graphic
                       {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-close:16:white"}}}])
-                 [{:fx/type :h-box
-                   :alignment :center-left
+                       :icon-literal "mdi-download:16:white"}}
+                     {:fx/type :label
+                      :text " Page: "}
+                     {:fx/type :text-field
+                      :text (str page)
+                      :style {:-fx-max-width 56}
+                      :on-text-changed {:event/type :spring-lobby/assoc
+                                        :key :bar-replays-page}}
+                     {:fx/type :label
+                      :text (str (when new-online-replays-count
+                                   (str " Got " new-online-replays-count " new")))}]))}
+                {:fx/type :pane
+                 :h-box/hgrow :sometimes}
+                {:fx/type :button
+                 :text "Settings"
+                 :on-action {:event/type :spring-lobby/toggle
+                             :key :show-settings-window}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-settings:16:white"}}]}
+              (if all-replays
+                (if (empty? all-replays)
+                  {:fx/type :label
+                   :style {:-fx-font-size 24}
+                   :text " No replays"}
+                  {:fx/type :v-box
+                   :v-box/vgrow :always
                    :children
-                   [
-                    {:fx/type :label
-                     :text " Filter specs:"}
-                    {:fx/type :check-box
-                     :selected (boolean replays-filter-specs)
-                     :h-box/margin 8
-                     :on-selected-changed {:event/type :spring-lobby/assoc
-                                           :key :replays-filter-specs}}]}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   [
-                    {:fx/type :label
-                     :text " Dedupe: "}
-                    {:fx/type :check-box
-                     :selected (boolean replays-window-dedupe)
-                     :h-box/margin 8
-                     :on-selected-changed {:event/type :spring-lobby/assoc
-                                           :key :replays-window-dedupe}}]}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   (concat
-                     [{:fx/type :label
-                       :text " Source: "}
-                      {:fx/type :combo-box
-                       :value filter-replay-source
-                       :on-value-changed {:event/type :spring-lobby/assoc
-                                          :key :filter-replay-source}
-                       :items (concat [nil] (sort (map :replay-source-name sources)))}]
-                     (when filter-replay-source
-                       [{:fx/type fx.ext.node/with-tooltip-props
-                         :props
-                         {:tooltip
-                          {:fx/type :tooltip
-                           :show-delay [10 :ms]
-                           :text "Clear source"}}
-                         :desc
-                         {:fx/type :button
-                          :on-action {:event/type :spring-lobby/dissoc
-                                      :key :filter-replay-source}
-                          :graphic
-                          {:fx/type font-icon/lifecycle
-                           :icon-literal "mdi-close:16:white"}}}]))}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   (concat
-                     [{:fx/type :label
-                       :text " Type: "}
-                      {:fx/type :combo-box
-                       :value filter-replay-type
-                       :on-value-changed {:event/type :spring-lobby/assoc
-                                          :key :filter-replay-type}
-                       :items (concat [nil] replay-types)}]
-                     (when filter-replay-type
-                       [{:fx/type fx.ext.node/with-tooltip-props
-                         :props
-                         {:tooltip
-                          {:fx/type :tooltip
-                           :show-delay [10 :ms]
-                           :text "Clear type"}}
-                         :desc
-                         {:fx/type :button
-                          :on-action {:event/type :spring-lobby/dissoc
-                                      :key :filter-replay-type}
-                          :graphic
-                          {:fx/type font-icon/lifecycle
-                           :icon-literal "mdi-close:16:white"}}}]))}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   (concat
-                     [{:fx/type :label
-                       :text " Min Players: "}
-                      {:fx/type :combo-box
-                       :value filter-replay-min-players
-                       :on-value-changed {:event/type :spring-lobby/assoc
-                                          :key :filter-replay-min-players}
-                       :items (concat [nil] num-players)}]
-                     (when filter-replay-min-players
-                       [{:fx/type fx.ext.node/with-tooltip-props
-                         :props
-                         {:tooltip
-                          {:fx/type :tooltip
-                           :show-delay [10 :ms]
-                           :text "Clear min players"}}
-                         :desc
-                         {:fx/type :button
-                          :on-action {:event/type :spring-lobby/dissoc
-                                      :key :filter-replay-min-players}
-                          :graphic
-                          {:fx/type font-icon/lifecycle
-                           :icon-literal "mdi-close:16:white"}}}]))}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   (concat
-                     [{:fx/type :label
-                       :text " Max Players: "}
-                      {:fx/type :combo-box
-                       :value filter-replay-max-players
-                       :on-value-changed {:event/type :spring-lobby/assoc
-                                          :key :filter-replay-max-players}
-                       :items (concat [nil] num-players)}]
-                     [{:fx/type :label
-                       :text " Min Avg Skill: "}
-                      {:fx/type :text-field
-                       :style {:-fx-max-width 60}
-                       :text-formatter
-                       {:fx/type :text-formatter
-                        :value-converter :integer
-                        :value (int (or filter-replay-min-skill 0))
-                        :on-value-changed {:event/type :spring-lobby/assoc
-                                           :key :filter-replay-min-skill}}}]
-                     (when filter-replay-max-players
-                       [{:fx/type fx.ext.node/with-tooltip-props
-                         :props
-                         {:tooltip
-                          {:fx/type :tooltip
-                           :show-delay [10 :ms]
-                           :text "Clear max players"}}
-                         :desc
-                         {:fx/type :button
-                          :on-action {:event/type :spring-lobby/dissoc
-                                      :key :filter-replay-max-players}
-                          :graphic
-                          {:fx/type font-icon/lifecycle
-                           :icon-literal "mdi-close:16:white"}}}]))}
-                  {:fx/type :h-box
-                   :alignment :center-left
-                   :children
-                   [{:fx/type :check-box
-                     :selected (boolean replays-window-details)
-                     :h-box/margin 8
-                     :on-selected-changed {:event/type :spring-lobby/assoc
-                                           :key :replays-window-details}}
-                    {:fx/type :label
-                     :text "Detailed table "}]}
-                  (let [refreshing (boolean (seq refresh-tasks))]
-                    {:fx/type :button
-                     :text (if refreshing
-                             " Refreshing... "
-                             " Refresh ")
-                     :on-action {:event/type :spring-lobby/add-task
-                                 :task {:spring-lobby/task-type :spring-lobby/refresh-replays}}
-                     :disable refreshing
-                     :graphic
-                     {:fx/type font-icon/lifecycle
-                      :icon-literal "mdi-refresh:16:white"}})]
-                (let [downloading (boolean (seq index-downloads-tasks))
-                      page (u/to-number bar-replays-page)]
-                  [{:fx/type :button
-                    :text (if downloading
-                            " Getting Online BAR Replays... "
-                            " Get Online BAR Replays")
-                    :on-action {:event/type :spring-lobby/add-task
-                                :task {:spring-lobby/task-type :spring-lobby/download-bar-replays
-                                       :page page}}
-                    :disable downloading
-                    :graphic
-                    {:fx/type font-icon/lifecycle
-                     :icon-literal "mdi-download:16:white"}}
-                   {:fx/type :label
-                    :text " Page: "}
-                   {:fx/type :text-field
-                    :text (str page)
-                    :style {:-fx-max-width 56}
-                    :on-text-changed {:event/type :spring-lobby/assoc
-                                      :key :bar-replays-page}}
-                   {:fx/type :label
-                    :text (str (when new-online-replays-count
-                                 (str " Got " new-online-replays-count " new")))}]))}
-              {:fx/type :pane
-               :h-box/hgrow :sometimes}
-              {:fx/type :button
-               :text "Settings"
-               :on-action {:event/type :spring-lobby/toggle
-                           :key :show-settings-window}
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal "mdi-settings:16:white"}}]}
-            (if all-replays
-              (if (empty? all-replays)
+                   [{:fx/type :label
+                     :text
+                     (let [ac (count all-replays)
+                           fc (count replays)]
+                       (str ac " replays" (when (not= ac fc) (str ", " fc " match filters"))))}
+                    {:fx/type replays-table
+                     :v-box/vgrow :always}]})
                 {:fx/type :label
                  :style {:-fx-font-size 24}
-                 :text " No replays"}
-                {:fx/type :v-box
-                 :v-box/vgrow :always
-                 :children
-                 [{:fx/type :label
-                   :text
-                   (let [ac (count all-replays)
-                         fc (count replays)]
-                     (str ac " replays" (when (not= ac fc) (str ", " fc " match filters"))))}
-                  (merge
-                    {:fx/type replays-table
-                     :v-box/vgrow :always}
-                    state
-                    {:download-tasks download-tasks
-                     :engine-update-tasks engine-update-tasks
-                     :engines-by-version engines-by-version
-                     :engines engines
-                     :extract-tasks extract-tasks
-                     :http-download-tasks http-download-tasks
-                     :import-tasks import-tasks
-                     :map-update-tasks map-update-tasks
-                     :maps-by-version maps-by-version
-                     :mod-update-tasks mod-update-tasks
-                     :mods-by-version mods-by-version
-                     :rapid-update-tasks rapid-update-tasks
-                     :rapid-tasks rapid-tasks
-                     :replays replays
-                     :selected-replay selected-replay
-                     :tasks-by-type tasks-by-type
-                     :time-zone-id time-zone-id})]})
-              {:fx/type :label
-               :style {:-fx-font-size 24}
-               :text " Loading replays..."})]
-           (when selected-replay
-             [{:fx/type ext-recreate-on-key-changed
-               :key (str (or (fs/canonical-path selected-replay-file)
-                             selected-replay-id))
-               :desc
-               (merge
-                 {:fx/type replay-view}
-                 state
-                 {:download-tasks download-tasks
-                  :engines-by-version engines-by-version
-                  :engines engines
-                  :file-cache file-cache
-                  :import-tasks import-tasks
-                  :maps-by-version maps-by-version
-                  :map-details map-details
-                  :mod-details mod-details
-                  :mod-update-tasks mod-update-tasks
-                  :mods-by-version mods-by-version
-                  :selected-replay selected-replay
-                  :show-sync-left true
-                  :tasks-by-type tasks-by-type})}]))})
-      {:fx/type :pane
-       :pref-width replays-window-width
-       :pref-height replays-window-height})}})
+                 :text " Loading replays..."})]
+             (when selected-replay
+               [{:fx/type ext-recreate-on-key-changed
+                 :key (str (or (fs/canonical-path selected-replay-file)
+                               selected-replay-id))
+                 :desc
+                 {:fx/type replay-view
+                  :show-sync-left true}}]))})
+       {:fx/type :pane
+        :pref-width replays-window-width
+        :pref-height replays-window-height})}}))
 
 (defn replays-window [state]
   (tufte/profile {:dynamic? true
@@ -1298,14 +1229,8 @@
 
 
 (defn standalone-replay-window
-  [{{:keys [by-spring-root css selected-replay spring-isolation-dir]
-     :as state}
-    :state}]
-  (let [{:keys [width height]} (skylobby.fx/get-screen-bounds)
-        {:keys [engines maps mods] :as spring-data} (get by-spring-root (fs/canonical-path spring-isolation-dir))
-        engines-by-version (into {} (map (juxt :engine-version identity) engines))
-        mods-by-version (into {} (map (juxt :mod-name identity) mods))
-        maps-by-version (into {} (map (juxt :map-name identity) maps))]
+  [{:fx/keys [context]}]
+  (let [{:keys [width height]} (skylobby.fx/get-screen-bounds)]
     {:fx/type :stage
      :showing true
      :title (str "skyreplays " app-version)
@@ -1318,14 +1243,6 @@
                         :standalone true}
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
-      :root (merge
-              {:fx/type replay-view}
-              (select-keys state replay-view-keys)
-              spring-data
-              {
-               :engines-by-version engines-by-version
-               :maps-by-version maps-by-version
-               :mods-by-version mods-by-version
-               :selected-replay selected-replay
-               :show-sync true})}}))
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root {:fx/type replay-view
+             :show-sync true}}}))

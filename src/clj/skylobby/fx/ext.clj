@@ -101,7 +101,8 @@
                (fn [^TableView table-view ^java.util.Collection items]
                  (let [table-items (.getItems table-view)]
                    (.clear table-items)
-                   (.setAll table-items items)
+                   (when items
+                     (.setAll table-items items))
                    (fix-table-columns table-view)
                    (.sort table-view))))
              fx.lifecycle/scalar

@@ -1,17 +1,23 @@
 (ns skylobby.fx.uikeys
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.string :as string]
     clojure.set
     [skylobby.fx :as skylobby.fx]
     [spring-lobby.spring.uikeys :as uikeys]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
   (:import
     (javafx.scene.input KeyCode KeyEvent)))
 
 
 (set! *warn-on-reflection* true)
+
+
+(def uikeys-window-width 1200)
+(def uikeys-window-height 1000)
 
 
 (def bind-keycodes
@@ -58,8 +64,11 @@
         (.getText key-event))))
 
 
-(defn uikeys-window [{:keys [css filter-uikeys-action selected-uikeys-action show-uikeys-window uikeys]}]
-  (let [default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
+(defn- uikeys-window-impl
+  [{:fx/keys [context]
+    :keys [filter-uikeys-action selected-uikeys-action uikeys]}]
+  (let [show-uikeys-window (fx/sub-val context :show-uikeys-window)
+        default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
                            [])
         filtered-uikeys (->>  default-uikeys
                               (filter
@@ -77,101 +86,106 @@
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/assoc
                         :key :show-uikeys-window}
-     :width 1200
-     :height 1000
+     :width uikeys-window-width
+     :height uikeys-window-height
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show-uikeys-window
         {:fx/type :v-box
          :style {:-fx-font-size 14}
          :children
-         (if show-uikeys-window
-           [{:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type :label
-               :text " Filter action: "}
-              {:fx/type :text-field
-               :text (str filter-uikeys-action)
-               :prompt-text "filter"
-               :on-text-changed {:event/type ::assoc
-                                 :key :filter-uikeys-action}}]}
-            {:fx/type fx.ext.table-view/with-selection-props
-             :v-box/vgrow :always
-             :props
-             {:selection-mode :single
-              :on-selected-item-changed
-              {:event/type ::uikeys-select}}
-             :desc
-             {:fx/type :table-view
-              :column-resize-policy :constrained
-              :items (or (seq filtered-uikeys) [])
-              :on-key-pressed {:event/type ::uikeys-pressed
-                               :selected-uikeys-action selected-uikeys-action}
-              :columns
-              [
-               {:fx/type :table-column
-                :text "Action"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (str (:bind-action i))})}}
-               {:fx/type :table-column
-                :text "Bind"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (:bind-key i))})}}
-               {:fx/type :table-column
-                :text "Parsed"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
-               {:fx/type :table-column
-                :text "JavaFX KeyCode"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   (let [bind-key-uc (string/upper-case (:bind-key i))
-                         parsed (uikeys/parse-bind-keys bind-key-uc)
-                         key-codes (map
-                                     (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
-                                     parsed)]
-                     {:text (pr-str key-codes)}))}}
-               {:fx/type :table-column
-                :text "Comment"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [{:keys [bind-comment]}]
-                   (merge
-                     {:text (str bind-comment)}
-                     (when bind-comment
-                       {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
-                         :style {:-fx-font-size 15}
-                         :text (str bind-comment)}})))}}
-               {:fx/type :table-column
-                :text "Override"
-                :cell-value-factory identity
-                :cell-factory
-                {:fx/cell-type :table-cell
-                 :describe
-                 (fn [i]
-                   {:text (pr-str (get uikeys-overrides (:bind-action i)))})}}]}}]
-           {:fx/type :label
-            :text "window hidden"})}
-        {:fx/type :pane})}}))
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text " Filter action: "}
+            {:fx/type :text-field
+             :text (str filter-uikeys-action)
+             :prompt-text "filter"
+             :on-text-changed {:event/type ::assoc
+                               :key :filter-uikeys-action}}]}
+          {:fx/type fx.ext.table-view/with-selection-props
+           :v-box/vgrow :always
+           :props
+           {:selection-mode :single
+            :on-selected-item-changed
+            {:event/type ::uikeys-select}}
+           :desc
+           {:fx/type :table-view
+            :column-resize-policy :constrained
+            :items (or (seq filtered-uikeys) [])
+            :on-key-pressed {:event/type ::uikeys-pressed
+                             :selected-uikeys-action selected-uikeys-action}
+            :columns
+            [
+             {:fx/type :table-column
+              :text "Action"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [i]
+                 {:text (str (:bind-action i))})}}
+             {:fx/type :table-column
+              :text "Bind"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [i]
+                 {:text (pr-str (:bind-key i))})}}
+             {:fx/type :table-column
+              :text "Parsed"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [i]
+                 {:text (pr-str (uikeys/parse-bind-keys (:bind-key i)))})}}
+             {:fx/type :table-column
+              :text "JavaFX KeyCode"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [i]
+                 (let [bind-key-uc (string/upper-case (:bind-key i))
+                       parsed (uikeys/parse-bind-keys bind-key-uc)
+                       key-codes (map
+                                   (partial map (comp #(when % (str %)) bind-key-to-javafx-keycode))
+                                   parsed)]
+                   {:text (pr-str key-codes)}))}}
+             {:fx/type :table-column
+              :text "Comment"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [{:keys [bind-comment]}]
+                 (merge
+                   {:text (str bind-comment)}
+                   (when bind-comment
+                     {:tooltip
+                      {:fx/type :tooltip
+                       :show-delay [10 :ms]
+                       :style {:-fx-font-size 15}
+                       :text (str bind-comment)}})))}}
+             {:fx/type :table-column
+              :text "Override"
+              :cell-value-factory identity
+              :cell-factory
+              {:fx/cell-type :table-cell
+               :describe
+               (fn [i]
+                 {:text (pr-str (get uikeys-overrides (:bind-action i)))})}}]}}]}
+        {:fx/type :pane
+         :pref-width uikeys-window-width
+         :pref-height uikeys-window-height})}}))
+
+(defn uikeys-window [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :uikeys-window
+      (uikeys-window-impl state))))

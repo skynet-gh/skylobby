@@ -3,6 +3,9 @@
     [clojure.string :as string]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def spads-message-types
   [
    [:vote-progress #"Vote in progress: \"(.*)\" \[y:(.*)/(.*), n:(\d+)/([^,]+)(.*)\] \((.*) remaining\)"]

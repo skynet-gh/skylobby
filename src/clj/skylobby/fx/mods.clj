@@ -1,11 +1,15 @@
 (ns skylobby.fx.mods
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]
     [version-clj.core :as version]))
 
 
@@ -25,11 +29,18 @@
     :source :http}])
 
 
-(defn mods-view
-  [{:keys [downloadables-by-url engine-file flow http-download mod-filter mod-name mods on-value-changed
-           rapid-data-by-id rapid-download spring-isolation-dir suggest tasks-by-type]
+(defn- mods-view-impl
+  [{:fx/keys [context]
+    :keys [engine-file flow mod-name on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
-  (let [games (filter :is-game mods)]
+  (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
+        http-download (fx/sub-val context :http-download)
+        rapid-download (fx/sub-val context :rapid-download)
+        mod-filter (fx/sub-val context :mod-filter)
+        mods (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :mods])
+        http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
+        rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+        games (filter :is-game mods)]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -46,7 +57,7 @@
                  (map
                    (fn [{:keys [mod-name source version]}]
                      (let [downloadable (case source
-                                          :rapid (:id (get rapid-data-by-id version))
+                                          :rapid (:id (fx/sub-val context [:rapid-data-by-id version]))
                                           :http (->> downloadables
                                                      (filter (partial resource/could-be-this-mod? version))
                                                      first)
@@ -75,10 +86,10 @@
                                   (concat
                                     (filter
                                       (comp #{downloadable} :id)
-                                      (get tasks-by-type :spring-lobby/rapid-download))
+                                      rapid-download-tasks)
                                     (filter
                                       (comp (partial resource/same-resource-filename? downloadable) :downloadable)
-                                      (get tasks-by-type :spring-lobby/http-downloadable))))]
+                                      http-download-tasks)))]
                        {:fx/type :button
                         :text (if (and (not downloadable) (= :rapid source))
                                 "Update rapid"
@@ -146,3 +157,10 @@
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])})))
+
+
+(defn mods-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :mods-view
+      (mods-view-impl state))))

@@ -1,7 +1,10 @@
 (ns skylobby.fx.minimap
   (:require
+    [cljfx.api :as fx]
     clojure.set
     [clojure.string :as string]
+    skylobby.fx
+    [skylobby.fx.sub :as sub]
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.spring :as spring]
     [spring-lobby.util :as u]
@@ -111,9 +114,25 @@
            doall))))
 
 (defn minimap-pane-impl
-  [{:keys [am-host am-spec battle-details client-data drag-team drag-allyteam map-details map-name
-           minimap-size minimap-type minimap-type-key scripttags singleplayer]}]
-  (let [{:keys [smf]} map-details
+  [{:fx/keys [context]
+    :keys [map-name minimap-type-key scripttags server-key]}]
+  (let [
+        am-host (fx/sub-ctx context sub/am-host server-key)
+        am-spec (fx/sub-ctx context sub/am-spec server-key)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        drag-team (fx/sub-val context :drag-team)
+        drag-allyteam (fx/sub-val context :drag-allyteam)
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        map-name (or map-name
+                     (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map]))
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
+        map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
+        scripttags (or scripttags
+                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
+        minimap-size (fx/sub-val context :minimap-size)
+        minimap-type (fx/sub-val context :minimap-type)
+        {:keys [smf]} map-details
         {:keys [minimap-height minimap-width]
          :or {minimap-height smf/minimap-display-size
               minimap-width smf/minimap-display-size}} smf
@@ -121,6 +140,7 @@
         minimap-size (or (u/to-number minimap-size)
                          default-minimap-size)
         minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
+        battle-details nil
         starting-points (minimap-starting-points battle-details map-details scripttags minimap-scale minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         minimap-image (case minimap-type
@@ -131,7 +151,8 @@
         startpostype (->> scripttags
                           :game
                           :startpostype
-                          spring/startpostype-name)]
+                          spring/startpostype-name)
+        singleplayer (= server-key :local)]
     {:fx/type :stack-pane
      :style
      {:-fx-min-width minimap-size

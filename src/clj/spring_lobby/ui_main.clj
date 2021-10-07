@@ -153,13 +153,14 @@
                        :selected-replay-file first-arg-as-file)
                 (spring-lobby/replay-map-and-mod-details-watcher nil spring-lobby/*state nil @spring-lobby/*state)
                 (let [r (fx/create-renderer
-                          :middleware (fx/wrap-map-desc
-                                        (fn [state]
-                                          {:fx/type fx.replay/standalone-replay-window
-                                           :state state}))
-                          :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+                          :middleware (comp
+                                        fx/wrap-context-desc
+                                        (fx/wrap-map-desc (fn [_] {:fx/type fx.replay/standalone-replay-window})))
+                          :opts {:fx.opt/map-event-handler spring-lobby/event-handler
+                                 :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
+                                                              (fx/fn->lifecycle-with-context %))})]
                   (log/info "Mounting renderer")
-                  (fx/mount-renderer spring-lobby/*state r))
+                  (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/standalone-replay-init spring-lobby/*state)
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
               :else
@@ -170,13 +171,14 @@
                   (log/info "Finished 7Zip init"))
                 (log/info "Creating renderer")
                 (let [r (fx/create-renderer
-                          :middleware (fx/wrap-map-desc
-                                        (fn [state]
-                                          {:fx/type fx.root/root-view
-                                           :state state}))
-                          :opts {:fx.opt/map-event-handler spring-lobby/event-handler})]
+                          :middleware (comp
+                                        fx/wrap-context-desc
+                                        (fx/wrap-map-desc (fn [_] {:fx/type fx.root/root-view})))
+                          :opts {:fx.opt/map-event-handler spring-lobby/event-handler
+                                 :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
+                                                              (fx/fn->lifecycle-with-context %))})]
                   (log/info "Mounting renderer")
-                  (fx/mount-renderer spring-lobby/*state r))
+                  (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/init-async spring-lobby/*state)
                 (spring-lobby/auto-connect-servers spring-lobby/*state)
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))))

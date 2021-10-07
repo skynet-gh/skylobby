@@ -1,10 +1,14 @@
 (ns skylobby.fx.players-table
   (:require
+    [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.color :as color]
+    skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.flag-icon :as flag-icon]
     [spring-lobby.fx.font-icon :as font-icon]
+    [spring-lobby.spring :as spring]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -30,10 +34,29 @@
 
 
 (defn players-table-impl
-  [{:keys [am-host battle-players-color-type channel-name client-data host-ingame host-username
-           ignore-users increment-ids
-           indexed-mod players players-table-columns ready-on-unspec scripttags server-key sides singleplayer username]}]
-  (let [players-with-skill (map
+  [{:fx/keys [context]
+    :keys [players server-key]}]
+  (let [am-host (fx/sub-ctx context sub/am-host server-key)
+        battle-players-color-type (fx/sub-val context :battle-players-color-type)
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        host-ingame (fx/sub-ctx context sub/host-ingame server-key)
+        host-username (fx/sub-ctx context sub/host-username server-key)
+        ignore-users (fx/sub-val context :ignore-users)
+        increment-ids (fx/sub-val context :increment-ids)
+        players-table-columns (fx/sub-val context :players-table-columns)
+        ready-on-unspec (fx/sub-val context :ready-on-unspec)
+        scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
+        battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        sides (spring/mod-sides battle-mod-details)
+        singleplayer (= :local server-key)
+        username (fx/sub-val context get-in [:by-server server-key :username])
+
+        players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
                                (let [username-kw (when username (keyword (string/lower-case username)))
                                      tags (some-> scripttags :game :players (get username-kw))

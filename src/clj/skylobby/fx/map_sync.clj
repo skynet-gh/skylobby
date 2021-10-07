@@ -1,21 +1,39 @@
 (ns skylobby.fx.map-sync
   (:require
+    [cljfx.api :as fx]
+    skylobby.fx
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
 
 
-(defn map-sync-pane
-  [{:keys [battle-map battle-map-details copying downloadables-by-url file-cache http-download
-           import-tasks importables-by-path indexed-map map-update-tasks spring-isolation-dir
-           springfiles-search-results tasks-by-type]}]
-  (let [
-        no-map-details (not (resource/details? battle-map-details))
-        tries (:tries battle-map-details)
+(defn- map-sync-pane-impl
+  [{:fx/keys [context]
+    :keys [battle-map map-name spring-isolation-dir]}]
+  (let [copying (fx/sub-val context :copying)
+        downloadables-by-url (fx/sub-val context :downloadables-by-url)
+        file-cache (fx/sub-val context :file-cache)
+        http-download (fx/sub-val context :http-download)
+        importables-by-path (fx/sub-val context :importables-by-path)
+        springfiles-search-results (fx/sub-val context :springfiles-search-results)
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        map-name (or map-name battle-map)
+        indexed-map (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
+        imports (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
+                     (map (comp fs/canonical-path :resource-file :importable))
+                     set)
+        map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
+        refresh-maps-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-maps)
+        map-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/map-details)
+        map-update-tasks (concat refresh-maps-tasks map-details-tasks)
+        no-map-details (not (resource/details? map-details))
+        tries (:tries map-details)
         at-max-tries (and (number? tries)
                           (>= tries resource/max-tries))]
     {:fx/type sync-pane
@@ -35,12 +53,12 @@
                         :else 0)]
          [{:severity severity
            :text "info"
-           :human-text battle-map
+           :human-text map-name
            :tooltip (if (zero? severity)
-                      (fs/canonical-path (:file battle-map-details))
+                      (fs/canonical-path (:file map-details))
                       (if indexed-map
-                        (str "Loading map details for '" battle-map "'")
-                        (str "Map '" battle-map "' not found locally")))}])
+                        (str "Loading map details for '" map-name "'")
+                        (str "Map '" map-name "' not found locally")))}])
        (when (and no-map-details at-max-tries (empty? map-update-tasks))
          [{:severity 2
            :text "retry"
@@ -50,7 +68,7 @@
            {:event/type :spring-lobby/add-task
             :task
             {:spring-lobby/task-type :spring-lobby/map-details
-             :map-name battle-map
+             :map-name map-name
              :map-file (:file indexed-map)
              :tries 0}}}])
        (when (and no-map-details (not indexed-map))
@@ -62,7 +80,7 @@
                  downloadables (->> downloadables-by-url
                                     vals
                                     (filter (comp #{:spring-lobby/map} :resource-type))
-                                    (filter (partial resource/could-be-this-map? battle-map)))]
+                                    (filter (partial resource/could-be-this-map? map-name)))]
              (if (seq downloadables)
                (map
                  (fn [downloadable]
@@ -81,7 +99,7 @@
                                       (if dest-exists
                                         (str "Downloaded " (fs/filename dest))
                                         (str "Download from " (:download-source-name downloadable)))
-                                      (str "No download for " battle-map)))
+                                      (str "No download for " map-name)))
                       :tooltip (if in-progress
                                  (str "Downloading " (u/download-progress download))
                                  (if dest-exists
@@ -96,7 +114,7 @@
                                   :spring-isolation-dir spring-isolation-dir}})}))
                  downloadables)
                (let [
-                     springname battle-map
+                     springname map-name
                      springfiles-searched (contains? springfiles-search-results springname)
                      springfiles-search-result (get springfiles-search-results springname)
                      springfiles-mirror-set (set (:mirrors springfiles-search-result))
@@ -132,13 +150,13 @@
            (let [importable (some->> importables-by-path
                                      vals
                                      (filter (comp #{:spring-lobby/map} :resource-type))
-                                     (filter (partial resource/could-be-this-map? battle-map))
+                                     (filter (partial resource/could-be-this-map? map-name))
                                      first)
                  resource-file (:resource-file importable)
                  resource-path (fs/canonical-path resource-file)
                  in-progress (boolean
                                (or (-> copying (get resource-path) :status boolean)
-                                   (contains? import-tasks resource-path)))
+                                   (contains? imports resource-path)))
                  dest (resource/resource-dest spring-isolation-dir importable)
                  dest-exists (fs/file-exists? file-cache dest)]
              [{:severity (if dest-exists -1 2)
@@ -148,7 +166,7 @@
                              "No import found")
                :tooltip (if importable
                           (str "Copy map archive from " resource-path)
-                          (str "No local import found for map " battle-map))
+                          (str "No local import found for map " map-name))
                :in-progress in-progress
                :action
                (when importable
@@ -162,3 +180,9 @@
                     :task
                     {:spring-lobby/task-type :spring-lobby/update-file-cache
                      :file (resource/resource-dest spring-isolation-dir importable)}}))}]))))}))
+
+(defn map-sync-pane [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :map-sync-pane
+      (map-sync-pane-impl state))))

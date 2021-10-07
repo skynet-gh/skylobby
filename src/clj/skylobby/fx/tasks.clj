@@ -1,5 +1,6 @@
 (ns skylobby.fx.tasks
   (:require
+    [cljfx.api :as fx]
     [clojure.pprint :refer [pprint]]
     skylobby.fx
     [skylobby.task :as task]
@@ -13,14 +14,12 @@
 (def tasks-window-width 1600)
 (def tasks-window-height 1000)
 
-(def tasks-window-keys
-  [:css :current-tasks :disable-tasks :disable-tasks-while-in-game :show-tasks-window :tasks-by-kind])
 
 (defn tasks-window-impl
-  [{:keys [css current-tasks disable-tasks disable-tasks-while-in-game screen-bounds show-tasks-window tasks-by-kind]}]
-  (let [_ screen-bounds]
+  [{:fx/keys [context] :keys [screen-bounds]}]
+  (let [show (boolean (fx/sub-val context :show-tasks-window))]
     {:fx/type :stage
-     :showing (boolean show-tasks-window)
+     :showing show
      :title (str u/app-name " Tasks")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
@@ -31,9 +30,9 @@
      :height (skylobby.fx/fitheight screen-bounds tasks-window-height)
      :scene
      {:fx/type :scene
-      :stylesheets (skylobby.fx/stylesheet-urls css)
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
-      (if show-tasks-window
+      (if show
         {:fx/type :v-box
          :style {:-fx-font-size 16}
          :children
@@ -43,7 +42,7 @@
            :children
            [
             {:fx/type :check-box
-             :selected (boolean disable-tasks)
+             :selected (boolean (fx/sub-val context :disable-tasks))
              :on-selected-changed {:event/type :spring-lobby/assoc
                                    :key :disable-tasks}}
             {:fx/type :label
@@ -53,7 +52,7 @@
            :children
            [
             {:fx/type :check-box
-             :selected (boolean disable-tasks-while-in-game)
+             :selected (boolean (fx/sub-val context :disable-tasks-while-in-game))
              :on-selected-changed {:event/type :spring-lobby/assoc
                                    :key :disable-tasks-while-in-game}}
             {:fx/type :label
@@ -75,14 +74,14 @@
                   :editable false
                   :wrap-text true
                   :text (str (with-out-str (pprint v)))}]})
-             current-tasks)}
+             (fx/sub-val context :current-tasks))}
           {:fx/type :label
            :text "Task Queue"
            :style {:-fx-font-size 24}}
           {:fx/type :table-view
            :v-box/vgrow :always
            :column-resize-policy :constrained
-           :items (or (->> tasks-by-kind
+           :items (or (->> (fx/sub-val context :tasks-by-kind)
                            (mapcat second)
                            seq)
                       [])
@@ -117,7 +116,9 @@
                   :editable false
                   :wrap-text true
                   :text (str (with-out-str (pprint i)))}})}}]}]}
-        {:fx/type :pane})}}))
+        {:fx/type :pane
+         :pref-width tasks-window-width
+         :pref-height tasks-window-height})}}))
 
 (defn tasks-window [state]
   (tufte/profile {:dynamic? true

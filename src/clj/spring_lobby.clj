@@ -3,6 +3,7 @@
     [aleph.http :as aleph-http]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
+    [cljfx.api :as fx]
     [cljfx.css :as css]
     [clojure.core.async :as async]
     [clojure.core.cache :as cache]
@@ -218,6 +219,7 @@
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :increment-ids true
+     :is-java (u/is-java? (u/process-command))
      :leave-battle-on-close-window true
      :players-table-columns {:skill true
                              :ally true
@@ -251,6 +253,21 @@
 
 
 (def ^:dynamic *state (atom {}))
+(def ^:dynamic *ui-state (atom (fx/create-context {})))
+
+
+(defn add-ui-state-watcher [state-atom ui-state-atom]
+  (log/info "Adding state to UI state watcher")
+  (remove-watch state-atom :ui-state)
+  (add-watch state-atom :ui-state
+    (fn [_k _state-atom old-state new-state]
+      (tufte/profile {:dynamic? true
+                      :id ::state-watcher}
+        (tufte/p :ui-state
+          (when (not= old-state new-state)
+            (swap! ui-state-atom fx/reset-context new-state)))))))
+
+(add-ui-state-watcher *state *ui-state)
 
 
 (def ^:dynamic disable-update-check false)
@@ -389,7 +406,9 @@
           (reduce-kv
             (fn [m k v]
               (assoc m k
-                (select-keys v [:client-data :battle :battles])))
+                (-> v
+                    (select-keys [:client-data :battle :battles])
+                    (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
 
@@ -401,7 +420,9 @@
           (reduce-kv
             (fn [m k v]
               (assoc m k
-                (select-keys v [:client-data :battle :battles])))
+                (-> v
+                    (select-keys [:client-data :battle :battles])
+                    (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
 
@@ -425,9 +446,10 @@
      :rapid-data-by-version :servers :spring-isolation-dir :tasks]))
 
 (defn- auto-get-resources-server-relevant-keys [state]
-  (select-keys
-    state
-    [:battle :battles]))
+  (update
+    (select-keys state [:battle :battles])
+    :battles
+    select-keys [(:battle-id (:battle state))]))
 
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
@@ -442,7 +464,9 @@
           (reduce-kv
             (fn [m k v]
               (assoc m k
-                (select-keys v [:client-data :battle :battles])))
+                (-> v
+                    (select-keys [:client-data :battle :battles])
+                    (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
 
@@ -626,7 +650,8 @@
                          :else
                          nil))
                      (when
-                       (and (not rapid-id)
+                       (and no-mod
+                            (not rapid-id)
                             (-> new-server :battle :battle-id)
                             (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))
                               ; ^ only do when first joining a battle
@@ -859,7 +884,8 @@
         (log/error e "Error in :fix-spring-isolation-dir state watcher")))))
 
 (defn spring-isolation-dir-changed-watcher [_k state-atom old-state new-state]
-  (when (not= old-state new-state)
+  (when (not= (:spring-isolation-dir old-state)
+              (:spring-isolation-dir new-state))
     (try
       (let [{:keys [spring-isolation-dir]} new-state]
         (when (and spring-isolation-dir
@@ -910,7 +936,7 @@
 (defn fix-selected-replay-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
                   :id ::state-watcher}
-    (tufte/p :fix-replays-watcher
+    (tufte/p :fix-selected-replay-watcher
       (when (not= (fix-selected-replay-relevant-keys old-state)
                   (fix-selected-replay-relevant-keys new-state))
         (try
@@ -967,13 +993,17 @@
               client-data (:client-data new-server)
               my-username (:username client-data)
               {:keys [battle-status team-color]} (-> battle :users (get my-username))
-              old-sync-number (-> battle :users (get my-username) :battle-status :sync)]
-          (when (and (:battle-id battle)
+              old-sync-number (-> battle :users (get my-username) :battle-status :sync)
+              battle-id (:battle-id battle)
+              battle-changed (not= battle-id
+                                   (-> old-server :battle :battle-id))]
+          (when (and battle-id
                      (or (not= old-sync new-sync)
-                         (not= (:battle-id battle)
-                               (-> old-server :battle :battle-id))))
-            (log/info "Updating battle sync status for" server-key "from" old-sync
-                      "(" old-sync-number ") to" new-sync "(" new-sync-number ")")
+                         battle-changed))
+            (if battle-changed
+              (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
+              (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
+                        "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
               (message/send-message *state client-data
                 (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))
@@ -1838,7 +1868,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
-            (java-time/duration 1 :seconds))
+            (java-time/duration 3 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))
@@ -2622,9 +2652,9 @@
   [{:keys [client-data scripttags host-battle-state use-git-mod-version]}]
   (swap! *state assoc :show-host-battle-window false)
   (let [{:keys [engine-version map-name mod-name]} host-battle-state]
-    (when-not (or (string/blank? engine-version)
-                  (string/blank? mod-name)
-                  (string/blank? map-name))
+    (if-not (or (string/blank? engine-version)
+                (string/blank? mod-name)
+                (string/blank? map-name))
       (future
         (try
           (let [adjusted-modname (if use-git-mod-version
@@ -2634,7 +2664,8 @@
           (when (seq scripttags)
             (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
           (catch Exception e
-            (log/error e "Error opening battle")))))))
+            (log/error e "Error opening battle"))))
+      (log/info "Invalid data to host battle" host-battle-state))))
 
 
 (defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [^Event event]}]
@@ -4329,12 +4360,6 @@
                                 (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
 
-
-(defn multi-server-tab
-  [state]
-  (merge
-    {:fx/type fx.battle/multi-battle-view-keys}
-    state))
 
 (defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
   (swap! *state assoc :selected-server-tab (.getId event)))

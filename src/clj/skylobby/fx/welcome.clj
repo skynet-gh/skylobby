@@ -1,13 +1,15 @@
 (ns skylobby.fx.welcome
   (:require
+    [cljfx.api :as fx]
     [clojure.string :as string]
+    skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
-    [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]))
+    [spring-lobby.util :as u]
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -16,11 +18,12 @@
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
 
-(def connect-button-keys
-  [:accepted :client-data :client-deferred :password :server :username])
-
-(defn connect-button [{:keys [accepted client-data password server username]}]
-  (let [{:keys [client client-deferred]} client-data
+(defn connect-button [{:fx/keys [context]}]
+  (let [{:keys [accepted client-data]} (fx/sub-ctx context skylobby.fx/selected-server-data-sub)
+        {:keys [client client-deferred]} client-data
+        password (fx/sub-val context :password)
+        username (fx/sub-val context :username)
+        server (fx/sub-val context :server)
         server-url (first server)
         server-key (u/server-key {:server-url server-url :username username})]
     {:fx/type :h-box
@@ -68,8 +71,9 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close-octagon:16:white"}}]))}))
 
-(defn app-update-button [{:keys [app-update-available http-download tasks-by-type]}]
-  (let [{:keys [latest]} app-update-available
+(defn app-update-button
+  [{:fx/keys [context]}]
+  (let [{:keys [latest]} (fx/sub-val context :app-update-available)
         color "gold"
         version latest
         url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
@@ -83,9 +87,9 @@
                            (if (fs/wsl-or-windows?) ; TODO mac
                              "windows.msi"
                              "linux-amd64.deb"))
-        download (get http-download url)
-        running (seq (get tasks-by-type :spring-lobby/download-app-update-and-restart))
-        is-java (u/is-java? (u/process-command))]
+        download (get (fx/sub-val context :http-download) url)
+        running (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-app-update-and-restart))
+        is-java (fx/sub-val context :is-java)]
     {:fx/type :h-box
      :alignment :center-left
      :children
@@ -128,106 +132,111 @@
         :icon-literal "mdi-close:30:black"}}]}))
 
 (defn singleplayer-buttons
-  [{:keys [app-update-available] :as state}]
+  [{:fx/keys [context]}]
   {:fx/type :v-box
    :spacing 10
    :children
    (concat
-     (when app-update-available
-       [(merge
-          {:fx/type app-update-button}
-          state)])
+     (when (fx/sub-val context :app-update-available)
+       [{:fx/type app-update-button}])
      [
-       {:fx/type :label
-        :text "Offline:"}
-       {:fx/type :button
-        :text "Singleplayer Battle"
-        :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
-       {:fx/type :button
-        :text "Watch Replays"
-        :on-action {:event/type :spring-lobby/toggle
-                    :key :show-replays}}
-       {:fx/type :pane
-        :v-box/vgrow :always}])})
+      {:fx/type :label
+       :text "Offline:"}
+      {:fx/type :button
+       :text "Singleplayer Battle"
+       :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
+      {:fx/type :button
+       :text "Watch Replays"
+       :on-action {:event/type :spring-lobby/toggle
+                   :key :show-replays}}
+      {:fx/type :pane
+       :v-box/vgrow :always}])})
 
 
 (defn multiplayer-buttons
-  [{:keys [agreement by-server client-data login-error logins password server servers username
-           verification-code]
-    :as state}]
-  {:fx/type :v-box
-   :spacing 10
-   :children
-   (concat
-     [{:fx/type :label
-       :text "Join a Multiplayer Server:"}
-      {:fx/type :h-box
-       :children
-       [
-        {:fx/type fx.server/server-combo-box
-         :server server
-         :servers servers
-         :on-value-changed {:event/type :spring-lobby/on-change-server}}
-        {:fx/type :button
-         :text ""
-         :on-action {:event/type :spring-lobby/toggle
-                     :key :show-servers-window}
-         :graphic
-         {:fx/type font-icon/lifecycle
-          :icon-literal
-          (if server
-            "mdi-wrench:30:white"
-            "mdi-plus:30:white")}}]}]
-     (when-let [login-error (str " " (get login-error (first server)))]
+  [{:fx/keys [context]}]
+  (let [server-key (fx/sub-ctx context skylobby.fx/welcome-server-key-sub)
+        agreement (fx/sub-val context get-in [:by-server server-key :agreement])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        login-error (fx/sub-val context get-in [:by-server server-key :login-error])
+        server (fx/sub-val context :server)
+        servers (fx/sub-val context :servers)
+        password (fx/sub-val context :password)
+        username (fx/sub-val context :username)
+        verification-code (fx/sub-val context :verification-code)]
+    {:fx/type :v-box
+     :spacing 10
+     :children
+     (concat
        [{:fx/type :label
-         :text (str " " login-error)
-         :style {:-fx-text-fill "#FF0000"
-                 :-fx-max-width "360px"}}])
-     [{:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :label
-         :text "Username: "}
-        {:fx/type :text-field
-         :text username
-         :prompt-text "Username"
-         :style {:-fx-pref-width 300
-                 :-fx-max-width 300}
-         :disable (boolean (not server))
-         :on-text-changed {:event/type :spring-lobby/username-change
-                           :server-url (first server)}}]}]
-     (if-not client-data
-       [
+         :text "Join a Multiplayer Server:"}
         {:fx/type :h-box
+         :children
+         [
+          {:fx/type fx.server/server-combo-box
+           :server server
+           :servers servers
+           :on-value-changed {:event/type :spring-lobby/on-change-server}}
+          {:fx/type :button
+           :text ""
+           :on-action {:event/type :spring-lobby/toggle
+                       :key :show-servers-window}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal
+            (if server
+              "mdi-wrench:30:white"
+              "mdi-plus:30:white")}}]}]
+       (when-let [login-error (str " " (get login-error (first server)))]
+         [{:fx/type :label
+           :text (str " " login-error)
+           :style {:-fx-text-fill "#FF0000"
+                   :-fx-max-width "360px"}}])
+       [{:fx/type :h-box
          :alignment :center-left
          :children
          [{:fx/type :label
-           :text "Password: "}
-          {:fx/type :password-field
-           :text password
+           :text "Username: "}
+          {:fx/type :text-field
+           :text username
+           :prompt-text "Username"
+           :style {:-fx-pref-width 300
+                   :-fx-max-width 300}
            :disable (boolean (not server))
-           :prompt-text "Password"
-           :style {:-fx-pref-width 300}
-           :on-text-changed {:event/type :spring-lobby/password-change
+           :on-text-changed {:event/type :spring-lobby/username-change
                              :server-url (first server)}}]}]
-       [{:fx/type :label
-         :style {:-fx-font-size 16}
-         :text "Logged in"}
-        {:fx/type :button
-         :text "Go to server tab"
-         :on-action {:event/type :spring-lobby/assoc
-                     :key :selected-server-tab
-                     :value (str username "@" (first server))}}])
-     [
-       {:fx/type :pane
-        :style {:-fx-min-height 20
-                :-fx-pref-height 20}}
-       (let [[server-url server-details] server
-             spring-isolation-dir (:spring-isolation-dir server-details)]
-         {:fx/type :v-box
-          :style {:-fx-font-size 16}
-          :children
-          [
+       (if-not client-data
+         [
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "Password: "}
+            {:fx/type :password-field
+             :text password
+             :disable (boolean (not server))
+             :prompt-text "Password"
+             :style {:-fx-pref-width 300}
+             :on-text-changed {:event/type :spring-lobby/password-change
+                               :server-url (first server)}}]}]
+         [{:fx/type :label
+           :style {:-fx-font-size 16}
+           :text "Logged in"}
+          {:fx/type :button
+           :text "Go to server tab"
+           :on-action {:event/type :spring-lobby/assoc
+                       :key :selected-server-tab
+                       :value (str username "@" (first server))}}])
+       [
+        {:fx/type :pane
+         :style {:-fx-min-height 20
+                 :-fx-pref-height 20}}
+        (let [[server-url server-details] server
+              spring-isolation-dir (:spring-isolation-dir server-details)]
+          {:fx/type :v-box
+           :style {:-fx-font-size 16}
+           :children
+           [
             {:fx/type :label
              :text " Server-specific Spring Dir"
              :style {:-fx-font-size 20}}
@@ -235,100 +244,74 @@
              :alignment :center-left
              :children
              (concat
-              [
-                {:fx/type :text-field
+               [{:fx/type :text-field
                  :disable true
                  :text (str (or spring-isolation-dir
                                 " < use default >"))
                  :style {:-fx-min-width 400}}]
-              (when spring-isolation-dir
-                    [{:fx/type :button
-                      :text ""
-                      :on-action {:event/type :spring-lobby/dissoc-in
-                                  :path [:servers server-url :spring-isolation-dir]}
-                      :graphic
-                      {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-close:16:white"}}])
-              [{:fx/type :button
-                :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                            :target [:servers server-url :spring-isolation-dir]}
-                :text ""
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-file-find:16:white"}}])}]})
-;       {:fx/type :pane
-;        :style {:-fx-min-height 20
-;                :-fx-pref-height 20}}
-       {:fx/type :h-box
-        :spacing 10
-        :children
-        (concat
-          [{:fx/type :pane
-            :h-box/hgrow :always}
-           (merge
-            {:fx/type connect-button
-             :server-key (u/server-key client-data)}
-            (select-keys state connect-button-keys))]
-          (when-not client-data
-            [{:fx/type :button
-              :text "Register"
-              :on-action {:event/type :spring-lobby/toggle
-                          :key :show-register-window}}]))}]
-     (let [auto-servers (->> servers
-                             (filter (comp :auto-connect second)))
-           auto-servers-not-connected (->> auto-servers
-                                           (map (fn [[server-url _server-data]]
-                                                  (u/server-key
-                                                    {:server-url server-url
-                                                     :username (-> logins (get server-url) :username)})))
-                                           (filter some?)
-                                           (remove (fn [server-key] (contains? by-server server-key))))]
-       (when (seq auto-servers)
-         [{:fx/type :button
-           :text (if (empty? auto-servers-not-connected)
-                   "All auto-connect servers connected"
-                   (str "Connect to " (count auto-servers-not-connected) " auto-connect servers"))
-           :disable (empty? auto-servers-not-connected)
-           :on-action {:event/type :spring-lobby/auto-connect-servers}}]))
-     (when agreement
-       [{:fx/type :label
-         :style {:-fx-font-size 20}
-         :text " Server agreement: "}
-        {:fx/type :text-area
-         :editable false
-         :text (str agreement)}
+               (when spring-isolation-dir
+                 [{:fx/type :button
+                   :text ""
+                   :on-action {:event/type :spring-lobby/dissoc-in
+                               :path [:servers server-url :spring-isolation-dir]}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-close:16:white"}}])
+               [{:fx/type :button
+                 :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                             :target [:servers server-url :spring-isolation-dir]}
+                 :text ""
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal "mdi-file-find:16:white"}}])}]})
         {:fx/type :h-box
-         :style {:-fx-font-size 20}
+         :spacing 10
          :children
-         [{:fx/type :text-field
-           :prompt-text "Email Verification Code"
-           :text verification-code
-           :on-text-changed {:event/type :spring-lobby/assoc
-                             :key :verification-code}}
-          {:fx/type :button
-           :text "Confirm"
-           :on-action {:event/type :spring-lobby/confirm-agreement
-                       :client-data client-data
-                       :server-key (u/server-key client-data)
-                       :verification-code verification-code}}]}]))})
+         (concat
+           [{:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type connect-button}]
+           (when-not client-data
+             [{:fx/type :button
+               :text "Register"
+               :on-action {:event/type :spring-lobby/toggle
+                           :key :show-register-window}}]))}]
+      (let [auto-servers (fx/sub-ctx context skylobby.fx/auto-servers-sub)
+            auto-servers-not-connected (fx/sub-ctx context skylobby.fx/auto-servers-not-connected-sub)]
+        (when (seq auto-servers)
+          [{:fx/type :button
+            :text (if (empty? auto-servers-not-connected)
+                    "All auto-connect servers connected"
+                    (str "Connect to " (count auto-servers-not-connected) " auto-connect servers"))
+            :disable (empty? auto-servers-not-connected)
+            :on-action {:event/type :spring-lobby/auto-connect-servers}}]))
+      (when agreement
+        [{:fx/type :label
+          :style {:-fx-font-size 20}
+          :text " Server agreement: "}
+         {:fx/type :text-area
+          :editable false
+          :text (str agreement)}
+         {:fx/type :h-box
+          :style {:-fx-font-size 20}
+          :children
+          [{:fx/type :text-field
+            :prompt-text "Email Verification Code"
+            :text verification-code
+            :on-text-changed {:event/type :spring-lobby/assoc
+                              :key :verification-code}}
+           {:fx/type :button
+            :text "Confirm"
+            :on-action {:event/type :spring-lobby/confirm-agreement
+                        :client-data client-data
+                        :server-key (u/server-key client-data)
+                        :verification-code verification-code}}]}]))}))
 
 
-(def welcome-view-keys
-  (concat
-    fx.battle/battle-view-keys
-    fx.bottom-bar/bottom-bar-keys
-    [:app-update-available :by-spring-root :by-server :client-data :http-download
-     :login-error :logins :password :pop-out-battle
-     :server :servers :spring-isolation-dir :tasks-by-type :username :verification-code]))
-
-(def welcome-view-server-keys
-  [:accepted :agreement :client-data])
-
-(defn welcome-view
-  [{:keys [by-spring-root by-server pop-out-battle spring-isolation-dir]
-    :as state}]
-  (let [show-local (and (-> by-server :local :battle :battle-id)
-                        (not pop-out-battle))]
+(defn- welcome-view-impl
+  [{:fx/keys [context]}]
+  (let [show-local (and (fx/sub-val context get-in [:by-server :local :battle :battle-id])
+                        (not (fx/sub-val context :pop-out-battle)))]
     {:fx/type :v-box
      :alignment :center
      :style {:-fx-font-size 20}
@@ -354,12 +337,8 @@
                [
                 {:fx/type :pane
                  :h-box/hgrow :always}
-                (merge
-                  {:fx/type singleplayer-buttons}
-                  state)
-                (merge
-                  {:fx/type multiplayer-buttons}
-                  state)
+                {:fx/type singleplayer-buttons}
+                {:fx/type multiplayer-buttons}
                 {:fx/type :pane
                  :h-box/hgrow :always}]}
               {:fx/type :pane
@@ -373,12 +352,9 @@
                  :text "Close Singleplayer Battle"
                  :on-action {:event/type :spring-lobby/dissoc-in
                              :path [:by-server :local :battle]}}]}
-              (merge
-                {:fx/type fx.battle/battle-view
-                 :v-box/vgrow :always}
-                (select-keys state fx.battle/battle-view-keys)
-                (:local by-server)
-                (resource/spring-root-resources spring-isolation-dir by-spring-root))]}]}
+              {:fx/type fx.battle/battle-view
+               :v-box/vgrow :always
+               :server-key :local}]}]}
           {:fx/type :h-box
            :children
            [
@@ -389,12 +365,8 @@
              :children
              [{:fx/type :pane
                :h-box/hgrow :always}
-              (merge
-                {:fx/type singleplayer-buttons}
-                state)
-              (merge
-                {:fx/type multiplayer-buttons}
-                state)
+              {:fx/type singleplayer-buttons}
+              {:fx/type multiplayer-buttons}
               {:fx/type :pane
                :h-box/hgrow :always}]}
             {:fx/type :pane
@@ -402,6 +374,10 @@
        (when-not show-local
          [{:fx/type :pane
            :v-box/vgrow :always}])
-       [(merge
-          {:fx/type fx.bottom-bar/bottom-bar}
-          (select-keys state fx.bottom-bar/bottom-bar-keys))])}))
+       [{:fx/type fx.bottom-bar/bottom-bar}])}))
+
+(defn welcome-view [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :welcome-view
+      (welcome-view-impl state))))

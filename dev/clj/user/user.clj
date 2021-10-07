@@ -29,6 +29,7 @@
 ; application state, copy this to spring-lobby nses on refresh
 
 (def *state (atom nil))
+(def *ui-state (atom nil))
 
 ; state from init to clean up (chimers)
 
@@ -97,19 +98,20 @@
 
 (defn create-renderer []
   (let [r (fx/create-renderer
-            :middleware (fx/wrap-map-desc
-                          (fn [state]
-                            {:fx/type view
-                             :state state}))
-            :opts {:fx.opt/map-event-handler event-handler}
+            :middleware (comp
+                          fx/wrap-context-desc
+                          (fx/wrap-map-desc (fn [_] {:fx/type view})))
+            :opts {:fx.opt/map-event-handler event-handler
+                   :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
+                                                (fx/fn->lifecycle-with-context %))}
             :error-handler (fn [t]
                              (println "Error occurred! Unmounting renderer for safety")
                              (println t)
                              (.printStackTrace t)
-                             (fx/unmount-renderer *state renderer)
+                             (fx/unmount-renderer *ui-state renderer)
                              (alter-var-root #'renderer (constantly nil))))]
     (alter-var-root #'renderer (constantly r)))
-  (fx/mount-renderer *state renderer))
+  (fx/mount-renderer *ui-state renderer))
 
 (defn client-handler [state-atom server-url message]
   (try
@@ -135,6 +137,7 @@
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
     (alter-var-root (find-var 'spring-lobby/*state) (constantly *state))
+    (alter-var-root (find-var 'spring-lobby/*ui-state) (constantly *ui-state))
     (require 'spring-lobby.client)
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (if renderer
@@ -221,9 +224,10 @@
           (catch Throwable e
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
+    (alter-var-root #'*ui-state (constantly (var-get (find-var 'spring-lobby/*ui-state))))
     (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
           initial-state (initial-state-fn)]
-      (reset! *state (initial-state-fn))
+      (reset! *state initial-state)
       (swap! *state assoc :css (css/register :skylobby.fx/current
                                  (or (:css initial-state)
                                      (var-get (find-var 'skylobby.fx/default-style-data))))))
