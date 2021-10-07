@@ -1,7 +1,9 @@
 (ns skylobby.fx.mod-sync
   (:require
     [cljfx.api :as fx]
+    [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
@@ -24,6 +26,13 @@
    #"Total Atomization Prime"])
 
 
+(defn mod-download-source [mod-name]
+  (cond
+    (string/blank? mod-name) nil
+    (string/includes? mod-name "Total Atomization Prime") "TAP GitHub releases"
+    :else nil))
+
+
 (defn- mod-sync-pane-impl
   [{:fx/keys [context]
     :keys [battle-modname engine-version mod-name spring-isolation-dir]}]
@@ -42,6 +51,9 @@
         no-mod-details (not (resource/details? mod-details))
         refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
         mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
+        update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
+                                     (map :download-source-name)
+                                     set)
         mod-update-tasks (concat refresh-mods-tasks mod-details-tasks)
         rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
                                (map (juxt :rapid-id identity))
@@ -86,10 +98,15 @@
                                    first)
                  download-url (:download-url downloadable)
                  download (get http-download download-url)
-                 in-progress (or (:running download)
-                                 (contains? download-tasks-by-url download-url))
+                 possible-source-name (mod-download-source mod-name)
+                 in-progress (if downloadable
+                               (or (:running download)
+                                   (contains? download-tasks-by-url download-url))
+                               (get update-download-sources possible-source-name))
                  {:keys [download-source-name download-url]} downloadable
-                 file-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
+                 dest (resource/resource-dest spring-isolation-dir downloadable)
+                 dest-path (fs/canonical-path dest)
+                 dest-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
                  springname mod-name
                  springfiles-searched (contains? springfiles-search-results springname)
                  springfiles-search-result (get springfiles-search-results springname)
@@ -103,27 +120,46 @@
                                                   keys
                                                   (filter springfiles-mirror-set)
                                                   seq))]
-             (if downloadable
-               [{:severity (if file-exists -1 2)
+             (if (or downloadable possible-source-name)
+               [{:severity (if dest-exists -1 2)
                  :text "download"
                  :human-text (if in-progress
-                               (u/download-progress download)
+                               (if downloadable
+                                 (u/download-progress download)
+                                 (str "Refreshing " possible-source-name))
                                (if no-mod-details
                                  (if downloadable
                                    (str "Download from " download-source-name)
-                                   (str "No download for " mod-name))
+                                   (if possible-source-name
+                                     (str "Update download source " possible-source-name)
+                                     (str "No download for " mod-name)))
                                  (:mod-name mod-details)))
                  :in-progress in-progress
-                 :tooltip (if downloadable
-                            (str "Download from " download-source-name " at " download-url)
-                            (str "No http download found for " mod-name))
+                 :tooltip (if in-progress
+                            (if downloadable
+                              (str "Downloading " (u/download-progress download))
+                              (str "Refreshing " possible-source-name))
+                            (if dest-exists
+                              (str "Downloaded to " dest-path)
+                              (if downloadable
+                                (str "Download from " download-source-name " at " download-url)
+                                (if possible-source-name
+                                  (str "Update download source " possible-source-name)
+                                  (str "No http download found for " mod-name)))))
                  :action
-                 (when downloadable
-                   {:event/type :spring-lobby/add-task
-                    :task
-                    {:spring-lobby/task-type :spring-lobby/http-downloadable
-                     :downloadable downloadable
-                     :spring-isolation-dir spring-isolation-dir}})}]
+                 (when-not dest-exists
+                   (if downloadable
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      {:spring-lobby/task-type :spring-lobby/http-downloadable
+                       :downloadable downloadable
+                       :spring-isolation-dir spring-isolation-dir}}
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      (merge
+                        {:spring-lobby/task-type :spring-lobby/update-downloadables
+                         :force true}
+                        (get download-sources-by-name possible-source-name))}))}]
                (when (and springname (not (some #(re-find % springname) no-springfiles)))
                  [{:severity 2
                    :text "springfiles"
