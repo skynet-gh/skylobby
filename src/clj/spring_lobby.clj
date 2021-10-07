@@ -269,7 +269,7 @@
   (atom
     (fx/create-context
       {}
-      (cache-factory-with-threshold cache/lru-cache-factory 16384))))
+      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
 
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
