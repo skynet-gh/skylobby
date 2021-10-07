@@ -500,7 +500,7 @@
 
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
+  (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
         {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
@@ -512,11 +512,14 @@
         battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
         new-battle-status (assoc (or battle-status cu/default-battle-status)
                             :id (battle/available-team-id battle)
-                            :ally 0 ; (battle/available-ally battle)
+                            :ally 0
                             :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
                                       0)
                             :sync (sync-number
                                     (resource/sync-status server-data spring mod-details map-details)))
+        new-battle-status (if join-battle-as-player
+                            (assoc new-battle-status :mode true)
+                            new-battle-status)
         color (or preferred-color (u/random-color))
         msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
     (message/send-message state-atom client-data msg)))
