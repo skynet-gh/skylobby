@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.5]
+
+- Add tab highlighting on new chats
+
 ### [0.6.4]
 
 - Add tab highlighting on new chats
