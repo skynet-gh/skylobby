@@ -279,6 +279,7 @@
                         (assoc-in [:my-channels channel-name] {}))))
                 (and (not focus-chat)
                      selected-tab-channel
+                     (not (u/battle-channel-name? channel-name))
                      (not (and (= server-key (:selected-server-tab state))
                                (= "chat" (:selected-tab-main state))
                                (= channel-name selected-tab-channel))))
