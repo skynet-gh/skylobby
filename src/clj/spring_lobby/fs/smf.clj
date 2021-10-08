@@ -183,7 +183,7 @@
 
 (defn minimap-dimensions [map-smf-header]
   (let [{:keys [map-width map-height]} map-smf-header]
-    (when (and map-width)
+    (when (and map-height map-width)
       (let [ratio-x (/ minimap-display-size map-width)
             ratio-y (/ minimap-display-size map-height)
             min-ratio (min ratio-x ratio-y)
@@ -199,22 +199,29 @@
          :minimap-height (or minimap-height minimap-display-size)}))))
 
 (defn decode-map
-  [input-stream]
-  (let [all-bytes (u/slurp-bytes input-stream)
-        header (b/decode map-header (io/input-stream all-bytes))
-        {:keys [heightmap-offset map-height map-width metalmap-offset minimap-offset]} header
-        heightmap-length (* 2 (inc map-width) (inc map-height))
-        metalmap-length (* (quot map-width 2) (quot map-height 2))
-        ^"[B" heightmap-bytes (decode-heightmap (subbytes all-bytes heightmap-offset heightmap-length))
-        minimap-bytes (subbytes all-bytes minimap-offset minimap-length)
-        metalmap-bytes (subbytes all-bytes metalmap-offset metalmap-length)
-        minimap-image (decompress-minimap minimap-bytes)
-        {:keys [minimap-width minimap-height]} (minimap-dimensions header)]
-    {:header header
-     :body
-     {:heightmap-image (heightmap-image map-width map-height heightmap-bytes)
-      :minimap-height minimap-height
-      :minimap-image minimap-image
-      :minimap-image-scaled (scale-minimap-image minimap-width minimap-height minimap-image)
-      :minimap-width minimap-width
-      :metalmap-image (metalmap-image map-width map-height metalmap-bytes)}}))
+  ([input-stream]
+   (decode-map input-stream nil))
+  ([input-stream {:keys [header-only map-images]}]
+   (let [all-bytes (u/slurp-bytes input-stream)
+         header (b/decode map-header (io/input-stream all-bytes))]
+     (merge
+       {:header header}
+       (when-not header-only
+         (let [
+               {:keys [heightmap-offset map-height map-width metalmap-offset minimap-offset]} header
+               heightmap-length (* 2 (inc map-width) (inc map-height))
+               metalmap-length (* (quot map-width 2) (quot map-height 2))
+               {:keys [minimap-width minimap-height]} (minimap-dimensions header)]
+           (merge
+             {:minimap-height minimap-height
+              :minimap-width minimap-width}
+             (when map-images
+               (let [
+                     ^"[B" heightmap-bytes (decode-heightmap (subbytes all-bytes heightmap-offset heightmap-length))
+                     minimap-bytes (subbytes all-bytes minimap-offset minimap-length)
+                     metalmap-bytes (subbytes all-bytes metalmap-offset metalmap-length)
+                     minimap-image (decompress-minimap minimap-bytes)]
+                 {
+                  :heightmap-image (heightmap-image map-width map-height heightmap-bytes)
+                  :metalmap-image (metalmap-image map-width map-height metalmap-bytes)
+                  :minimap-image minimap-image})))))))))

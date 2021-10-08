@@ -35,6 +35,7 @@
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
+    [spring-lobby.fs.smf :as fs.smf]
     [spring-lobby.git :as git]
     [spring-lobby.http :as http]
     [spring-lobby.rapid :as rapid]
@@ -270,6 +271,8 @@
     (fx/create-context
       {}
       (cache-factory-with-threshold cache/lru-cache-factory 4096))))
+
+(def main-stage-atom (atom nil))
 
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
@@ -1611,8 +1614,14 @@
               (filter :map-name)
               (filter
                 (fn [map-details]
-                  (let [minimap-file (-> map-details :map-name fs/minimap-image-cache-file)]
-                    (or (:force opts) (not (fs/exists minimap-file))))))
+                  (let [
+                        heightmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "heightmap"}))
+                        metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
+                        minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
+                    (or (:force opts)
+                        (not (fs/exists heightmap-file))
+                        (not (fs/exists metalmap-file))
+                        (not (fs/exists minimap-file))))))
               (sort-by :map-name))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
@@ -1621,9 +1630,17 @@
        (if-let [map-file (:file map-details)]
          (do
            (log/info "Caching minimap for" map-file)
-           (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
-             (when-let [minimap-image-scaled (:minimap-image-scaled smf)]
-               (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
+           (let [{:keys [map-name smf]} (fs/read-map-data map-file {:map-images true})
+                 {:keys [minimap-height minimap-width]} smf]
+             (when-let [minimap-image (:minimap-image smf)]
+               (let [minimap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height minimap-image)]
+                 (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "minimap"}))))
+             (when-let [metalmap-image (:metalmap-image smf)]
+               (let [metalmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height metalmap-image)]
+                 (fs/write-image-png metalmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "metalmap"}))))
+             (when-let [heightmap-image (:heightmap-image smf)]
+               (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
+                 (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
        (add-task! *state {::task-type ::update-cached-minimaps
@@ -2432,7 +2449,11 @@
 (defn- update-disconnected!
   [state-atom server-key]
   (log/info "Disconnecting from" (pr-str server-key))
-  (let [[old-state _new-state] (swap-vals! state-atom update :by-server dissoc server-key)
+  (let [[old-state _new-state] (swap-vals! state-atom
+                                 (fn [state]
+                                   (-> state
+                                       (update :by-server dissoc server-key)
+                                       (update :needs-focus dissoc server-key))))
         {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
     (if client-data
       (client/disconnect *state client-data)
@@ -3131,14 +3152,16 @@
         (log/error e "Error dragging minimap")))))
 
 (defmethod event-handler ::minimap-mouse-released
-  [{:keys [am-host client-data minimap-width minimap-height map-details singleplayer] :as e}]
+  [{:keys [am-host client-data minimap-scale minimap-width minimap-height map-details singleplayer]
+    :or {minimap-scale 1.0}
+    :as e}]
   (future
     (try
       (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
         (when-let [{:keys [team x y]} (:drag-team before)]
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-                x (int (* (/ x minimap-width) map-width spring/map-multiplier))
-                z (int (* (/ y minimap-height) map-height spring/map-multiplier))
+                x (int (* (/ x (* minimap-width minimap-scale)) map-width spring/map-multiplier))
+                z (int (* (/ y (* minimap-height minimap-scale)) map-height spring/map-multiplier))
                 team-data {:startposx x
                            :startposy z ; for SpringLobby bug
                            :startposz z}
@@ -3154,10 +3177,10 @@
                 t (min starty endy)
                 r (max startx endx)
                 b (max starty endy)
-                left (/ l (* 1.0 minimap-width))
-                top (/ t (* 1.0 minimap-height))
-                right (/ r (* 1.0 minimap-width))
-                bottom (/ b (* 1.0 minimap-height))]
+                left (/ l (* minimap-scale minimap-width))
+                top (/ t (* minimap-scale minimap-height))
+                right (/ r (* minimap-scale minimap-width))
+                bottom (/ b (* minimap-scale minimap-height))]
             (if singleplayer
               (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
                      (fn [allyteam]
@@ -4386,11 +4409,39 @@
           (log/error e "Error setting chat history message"))))))
 
 
-(defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]
-  (swap! *state assoc :selected-tab-channel (.getId event)))
+(defmethod event-handler ::selected-item-changed-channel-tabs
+  [{:fx/keys [^Tab event] :keys [server-key]}]
+  (let [tab (.getId event)]
+    (swap! *state
+      (fn [state]
+        (-> state
+            (assoc :selected-tab-channel tab)
+            (update :needs-focus
+              (fn [needs-focus]
+                (let [
+                      path [server-key "chat"]
+                      r (update-in needs-focus path dissoc tab)]
+                  (if (empty? (get-in r path))
+                    {} ; todo battle focus too
+                    r)))))))))
 
-(defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
-  (swap! *state assoc :selected-tab-main (.getId event)))
+(defmethod event-handler ::selected-item-changed-main-tabs
+  [{:fx/keys [^Tab event] :keys [selected-tab-channel server-key]}]
+  (let [tab (.getId event)]
+    (swap! *state
+      (fn [state]
+        (cond-> state
+                true
+                (assoc :selected-tab-main tab)
+                (= "chat" tab) ; todo battle focus too
+                (update :needs-focus
+                  (fn [needs-focus]
+                    (let [
+                          path [server-key tab]
+                          r (update-in needs-focus path dissoc selected-tab-channel)]
+                      (if (empty? (get-in r path))
+                        {} ; todo battle focus too
+                        r)))))))))
 
 (defmethod event-handler ::send-console [{:keys [client-data message server-key]}]
   (future

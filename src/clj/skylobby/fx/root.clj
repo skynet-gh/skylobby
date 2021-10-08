@@ -18,6 +18,7 @@
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
+    spring-lobby
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
@@ -45,7 +46,9 @@
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
         show-battle-window (boolean (and pop-out-battle battle-id))]
     {:fx/type fx/ext-on-instance-lifecycle
-     :on-created (partial skylobby.fx/add-maximized-listener :battle)
+     :on-created (fn [node]
+                   (skylobby.fx/add-maximized-listener :battle node)
+                   (reset! spring-lobby/main-stage-atom node))
      :desc
      {:fx/type :stage
       :showing show-battle-window

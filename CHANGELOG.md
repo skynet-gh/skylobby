@@ -26,6 +26,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.4]
+
+- Add tab highlighting on new chats
+- Fix message context menu not working
+- Fix minimap display for non-boxes and in replays
+- Improve replay details parsing and caching
+- Move all map images to files, improving performance and reducing cache size
+
 ### [0.6.3]
 
 - Add cooldown to rapid auto download tries

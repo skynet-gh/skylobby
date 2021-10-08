@@ -749,21 +749,11 @@
 (defn read-zip-smf
   ([^ZipFile zf ^ZipEntry smf-entry]
    (read-zip-smf zf smf-entry nil))
-  ([^ZipFile zf ^ZipEntry smf-entry {:keys [header-only]}]
-   (let [smf-path (.getName smf-entry)]
-     (if header-only
-       (let [header (smf/decode-map-header (.getInputStream zf smf-entry))]
-         {:map-name (map-name smf-path)
-          :smf (merge
-                 {::source smf-path
-                  :header header})})
-       (let [{:keys [body header]} (smf/decode-map (.getInputStream zf smf-entry))]
-         {:map-name (map-name smf-path)
-          ; TODO extract only what's needed
-          :smf (merge
-                 {::source smf-path
-                  :header header}
-                 body)})))))
+  ([^ZipFile zf ^ZipEntry smf-entry opts]
+   (let [smf-path (.getName smf-entry)
+         smf-data (smf/decode-map (.getInputStream zf smf-entry) opts)]
+     {:map-name (map-name smf-path)
+      :smf (assoc smf-data ::source smf-path)})))
 
 (defn read-zip-map
   ([^java.io.File file]
@@ -813,20 +803,10 @@
       (.toByteArray baos))))
 
 (defn read-7z-smf-bytes
-  [smf-path smf-bytes {:keys [header-only]}]
-  (if header-only
-    (let [header (smf/decode-map-header (io/input-stream smf-bytes))]
-      {:map-name (map-name smf-path)
-       :smf (merge
-              {::source smf-path
-               :header header})})
-    (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-bytes))]
-      {:map-name (map-name smf-path)
-       ; TODO extract only what's needed
-       :smf (merge
-              {::source smf-path
-               :header header}
-              body)})))
+  [smf-path smf-bytes opts]
+  (let [smf-data (smf/decode-map (io/input-stream smf-bytes) opts)]
+    {:map-name (map-name smf-path)
+     :smf (assoc smf-data ::source smf-path)}))
 
 
 (defn read-7z-map-fast
@@ -915,21 +895,12 @@
 (defn read-smf-file
   ([smf-file]
    (read-smf-file smf-file nil))
-  ([smf-file {:keys [header-only]}]
-   (let [smf-path (canonical-path smf-file)]
-     (if header-only
-       (let [header (smf/decode-map-header (io/input-stream smf-file))]
-         {:map-name (map-name smf-path)
-          :smf (merge
-                 {::source smf-path
-                  :header header})})
-       (let [{:keys [body header]} (smf/decode-map (io/input-stream smf-file))]
-         {:map-name (map-name smf-path)
-          ; TODO extract only what's needed
-          :smf (merge
-                 {::source smf-path
-                  :header header}
-                 body)})))))
+  ([smf-file opts]
+   (let [smf-path (canonical-path smf-file)
+         smf-data (smf/decode-map (io/input-stream smf-file) opts)]
+     {:map-name (map-name smf-path)
+      :smf (assoc smf-data ::source smf-path)})))
+
 
 (defn read-map-directory
   ([file]
@@ -989,9 +960,9 @@
 
 (defn minimap-image-cache-file
   ([map-name]
-   (minimap-image-cache-file maps-cache-root map-name))
-  ([root map-name]
-   (io/file root (str map-name ".minimap.png"))))
+   (minimap-image-cache-file map-name nil))
+  ([map-name {:keys [root minimap-type] :or {root maps-cache-root minimap-type "minimap"}}]
+   (io/file root (str map-name "." minimap-type ".png"))))
 
 
 (defn copy-dir

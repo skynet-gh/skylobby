@@ -614,8 +614,10 @@
                                                       :username "host1"
                                                       :spads nil
                                                       :vote nil}]}}
+                :my-channels {"__battle__0" {}}
                 :username "skynet"
-                :client-data {:compflags #{"u"}}}}}
+                :client-data {:compflags #{"u"}}}}
+              :selected-tab-channel "__battle__0"}
              @state-atom))
       (is (= ["MYBATTLESTATUS 1024 0"]
              @messages-atom)))))
