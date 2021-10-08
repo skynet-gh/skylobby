@@ -277,7 +277,7 @@
            [{:fx/type fx.players-table/players-table
              :v-box/vgrow :always
              :am-host false
-             :battle-modname gametype
+             :mod-name gametype
              :players players-and-bots
              :sides sides
              :singleplayer true}
@@ -344,6 +344,7 @@
            :map-name mapname
            :server-key :local
            :minimap-type-key :replay-minimap-type
+           :players players-and-bots
            :scripttags script-data}
           {:fx/type :h-box
            :alignment :center-left

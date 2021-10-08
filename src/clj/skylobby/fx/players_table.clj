@@ -35,7 +35,7 @@
 
 (defn players-table-impl
   [{:fx/keys [context]
-    :keys [players server-key]}]
+    :keys [mod-name players server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
@@ -48,12 +48,13 @@
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
-        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        mod-name (or mod-name
+                     (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         sides (spring/mod-sides battle-mod-details)
-        singleplayer (= :local server-key)
+        singleplayer (or (not server-key) (= :local server-key))
         username (fx/sub-val context get-in [:by-server server-key :username])
 
         players-with-skill (map

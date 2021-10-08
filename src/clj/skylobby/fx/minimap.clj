@@ -56,15 +56,20 @@
       (when drag-allyteam
         (let [{:keys [startx starty endx endy]} drag-allyteam]
           {:allyteam (str (:allyteam-id drag-allyteam))
-           :x (int (* scale (min startx endx)))
-           :y (int (* scale (min starty endy)))
-           :width (int (* scale (Math/abs (double (- endx startx)))))
-           :height (int (* scale (Math/abs (double (- endy starty)))))})))))
+           :x (int (min startx endx))
+           :y (int (min starty endy))
+           :width (int (Math/abs (double (- endx startx))))
+           :height (int (Math/abs (double (- endy starty))))})))))
+
+(defn get-teams [players]
+  (->> players
+       (filter (comp :mode :battle-status))
+       (map (juxt :username identity))
+       (into {})))
 
 (defn minimap-starting-points
-  [battle-details map-details scripttags scale minimap-width minimap-height]
+  [teams map-details scripttags scale minimap-width minimap-height]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-        teams (spring/teams battle-details)
         team-by-key (->> teams
                          (map second)
                          (map (juxt (comp spring/team-name :id :battle-status) identity))
@@ -116,10 +121,11 @@
 
 (defn minimap-pane-impl
   [{:fx/keys [context]
-    :keys [map-name minimap-type-key scripttags server-key]}]
+    :keys [players map-name minimap-type-key scripttags server-key]}]
   (let [
         am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         drag-team (fx/sub-val context :drag-team)
         drag-allyteam (fx/sub-val context :drag-allyteam)
@@ -132,7 +138,7 @@
         scripttags (or scripttags
                        (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
         minimap-size (fx/sub-val context :minimap-size)
-        minimap-type (fx/sub-val context :minimap-type)
+        minimap-type (fx/sub-val context minimap-type-key)
         {:keys [smf]} map-details
         {:keys [minimap-height minimap-width]
          :or {minimap-height smf/minimap-display-size
@@ -141,8 +147,12 @@
         minimap-size (or (u/to-number minimap-size)
                          default-minimap-size)
         minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
-        battle-details nil
-        starting-points (minimap-starting-points battle-details map-details scripttags minimap-scale minimap-width minimap-height)
+        teams (if players
+                (get-teams players)
+                (when server-key
+                  (spring/teams
+                    (spring/battle-details {:battle (fx/sub-val context get-in [:by-server server-key :battle])}))))
+        starting-points (minimap-starting-points teams map-details scripttags minimap-scale minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         startpostype (->> scripttags
                           :game
@@ -179,6 +189,7 @@
       (merge
         (when (or singleplayer (not am-spec))
           {:on-mouse-pressed {:event/type :spring-lobby/minimap-mouse-pressed
+                              :minimap-scale minimap-scale
                               :startpostype startpostype
                               :starting-points starting-points
                               :start-boxes start-boxes}
@@ -186,9 +197,10 @@
            :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
                                :am-host am-host
                                :am-spec am-spec
-                               :channel-name (:channel-name battle-details)
+                               :channel-name channel-name
                                :client-data client-data
                                :map-details map-details
+                               :minimap-scale minimap-scale
                                :minimap-width minimap-width
                                :minimap-height minimap-height
                                :singleplayer singleplayer}})
@@ -202,8 +214,7 @@
                                 Color/WHITE Color/BLACK)
                  random (= "Random" startpostype)
                  random-teams (when random
-                                (let [teams (spring/teams battle-details)]
-                                  (set (map str (take (count teams) (iterate inc 0))))))
+                                (set (map str (take (count teams) (iterate inc 0)))))
                  starting-points (if random
                                    (filter (comp random-teams :team) starting-points)
                                    starting-points)]

@@ -3152,14 +3152,16 @@
         (log/error e "Error dragging minimap")))))
 
 (defmethod event-handler ::minimap-mouse-released
-  [{:keys [am-host client-data minimap-width minimap-height map-details singleplayer] :as e}]
+  [{:keys [am-host client-data minimap-scale minimap-width minimap-height map-details singleplayer]
+    :or {minimap-scale 1.0}
+    :as e}]
   (future
     (try
       (let [[before _after] (swap-vals! *state dissoc :drag-team :drag-allyteam)]
         (when-let [{:keys [team x y]} (:drag-team before)]
           (let [{:keys [map-width map-height]} (-> map-details :smf :header)
-                x (int (* (/ x minimap-width) map-width spring/map-multiplier))
-                z (int (* (/ y minimap-height) map-height spring/map-multiplier))
+                x (int (* (/ x (* minimap-width minimap-scale)) map-width spring/map-multiplier))
+                z (int (* (/ y (* minimap-height minimap-scale)) map-height spring/map-multiplier))
                 team-data {:startposx x
                            :startposy z ; for SpringLobby bug
                            :startposz z}
@@ -3175,10 +3177,10 @@
                 t (min starty endy)
                 r (max startx endx)
                 b (max starty endy)
-                left (/ l (* 1.0 minimap-width))
-                top (/ t (* 1.0 minimap-height))
-                right (/ r (* 1.0 minimap-width))
-                bottom (/ b (* 1.0 minimap-height))]
+                left (/ l (* minimap-scale minimap-width))
+                top (/ t (* minimap-scale minimap-height))
+                right (/ r (* minimap-scale minimap-width))
+                bottom (/ b (* minimap-scale minimap-height))]
             (if singleplayer
               (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
                      (fn [allyteam]
