@@ -139,7 +139,21 @@
                    (fn [demo-stream-raw]
                      (if parse-stream
                        (try
-                         (b/decode (b/repeated demo-stream-chunk-protocol) (io/input-stream demo-stream-raw))
+                         (let [parsed (b/decode (b/repeated demo-stream-chunk-protocol) (io/input-stream demo-stream-raw))
+                               player-num-to-name (->> parsed
+                                                       (map (comp :demo-stream-chunk :body))
+                                                       (filter (comp #{6} :command :header))
+                                                       (map :body)
+                                                       (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
+                                                       (into {}))
+                               chat-log (->> parsed
+                                             (map (comp :demo-stream-chunk :body))
+                                             (filter (comp #{7} :command :header))
+                                             (map :body)
+                                             (remove (comp #(string/starts-with? % "My player ID is") :message))
+                                             doall)]
+                           {:chat-log chat-log
+                            :player-num-to-name player-num-to-name})
                          (catch Exception e
                            (log/warn e "Exception parsing demo stream")))
                        nil))))))))))

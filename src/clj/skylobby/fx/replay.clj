@@ -318,14 +318,7 @@
            (when show-sync-left
              [sync-pane])
            (if-let [details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))]
-             (let [player-num-to-name (->> details
-                                           :body
-                                           :demo-stream
-                                           (map (comp :demo-stream-chunk :body))
-                                           (filter (comp #{6} :command :header))
-                                           (map :body)
-                                           (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
-                                           (into {}))]
+             (let [{:keys [chat-log player-num-to-name]} (-> details :body :demo-stream)]
                [{:fx/type :label
                  :text "Chat log"
                  :style {:-fx-font-size 20}}
@@ -338,13 +331,7 @@
                           :-fx-font-size 18}
                   :wrap-text true
                   :document (chat-log-document
-                              (->> details
-                                   :body
-                                   :demo-stream
-                                   (map (comp :demo-stream-chunk :body))
-                                   (filter (comp #{7} :command :header))
-                                   (map :body)
-                                   (remove (comp #(string/starts-with? % "My player ID is") :message)))
+                              chat-log
                               {:player-name-to-color player-name-to-color
                                :player-num-to-name player-num-to-name})}}])
              [{:fx/type :label
