@@ -35,6 +35,7 @@
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
+    [spring-lobby.fs.smf :as fs.smf]
     [spring-lobby.git :as git]
     [spring-lobby.http :as http]
     [spring-lobby.rapid :as rapid]
@@ -1613,8 +1614,14 @@
               (filter :map-name)
               (filter
                 (fn [map-details]
-                  (let [minimap-file (-> map-details :map-name fs/minimap-image-cache-file)]
-                    (or (:force opts) (not (fs/exists minimap-file))))))
+                  (let [
+                        heightmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "heightmap"}))
+                        metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
+                        minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
+                    (or (:force opts)
+                        (not (fs/exists heightmap-file))
+                        (not (fs/exists metalmap-file))
+                        (not (fs/exists minimap-file))))))
               (sort-by :map-name))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
@@ -1623,9 +1630,17 @@
        (if-let [map-file (:file map-details)]
          (do
            (log/info "Caching minimap for" map-file)
-           (let [{:keys [map-name smf]} (fs/read-map-data map-file)]
-             (when-let [minimap-image-scaled (:minimap-image-scaled smf)]
-               (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name)))))
+           (let [{:keys [map-name smf]} (fs/read-map-data map-file {:map-images true})
+                 {:keys [minimap-height minimap-width]} smf]
+             (when-let [minimap-image (:minimap-image smf)]
+               (let [minimap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height minimap-image)]
+                 (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "minimap"}))))
+             (when-let [metalmap-image (:metalmap-image smf)]
+               (let [metalmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height metalmap-image)]
+                 (fs/write-image-png metalmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "metalmap"}))))
+             (when-let [heightmap-image (:heightmap-image smf)]
+               (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
+                 (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
        (add-task! *state {::task-type ::update-cached-minimaps
