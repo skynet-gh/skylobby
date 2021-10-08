@@ -69,7 +69,7 @@
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
-   :jvm-opts ["-server" "-Xms128m" "-Xmx4g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+   :jvm-opts ["-server" "-Xms128m" "-Xmx8g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}

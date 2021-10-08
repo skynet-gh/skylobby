@@ -269,7 +269,7 @@
   (atom
     (fx/create-context
       {}
-      (cache-factory-with-threshold cache/lru-cache-factory 16384))))
+      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
 
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
@@ -453,6 +453,28 @@
     state
     [:engine-version :engines :map-name :maps :mod-name :mods]))
 
+
+(defn update-cooldown [state-atom k]
+  (swap! state-atom update-in [:cooldowns k]
+    (fn [state]
+      (-> state
+          (update :tries (fnil inc 0))
+          (assoc :updated (u/curr-millis))))))
+
+(defn check-cooldown [cooldowns k]
+  (if-let [{:keys [tries updated]} (get cooldowns k)]
+    (if (and (number? tries) (number? updated))
+      (let [cd (< (u/curr-millis)
+                  (+ updated (* 1000 (Math/pow 2 tries))))] ; exponential backoff
+        (if cd
+          (do
+            (log/info k "is on cooldown")
+            false)
+          true))
+      true)
+    true))
+
+
 (defn- auto-get-resources-relevant-keys [state]
   (select-keys
     state
@@ -498,7 +520,7 @@
                            sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
                        (not= 1 sync-status))))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
-        (let [{:keys [current-tasks downloadables-by-url file-cache importables-by-path
+        (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache importables-by-path
                       rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
@@ -516,7 +538,6 @@
                               (filter (comp #{::rapid-download} ::task-type))
                               (filter (comp #{rapid-id} :rapid-id))
                               first)
-              engine-file (-> engines first :file)
               importables (vals importables-by-path)
               map-importable (some->> importables
                                       (filter (comp #{::map} :resource-type))
@@ -548,6 +569,7 @@
                                                  (filter (comp #{battle-map} :springname))
                                                  first)
               engine-details (spring/engine-details engines battle-version)
+              engine-file (:file engine-details)
               engine-importable (some->> importables
                                          (filter (comp #{::engine} :resource-type))
                                          (filter (partial resource/could-be-this-engine? battle-version))
@@ -652,7 +674,8 @@
                          (and rapid-id
                               (not rapid-task)
                               engine-file
-                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp")))))
+                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))))
+                              (check-cooldown cooldowns [:rapid (:id rapid-data)]))
                          (do
                            (log/info "Adding task to auto download rapid" rapid-id)
                            {::task-type ::rapid-download
@@ -3801,8 +3824,12 @@
 
 (defmethod event-handler ::rapid-download
   [{:keys [engine-file rapid-id spring-isolation-dir]}]
-  (swap! *state assoc-in [:rapid-download rapid-id] {:running true
-                                                     :message "Preparing to run pr-downloader"})
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc-in [:rapid-download rapid-id] {:running true
+                                                :message "Preparing to run pr-downloader"})
+          (assoc-in [:rapid-failures rapid-id] false))))
   (future
     (try
       (let [^File root spring-isolation-dir
@@ -3839,6 +3866,7 @@
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (.waitFor process)
+          (update-cooldown *state [:rapid rapid-id])
           (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))
           (add-tasks! *state [{::task-type ::update-rapid-packages}
                               {::task-type ::refresh-mods}])))

@@ -26,6 +26,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.3]
+
+- Add cooldown to rapid auto download tries
+- Fix rapid download engine file choice
+- Fix ba github download source
+- Reduce ui context cache size
+
 ### [0.6.2]
 
 - Fix ready change in battle

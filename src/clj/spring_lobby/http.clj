@@ -43,6 +43,9 @@
 (def springlauncher-root
   "https://content.spring-launcher.com")
 
+(def ba-github-releases-url
+  "https://api.github.com/repos/Balanced-Annihilation/Balanced-Annihilation/releases")
+
 (def bar-spring-releases-url
   "https://api.github.com/repos/beyond-all-reason/spring/releases")
 

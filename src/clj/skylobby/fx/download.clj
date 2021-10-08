@@ -37,7 +37,7 @@
   [;springfiles-maps-download-source gone now
    hakora-maps-download-source
    {:download-source-name "Balanced Annihilation GitHub releases"
-    :url http/tap-github-releases-url
+    :url http/ba-github-releases-url
     :browse-url "https://github.com/Balanced-Annihilation/Balanced-Annihilation/releases"
     :resources-fn http/get-github-release-downloadables
     :resource-type-fn #(when (string/ends-with? % ".sdz") :spring-lobby/mod)}
