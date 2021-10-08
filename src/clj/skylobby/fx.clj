@@ -110,6 +110,10 @@
    {"-normal"
     {"> .ikonli-font-icon"
      {:-fx-icon-color "dimgrey"}}
+    "-tab"
+    {"-focus"
+     {:-fx-background "#ffd700"
+      :-fx-base "#ffd700"}}
     "-chat"
     {
      "-time"

@@ -271,6 +271,8 @@
       {}
       (cache-factory-with-threshold cache/lru-cache-factory 4096))))
 
+(def main-stage-atom (atom nil))
+
 
 (defn add-ui-state-watcher [state-atom ui-state-atom]
   (log/info "Adding state to UI state watcher")
@@ -2432,7 +2434,11 @@
 (defn- update-disconnected!
   [state-atom server-key]
   (log/info "Disconnecting from" (pr-str server-key))
-  (let [[old-state _new-state] (swap-vals! state-atom update :by-server dissoc server-key)
+  (let [[old-state _new-state] (swap-vals! state-atom
+                                 (fn [state]
+                                   (-> state
+                                       (update :by-server dissoc server-key)
+                                       (update :needs-focus dissoc server-key))))
         {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
     (if client-data
       (client/disconnect *state client-data)
@@ -4386,11 +4392,39 @@
           (log/error e "Error setting chat history message"))))))
 
 
-(defmethod event-handler ::selected-item-changed-channel-tabs [{:fx/keys [^Tab event]}]
-  (swap! *state assoc :selected-tab-channel (.getId event)))
+(defmethod event-handler ::selected-item-changed-channel-tabs
+  [{:fx/keys [^Tab event] :keys [server-key]}]
+  (let [tab (.getId event)]
+    (swap! *state
+      (fn [state]
+        (-> state
+            (assoc :selected-tab-channel tab)
+            (update :needs-focus
+              (fn [needs-focus]
+                (let [
+                      path [server-key "chat"]
+                      r (update-in needs-focus path dissoc tab)]
+                  (if (empty? (get-in r path))
+                    {} ; todo battle focus too
+                    r)))))))))
 
-(defmethod event-handler ::selected-item-changed-main-tabs [{:fx/keys [^Tab event]}]
-  (swap! *state assoc :selected-tab-main (.getId event)))
+(defmethod event-handler ::selected-item-changed-main-tabs
+  [{:fx/keys [^Tab event] :keys [selected-tab-channel server-key]}]
+  (let [tab (.getId event)]
+    (swap! *state
+      (fn [state]
+        (cond-> state
+                true
+                (assoc :selected-tab-main tab)
+                (= "chat" tab) ; todo battle focus too
+                (update :needs-focus
+                  (fn [needs-focus]
+                    (let [
+                          path [server-key tab]
+                          r (update-in needs-focus path dissoc selected-tab-channel)]
+                      (if (empty? (get-in r path))
+                        {} ; todo battle focus too
+                        r)))))))))
 
 (defmethod event-handler ::send-console [{:keys [client-data message server-key]}]
   (future

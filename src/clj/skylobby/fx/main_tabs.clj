@@ -46,10 +46,12 @@
                               sort)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^java.util.List my-channel-names selected-tab-channel)
-                         0)]
+                         0)
+        needs-focus (fx/sub-val context :needs-focus)]
     (if (seq my-channel-names)
       {:fx/type fx.ext.tab-pane/with-selection-props
-       :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-channel-tabs}
+       :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-channel-tabs
+                                          :server-key server-key}
                :selected-index selected-index}
        :desc
        {:fx/type :tab-pane
@@ -62,6 +64,7 @@
              :graphic {:fx/type :label
                        :text (str channel-name)}
              :id channel-name
+             :style-class (concat ["tab"] (when (-> needs-focus (get server-key) (get "chat") (contains? channel-name)) ["skylobby-tab-focus"]))
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type :spring-lobby/leave-channel
                                 :channel-name channel-name
@@ -96,6 +99,7 @@
         filter-battles (fx/sub-val context :filter-battles)
         join-channel-name (fx/sub-val context :join-channel-name)
         pop-out-battle (fx/sub-val context :pop-out-battle)
+        selected-tab-channel (fx/sub-val context :selected-tab-channel)
         selected-tab-main (fx/sub-val context :selected-tab-main)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
@@ -115,9 +119,12 @@
                          0)
         users-view {:fx/type fx.user/users-view
                     :v-box/vgrow :always
-                    :server-key server-key}]
+                    :server-key server-key}
+        needs-focus (fx/sub-val context :needs-focus)]
     {:fx/type fx.ext.tab-pane/with-selection-props
-     :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs}
+     :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
+                                        :server-key server-key
+                                        :selected-tab-channel selected-tab-channel}
              :selected-index (or selected-index 0)}
      :desc
      {:fx/type :tab-pane
@@ -137,6 +144,7 @@
                                :client-data client-data
                                :consume true}
             :id "battle"
+            :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
             :content
             (if battle-id
               {:fx/type fx.battle/battle-view
@@ -213,6 +221,7 @@
                     :text "Chat"}
           :closable false
           :id "chat"
+          :style-class (concat ["tab"] (when (contains? (get needs-focus server-key) "chat") ["skylobby-tab-focus"]))
           :content
           {:fx/type :split-pane
            :divider-positions [0.70 0.9]

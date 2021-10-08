@@ -19,7 +19,8 @@
         selected-server-tab (fx/sub-val context :selected-server-tab)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
                              (.indexOf ^java.util.List tab-ids selected-server-tab))
-                           0)]
+                           0)
+        needs-focus (fx/sub-val context :needs-focus)]
     {:fx/type :v-box
      :style {:-fx-font-size 14}
      :alignment :top-left
@@ -47,6 +48,7 @@
             (fn [server-key]
               {:fx/type :tab
                :id (str server-key)
+               :style-class (concat ["tab"] (when (contains? needs-focus server-key) ["skylobby-tab-focus"]))
                :graphic {:fx/type :label
                          :text (str (let [[_ server-config] (fx/sub-val context get-in [:by-server server-key :server])]
                                       (:alias server-config))

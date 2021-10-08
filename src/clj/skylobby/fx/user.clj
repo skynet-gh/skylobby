@@ -239,6 +239,7 @@
               :icon-literal "mdi-close:16:white"}}]))}
       {:fx/type users-table
        :v-box/vgrow :always
+       :server-key server-key
        :users filtered-users}]}))
 
 (defn users-view [state]
