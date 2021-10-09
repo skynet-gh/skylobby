@@ -130,6 +130,7 @@
         drag-team (fx/sub-val context :drag-team)
         drag-allyteam (fx/sub-val context :drag-allyteam)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        increment-ids (fx/sub-val context :increment-ids)
         map-name (or map-name
                      (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map]))
         spring-root (fx/sub-ctx context sub/spring-root server-key)
@@ -228,12 +229,16 @@
                               drag-team)
                        x (or (:x drag) x)
                        y (or (:y drag) y)
-                       xc (- x (if (= 1 (count team)) ; single digit
+                       text (if random "?"
+                              (if increment-ids
+                                (inc (u/to-number team))
+                                team))
+                       xc (- x (if (= 1 (count (str text))) ; single digit
                                  (* u/start-pos-r -0.6)
                                  (* u/start-pos-r -0.2)))
-                       yc (+ y (/ u/start-pos-r 0.75))
-                       text (if random "?" team)
+                       yc (+ y (/ u/start-pos-r 0.70))
                        fill-color (if random Color/RED color)]
+                   (.setLineWidth gc 2.0)
                    (.beginPath gc)
                    (.rect gc x y
                           (* 2 u/start-pos-r)
@@ -244,17 +249,21 @@
                    (.stroke gc)
                    (.closePath gc)
                    (.setStroke gc Color/BLACK)
-                   (.strokeText gc text xc yc)
+                   (.setLineWidth gc 3.0)
+                   (.strokeText gc (str text) xc yc)
                    (.setFill gc Color/WHITE)
-                   (.fillText gc text xc yc)))
+                   (.fillText gc (str text) xc yc)))
                (doseq [{:keys [allyteam x y width height]} start-boxes]
                  (when (and x y width height)
                    (let [color (Color/color 0.5 0.5 0.5 0.5)
                          border 4
-                         text allyteam
+                         text (if increment-ids
+                                (inc (u/to-number allyteam))
+                                allyteam)
                          font-size 20.0
                          xt (+ x (quot font-size 2))
                          yt (+ y (* font-size 1.2))]
+                     (.setLineWidth gc 2.0)
                      (.beginPath gc)
                      (.rect gc (+ x (quot border 2)) (+ y (quot border 2)) (inc (- width border)) (inc (- height border)))
                      (.setFill gc color)
@@ -265,10 +274,10 @@
                      (.closePath gc)
                      (.setFont gc (Font/font "Regular" FontWeight/BOLD font-size))
                      (.setStroke gc Color/BLACK)
-                     (.setLineWidth gc 2.0)
-                     (.strokeText gc text xt yt)
+                     (.setLineWidth gc 5.0)
+                     (.strokeText gc (str text) xt yt)
                      (.setFill gc Color/WHITE)
-                     (.fillText gc text xt yt)))))))})]}))
+                     (.fillText gc (str text) xt yt)))))))})]}))
 
 
 (defn minimap-pane [state]
