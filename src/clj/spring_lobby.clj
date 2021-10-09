@@ -148,7 +148,7 @@
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
+   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
@@ -222,6 +222,8 @@
      :battle-resource-details true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
+     :highlight-tabs-with-new-battle-messages true
+     :highlight-tabs-with-new-chat-messages true
      :increment-ids true
      :is-java (u/is-java? (u/process-command))
      :leave-battle-on-close-window true
@@ -4410,6 +4412,24 @@
           (log/error e "Error setting chat history message"))))))
 
 
+(defn dissoc-if-empty [m path k]
+  (let [sub (if (empty? path) m (get-in m path))
+        new-sub (dissoc sub k)
+        new-path (drop-last path)
+        new-k (last path)]
+    (if new-k
+      (dissoc-if-empty
+        (if (empty? new-sub)
+          (if (empty? new-path)
+            (dissoc m new-k)
+            (update-in m new-path dissoc new-k))
+          (assoc-in m path new-sub))
+        new-path new-k)
+      m)))
+
+(defn update-needs-focus [server-tab main-tab channel-tab needs-focus]
+  (dissoc-if-empty needs-focus [server-tab main-tab] (if (= "battle" main-tab) :battle channel-tab)))
+
 (defmethod event-handler ::selected-item-changed-channel-tabs
   [{:fx/keys [^Tab event] :keys [server-key]}]
   (let [tab (.getId event)]
@@ -4417,32 +4437,16 @@
       (fn [state]
         (-> state
             (assoc-in [:selected-tab-channel server-key] tab)
-            (update :needs-focus
-              (fn [needs-focus]
-                (let [
-                      path [server-key "chat"]
-                      r (update-in needs-focus path dissoc tab)]
-                  (if (empty? (get-in r path))
-                    {} ; todo battle focus too
-                    r)))))))))
+            (update :needs-focus (partial update-needs-focus server-key "chat" tab)))))))
 
 (defmethod event-handler ::selected-item-changed-main-tabs
   [{:fx/keys [^Tab event] :keys [selected-tab-channel server-key]}]
   (let [tab (.getId event)]
     (swap! *state
       (fn [state]
-        (cond-> state
-                true
-                (assoc-in [:selected-tab-main server-key] tab)
-                (= "chat" tab) ; todo battle focus too
-                (update :needs-focus
-                  (fn [needs-focus]
-                    (let [
-                          path [server-key tab]
-                          r (update-in needs-focus path dissoc selected-tab-channel)]
-                      (if (empty? (get-in r path))
-                        {} ; todo battle focus too
-                        r)))))))))
+        (-> state
+            (assoc-in [:selected-tab-main server-key] tab)
+            (update :needs-focus (partial update-needs-focus server-key tab selected-tab-channel)))))))
 
 (defmethod event-handler ::send-console [{:keys [client-data message server-key]}]
   (future
@@ -4473,8 +4477,15 @@
       (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
 
 
-(defmethod event-handler ::selected-item-changed-server-tabs [{:fx/keys [^Tab event]}]
-  (swap! *state assoc :selected-server-tab (.getId event)))
+(defmethod event-handler ::selected-item-changed-server-tabs
+  [{:fx/keys [^Tab event] :keys [selected-tab-main selected-tab-channel]}]
+  (let [tab (.getId event)]
+    (swap! *state
+      (fn [state]
+        (-> state
+            (assoc :selected-server-tab tab)
+            (update :needs-focus (partial update-needs-focus tab (get selected-tab-main tab) (get selected-tab-channel tab))))))))
+
 
 (defmethod event-handler ::matchmaking-list-all [{:keys [client-data]}]
   (message/send-message *state client-data "c.matchmaking.list_all_queues"))

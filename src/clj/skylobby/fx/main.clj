@@ -20,7 +20,11 @@
         selected-index (or (when (contains? tab-id-set selected-server-tab)
                              (.indexOf ^java.util.List tab-ids selected-server-tab))
                            0)
-        needs-focus (fx/sub-val context :needs-focus)]
+        needs-focus (fx/sub-val context :needs-focus)
+        highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-battle-messages)
+        highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
+        selected-tab-main (fx/sub-val context :selected-tab-main)
+        selected-tab-channel (fx/sub-val context :selected-tab-channel)]
     {:fx/type :v-box
      :style {:-fx-font-size 14}
      :alignment :top-left
@@ -29,7 +33,9 @@
       {:fx/type fx.ext.tab-pane/with-selection-props
        :v-box/vgrow :always
        :props
-       {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-server-tabs}
+       {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-server-tabs
+                                   :selected-tab-channel selected-tab-channel
+                                   :selected-tab-main selected-tab-main}
         :selected-index selected-index}
        :desc
        {:fx/type :tab-pane
@@ -46,19 +52,26 @@
              :v-box/vgrow :always}}]
           (mapv
             (fn [server-key]
-              {:fx/type :tab
-               :id (str server-key)
-               :style-class (concat ["tab"] (when (contains? needs-focus server-key) ["skylobby-tab-focus"]))
-               :graphic {:fx/type :label
-                         :text (str (let [[_ server-config] (fx/sub-val context get-in [:by-server server-key :server])]
-                                      (:alias server-config))
-                                    " (" server-key ")")
-                         :style {:-fx-font-size 18}}
-               :on-close-request {:event/type :spring-lobby/disconnect
-                                  :server-key server-key}
-               :content
-               {:fx/type fx.server-tab/server-tab
-                :server-key server-key}})
+              (let [classes (if (and (contains? needs-focus server-key)
+                                     (or (and highlight-tabs-with-new-battle-messages
+                                              (contains? (get needs-focus server-key) "battle"))
+                                         (and highlight-tabs-with-new-chat-messages
+                                              (contains? (get needs-focus server-key) "chat"))))
+                                ["tab" "skylobby-tab-focus"]
+                                ["tab"])]
+                {:fx/type :tab
+                 :id (str server-key)
+                 :style-class classes
+                 :graphic {:fx/type :label
+                           :text (str (let [[_ server-config] (fx/sub-val context get-in [:by-server server-key :server])]
+                                        (:alias server-config))
+                                      " (" server-key ")")
+                           :style {:-fx-font-size 18}}
+                 :on-close-request {:event/type :spring-lobby/disconnect
+                                    :server-key server-key}
+                 :content
+                 {:fx/type fx.server-tab/server-tab
+                  :server-key server-key}}))
             valid-server-keys)
           #_
           (when (seq valid-servers)

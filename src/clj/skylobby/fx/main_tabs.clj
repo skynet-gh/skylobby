@@ -38,6 +38,7 @@
     :keys [server-key]}]
   (let [
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
         my-channel-names (->> my-channels
@@ -64,7 +65,9 @@
              :graphic {:fx/type :label
                        :text (str channel-name)}
              :id channel-name
-             :style-class (concat ["tab"] (when (-> needs-focus (get server-key) (get "chat") (contains? channel-name)) ["skylobby-tab-focus"]))
+             :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
+                                                     (-> needs-focus (get server-key) (get "chat") (contains? channel-name)))
+                                            ["skylobby-tab-focus"]))
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type :spring-lobby/leave-channel
                                 :channel-name channel-name
@@ -120,7 +123,9 @@
         users-view {:fx/type fx.user/users-view
                     :v-box/vgrow :always
                     :server-key server-key}
-        needs-focus (fx/sub-val context :needs-focus)]
+        needs-focus (fx/sub-val context :needs-focus)
+        highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
+        highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
                                         :server-key server-key
@@ -144,6 +149,9 @@
                                :client-data client-data
                                :consume true}
             :id "battle"
+            :style-class (concat ["tab"] (when (and highlight-tabs-with-new-battle-messages
+                                                    (contains? (get needs-focus server-key) "battle"))
+                                           ["skylobby-tab-focus"]))
             :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
             :content
             (if battle-id
@@ -221,7 +229,9 @@
                     :text "Chat"}
           :closable false
           :id "chat"
-          :style-class (concat ["tab"] (when (contains? (get needs-focus server-key) "chat") ["skylobby-tab-focus"]))
+          :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
+                                                  (contains? (get needs-focus server-key) "chat"))
+                                         ["skylobby-tab-focus"]))
           :content
           {:fx/type :split-pane
            :divider-positions [0.70 0.9]
