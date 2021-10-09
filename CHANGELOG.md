@@ -26,6 +26,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.8]
+
+- Move battle votes below map in vertical layout
+- Add highlighting for battle chat
+- Add settings to control both battle and chat highlighting
+- Add muting of individual chats for highlighting
+
 ### [0.6.7]
 
 - Fix chat focus tracking

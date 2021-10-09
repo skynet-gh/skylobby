@@ -24,13 +24,16 @@
 (set! *warn-on-reflection* true)
 
 
-(defn- focus-text-field [^javafx.scene.control.Tab tab]
-  (when-let [content (.getContent tab)]
-    (let [^javafx.scene.Node text-field (-> content (.lookupAll "#channel-text-field") first)]
-      (log/info "Found text field" (.getId text-field))
-      (Platform/runLater
-        (fn []
-          (.requestFocus text-field))))))
+(defn- focus-text-field
+  ([^javafx.scene.control.Tab tab]
+   (focus-text-field tab "#channel-text-field"))
+  ([^javafx.scene.control.Tab tab id-str]
+   (when-let [content (.getContent tab)]
+     (let [^javafx.scene.Node text-field (-> content (.lookupAll id-str) first)]
+       (log/info "Found text field" (.getId text-field))
+       (Platform/runLater
+         (fn []
+           (.requestFocus text-field)))))))
 
 
 (defn- my-channels-view-impl
@@ -38,6 +41,7 @@
     :keys [server-key]}]
   (let [
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
         my-channel-names (->> my-channels
@@ -64,7 +68,9 @@
              :graphic {:fx/type :label
                        :text (str channel-name)}
              :id channel-name
-             :style-class (concat ["tab"] (when (-> needs-focus (get server-key) (get "chat") (contains? channel-name)) ["skylobby-tab-focus"]))
+             :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
+                                                     (-> needs-focus (get server-key) (get "chat") (contains? channel-name)))
+                                            ["skylobby-tab-focus"]))
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type :spring-lobby/leave-channel
                                 :channel-name channel-name
@@ -97,7 +103,7 @@
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-as-tab (fx/sub-val context :battle-as-tab)
         filter-battles (fx/sub-val context :filter-battles)
-        join-channel-name (fx/sub-val context :join-channel-name)
+        join-channel-name (fx/sub-val context get-in [:by-server server-key :join-channel-name])
         pop-out-battle (fx/sub-val context :pop-out-battle)
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
         selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])
@@ -120,7 +126,10 @@
         users-view {:fx/type fx.user/users-view
                     :v-box/vgrow :always
                     :server-key server-key}
-        needs-focus (fx/sub-val context :needs-focus)]
+        needs-focus (fx/sub-val context :needs-focus)
+        highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
+        highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
+        mute (fx/sub-val context :mute)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
                                         :server-key server-key
@@ -144,6 +153,10 @@
                                :client-data client-data
                                :consume true}
             :id "battle"
+            :style-class (concat ["tab"] (when (and highlight-tabs-with-new-battle-messages
+                                                    (contains? (get needs-focus server-key) "battle")
+                                                    (not (get-in mute [server-key :battle])))
+                                           ["skylobby-tab-focus"]))
             :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
             :content
             (if battle-id
@@ -221,7 +234,12 @@
                     :text "Chat"}
           :closable false
           :id "chat"
-          :style-class (concat ["tab"] (when (contains? (get needs-focus server-key) "chat") ["skylobby-tab-focus"]))
+          :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
+          :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
+                                                  (contains? (get needs-focus server-key) "chat")
+                                                  (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))
+                                                        (keys (get-in needs-focus [server-key "chat"]))))
+                                         ["skylobby-tab-focus"]))
           :content
           {:fx/type :split-pane
            :divider-positions [0.70 0.9]
@@ -261,6 +279,7 @@
                     :text "Console"}
           :closable false
           :id "console"
+          :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev) "#console-text-field"))
           :content
           {:fx/type fx.console/console-view
            :server-key server-key}}])}}))

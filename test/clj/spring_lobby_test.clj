@@ -201,3 +201,16 @@
              :id 4}]
            (map :status-changes
              (spring-lobby/balance-teams players 5))))))
+
+
+(deftest update-needs-focus
+  (is (= {}
+         (spring-lobby/update-needs-focus "server" "chat" "channel" {"server" {"chat" {"channel" true}}})))
+  (is (= {}
+         (spring-lobby/update-needs-focus "server" "battle" :battle {"server" {"battle" {:battle true}}})))
+  (is (= {"server" {"battle" {:battle true}}}
+         (spring-lobby/update-needs-focus "server" "chat" "channel" {"server" {"chat" {"channel" true}
+                                                                               "battle" {:battle true}}})))
+  (is (= {"server" {"chat" {"channel" true}}}
+         (spring-lobby/update-needs-focus "server" "battle" :battle {"server" {"battle" {:battle true}
+                                                                               "chat" {"channel" true}}}))))

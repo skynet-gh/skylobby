@@ -215,7 +215,8 @@
                                            "skynet"
                                            "team"],
                             :text "* Hi skynet! Current battle type is team."}
-                    :vote nil}]}}}}}
+                    :vote nil}]}}}}
+              :needs-focus {:server1 {"battle" {:battle true}}}}
              @state-atom))))
   (testing "auto unspec"
     (let [
@@ -266,7 +267,8 @@
                                                       :spads nil
                                                       :vote nil}]}}
                 :username "skynet"
-                :client-data {:compflags #{"u"}}}}}
+                :client-data {:compflags #{"u"}}}}
+              :needs-focus {:server1 {"battle" {:battle true}}}}
              @state-atom))
       (is (= ["MYBATTLESTATUS 1024 0"]
              @messages-atom)))))
@@ -617,7 +619,7 @@
                 :my-channels {"__battle__0" {}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}
-              :selected-tab-channel {server-key "__battle__0"}}
+              :needs-focus {:server1 {"battle" {:battle true}}}}
              @state-atom))
       (is (= ["MYBATTLESTATUS 1024 0"]
              @messages-atom)))))

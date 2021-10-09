@@ -77,6 +77,8 @@
               hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
               hide-spads-messages (fx/sub-val context :hide-spads-messages)
               hide-vote-messages (fx/sub-val context :hide-vote-messages)
+              highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-battle-messages)
+              highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
               increment-ids (fx/sub-val context :increment-ids)
               join-battle-as-player (fx/sub-val context :join-battle-as-player)
               leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
@@ -195,6 +197,24 @@
                                           :key :focus-chat-on-message}}
                    {:fx/type :label
                     :text " Focus chat on incoming message"}]}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean highlight-tabs-with-new-chat-messages)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :highlight-tabs-with-new-chat-messages}}
+                   {:fx/type :label
+                    :text " Highlight tabs with new chat messages"}]}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean highlight-tabs-with-new-battle-messages)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :highlight-tabs-with-new-battle-messages}}
+                   {:fx/type :label
+                    :text " Highlight tabs with new battle messages"}]}
                  {:fx/type :h-box
                   :style {:-fx-font-size 18}
                   :children

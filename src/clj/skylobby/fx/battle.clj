@@ -951,7 +951,7 @@
 
 (defn battle-votes
   [{:fx/keys [context]
-    :keys [server-key]}]
+    :keys [battle-layout server-key]}]
   (let [show-vote-log (fx/sub-val context :show-vote-log)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
@@ -1053,7 +1053,7 @@
        [{:fx/type :h-box
          :children
          (concat
-           (when-not show-vote-log
+           (when show-vote-log
              [{:fx/type :label
                :text "Vote Log (newest to oldest)"
                :style {:-fx-font-size 24}}])
@@ -1066,9 +1066,13 @@
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal (if show-vote-log
-                              "mdi-arrow-left:16:white"
-                              "mdi-arrow-right:16:white")}}])}]
-       (when-not show-vote-log
+                              (if (= "vertical" battle-layout)
+                                "mdi-arrow-down:16:white"
+                                "mdi-arrow-right:16:white")
+                              (if (= "vertical" battle-layout)
+                                "mdi-arrow-up:16:white"
+                                "mdi-arrow-left:16:white"))}}])}]
+       (when show-vote-log
          [{:fx/type :scroll-pane
            :pref-width 400
            :v-box/vgrow :always
@@ -1181,6 +1185,7 @@
         battle-layout (if (contains? (set battle-layouts) battle-layout)
                         battle-layout
                         (first battle-layouts))
+        show-vote-log (fx/sub-val context :show-vote-log)
         battle-buttons {:fx/type battle-buttons
                         :server-key server-key
                         :my-player my-player
@@ -1188,16 +1193,41 @@
                         :team-skills team-skills}
         battle-chat {:fx/type :h-box
                      :children
-                     [
-                      {:fx/type fx.channel/channel-view
-                       :h-box/hgrow :always
-                       :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
-                       :hide-users true
-                       :server-key server-key}
-                      {:fx/type battle-votes
-                       :server-key server-key}]}
-        battle-tabs {:fx/type battle-tabs
-                     :server-key server-key}
+                     (concat
+                       [
+                        {:fx/type fx.channel/channel-view
+                         :h-box/hgrow :always
+                         :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+                         :hide-users true
+                         :server-key server-key}]
+                       (when (not= "vertical" battle-layout)
+                         [{:fx/type battle-votes
+                           :battle-layout battle-layout
+                           :server-key server-key}]))}
+        battle-tabs
+        (if (and (not= "vertical" battle-layout) (not pop-out-chat))
+          {:fx/type battle-tabs
+           :server-key server-key}
+          (if show-vote-log
+            {:fx/type :split-pane
+             :orientation :vertical
+             :divider-positions [0.5]
+             :items
+             [
+              {:fx/type battle-tabs
+               :server-key server-key}
+              {:fx/type battle-votes
+               :battle-layout battle-layout
+               :server-key server-key}]}
+            {:fx/type :v-box
+             :children
+             [
+              {:fx/type battle-tabs
+               :v-box/vgrow :always
+               :server-key server-key}
+              {:fx/type battle-votes
+               :battle-layout battle-layout
+               :server-key server-key}]}))
         resources-buttons {:fx/type :h-box
                            :alignment :center-left
                            :children
