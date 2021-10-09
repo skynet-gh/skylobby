@@ -224,7 +224,7 @@
     (swap! state-atom
       (fn [state]
         (-> state
-            (assoc :selected-tab-channel channel-name)
+            (assoc-in [:selected-tab-channel server-key] channel-name)
             (assoc-in [:by-server server-key :my-channels channel-name] {}))))))
 
 (defmethod handle "JOINFAILED" [state-atom server-key m]
@@ -269,7 +269,7 @@
   (swap! state-atom
     (fn [state]
       (let [focus-chat (:focus-chat-on-message state)
-            selected-tab-channel (:selected-tab-channel state)]
+            selected-tab-channel (get-in state [:selected-tab-channel server-key])]
         (cond-> state
                 true
                 (update-in [:by-server server-key]
@@ -281,13 +281,13 @@
                      selected-tab-channel
                      (not (u/battle-channel-name? channel-name))
                      (not (and (= server-key (:selected-server-tab state))
-                               (= "chat" (:selected-tab-main state))
+                               (= "chat" (get-in state [:selected-tab-main server-key]))
                                (= channel-name selected-tab-channel))))
                 (assoc-in [:needs-focus server-key "chat" channel-name] true)
                 focus-chat
-                (assoc :selected-tab-main "chat")
+                (assoc-in [:selected-tab-main server-key] "chat")
                 (or focus-chat (not selected-tab-channel))
-                (assoc :selected-tab-channel channel-name))))))
+                (assoc-in [:selected-tab-channel server-key] channel-name))))))
 
 (defmethod handle "SAID" [state-atom server-key m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
