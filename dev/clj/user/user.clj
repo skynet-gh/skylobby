@@ -44,9 +44,6 @@
 (def ^:dynamic renderer nil)
 
 
-(def ^:dynamic old-view nil)
-(def ^:dynamic old-handler nil)
-(def ^:dynamic old-task-handler nil)
 (def ^:dynamic old-client-handler nil)
 
 
@@ -58,50 +55,15 @@
       (catch Throwable e
         (println "error stopping chimer" chimer e)))))
 
-(defn view [state]
-  (try
-    (require 'skylobby.fx.root)
-    (require 'spring-lobby)
-    (if-let [v (find-var 'skylobby.fx.root/root-view)]
-      (if-let [new-view (var-get v)]
-        (when new-view
-          (alter-var-root #'old-view (constantly new-view)))
-        (println "no new view found"))
-      (println "unable to find var"))
-    (catch Throwable e
-      (println e)
-      (.printStackTrace e)
-      (println "compile error, using old view")))
-  (try
-    (if old-view
-      (old-view state)
-      (println "no old view"))
-    (catch Throwable e
-      (println e)
-      (.printStackTrace e)
-      (println "exception in old view")
-      (throw e))))
-
-(defn event-handler [event]
-  (try
-    (require 'spring-lobby)
-    (let [new-handler (var-get (find-var 'spring-lobby/event-handler))]
-      (when new-handler
-        (alter-var-root #'old-handler (constantly new-handler))))
-    (catch Throwable e
-      (println e "compile error, using old event handler")))
-  (try
-    (old-handler event)
-    (catch Throwable e
-      (println "exception in old event handler" e)
-      (throw e))))
 
 (defn create-renderer []
-  (let [r (fx/create-renderer
+  (let [_ (require 'spring-lobby)
+        _ (require 'skylobby.fx.root)
+        r (fx/create-renderer
             :middleware (comp
                           fx/wrap-context-desc
-                          (fx/wrap-map-desc (fn [_] {:fx/type view})))
-            :opts {:fx.opt/map-event-handler event-handler
+                          (fx/wrap-map-desc (fn [_] {:fx/type (var-get (find-var 'skylobby.fx.root/root-view))})))
+            :opts {:fx.opt/map-event-handler (var-get (find-var 'spring-lobby/event-handler))
                    :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
                                                 (fx/fn->lifecycle-with-context %))}
             :error-handler (fn [t]
@@ -130,10 +92,6 @@
 
 (defn rerender []
   (try
-    (println "Stopping old chimers")
-    (let [{:keys [chimers]} @init-state]
-      (doseq [chimer chimers]
-        (stop-chimer chimer)))
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
     (let [new-state-var (find-var 'spring-lobby/*state)
@@ -141,19 +99,13 @@
       (remove-watch new-state-atom :ui-state) ; to prevent leak
       (alter-var-root new-state-var (constantly *state)))
     (alter-var-root (find-var 'spring-lobby/*ui-state) (constantly *ui-state))
+    (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))]
+      (add-ui-state-watcher-fn *state *ui-state))
+    (if-not renderer
+      (create-renderer)
+      (println "Renderer already exists"))
     (require 'spring-lobby.client)
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
-    (if renderer
-      (do
-        (println "Re-rendering")
-        (try
-          (renderer)
-          (catch Throwable e
-            (println "error rendering" e)
-            (throw e))))
-      (do
-        (println "No renderer, creating new one")
-        (create-renderer)))
     (try
       (let [init-fn (var-get (find-var 'spring-lobby/init))]
         (reset! init-state (init-fn *state {:skip-tasks true})))
@@ -167,6 +119,18 @@
 (defn refresh-rerender []
   (println "Refreshing")
   (future
+    (when renderer
+      (try
+        (println "Unmounting")
+        (fx/unmount-renderer *ui-state renderer)
+        (alter-var-root #'renderer (constantly nil))
+        (catch Throwable e
+          (println "error unmounting" e)
+          (throw e))))
+    (println "Stopping old chimers")
+    (let [{:keys [chimers]} @init-state]
+      (doseq [chimer chimers]
+        (stop-chimer chimer)))
     (try
       (binding [*ns* *ns*]
         (let [res (refresh :after 'user/rerender)]
@@ -194,21 +158,6 @@
   context)
 
 
-(defn task-handler [task]
-  (try
-    (require 'spring-lobby)
-    (let [new-handler (var-get (find-var 'spring-lobby/task-handler))]
-      (when new-handler
-        (alter-var-root #'old-task-handler (constantly new-handler))))
-    (catch Throwable e
-      (println e "compile error, using old task handler")))
-  (try
-    (old-task-handler task)
-    (catch Throwable e
-      (println e "exception in old task handler, probably unbound fn, fix asap")
-      (throw e))))
-
-
 (defn init []
   (try
     [datafy pprint chime/chime-at string/split edn/read-string http/get]
@@ -228,22 +177,21 @@
             (println e)))))
     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
     (alter-var-root #'*ui-state (constantly (var-get (find-var 'spring-lobby/*ui-state))))
-    (let [initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
+    (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))
+          initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
           initial-state (initial-state-fn)]
+      (remove-watch *state :ui-state) ; to prevent leak
+      (add-ui-state-watcher-fn *state *ui-state)
       (reset! *state initial-state)
       (swap! *state assoc :css (css/register :skylobby.fx/current
                                  (or (:css initial-state)
                                      (var-get (find-var 'skylobby.fx/default-style-data))))))
     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
-    (alter-var-root #'old-view (constantly (var-get (find-var 'skylobby.fx.root/root-view))))
-    (alter-var-root #'old-handler (constantly (var-get (find-var 'spring-lobby/event-handler))))
     (require 'spring-lobby.client)
     (require 'spring-lobby.client.handler)
     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (require 'spring-lobby)
-    (alter-var-root #'old-task-handler (constantly (var-get (find-var 'spring-lobby/handle-task))))
-    (alter-var-root (find-var 'spring-lobby/handle-task) (constantly task-handler))
     (let [init-fn (var-get (find-var 'spring-lobby/init))]
       (reset! init-state (init-fn *state))
       (create-renderer))
