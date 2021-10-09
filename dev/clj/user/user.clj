@@ -67,13 +67,10 @@
                    :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
                                                 (fx/fn->lifecycle-with-context %))}
             :error-handler (fn [t]
-                             (println "Error occurred! Unmounting renderer for safety")
-                             (println t)
-                             (.printStackTrace t)
-                             (fx/unmount-renderer *ui-state renderer)
-                             (alter-var-root #'renderer (constantly nil))))]
+                             (println "Error occurred in renderer" t)
+                             (.printStackTrace t)))]
     (alter-var-root #'renderer (constantly r)))
-  (fx/mount-renderer *ui-state renderer))
+  (fx/mount-renderer (var-get (find-var 'spring-lobby/*ui-state)) renderer))
 
 (defn client-handler [state-atom server-url message]
   (try
