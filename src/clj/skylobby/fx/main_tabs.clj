@@ -39,7 +39,7 @@
   (let [
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
-        selected-tab-channel (fx/sub-val context :selected-tab-channel)
+        selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
         my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
@@ -99,8 +99,8 @@
         filter-battles (fx/sub-val context :filter-battles)
         join-channel-name (fx/sub-val context :join-channel-name)
         pop-out-battle (fx/sub-val context :pop-out-battle)
-        selected-tab-channel (fx/sub-val context :selected-tab-channel)
-        selected-tab-main (fx/sub-val context :selected-tab-main)
+        selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
+        selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         channels (fx/sub-val context get-in [:by-server server-key :channels])
