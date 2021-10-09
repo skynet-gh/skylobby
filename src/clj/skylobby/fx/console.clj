@@ -2,7 +2,7 @@
   (:require
     [cljfx.api :as fx]
     skylobby.fx
-    [skylobby.fx.ext :refer [ext-scroll-on-create]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.util :as u]
@@ -60,18 +60,21 @@
     {:fx/type :v-box
      :children
      [
-      {:fx/type ext-scroll-on-create
+      {:fx/type ext-recreate-on-key-changed
+       :key {:server-key server-key}
        :v-box/vgrow :always
        :desc
-       {:fx/type fx.virtualized-scroll-pane/lifecycle
-        :event-filter {:event/type :spring-lobby/filter-console-scroll}
-        :content
-        {:fx/type fx.rich-text/lifecycle-fast
-         :editable false
-         :style {:-fx-font-family skylobby.fx/monospace-font-family
-                 :-fx-font-size default-font-size}
-         :wrap-text true
-         :document [(reverse console-log) console-document console-auto-scroll]}}}
+       {:fx/type ext-scroll-on-create
+        :desc
+        {:fx/type fx.virtualized-scroll-pane/lifecycle
+         :event-filter {:event/type :spring-lobby/filter-console-scroll}
+         :content
+         {:fx/type fx.rich-text/lifecycle-fast
+          :editable false
+          :style {:-fx-font-family skylobby.fx/monospace-font-family
+                  :-fx-font-size default-font-size}
+          :wrap-text true
+          :document [(reverse console-log) console-document console-auto-scroll]}}}}
       {:fx/type :h-box
        :alignment :center-left
        :children

@@ -79,7 +79,6 @@
           client-id (u/client-id state-atom state)
           flags "skylobby=true"
           suffix (str "\t" user-agent "\t" client-id "\t" flags)
-          message (str "c.user.login " auth-token suffix)
-          log-message (str "c.user.login " "<token>" suffix)]
-      (message/send-message state-atom client-data message {:log-message log-message}))
+          message (str "c.user.login " auth-token suffix)]
+      (message/send-message state-atom client-data message))
     (log/error "Error parsing user token message")))

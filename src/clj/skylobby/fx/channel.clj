@@ -118,7 +118,11 @@
                             (map first)
                             set)]
     {:fx/type ext-recreate-on-key-changed
-     :key {:ignore ignore-users-set :joinas-spec hide-joinas-spec :spads hide-spads-set :vote hide-vote-messages}
+     :key {:ignore ignore-users-set
+           :joinas-spec hide-joinas-spec
+           :server-key server-key
+           :spads hide-spads-set
+           :vote hide-vote-messages}
      :desc
      {:fx/type ext-scroll-on-create
       :desc

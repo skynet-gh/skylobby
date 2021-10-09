@@ -207,15 +207,11 @@
    "lobby.springrts.com:8200"
    {:host "lobby.springrts.com"
     :port 8200
-    :alias "SpringLobby"}
-   "springfightclub.com:8200"
-   {:host "springfightclub.com"
+    :alias "Spring Official"}
+   "balancedannihilation.com:8200"
+   {:host "balancedannihilation.com"
     :port 8200
-    :alias "Spring Fight Club"}
-   "road-flag.bnr.la:8200"
-   {:host "road-flag.bnr.la"
-    :port 8200
-    :alias "Beyond All Reason (old)"}})
+    :alias "Balanced Annihilation"}})
 
 
 (defn initial-state []
@@ -2405,8 +2401,8 @@
       (let [channel-name (str "@" username)]
         (-> state
             (assoc-in [:by-server server-key :my-channels channel-name] {})
-            (assoc :selected-tab-main "chat")
-            (assoc :selected-tab-channel channel-name))))))
+            (assoc-in [:selected-tab-main server-key] "chat")
+            (assoc-in [:selected-tab-channel server-key] channel-name))))))
 
 (defmethod event-handler ::on-mouse-clicked-users-row
   [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [username] :as e}]
@@ -2764,8 +2760,13 @@
         @(event-handler (merge e {:event/type ::leave-battle}))
         (async/<!! (async/timeout 500)))
       (if selected-battle
-        (do
-          (swap! *state assoc :selected-battle nil :battle {} :selected-tab-main "battle")
+        (let [server-key (u/server-key client-data)]
+          (swap! *state
+            (fn [state]
+              (-> state
+                  (assoc :battle {})
+                  (update-in [:by-server server-key] dissoc :selected-battle)
+                  (assoc-in [:selected-tab-main server-key] "battle"))))
           (message/send-message *state client-data
             (str "JOINBATTLE " selected-battle
                  (if battle-passworded
@@ -4415,7 +4416,7 @@
     (swap! *state
       (fn [state]
         (-> state
-            (assoc :selected-tab-channel tab)
+            (assoc-in [:selected-tab-channel server-key] tab)
             (update :needs-focus
               (fn [needs-focus]
                 (let [
@@ -4432,7 +4433,7 @@
       (fn [state]
         (cond-> state
                 true
-                (assoc :selected-tab-main tab)
+                (assoc-in [:selected-tab-main server-key] tab)
                 (= "chat" tab) ; todo battle focus too
                 (update :needs-focus
                   (fn [needs-focus]
