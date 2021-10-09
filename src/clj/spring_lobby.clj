@@ -149,7 +149,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :mute :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
@@ -4411,6 +4411,26 @@
         (catch Exception e
           (log/error e "Error setting chat history message"))))))
 
+(defmethod event-handler ::on-console-key-pressed [{:fx/keys [^KeyEvent event] :keys [server-key]}]
+  (let [code (.getCode event)]
+    (when-let [dir (cond
+                     (= KeyCode/UP code) inc
+                     (= KeyCode/DOWN code) dec
+                     :else nil)]
+      (try
+        (swap! *state update-in [:by-server server-key]
+          (fn [server-data]
+            (let [{:keys [console-history-index console-sent-messages]} server-data
+                  new-history-index (max default-history-index
+                                         (min (dec (count console-sent-messages))
+                                              (dir (or console-history-index default-history-index))))
+                  history-message (nth console-sent-messages new-history-index "")]
+              (-> server-data
+                  (assoc :console-message-draft history-message)
+                  (assoc :console-history-index new-history-index)))))
+        (catch Exception e
+          (log/error e "Error setting console history message"))))))
+
 
 (defn dissoc-if-empty [m path k]
   (let [sub (if (empty? path) m (get-in m path))
@@ -4451,7 +4471,12 @@
 (defmethod event-handler ::send-console [{:keys [client-data message server-key]}]
   (future
     (try
-      (swap! *state assoc-in [:by-server server-key :console-message-draft] "")
+      (swap! *state update-in [:by-server server-key]
+        (fn [server-data]
+          (-> server-data
+              (assoc :console-message-draft "")
+              (update :console-sent-messages conj message)
+              (assoc :console-history-index default-history-index))))
       (when-not (string/blank? message)
         (message/send-message *state client-data message))
       (catch Exception e

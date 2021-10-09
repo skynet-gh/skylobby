@@ -86,13 +86,16 @@
                      :server-key server-key}}
         {:fx/type :text-field
          :h-box/hgrow :always
+         :id "console-text-field"
          :text (str console-message-draft)
          :on-text-changed {:event/type :spring-lobby/assoc-in
                            :path [:by-server server-key :console-message-draft]}
          :on-action {:event/type :spring-lobby/send-console
                      :client-data client-data
                      :message console-message-draft
-                     :server-key server-key}}]}]}))
+                     :server-key server-key}
+         :on-key-pressed {:event/type :spring-lobby/on-console-key-pressed
+                          :server-key server-key}}]}]}))
 
 (defn console-view
   [state]

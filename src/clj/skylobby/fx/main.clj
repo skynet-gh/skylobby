@@ -24,7 +24,8 @@
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-battle-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         selected-tab-main (fx/sub-val context :selected-tab-main)
-        selected-tab-channel (fx/sub-val context :selected-tab-channel)]
+        selected-tab-channel (fx/sub-val context :selected-tab-channel)
+        mute (fx/sub-val context :mute)]
     {:fx/type :v-box
      :style {:-fx-font-size 14}
      :alignment :top-left
@@ -52,11 +53,15 @@
              :v-box/vgrow :always}}]
           (mapv
             (fn [server-key]
-              (let [classes (if (and (contains? needs-focus server-key)
+              (let [classes (if (and (not= server-key selected-server-tab)
+                                     (contains? needs-focus server-key)
                                      (or (and highlight-tabs-with-new-battle-messages
-                                              (contains? (get needs-focus server-key) "battle"))
+                                              (contains? (get needs-focus server-key) "battle")
+                                              (not (get-in mute [server-key "battle" :battle])))
                                          (and highlight-tabs-with-new-chat-messages
-                                              (contains? (get needs-focus server-key) "chat"))))
+                                              (contains? (get needs-focus server-key) "chat")
+                                              (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))
+                                                    (keys (get-in needs-focus [server-key "chat"]))))))
                                 ["tab" "skylobby-tab-focus"]
                                 ["tab"])]
                 {:fx/type :tab

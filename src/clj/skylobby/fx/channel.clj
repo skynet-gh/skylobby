@@ -6,6 +6,7 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
+    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
@@ -168,7 +169,9 @@
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
   (let [client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])]
+        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])
+        mute-path [:mute server-key (if (u/battle-channel-name? channel-name) :battle channel-name)]
+        mute (fx/sub-val context get-in mute-path)]
     {:fx/type :h-box
      :children
      [{:fx/type :button
@@ -191,7 +194,23 @@
                    :server-key server-key}
        :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
                         :channel-name channel-name
-                        :server-key server-key}}]}))
+                        :server-key server-key}}
+      {:fx/type :button
+       :text ""
+       :tooltip
+       {:fx/type :tooltip
+        :show-delay [10 :ms]
+        :text
+        (str
+          (if mute "Enable" "Disable")
+          " tab highlighting on new messages")}
+       :on-action {:event/type (if mute :spring-lobby/dissoc-in :spring-lobby/assoc-in)
+                   :path mute-path}
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal (if mute
+                        "mdi-message-bulleted-off:16:red"
+                        "mdi-message:16:white")}}]}))
 
 (defn- channel-view-users
   [{:fx/keys [context]
