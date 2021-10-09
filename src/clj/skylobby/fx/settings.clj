@@ -521,12 +521,12 @@
                     :text " Preset: "}
                    {:fx/type :button
                     :on-action {:event/type :spring-lobby/update-css
-                                :css skylobby.fx/default-style-data}
-                    :text "Default"}
+                                :css skylobby.fx/black-style-data}
+                    :text "Black (default)"}
                    {:fx/type :button
                     :on-action {:event/type :spring-lobby/update-css
-                                :css skylobby.fx/black-style-data}
-                    :text "Black"}
+                                :css skylobby.fx/grey-style-data}
+                    :text "Grey"}
                    {:fx/type :button
                     :on-action {:event/type :spring-lobby/update-css
                                 :css skylobby.fx/javafx-style-data}

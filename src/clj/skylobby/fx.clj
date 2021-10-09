@@ -37,7 +37,7 @@
 
 
 ; https://tomsondev.bestsolution.at/2014/03/13/eclipse-on-javafx-get-dark-the-power-of-javafx-css
-(def default-style-data
+(def grey-style-data
   {".root"
    {:-fx-base "rgb(50, 50, 50)"
     :-fx-accent "rgb(80, 80, 80)"
@@ -90,16 +90,18 @@
     {
      "-message"
      {:-fx-fill "black"}}}})
+(def default-style-data black-style-data)
 
 
 (def style-presets
-  {"default" default-style-data
+  {
    "black" black-style-data
+   "grey" grey-style-data
    "javafx" javafx-style-data})
 
 
 (def default-style
-  (css/register ::default default-style-data))
+  (css/register ::default black-style-data))
 
 ; so that themes can override
 (def default-classes
