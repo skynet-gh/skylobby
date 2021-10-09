@@ -243,7 +243,9 @@
         accepted (-> state :by-server (get server-key) :accepted)
         {:keys [ssl username password] :as client-data} (-> state :by-server (get server-key) :client-data)]
     (if (and ssl (contains? compflags "token-auth"))
-      (message/send-message state-atom client-data (str "c.user.get_token_by_name " username "\t" password))
+      (let [message (str "c.user.get_token_by_name " username "\t" password)
+            log-message (str "c.user.get_token_by_name " username "\t<password>")]
+        (message/send-message state-atom client-data message {:log-message log-message}))
       (when (not accepted)
         (let [client-id (u/client-id state-atom state)]
           (login state-atom client-data {:client-id client-id
