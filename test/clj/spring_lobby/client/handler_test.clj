@@ -617,7 +617,7 @@
                 :my-channels {"__battle__0" {}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}
-              :selected-tab-channel "__battle__0"}
+              :selected-tab-channel {server-key "__battle__0"}}
              @state-atom))
       (is (= ["MYBATTLESTATUS 1024 0"]
              @messages-atom)))))

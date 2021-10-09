@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.7]
+
+- Fix chat focus tracking
+
 ### [0.6.6]
 
 - Make selected tabs per server
