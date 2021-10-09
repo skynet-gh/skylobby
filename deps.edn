@@ -44,7 +44,6 @@
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.2.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.2.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
-  org.openjfx/javafx-swing {:mvn/version "17.0.0.1"}
   org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}
