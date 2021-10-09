@@ -57,7 +57,7 @@
                                      (contains? needs-focus server-key)
                                      (or (and highlight-tabs-with-new-battle-messages
                                               (contains? (get needs-focus server-key) "battle")
-                                              (not (get-in mute [server-key "battle" :battle])))
+                                              (not (get-in mute [server-key :battle])))
                                          (and highlight-tabs-with-new-chat-messages
                                               (contains? (get needs-focus server-key) "chat")
                                               (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))

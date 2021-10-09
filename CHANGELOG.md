@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.9]
+
+- Fix server tab highlight on muted battle
+
 ### [0.6.8]
 
 - Move battle votes below map in vertical layout
