@@ -207,15 +207,11 @@
    "lobby.springrts.com:8200"
    {:host "lobby.springrts.com"
     :port 8200
-    :alias "SpringLobby"}
-   "springfightclub.com:8200"
-   {:host "springfightclub.com"
+    :alias "Spring Official"}
+   "balancedannihilation.com:8200"
+   {:host "balancedannihilation.com"
     :port 8200
-    :alias "Spring Fight Club"}
-   "road-flag.bnr.la:8200"
-   {:host "road-flag.bnr.la"
-    :port 8200
-    :alias "Beyond All Reason (old)"}})
+    :alias "Balanced Annihilation"}})
 
 
 (defn initial-state []
