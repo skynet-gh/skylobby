@@ -26,6 +26,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.6]
+
+- Make selected tabs per server
+- Fix ba and spring official server names
+- Make black css theme the default
+- Fix minimap teams not using inc ids setting
+- Fix chat and console reuse when server tab positions change
+
 ### [0.6.5]
 
 - Add tab highlighting on new chats
