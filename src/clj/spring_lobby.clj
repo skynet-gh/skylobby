@@ -268,7 +268,7 @@
   (atom
     (fx/create-context
       {}
-      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
+      (cache-factory-with-threshold cache/lru-cache-factory 2048))))
 
 (def main-stage-atom (atom nil))
 
