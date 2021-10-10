@@ -170,47 +170,67 @@
     :keys [channel-name server-key]}]
   (let [client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])
-        mute-path [:mute server-key (if (u/battle-channel-name? channel-name) :battle channel-name)]
-        mute (fx/sub-val context get-in mute-path)]
+        is-battle-channel (u/battle-channel-name? channel-name)
+        mute-path [:mute server-key (if is-battle-channel :battle channel-name)]
+        mute (fx/sub-val context get-in mute-path)
+        mute-ring (fx/sub-val context get-in [:mute-ring server-key])]
     {:fx/type :h-box
      :children
-     [{:fx/type :button
-       :text "Send"
-       :on-action {:event/type :spring-lobby/send-message
-                   :channel-name channel-name
-                   :client-data client-data
-                   :message message-draft
-                   :server-key server-key}}
-      {:fx/type :text-field
-       :id "channel-text-field"
-       :h-box/hgrow :always
-       :text (str message-draft)
-       :on-text-changed {:event/type :spring-lobby/assoc-in
-                         :path [:by-server server-key :message-drafts channel-name]}
-       :on-action {:event/type :spring-lobby/send-message
-                   :channel-name channel-name
-                   :client-data client-data
-                   :message message-draft
-                   :server-key server-key}
-       :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                        :channel-name channel-name
-                        :server-key server-key}}
-      {:fx/type :button
-       :text ""
-       :tooltip
-       {:fx/type :tooltip
-        :show-delay [10 :ms]
-        :text
-        (str
-          (if mute "Enable" "Disable")
-          " tab highlighting on new messages")}
-       :on-action {:event/type (if mute :spring-lobby/dissoc-in :spring-lobby/assoc-in)
-                   :path mute-path}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal (if mute
-                        "mdi-message-bulleted-off:16:red"
-                        "mdi-message:16:white")}}]}))
+     (concat
+       [{:fx/type :button
+         :text "Send"
+         :on-action {:event/type :spring-lobby/send-message
+                     :channel-name channel-name
+                     :client-data client-data
+                     :message message-draft
+                     :server-key server-key}}
+        {:fx/type :text-field
+         :id "channel-text-field"
+         :h-box/hgrow :always
+         :text (str message-draft)
+         :on-text-changed {:event/type :spring-lobby/assoc-in
+                           :path [:by-server server-key :message-drafts channel-name]}
+         :on-action {:event/type :spring-lobby/send-message
+                     :channel-name channel-name
+                     :client-data client-data
+                     :message message-draft
+                     :server-key server-key}
+         :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                          :channel-name channel-name
+                          :server-key server-key}}]
+       (when is-battle-channel
+         [{:fx/type :button
+           :text ""
+           :tooltip
+           {:fx/type :tooltip
+            :show-delay [10 :ms]
+            :text
+            (str
+              (if mute-ring "Enable" "Disable")
+              " mute sound for this server")}
+           :on-action {:event/type (if mute-ring :spring-lobby/dissoc-in :spring-lobby/assoc-in)
+                       :path [:mute-ring server-key]}
+           :graphic
+           {:fx/type font-icon/lifecycle
+            :icon-literal (if mute-ring
+                            "mdi-volume-off:16:red"
+                            "mdi-volume-high:16:white")}}])
+       [{:fx/type :button
+         :text ""
+         :tooltip
+         {:fx/type :tooltip
+          :show-delay [10 :ms]
+          :text
+          (str
+            (if mute "Enable" "Disable")
+            " tab highlighting on new messages")}
+         :on-action {:event/type (if mute :spring-lobby/dissoc-in :spring-lobby/assoc-in)
+                     :path mute-path}
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal (if mute
+                          "mdi-message-bulleted-off:16:red"
+                          "mdi-message:16:white")}}])}))
 
 (defn- channel-view-users
   [{:fx/keys [context]
