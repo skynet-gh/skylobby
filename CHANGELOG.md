@@ -26,6 +26,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.11]
+
+- Fix NPE in chat and console tabs
+
 ### [0.6.10]
 
 - Fix singleplayer game not starting when spec
