@@ -274,7 +274,9 @@
                                  (and map-name
                                       (string/includes? (string/lower-case map-name) filter-lc))))
                        (sort-by :map-name))))}}]})
-        {:fx/type :pane})}}))
+        {:fx/type :pane
+         :pref-width maps-window-width
+         :pref-height maps-window-height})}}))
 
 (defn maps-window [state]
   (tufte/profile {:dyanmic? true
