@@ -29,7 +29,7 @@
    (focus-text-field tab "#channel-text-field"))
   ([^javafx.scene.control.Tab tab id-str]
    (when-let [content (.getContent tab)]
-     (let [^javafx.scene.Node text-field (-> content (.lookupAll id-str) first)]
+     (when-let [^javafx.scene.Node text-field (-> content (.lookupAll id-str) first)]
        (log/info "Found text field" (.getId text-field))
        (Platform/runLater
          (fn []
