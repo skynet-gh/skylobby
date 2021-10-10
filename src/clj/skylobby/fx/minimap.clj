@@ -5,6 +5,7 @@
     clojure.set
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.smf :as smf]
@@ -159,7 +160,8 @@
                           :game
                           :startpostype
                           spring/startpostype-name)
-        singleplayer (= server-key :local)]
+        singleplayer (= server-key :local)
+        cached-minimap-updated (fx/sub-val context get-in [:cached-minimap-updated (fs/canonical-path (:file map-details))])]
     {:fx/type :stack-pane
      :style
      {:-fx-min-width minimap-size
@@ -181,12 +183,15 @@
                  "(no image)"
                  "(loading...)")
          :alignment :center}]}
-      {:fx/type :image-view
-       :image {:url (-> map-name (fs/minimap-image-cache-file {:minimap-type minimap-type}) io/as-url str)
-               :background-loading true}
-       :fit-width minimap-size
-       :fit-height minimap-size
-       :preserve-ratio true}
+      {:fx/type ext-recreate-on-key-changed
+       :key (or cached-minimap-updated 0)
+       :desc
+       {:fx/type :image-view
+        :image {:url (-> map-name (fs/minimap-image-cache-file {:minimap-type minimap-type}) io/as-url str)
+                :background-loading true}
+        :fit-width minimap-size
+        :fit-height minimap-size
+        :preserve-ratio true}}
       (merge
         (when (or singleplayer (not am-spec))
           {:on-mouse-pressed {:event/type :spring-lobby/minimap-mouse-pressed
