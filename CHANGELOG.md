@@ -26,6 +26,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.10]
+
+- Fix singleplayer game not starting when spec
+- Fix minimap image not showing after download
+
 ### [0.6.9]
 
 - Fix server tab highlight on muted battle
