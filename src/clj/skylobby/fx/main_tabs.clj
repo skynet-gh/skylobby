@@ -154,6 +154,7 @@
                                :consume true}
             :id "battle"
             :style-class (concat ["tab"] (when (and highlight-tabs-with-new-battle-messages
+                                                    (not= selected-tab-main "battle")
                                                     (contains? (get needs-focus server-key) "battle")
                                                     (not (get-in mute [server-key :battle])))
                                            ["skylobby-tab-focus"]))
@@ -236,6 +237,7 @@
           :id "chat"
           :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
           :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
+                                                  (not= selected-tab-main "chat")
                                                   (contains? (get needs-focus server-key) "chat")
                                                   (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))
                                                         (keys (get-in needs-focus [server-key "chat"]))))
