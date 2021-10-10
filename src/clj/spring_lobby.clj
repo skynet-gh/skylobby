@@ -3066,8 +3066,9 @@
   (future
     (try
       (when-not (:mode battle-status)
-        (if (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
-                (string/starts-with? (:server-url client-data) "road-flag.bnr.la"))
+        (if (and (:server-url client-data)
+                 (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
+                     (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
           @(event-handler
              {:event/type ::send-message
               :channel-name channel-name
