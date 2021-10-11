@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.12]
+
+- Add mute for rings to the right of battle chat input
+- Track user away time and display as tooltip
+- Add button to cancel a queued task
+- Add button to stop a running task, best to only be used if task is hung
+
 ### [0.6.11]
 
 - Fix NPE in chat and console tabs
