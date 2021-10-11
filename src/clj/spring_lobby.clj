@@ -405,6 +405,26 @@
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
 
 
+(defmethod event-handler ::stop-task [{:keys [task-kind task-thread]}]
+  (if task-thread
+    (future
+      (try
+        (.stop task-thread)
+        (catch Exception e
+          (log/error e "Error stopping task" task-kind))
+        (catch Throwable t
+          (log/error t "Critical error stopping task" task-kind))))
+    (log/warn "No thread found for task kind" task-kind)))
+
+(defn remove-task [task tasks]
+  (disj (set tasks) task))
+
+(defmethod event-handler ::cancel-task [{:keys [task]}]
+  (if-let [kind (task/task-kind task)]
+    (swap! *state update-in [:tasks-by-kind kind] (partial remove-task task))
+    (log/warn "Unable to determine task kind to cancel for" task)))
+
+
 (defn spring-roots [{:keys [spring-isolation-dir servers]}]
   (set
     (filter some?
@@ -1280,20 +1300,25 @@
                                state ; don't update unnecessarily
                                (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
                                  (-> state
-                                     (update-in [:tasks-by-kind task-kind]
-                                       (fn [tasks]
-                                         (disj (set tasks) task)))
+                                     (update-in [:tasks-by-kind task-kind] (partial remove-task task))
                                      (assoc-in [:current-tasks task-kind] task))))))
          task (-> after :current-tasks (get task-kind))]
      (try
-       (handle-task task)
+       (let [thread (Thread. (fn [] (handle-task task)))]
+         (swap! *state assoc-in [:task-threads task-kind] thread)
+         (.start thread)
+         (.join thread))
        (catch Exception e
          (log/error e "Error running task"))
        (catch Throwable t
          (log/error t "Critical error running task"))
        (finally
          (when task
-           (swap! state-atom update :current-tasks assoc task-kind nil))))
+           (swap! state-atom
+             (fn [state]
+               (-> state
+                   (assoc-in [:current-tasks task-kind] nil)
+                   (update :task-threads dissoc task-kind)))))))
      task)))
 
 

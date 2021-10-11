@@ -43,12 +43,14 @@
       (try
         (spring-lobby/handle-task! state :spring-lobby/other-task)
         (is (= {:current-tasks {:spring-lobby/other-task nil}
-                :tasks-by-kind {:spring-lobby/other-task #{}}}
+                :tasks-by-kind {:spring-lobby/other-task #{}}
+                :task-threads nil}
                @state))
         (is (= [{:current-tasks {:spring-lobby/other-task {:spring-lobby/task-type :spring-lobby-test/fake-task}}
                  :tasks-by-kind {:spring-lobby/other-task #{}}}
                 {:current-tasks {:spring-lobby/other-task nil}
-                 :tasks-by-kind {:spring-lobby/other-task #{}}}]
+                 :tasks-by-kind {:spring-lobby/other-task #{}}
+                 :task-threads nil}]
                @changes))
         (finally
           (remove-watch state :changes))))))

@@ -6,7 +6,6 @@ Notable changes and todo list.
 
 Future Features:
 
-- Cancel downloads and other tasks
 - Query auto hosts for battle details
 - Friends list support
 - Visually group teams in players table
