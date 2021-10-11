@@ -6,11 +6,9 @@ Notable changes and todo list.
 
 Future Features:
 
-- Cancel downloads and other tasks
 - Query auto hosts for battle details
 - Friends list support
 - Visually group teams in players table
-- Track and display player away time
 - Arbitrary engine directories
 - Open battle links
 - First run intro window
@@ -25,6 +23,13 @@ Future Features:
 
 
 ## Actual changelog
+
+### [0.6.12]
+
+- Add mute for rings to the right of battle chat input
+- Track user away time and display as tooltip
+- Add button to cancel a queued task
+- Add button to stop a running task, best to only be used if task is hung
 
 ### [0.6.11]
 

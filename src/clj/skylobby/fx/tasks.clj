@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     [clojure.pprint :refer [pprint]]
     skylobby.fx
+    [skylobby.fx.sync :refer [error-severity]]
     [skylobby.task :as task]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -33,89 +34,115 @@
       :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show
-        {:fx/type :v-box
-         :style {:-fx-font-size 16}
-         :children
-         [
-          {:fx/type :h-box
-           :style {:-fx-font-size 18}
+        (let [task-threads (fx/sub-val context :task-threads)]
+          {:fx/type :v-box
+           :style {:-fx-font-size 16}
            :children
            [
-            {:fx/type :check-box
-             :selected (boolean (fx/sub-val context :disable-tasks))
-             :on-selected-changed {:event/type :spring-lobby/assoc
-                                   :key :disable-tasks}}
+            {:fx/type :h-box
+             :style {:-fx-font-size 18}
+             :children
+             [
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :disable-tasks))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :disable-tasks}}
+              {:fx/type :label
+               :text " Disable tasks"}]}
+            {:fx/type :h-box
+             :style {:-fx-font-size 18}
+             :children
+             [
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :disable-tasks-while-in-game))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :disable-tasks-while-in-game}}
+              {:fx/type :label
+               :text " Disable tasks while in game"}]}
             {:fx/type :label
-             :text " Disable tasks"}]}
-          {:fx/type :h-box
-           :style {:-fx-font-size 18}
-           :children
-           [
-            {:fx/type :check-box
-             :selected (boolean (fx/sub-val context :disable-tasks-while-in-game))
-             :on-selected-changed {:event/type :spring-lobby/assoc
-                                   :key :disable-tasks-while-in-game}}
+             :text "Workers"
+             :style {:-fx-font-size 24}}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             (map
+               (fn [[k v]]
+                 {:fx/type :v-box
+                  :children
+                  (concat
+                    [{:fx/type :label
+                      :style {:-fx-font-size 20}
+                      :text (str " " k ": ")}
+                     {:fx/type :text-area
+                      :editable false
+                      :wrap-text true
+                      :text (if v
+                              (str (with-out-str (pprint v)))
+                              "")}]
+                    (when-let [task-thread (get task-threads k)]
+                      (when v
+                        [{:fx/type :button
+                          :text "Stop"
+                          :style (dissoc error-severity :-fx-background)
+                          :on-action {:event/type :spring-lobby/stop-task
+                                      :task-kind k
+                                      :task-thread task-thread}}])))})
+               (fx/sub-val context :current-tasks))}
             {:fx/type :label
-             :text " Disable tasks while in game"}]}
-          {:fx/type :label
-           :text "Workers"
-           :style {:-fx-font-size 24}}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           (map
-             (fn [[k v]]
-               {:fx/type :v-box
-                :children
-                [{:fx/type :label
-                  :style {:-fx-font-size 20}
-                  :text (str " " k ": ")}
-                 {:fx/type :text-area
-                  :editable false
-                  :wrap-text true
-                  :text (str (with-out-str (pprint v)))}]})
-             (fx/sub-val context :current-tasks))}
-          {:fx/type :label
-           :text "Task Queue"
-           :style {:-fx-font-size 24}}
-          {:fx/type :table-view
-           :v-box/vgrow :always
-           :column-resize-policy :constrained
-           :items (or (->> (fx/sub-val context :tasks-by-kind)
-                           (mapcat second)
-                           seq)
-                      [])
-           :columns
-           [
-            {:fx/type :table-column
-             :text "Kind"
-             :cell-value-factory task/task-kind
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [i]
-                {:text (str i)})}}
-            {:fx/type :table-column
-             :text "Type"
-             :cell-value-factory :spring-lobby/task-type
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [i]
-                {:text (str i)})}}
-            {:fx/type :table-column
-             :text "Data"
-             :cell-value-factory identity
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [i]
-                {:text ""
-                 :graphic
-                 {:fx/type :text-area
-                  :editable false
-                  :wrap-text true
-                  :text (str (with-out-str (pprint i)))}})}}]}]}
+             :text "Task Queue"
+             :style {:-fx-font-size 24}}
+            {:fx/type :table-view
+             :v-box/vgrow :always
+             :column-resize-policy :constrained
+             :items (or (->> (fx/sub-val context :tasks-by-kind)
+                             (mapcat second)
+                             seq)
+                        [])
+             :columns
+             [
+              {:fx/type :table-column
+               :text "Kind"
+               :cell-value-factory task/task-kind
+               :cell-factory
+               {:fx/cell-type :table-cell
+                :describe
+                (fn [i]
+                  {:text (str i)})}}
+              {:fx/type :table-column
+               :text "Type"
+               :cell-value-factory :spring-lobby/task-type
+               :cell-factory
+               {:fx/cell-type :table-cell
+                :describe
+                (fn [i]
+                  {:text (str i)})}}
+              {:fx/type :table-column
+               :text "Data"
+               :cell-value-factory identity
+               :cell-factory
+               {:fx/cell-type :table-cell
+                :describe
+                (fn [i]
+                  {:text ""
+                   :graphic
+                   {:fx/type :text-area
+                    :editable false
+                    :wrap-text true
+                    :text (str (with-out-str (pprint i)))}})}}
+              {:fx/type :table-column
+               :text "Actions"
+               :sortable false
+               :cell-value-factory identity
+               :cell-factory
+               {:fx/cell-type :table-cell
+                :describe
+                (fn [task]
+                  {:text ""
+                   :graphic
+                   {:fx/type :button
+                    :text "Cancel"
+                    :on-action {:event/type :spring-lobby/cancel-task
+                                :task task}}})}}]}]})
         {:fx/type :pane
          :pref-width tasks-window-width
          :pref-height tasks-window-height})}}))

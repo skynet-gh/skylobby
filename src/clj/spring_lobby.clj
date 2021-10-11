@@ -149,7 +149,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :mute :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
+   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
    :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
@@ -268,7 +268,7 @@
   (atom
     (fx/create-context
       {}
-      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
+      (cache-factory-with-threshold cache/lru-cache-factory 2048))))
 
 (def main-stage-atom (atom nil))
 
@@ -403,6 +403,26 @@
 (defn- add-tasks! [state-atom new-tasks]
   (log/info "Adding tasks" (pr-str new-tasks))
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
+
+
+(defmethod event-handler ::stop-task [{:keys [task-kind task-thread]}]
+  (if task-thread
+    (future
+      (try
+        (.stop task-thread)
+        (catch Exception e
+          (log/error e "Error stopping task" task-kind))
+        (catch Throwable t
+          (log/error t "Critical error stopping task" task-kind))))
+    (log/warn "No thread found for task kind" task-kind)))
+
+(defn remove-task [task tasks]
+  (disj (set tasks) task))
+
+(defmethod event-handler ::cancel-task [{:keys [task]}]
+  (if-let [kind (task/task-kind task)]
+    (swap! *state update-in [:tasks-by-kind kind] (partial remove-task task))
+    (log/warn "Unable to determine task kind to cancel for" task)))
 
 
 (defn spring-roots [{:keys [spring-isolation-dir servers]}]
@@ -1280,20 +1300,25 @@
                                state ; don't update unnecessarily
                                (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
                                  (-> state
-                                     (update-in [:tasks-by-kind task-kind]
-                                       (fn [tasks]
-                                         (disj (set tasks) task)))
+                                     (update-in [:tasks-by-kind task-kind] (partial remove-task task))
                                      (assoc-in [:current-tasks task-kind] task))))))
          task (-> after :current-tasks (get task-kind))]
      (try
-       (handle-task task)
+       (let [thread (Thread. (fn [] (handle-task task)))]
+         (swap! *state assoc-in [:task-threads task-kind] thread)
+         (.start thread)
+         (.join thread))
        (catch Exception e
          (log/error e "Error running task"))
        (catch Throwable t
          (log/error t "Critical error running task"))
        (finally
          (when task
-           (swap! state-atom update :current-tasks assoc task-kind nil))))
+           (swap! state-atom
+             (fn [state]
+               (-> state
+                   (assoc-in [:current-tasks task-kind] nil)
+                   (update :task-threads dissoc task-kind)))))))
      task)))
 
 

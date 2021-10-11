@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    java-time
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
@@ -27,7 +28,8 @@
                                     (fn [[username _status]]
                                       [username battle])
                                     (:users battle))))
-                              (into {}))]
+                              (into {}))
+        now (fx/sub-val context :now)]
     {:fx/type ext-table-column-auto-size
      :items (->> users
                  vals
@@ -40,7 +42,7 @@
       :column-resize-policy :constrained ; TODO auto resize
       :row-factory
       {:fx/cell-type :table-row
-       :describe (fn [{:keys [client-status country user-agent user-id username]}]
+       :describe (fn [{:keys [client-status country away-start-time user-agent user-id username]}]
                    (let [{:keys [battle-id battle-title] :as battle} (get battles-by-users username)]
                      (merge
                        {:on-mouse-clicked
@@ -107,7 +109,9 @@
                                     "Rank: " (:rank client-status) "\n"
                                     "Lobby: " user-agent "\n"
                                     (when battle
-                                      (str "\nBattle: " battle-title)))}})))}
+                                      (str "\nBattle: " battle-title))
+                                    (when (and (:away client-status) away-start-time)
+                                      (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis))))))}})))}
       :columns
       [{:fx/type :table-column
         :text "Username"

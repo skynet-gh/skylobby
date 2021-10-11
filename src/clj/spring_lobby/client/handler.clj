@@ -108,7 +108,9 @@
                                          true
                                          (assoc :client-status decoded-status)
                                          (and (not (:ingame prev-status)) (:ingame decoded-status))
-                                         (assoc :game-start-time now)))))
+                                         (assoc :game-start-time now)
+                                         (and (not (:away user-data)) (:away decoded-status))
+                                         (assoc :away-start-time now)))))
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)
@@ -684,10 +686,11 @@
 
 (defmethod handle "RING" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        {:keys [by-server prevent-non-host-rings] :as state} @state-atom
+        {:keys [by-server mute-ring prevent-non-host-rings] :as state} @state-atom
         {:keys [battle battles]} (-> by-server (get server-key))
         {:keys [host-username]} (get battles (:battle-id battle))]
-    (if (and prevent-non-host-rings (not= username host-username))
+    (if (or (and prevent-non-host-rings (not= username host-username))
+            (get mute-ring server-key))
       (log/info "Ignoring ring from non-host" username)
       (do
         (log/info "Playing ring sound from" username)
