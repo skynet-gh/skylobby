@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    java-time
     [skylobby.color :as color]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
@@ -77,7 +78,8 @@
                              (if increment-ids
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
-                               (str id))})]
+                               (str id))})
+        now (fx/sub-val context :now)]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -286,6 +288,25 @@
                     (let [client-status (:client-status user)
                           am-host (= username host-username)]
                       {:text ""
+                       :tooltip
+                       {:fx/type :tooltip
+                        :style {:-fx-font-size "16"}
+                        :show-delay [10 :ms]
+                        :text
+                        (str
+                          (case (:sync battle-status)
+                            1 "Synced"
+                            2 "Unsynced"
+                            "Unknown sync")
+                          "\n"
+                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating") "\n"
+                          (when (u/to-bool (:mode battle-status))
+                            (str "\n" (if (:ready battle-status) "Ready" "Unready")))
+                          (when (:ingame client-status)
+                            "\nIn game")
+                          (when-let [away-start-time (:away-start-time user)]
+                            (when (and (:away client-status) away-start-time)
+                              (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))}
                        :graphic
                        {:fx/type :h-box
                         :children

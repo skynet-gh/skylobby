@@ -9,7 +9,6 @@ Future Features:
 - Query auto hosts for battle details
 - Friends list support
 - Visually group teams in players table
-- Track and display player away time
 - Arbitrary engine directories
 - Open battle links
 - First run intro window

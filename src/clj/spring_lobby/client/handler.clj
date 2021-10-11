@@ -108,7 +108,9 @@
                                          true
                                          (assoc :client-status decoded-status)
                                          (and (not (:ingame prev-status)) (:ingame decoded-status))
-                                         (assoc :game-start-time now)))))
+                                         (assoc :game-start-time now)
+                                         (and (not (:away user-data)) (:away decoded-status))
+                                         (assoc :away-start-time now)))))
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
         prev-status (-> users (get username) :client-status)
         my-username (:username server-data)
