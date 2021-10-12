@@ -29,7 +29,7 @@
                                       [username battle])
                                     (:users battle))))
                               (into {}))
-        now (fx/sub-val context :now)]
+        now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type ext-table-column-auto-size
      :items (->> users
                  vals
@@ -110,7 +110,7 @@
                                     "Lobby: " user-agent "\n"
                                     (when battle
                                       (str "\nBattle: " battle-title))
-                                    (when (and (:away client-status) away-start-time)
+                                    (when (and (:away client-status) (number? away-start-time))
                                       (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis))))))}})))}
       :columns
       [{:fx/type :table-column

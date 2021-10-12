@@ -79,7 +79,7 @@
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
                                (str id))})
-        now (fx/sub-val context :now)]
+        now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -299,7 +299,7 @@
                             2 "Unsynced"
                             "Unknown sync")
                           "\n"
-                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating") "\n"
+                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
                           (when (u/to-bool (:mode battle-status))
                             (str "\n" (if (:ready battle-status) "Ready" "Unready")))
                           (when (:ingame client-status)
