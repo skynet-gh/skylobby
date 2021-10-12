@@ -306,7 +306,11 @@
                             "\nIn game")
                           (when-let [away-start-time (:away-start-time user)]
                             (when (and (:away client-status) away-start-time)
-                              (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))}
+                              (str "\nAway: "
+                                   (let [diff (- now away-start-time)]
+                                     (if (< diff 30000)
+                                       " just now"
+                                       (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
                        :graphic
                        {:fx/type :h-box
                         :children

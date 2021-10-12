@@ -1968,7 +1968,7 @@
         (chime/chime-at
           (chime/periodic-seq
             (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
-            (java-time/duration 3 :seconds))
+            (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))

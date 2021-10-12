@@ -111,7 +111,11 @@
                                     (when battle
                                       (str "\nBattle: " battle-title))
                                     (when (and (:away client-status) (number? away-start-time))
-                                      (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis))))))}})))}
+                                      (str "\nAway: "
+                                           (let [diff (- now away-start-time)]
+                                             (if (< diff 30000)
+                                               " just now"
+                                               (str " " (u/format-duration (java-time/duration diff :millis))))))))}})))}
       :columns
       [{:fx/type :table-column
         :text "Username"
