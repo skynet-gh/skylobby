@@ -405,7 +405,7 @@
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
 
 
-(defmethod event-handler ::stop-task [{:keys [task-kind task-thread]}]
+(defmethod event-handler ::stop-task [{:keys [task-kind ^java.lang.Thread task-thread]}]
   (if task-thread
     (future
       (try

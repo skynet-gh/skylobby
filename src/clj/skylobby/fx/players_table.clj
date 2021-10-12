@@ -294,7 +294,7 @@
                         :show-delay [10 :ms]
                         :text
                         (str
-                          (case (:sync battle-status)
+                          (case (int (or (:sync battle-status) 0))
                             1 "Synced"
                             2 "Unsynced"
                             "Unknown sync")
