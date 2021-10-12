@@ -774,45 +774,53 @@
         (log/error e "Error in :battle-map-details state watcher")))))
 
 
+(defn server-needs-battle-status-sync-check [server-data]
+  (and (-> server-data :battle :battle-id)
+       (let [username (:username server-data)
+             sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
+         (not= 1 sync-status))))
+
 (defn battle-mod-details-watcher [_k state-atom old-state new-state]
   (when (not= (battle-mod-details-relevant-data old-state)
               (battle-mod-details-relevant-data new-state))
     (try
       (doseq [[server-key new-server] (-> new-state :by-server seq)]
-        (let [old-server (-> old-state :by-server (get server-key))
-              server-url (-> new-server :client-data :server-url)
-              {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
-              old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-              new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-              old-battle-id (-> old-server :battle :battle-id)
-              new-battle-id (-> new-server :battle :battle-id)
-              old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
-              new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
-              new-mod-sans-git (u/mod-name-sans-git new-mod)
-              mod-name-set (set [new-mod new-mod-sans-git])
-              filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-              mod-exists (->> new-mods (filter filter-fn) first)
-              mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
-          (when (or (and (and (not (string/blank? new-mod))
-                              (not (resource/details? mod-details)))
-                         (or (not= old-battle-id new-battle-id)
-                             (not= old-mod new-mod)
-                             (and
-                               (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
-                               mod-exists)))
-                    (and (not (some filter-fn old-mods))
-                         mod-exists))
-            (log/info "Mod details update for" server-key)
-            (add-task! state-atom
-              {::task-type ::mod-details
-               :mod-name new-mod
-               :mod-file (:file mod-exists)
-               :source :battle-mod-details-watcher
-               :use-git-mod-version (:use-git-mod-version new-state)}))))
+        (if-not (server-needs-battle-status-sync-check new-server)
+          (log/info "Server" server-key "does not need battle mod details check")
+          (let [old-server (-> old-state :by-server (get server-key))
+                server-url (-> new-server :client-data :server-url)
+                {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
+                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                spring-isolation-dir)
+                spring-root-path (fs/canonical-path spring-root)
+                old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+                new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
+                old-battle-id (-> old-server :battle :battle-id)
+                new-battle-id (-> new-server :battle :battle-id)
+                old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
+                new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
+                new-mod-sans-git (u/mod-name-sans-git new-mod)
+                mod-name-set (set [new-mod new-mod-sans-git])
+                filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+                mod-exists (->> new-mods (filter filter-fn) first)
+                mod-details (resource/cached-details (:mod-details new-state) mod-exists)
+                all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
+            (when (or (and (and (not (string/blank? new-mod))
+                                (not (resource/details? mod-details)))
+                           (or (not= old-battle-id new-battle-id)
+                               (not= old-mod new-mod)
+                               (and
+                                 (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
+                                 mod-exists)))
+                      (and (not (some filter-fn old-mods))
+                           mod-exists))
+              (log/info "Mod details update for" server-key)
+              (add-task! state-atom
+                {::task-type ::mod-details
+                 :mod-name new-mod
+                 :mod-file (:file mod-exists)
+                 :source :battle-mod-details-watcher
+                 :use-git-mod-version (:use-git-mod-version new-state)})))))
       (catch Exception e
         (log/error e "Error in :battle-mod-details state watcher")))))
 
@@ -1037,52 +1045,48 @@
 
 
 (defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (or (not= (update-battle-status-sync-relevant-data old-state)
-                  (update-battle-status-sync-relevant-data new-state))
-            (some
-              (fn [[_server-key server-data]]
-                (and (-> server-data :battle :battle-id)
-                     (let [username (:username server-data)
-                           sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
-                       (not= 1 sync-status))))
-              (->> new-state :by-server u/valid-servers seq)))
-    (log/info "Updating battle sync status")
+  (when (not= (update-battle-status-sync-relevant-data old-state)
+              (update-battle-status-sync-relevant-data new-state))
+    (log/info "Checking servers for battle sync status updates")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
-        (log/info "Updating battle sync status for" server-key)
-        (let [old-server (-> old-state :by-server (get server-key))
-              server-url (-> new-server :client-data :server-url)
-              {:keys [servers spring-isolation-dir]} new-state
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
+        (if-not (server-needs-battle-status-sync-check new-server)
+          (log/info "Server" server-key "does not need battle sync status check")
+          (let [
+                _ (log/info "Checking battle sync status for" server-key)
+                old-server (-> old-state :by-server (get server-key))
+                server-url (-> new-server :client-data :server-url)
+                {:keys [servers spring-isolation-dir]} new-state
+                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                spring-isolation-dir)
+                spring-root-path (fs/canonical-path spring-root)
 
-              old-spring (-> old-state :by-spring-root (get spring-root-path))
-              new-spring (-> new-state :by-spring-root (get spring-root-path))
+                old-spring (-> old-state :by-spring-root (get spring-root-path))
+                new-spring (-> new-state :by-spring-root (get spring-root-path))
 
-              old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
-              new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
+                old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
+                new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
 
-              new-sync-number (handler/sync-number new-sync)
-              battle (:battle new-server)
-              client-data (:client-data new-server)
-              my-username (:username client-data)
-              {:keys [battle-status team-color]} (-> battle :users (get my-username))
-              old-sync-number (-> battle :users (get my-username) :battle-status :sync)
-              battle-id (:battle-id battle)
-              battle-changed (not= battle-id
-                                   (-> old-server :battle :battle-id))]
-          (when (and battle-id
-                     (or (not= old-sync new-sync)
-                         (not= old-sync-number new-sync-number)
-                         battle-changed))
-            (if battle-changed
-              (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
-              (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
-                        "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
-            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-              (message/send-message *state client-data
-                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))
+                new-sync-number (handler/sync-number new-sync)
+                battle (:battle new-server)
+                client-data (:client-data new-server)
+                my-username (:username client-data)
+                {:keys [battle-status team-color]} (-> battle :users (get my-username))
+                old-sync-number (-> battle :users (get my-username) :battle-status :sync)
+                battle-id (:battle-id battle)
+                battle-changed (not= battle-id
+                                     (-> old-server :battle :battle-id))]
+            (when (and battle-id
+                       (or (not= old-sync new-sync)
+                           (not= old-sync-number new-sync-number)
+                           battle-changed))
+              (if battle-changed
+                (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
+                (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
+                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
+              (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+                (message/send-message *state client-data
+                  (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0))))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
