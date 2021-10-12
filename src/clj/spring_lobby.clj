@@ -72,7 +72,7 @@
 
 (def app-version (u/app-version))
 
-(def wait-before-init-tasks-ms 10000)
+(def wait-init-tasks-ms 20000)
 
 (dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
 
@@ -1332,7 +1332,7 @@
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 20 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
              (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
@@ -1885,8 +1885,8 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 3 :seconds))
-            (java-time/duration 3 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 5 :seconds))
           (fn [_chimestamp]
             (log/debug "Fixing battle ready if needed")
             (let [state @state-atom]
@@ -1910,7 +1910,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 120 :seconds))
             (java-time/duration 60 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating matchmaking")
@@ -1933,7 +1933,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
             (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
@@ -1963,7 +1963,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating now")
@@ -2098,12 +2098,12 @@
          {}
          by-server)))))
 
-(defn- truncate-messages-chimer-fn [state-atom]
+(defn truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
             (if false
@@ -2210,7 +2210,7 @@
         chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
             (let [old-state @old-state-atom
@@ -2233,7 +2233,7 @@
          chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/instant)
+             (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
              (java-time/duration (or duration 3) :seconds))
            (fn [_chimestamp]
              (let [old-state @old-state-atom
@@ -2257,7 +2257,7 @@
         chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 1 :minutes))
           (fn [_chimestamp]
             (if-let [m (not-empty @stats-accumulator)]
@@ -4653,7 +4653,7 @@
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         ;truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
@@ -4665,19 +4665,20 @@
      (if-not skip-tasks
        (future
          (try
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-engines})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-mods})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-maps})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-replays})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::update-rapid})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::update-all-downloadables})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::scan-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
@@ -4692,7 +4693,7 @@
          check-app-update-chimer
          profile-print-chimer
          spit-app-config-chimer
-         truncate-messages-chimer
+         ;truncate-messages-chimer
          fix-battle-ready-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
@@ -4750,6 +4751,7 @@
 
 (defn init-async [state-atom]
   (future
-    (log/info "Sleeping to let JavaFX start")
-    (async/<!! (async/timeout wait-before-init-tasks-ms))
-    (init state-atom)))
+    (try
+      (init state-atom)
+      (catch Exception e
+        (log/error e "Error in init async")))))
