@@ -24,6 +24,16 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.13]
+
+- Add launchers for different max memory sizes
+- Spread out initial task runs to reduce CPU on startup
+- Fix battle sync check running when not needed
+- Move 7z init later to improve startup time
+- Remove dynamic require of ui ns to improve startup time
+- Remove -server and -Xms jvm flags to attempt to improve startup time
+- Remove large icons to reduce per-window memory footprint
+
 ### [0.6.12]
 
 - Add mute for rings to the right of battle chat input
