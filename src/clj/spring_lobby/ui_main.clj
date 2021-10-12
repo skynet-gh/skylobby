@@ -165,10 +165,6 @@
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
               :else
               (do
-                (future
-                  (log/info "Start 7Zip init, async")
-                  (fs/init-7z!)
-                  (log/info "Finished 7Zip init"))
                 (log/info "Creating renderer")
                 (let [r (fx/create-renderer
                           :middleware (comp
@@ -181,6 +177,10 @@
                   (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/init-async spring-lobby/*state)
                 (spring-lobby/auto-connect-servers spring-lobby/*state)
+                (future
+                  (log/info "Start 7Zip init, async")
+                  (fs/init-7z!)
+                  (log/info "Finished 7Zip init"))
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))))
           (catch Throwable t
             (let [st (with-out-str (.printStackTrace t))]
