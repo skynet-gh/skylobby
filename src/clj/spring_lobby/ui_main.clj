@@ -82,7 +82,7 @@
               (alter-var-root #'fs/replay-sources-override (constantly replay-sources-override))))
           (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
           (let [before (u/curr-millis)]
-            (log/info "Main start")
+            (log/info "UI Main")
             (Platform/setImplicitExit true)
             (log/info "Set JavaFX implicit exit")
             (let [before-state (u/curr-millis)
