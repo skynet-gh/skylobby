@@ -7,7 +7,6 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
@@ -71,86 +70,24 @@
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-close-octagon:16:white"}}]))}))
 
-(defn app-update-button
-  [{:fx/keys [context]}]
-  (let [{:keys [latest]} (fx/sub-val context :app-update-available)
-        color "gold"
-        version latest
-        url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
-                 "skylobby-" version "-"
-                 (if (fs/wsl-or-windows?) ; TODO mac
-                   "windows"
-                   "linux")
-                 ".jar")
-        installer-url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
-                           "skylobby-" version "_"
-                           (if (fs/wsl-or-windows?) ; TODO mac
-                             "windows.msi"
-                             "linux-amd64.deb"))
-        download (get (fx/sub-val context :http-download) url)
-        running (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-app-update-and-restart))
-        is-java (fx/sub-val context :is-java)]
-    {:fx/type :h-box
-     :alignment :center-left
-     :children
-     [
-      {:fx/type :button
-       :text (if running
-               (u/download-progress download)
-               (str "Update to " latest))
-       :disable (boolean running)
-       :on-action
-       (if is-java
-         {:event/type :spring-lobby/add-task
-          :task {:spring-lobby/task-type :spring-lobby/download-app-update-and-restart
-                 :downloadable {:download-url url}
-                 :version version}}
-         {:event/type :spring-lobby/desktop-browse-url
-          :url installer-url})
-       :style {:-fx-base color
-               :-fx-background color}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-download:30:black"}}
-      {:fx/type :button
-       :text ""
-       :on-action {:event/type :spring-lobby/desktop-browse-url
-                   :url app-update-browseurl}
-       :style {:-fx-base color
-               :-fx-background color}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-open-in-new:30:black"}}
-      {:fx/type :button
-       :text ""
-       :on-action {:event/type :spring-lobby/dissoc
-                   :key :app-update-available}
-       :style {:-fx-base color
-               :-fx-background color}
-       :graphic
-       {:fx/type font-icon/lifecycle
-        :icon-literal "mdi-close:30:black"}}]}))
 
 (defn singleplayer-buttons
-  [{:fx/keys [context]}]
+  [{:fx/keys [_context]}]
   {:fx/type :v-box
    :spacing 10
    :children
-   (concat
-     (when (fx/sub-val context :app-update-available)
-       [{:fx/type app-update-button}])
-     [
-      {:fx/type :label
-       :text "Offline:"}
-      {:fx/type :button
-       :text "Singleplayer Battle"
-       :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
-      {:fx/type :button
-       :text "Watch Replays"
-       :on-action {:event/type :spring-lobby/toggle
-                   :key :show-replays}}
-      {:fx/type :pane
-       :v-box/vgrow :always}])})
+   [
+    {:fx/type :label
+     :text "Offline:"}
+    {:fx/type :button
+     :text "Singleplayer Battle"
+     :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
+    {:fx/type :button
+     :text "Watch Replays"
+     :on-action {:event/type :spring-lobby/toggle
+                 :key :show-replays}}
+    {:fx/type :pane
+     :v-box/vgrow :always}]})
 
 
 (defn multiplayer-buttons
