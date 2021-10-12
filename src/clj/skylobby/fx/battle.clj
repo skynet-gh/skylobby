@@ -949,7 +949,7 @@
                       :key :show-uikeys-window}}]}}]}))
 
 
-(defn battle-votes
+(defn battle-votes-impl
   [{:fx/keys [context]
     :keys [battle-layout server-key]}]
   (let [show-vote-log (fx/sub-val context :show-vote-log)
@@ -1109,6 +1109,13 @@
                           [{:fx/type :label
                             :style {:-fx-font-family monospace-font-family}
                             :text (str " " (:command vote-data))}])}))))}}]))}))
+
+(defn battle-votes
+  [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :battle-votes
+      (battle-votes-impl state))))
 
 
 (defn battle-players-and-bots
