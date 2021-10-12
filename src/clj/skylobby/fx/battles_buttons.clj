@@ -4,7 +4,6 @@
     clojure.set
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.welcome :refer [app-update-button]]
     [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
@@ -17,8 +16,7 @@
 
 (defn- battles-buttons-view-impl
   [{:fx/keys [context]}]
-  (let [app-update-available (fx/sub-val context :app-update-available)
-        battle-password (fx/sub-val context :battle-password)
+  (let [battle-password (fx/sub-val context :battle-password)
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle])
@@ -92,9 +90,7 @@
                        :key :show-rapid-downloader}
            :graphic
            {:fx/type font-icon/lifecycle
-            :icon-literal (str "mdi-download:16:white")}}]
-         (when app-update-available
-           [{:fx/type app-update-button}]))}]}))
+            :icon-literal (str "mdi-download:16:white")}}])}]}))
 
 (defn battles-buttons-view [state]
   (tufte/profile {:dynamic? true

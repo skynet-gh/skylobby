@@ -4,6 +4,7 @@
     clojure.core.async
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    [spring-lobby.ui-main :as ui-main]
     [spring-lobby.fs :as fs]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
@@ -17,6 +18,7 @@
 
 
 (defn -main [& args]
+  (log/info "Main")
   (let [{:keys [arguments]} (cli/parse-opts args cli-options)
         first-arg-as-file (some-> arguments first fs/file)
         first-arg-filename (fs/filename first-arg-as-file)
@@ -31,10 +33,7 @@
             (str "http://localhost:" u/ipc-port "/replay")
             {:query-params {:path (fs/canonical-path first-arg-as-file)}})
           (System/exit 0))
-        (do
-          (require 'spring-lobby.ui-main)
-          (let [main (var-get (find-var 'spring-lobby.ui-main/-main))]
-            (apply main args))))
+        (apply ui-main/-main args))
       (catch Throwable t
         (let [st (with-out-str (.printStackTrace t))]
           (println st)

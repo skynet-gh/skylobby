@@ -79,7 +79,7 @@
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
                                (str id))})
-        now (fx/sub-val context :now)]
+        now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -294,19 +294,23 @@
                         :show-delay [10 :ms]
                         :text
                         (str
-                          (case (:sync battle-status)
+                          (case (int (or (:sync battle-status) 0))
                             1 "Synced"
                             2 "Unsynced"
                             "Unknown sync")
                           "\n"
-                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating") "\n"
+                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
                           (when (u/to-bool (:mode battle-status))
                             (str "\n" (if (:ready battle-status) "Ready" "Unready")))
                           (when (:ingame client-status)
                             "\nIn game")
                           (when-let [away-start-time (:away-start-time user)]
                             (when (and (:away client-status) away-start-time)
-                              (str "\nAway: " (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))}
+                              (str "\nAway: "
+                                   (let [diff (- now away-start-time)]
+                                     (if (< diff 30000)
+                                       " just now"
+                                       (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
                        :graphic
                        {:fx/type :h-box
                         :children

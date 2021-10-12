@@ -83,4 +83,5 @@
     (uberjar (merge default-uberjar-opts options))
     (fix-manifest)
     (println "\nSuccessfully built jar, exiting\n")
-    (Platform/exit)))
+    (Platform/exit)
+    (System/exit 0)))

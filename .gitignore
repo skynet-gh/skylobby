@@ -11,5 +11,6 @@
 /.settings/
 /dist/
 /pom.xml
+/skylobby-*.msi
 /target/
 /trace.edn

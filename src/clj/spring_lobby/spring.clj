@@ -375,12 +375,13 @@
                         (if (and media-player (not music-paused))
                           (do
                             (log/info "Pausing media player")
-                            (let [timeline (Timeline.
-                                             (into-array KeyFrame
-                                               [(KeyFrame.
-                                                  (Duration/seconds 3)
-                                                  (into-array KeyValue
-                                                    [(KeyValue. (.volumeProperty media-player) 0)]))]))]
+                            (let [^"[Ljavafx.animation.KeyFrame;"
+                                  keyframes (into-array KeyFrame
+                                              [(KeyFrame.
+                                                 (Duration/seconds 3)
+                                                 (into-array KeyValue
+                                                   [(KeyValue. (.volumeProperty media-player) 0)]))])
+                                  timeline (Timeline.  keyframes)]
                               (.setOnFinished timeline
                                 (reify EventHandler
                                   (handle [_this _e]
@@ -445,12 +446,13 @@
                            (log/info "Resuming media player")
                            (.play media-player)
                            (let [{:keys [music-volume]} (swap! state-atom assoc :music-paused false)
-                                 timeline (Timeline.
-                                            (into-array KeyFrame
-                                              [(KeyFrame.
-                                                 (Duration/seconds 3)
-                                                 (into-array KeyValue
-                                                   [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))]))]
+                                 ^"[Ljavafx.animation.KeyFrame;"
+                                 keyframes (into-array KeyFrame
+                                             [(KeyFrame.
+                                                (Duration/seconds 3)
+                                                (into-array KeyValue
+                                                  [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))])
+                                 timeline (Timeline. keyframes)]
                              (.play timeline)))
                          (when (not media-player)
                            (log/info "No media player to resume"))))

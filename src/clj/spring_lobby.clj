@@ -72,7 +72,7 @@
 
 (def app-version (u/app-version))
 
-(def wait-before-init-tasks-ms 10000)
+(def wait-init-tasks-ms 20000)
 
 (dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
 
@@ -405,7 +405,7 @@
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
 
 
-(defmethod event-handler ::stop-task [{:keys [task-kind task-thread]}]
+(defmethod event-handler ::stop-task [{:keys [task-kind ^java.lang.Thread task-thread]}]
   (if task-thread
     (future
       (try
@@ -774,45 +774,53 @@
         (log/error e "Error in :battle-map-details state watcher")))))
 
 
+(defn server-needs-battle-status-sync-check [server-data]
+  (and (-> server-data :battle :battle-id)
+       (let [username (:username server-data)
+             sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
+         (not= 1 sync-status))))
+
 (defn battle-mod-details-watcher [_k state-atom old-state new-state]
   (when (not= (battle-mod-details-relevant-data old-state)
               (battle-mod-details-relevant-data new-state))
     (try
       (doseq [[server-key new-server] (-> new-state :by-server seq)]
-        (let [old-server (-> old-state :by-server (get server-key))
-              server-url (-> new-server :client-data :server-url)
-              {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
-              old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-              new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-              old-battle-id (-> old-server :battle :battle-id)
-              new-battle-id (-> new-server :battle :battle-id)
-              old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
-              new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
-              new-mod-sans-git (u/mod-name-sans-git new-mod)
-              mod-name-set (set [new-mod new-mod-sans-git])
-              filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-              mod-exists (->> new-mods (filter filter-fn) first)
-              mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
-          (when (or (and (and (not (string/blank? new-mod))
-                              (not (resource/details? mod-details)))
-                         (or (not= old-battle-id new-battle-id)
-                             (not= old-mod new-mod)
-                             (and
-                               (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
-                               mod-exists)))
-                    (and (not (some filter-fn old-mods))
-                         mod-exists))
-            (log/info "Mod details update for" server-key)
-            (add-task! state-atom
-              {::task-type ::mod-details
-               :mod-name new-mod
-               :mod-file (:file mod-exists)
-               :source :battle-mod-details-watcher
-               :use-git-mod-version (:use-git-mod-version new-state)}))))
+        (if-not (server-needs-battle-status-sync-check new-server)
+          (log/info "Server" server-key "does not need battle mod details check")
+          (let [old-server (-> old-state :by-server (get server-key))
+                server-url (-> new-server :client-data :server-url)
+                {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
+                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                spring-isolation-dir)
+                spring-root-path (fs/canonical-path spring-root)
+                old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
+                new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
+                old-battle-id (-> old-server :battle :battle-id)
+                new-battle-id (-> new-server :battle :battle-id)
+                old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
+                new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
+                new-mod-sans-git (u/mod-name-sans-git new-mod)
+                mod-name-set (set [new-mod new-mod-sans-git])
+                filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
+                mod-exists (->> new-mods (filter filter-fn) first)
+                mod-details (resource/cached-details (:mod-details new-state) mod-exists)
+                all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
+            (when (or (and (and (not (string/blank? new-mod))
+                                (not (resource/details? mod-details)))
+                           (or (not= old-battle-id new-battle-id)
+                               (not= old-mod new-mod)
+                               (and
+                                 (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
+                                 mod-exists)))
+                      (and (not (some filter-fn old-mods))
+                           mod-exists))
+              (log/info "Mod details update for" server-key)
+              (add-task! state-atom
+                {::task-type ::mod-details
+                 :mod-name new-mod
+                 :mod-file (:file mod-exists)
+                 :source :battle-mod-details-watcher
+                 :use-git-mod-version (:use-git-mod-version new-state)})))))
       (catch Exception e
         (log/error e "Error in :battle-mod-details state watcher")))))
 
@@ -1037,52 +1045,48 @@
 
 
 (defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (or (not= (update-battle-status-sync-relevant-data old-state)
-                  (update-battle-status-sync-relevant-data new-state))
-            (some
-              (fn [[_server-key server-data]]
-                (and (-> server-data :battle :battle-id)
-                     (let [username (:username server-data)
-                           sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
-                       (not= 1 sync-status))))
-              (->> new-state :by-server u/valid-servers seq)))
-    (log/info "Updating battle sync status")
+  (when (not= (update-battle-status-sync-relevant-data old-state)
+              (update-battle-status-sync-relevant-data new-state))
+    (log/info "Checking servers for battle sync status updates")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
-        (log/info "Updating battle sync status for" server-key)
-        (let [old-server (-> old-state :by-server (get server-key))
-              server-url (-> new-server :client-data :server-url)
-              {:keys [servers spring-isolation-dir]} new-state
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
+        (if-not (server-needs-battle-status-sync-check new-server)
+          (log/info "Server" server-key "does not need battle sync status check")
+          (let [
+                _ (log/info "Checking battle sync status for" server-key)
+                old-server (-> old-state :by-server (get server-key))
+                server-url (-> new-server :client-data :server-url)
+                {:keys [servers spring-isolation-dir]} new-state
+                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                                spring-isolation-dir)
+                spring-root-path (fs/canonical-path spring-root)
 
-              old-spring (-> old-state :by-spring-root (get spring-root-path))
-              new-spring (-> new-state :by-spring-root (get spring-root-path))
+                old-spring (-> old-state :by-spring-root (get spring-root-path))
+                new-spring (-> new-state :by-spring-root (get spring-root-path))
 
-              old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
-              new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
+                old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
+                new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
 
-              new-sync-number (handler/sync-number new-sync)
-              battle (:battle new-server)
-              client-data (:client-data new-server)
-              my-username (:username client-data)
-              {:keys [battle-status team-color]} (-> battle :users (get my-username))
-              old-sync-number (-> battle :users (get my-username) :battle-status :sync)
-              battle-id (:battle-id battle)
-              battle-changed (not= battle-id
-                                   (-> old-server :battle :battle-id))]
-          (when (and battle-id
-                     (or (not= old-sync new-sync)
-                         (not= old-sync-number new-sync-number)
-                         battle-changed))
-            (if battle-changed
-              (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
-              (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
-                        "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
-            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-              (message/send-message *state client-data
-                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))
+                new-sync-number (handler/sync-number new-sync)
+                battle (:battle new-server)
+                client-data (:client-data new-server)
+                my-username (:username client-data)
+                {:keys [battle-status team-color]} (-> battle :users (get my-username))
+                old-sync-number (-> battle :users (get my-username) :battle-status :sync)
+                battle-id (:battle-id battle)
+                battle-changed (not= battle-id
+                                     (-> old-server :battle :battle-id))]
+            (when (and battle-id
+                       (or (not= old-sync new-sync)
+                           (not= old-sync-number new-sync-number)
+                           battle-changed))
+              (if battle-changed
+                (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
+                (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
+                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
+              (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+                (message/send-message *state client-data
+                  (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0))))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
@@ -1332,7 +1336,7 @@
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 20 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
              (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
@@ -1885,8 +1889,8 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 3 :seconds))
-            (java-time/duration 3 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 5 :seconds))
           (fn [_chimestamp]
             (log/debug "Fixing battle ready if needed")
             (let [state @state-atom]
@@ -1910,7 +1914,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 120 :seconds))
             (java-time/duration 60 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating matchmaking")
@@ -1933,7 +1937,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
             (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
@@ -1963,8 +1967,8 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :seconds))
-            (java-time/duration 3 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))
@@ -2098,12 +2102,12 @@
          {}
          by-server)))))
 
-(defn- truncate-messages-chimer-fn [state-atom]
+(defn truncate-messages-chimer-fn [state-atom]
   (log/info "Starting message truncate chimer")
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
             (java-time/duration 5 :minutes))
           (fn [_chimestamp]
             (if false
@@ -2210,7 +2214,7 @@
         chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
             (let [old-state @old-state-atom
@@ -2233,7 +2237,7 @@
          chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/instant)
+             (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
              (java-time/duration (or duration 3) :seconds))
            (fn [_chimestamp]
              (let [old-state @old-state-atom
@@ -2257,7 +2261,7 @@
         chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :seconds))
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 1 :minutes))
           (fn [_chimestamp]
             (if-let [m (not-empty @stats-accumulator)]
@@ -4653,7 +4657,7 @@
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-         truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
+         ;truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
@@ -4665,19 +4669,20 @@
      (if-not skip-tasks
        (future
          (try
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-engines})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-mods})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-maps})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-replays})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::update-rapid})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::update-all-downloadables})
-           (async/<!! (async/timeout 10000))
+           (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::scan-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
@@ -4692,7 +4697,7 @@
          check-app-update-chimer
          profile-print-chimer
          spit-app-config-chimer
-         truncate-messages-chimer
+         ;truncate-messages-chimer
          fix-battle-ready-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
@@ -4750,6 +4755,7 @@
 
 (defn init-async [state-atom]
   (future
-    (log/info "Sleeping to let JavaFX start")
-    (async/<!! (async/timeout wait-before-init-tasks-ms))
-    (init state-atom)))
+    (try
+      (init state-atom)
+      (catch Exception e
+        (log/error e "Error in init async")))))
