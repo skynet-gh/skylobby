@@ -37,8 +37,9 @@
               {:fx/type :label
                :text " Song: "}
               {:fx/type :label
-               :text (str (fs/filename music-now-playing))}
+               :text (str (fs/filename music-now-playing) " ")}
               {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
                :text ""
                :on-action {:event/type :spring-lobby/prev-music
                            :media-player media-player
@@ -49,6 +50,7 @@
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-skip-previous:16"}}
               {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
                :text ""
                :on-action {:event/type :spring-lobby/stop-music
                            :media-player media-player}
@@ -56,6 +58,7 @@
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-stop:16"}}
               {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
                :text ""
                :on-action {:event/type :spring-lobby/toggle-music-play
                            :media-player media-player
@@ -67,6 +70,7 @@
                   "mdi-play:16"
                   "mdi-pause:16")}}
               {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
                :text ""
                :on-action {:event/type :spring-lobby/next-music
                            :media-player media-player
@@ -83,6 +87,7 @@
               {:fx/type :label
                :text " No music playing "}
               {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
                :text ""
                :on-action {:event/type :spring-lobby/start-music
                            :music-queue music-queue
@@ -93,21 +98,24 @@
        [{:fx/type :pane
          :style {:-fx-pref-width "200px"}}
         {:fx/type :button
+         :style-class ["button" "skylobby-normal"]
          :text "Replays"
          :style {:-fx-font-size 14}
          :on-action {:event/type :spring-lobby/toggle
                      :key :show-replays}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-open-in-new:16:white"}}
+          :icon-literal "mdi-open-in-new:16"}}
         {:fx/type :button
+         :style-class ["button" "skylobby-normal"]
          :style {:-fx-font-size 14}
          :text "Settings"
          :graphic {:fx/type font-icon/lifecycle
-                   :icon-literal "mdi-settings:16:white"}
+                   :icon-literal "mdi-settings:16"}
          :on-action {:event/type :spring-lobby/toggle
                      :key :show-settings-window}}
         {:fx/type :button
+         :style-class ["button" "skylobby-normal"]
          :text (str (count tasks-by-type) " tasks")
          :on-action {:event/type :spring-lobby/toggle
                      :key :show-tasks-window}}])}))
