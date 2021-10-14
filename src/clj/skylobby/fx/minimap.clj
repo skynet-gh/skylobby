@@ -259,7 +259,7 @@
                    (.setFill gc Color/WHITE)
                    (.fillText gc (str text) xc yc)))
                (doseq [{:keys [allyteam x y width height]} start-boxes]
-                 (when (and x y width height)
+                 (when (and x y width height (not= 0 width) (not= 0 height))
                    (let [color (Color/color 0.5 0.5 0.5 0.5)
                          border 4
                          text (if increment-ids
@@ -282,7 +282,9 @@
                      (.setLineWidth gc 5.0)
                      (.strokeText gc (str text) xt yt)
                      (.setFill gc Color/WHITE)
-                     (.fillText gc (str text) xt yt)))))))})]}))
+                     (.fillText gc (str text) xt yt)
+                     (.setFill gc Color/BLACK)
+                     (.fillText gc "x" (- (+ x width) font-size) yt)))))))})]}))
 
 
 (defn minimap-pane [state]

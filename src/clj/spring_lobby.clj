@@ -3163,12 +3163,24 @@
               allyteam-id (loop [i 0]
                             (if (contains? allyteam-ids i)
                               (recur (inc i))
-                              i))]
+                              i))
+              close-size (* 2 start-pos-r)
+              target (some
+                       (fn [{:keys [allyteam x y width height]}]
+                         (when (and allyteam x y width height)
+                           (let [xt (+ x width)]
+                             (when (and
+                                     (< (- xt close-size) ex (+ xt close-size))
+                                     (< (- y close-size) ey (+ y close-size)))
+                               allyteam))))
+                       start-boxes)]
+          (when target (log/info "Mousedown on close button for box" target))
           (swap! *state assoc :drag-allyteam {:allyteam-id allyteam-id
                                               :startx ex
                                               :starty ey
                                               :endx ex
-                                              :endy ey}))
+                                              :endy ey
+                                              :target target}))
         :else
         nil)
       (catch Exception e
@@ -3200,6 +3212,8 @@
       (catch Exception e
         (log/error e "Error dragging minimap")))))
 
+(def min-box-size 0.05)
+
 (defmethod event-handler ::minimap-mouse-released
   [{:keys [am-host client-data minimap-scale minimap-width minimap-height map-details singleplayer]
     :or {minimap-scale 1.0}
@@ -3221,7 +3235,7 @@
                      merge team-data)
               (message/send-message *state client-data
                 (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
-        (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
+        (when-let [{:keys [allyteam-id startx starty endx endy target]} (:drag-allyteam before)]
           (let [l (min startx endx)
                 t (min starty endy)
                 r (max startx endx)
@@ -3230,31 +3244,45 @@
                 top (/ t (* minimap-scale minimap-height))
                 right (/ r (* minimap-scale minimap-width))
                 bottom (/ b (* minimap-scale minimap-height))]
-            (if singleplayer
-              (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
-                     (fn [allyteam]
-                       (assoc allyteam
-                              :startrectleft left
-                              :startrecttop top
-                              :startrectright right
-                              :startrectbottom bottom)))
-              (if am-host
-                (message/send-message *state client-data
-                  (str "ADDSTARTRECT " allyteam-id " "
-                       (int (* 200 left)) " "
-                       (int (* 200 top)) " "
-                       (int (* 200 right)) " "
-                       (int (* 200 bottom))))
-                (event-handler
-                  (assoc e
-                         :event/type ::send-message
-                         :message
-                         (str "!addBox "
-                              (int (* 200 left)) " "
-                              (int (* 200 top)) " "
-                              (int (* 200 right)) " "
-                              (int (* 200 bottom)) " "
-                              (inc allyteam-id)))))))))
+            (if (and (< min-box-size (- right left))
+                     (< min-box-size (- bottom top)))
+              (if singleplayer
+                (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+                       (fn [allyteam]
+                         (assoc allyteam
+                                :startrectleft left
+                                :startrecttop top
+                                :startrectright right
+                                :startrectbottom bottom)))
+                (if am-host
+                  (message/send-message *state client-data
+                    (str "ADDSTARTRECT " allyteam-id " "
+                         (int (* 200 left)) " "
+                         (int (* 200 top)) " "
+                         (int (* 200 right)) " "
+                         (int (* 200 bottom))))
+                  (event-handler
+                    (assoc e
+                           :event/type ::send-message
+                           :message
+                           (str "!addBox "
+                                (int (* 200 left)) " "
+                                (int (* 200 top)) " "
+                                (int (* 200 right)) " "
+                                (int (* 200 bottom)) " "
+                                (inc allyteam-id))))))
+              (if target
+                (do
+                  (log/info "Clearing box" target)
+                  (if singleplayer
+                    (swap! *state update-in [:by-server :local :battle :scripttags :game] dissoc (keyword (str "allyteam" target)))
+                    (if am-host
+                      (message/send-message *state client-data (str "REMOVESTARTRECT " target))
+                      (event-handler
+                        (assoc e
+                               :event/type ::send-message
+                               :message (str "!clearBox " (inc (int (u/to-number target)))))))))
+                (log/info "Start box too small, ignoring" left top right bottom))))))
       (catch Exception e
         (log/error e "Error releasing minimap")))))
 
@@ -3619,7 +3647,6 @@
   (doseq [allyteam-id allyteam-ids]
     (let [allyteam-kw (keyword (str "allyteam" allyteam-id))]
       (swap! *state update-in [:by-server server-key]
-             ; TODO one swap
              (fn [state]
                (-> state
                    (update-in [:scripttags :game] dissoc allyteam-kw)
