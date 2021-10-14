@@ -744,3 +744,6 @@
                   client-data (-> state :by-server (get server-key) :client-data)]
               (message/send-message state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id)))
             nil))))))
+
+(defmethod handle "ENABLEALLUNITS" [_state-atom _server-key _m]
+  (log/info "Nothing to do for unit restrictions yet"))
