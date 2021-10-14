@@ -964,7 +964,10 @@
         spads-messages (->> host-ex-messages
                             (filter :spads))
         vote-messages (->> spads-messages
-                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
+                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled
+                                           :vote-cancelled-game-launch :vote-failed :vote-passed :vote-progress}
+                                         :spads-message-type
+                                         :spads))
                            (map
                              (fn [{:keys [spads] :as message}]
                                (let [{:keys [spads-message-type spads-parsed]} spads]
@@ -985,7 +988,7 @@
                                                                        :n n
                                                                        :nt nt
                                                                        :remaining remaining}))
-                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
+                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-cancelled-game-launch :vote-failed :vote-passed} spads-message-type) nil
                              :else prev)))
                        nil
                        (reverse vote-messages))]
@@ -1098,6 +1101,7 @@
                                             :vote-passed "mdi-phone-incoming:16:green"
                                             :vote-failed "mdi-phone-missed:16:red"
                                             :vote-cancelled "mdi-phone-minus:16:gold"
+                                            :vote-cancelled-game-launch "mdi-phone-minus:16:gold"
                                             :game-starting-cancel "mdi-phone-minus:16:gold"
                                             ; else
                                             "mdi-phone:16:white")}]

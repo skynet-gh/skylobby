@@ -44,6 +44,7 @@
    [:award #" (.*) award:\s+(.*)\s+\((.*)\)(.*)"]
    [:ally-team-won #"Ally team (.*) won! \((.*)\)"]
    [:won #"(.*) won!"]
+   [:vote-cancelled-game-launch #"Vote cancelled, launching game\.\.\."]
    [:game-launch #"Launching game\.\.\."]
    [:force-start #"Forcing game start by (.*)"]
    [:random-map #"Automatic random map rotation: next map is \"(.*)\""]
