@@ -118,6 +118,8 @@
       :-fx-base "#ffd700"}}
     "-chat"
     {
+     "-info"
+     {:-fx-fill "grey"}
      "-time"
      {:-fx-fill "grey"}
      "-username"

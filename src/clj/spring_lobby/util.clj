@@ -238,6 +238,13 @@
 (defn user-channel [username]
   (str "@" username))
 
+(defn visible-channel [{:keys [by-server selected-tab-channel selected-tab-main]} server-key]
+  (let [main-tab (get selected-tab-main server-key)]
+    (if (= "battle" main-tab)
+      (when-let [battle-id (get-in by-server [server-key :battle :battle-id])]
+        (battle-channel-name battle-id))
+      (get selected-tab-channel server-key))))
+
 
 (defn postprocess-byar-units-en [language-units-en]
   (->> language-units-en

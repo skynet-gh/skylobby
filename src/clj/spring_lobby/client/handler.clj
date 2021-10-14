@@ -747,3 +747,13 @@
 
 (defmethod handle "ENABLEALLUNITS" [_state-atom _server-key _m]
   (log/info "Nothing to do for unit restrictions yet"))
+
+(defmethod handle "SERVERMSG" [state-atom server-key m]
+  (when-let [[_all message] (re-find #"[^\s]+\s+(.*)" m)]
+    (when (string/starts-with? message "Ingame time:")
+      (swap! state-atom
+        (fn [state]
+          (let [channel-name (u/visible-channel state server-key)]
+            (update-in state [:by-server server-key :channels channel-name :messages] conj {:text (str message)
+                                                                                            :timestamp (u/curr-millis)
+                                                                                            :message-type :info})))))))

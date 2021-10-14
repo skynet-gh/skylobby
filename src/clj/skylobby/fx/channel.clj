@@ -74,9 +74,12 @@
                       :ex (str "* " username " " text)
                       :join (str username " has joined")
                       :leave (str username " has left")
+                      :info (str "* " text)
                       ; else
                       (str username ": ")))
-                  ["text" (str "skylobby-chat-username" (when message-type (str "-" (name message-type))))])]
+                  ["text" (if (= :info message-type)
+                            "skylobby-chat-info"
+                            (str "skylobby-chat-username" (when message-type (str "-" (name message-type)))))])]
                (when-not message-type
                  (map
                    (fn [[_all _ _irc-color-code text-segment]]

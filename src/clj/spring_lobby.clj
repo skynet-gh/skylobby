@@ -3559,13 +3559,27 @@
   @(event-handler (assoc task :event/type ::ring-specs)))
 
 
+(defn set-ignore
+  ([server-key username ignore]
+   (set-ignore server-key username ignore nil))
+  ([server-key username ignore {:keys [channel-name]}]
+   (swap! *state
+     (fn [state]
+       (let [channel-name (or channel-name
+                              (u/visible-channel state server-key))]
+         (-> state
+             (assoc-in [:ignore-users server-key username] ignore)
+             (update-in [:by-server server-key :channels channel-name :messages] conj {:text (str (if ignore "Ignored " "Unignored ") username)
+                                                                                       :timestamp (u/curr-millis)
+                                                                                       :message-type :info})))))))
+
 (defmethod event-handler ::ignore-user
-  [{:keys [server-key username]}]
-  (swap! *state assoc-in [:ignore-users server-key username] true))
+  [{:keys [channel-name server-key username]}]
+  (set-ignore server-key username true {:channel-name channel-name}))
 
 (defmethod event-handler ::unignore-user
-  [{:keys [server-key username]}]
-  (swap! *state assoc-in [:ignore-users server-key username] false))
+  [{:keys [channel-name server-key username]}]
+  (set-ignore server-key username false {:channel-name channel-name}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -4415,6 +4429,12 @@
         :else
         (cond
           (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
+          (re-find #"^/ignore" message)
+          (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
+            (set-ignore server-key username true {:channel-name channel-name}))
+          (re-find #"^/unignore" message)
+          (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
+            (set-ignore server-key username false {:channel-name channel-name}))
           (re-find #"^/msg" message)
           (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
             @(event-handler
@@ -4424,7 +4444,10 @@
                   :message message})))
           (re-find #"^/rename" message)
           (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
-            (message/send-message *state client-data (str "RENAMEACCOUNT " new-username)))
+           (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
+                                                                                                  :timestamp (u/curr-millis)
+                                                                                                  :message-type :info}
+            (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
           :else
           (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                 unified (-> client-data :compflags (contains? "u"))]
