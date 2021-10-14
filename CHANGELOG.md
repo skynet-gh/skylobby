@@ -24,7 +24,22 @@ Future Features:
 
 ## Actual changelog
 
-### [0.6.14
+### [0.6.15]
+
+- Add info messages in chat for slash commands
+- Add /ignore and /unignore slash commands
+- Add promote to discord for BA battles
+- Fix tooltips stealing window focus
+- Fix resource issues with EvoRTS
+- Improve sorting of battle players table
+- Add x button to clear map boxes
+- Add flags for players on battle hover
+- Ignore now works on relayed ingame messages too
+- Add threshold for minimum map box sizes
+- Fix local spectate change not immediately set in state
+- Add spads message for vote cancel game launch
+
+### [0.6.14]
 
 - Rework replays to save memory and startup time
 - Replays will be migrated to new format on first Refresh
