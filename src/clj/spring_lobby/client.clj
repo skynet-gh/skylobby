@@ -197,22 +197,22 @@
 (defn print-loop
   [state-atom server-key client]
   (let [print-loop (future
-                     (try
-                       (log/info "print loop thread started")
-                       (let [pd (tufte/new-pdata {:dynamic? true})
-                             chimer
-                             (chime/chime-at
-                               (chime/periodic-seq
-                                 (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
-                                 (java-time/duration 1 :minutes))
-                               (fn [_chimestamp]
-                                 (if-let [m @@pd]
-                                   (log/info (str "Profiler stats for " server-key ":\n" (tufte/format-pstats m)))
-                                   (log/warn "No profiler stats to print for" server-key)))
-                               {:error-handler
-                                (fn [e]
-                                  (log/error e "Error in profiler print")
-                                  true)})]
+                     (let [pd (tufte/new-pdata {:dynamic? true})
+                           chimer
+                           (chime/chime-at
+                             (chime/periodic-seq
+                               (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+                               (java-time/duration 1 :minutes))
+                             (fn [_chimestamp]
+                               (if-let [m @@pd]
+                                 (log/info (str "Profiler stats for " server-key ":\n" (tufte/format-pstats m)))
+                                 (log/warn "No profiler stats to print for" server-key)))
+                             {:error-handler
+                              (fn [e]
+                                (log/error e "Error in profiler print")
+                                true)})]
+                       (try
+                         (log/info "print loop thread started")
                          (loop []
                            (when-let [d (s/take! client)]
                              (when-let [m @d]
@@ -234,10 +234,11 @@
                                    (throw t)))
                                (when-not (Thread/interrupted)
                                  (recur)))))
-                         (chimer))
-                       (log/info "print loop ended")
-                       (catch Exception e
-                         (log/error e "Error in print loop"))))]
+                         (log/info "print loop ended")
+                         (catch Exception e
+                           (log/error e "Error in print loop"))
+                         (finally
+                           (chimer)))))]
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 (defn login
