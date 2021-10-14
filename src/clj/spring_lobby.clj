@@ -1159,21 +1159,20 @@
                                (fn [replay]
                                  (if (empty? filter-terms)
                                    true
-                                   (every?
-                                     (some-fn
-                                       (partial includes-term? (:replay-id replay))
-                                       (partial includes-term? (get replays-tags (:replay-id replay)))
-                                       (partial includes-term? (:replay-engine-version replay))
-                                       (partial includes-term? (:replay-mod-name replay))
-                                       (partial includes-term? (:replay-map-name replay))
-                                       (fn [term]
-                                         (let [players (concat
-                                                         (mapcat identity (:replay-allyteam-player-names replay))
-                                                         (when replays-filter-specs
-                                                           (:replay-spec-names replay)))]
-                                           (some #(includes-term? % term)
-                                                 (map fx.replay/sanitize-replay-filter players)))))
-                                     filter-terms))))
+                                   (let [players (concat
+                                                   (mapcat identity (:replay-allyteam-player-names replay))
+                                                   (when replays-filter-specs
+                                                     (:replay-spec-names replay)))
+                                         players (map fx.replay/sanitize-replay-filter players)]
+                                     (every?
+                                       (some-fn
+                                         (partial includes-term? (:replay-id replay))
+                                         (partial includes-term? (get replays-tags (:replay-id replay)))
+                                         (partial includes-term? (:replay-engine-version replay))
+                                         (partial includes-term? (:replay-mod-name replay))
+                                         (partial includes-term? (:replay-map-name replay))
+                                         (fn [term] (some #(includes-term? % term) players)))
+                                       filter-terms)))))
                              doall)
                 replays (if replays-window-dedupe
                           (:replays
