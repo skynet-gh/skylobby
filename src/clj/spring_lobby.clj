@@ -530,7 +530,6 @@
             by-server)))))
 
 
-
 (defn server-auto-resources [_old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
@@ -3763,7 +3762,7 @@
 
 
 (defmethod task-handler ::update-rapid
-  [{:keys [engine-version mod-name rapid-repo spring-isolation-dir] :as e}]
+  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as e}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
@@ -3775,22 +3774,18 @@
                          preferred-engine-details
                          (->> engines
                               (filter (comp fs/canonical-path :file))
-                              first))]
+                              first))
+        rapid-repo (or rapid-repo
+                       (resource/mod-repo-name mod-name))
+        rapid-id (or rapid-id
+                     (str rapid-repo ":test"))]
     (if (and engine-details (:file engine-details))
       (do
         (log/info "Initializing rapid by calling download")
         (deref
           (event-handler
             {:event/type ::rapid-download
-             :rapid-id
-             (or (when rapid-repo
-                   (str rapid-repo ":test"))
-                 (when mod-name
-                   (cond
-                     (string/includes? mod-name "Beyond All Reason") "byar:test"
-                     :else nil))
-                 "i18n:test")
-             ; TODO how else to init rapid without download...
+             :rapid-id rapid-id
              :engine-file (:file engine-details)
              :spring-isolation-dir spring-isolation-dir})))
       (log/warn "No engine details to do rapid init"))
@@ -3816,8 +3811,8 @@
                               reverse)
           _ (log/info "Found" (count rapid-versions) "rapid versions")
           rapid-data-by-hash (->> rapid-versions
-                              (map (juxt :hash identity))
-                              (into {}))
+                                  (map (juxt :hash identity))
+                                  (into {}))
           rapid-data-by-id (->> rapid-versions
                                 (map (juxt :id identity))
                                 (into {}))
@@ -3833,7 +3828,13 @@
               (update :rapid-data-by-id merge rapid-data-by-id)
               (update :rapid-data-by-version merge rapid-data-by-version)
               (update :rapid-versions (fn [old-versions]
-                                        (set (concat old-versions rapid-versions))))
+                                        (set
+                                          (vals
+                                            (merge
+                                              (into {}
+                                                (map (juxt :id identity) old-versions))
+                                              (into {}
+                                                (map (juxt :id identity) rapid-versions)))))))
               (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
     (add-task! *state
