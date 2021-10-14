@@ -841,13 +841,11 @@
             new-replay (or (get parsed-replays-by-path new-replay-path)
                            (get online-bar-replays selected-replay-id))
 
-            old-game (-> old-replay :body :script-data :game)
-            old-mod (:gametype old-game)
-            old-map (:mapname old-game)
+            old-mod (:replay-mod-name old-replay)
+            old-map (:replay-map-name old-replay)
 
-            new-game (-> new-replay :body :script-data :game)
-            new-mod (:gametype new-game)
-            new-map (:mapname new-game)
+            new-mod (:replay-mod-name new-replay)
+            new-map (:replay-map-name new-replay)
 
             spring-root-path (fs/canonical-path spring-isolation-dir)
 
@@ -1017,7 +1015,7 @@
             (when (and selected-replay-id (not selected-replay-file))
               (when-let [local (->> parsed-replays-by-path
                                     vals
-                                    (filter (comp #{selected-replay-id} :game-id :header))
+                                    (filter (comp #{selected-replay-id} :replay-id))
                                     first
                                     :file)]
                 (log/info "Fixing selected replay from" selected-replay-id "to" local)
@@ -1143,17 +1141,17 @@
                              (filter
                                (fn [replay]
                                  (if filter-replay-min-players
-                                   (<= filter-replay-min-players (fx.replay/replay-player-count replay))
+                                   (<= filter-replay-min-players (:replay-player-count replay))
                                    true)))
                              (filter
                                (fn [replay]
                                  (if filter-replay-max-players
-                                   (<= (fx.replay/replay-player-count replay) filter-replay-max-players)
+                                   (<= (:replay-player-count replay) filter-replay-max-players)
                                    true)))
                              (filter
                                (fn [replay]
                                  (if filter-replay-min-skill
-                                   (if-let [avg (fx.replay/average-skill (fx.replay/replay-skills replay))]
+                                   (if-let [avg (:replay-average-skill replay)]
                                      (<= filter-replay-min-skill avg)
                                      false)
                                    true)))
@@ -1163,30 +1161,25 @@
                                    true
                                    (every?
                                      (some-fn
-                                       (partial includes-term? (fx.replay/replay-id replay))
-                                       (partial includes-term? (get replays-tags (fx.replay/replay-id replay)))
-                                       (partial includes-term? (-> replay :header :engine-version))
-                                       (partial includes-term? (-> replay :body :script-data :game :gametype))
-                                       (partial includes-term? (-> replay :body :script-data :game :mapname))
+                                       (partial includes-term? (:replay-id replay))
+                                       (partial includes-term? (get replays-tags (:replay-id replay)))
+                                       (partial includes-term? (:replay-engine-version replay))
+                                       (partial includes-term? (:replay-mod-name replay))
+                                       (partial includes-term? (:replay-map-name replay))
                                        (fn [term]
-                                         (let [players (some->> replay :body :script-data :game
-                                                                (filter (comp #(string/starts-with? % "player") name first))
-                                                                (filter
-                                                                  (if replays-filter-specs
-                                                                    (constantly true)
-                                                                    (some-fn
-                                                                      (comp #{0 "0"} :spectator second)
-                                                                      (comp not #(contains? % :spectator) second))))
-                                                                (map (comp #(some % [:name :username]) second))
-                                                                (map fx.replay/sanitize-replay-filter))]
-                                           (some #(includes-term? % term) players))))
+                                         (let [players (concat
+                                                         (mapcat identity (:replay-allyteam-player-names replay))
+                                                         (when replays-filter-specs
+                                                           (:replay-spec-names replay)))]
+                                           (some #(includes-term? % term)
+                                                 (map fx.replay/sanitize-replay-filter players)))))
                                      filter-terms))))
                              doall)
                 replays (if replays-window-dedupe
                           (:replays
                             (reduce ; dedupe by id
                               (fn [agg curr]
-                                (let [id (fx.replay/replay-id curr)]
+                                (let [id (:replay-id curr)]
                                   (cond
                                     (not id)
                                     (update agg :replays conj curr)
@@ -1199,7 +1192,7 @@
                                :seen-ids #{}}
                               replays))
                           replays)]
-            (swap! *state assoc :filtered-replays replays)
+            (swap! *state assoc :filtered-replays (doall replays))
             (log/info "Filtered replays in" (- (u/curr-millis) before) "ms"))
           (catch Exception e
             (log/error e "Error in :filter-replays state watcher")))
@@ -1350,13 +1343,26 @@
      (fn [] (.close chimer)))))
 
 
-(defn- valid-replay-fn [all-paths-set]
+(defn- old-valid-replay-fn [all-paths-set]
   (fn [[path replay]]
     (and
       (contains? all-paths-set path) ; remove missing files
       (-> replay :header :game-id) ; re-parse if no game id
       (not (-> replay :file-size zero?)) ; remove empty files
       (not (-> replay :game-type #{:invalid}))))) ; remove invalid
+
+(defn- valid-replay-fn [all-paths-set]
+  (fn [[path replay]]
+    (and
+      (contains? all-paths-set path) ; remove missing files
+      (:replay-id replay) ; re-parse if no replay id
+      (not (-> replay :file-size zero?)) ; remove empty files
+      (not (-> replay :game-type #{:invalid}))))) ; remove invalid
+
+(defn migrate-replay [replay]
+  (merge
+    (select-keys replay [:file :filename :file-size :source-name])
+    (replay/replay-metadata replay)))
 
 (defn- refresh-replays
   [state-atom]
@@ -1386,7 +1392,8 @@
                                    {:source-name source})]))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
-    (let [valid-replay? (valid-replay-fn all-paths)
+    (let [old-valid-replay? (old-valid-replay-fn all-paths)
+          valid-replay? (valid-replay-fn all-paths)
           new-state (swap! state-atom
                       (fn [state]
                         (let [old-replays (:parsed-replays-by-path state)
@@ -1395,15 +1402,24 @@
                               valid-replays (->> all-replays
                                                  (filter valid-replay?)
                                                  (into {}))
-                              valid-replay-paths (set (keys valid-replays))
+                              migratable-replays (->> all-replays
+                                                      (remove valid-replay?)
+                                                      (filter old-valid-replay?))
+                              _ (log/info "Migrating" (count migratable-replays) "replays")
+                              migrated-replays (->> migratable-replays
+                                                    (map (fn [[path replay]] [path (migrate-replay replay)]))
+                                                    (into {}))
+                              _ (log/info "Migrated" (count migratable-replays) "replays")
+                              replays-by-path (merge valid-replays migrated-replays)
+                              valid-replay-paths (set (concat (keys replays-by-path)))
                               invalid-replay-paths (->> all-replays
-                                                        (remove valid-replay?)
+                                                        (remove (some-fn old-valid-replay? valid-replay?))
                                                         keys
                                                         (concat (:invalid-replay-paths state))
                                                         (remove valid-replay-paths)
                                                         set)]
                           (assoc state
-                                 :parsed-replays-by-path valid-replays
+                                 :parsed-replays-by-path replays-by-path
                                  :invalid-replay-paths invalid-replay-paths))))
           invalid-replay-paths (set (:invalid-replay-paths new-state))
           valid-next-round (remove
@@ -2389,7 +2405,7 @@
       (if (and replay-file (fs/exists? replay-file))
         (do
           (log/info "Updating replay details for" replay-file)
-          (let [replay-details (replay/parse-replay replay-file {:parse-stream true})]
+          (let [replay-details (replay/parse-replay replay-file {:details true :parse-stream true})]
             (log/info "Got replay details for" replay-file (keys replay-details))
             (swap! *state update :replay-details cache/miss cache-key replay-details)))
         (do
@@ -4339,13 +4355,17 @@
                         (map (fn [{:keys [playerId] :as spec}]
                                [(str "player" playerId)
                                 {:username (:name spec)
-                                 :spectator 1}])))]
-    (-> replay
-        (assoc :source-name "BAR Online")
-        (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
-        (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
-        (assoc :player-counts player-counts)
-        (assoc :game-type (u/game-type player-counts)))))
+                                 :spectator 1}])))
+        r
+        (-> replay
+            (assoc :source-name "BAR Online")
+            (assoc :body {:script-data {:game (into {} (concat (:hostSettings replay) players teams spectators))}})
+            (assoc :header {:unix-time (quot (inst-ms (java-time/instant (:startTime replay))) 1000)})
+            (assoc :player-counts player-counts)
+            (assoc :game-type (u/game-type player-counts)))]
+    (merge
+      r
+      {:replay-map-name (-> r :Map :scriptName)})))
 
 (defmethod task-handler ::download-bar-replays [{:keys [page]}]
   (let [new-bar-replays (->> (http/get-bar-replays {:page page})
@@ -4354,7 +4374,7 @@
     (let [[before after] (swap-vals! *state
                            (fn [state]
                              (-> state
-                                 (assoc :bar-replays-page ((fnil inc 0) (int (u/to-number page))))
+                                 (assoc :bar-replays-page ((fnil inc 0) ((fnil int 0) (u/to-number page))))
                                  (update :online-bar-replays
                                    (fn [online-bar-replays]
                                      (u/deep-merge
@@ -4677,8 +4697,8 @@
            (add-task! state-atom {::task-type ::refresh-mods})
            (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-maps})
-           (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-replays})
+           ;(async/<!! (async/timeout wait-init-tasks-ms))
+           ;(add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::update-rapid})
            (async/<!! (async/timeout wait-init-tasks-ms))

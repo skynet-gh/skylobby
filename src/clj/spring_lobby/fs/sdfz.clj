@@ -159,7 +159,36 @@
                        nil))))))))))
 
 
-(defn- replay-type-and-players [parsed-replay]
+(defn replay-player-count
+  [player-counts]
+  (reduce (fnil + 0) 0 player-counts))
+
+(defn replay-skills
+  [{:keys [body]}]
+  (let [skills (some->> body :script-data :game
+                        (filter (comp #(string/starts-with? % "player") name first))
+                        (filter (comp #{0 "0"} :spectator second))
+                        (map (comp :skill second))
+                        (map u/parse-skill)
+                        (filter some?))]
+    skills))
+
+(defn average-skill [coll]
+  (when (seq coll)
+    (with-precision 3
+      (/ (bigdec (reduce + coll))
+         (bigdec (count coll))))))
+
+(def replay-id
+  (some-fn :id (comp :game-id :header)))
+
+(defn spec-names [replay]
+  (some->> replay :body :script-data :game
+           (filter (comp #(string/starts-with? % "player") name first))
+           (map (comp str #(some % [:name :username]) second))
+           (remove (comp #{0 "0"} :spectator second))))
+
+(defn replay-metadata [parsed-replay]
   (let [teams (->> parsed-replay
                    :body
                    :script-data
@@ -167,14 +196,46 @@
                    (filter (comp #(string/starts-with? % "team") name first)))
         teams-by-allyteam (->> teams
                                (group-by (comp keyword (partial str "allyteam") :allyteam second)))
-        allyteam-counts (sort (map (comp count second) teams-by-allyteam))]
+        players-by-team (->> parsed-replay
+                             :body
+                             :script-data
+                             :game
+                             (filter (comp (some-fn #(string/starts-with? % "player")
+                                                    #(string/starts-with? % "ai"))
+                                           name first))
+                             (filter
+                               (some-fn
+                                 (comp #{0 "0"} :spectator second)
+                                 (comp not #(contains? % :spectator) second)))
+                             (map (juxt (comp keyword #(str "team" %) :team second) (comp str #(some % [:name :username]) second)))
+                             (into {}))
+        allyteam-counts (sort (map (comp count second) teams-by-allyteam))
+        allyteam-players (map
+                           (fn [[_allyteam teams]]
+                             (map
+                               (comp players-by-team first)
+                               teams))
+                           teams-by-allyteam)
+        skills (replay-skills parsed-replay)]
     {:game-type (u/game-type allyteam-counts)
-     :player-counts allyteam-counts}))
+     :player-counts allyteam-counts
+     :replay-player-count (replay-player-count allyteam-counts)
+     :replay-skills skills
+     :replay-average-skill (average-skill skills)
+     :replay-id (replay-id parsed-replay)
+     :replay-allyteam-player-names allyteam-players
+     :replay-spec-names (spec-names parsed-replay)
+     :replay-engine-version (-> parsed-replay :header :engine-version)
+     :replay-mod-name (-> parsed-replay :body :script-data :game :gametype)
+     :replay-map-name (-> parsed-replay :body :script-data :game :mapname)
+     :replay-unix-time-str (some-> parsed-replay :header :unix-time str)
+     :replay-timestamp (some-> parsed-replay :header :unix-time (* 1000))
+     :replay-game-time (-> parsed-replay :header :game-time)}))
 
 (defn parse-replay
   ([^java.io.File f]
    (parse-replay f nil))
-  ([^java.io.File f opts]
+  ([^java.io.File f {:keys [details] :as opts}]
    (let [replay (try
                   (decode-replay f opts)
                   (catch Exception e
@@ -183,5 +244,5 @@
        {:file f
         :filename (fs/filename f)
         :file-size (fs/size f)}
-       replay
-       (replay-type-and-players replay)))))
+       (when details replay)
+       (replay-metadata replay)))))
