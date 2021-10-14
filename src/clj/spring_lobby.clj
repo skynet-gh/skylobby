@@ -3655,22 +3655,25 @@
 
 (defmethod event-handler ::battle-spectate-change
   [{:keys [client-data id is-me is-bot ready-on-unspec] :fx/keys [event] :as data}]
-  (future
-    (try
-      (if (or is-me is-bot)
-        (let [mode (if (contains? data :value)
-                     (:value data)
-                     (not event))
-              battle-status (assoc (:battle-status id) :mode mode)
-              battle-status (if (and (not is-bot) (:mode battle-status))
-                              (do
-                                (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
-                                (assoc battle-status :ready (boolean ready-on-unspec)))
-                              battle-status)]
-          (update-battle-status client-data data battle-status (:team-color id)))
-        (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
-      (catch Exception e
-        (log/error e "Error updating battle spectate")))))
+  (let [mode (if (contains? data :value)
+               (:value data)
+               (not event))]
+    (when-not is-bot
+      (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :users (:username id) :battle-status :mode] mode))
+    (future
+      (try
+        (if (or is-me is-bot)
+          (let [
+                battle-status (assoc (:battle-status id) :mode mode)
+                battle-status (if (and (not is-bot) (:mode battle-status))
+                                (do
+                                  (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
+                                  (assoc battle-status :ready (boolean ready-on-unspec)))
+                                battle-status)]
+            (update-battle-status client-data data battle-status (:team-color id)))
+          (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
+        (catch Exception e
+          (log/error e "Error updating battle spectate"))))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
   (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
