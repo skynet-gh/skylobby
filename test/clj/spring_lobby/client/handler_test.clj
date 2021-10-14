@@ -376,8 +376,8 @@
                          {:battle
                           {:battle-id :battle1
                            :users
-                           {me
-                            {:battle-status {:mode true}}}}
+                           {me {:battle-status {:mode true}}
+                            host {}}}
                           :battles
                           {:battle1
                            {:host-username host}}
@@ -398,13 +398,14 @@
                 {:battle-id :battle1
                  :users
                  {me
-                  {:battle-status {:mode true}}}}
+                  {:battle-status {:mode true}}
+                  host {}}}
                 :battles
                 {:battle1
                  {:host-username host}}
                 :username me
                 :users
-                {"skynet"
+                {host
                  {:client-status
                   {:access false
                    :away false

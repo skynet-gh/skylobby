@@ -111,25 +111,28 @@
                                          (assoc :game-start-time now)
                                          (and (not (:away user-data)) (:away decoded-status))
                                          (assoc :away-start-time now)))))
-        {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))
-        prev-status (-> users (get username) :client-status)
-        my-username (:username server-data)
-        my-status (-> users (get my-username) :client-status)
-        battle-detail (-> battles (get (:battle-id battle)))
-        my-battle-status (-> battle :users (get my-username) :battle-status)
-        am-spec (not (:mode my-battle-status))]
-    (log/debug "CLIENTSTATUS" username decoded-status)
-    (cond
-      (not (:ingame decoded-status)) (log/debug "Not in game")
-      (= (:ingame prev-status) (:ingame decoded-status)) (log/debug "Not a game status change")
-      (= username my-username) (log/debug "Ignoring own game start")
-      (:ingame my-status) (log/debug "Already in game")
-      (not battle) (log/debug "Not in a battle")
-      (not= (:host-username battle-detail) username) (log/debug "Not the host game start")
-      (and (not auto-launch) am-spec)
-      (log/info "Not auto starting game" (pr-str {:spec am-spec :auto-launch auto-launch}))
-      :else
-      (start-game-if-synced state-atom prev-state server-data))))
+        {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
+    (if-not (= (get-in battles [(:battle-id battle) :host-username]) username)
+      (log/debug "Short circuiting CLIENTSTATUS handler since not battle host")
+      (if-not (contains? (:users battle) username)
+        (log/debug "Short circuiting CLIENTSTATUS handler since user not in battle")
+        (let [
+              prev-status (-> users (get username) :client-status)
+              my-username (:username server-data)
+              my-status (-> users (get my-username) :client-status)
+              my-battle-status (-> battle :users (get my-username) :battle-status)
+              am-spec (not (:mode my-battle-status))]
+          (log/debug "CLIENTSTATUS" username decoded-status)
+          (cond
+            (not battle) (log/debug "Not in a battle")
+            (not (:ingame decoded-status)) (log/debug "Not in game")
+            (= (:ingame prev-status) (:ingame decoded-status)) (log/debug "Not a game status change")
+            (= username my-username) (log/debug "Ignoring own game start")
+            (:ingame my-status) (log/debug "Already in game")
+            (and (not auto-launch) am-spec)
+            (log/info "Not auto starting game" (pr-str {:spec am-spec :auto-launch auto-launch}))
+            :else
+            (start-game-if-synced state-atom prev-state server-data)))))))
 
 (defn do-auto-unspec [state-atom client-data me]
   (try
@@ -148,12 +151,12 @@
       (log/warn e "Error auto unspeccing"))))
 
 
-(defmethod handle "CLIENTBATTLESTATUS" [state-atom server-url m]
+(defmethod handle "CLIENTBATTLESTATUS" [state-atom server-key m]
   (let [[_all username battle-status team-color] (re-find #"\w+ ([^\s]+) (\w+) (\w+)" m)
         decoded (cu/decode-battle-status battle-status)]
     (log/info "Updating status of" username "to" decoded "with color" team-color)
     (let [[prev curr]
-          (swap-vals! state-atom update-in [:by-server server-url]
+          (swap-vals! state-atom update-in [:by-server server-key]
             (fn [server]
               (if (:battle server)
                 (-> server
@@ -164,15 +167,17 @@
                 (do
                   (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
                   server))))
-          {:keys [auto-unspec battle client-data] :as server-data} (-> prev :by-server (get server-url))
-          my-username (:username server-data)
-          me (-> battle :users (get my-username))]
-      (when (and auto-unspec
-                 (-> me :battle-status :mode not)
-                 (not= username my-username)
-                 (-> battle :users (get username) :battle-status :mode)
-                 (-> curr :by-server (get server-url) :battle :users (get username) :battle-status :mode not))
-        (do-auto-unspec state-atom client-data me)))))
+          {:keys [auto-unspec battle client-data] :as server-data} (get-in prev [:by-server server-key])]
+      (if-not auto-unspec
+        (log/debug "Short circuiting CLIENTBATTLESTATUS handler since not auto unspeccing")
+        (if-not (get-in battle [:users username :battle-status :mode])
+          (log/debug "Short circuiting CLIENTBATTLESTATUS handler since user was not playing")
+          (let [my-username (:username server-data)
+                me (get-in battle [:users my-username])]
+            (when (and (not= username my-username)
+                       (not (get-in me [:battle-status :mode]))
+                       (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
+              (do-auto-unspec state-atom client-data me))))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -508,29 +513,34 @@
 
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
-        {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
-        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                        spring-isolation-dir)
-        spring-root-path (fs/canonical-path spring-root)
-        spring (-> state :by-spring-root (get spring-root-path))
-        my-username (:username client-data)
-        {:keys [battle-status]} (-> battle :users (get my-username))
-        battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
-        battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
-        new-battle-status (assoc (or battle-status cu/default-battle-status)
-                            :id (battle/available-team-id battle)
-                            :ally 0
-                            :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
-                                      0)
-                            :sync (sync-number
-                                    (resource/sync-status server-data spring mod-details map-details)))
-        new-battle-status (if join-battle-as-player
-                            (assoc new-battle-status :mode true)
-                            new-battle-status)
-        color (or preferred-color (u/random-color))
-        msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
-    (message/send-message state-atom client-data msg)))
+  (future
+    (try
+      (log/info "Handling REQUESTBATTLESTATUS async")
+      (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
+            {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
+            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                            spring-isolation-dir)
+            spring-root-path (fs/canonical-path spring-root)
+            spring (-> state :by-spring-root (get spring-root-path))
+            my-username (:username client-data)
+            {:keys [battle-status]} (-> battle :users (get my-username))
+            battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
+            battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
+            new-battle-status (assoc (or battle-status cu/default-battle-status)
+                                :id (battle/available-team-id battle)
+                                :ally 0
+                                :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
+                                          0)
+                                :sync (sync-number
+                                        (resource/sync-status server-data spring mod-details map-details)))
+            new-battle-status (if join-battle-as-player
+                                (assoc new-battle-status :mode true)
+                                new-battle-status)
+            color (or preferred-color (u/random-color))
+            msg (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or color 0))]
+        (message/send-message state-atom client-data msg))
+      (catch Exception e
+        (log/error e "Error handling REQUESTBATTLESTATUS")))))
 
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
