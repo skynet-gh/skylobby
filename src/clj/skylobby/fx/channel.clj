@@ -5,6 +5,7 @@
     [skylobby.fx :refer [monospace-font-family]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
     [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
@@ -206,8 +207,8 @@
          [{:fx/type :button
            :text ""
            :tooltip
-           {:fx/type :tooltip
-            :show-delay [10 :ms]
+           {:fx/type tooltip-nofocus/lifecycle
+            :show-delay skylobby.fx/tooltip-show-delay
             :text
             (str
               (if mute-ring "Enable" "Disable")
@@ -222,8 +223,8 @@
        [{:fx/type :button
          :text ""
          :tooltip
-         {:fx/type :tooltip
-          :show-delay [10 :ms]
+         {:fx/type tooltip-nofocus/lifecycle
+          :show-delay skylobby.fx/tooltip-show-delay
           :text
           (str
             (if mute "Enable" "Disable")

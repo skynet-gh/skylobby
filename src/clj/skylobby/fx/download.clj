@@ -6,6 +6,7 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -165,15 +166,15 @@
                  {:fx/cell-type :list-cell
                   :describe download-source-cell}
                  :on-value-changed {:event/type :spring-lobby/download-source-change}
-                 :tooltip {:fx/type :tooltip
-                           :show-delay [10 :ms]
+                 :tooltip {:fx/type tooltip-nofocus/lifecycle
+                           :show-delay skylobby.fx/tooltip-show-delay
                            :text "Choose download source"}}]
                (when download-source
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear source filter"}}
                    :desc
                    {:fx/type :button
@@ -185,8 +186,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Open download source url"}}
                    :desc
                    {:fx/type :button
@@ -227,8 +228,8 @@
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear filter"}}
                    :desc
                    {:fx/type :button
@@ -249,15 +250,15 @@
                   :describe download-type-cell}
                  :on-value-changed {:event/type :spring-lobby/assoc
                                     :key :download-type}
-                 :tooltip {:fx/type :tooltip
-                           :show-delay [10 :ms]
+                 :tooltip {:fx/type tooltip-nofocus/lifecycle
+                           :show-delay skylobby.fx/tooltip-show-delay
                            :text "Choose download type"}}]
                (when download-type
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear type filter"}}
                    :desc
                    {:fx/type :button
@@ -325,8 +326,8 @@
                  (fn [download-url]
                    {:text (str download-url)
                     :tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :style {:-fx-font-size 18}
                      :text (str download-url)}})}}
                {:fx/type :table-column
@@ -354,8 +355,8 @@
                              (not (fs/file-exists? file-cache dest-path)))
                         {:fx/type :button
                          :tooltip
-                         {:fx/type :tooltip
-                          :show-delay [10 :ms]
+                         {:fx/type tooltip-nofocus/lifecycle
+                          :show-delay skylobby.fx/tooltip-show-delay
                           :text (str "Download to " dest-path)}
                          :on-action {:event/type :spring-lobby/add-task
                                      :task {:spring-lobby/task-type :spring-lobby/http-downloadable
@@ -374,8 +375,8 @@
                              (not (fs/file-exists? file-cache (fs/canonical-path extract-file))))
                         {:fx/type :button
                          :tooltip
-                         {:fx/type :tooltip
-                          :show-delay [10 :ms]
+                         {:fx/type tooltip-nofocus/lifecycle
+                          :show-delay skylobby.fx/tooltip-show-delay
                           :text (str "Extract to " extract-file)}
                          :on-action
                          {:event/type :spring-lobby/extract-7z

@@ -5,6 +5,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     skylobby.fx
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -88,8 +89,8 @@
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
+            {:fx/type tooltip-nofocus/lifecycle
+             :show-delay skylobby.fx/tooltip-show-delay
              :text "Open engine directory"}}
            :desc
            {:fx/type :button
@@ -101,8 +102,8 @@
           {:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
+            {:fx/type tooltip-nofocus/lifecycle
+             :show-delay skylobby.fx/tooltip-show-delay
              :text "Reload engines"}}
            :desc
            {:fx/type :button

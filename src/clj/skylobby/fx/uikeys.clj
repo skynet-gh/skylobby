@@ -5,6 +5,7 @@
     [clojure.string :as string]
     clojure.set
     [skylobby.fx :as skylobby.fx]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.spring.uikeys :as uikeys]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log]
@@ -168,8 +169,8 @@
                    {:text (str bind-comment)}
                    (when bind-comment
                      {:tooltip
-                      {:fx/type :tooltip
-                       :show-delay [10 :ms]
+                      {:fx/type tooltip-nofocus/lifecycle
+                       :show-delay skylobby.fx/tooltip-show-delay
                        :style {:-fx-font-size 15}
                        :text (str bind-comment)}})))}}
              {:fx/type :table-column

@@ -6,6 +6,7 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
@@ -125,8 +126,8 @@
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear rapid repo filter"}}
                    :desc
                    {:fx/type :button
@@ -146,8 +147,8 @@
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear filter"}}
                    :desc
                    {:fx/type :button
@@ -239,8 +240,8 @@
               {:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
-                {:fx/type :tooltip
-                 :show-delay [10 :ms]
+                {:fx/type tooltip-nofocus/lifecycle
+                 :show-delay skylobby.fx/tooltip-show-delay
                  :text "Open rapid packages directory"}}
                :desc
                {:fx/type :button

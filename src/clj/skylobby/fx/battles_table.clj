@@ -7,6 +7,7 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -62,9 +63,9 @@
                         :selected-battle selected-battle
                         :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
                        :tooltip
-                       {:fx/type :tooltip
+                       {:fx/type tooltip-nofocus/lifecycle
                         :style {:-fx-font-size 16}
-                        :show-delay [10 :ms]
+                        :show-delay skylobby.fx/tooltip-show-delay
                         :text (str battle-title "\n\n"
                                    "Map: " battle-map "\n"
                                    "Game: " battle-modname "\n"

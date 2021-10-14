@@ -14,6 +14,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def tooltip-show-delay [50 :ms])
+
+
 (def divider-positions
   (atom {}))
 (def window-states

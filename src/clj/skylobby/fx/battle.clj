@@ -7,7 +7,6 @@
     java-time
     [skylobby.discord :as discord]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.sub :as sub]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
@@ -18,7 +17,9 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -98,8 +99,8 @@
              {:fx/type fx.ext.node/with-tooltip-props
               :props
               {:tooltip
-               {:fx/type :tooltip
-                :show-delay [10 :ms]
+               {:fx/type tooltip-nofocus/lifecycle
+                :show-delay skylobby.fx/tooltip-show-delay
                 :text (str (:name i) "\n\n" (:desc i))}}
               :desc
               (merge
@@ -127,8 +128,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :check-box
@@ -150,8 +151,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :text-field
@@ -176,8 +177,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :combo-box
@@ -540,8 +541,8 @@
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
+              {:fx/type tooltip-nofocus/lifecycle
+               :show-delay skylobby.fx/tooltip-show-delay
                :style {:-fx-font-size 12}
                :text (cond
                        am-host "You are the host, start the game"
