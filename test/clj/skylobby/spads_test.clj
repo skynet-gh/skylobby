@@ -49,3 +49,8 @@
   (is (= {:command "vote y"
           :vote :y}
          (spads/parse-command-message "!vote y"))))
+
+
+(deftest parse-relay-message
+  (is (= {:on-behalf-of "skynet"}
+         (spads/parse-relay-message "<skynet> test"))))

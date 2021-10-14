@@ -298,7 +298,8 @@
                      :username username
                      :message-type (when ex :ex)
                      :spads (when ex (spads/parse-spads-message message))
-                     :vote (when-not ex (spads/parse-command-message message))}))))
+                     :vote (when-not ex (spads/parse-command-message message))
+                     :relay (when-not ex (spads/parse-relay-message message))}))))
 
 (defn parse-skill [skill]
   (cond

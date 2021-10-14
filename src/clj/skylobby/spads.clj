@@ -84,3 +84,10 @@
                      :else nil)]
           {:command command
            :vote vote})))))
+
+(defn parse-relay-message [text]
+  (when text
+    (let [trimmed (string/trim text)]
+      (when (string/starts-with? trimmed "<")
+        (let [[_all username] (re-find #"<([^\s]+)>" trimmed)]
+          {:on-behalf-of username})))))

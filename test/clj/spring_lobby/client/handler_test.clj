@@ -273,7 +273,8 @@
                                            "skynet"
                                            "team"],
                             :text "* Hi skynet! Current battle type is team."}
-                    :vote nil}]}}}}
+                    :vote nil
+                    :relay nil}]}}}}
               :needs-focus {:server1 {"battle" {:battle true}}}}
              @state-atom))))
   (testing "auto unspec"
@@ -323,7 +324,8 @@
                                                       :timestamp now
                                                       :username "host1"
                                                       :spads nil
-                                                      :vote nil}]}}
+                                                      :vote nil
+                                                      :relay nil}]}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}
               :needs-focus {:server1 {"battle" {:battle true}}}}
@@ -348,7 +350,8 @@
                   :timestamp now
                   :username "user:springrts.com"
                   :spads nil
-                  :vote nil}]}}}}}
+                  :vote nil
+                  :relay nil}]}}}}}
            @state-atom))))
 
 (deftest handle-CLIENTSFROM
@@ -674,7 +677,8 @@
                                                       :timestamp now
                                                       :username "host1"
                                                       :spads nil
-                                                      :vote nil}]}}
+                                                      :vote nil
+                                                      :relay nil}]}}
                 :my-channels {"__battle__0" {}}
                 :username "skynet"
                 :client-data {:compflags #{"u"}}}}

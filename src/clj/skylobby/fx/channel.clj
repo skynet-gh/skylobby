@@ -141,6 +141,7 @@
         [
          (->> messages
               (remove (comp ignore-users-set :username))
+              (remove (comp ignore-users-set :on-behalf-of :relay))
               (remove (comp hide-spads-set :spads-message-type :spads))
               (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
               (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
