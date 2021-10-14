@@ -447,6 +447,9 @@
 (defn base64-encode [bs]
   (.encodeToString (Base64/getEncoder) bs))
 
+(defn base64-decode [to-decode]
+  (String. (.decode (Base64/getDecoder) to-decode)))
+
 ; https://gist.github.com/jizhang/4325757
 (defn md5-bytes [^String s]
   (let [algorithm (MessageDigest/getInstance "MD5")]

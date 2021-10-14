@@ -21,6 +21,7 @@
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
+    [skylobby.discord :as discord]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.download :as fx.download]
@@ -4467,6 +4468,21 @@
                   (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
+
+
+(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted]}]
+  (let [now (u/curr-millis)]
+    (if (or (not discord-promoted)
+            (< (- now discord-promoted) discord/cooldown))
+      (do
+        (swap! *state assoc-in [:discord-promoted discord-channel] now)
+        (future
+          (try
+            (discord/promote-battle discord-channel data)
+            (catch Exception e
+              (log/error e "Error promoting battle in Discord to" discord-channel)))))
+      (log/info "Too soon to promote to discord" discord-channel))))
+
 
 (defmethod event-handler ::on-channel-key-pressed [{:fx/keys [^KeyEvent event] :keys [channel-name server-key]}]
   (let [code (.getCode event)]
