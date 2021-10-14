@@ -22,21 +22,21 @@
    #"Tech Annihilation"])
 
 (def no-rapid
-  [#"Evolution RTS"
-   #"Total Atomization Prime"])
+  [#"Total Atomization Prime"])
 
 
 (defn mod-download-source [mod-name]
   (cond
     (string/blank? mod-name) nil
     (string/includes? mod-name "Total Atomization Prime") "TAP GitHub releases"
+    (string/includes? mod-name "Evolution RTS") "Evolution-RTS GitHub releases"
     (string/includes? mod-name "Balanced Annihilation") "Balanced Annihilation GitHub releases"
     :else nil))
 
 
 (defn- mod-sync-pane-impl
   [{:fx/keys [context]
-    :keys [battle-modname engine-version mod-name spring-isolation-dir]}]
+    :keys [dependency engine-version mod-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
         downloadables-by-url (fx/sub-val context :downloadables-by-url)
         file-cache (fx/sub-val context :file-cache)
@@ -46,10 +46,9 @@
         rapid-downloads-by-id (fx/sub-val context :rapid-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
-        mod-name (or mod-name battle-modname)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
-        no-mod-details (not (resource/details? mod-details))
+        no-mod-details (and (not dependency) (not (resource/details? mod-details)))
         refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
         mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
         update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
@@ -59,7 +58,7 @@
         rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
                                (map (juxt :rapid-id identity))
                                (into {}))
-        mod-file (:file mod-details)
+        mod-file (or (:file mod-details) (:file indexed-mod))
         engine-details (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version)
         engine-file (:file engine-details)
         canonical-path (fs/canonical-path mod-file)
@@ -79,8 +78,7 @@
        (let [severity (if no-mod-details
                         (if indexed-mod
                           -1 2)
-                        (if (= mod-name
-                               (:mod-name indexed-mod))
+                        (if (or dependency (= mod-name (:mod-name indexed-mod)))
                           0 1))]
          [{:severity severity
            :text "info"

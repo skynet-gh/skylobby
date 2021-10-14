@@ -1331,6 +1331,7 @@
                               (map
                                 (fn [{:keys [mod-name]}]
                                   {:fx/type mod-sync-pane
+                                   :dependency true
                                    :engine-version engine-version
                                    :mod-name mod-name
                                    :spring-isolation-dir spring-root})
