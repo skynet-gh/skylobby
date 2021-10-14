@@ -24,6 +24,16 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.14
+
+- Rework replays to save memory and startup time
+- Replays will be migrated to new format on first Refresh
+- Increase frequency of battle sync watchers
+- Add join/leave messages for dm channels
+- Display download progress during rapid update
+- Improve performance of some client message handlers
+- Change music to line up better with main window show
+
 ### [0.6.13]
 
 - Add launchers for different max memory sizes

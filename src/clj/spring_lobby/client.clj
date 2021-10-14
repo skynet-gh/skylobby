@@ -3,11 +3,13 @@
     aleph.netty
     [aleph.tcp :as tcp]
     [byte-streams]
+    [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.string :as string]
     [gloss.core :as gloss]
     [gloss.io :as gio]
+    java-time
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [spring-lobby.client.handler :as handler]
@@ -15,7 +17,8 @@
     spring-lobby.client.handler.tei
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
   (:import
     (io.netty.handler.ssl SslContextBuilder SslHandler)
     (io.netty.handler.ssl.util InsecureTrustManagerFactory)
@@ -194,25 +197,48 @@
 (defn print-loop
   [state-atom server-key client]
   (let [print-loop (future
-                     (try
-                       (log/info "print loop thread started")
-                       (loop []
-                         (when-let [d (s/take! client)]
-                           (when-let [m @d]
-                             (log/info (str "[" server-key "]") "<" (str "'" m "'"))
-                             (try
-                               (u/append-console-log state-atom server-key :server m)
-                               (handler state-atom server-key m)
-                               (catch Exception e
-                                 (log/error e "Error handling message" (str "'" m "'")))
-                               (catch Throwable t
-                                 (log/error t "Critical error handling message" (str "'" m "'"))
-                                 (throw t)))
-                             (when-not (Thread/interrupted)
-                               (recur)))))
-                       (log/info "print loop ended")
-                       (catch Exception e
-                         (log/error e "Error in print loop"))))]
+                     (let [pd (tufte/new-pdata {:dynamic? true})
+                           chimer
+                           (chime/chime-at
+                             (chime/periodic-seq
+                               (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+                               (java-time/duration 1 :minutes))
+                             (fn [_chimestamp]
+                               (if-let [m @@pd]
+                                 (log/info (str "Profiler stats for " server-key ":\n" (tufte/format-pstats m)))
+                                 (log/warn "No profiler stats to print for" server-key)))
+                             {:error-handler
+                              (fn [e]
+                                (log/error e "Error in profiler print")
+                                true)})]
+                       (try
+                         (log/info "print loop thread started")
+                         (loop []
+                           (when-let [d (s/take! client)]
+                             (when-let [m @d]
+                               (log/info (str "[" server-key "]") "<" (str "'" m "'"))
+                               (try
+                                 (u/append-console-log state-atom server-key :server m)
+                                 (let [t0 (System/nanoTime)
+                                       k (-> m
+                                             (string/split #"\s")
+                                             first)]
+                                   (tufte/with-profiling pd {:dynamic? true
+                                                             :id :skylobby/client}
+                                     (handler state-atom server-key m)
+                                     (tufte/capture-time! pd k (- (System/nanoTime) t0))))
+                                 (catch Exception e
+                                   (log/error e "Error handling message" (str "'" m "'")))
+                                 (catch Throwable t
+                                   (log/error t "Critical error handling message" (str "'" m "'"))
+                                   (throw t)))
+                               (when-not (Thread/interrupted)
+                                 (recur)))))
+                         (log/info "print loop ended")
+                         (catch Exception e
+                           (log/error e "Error in print loop"))
+                         (finally
+                           (chimer)))))]
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 (defn login
@@ -290,7 +316,7 @@
   (when-let [^SplicedStream client (:client client-data)]
     (log/info "Disconnecting client" (:server-key client-data))
     (if-not (s/closed? client)
-      (message/send-message state-atom client "EXIT")
+      (message/send-message state-atom client-data "EXIT")
       (log/warn "Client" server-key "was already closed"))
     (s/close! client)
     (log/info "Connection" server-key "closed?" (s/closed? client))))

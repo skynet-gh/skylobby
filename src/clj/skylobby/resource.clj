@@ -24,6 +24,13 @@
     ["Evolution RTS Music Addon v2"]
     nil))
 
+(defn mod-repo-name [mod-name]
+  (or (when mod-name
+        (cond
+          (string/includes? mod-name "Beyond All Reason") "byar"
+          :else nil))
+      "i18n"))
+
 
 (defn resource-dest
   [root {:keys [resource-filename resource-name resource-file resource-type]}]

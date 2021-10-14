@@ -50,29 +50,9 @@
     extra-replay-sources))
 
 
-(defn replay-player-count
-  [{:keys [player-counts]}]
-  (reduce (fnil + 0) 0 player-counts))
-
-(defn replay-skills
-  [{:keys [body]}]
-  (let [skills (some->> body :script-data :game
-                        (filter (comp #(string/starts-with? % "player") name first))
-                        (filter (comp #{0 "0"} :spectator second))
-                        (map (comp :skill second))
-                        (map u/parse-skill)
-                        (filter some?))]
-    skills))
-
 (defn- min-skill [coll]
   (when (seq coll)
     (reduce min Long/MAX_VALUE coll)))
-
-(defn average-skill [coll]
-  (when (seq coll)
-    (with-precision 3
-      (/ (bigdec (reduce + coll))
-         (bigdec (count coll))))))
 
 (defn- max-skill [coll]
   (when (seq coll)
@@ -161,13 +141,15 @@
         replay-minimap-type (fx/sub-val context :replay-minimap-type)
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
-        script-data (-> selected-replay :body :script-data)
-        {:keys [gametype mapname] :as game} (:game script-data)
-        selected-engine-version (-> selected-replay :header :engine-version)
+        selected-replay-details (or (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))
+                                    selected-replay)
+        script-data (-> selected-replay-details :body :script-data)
+        game (:game script-data)
+        selected-engine-version (:replay-engine-version selected-replay)
         selected-matching-engine (get engines-by-version selected-engine-version)
-        mod-name gametype
+        mod-name (:replay-mod-name selected-replay)
         selected-matching-mod (get mods-by-name mod-name)
-        map-name mapname
+        map-name (:replay-map-name selected-replay)
         selected-matching-map (get maps-by-name map-name)
         teams-by-id (->> game
                          (filter (comp #(string/starts-with? % "team") name first))
@@ -176,7 +158,7 @@
                              (let [[_all id] (re-find #"team(\d+)" (name teamid))]
                                [id team])))
                          (into {}))
-        indexed-mod (get mods-by-name gametype)
+        indexed-mod (get mods-by-name mod-name)
         replay-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         sides (spring/mod-sides replay-mod-details)
         players (->> game
@@ -229,9 +211,23 @@
                                   (filter :username)
                                   (filter :team-color)
                                   (filter (comp :mode :battle-status))
-                                  (map (juxt (comp string/trim :username) :team-color))
+                                  (map (juxt (comp string/trim str :username) :team-color))
                                   (into {}))
-        indexed-map (get maps-by-name mapname)
+        players-and-bots (or (seq players-and-bots)
+                             (concat
+                               (mapcat
+                                 (fn [[i players]]
+                                   (map
+                                     (fn [player]
+                                       {:username player
+                                        :battle-status
+                                        {:mode true
+                                         :ally i}})
+                                     players))
+                                 (map-indexed vector (:replay-allyteam-player-names selected-replay)))
+                               (map (fn [spec] {:username spec :battle-status {:mode false}})
+                                    (:replay-spec-names selected-replay))))
+        indexed-map (get maps-by-name map-name)
         replay-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         replay-id-downloads (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replay)
                                  (map :id)
@@ -274,13 +270,16 @@
         {:fx/type :v-box
          :children
          (concat
-           [{:fx/type fx.players-table/players-table
+           [{:fx/type ext-recreate-on-key-changed
              :v-box/vgrow :always
-             :am-host false
-             :mod-name gametype
-             :players players-and-bots
-             :sides sides
-             :singleplayer true}
+             :key (str (not= selected-replay selected-replay-details))
+             :desc
+             {:fx/type fx.players-table/players-table
+              :am-host false
+              :mod-name mod-name
+              :players players-and-bots
+              :sides sides
+              :singleplayer true}}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -317,8 +316,8 @@
          (concat
            (when show-sync-left
              [sync-pane])
-           (if-let [details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))]
-             (let [{:keys [chat-log player-num-to-name]} (-> details :body :demo-stream)]
+           (if (not= selected-replay selected-replay-details)
+             (let [{:keys [chat-log player-num-to-name]} (-> selected-replay-details :body :demo-stream)]
                [{:fx/type :label
                  :text "Chat log"
                  :style {:-fx-font-size 20}}
@@ -341,7 +340,7 @@
        (concat
          [
           {:fx/type fx.minimap/minimap-pane
-           :map-name mapname
+           :map-name map-name
            :server-key :local
            :minimap-type-key :replay-minimap-type
            :players players-and-bots
@@ -367,10 +366,6 @@
            [sync-pane]))}]}))
 
 
-(def replay-id
-  (some-fn :id (comp :game-id :header)))
-
-
 (def time-zone-id
   (.toZoneId (TimeZone/getDefault)))
 
@@ -384,6 +379,10 @@
         replay-imports-by-mod (fx/sub-val context :replay-imports-by-mod)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
         replays (fx/sub-val context :filtered-replays)
+        sorted-replays (->> replays
+                            (sort-by :replay-unix-time-str)
+                            reverse
+                            doall)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         copying (fx/sub-val context :copying)
@@ -433,7 +432,7 @@
       :key replays-window-details
       :desc
       {:fx/type ext-table-column-auto-size
-       :items replays
+       :items sorted-replays
        :desc
        {:fx/type :table-view
         :column-resize-policy :constrained
@@ -446,7 +445,7 @@
               :text "ID"
               :resizable true
               :pref-width 80
-              :cell-value-factory replay-id
+              :cell-value-factory :replay-id
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
@@ -477,7 +476,7 @@
             :text "Map"
             :resizable true
             :pref-width 200
-            :cell-value-factory #(-> % :body :script-data :game :mapname)
+            :cell-value-factory :replay-map-name
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -487,7 +486,7 @@
             :text "Game"
             :resizable true
             :pref-width 300
-            :cell-value-factory #(-> % :body :script-data :game :gametype)
+            :cell-value-factory :replay-mod-name
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -497,7 +496,7 @@
             :text "Timestamp"
             :resizable false
             :pref-width 160
-            :cell-value-factory #(some-> % :header :unix-time (* 1000))
+            :cell-value-factory :replay-timestamp
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -532,7 +531,7 @@
             :text "Skill Min"
             :resizable false
             :pref-width 80
-            :cell-value-factory (comp min-skill replay-skills)
+            :cell-value-factory (comp min-skill :replay-skills)
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -542,7 +541,7 @@
             :text "Skill Avg"
             :resizable false
             :pref-width 80
-            :cell-value-factory (comp average-skill replay-skills)
+            :cell-value-factory :replay-average-skill
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -552,7 +551,7 @@
             :text "Skill Max"
             :resizable false
             :pref-width 80
-            :cell-value-factory (comp max-skill replay-skills)
+            :cell-value-factory (comp max-skill :replay-skills)
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -563,7 +562,7 @@
               :text "Engine"
               :resizable true
               :pref-width 220
-              :cell-value-factory #(-> % :header :engine-version)
+              :cell-value-factory :replay-engine-version
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
@@ -583,7 +582,7 @@
             :text "Duration"
             :resizable false
             :pref-width 80
-            :cell-value-factory #(-> % :header :game-time)
+            :cell-value-factory :replay-game-time
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
@@ -602,7 +601,7 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [replay]
-               (let [id (replay-id replay)]
+               (let [id (:replay-id replay)]
                  {:text ""
                   :graphic
                   {:fx/type ext-recreate-on-key-changed
@@ -655,8 +654,8 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-folder:16:white"}}])
-                   (when-let [id (replay-id i)]
-                     (let [mod-version (-> i :body :script-data :game :gametype)]
+                   (when-let [id (:id i)]
+                     (let [mod-version (:replay-mod-name i)]
                        (when (and (not (string/blank? mod-version))
                                   (string/starts-with? mod-version "Beyond All Reason"))
                          [{:fx/type :button
@@ -667,15 +666,15 @@
                             :icon-literal "mdi-web:16:white"}}])))
                    [{:fx/type :pane
                      :h-box/hgrow :always}
-                    (let [engine-version (-> i :header :engine-version)
+                    (let [engine-version (:replay-engine-version i)
                           matching-engine (get engines-by-version engine-version)
                           engine-downloadable (get replay-downloads-by-engine engine-version)
-                          mod-version (-> i :body :script-data :game :gametype)
+                          mod-version (:replay-mod-name i)
                           matching-mod (get mods-by-name mod-version)
                           mod-downloadable (get replay-downloads-by-mod mod-version)
                           mod-importable (get replay-imports-by-mod mod-version)
                           mod-rapid (get rapid-data-by-version mod-version)
-                          map-name (-> i :body :script-data :game :mapname)
+                          map-name (:replay-map-name i)
                           matching-map (get maps-by-name map-name)
                           map-downloadable (get replay-downloads-by-map map-name)
                           map-importable (get replay-imports-by-map map-name)
@@ -943,15 +942,12 @@
               all-replays (->> parsed-replays-by-path
                                vals
                                (concat online-only-replays)
-                               (sort-by (comp str :unix-time :header))
-                               reverse
                                doall)
               replay-types (set (map :game-type all-replays))
               num-players (->> all-replays
-                               (map replay-player-count)
+                               (map :replay-player-count)
                                set
                                sort)
-              replays filtered-replays
               selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
               refresh-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-replays)
               index-downloads-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replays)
@@ -1188,7 +1184,7 @@
                    [{:fx/type :label
                      :text
                      (let [ac (count all-replays)
-                           fc (count replays)]
+                           fc (count filtered-replays)]
                        (str ac " replays" (when (not= ac fc) (str ", " fc " match filters"))))}
                     {:fx/type replays-table
                      :v-box/vgrow :always}]})
