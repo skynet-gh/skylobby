@@ -48,20 +48,40 @@
 (defn parse-adduser [m]
   (re-find #"\w+ ([^\s]+) ([^\s]+)( ([\d]+))? ([\d]+|None)( (.+))?" m))
 
-(defmethod handle "ADDUSER" [state-atom server-url m]
+(defmethod handle "ADDUSER" [state-atom server-key m]
   (if-let [[_all username country _cpu cpu user-id _user-agent user-agent] (parse-adduser m)]
     (let [user {:username username
                 :country country
                 :cpu cpu
                 :user-id user-id
                 :user-agent user-agent
-                :client-status cu/default-client-status}]
-      (swap! state-atom assoc-in [:by-server server-url :users username] user))
+                :client-status cu/default-client-status}
+          channel-name (u/user-channel username)]
+      (swap! state-atom update-in [:by-server server-key]
+        (fn [server-data]
+          (cond-> server-data
+                  true
+                  (assoc-in [:users username] user)
+                  (contains? (:my-channels server-data) channel-name)
+                  (update-in [:channels channel-name :messages] conj {:text ""
+                                                                      :timestamp (u/curr-millis)
+                                                                      :message-type :join
+                                                                      :username username})))))
     (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
-(defmethod handle "REMOVEUSER" [state-atom server-url m]
-  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)]
-    (swap! state-atom update-in [:by-server server-url :users] dissoc username)))
+(defmethod handle "REMOVEUSER" [state-atom server-key m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
+        channel-name (u/user-channel username)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server-data]
+        (cond-> server-data
+                true
+                (update :users dissoc username)
+                (contains? (:my-channels server-data) channel-name)
+                (update-in [:channels channel-name :messages] conj {:text ""
+                                                                    :timestamp (u/curr-millis)
+                                                                    :message-type :leave
+                                                                    :username username}))))))
 
 (defn parse-client-status [m]
   (re-find #"\w+ ([^\s]+) (\w+)" m))

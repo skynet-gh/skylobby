@@ -190,7 +190,65 @@
                 :user-agent "SpringLobby 0.270-49-gab254fe7d (windows64)"
                 :user-id "67"
                 :username "Zecrus"}}}}}
-           @state-atom))))
+           @state-atom)))
+  (testing "join message"
+    (let [
+          server-key :server1
+          state-atom (atom {:by-server
+                            {server-key
+                             {:my-channels {"@skynet" {}}}}})
+          now 12345]
+      (with-redefs [u/curr-millis (constantly now)]
+        (handler/handle state-atom server-key "ADDUSER skynet ?? 8"))
+      (is (= {:by-server
+              {:server1
+               {:channels
+                {"@skynet"
+                 {:messages
+                  [{:message-type :join
+                    :text ""
+                    :timestamp now
+                    :username "skynet"}]}}
+                :my-channels {"@skynet" {}}
+                :users
+                {"skynet"
+                 {:client-status {:access false
+                                  :away false
+                                  :bot false
+                                  :ingame false
+                                  :rank 0}
+                  :country "??"
+                  :cpu nil
+                  :user-agent nil
+                  :user-id "8"
+                  :username "skynet"}}}}}
+             @state-atom)))))
+
+
+(deftest handle-REMOVEUSER
+  (testing "leave message"
+    (let [
+          server-key :server1
+          state-atom (atom {:by-server
+                            {server-key
+                             {:my-channels {"@skynet" {}}
+                              :users {"skynet" {}}}}})
+          now 12345]
+      (with-redefs [u/curr-millis (constantly now)]
+        (handler/handle state-atom server-key "REMOVEUSER skynet"))
+      (is (= {:by-server
+              {:server1
+               {
+                :channels
+                {"@skynet"
+                 {:messages
+                  [{:message-type :leave
+                    :text ""
+                    :timestamp now
+                    :username "skynet"}]}}
+                :my-channels {"@skynet" {}}
+                :users {}}}}
+             @state-atom)))))
 
 
 (deftest handle-SAIDBATTLEEX
