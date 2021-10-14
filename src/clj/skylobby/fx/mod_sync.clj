@@ -43,7 +43,7 @@
         http-download (fx/sub-val context :http-download)
         importables-by-path (fx/sub-val context :importables-by-path)
         rapid-data-by-version (fx/sub-val context :rapid-data-by-version)
-        rapid-download (fx/sub-val context :rapid-download)
+        rapid-downloads-by-id (fx/sub-val context :rapid-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
         mod-name (or mod-name battle-modname)
@@ -187,7 +187,7 @@
            (when (and mod-name (not (some #(re-find % mod-name) no-rapid)))
              (let [rapid-data (get rapid-data-by-version mod-name)
                    rapid-id (:id rapid-data)
-                   rapid-download (get rapid-download rapid-id)
+                   rapid-download (get rapid-downloads-by-id rapid-id)
                    running (some? (get rapid-tasks-by-id rapid-id))
                    sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
                    package-exists (fs/file-exists? file-cache sdp-file)
@@ -198,6 +198,9 @@
                                            (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
                                            (mapcat second)
                                            seq)
+                   rapid-repo (resource/mod-repo-name mod-name)
+                   rapid-update-id (when rapid-repo (str rapid-repo ":test"))
+                   rapid-update-download (get rapid-downloads-by-id rapid-update-id)
                    in-progress (or running
                                    rapid-update-tasks
                                    (contains? rapid-tasks rapid-id)
@@ -208,7 +211,9 @@
                  :human-text
                              (if engine-file
                                (if rapid-update-tasks
-                                 "Updating rapid packages..."
+                                 (if rapid-update-download
+                                   (str (u/download-progress rapid-update-download))
+                                   "Updating rapid packages...")
                                  (if rapid-id
                                    (if in-progress
                                      (str (u/download-progress rapid-download))
