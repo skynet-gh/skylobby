@@ -144,7 +144,10 @@
                         :desc
                         {:fx/type :label
                          :text
-                         (str " " (u/format-duration (java-time/duration (- now game-start-time) :millis)))}}])))}}))}}
+                         (str " "
+                              (let [diff (- now game-start-time)]
+                                (when (pos? diff)
+                                  (u/format-duration (java-time/duration diff :millis)))))}}])))}}))}}
         {:fx/type :table-column
          :text "Map"
          :pref-width 200
