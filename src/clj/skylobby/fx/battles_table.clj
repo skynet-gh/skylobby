@@ -66,15 +66,34 @@
                        {:fx/type tooltip-nofocus/lifecycle
                         :style {:-fx-font-size 16}
                         :show-delay skylobby.fx/tooltip-show-delay
-                        :text (str battle-title "\n\n"
-                                   "Map: " battle-map "\n"
-                                   "Game: " battle-modname "\n"
-                                   "Engine: " battle-engine " " battle-version "\n\n"
-                                   (->> battle-users
-                                        keys
-                                        (sort String/CASE_INSENSITIVE_ORDER)
-                                        (string/join "\n")
-                                        (str "Players:\n\n")))}
+                        :text ""
+                        :graphic
+                        {:fx/type :v-box
+                         :children
+                         (concat
+                           [
+                            {:fx/type :label
+                             :text (str battle-title "\n")}
+                            {:fx/type :label
+                             :text (str "Map: " battle-map)}
+                            {:fx/type :label
+                             :text (str "Game: " battle-modname)}
+                            {:fx/type :label
+                             :text (str "Engine: " battle-engine " " battle-version "\n")}
+                            {:fx/type :label
+                             :text (str "Players:\n\n")}]
+                           (->> battle-users
+                                keys
+                                (sort String/CASE_INSENSITIVE_ORDER)
+                                (map
+                                  (fn [player]
+                                    (let [country (:country (get users player))]
+                                      {:fx/type :label
+                                       :text player
+                                       :graphic
+                                       {:fx/type flag-icon/flag-icon
+                                        :no-text true
+                                        :country-code country}})))))}}
                        :context-menu
                        {:fx/type :context-menu
                         :items
