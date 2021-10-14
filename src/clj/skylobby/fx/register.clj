@@ -4,6 +4,7 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.server :as fx.server]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
@@ -108,8 +109,8 @@
            :text "Register"
            :style {:-fx-font-size 20}
            :tooltip
-           {:fx/type :tooltip
-            :show-delay [10 :ms]
+           {:fx/type tooltip-nofocus/lifecycle
+            :show-delay skylobby.fx/tooltip-show-delay
             :text "Register with server"}
            :disable (not (and server
                               username

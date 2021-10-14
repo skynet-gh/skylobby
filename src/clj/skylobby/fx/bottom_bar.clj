@@ -88,16 +88,32 @@
         music-paused (fx/sub-val context :music-paused)
         music-queue (fx/sub-val context :music-queue)
         music-volume (fx/sub-val context :music-volume)
-        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)]
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)]
     {:fx/type :h-box
      :alignment :center-left
      :style {:-fx-font-size 14}
      :children
      (concat
        [{:fx/type app-update-button}
-        {:fx/type :label
-         :text (str " " (fx/sub-val context :last-failed-message))
-         :style {:-fx-text-fill "#FF0000"}}
+        (let [last-failed-message (fx/sub-val context get-in [:by-server server-key :last-failed-message])]
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           (if last-failed-message
+             [
+              {:fx/type :button
+               :style-class ["button" "skylobby-normal"]
+               :on-action {:event/type :spring-lobby/dissoc-in
+                           :path [:by-server server-key :last-failed-message]}
+               :graphic
+               {
+                :fx/type font-icon/lifecycle
+                :icon-literal (str "mdi-window-close:" icon-size)}}
+              {:fx/type :label
+               :text (str " " last-failed-message)
+               :style {:-fx-text-fill "#FF0000"}}]
+             [])})
         {:fx/type :pane
          :h-box/hgrow :always}]
        (when (fx/sub-val context :music-dir)

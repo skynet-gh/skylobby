@@ -18,11 +18,12 @@
   (memoize flag-image))
 
 
-(defn flag-icon [{:keys [^String country-code]}]
-  (merge
-    {:fx/type :label
-     :text (str country-code)}
-    (when-let [image (flag-image-memoized country-code)]
-      {:graphic
-       {:fx/type :image-view
-        :image image}})))
+(defn flag-icon [{:keys [^String country-code no-text]}]
+  (let [image (flag-image-memoized country-code)]
+    (merge
+      {:fx/type :label
+       :text (if (and no-text image) "" (str country-code))}
+      (when image
+        {:graphic
+         {:fx/type :image-view
+          :image image}}))))

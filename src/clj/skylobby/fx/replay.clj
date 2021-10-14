@@ -17,6 +17,7 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
@@ -823,8 +824,8 @@
                                    " Importing..."
                                    " Import map")
                            :tooltip
-                           {:fx/type :tooltip
-                            :show-delay [10 :ms]
+                           {:fx/type tooltip-nofocus/lifecycle
+                            :show-delay skylobby.fx/tooltip-show-delay
                             :text (str (:resource-file map-importable))}
                            :disable in-progress
                            :on-action
@@ -978,8 +979,8 @@
                      [{:fx/type fx.ext.node/with-tooltip-props
                        :props
                        {:tooltip
-                        {:fx/type :tooltip
-                         :show-delay [10 :ms]
+                        {:fx/type tooltip-nofocus/lifecycle
+                         :show-delay skylobby.fx/tooltip-show-delay
                          :text "Clear filter"}}
                        :desc
                        {:fx/type :button
@@ -1025,8 +1026,8 @@
                          [{:fx/type fx.ext.node/with-tooltip-props
                            :props
                            {:tooltip
-                            {:fx/type :tooltip
-                             :show-delay [10 :ms]
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :show-delay skylobby.fx/tooltip-show-delay
                              :text "Clear source"}}
                            :desc
                            {:fx/type :button
@@ -1050,8 +1051,8 @@
                          [{:fx/type fx.ext.node/with-tooltip-props
                            :props
                            {:tooltip
-                            {:fx/type :tooltip
-                             :show-delay [10 :ms]
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :show-delay skylobby.fx/tooltip-show-delay
                              :text "Clear type"}}
                            :desc
                            {:fx/type :button
@@ -1075,8 +1076,8 @@
                          [{:fx/type fx.ext.node/with-tooltip-props
                            :props
                            {:tooltip
-                            {:fx/type :tooltip
-                             :show-delay [10 :ms]
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :show-delay skylobby.fx/tooltip-show-delay
                              :text "Clear min players"}}
                            :desc
                            {:fx/type :button
@@ -1110,8 +1111,8 @@
                          [{:fx/type fx.ext.node/with-tooltip-props
                            :props
                            {:tooltip
-                            {:fx/type :tooltip
-                             :show-delay [10 :ms]
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :show-delay skylobby.fx/tooltip-show-delay
                              :text "Clear max players"}}
                            :desc
                            {:fx/type :button

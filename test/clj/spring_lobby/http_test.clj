@@ -71,3 +71,10 @@
   (is (true?
         (http/bar-engine-filename?
           "spring_bar_.BAR105.105.0-430-g2727993_windows-64-minimal-portable.7z"))))
+
+
+(deftest evo-rts-filename?
+  (is (true?
+        (http/evo-rts-filename? "Evolution-RTSv1611.sdz")))
+  (is (true?
+        (http/evo-rts-filename? "Evolution-RTS-v16.20.sdz"))))

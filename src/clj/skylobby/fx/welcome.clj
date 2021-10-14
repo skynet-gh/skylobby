@@ -6,6 +6,7 @@
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -58,8 +59,8 @@
          [{:fx/type :button
            :text ""
            :tooltip
-           {:fx/type :tooltip
-            :show-delay [10 :ms]
+           {:fx/type tooltip-nofocus/lifecycle
+            :show-delay skylobby.fx/tooltip-show-delay
             :style {:-fx-font-size 14}
             :text "Cancel connect"}
            :on-action {:event/type :spring-lobby/cancel-connect

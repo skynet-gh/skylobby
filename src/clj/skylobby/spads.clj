@@ -44,6 +44,7 @@
    [:award #" (.*) award:\s+(.*)\s+\((.*)\)(.*)"]
    [:ally-team-won #"Ally team (.*) won! \((.*)\)"]
    [:won #"(.*) won!"]
+   [:vote-cancelled-game-launch #"Vote cancelled, launching game\.\.\."]
    [:game-launch #"Launching game\.\.\."]
    [:force-start #"Forcing game start by (.*)"]
    [:random-map #"Automatic random map rotation: next map is \"(.*)\""]
@@ -83,3 +84,10 @@
                      :else nil)]
           {:command command
            :vote vote})))))
+
+(defn parse-relay-message [text]
+  (when text
+    (let [trimmed (string/trim text)]
+      (when (string/starts-with? trimmed "<")
+        (let [[_all username] (re-find #"<([^\s]+)>" trimmed)]
+          {:on-behalf-of username})))))

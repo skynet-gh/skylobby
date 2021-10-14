@@ -416,7 +416,7 @@
                 :resource-updated now}))))))
 
 (def evo-rts-re
-  #"^Evolution-RTSv([0-9a-z]+)\.sdz$")
+  #"^Evolution-RTS\-?v([0-9a-z\.]+)\.sdz$")
 
 (defn evo-rts-filename?
   [filename]
@@ -503,25 +503,6 @@
     (http/get (bar-replay-download-url id) {:as :auto})))
 
 ; https://github.com/dakrone/clj-http/pull/220/files
-(defn- print-progress-bar
-  "Render a simple progress bar given the progress and total. If the total is zero
-   the progress will run as indeterminated."
-  ([progress total] (print-progress-bar progress total {}))
-  ([progress total {:keys [bar-width]
-                    :or   {bar-width 10}}]
-   (if (pos? total)
-     (let [pct (/ progress total)
-           render-bar (fn []
-                        (let [bars (Math/floor (* pct bar-width))
-                              pad (- bar-width bars)]
-                          (str (clojure.string/join (repeat bars "="))
-                               (clojure.string/join (repeat pad " ")))))]
-       (print (str "[" (render-bar) "] "
-                   (int (* pct 100)) "% "
-                   progress "/" total)))
-     (let [render-bar (fn [] (clojure.string/join (repeat bar-width "-")))]
-       (print (str "[" (render-bar) "] "
-                   progress "/?"))))))
 
 (defn- insert-at
   "Addes value into a vector at an specific index."

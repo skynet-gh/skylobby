@@ -126,7 +126,11 @@
   (is (true?
         (resource/could-be-this-mod?
           "Total Atomization Prime 2.6RC5"
-          {:resource-filename "TAPrime_v2.6RC5.sdz"}))))
+          {:resource-filename "TAPrime_v2.6RC5.sdz"})))
+  (is (true?
+        (resource/could-be-this-mod?
+          "Evolution RTS - v16.20"
+          {:resource-filename "Evolution-RTS-v16.20.sdz"}))))
 
 
 (deftest same-resource-file?

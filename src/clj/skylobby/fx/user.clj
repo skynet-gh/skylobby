@@ -6,6 +6,7 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -98,9 +99,9 @@
                             {:fx/type :menu-item
                              :text (str "User ID: " user-id)}])}}
                        {:tooltip
-                        {:fx/type :tooltip
+                        {:fx/type tooltip-nofocus/lifecycle
                          :style {:-fx-font-size 16}
-                         :show-delay [10 :ms]
+                         :show-delay skylobby.fx/tooltip-show-delay
                          :text (str username "\n\n"
                                     (when (:access client-status)
                                       "Admin\n")

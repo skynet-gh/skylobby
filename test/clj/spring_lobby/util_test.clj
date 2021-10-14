@@ -47,7 +47,8 @@
              :username "me"
              :message-type :ex
              :spads nil
-             :vote nil}]
+             :vote nil
+             :relay nil}]
            (with-redefs [u/curr-millis (constantly now)]
              ((u/update-chat-messages-fn "me" "m" true) []))))
     (is (= [{:text "!y"
@@ -56,9 +57,19 @@
              :message-type nil
              :spads nil
              :vote {:command "y"
-                    :vote :y}}]
+                    :vote :y}
+             :relay nil}]
            (with-redefs [u/curr-millis (constantly now)]
-             ((u/update-chat-messages-fn "me" "!y" false) []))))))
+             ((u/update-chat-messages-fn "me" "!y" false) []))))
+    (is (= [{:text "<you> blah"
+             :timestamp now
+             :username "me"
+             :message-type nil
+             :spads nil
+             :vote nil
+             :relay {:on-behalf-of "you"}}]
+           (with-redefs [u/curr-millis (constantly now)]
+             ((u/update-chat-messages-fn "me" "<you> blah" false) []))))))
 
 
 (deftest parse-skill

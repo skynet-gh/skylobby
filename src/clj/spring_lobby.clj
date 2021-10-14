@@ -21,6 +21,7 @@
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
+    [skylobby.discord :as discord]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.download :as fx.download]
@@ -1159,21 +1160,20 @@
                                (fn [replay]
                                  (if (empty? filter-terms)
                                    true
-                                   (every?
-                                     (some-fn
-                                       (partial includes-term? (:replay-id replay))
-                                       (partial includes-term? (get replays-tags (:replay-id replay)))
-                                       (partial includes-term? (:replay-engine-version replay))
-                                       (partial includes-term? (:replay-mod-name replay))
-                                       (partial includes-term? (:replay-map-name replay))
-                                       (fn [term]
-                                         (let [players (concat
-                                                         (mapcat identity (:replay-allyteam-player-names replay))
-                                                         (when replays-filter-specs
-                                                           (:replay-spec-names replay)))]
-                                           (some #(includes-term? % term)
-                                                 (map fx.replay/sanitize-replay-filter players)))))
-                                     filter-terms))))
+                                   (let [players (concat
+                                                   (mapcat identity (:replay-allyteam-player-names replay))
+                                                   (when replays-filter-specs
+                                                     (:replay-spec-names replay)))
+                                         players (map fx.replay/sanitize-replay-filter players)]
+                                     (every?
+                                       (some-fn
+                                         (partial includes-term? (:replay-id replay))
+                                         (partial includes-term? (get replays-tags (:replay-id replay)))
+                                         (partial includes-term? (:replay-engine-version replay))
+                                         (partial includes-term? (:replay-mod-name replay))
+                                         (partial includes-term? (:replay-map-name replay))
+                                         (fn [term] (some #(includes-term? % term) players)))
+                                       filter-terms)))))
                              doall)
                 replays (if replays-window-dedupe
                           (:replays
@@ -3163,12 +3163,24 @@
               allyteam-id (loop [i 0]
                             (if (contains? allyteam-ids i)
                               (recur (inc i))
-                              i))]
+                              i))
+              close-size (* 2 start-pos-r)
+              target (some
+                       (fn [{:keys [allyteam x y width height]}]
+                         (when (and allyteam x y width height)
+                           (let [xt (+ x width)]
+                             (when (and
+                                     (< (- xt close-size) ex (+ xt close-size))
+                                     (< (- y close-size) ey (+ y close-size)))
+                               allyteam))))
+                       start-boxes)]
+          (when target (log/info "Mousedown on close button for box" target))
           (swap! *state assoc :drag-allyteam {:allyteam-id allyteam-id
                                               :startx ex
                                               :starty ey
                                               :endx ex
-                                              :endy ey}))
+                                              :endy ey
+                                              :target target}))
         :else
         nil)
       (catch Exception e
@@ -3200,6 +3212,8 @@
       (catch Exception e
         (log/error e "Error dragging minimap")))))
 
+(def min-box-size 0.05)
+
 (defmethod event-handler ::minimap-mouse-released
   [{:keys [am-host client-data minimap-scale minimap-width minimap-height map-details singleplayer]
     :or {minimap-scale 1.0}
@@ -3221,7 +3235,7 @@
                      merge team-data)
               (message/send-message *state client-data
                 (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
-        (when-let [{:keys [allyteam-id startx starty endx endy]} (:drag-allyteam before)]
+        (when-let [{:keys [allyteam-id startx starty endx endy target]} (:drag-allyteam before)]
           (let [l (min startx endx)
                 t (min starty endy)
                 r (max startx endx)
@@ -3230,31 +3244,45 @@
                 top (/ t (* minimap-scale minimap-height))
                 right (/ r (* minimap-scale minimap-width))
                 bottom (/ b (* minimap-scale minimap-height))]
-            (if singleplayer
-              (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
-                     (fn [allyteam]
-                       (assoc allyteam
-                              :startrectleft left
-                              :startrecttop top
-                              :startrectright right
-                              :startrectbottom bottom)))
-              (if am-host
-                (message/send-message *state client-data
-                  (str "ADDSTARTRECT " allyteam-id " "
-                       (int (* 200 left)) " "
-                       (int (* 200 top)) " "
-                       (int (* 200 right)) " "
-                       (int (* 200 bottom))))
-                (event-handler
-                  (assoc e
-                         :event/type ::send-message
-                         :message
-                         (str "!addBox "
-                              (int (* 200 left)) " "
-                              (int (* 200 top)) " "
-                              (int (* 200 right)) " "
-                              (int (* 200 bottom)) " "
-                              (inc allyteam-id)))))))))
+            (if (and (< min-box-size (- right left))
+                     (< min-box-size (- bottom top)))
+              (if singleplayer
+                (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+                       (fn [allyteam]
+                         (assoc allyteam
+                                :startrectleft left
+                                :startrecttop top
+                                :startrectright right
+                                :startrectbottom bottom)))
+                (if am-host
+                  (message/send-message *state client-data
+                    (str "ADDSTARTRECT " allyteam-id " "
+                         (int (* 200 left)) " "
+                         (int (* 200 top)) " "
+                         (int (* 200 right)) " "
+                         (int (* 200 bottom))))
+                  (event-handler
+                    (assoc e
+                           :event/type ::send-message
+                           :message
+                           (str "!addBox "
+                                (int (* 200 left)) " "
+                                (int (* 200 top)) " "
+                                (int (* 200 right)) " "
+                                (int (* 200 bottom)) " "
+                                (inc allyteam-id))))))
+              (if target
+                (do
+                  (log/info "Clearing box" target)
+                  (if singleplayer
+                    (swap! *state update-in [:by-server :local :battle :scripttags :game] dissoc (keyword (str "allyteam" target)))
+                    (if am-host
+                      (message/send-message *state client-data (str "REMOVESTARTRECT " target))
+                      (event-handler
+                        (assoc e
+                               :event/type ::send-message
+                               :message (str "!clearBox " (inc (int (u/to-number target)))))))))
+                (log/info "Start box too small, ignoring" left top right bottom))))))
       (catch Exception e
         (log/error e "Error releasing minimap")))))
 
@@ -3409,7 +3437,7 @@
 (defn- update-handicap [client-data id {:keys [is-bot] :as opts} handicap]
   (future
     (try
-      (if is-bot
+      (if (or is-bot (not client-data))
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
         (message/send-message *state client-data (str "HANDICAP " (:username id) " " handicap)))
       (catch Exception e
@@ -3560,13 +3588,27 @@
   @(event-handler (assoc task :event/type ::ring-specs)))
 
 
+(defn set-ignore
+  ([server-key username ignore]
+   (set-ignore server-key username ignore nil))
+  ([server-key username ignore {:keys [channel-name]}]
+   (swap! *state
+     (fn [state]
+       (let [channel-name (or channel-name
+                              (u/visible-channel state server-key))]
+         (-> state
+             (assoc-in [:ignore-users server-key username] ignore)
+             (update-in [:by-server server-key :channels channel-name :messages] conj {:text (str (if ignore "Ignored " "Unignored ") username)
+                                                                                       :timestamp (u/curr-millis)
+                                                                                       :message-type :info})))))))
+
 (defmethod event-handler ::ignore-user
-  [{:keys [server-key username]}]
-  (swap! *state assoc-in [:ignore-users server-key username] true))
+  [{:keys [channel-name server-key username]}]
+  (set-ignore server-key username true {:channel-name channel-name}))
 
 (defmethod event-handler ::unignore-user
-  [{:keys [server-key username]}]
-  (swap! *state assoc-in [:ignore-users server-key username] false))
+  [{:keys [channel-name server-key username]}]
+  (set-ignore server-key username false {:channel-name channel-name}))
 
 
 (defmethod event-handler ::battle-startpostype-change
@@ -3605,7 +3647,6 @@
   (doseq [allyteam-id allyteam-ids]
     (let [allyteam-kw (keyword (str "allyteam" allyteam-id))]
       (swap! *state update-in [:by-server server-key]
-             ; TODO one swap
              (fn [state]
                (-> state
                    (update-in [:scripttags :game] dissoc allyteam-kw)
@@ -3642,22 +3683,25 @@
 
 (defmethod event-handler ::battle-spectate-change
   [{:keys [client-data id is-me is-bot ready-on-unspec] :fx/keys [event] :as data}]
-  (future
-    (try
-      (if (or is-me is-bot)
-        (let [mode (if (contains? data :value)
-                     (:value data)
-                     (not event))
-              battle-status (assoc (:battle-status id) :mode mode)
-              battle-status (if (and (not is-bot) (:mode battle-status))
-                              (do
-                                (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
-                                (assoc battle-status :ready (boolean ready-on-unspec)))
-                              battle-status)]
-          (update-battle-status client-data data battle-status (:team-color id)))
-        (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
-      (catch Exception e
-        (log/error e "Error updating battle spectate")))))
+  (let [mode (if (contains? data :value)
+               (:value data)
+               (not event))]
+    (when-not is-bot
+      (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :users (:username id) :battle-status :mode] mode))
+    (future
+      (try
+        (if (or is-me is-bot)
+          (let [
+                battle-status (assoc (:battle-status id) :mode mode)
+                battle-status (if (and (not is-bot) (:mode battle-status))
+                                (do
+                                  (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
+                                  (assoc battle-status :ready (boolean ready-on-unspec)))
+                                battle-status)]
+            (update-battle-status client-data data battle-status (:team-color id)))
+          (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
+        (catch Exception e
+          (log/error e "Error updating battle spectate"))))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
   (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
@@ -4416,6 +4460,12 @@
         :else
         (cond
           (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
+          (re-find #"^/ignore" message)
+          (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
+            (set-ignore server-key username true {:channel-name channel-name}))
+          (re-find #"^/unignore" message)
+          (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
+            (set-ignore server-key username false {:channel-name channel-name}))
           (re-find #"^/msg" message)
           (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
             @(event-handler
@@ -4425,7 +4475,10 @@
                   :message message})))
           (re-find #"^/rename" message)
           (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
-            (message/send-message *state client-data (str "RENAMEACCOUNT " new-username)))
+           (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
+                                                                                                  :timestamp (u/curr-millis)
+                                                                                                  :message-type :info}
+            (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
           :else
           (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                 unified (-> client-data :compflags (contains? "u"))]
@@ -4442,6 +4495,21 @@
                   (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
+
+
+(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted]}]
+  (let [now (u/curr-millis)]
+    (if (or (not discord-promoted)
+            (< (- now discord-promoted) discord/cooldown))
+      (do
+        (swap! *state assoc-in [:discord-promoted discord-channel] now)
+        (future
+          (try
+            (discord/promote-battle discord-channel data)
+            (catch Exception e
+              (log/error e "Error promoting battle in Discord to" discord-channel)))))
+      (log/info "Too soon to promote to discord" discord-channel))))
+
 
 (defmethod event-handler ::on-channel-key-pressed [{:fx/keys [^KeyEvent event] :keys [channel-name server-key]}]
   (let [code (.getCode event)]

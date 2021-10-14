@@ -1,6 +1,8 @@
 (ns skylobby.fx.sync
   (:require
     [cljfx.ext.node :as fx.ext.node]
+    skylobby.fx
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
@@ -59,8 +61,8 @@
               :props
               (when tooltip
                 {:tooltip
-                 {:fx/type :tooltip
-                  :show-delay [10 :ms]
+                 {:fx/type tooltip-nofocus/lifecycle
+                  :show-delay skylobby.fx/tooltip-show-delay
                   :style {:-fx-font-size 14}
                   :text tooltip}})
               :desc

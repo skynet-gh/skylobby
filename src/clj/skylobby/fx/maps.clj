@@ -6,6 +6,7 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.sub :as sub]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -114,8 +115,8 @@
           {:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
+            {:fx/type tooltip-nofocus/lifecycle
+             :show-delay skylobby.fx/tooltip-show-delay
              :text "Open maps directory"}}
            :desc
            {:fx/type :button
@@ -128,8 +129,8 @@
            [{:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
+              {:fx/type tooltip-nofocus/lifecycle
+               :show-delay skylobby.fx/tooltip-show-delay
                :text "Random map"}}
              :desc
              {:fx/type :button
@@ -143,8 +144,8 @@
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
-            {:fx/type :tooltip
-             :show-delay [10 :ms]
+            {:fx/type tooltip-nofocus/lifecycle
+             :show-delay skylobby.fx/tooltip-show-delay
              :text "Reload maps"}}
            :desc
            {:fx/type :button
@@ -205,8 +206,8 @@
                  [{:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text "Clear filter"}}
                    :desc
                    {:fx/type :button
@@ -234,9 +235,9 @@
                    :on-action {:event/type :spring-lobby/map-window-action
                                :on-change-map (assoc on-change-map :map-name map-name :value map-name)}
                    :tooltip
-                   {:fx/type :tooltip
+                   {:fx/type tooltip-nofocus/lifecycle
                     :text (str map-name)
-                    :show-delay [10 :ms]
+                    :show-delay skylobby.fx/tooltip-show-delay
                     :style {:-fx-font-size 20}
                     :content-display :top
                     :graphic

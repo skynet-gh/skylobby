@@ -4,8 +4,9 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    java-time
+    [skylobby.discord :as discord]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.sub :as sub]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
@@ -16,7 +17,9 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
@@ -96,8 +99,8 @@
              {:fx/type fx.ext.node/with-tooltip-props
               :props
               {:tooltip
-               {:fx/type :tooltip
-                :show-delay [10 :ms]
+               {:fx/type tooltip-nofocus/lifecycle
+                :show-delay skylobby.fx/tooltip-show-delay
                 :text (str (:name i) "\n\n" (:desc i))}}
               :desc
               (merge
@@ -125,8 +128,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :check-box
@@ -148,8 +151,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :text-field
@@ -174,8 +177,8 @@
                   {:fx/type fx.ext.node/with-tooltip-props
                    :props
                    {:tooltip
-                    {:fx/type :tooltip
-                     :show-delay [10 :ms]
+                    {:fx/type tooltip-nofocus/lifecycle
+                     :show-delay skylobby.fx/tooltip-show-delay
                      :text (str (:name i) "\n\n" (:desc i))}}
                    :desc
                    {:fx/type :combo-box
@@ -270,6 +273,13 @@
         my-sync-status (int (or (:sync my-battle-status) 0))
         in-sync (= 1 (:sync my-battle-status))
         ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
+        discord-channel (discord/channel-to-promote {:mod-name mod-name
+                                                     :server-url (:server-url client-data)})
+        now (fx/sub-val context :now)
+        discord-promoted (fx/sub-val context get-in [:discord-promoted discord-channel])
+        discord-promoted-diff (when discord-promoted (- now discord-promoted))
+        discord-promote-cooldown (boolean (and discord-promoted-diff
+                                               (< discord-promoted-diff discord/cooldown)))
         sync-button-style (assoc
                             (dissoc
                               (case my-sync-status
@@ -343,12 +353,25 @@
                         :client-data client-data
                         :users users}}}
                      {:fx/type :button
-                      :text "Promote"
-                      :on-action {:event/type :spring-lobby/send-message
-                                  :channel-name channel-name
-                                  :client-data client-data
-                                  :message "!promote"
-                                  :server-key server-key}}])
+                      :text (if discord-channel
+                              (if discord-promote-cooldown
+                                (str "Promote every " (.toMinutesPart (java-time/duration discord/cooldown :millis)) "m")
+                                "Promote to Discord")
+                              "Promote")
+                      :disable discord-promote-cooldown
+                      :on-action
+                      (if discord-channel
+                        {:event/type :spring-lobby/promote-discord
+                         :discord-channel discord-channel
+                         :data {:battle-title (get-in battles [battle-id :battle-title])
+                                :map-name map-name
+                                :mod-name mod-name
+                                :team-counts team-counts}}
+                        {:event/type :spring-lobby/send-message
+                         :channel-name channel-name
+                         :client-data client-data
+                         :message "!promote"
+                         :server-key server-key})}])
                   (when am-host
                     [{:fx/type :h-box
                       :alignment :center-left
@@ -518,8 +541,8 @@
             {:fx/type fx.ext.node/with-tooltip-props
              :props
              {:tooltip
-              {:fx/type :tooltip
-               :show-delay [10 :ms]
+              {:fx/type tooltip-nofocus/lifecycle
+               :show-delay skylobby.fx/tooltip-show-delay
                :style {:-fx-font-size 12}
                :text (cond
                        am-host "You are the host, start the game"
@@ -964,7 +987,10 @@
         spads-messages (->> host-ex-messages
                             (filter :spads))
         vote-messages (->> spads-messages
-                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed :vote-progress} :spads-message-type :spads))
+                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled
+                                           :vote-cancelled-game-launch :vote-failed :vote-passed :vote-progress}
+                                         :spads-message-type
+                                         :spads))
                            (map
                              (fn [{:keys [spads] :as message}]
                                (let [{:keys [spads-message-type spads-parsed]} spads]
@@ -985,7 +1011,7 @@
                                                                        :n n
                                                                        :nt nt
                                                                        :remaining remaining}))
-                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-failed :vote-passed} spads-message-type) nil
+                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-cancelled-game-launch :vote-failed :vote-passed} spads-message-type) nil
                              :else prev)))
                        nil
                        (reverse vote-messages))]
@@ -1098,6 +1124,7 @@
                                             :vote-passed "mdi-phone-incoming:16:green"
                                             :vote-failed "mdi-phone-missed:16:red"
                                             :vote-cancelled "mdi-phone-minus:16:gold"
+                                            :vote-cancelled-game-launch "mdi-phone-minus:16:gold"
                                             :game-starting-cancel "mdi-phone-minus:16:gold"
                                             ; else
                                             "mdi-phone:16:white")}]
@@ -1331,6 +1358,7 @@
                               (map
                                 (fn [{:keys [mod-name]}]
                                   {:fx/type mod-sync-pane
+                                   :dependency true
                                    :engine-version engine-version
                                    :mod-name mod-name
                                    :spring-isolation-dir spring-root})

@@ -7,6 +7,7 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -62,18 +63,37 @@
                         :selected-battle selected-battle
                         :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
                        :tooltip
-                       {:fx/type :tooltip
+                       {:fx/type tooltip-nofocus/lifecycle
                         :style {:-fx-font-size 16}
-                        :show-delay [10 :ms]
-                        :text (str battle-title "\n\n"
-                                   "Map: " battle-map "\n"
-                                   "Game: " battle-modname "\n"
-                                   "Engine: " battle-engine " " battle-version "\n\n"
-                                   (->> battle-users
-                                        keys
-                                        (sort String/CASE_INSENSITIVE_ORDER)
-                                        (string/join "\n")
-                                        (str "Players:\n\n")))}
+                        :show-delay skylobby.fx/tooltip-show-delay
+                        :text ""
+                        :graphic
+                        {:fx/type :v-box
+                         :children
+                         (concat
+                           [
+                            {:fx/type :label
+                             :text (str battle-title "\n")}
+                            {:fx/type :label
+                             :text (str "Map: " battle-map)}
+                            {:fx/type :label
+                             :text (str "Game: " battle-modname)}
+                            {:fx/type :label
+                             :text (str "Engine: " battle-engine " " battle-version "\n")}
+                            {:fx/type :label
+                             :text (str "Players:\n\n")}]
+                           (->> battle-users
+                                keys
+                                (sort String/CASE_INSENSITIVE_ORDER)
+                                (map
+                                  (fn [player]
+                                    (let [country (:country (get users player))]
+                                      {:fx/type :label
+                                       :text player
+                                       :graphic
+                                       {:fx/type flag-icon/flag-icon
+                                        :no-text true
+                                        :country-code country}})))))}}
                        :context-menu
                        {:fx/type :context-menu
                         :items
@@ -144,7 +164,10 @@
                         :desc
                         {:fx/type :label
                          :text
-                         (str " " (u/format-duration (java-time/duration (- now game-start-time) :millis)))}}])))}}))}}
+                         (str " "
+                              (let [diff (- now game-start-time)]
+                                (when (pos? diff)
+                                  (u/format-duration (java-time/duration diff :millis)))))}}])))}}))}}
         {:fx/type :table-column
          :text "Map"
          :pref-width 200
