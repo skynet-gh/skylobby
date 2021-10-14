@@ -4599,13 +4599,13 @@
 
 (def state-watch-chimers
   [
-   [:auto-get-resources-watcher auto-get-resources-watcher]
-   [:battle-map-details-watcher battle-map-details-watcher]
-   [:battle-mod-details-watcher battle-mod-details-watcher 15]
+   [:auto-get-resources-watcher auto-get-resources-watcher 2]
+   [:battle-map-details-watcher battle-map-details-watcher 2]
+   [:battle-mod-details-watcher battle-mod-details-watcher 2]
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
    [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
    [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
-   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 15]])
+   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
 
 
 (defn ipc-handler
