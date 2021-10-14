@@ -316,7 +316,7 @@
   (when-let [^SplicedStream client (:client client-data)]
     (log/info "Disconnecting client" (:server-key client-data))
     (if-not (s/closed? client)
-      (message/send-message state-atom client "EXIT")
+      (message/send-message state-atom client-data "EXIT")
       (log/warn "Client" server-key "was already closed"))
     (s/close! client)
     (log/info "Connection" server-key "closed?" (s/closed? client))))

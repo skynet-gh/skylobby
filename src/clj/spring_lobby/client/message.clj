@@ -11,11 +11,11 @@
 
 (defn send-message
   ([c m]
+   (log/error (ex-info "Old client message fn" {}))
    (if c
      (do
        (log/info ">" (str "'" m "'"))
-       @(s/put! c (str m "\n"))
-       (log/error (ex-info "Old client message fn" {})))
+       @(s/put! c (str m "\n")))
      (log/error (ex-info "No client to send message" {}))))
   ([state-atom client-data message]
    (send-message state-atom client-data message nil))
