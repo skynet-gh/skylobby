@@ -1937,7 +1937,7 @@
   (let [chimer
         (chime/chime-at
           (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/plus (java-time/instant))
             (java-time/duration 30 :seconds))
           (fn [_chimestamp]
             (log/info "Updating music queue")
