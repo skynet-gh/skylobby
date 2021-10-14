@@ -35,6 +35,13 @@
        (into {})))
 
 
+(def sort-playing (comp u/to-number not u/to-bool :mode :battle-status))
+(def sort-bot (comp u/to-number :bot :client-status :user))
+(def sort-ally (comp u/to-number :ally :battle-status))
+(def sort-skill (comp (fnil - 0) u/parse-skill :skill))
+(def sort-id (comp u/to-number :id :battle-status))
+
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
@@ -56,6 +63,7 @@
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         sides (spring/mod-sides battle-mod-details)
+        side-items (->> sides seq (sort-by first) (map second))
         singleplayer (or (not server-key) (= :local server-key))
         username (fx/sub-val context get-in [:by-server server-key :username])
 
@@ -193,11 +201,11 @@
            :text "Nickname"
            :resizable true
            :min-width 200
-           :cell-value-factory identity
+           :cell-value-factory (juxt (comp (fnil string/lower-case "") u/nickname) u/nickname identity)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [{:keys [owner] :as id}]
+            (fn [[_nickname-lc nickname {:keys [owner] :as id}]]
               (tufte/profile {:dynamic? true
                               :id :skylobby/player-table}
                 (tufte/p :nickname
@@ -216,7 +224,7 @@
                      {:fx/type tooltip-nofocus/lifecycle
                       :show-delay skylobby.fx/tooltip-show-delay
                       :style {:-fx-font-size "16"}
-                      :text (u/nickname id)}
+                      :text nickname}
                      :graphic
                      {:fx/type :h-box
                       :alignment :center
@@ -247,7 +255,7 @@
                                               "black")
                                      :radius 2
                                      :spread 1}
-                            :text (u/nickname id)
+                            :text nickname
                             :fill text-color-css
                             :style
                             (merge
@@ -260,11 +268,11 @@
              :text "Skill"
              :resizable false
              :pref-width 80
-             :cell-value-factory identity
+             :cell-value-factory (juxt sort-skill :skilluncertainty :skill)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [{:keys [skill skilluncertainty]}]
+              (fn [[_ skilluncertainty skill]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :skill
@@ -278,11 +286,11 @@
              :text "Status"
              :resizable false
              :pref-width 82
-             :cell-value-factory identity
+             :cell-value-factory (juxt sort-playing (comp :ingame :client-status :user) u/nickname identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [{:keys [battle-status user username]}]
+              (fn [[_ _ _ {:keys [battle-status user username]}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :status
@@ -353,11 +361,16 @@
              :text "Ally"
              :resizable false
              :pref-width 80
-             :cell-value-factory identity
+             :cell-value-factory (juxt (comp not u/to-bool :mode :battle-status)
+                                       (comp :ally :battle-status)
+                                       (comp (fnil - 0) u/parse-skill :skill)
+                                       (comp :id :battle-status)
+                                       u/nickname
+                                       identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [i]
+              (fn [[_status ally _skill _team _username i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :ally
@@ -367,7 +380,7 @@
                       :key [(u/nickname i) increment-ids]
                       :desc
                       {:fx/type :combo-box
-                       :value (str (:ally (:battle-status i)))
+                       :value (str ally)
                        :on-value-changed {:event/type :spring-lobby/battle-ally-changed
                                           :client-data (when-not singleplayer client-data)
                                           :is-me (= (:username i) username)
@@ -386,16 +399,21 @@
              :text "Team"
              :resizable false
              :pref-width 80
-             :cell-value-factory identity
+             :cell-value-factory (juxt
+                                   sort-playing
+                                   sort-id
+                                   sort-skill
+                                   :username
+                                   identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [i]
+              (fn [[_play id _skill _username i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :team
                     (let [items (map str (take 16 (iterate inc 0)))
-                          value (str (:id (:battle-status i)))]
+                          value (str id)]
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
@@ -450,78 +468,87 @@
              :text "Spectator"
              :resizable false
              :pref-width 80
-             :cell-value-factory identity
+             :cell-value-factory (juxt
+                                   sort-playing
+                                   #(-> % :battle-status :mode u/to-bool not boolean)
+                                   sort-skill
+                                   :username
+                                   identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [i]
+              (fn [[_ am-spec _ _ i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :spectator
-                    (let [am-spec (-> i :battle-status :mode u/to-bool not boolean)]
-                      {:text ""
-                       :graphic
-                       {:fx/type ext-recreate-on-key-changed
-                        :key (u/nickname i)
-                        :desc
-                        {:fx/type :check-box
-                         :selected am-spec
-                         :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                               :client-data (when-not singleplayer client-data)
-                                               :is-me (= (:username i) username)
-                                               :is-bot (-> i :user :client-status :bot)
-                                               :id i
-                                               :ready-on-unspec ready-on-unspec}
-                         :disable (or (not username)
-                                      (not (or (and am-host (not am-spec))
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))}}}))))}}])
+                    {:text ""
+                     :graphic
+                     {:fx/type ext-recreate-on-key-changed
+                      :key (u/nickname i)
+                      :desc
+                      {:fx/type :check-box
+                       :selected (boolean am-spec)
+                       :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
+                                             :client-data (when-not singleplayer client-data)
+                                             :is-me (= (:username i) username)
+                                             :is-bot (-> i :user :client-status :bot)
+                                             :id i
+                                             :ready-on-unspec ready-on-unspec}
+                       :disable (or (not username)
+                                    (not (or (and am-host (not am-spec))
+                                             (= (:username i) username)
+                                             (= (:owner i) username))))}}})))}}])
          (when (:faction players-table-columns)
            [{:fx/type :table-column
              :text "Faction"
              :resizable false
              :pref-width 120
-             :cell-value-factory identity
+             :cell-value-factory (juxt
+                                   sort-playing
+                                   (comp :side :battle-status)
+                                   sort-skill
+                                   :username
+                                   identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [i]
+              (fn [[_ side _ _ i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :faction
-                    (let [items (->> sides seq (sort-by first) (map second))]
-                      {:text ""
-                       :graphic
-                       (if (seq items)
-                         {:fx/type ext-recreate-on-key-changed
-                          :key (u/nickname i)
-                          :desc
-                          {:fx/type :combo-box
-                           :value (->> i :battle-status :side (get sides) str)
-                           :on-value-changed {:event/type :spring-lobby/battle-side-changed
-                                              :client-data (when-not singleplayer client-data)
-                                              :is-me (= (:username i) username)
-                                              :is-bot (-> i :user :client-status :bot)
-                                              :id i
-                                              :indexed-mod indexed-mod
-                                              :sides sides}
-                           :items items
-                           :disable (or (not username)
-                                        (not (or am-host
-                                                 (= (:username i) username)
-                                                 (= (:owner i) username))))}}
-                         {:fx/type :label
-                          :text "loading..."})}))))}}])
+                    {:text ""
+                     :graphic
+                     (if (seq side-items)
+                       {:fx/type ext-recreate-on-key-changed
+                        :key (u/nickname i)
+                        :desc
+                        {:fx/type :combo-box
+                         :value (->> side (get sides) str)
+                         :on-value-changed {:event/type :spring-lobby/battle-side-changed
+                                            :client-data (when-not singleplayer client-data)
+                                            :is-me (= (:username i) username)
+                                            :is-bot (-> i :user :client-status :bot)
+                                            :id i
+                                            :indexed-mod indexed-mod
+                                            :sides sides}
+                         :items side-items
+                         :disable (or (not username)
+                                      (not (or am-host
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))}}
+                       {:fx/type :label
+                        :text "loading..."})})))}}])
          (when (:rank players-table-columns)
            [{:fx/type :table-column
              :editable false
              :text "Rank"
              :pref-width 48
              :resizable false
-             :cell-value-factory (comp u/to-number :rank :client-status :user)
+             :cell-value-factory (juxt (comp (fnil - 0) u/to-number :rank :client-status :user)
+                                       (comp u/to-number :rank :client-status :user))
              :cell-factory
              {:fx/cell-type :table-cell
-              :describe (fn [rank] {:text (str rank)})}}])
+              :describe (fn [[_ rank]] {:text (str rank)})}}])
          (when (:country players-table-columns)
            [{:fx/type :table-column
              :text "Country"
@@ -545,11 +572,15 @@
              :resizable true
              :min-width 64
              :pref-width 64
-             :cell-value-factory identity
+             :cell-value-factory (juxt
+                                   (comp str :handicap :battle-status)
+                                   (comp :handicap :battle-status)
+                                   u/nickname
+                                   identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [i]
+              (fn [[_ bonus _ i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :bonus
@@ -563,7 +594,7 @@
                        :text-formatter
                        {:fx/type :text-formatter
                         :value-converter :integer
-                        :value (int (or (:handicap (:battle-status i)) 0))
+                        :value (int (or bonus 0))
                         :on-value-changed {:event/type :spring-lobby/battle-handicap-change
                                            :client-data (when-not singleplayer client-data)
                                            :is-bot (-> i :user :client-status :bot)

@@ -3437,7 +3437,7 @@
 (defn- update-handicap [client-data id {:keys [is-bot] :as opts} handicap]
   (future
     (try
-      (if is-bot
+      (if (or is-bot (not client-data))
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
         (message/send-message *state client-data (str "HANDICAP " (:username id) " " handicap)))
       (catch Exception e
