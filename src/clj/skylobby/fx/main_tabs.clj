@@ -51,7 +51,8 @@
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^java.util.List my-channel-names selected-tab-channel)
                          0)
-        needs-focus (fx/sub-val context :needs-focus)]
+        needs-focus (fx/sub-val context :needs-focus)
+        mute (fx/sub-val context :mute)]
     (if (seq my-channel-names)
       {:fx/type fx.ext.tab-pane/with-selection-props
        :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-channel-tabs
@@ -69,7 +70,9 @@
                        :text (str channel-name)}
              :id channel-name
              :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
-                                                     (-> needs-focus (get server-key) (get "chat") (contains? channel-name)))
+                                                     (not= selected-tab-channel channel-name)
+                                                     (-> needs-focus (get server-key) (get "chat") (contains? channel-name))
+                                                     (not (contains? (get mute server-key) channel-name)))
                                             ["skylobby-tab-focus"]))
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type :spring-lobby/leave-channel
@@ -96,7 +99,7 @@
 (def no-matchmaking-tab-ids
   ["battles" "chat" "console"])
 (def matchmaking-tab-ids
-  ["battles" "matchmaking" "chat" "console"])
+  ["battles" "chat" "console" "matchmaking"])
 
 
 (defn- main-tab-view-impl
@@ -137,7 +140,6 @@
              :selected-index (or selected-index 0)}
      :desc
      {:fx/type :tab-pane
-      :tab-drag-policy :reorder
       :style {:-fx-font-size 16
               :-fx-min-height 164
               :-fx-pref-height 164}
@@ -216,20 +218,6 @@
               users-view]}
             {:fx/type fx.battles-buttons/battles-buttons-view
              :server-key server-key}]}}]
-        (when matchmaking
-          [{:fx/type :tab
-            :graphic {:fx/type :label
-                      :text "Matchmaking"}
-            :closable false
-            :id "matchmaking"
-            :content
-            {:fx/type :split-pane
-             :divider-positions [0.75]
-             :items
-             [
-              {:fx/type fx.matchmaking/matchmaking-view
-               :server-key server-key}
-              users-view]}}])
         [{:fx/type :tab
           :graphic {:fx/type :label
                     :text "Chat"}
@@ -284,7 +272,21 @@
           :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev) "#console-text-field"))
           :content
           {:fx/type fx.console/console-view
-           :server-key server-key}}])}}))
+           :server-key server-key}}]
+        (when matchmaking
+          [{:fx/type :tab
+            :graphic {:fx/type :label
+                      :text "Matchmaking"}
+            :closable false
+            :id "matchmaking"
+            :content
+            {:fx/type :split-pane
+             :divider-positions [0.99]
+             :items
+             [
+              {:fx/type fx.matchmaking/matchmaking-view
+               :server-key server-key}
+              users-view]}}]))}}))
 
 (defn main-tab-view [state]
   (tufte/profile {:dynamic? true

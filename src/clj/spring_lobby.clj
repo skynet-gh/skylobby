@@ -4243,12 +4243,17 @@
       (log/info "Dissoc" (:key e))
       (swap! *state dissoc (:key e)))))
 
+(defn dissoc-in [m path]
+  (if (empty? path)
+    m
+    (if (= 1 (count path))
+      (dissoc m (first path))
+      (update-in m (drop-last path) dissoc (last path)))))
+
 (defmethod event-handler ::dissoc-in
   [{:keys [path]}]
   (log/info "Dissoc" path)
-  (if (= 1 (count path))
-    (swap! *state dissoc (first path))
-    (swap! *state update-in (drop-last path) dissoc (last path))))
+  (swap! *state dissoc-in path))
 
 (defmethod event-handler ::enable-auto-scroll-if-at-bottom
   [{:fx/keys [^ScrollEvent event]}]
@@ -4552,23 +4557,17 @@
           (log/error e "Error setting console history message"))))))
 
 
-(defn dissoc-if-empty [m path k]
-  (let [sub (if (empty? path) m (get-in m path))
-        new-sub (dissoc sub k)
-        new-path (drop-last path)
-        new-k (last path)]
-    (if new-k
-      (dissoc-if-empty
-        (if (empty? new-sub)
-          (if (empty? new-path)
-            (dissoc m new-k)
-            (update-in m new-path dissoc new-k))
-          (assoc-in m path new-sub))
-        new-path new-k)
-      m)))
+(defn dissoc-if-empty [m path]
+  (let [without (dissoc-in m path)
+        new-path (drop-last path)]
+    (if (empty? (get-in without new-path))
+      (if (seq new-path)
+        (dissoc-if-empty without new-path)
+        {})
+      without)))
 
 (defn update-needs-focus [server-tab main-tab channel-tab needs-focus]
-  (dissoc-if-empty needs-focus [server-tab main-tab] (if (= "battle" main-tab) :battle channel-tab)))
+  (dissoc-if-empty needs-focus [server-tab main-tab (if (= "battle" main-tab) :battle channel-tab)]))
 
 (defmethod event-handler ::selected-item-changed-channel-tabs
   [{:fx/keys [^Tab event] :keys [server-key]}]

@@ -215,4 +215,13 @@
                                                                                "battle" {:battle true}}})))
   (is (= {"server" {"chat" {"channel" true}}}
          (spring-lobby/update-needs-focus "server" "battle" :battle {"server" {"battle" {:battle true}
-                                                                               "chat" {"channel" true}}}))))
+                                                                               "chat" {"channel" true}}})))
+  (is (= {"server" {"chat" {"channel" true}}}
+         (spring-lobby/update-needs-focus "server" "battle" :battle {"server" {"battle" {:battle true}
+                                                                               "chat" {"channel" true}}})))
+  (is (= {"server" {"chat" {"@me" true}}}
+         (spring-lobby/update-needs-focus "server" "chat" "main"
+           {"server" {"chat" {"@me" true}}})))
+  (is (= {"server" {"chat" {"channel1" true}}}
+         (spring-lobby/update-needs-focus "server" "chat" "channel2" {"server" {"chat" {"channel1" true
+                                                                                        "channel2" true}}}))))
