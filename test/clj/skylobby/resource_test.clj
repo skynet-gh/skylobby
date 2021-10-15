@@ -87,6 +87,11 @@
         (resource/could-be-this-map?
           "Seth's Ravine 3.1"
           {:resource-filename "seth_s_ravine_3.1.sd7"
+           :resource-type :spring-lobby/map})))
+  (is (true?
+        (resource/could-be-this-map?
+          "Techno Lands Final 9.0"
+          {:resource-filename "techno_lands_final_v9.0.sdz"
            :resource-type :spring-lobby/map}))))
 
 

@@ -71,12 +71,17 @@
                       resource-filename)
                    (= (http/bar-engine-filename engine-version) resource-filename)))))))
 
+(defn remove-v-before-number [s]
+  (when s
+    (string/replace s #"v(\d+)" "$1")))
+
 (defn normalize-map [map-name-or-filename]
   (some-> map-name-or-filename
           string/lower-case
           (string/replace #"\s+" "_")
           (string/replace #"[-']" "_")
-          (string/replace #"\.sd[7z]$" "")))
+          (string/replace #"\.sd[7z]$" "")
+          remove-v-before-number))
 
 (defn could-be-this-map?
   "Returns true if this resource might be the map with the given name, by magic, false otherwise."
@@ -86,10 +91,6 @@
            (when (and map-name resource-filename)
              (= (normalize-map map-name)
                 (normalize-map resource-filename))))))
-
-(defn remove-v-before-number [s]
-  (when s
-    (string/replace s #"v(\d+)" "$1")))
 
 (defn normalize-mod [mod-name-or-filename]
   (-> mod-name-or-filename
