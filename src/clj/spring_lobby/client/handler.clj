@@ -100,15 +100,19 @@
     (if (and has-engine has-mod has-map)
       (do
         (log/info "Starting game to join host")
-        (spring/start-game
-          state-atom
-          (merge
-            state
-            server-data
-            {:spring-isolation-dir spring-root
-             :engines engines
-             :maps maps
-             :mods mods})))
+        (future
+          (try
+            (spring/start-game
+              state-atom
+              (merge
+                state
+                server-data
+                {:spring-isolation-dir spring-root
+                 :engines engines
+                 :maps maps
+                 :mods mods}))
+            (catch Exception e
+              (log/error e "Error starting spring")))))
       (log/info
         (str "Missing engine, mod, or map\n"
              (with-out-str

@@ -240,6 +240,7 @@
         show-team-skills (fx/sub-val context :show-team-skills)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        spring-running (fx/sub-val context get-in [:spring-running server-key battle-id])
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
         engine-details (fx/sub-ctx context sub/indexed-engine spring-root engine-version)
@@ -264,7 +265,6 @@
         sides (spring/mod-sides battle-mod-details)
         am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
-        am-ingame (fx/sub-ctx context sub/am-ingame server-key)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         username (fx/sub-val context get-in [:by-server server-key :username])
         my-client-status (fx/sub-ctx context sub/my-client-status server-key)
@@ -552,7 +552,7 @@
              :desc
              {:fx/type :button
               :text (cond
-                      (and am-ingame (not singleplayer))
+                      (and spring-running (not singleplayer))
                       "Game running"
                       (and am-spec (not host-ingame) (not singleplayer))
                       "Game not running"
@@ -560,10 +560,11 @@
                       (str (if (and (not singleplayer) (or host-ingame am-spec))
                              "Join" "Start")
                            " Game"))
-              :disable (boolean (and (not singleplayer)
-                                     (or (and (not host-ingame) am-spec)
-                                         (and (not am-spec) am-ingame)
-                                         (not in-sync))))
+              :disable (boolean
+                         (or spring-running
+                             (and (not singleplayer)
+                                  (or (and (not host-ingame) am-spec)
+                                      (not in-sync)))))
               :on-action
               (merge
                 {:event/type :spring-lobby/start-battle}
