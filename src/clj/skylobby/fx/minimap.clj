@@ -283,8 +283,9 @@
                      (.strokeText gc (str text) xt yt)
                      (.setFill gc Color/WHITE)
                      (.fillText gc (str text) xt yt)
-                     (.setFill gc Color/BLACK)
-                     (.fillText gc "x" (- (+ x width) font-size) yt)))))))})]}))
+                     (when (or singleplayer (not am-spec))
+                       (.setFill gc Color/BLACK)
+                       (.fillText gc "x" (- (+ x width) font-size) yt))))))))})]}))
 
 
 (defn minimap-pane [state]
