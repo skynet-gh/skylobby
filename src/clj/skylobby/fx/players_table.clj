@@ -40,6 +40,8 @@
 (def sort-ally (comp u/to-number :ally :battle-status))
 (def sort-skill (comp (fnil - 0) u/parse-skill :skill))
 (def sort-id (comp u/to-number :id :battle-status))
+(def sort-side (comp u/to-number :side :battle-status))
+(def sort-rank (comp (fnil - 0) u/to-number :rank :client-status :user))
 
 
 (defn players-table-impl
@@ -96,11 +98,11 @@
       :items
       (sort-by
         (juxt
-          (comp u/to-number not u/to-bool :mode :battle-status)
-          (comp u/to-number :bot :client-status :user)
-          (comp u/to-number :ally :battle-status)
-          (comp (fnil - 0) u/parse-skill :skill)
-          (comp u/to-number :id :battle-status))
+          sort-playing
+          sort-bot
+          sort-ally
+          sort-skill
+          sort-id)
         players-with-skill)
       :desc
       {:fx/type :table-view
@@ -201,7 +203,10 @@
            :text "Nickname"
            :resizable true
            :min-width 200
-           :cell-value-factory (juxt (comp (fnil string/lower-case "") u/nickname) u/nickname identity)
+           :cell-value-factory (juxt
+                                 (comp (fnil string/lower-case "") u/nickname)
+                                 u/nickname
+                                 identity)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -361,16 +366,17 @@
              :text "Ally"
              :resizable false
              :pref-width 80
-             :cell-value-factory (juxt (comp not u/to-bool :mode :battle-status)
-                                       (comp :ally :battle-status)
-                                       (comp (fnil - 0) u/parse-skill :skill)
-                                       (comp :id :battle-status)
-                                       u/nickname
-                                       identity)
+             :cell-value-factory (juxt
+                                   sort-playing
+                                   sort-ally
+                                   sort-skill
+                                   sort-id
+                                   u/nickname
+                                   identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_status ally _skill _team _username i]]
+              (fn [[_status _ally _skill _team _username i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :ally
@@ -380,7 +386,7 @@
                       :key [(u/nickname i) increment-ids]
                       :desc
                       {:fx/type :combo-box
-                       :value (str ally)
+                       :value (-> i :battle-status :ally str)
                        :on-value-changed {:event/type :spring-lobby/battle-ally-changed
                                           :client-data (when-not singleplayer client-data)
                                           :is-me (= (:username i) username)
@@ -403,7 +409,7 @@
                                    sort-playing
                                    sort-id
                                    sort-skill
-                                   :username
+                                   u/nickname
                                    identity)
              :cell-factory
              {:fx/cell-type :table-cell
@@ -439,11 +445,11 @@
              :text "Color"
              :resizable false
              :pref-width 130
-             :cell-value-factory identity
+             :cell-value-factory (juxt :team-color u/nickname identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [{:keys [team-color] :as i}]
+              (fn [[team-color i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :color
@@ -470,34 +476,34 @@
              :pref-width 80
              :cell-value-factory (juxt
                                    sort-playing
-                                   #(-> % :battle-status :mode u/to-bool not boolean)
                                    sort-skill
-                                   :username
+                                   u/nickname
                                    identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ am-spec _ _ i]]
+              (fn [[_ _ _ i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :spectator
-                    {:text ""
-                     :graphic
-                     {:fx/type ext-recreate-on-key-changed
-                      :key (u/nickname i)
-                      :desc
-                      {:fx/type :check-box
-                       :selected (boolean am-spec)
-                       :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                             :client-data (when-not singleplayer client-data)
-                                             :is-me (= (:username i) username)
-                                             :is-bot (-> i :user :client-status :bot)
-                                             :id i
-                                             :ready-on-unspec ready-on-unspec}
-                       :disable (or (not username)
-                                    (not (or (and am-host (not am-spec))
-                                             (= (:username i) username)
-                                             (= (:owner i) username))))}}})))}}])
+                    (let [is-spec (-> i :battle-status :mode u/to-bool not boolean)]
+                      {:text ""
+                       :graphic
+                       {:fx/type ext-recreate-on-key-changed
+                        :key (u/nickname i)
+                        :desc
+                        {:fx/type :check-box
+                         :selected (boolean is-spec)
+                         :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
+                                               :client-data (when-not singleplayer client-data)
+                                               :is-me (= (:username i) username)
+                                               :is-bot (-> i :user :client-status :bot)
+                                               :id i
+                                               :ready-on-unspec ready-on-unspec}
+                         :disable (or (not username)
+                                      (not (or (and am-host (not is-spec))
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))}}}))))}}])
          (when (:faction players-table-columns)
            [{:fx/type :table-column
              :text "Faction"
@@ -505,14 +511,14 @@
              :pref-width 120
              :cell-value-factory (juxt
                                    sort-playing
-                                   (comp :side :battle-status)
+                                   sort-side
                                    sort-skill
                                    :username
                                    identity)
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ side _ _ i]]
+              (fn [[_ _ _ _ i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :faction
@@ -523,7 +529,7 @@
                         :key (u/nickname i)
                         :desc
                         {:fx/type :combo-box
-                         :value (->> side (get sides) str)
+                         :value (->> i :battle-status :side (get sides) str)
                          :on-value-changed {:event/type :spring-lobby/battle-side-changed
                                             :client-data (when-not singleplayer client-data)
                                             :is-me (= (:username i) username)
@@ -544,8 +550,9 @@
              :text "Rank"
              :pref-width 48
              :resizable false
-             :cell-value-factory (juxt (comp (fnil - 0) u/to-number :rank :client-status :user)
-                                       (comp u/to-number :rank :client-status :user))
+             :cell-value-factory (juxt
+                                   sort-rank
+                                   (comp u/to-number :rank :client-status :user))
              :cell-factory
              {:fx/cell-type :table-cell
               :describe (fn [[_ rank]] {:text (str rank)})}}])
