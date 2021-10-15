@@ -565,7 +565,6 @@
                   (log/info "(spring err)" line)
                   (recur))
                 (log/info "Spring stderr stream closed")))))
-        (future
-          (.waitFor process))))
+        (.waitFor process)))
     (catch Exception e
       (log/error e "Error starting replay" replay-file))))

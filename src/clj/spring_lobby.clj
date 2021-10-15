@@ -4353,14 +4353,20 @@
   (future
     (try
       (let [replay-file (:file replay)]
-        (swap! *state assoc-in [:replays-watched (fs/canonical-path replay-file)] true)
+        (swap! *state
+          (fn [state]
+            (-> state
+                (assoc-in [:replays-watched (fs/canonical-path replay-file)] true)
+                (assoc-in [:spring-running :replay :replay] true))))
         (spring/watch-replay
           {:engine-version engine-version
            :engines engines
            :replay-file replay-file
            :spring-isolation-dir spring-isolation-dir}))
       (catch Exception e
-        (log/error e "Error watching replay" replay)))))
+        (log/error e "Error watching replay" replay))
+      (finally
+        (swap! *state assoc-in [:spring-running :replay :replay] false)))))
 
 
 (defmethod event-handler ::select-replay
