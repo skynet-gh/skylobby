@@ -108,11 +108,7 @@
             {:server1
              {:users
               {"skynet"
-               {:client-status {:access false
-                                :away false
-                                :bot false
-                                :ingame false
-                                :rank 0}
+               {
                 :country "??"
                 :cpu nil
                 :user-agent "SpringLobby 0.270 (win x32)"
@@ -126,11 +122,7 @@
             {:server1
              {:users
               {"ChanServ"
-               {:client-status {:access false
-                                :away false
-                                :bot false
-                                :ingame false
-                                :rank 0}
+               {
                 :country "US"
                 :cpu nil
                 :user-agent "ChanServ"
@@ -144,11 +136,7 @@
             {:server1
              {:users
               {"[teh]host20"
-               {:client-status {:access false
-                                :away false
-                                :bot false
-                                :ingame false
-                                :rank 0}
+               {
                 :country "HU"
                 :cpu nil
                 :user-agent "SPADS v0.12.18"
@@ -162,11 +150,7 @@
             {:server1
              {:users
               {"skynet"
-               {:client-status {:access false
-                                :away false
-                                :bot false
-                                :ingame false
-                                :rank 0}
+               {
                 :country "??"
                 :cpu nil
                 :user-agent nil
@@ -180,11 +164,7 @@
             {:server1
              {:users
               {"Zecrus"
-               {:client-status {:access false
-                                :away false
-                                :bot false
-                                :ingame false
-                                :rank 0}
+               {
                 :country "US"
                 :cpu "0"
                 :user-agent "SpringLobby 0.270-49-gab254fe7d (windows64)"
@@ -212,11 +192,7 @@
                 :my-channels {"@skynet" {}}
                 :users
                 {"skynet"
-                 {:client-status {:access false
-                                  :away false
-                                  :bot false
-                                  :ingame false
-                                  :rank 0}
+                 {
                   :country "??"
                   :cpu nil
                   :user-agent nil
@@ -442,7 +418,9 @@
                           :battles
                           {:battle1
                            {:host-username host}}
-                          :username me}}})
+                          :username me
+                          :users
+                          {host {:client-status {:ingame false}}}}}})
           game-started (atom false)
           server-key :server1
           client-status-str (cu/encode-client-status
