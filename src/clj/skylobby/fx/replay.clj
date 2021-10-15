@@ -139,6 +139,7 @@
 (defn replay-view
   [{:fx/keys [context] :keys [show-sync show-sync-left]}]
   (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+        spring-running (fx/sub-val context get-in [:spring-running :replay :replay])
         replay-minimap-type (fx/sub-val context :replay-minimap-type)
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
@@ -296,7 +297,10 @@
            (when (and selected-matching-engine selected-matching-mod selected-matching-map)
              (let [watch-button {:fx/type :button
                                  :style {:-fx-font-size 24}
-                                 :text " Watch"
+                                 :text (if spring-running
+                                         " Watching a replay"
+                                         " Watch")
+                                 :disable (boolean spring-running)
                                  :on-action
                                  {:event/type :spring-lobby/watch-replay
                                   :engines engines
@@ -378,6 +382,7 @@
         replay-downloads-by-mod (fx/sub-val context :replay-downloads-by-mod)
         replay-imports-by-map (fx/sub-val context :replay-imports-by-map)
         replay-imports-by-mod (fx/sub-val context :replay-imports-by-mod)
+        spring-running (fx/sub-val context get-in [:spring-running :replay :replay])
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
         replays (fx/sub-val context :filtered-replays)
         sorted-replays (->> replays
@@ -702,7 +707,10 @@
                             :icon-literal "mdi-download:16:white"}})
                         (and matching-engine matching-mod matching-map)
                         {:fx/type :button
-                         :text " Watch"
+                         :text (if spring-running
+                                 " Watching a replay"
+                                 " Watch")
+                         :disable (boolean spring-running)
                          :on-action
                          {:event/type :spring-lobby/watch-replay
                           :engines engines

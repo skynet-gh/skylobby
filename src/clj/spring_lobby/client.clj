@@ -167,9 +167,11 @@
       (message/send-message state-atom client-data "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
-        (when-not (or (u/battle-channel-name? channel-name)
-                      (u/user-channel-name? channel-name))
-          (message/send-message state-atom client-data (str "JOIN " channel-name)))))
+        (if (and channel-name
+                 (not (u/battle-channel-name? channel-name))
+                 (not (u/user-channel-name? channel-name)))
+          (message/send-message state-atom client-data (str "JOIN " channel-name))
+          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))
     (ping-loop state-atom server-key client-data)))
 
 (defmethod handler/handle "MOTD" [_state-atom _server-url m]

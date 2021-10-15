@@ -15,27 +15,35 @@
   (let [
         channels (fx/sub-val context get-in [:by-server server-key :channels])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])]
+        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
+        items (->> (vals channels)
+                   u/non-battle-channels
+                   (sort-by :channel-name String/CASE_INSENSITIVE_ORDER)
+                   doall)]
     {:fx/type :table-view
+     :style {:-fx-min-width "240"}
      :column-resize-policy :constrained
-     :items (->> (vals channels)
-                 u/non-battle-channels
-                 (sort-by :channel-name String/CASE_INSENSITIVE_ORDER))
+     :items items
      :columns
      [{:fx/type :table-column
        :text "Channel"
+       :pref-width 100
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [i] {:text (str (:channel-name i))})}}
       {:fx/type :table-column
-       :text "User Count"
+       :text "Users"
+       :resizable false
+       :pref-width 60
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell
         :describe (fn [i] {:text (str (:user-count i))})}}
       {:fx/type :table-column
        :text "Actions"
+       :resizable false
+       :pref-width 80
        :cell-value-factory identity
        :cell-factory
        {:fx/cell-type :table-cell

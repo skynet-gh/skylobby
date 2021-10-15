@@ -237,10 +237,10 @@
                              :faction true
                              :country true
                              :bonus true}
+     :ready-on-unspec true
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers
-     :use-default-ring-sound true
-     :unready-after-game true}
+     :use-default-ring-sound true}
     (apply
       merge
       (doall
@@ -1328,7 +1328,7 @@
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 20 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
              (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
@@ -4243,12 +4243,17 @@
       (log/info "Dissoc" (:key e))
       (swap! *state dissoc (:key e)))))
 
+(defn dissoc-in [m path]
+  (if (empty? path)
+    m
+    (if (= 1 (count path))
+      (dissoc m (first path))
+      (update-in m (drop-last path) dissoc (last path)))))
+
 (defmethod event-handler ::dissoc-in
   [{:keys [path]}]
   (log/info "Dissoc" path)
-  (if (= 1 (count path))
-    (swap! *state dissoc (first path))
-    (swap! *state update-in (drop-last path) dissoc (last path))))
+  (swap! *state dissoc-in path))
 
 (defmethod event-handler ::enable-auto-scroll-if-at-bottom
   [{:fx/keys [^ScrollEvent event]}]
@@ -4348,14 +4353,20 @@
   (future
     (try
       (let [replay-file (:file replay)]
-        (swap! *state assoc-in [:replays-watched (fs/canonical-path replay-file)] true)
+        (swap! *state
+          (fn [state]
+            (-> state
+                (assoc-in [:replays-watched (fs/canonical-path replay-file)] true)
+                (assoc-in [:spring-running :replay :replay] true))))
         (spring/watch-replay
           {:engine-version engine-version
            :engines engines
            :replay-file replay-file
            :spring-isolation-dir spring-isolation-dir}))
       (catch Exception e
-        (log/error e "Error watching replay" replay)))))
+        (log/error e "Error watching replay" replay))
+      (finally
+        (swap! *state assoc-in [:spring-running :replay :replay] false)))))
 
 
 (defmethod event-handler ::select-replay
@@ -4497,12 +4508,19 @@
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
 
-(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted]}]
+(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted server-key]}]
   (let [now (u/curr-millis)]
     (if (or (not discord-promoted)
             (< (- now discord-promoted) discord/cooldown))
       (do
-        (swap! *state assoc-in [:discord-promoted discord-channel] now)
+        (swap! *state
+          (fn [state]
+            (let [channel-name (u/visible-channel state server-key)]
+              (-> state
+                  (assoc-in [:discord-promoted discord-channel] now)
+                  (update-in [:by-server server-key :channels channel-name :messages] conj {:text "Promoted to Discord"
+                                                                                            :timestamp now
+                                                                                            :message-type :info})))))
         (future
           (try
             (discord/promote-battle discord-channel data)
@@ -4552,23 +4570,17 @@
           (log/error e "Error setting console history message"))))))
 
 
-(defn dissoc-if-empty [m path k]
-  (let [sub (if (empty? path) m (get-in m path))
-        new-sub (dissoc sub k)
-        new-path (drop-last path)
-        new-k (last path)]
-    (if new-k
-      (dissoc-if-empty
-        (if (empty? new-sub)
-          (if (empty? new-path)
-            (dissoc m new-k)
-            (update-in m new-path dissoc new-k))
-          (assoc-in m path new-sub))
-        new-path new-k)
-      m)))
+(defn dissoc-if-empty [m path]
+  (let [without (dissoc-in m path)
+        new-path (drop-last path)]
+    (if (empty? (get-in without new-path))
+      (if (seq new-path)
+        (dissoc-if-empty without new-path)
+        {})
+      without)))
 
 (defn update-needs-focus [server-tab main-tab channel-tab needs-focus]
-  (dissoc-if-empty needs-focus [server-tab main-tab] (if (= "battle" main-tab) :battle channel-tab)))
+  (dissoc-if-empty needs-focus [server-tab main-tab (if (= "battle" main-tab) :battle channel-tab)]))
 
 (defmethod event-handler ::selected-item-changed-channel-tabs
   [{:fx/keys [^Tab event] :keys [server-key]}]
@@ -4827,12 +4839,15 @@
                                           :username username})]
             (if (contains? by-server server-key)
               (log/warn "Already connected to" server-key)
-              (event-handler
-                (merge
-                  {:event/type ::connect
-                   :server server
-                   :server-key server-key}
-                  login)))))))))
+              @(event-handler
+                 (merge
+                   {:event/type ::connect
+                    :server server
+                    :server-key server-key}
+                   login)))))))))
+
+(defmethod task-handler ::auto-connect-servers [_]
+  (auto-connect-servers *state))
 
 (defmethod event-handler ::auto-connect-servers [_]
   (future

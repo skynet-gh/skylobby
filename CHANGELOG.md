@@ -24,6 +24,16 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.16]
+
+- Fix chat tab highlight when not focused
+- Stop showing battle time when started before login
+- Prevent attempt to watch multiple replays
+- Track spring running per battle to prevent dupe starts
+- Add info message in chat when promoting to discord
+- Make auto connect servers on init async
+- Prevent attempt to join invalid channels
+
 ### [0.6.15]
 
 - Add info messages in chat for slash commands

@@ -54,8 +54,8 @@
                 :country country
                 :cpu cpu
                 :user-id user-id
-                :user-agent user-agent
-                :client-status cu/default-client-status}
+                :user-agent user-agent}
+                ;:client-status cu/default-client-status}
           channel-name (u/user-channel username)]
       (swap! state-atom update-in [:by-server server-key]
         (fn [server-data]
@@ -100,15 +100,19 @@
     (if (and has-engine has-mod has-map)
       (do
         (log/info "Starting game to join host")
-        (spring/start-game
-          state-atom
-          (merge
-            state
-            server-data
-            {:spring-isolation-dir spring-root
-             :engines engines
-             :maps maps
-             :mods mods})))
+        (future
+          (try
+            (spring/start-game
+              state-atom
+              (merge
+                state
+                server-data
+                {:spring-isolation-dir spring-root
+                 :engines engines
+                 :maps maps
+                 :mods mods}))
+            (catch Exception e
+              (log/error e "Error starting spring")))))
       (log/info
         (str "Missing engine, mod, or map\n"
              (with-out-str
@@ -127,9 +131,9 @@
                                        (cond-> user-data
                                          true
                                          (assoc :client-status decoded-status)
-                                         (and (not (:ingame prev-status)) (:ingame decoded-status))
+                                         (and prev-status (not (:ingame prev-status)) (:ingame decoded-status))
                                          (assoc :game-start-time now)
-                                         (and (not (:away user-data)) (:away decoded-status))
+                                         (and prev-status (not (:away prev-status)) (:away decoded-status))
                                          (assoc :away-start-time now)))))
         {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
     (if-not (= (get-in battles [(:battle-id battle) :host-username]) username)

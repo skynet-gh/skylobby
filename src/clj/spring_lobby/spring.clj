@@ -370,6 +370,9 @@
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
         now (u/curr-millis)
+        server-key (u/server-key client-data)
+        battle-id (-> state :battle :battle-id)
+        _ (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
@@ -422,7 +425,7 @@
                          (catch Exception e
                            (log/error e "Error backing up infolog")))
                        (when (:unready-after-game state)
-                         (let [server-key (u/server-key client-data)
+                         (let [
                                state (swap! state-atom update-in [:by-server server-key]
                                        (fn [server-data]
                                          (if (:battle server-data)
@@ -509,21 +512,21 @@
                       (log/info "(spring err)" line)
                       (recur))
                     (log/info "Spring stderr stream closed")))))
-            (future
+            (try
+              (.waitFor process)
               (try
-                (.waitFor process)
-                (set-ingame false)
-                (try
-                  (post-game-fn)
-                  (catch Exception e
-                    (log/error e "Error in post-game-fn")))
+                (post-game-fn)
                 (catch Exception e
-                  (log/error e "Error waiting for Spring to close"))
-                (catch Throwable t
-                  (log/error t "Fatal error waiting for Spring to close")
-                  (throw t)))))))
+                  (log/error e "Error in post-game-fn")))
+              (catch Exception e
+                (log/error e "Error waiting for Spring to close"))
+              (catch Throwable t
+                (log/error t "Fatal error waiting for Spring to close")
+                (throw t))))))
       (catch Exception e
-        (log/error e "Error starting game")
+        (log/error e "Error starting game"))
+      (finally
+        (swap! state-atom assoc-in [:spring-running server-key battle-id] false)
         (set-ingame false)))))
 
 
@@ -565,7 +568,6 @@
                   (log/info "(spring err)" line)
                   (recur))
                 (log/info "Spring stderr stream closed")))))
-        (future
-          (.waitFor process))))
+        (.waitFor process)))
     (catch Exception e
       (log/error e "Error starting replay" replay-file))))
