@@ -366,7 +366,8 @@
                          :data {:battle-title (get-in battles [battle-id :battle-title])
                                 :map-name map-name
                                 :mod-name mod-name
-                                :team-counts team-counts}}
+                                :team-counts team-counts}
+                         :server-key server-key}
                         {:event/type :spring-lobby/send-message
                          :channel-name channel-name
                          :client-data client-data

@@ -4502,12 +4502,19 @@
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
 
-(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted]}]
+(defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted server-key]}]
   (let [now (u/curr-millis)]
     (if (or (not discord-promoted)
             (< (- now discord-promoted) discord/cooldown))
       (do
-        (swap! *state assoc-in [:discord-promoted discord-channel] now)
+        (swap! *state
+          (fn [state]
+            (let [channel-name (u/visible-channel state server-key)]
+              (-> state
+                  (assoc-in [:discord-promoted discord-channel] now)
+                  (update-in [:by-server server-key :channels channel-name :messages] conj {:text "Promoted to Discord"
+                                                                                            :timestamp now
+                                                                                            :message-type :info})))))
         (future
           (try
             (discord/promote-battle discord-channel data)
