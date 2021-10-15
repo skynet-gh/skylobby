@@ -14,12 +14,19 @@
 (defn create []
   (proxy [Tooltip] []
     (show
-      ([owner]
+      ([^javafx.stage.Window owner]
        (when (.isFocused owner)
-         (proxy-super show owner)))
-      ([owner x y]
-       (when (.isFocused owner)
-         (proxy-super show owner x y))))))
+         (let [^Tooltip this this]
+           (proxy-super show owner))))
+      ([owner ^double x ^double y]
+       (let [^Tooltip this this]
+         (if (instance? javafx.scene.Node owner)
+           (let [^javafx.scene.Node owner owner]
+             (when (.isFocused owner)
+               (proxy-super show owner x y)))
+           (let [^javafx.stage.Window owner owner]
+             (when (.isFocused owner)
+               (proxy-super show owner x y)))))))))
 
 (def lifecycle
   (composite/lifecycle

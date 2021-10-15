@@ -1328,7 +1328,7 @@
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 20 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 10 :seconds))
              (java-time/duration 1 :seconds))
            (fn [_chimestamp]
              (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom

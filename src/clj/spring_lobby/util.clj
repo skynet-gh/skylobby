@@ -447,7 +447,7 @@
 (defn base64-encode [bs]
   (.encodeToString (Base64/getEncoder) bs))
 
-(defn base64-decode [to-decode]
+(defn base64-decode [^String to-decode]
   (String. (.decode (Base64/getDecoder) to-decode)))
 
 ; https://gist.github.com/jizhang/4325757
