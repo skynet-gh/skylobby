@@ -176,7 +176,8 @@
                   (log/info "Mounting renderer")
                   (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/init-async spring-lobby/*state)
-                (spring-lobby/auto-connect-servers spring-lobby/*state)
+                (future
+                  (spring-lobby/auto-connect-servers spring-lobby/*state))
                 (future
                   (log/info "Start 7Zip init, async")
                   (fs/init-7z!)

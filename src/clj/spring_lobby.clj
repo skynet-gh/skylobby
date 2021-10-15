@@ -4839,12 +4839,15 @@
                                           :username username})]
             (if (contains? by-server server-key)
               (log/warn "Already connected to" server-key)
-              (event-handler
-                (merge
-                  {:event/type ::connect
-                   :server server
-                   :server-key server-key}
-                  login)))))))))
+              @(event-handler
+                 (merge
+                   {:event/type ::connect
+                    :server server
+                    :server-key server-key}
+                   login)))))))))
+
+(defmethod task-handler ::auto-connect-servers [_]
+  (auto-connect-servers *state))
 
 (defmethod event-handler ::auto-connect-servers [_]
   (future

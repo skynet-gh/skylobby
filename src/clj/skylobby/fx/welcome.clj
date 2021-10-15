@@ -101,7 +101,9 @@
         servers (fx/sub-val context :servers)
         password (fx/sub-val context :password)
         username (fx/sub-val context :username)
-        verification-code (fx/sub-val context :verification-code)]
+        verification-code (fx/sub-val context :verification-code)
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        auto-connect-running (seq (get tasks-by-type :spring-lobby/auto-connect-servers))]
     {:fx/type :v-box
      :spacing 10
      :children
@@ -218,11 +220,16 @@
             auto-servers-not-connected (fx/sub-ctx context skylobby.fx/auto-servers-not-connected-sub)]
         (when (seq auto-servers)
           [{:fx/type :button
-            :text (if (empty? auto-servers-not-connected)
-                    "All auto-connect servers connected"
-                    (str "Connect to " (count auto-servers-not-connected) " auto-connect servers"))
-            :disable (empty? auto-servers-not-connected)
-            :on-action {:event/type :spring-lobby/auto-connect-servers}}]))
+            :text
+            (if auto-connect-running
+              "Connecting..."
+              (if (empty? auto-servers-not-connected)
+                "All auto-connect servers connected"
+                (str "Connect to " (count auto-servers-not-connected) " auto-connect servers")))
+            :disable (boolean (or auto-connect-running
+                                  (empty? auto-servers-not-connected)))
+            :on-action {:event/type :spring-lobby/add-task
+                        :task {:spring-lobby/task-type :spring-lobby/auto-connect-servers}}}]))
       (when agreement
         [{:fx/type :label
           :style {:-fx-font-size 20}
