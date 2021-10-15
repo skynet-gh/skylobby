@@ -237,10 +237,10 @@
                              :faction true
                              :country true
                              :bonus true}
+     :ready-on-unspec true
      :spring-isolation-dir (fs/default-isolation-dir)
      :servers default-servers
-     :use-default-ring-sound true
-     :unready-after-game true}
+     :use-default-ring-sound true}
     (apply
       merge
       (doall
