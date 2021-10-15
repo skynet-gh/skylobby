@@ -185,7 +185,7 @@
            [
             {:fx/type :split-pane
              :v-box/vgrow :always
-             :divider-positions [0.75]
+             :divider-positions [0.99]
              :items
              [
               {:fx/type :v-box
@@ -232,38 +232,40 @@
                                          ["skylobby-tab-focus"]))
           :content
           {:fx/type :split-pane
-           :divider-positions [0.70 0.9]
+           :divider-positions [0.90]
            :items
            [{:fx/type my-channels-view
              :server-key server-key}
-            users-view
             {:fx/type :v-box
              :children
-             [{:fx/type :label
-               :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
-              {:fx/type fx.channels/channels-table
-               :v-box/vgrow :always
-               :server-key server-key}
-              {:fx/type :h-box
-               :alignment :center-left
+             [users-view
+              {:fx/type :v-box
                :children
-               [
-                {:fx/type :button
-                 :text ""
-                 :on-action {:event/type :spring-lobby/join-channel
-                             :channel-name join-channel-name
-                             :client-data client-data}
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-plus:20:white"}}
-                {:fx/type :text-field
-                 :text join-channel-name
-                 :prompt-text "New Channel"
-                 :on-text-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:by-server server-key :join-channel-name]}
-                 :on-action {:event/type :spring-lobby/join-channel
-                             :channel-name join-channel-name
-                             :client-data client-data}}]}]}]}}
+               [{:fx/type :label
+                 :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
+                {:fx/type fx.channels/channels-table
+                 :v-box/vgrow :always
+                 :server-key server-key}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [
+                  {:fx/type :button
+                   :text ""
+                   :on-action {:event/type :spring-lobby/join-channel
+                               :channel-name join-channel-name
+                               :client-data client-data}
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-plus:20:white"}}
+                  {:fx/type :text-field
+                   :text join-channel-name
+                   :prompt-text "New Channel"
+                   :on-text-changed {:event/type :spring-lobby/assoc-in
+                                     :path [:by-server server-key :join-channel-name]}
+                   :on-action {:event/type :spring-lobby/join-channel
+                               :channel-name join-channel-name
+                               :client-data client-data}}]}]}]}]}}
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text "Console"}
