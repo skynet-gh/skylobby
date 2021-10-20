@@ -13,7 +13,6 @@
     [clojure.set]
     [clojure.string :as string]
     [crypto.random]
-    [diehard.core :as dh]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -68,15 +67,12 @@
 (set! *warn-on-reflection* true)
 
 
-(declare limit-download-status download-http-resource)
+(declare download-http-resource)
 
 
 (def app-version (u/app-version))
 
 (def wait-init-tasks-ms 20000)
-
-(dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
-
 
 (def start-pos-r 10.0)
 
@@ -149,9 +145,9 @@
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-joinas-spec :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
-   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :replays-tags
-   :replays-watched :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
+   :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
+   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec
+   :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -176,7 +172,7 @@
 
 (defn- select-replays [state]
   (select-keys state
-    [:online-bar-replays]))
+    [:online-bar-replays :replays-tags :replays-watched]))
 
 (def state-to-edn
   [{:select-fn select-config
@@ -196,23 +192,23 @@
 
 (def default-servers
   {
+   "lobby.springrts.com:8200"
+   {:host "lobby.springrts.com"
+    :port 8200
+    :alias "Spring Official"}
+   "bar.teifion.co.uk:8200"
+   {:host "bar.teifion.co.uk"
+    :port 8200
+    :alias "Beyond All Reason"}
    "bar.teifion.co.uk:8201"
    {:host "bar.teifion.co.uk"
     :port 8201
     :alias "Beyond All Reason (SSL)"
     :ssl true}
-   "bar.teifion.co.uk:8200"
-   {:host "bar.teifion.co.uk"
-    :port 8200
-    :alias "Beyond All Reason"}
-   "lobby.springrts.com:8200"
-   {:host "lobby.springrts.com"
-    :port 8200
-    :alias "Spring Official"}
    "balancedannihilation.com:8200"
    {:host "balancedannihilation.com"
     :port 8200
-    :alias "Balanced Annihilation"}})
+    :alias "Mandohost"}})
 
 
 (defn initial-state []
@@ -556,9 +552,12 @@
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
-                              (filter (comp #{::rapid-download} ::task-type))
+                              (filter (comp #{::rapid-download} :task-type))
                               (filter (comp #{rapid-id} :rapid-id))
                               first)
+              update-rapid-task (->> all-tasks
+                                     (filter (comp #{::update-rapid ::update-rapid-packages}))
+                                     first)
               importables (vals importables-by-path)
               map-importable (some->> importables
                                       (filter (comp #{::map} :resource-type))
@@ -694,6 +693,7 @@
                        (cond
                          (and rapid-id
                               (not rapid-task)
+                              (not update-rapid-task)
                               engine-file
                               (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))))
                               (check-cooldown cooldowns [:rapid (:id rapid-data)]))
@@ -717,6 +717,8 @@
                      (when
                        (and no-mod
                             (not rapid-id)
+                            (not rapid-task)
+                            (not update-rapid-task)
                             (-> new-server :battle :battle-id)
                             (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))
                               ; ^ only do when first joining a battle
@@ -2692,15 +2694,13 @@
                                               :recursive extra-replay-recursive})
           (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
 
-(defmethod event-handler ::spring-root-focused-changed [{:fx/keys [event]}]
-  (when-not event
-    (swap! *state dissoc :spring-isolation-dir-draft)))
 
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future
     (try
       (swap! *state
         (fn [{:keys [spring-isolation-dir-draft] :as state}]
+          (log/info "Attempting to update spring dir to" spring-isolation-dir-draft)
           (let [f (io/file spring-isolation-dir-draft)
                 isolation-dir (if (fs/exists? f)
                                 f

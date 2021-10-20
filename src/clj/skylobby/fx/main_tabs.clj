@@ -2,7 +2,6 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
-    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
@@ -105,7 +104,6 @@
 (defn- main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-as-tab (fx/sub-val context :battle-as-tab)
-        filter-battles (fx/sub-val context :filter-battles)
         join-channel-name (fx/sub-val context get-in [:by-server server-key :join-channel-name])
         pop-out-battle (fx/sub-val context :pop-out-battle)
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
@@ -188,33 +186,9 @@
              :divider-positions [0.99]
              :items
              [
-              {:fx/type :v-box
-               :children
-               [{:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 (concat
-                   [
-                    {:fx/type :label
-                     :text (str "Battles (" (count battles) ")")}
-                    {:fx/type :pane
-                     :h-box/hgrow :always}
-                    {:fx/type :label
-                     :text (str " Filter: ")}
-                    {:fx/type :text-field
-                     :text (str filter-battles)
-                     :on-text-changed {:event/type :spring-lobby/assoc
-                                       :key :filter-battles}}]
-                   (when-not (string/blank? filter-battles)
-                     [{:fx/type :button
-                       :on-action {:event/type :spring-lobby/dissoc
-                                   :key :filter-battles}
-                       :graphic
-                       {:fx/type font-icon/lifecycle
-                        :icon-literal "mdi-close:16:white"}}]))}
-                {:fx/type fx.battles-table/battles-table
-                 :v-box/vgrow :always
-                 :server-key server-key}]}
+              {:fx/type fx.battles-table/battles-table
+               :v-box/vgrow :always
+               :server-key server-key}
               users-view]}
             {:fx/type fx.battles-buttons/battles-buttons-view
              :server-key server-key}]}}]

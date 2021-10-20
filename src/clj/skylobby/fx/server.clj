@@ -18,6 +18,17 @@
 (def server-window-width 640)
 (def server-window-height 400)
 
+(def fixed-order ; reversed
+  [
+   "Beyond All Reason (SSL)"
+   "Beyond All Reason"
+   "SpringLobby"
+   "Spring Official"])
+(def fixed-order-indices
+  (->> fixed-order
+       (map-indexed (fn [i s] [s (inc i)]))
+       (into {})))
+
 
 (defn- server-cell
   [[server-url server-data]]
@@ -35,7 +46,7 @@
         value (->> servers
                    (filter (comp #{(first server)} first))
                    first)
-        items (sort-by (juxt (comp :alias second) first) servers)]
+        items (sort-by (juxt (comp (fnil - 0) fixed-order-indices :alias second) (comp :alias second) first) servers)]
     {:fx/type ext-recreate-on-key-changed
      :key items
      :desc

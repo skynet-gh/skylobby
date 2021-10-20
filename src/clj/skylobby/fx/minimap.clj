@@ -236,7 +236,8 @@
                        y (or (:y drag) y)
                        text (if random "?"
                               (if increment-ids
-                                (inc (u/to-number team))
+                                (when-let [n (u/to-number team)]
+                                  (inc n))
                                 team))
                        xc (- x (if (= 1 (count (str text))) ; single digit
                                  (* u/start-pos-r -0.6)
