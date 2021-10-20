@@ -24,6 +24,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.17]
+
+- Attempt to fix issue with auto get resources and rapid
+- Fix issue setting custom spring root
+- Fix spring root for singleplayer
+- Add controls to hide battles by status
+- Add missing vote cancel spads message format
+- Add sort order to servers
+
 ### [0.6.16]
 
 - Fix chat tab highlight when not focused
