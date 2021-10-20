@@ -556,9 +556,12 @@
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
-                              (filter (comp #{::rapid-download} ::task-type))
+                              (filter (comp #{::rapid-download} :task-type))
                               (filter (comp #{rapid-id} :rapid-id))
                               first)
+              update-rapid-task (->> all-tasks
+                                     (filter (comp #{::update-rapid ::update-rapid-packages}))
+                                     first)
               importables (vals importables-by-path)
               map-importable (some->> importables
                                       (filter (comp #{::map} :resource-type))
@@ -694,6 +697,7 @@
                        (cond
                          (and rapid-id
                               (not rapid-task)
+                              (not update-rapid-task)
                               engine-file
                               (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))))
                               (check-cooldown cooldowns [:rapid (:id rapid-data)]))
@@ -717,6 +721,8 @@
                      (when
                        (and no-mod
                             (not rapid-id)
+                            (not rapid-task)
+                            (not update-rapid-task)
                             (-> new-server :battle :battle-id)
                             (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))
                               ; ^ only do when first joining a battle
