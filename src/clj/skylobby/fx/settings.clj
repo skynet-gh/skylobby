@@ -120,13 +120,13 @@
                   :children
                   [
                    {:fx/type :text-field
-                    :on-focused-changed {:event/type :spring-lobby/spring-root-focused-changed}
                     :text (str
                             (or
                               spring-isolation-dir-draft
                               (fs/canonical-path spring-isolation-dir)
                               spring-isolation-dir))
-                    :style {:-fx-max-width 480}
+                    :style {:-fx-pref-width 480
+                            :-fx-max-width 500}
                     :on-text-changed {:event/type :spring-lobby/assoc
                                       :key :spring-isolation-dir-draft}}
                    {:fx/type :button

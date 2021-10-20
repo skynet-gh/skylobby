@@ -76,7 +76,8 @@
    (fx/sub-val context get-in [:by-server server-key :client-data :server-url]))
 
 (defn spring-root [context server-key]
-  (let [servers (fx/sub-val context :servers)
-        server-url (fx/sub-ctx context server-url server-key)]
-    (or (-> servers (get server-url) :spring-isolation-dir)
-        (fx/sub-val context :spring-isolation-dir))))
+  (or (when (not= :local server-key)
+        (let [servers (fx/sub-val context :servers)
+              server-url (fx/sub-ctx context server-url server-key)]
+          (-> servers (get server-url) :spring-isolation-dir)))
+      (fx/sub-val context :spring-isolation-dir)))

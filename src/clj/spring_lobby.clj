@@ -2698,15 +2698,13 @@
                                               :recursive extra-replay-recursive})
           (dissoc :extra-replay-name :extra-replay-path :extra-replay-recursive)))))
 
-(defmethod event-handler ::spring-root-focused-changed [{:fx/keys [event]}]
-  (when-not event
-    (swap! *state dissoc :spring-isolation-dir-draft)))
 
 (defmethod event-handler ::save-spring-isolation-dir [_e]
   (future
     (try
       (swap! *state
         (fn [{:keys [spring-isolation-dir-draft] :as state}]
+          (log/info "Attempting to update spring dir to" spring-isolation-dir-draft)
           (let [f (io/file spring-isolation-dir-draft)
                 isolation-dir (if (fs/exists? f)
                                 f
