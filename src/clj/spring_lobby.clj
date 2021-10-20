@@ -196,23 +196,23 @@
 
 (def default-servers
   {
+   "lobby.springrts.com:8200"
+   {:host "lobby.springrts.com"
+    :port 8200
+    :alias "Spring Official"}
+   "bar.teifion.co.uk:8200"
+   {:host "bar.teifion.co.uk"
+    :port 8200
+    :alias "Beyond All Reason"}
    "bar.teifion.co.uk:8201"
    {:host "bar.teifion.co.uk"
     :port 8201
     :alias "Beyond All Reason (SSL)"
     :ssl true}
-   "bar.teifion.co.uk:8200"
-   {:host "bar.teifion.co.uk"
-    :port 8200
-    :alias "Beyond All Reason"}
-   "lobby.springrts.com:8200"
-   {:host "lobby.springrts.com"
-    :port 8200
-    :alias "Spring Official"}
    "balancedannihilation.com:8200"
    {:host "balancedannihilation.com"
     :port 8200
-    :alias "Balanced Annihilation"}})
+    :alias "Mandohost"}})
 
 
 (defn initial-state []
