@@ -39,6 +39,7 @@
    [:vote-cancelled #"Vote cancelled by (.*)"]
    [:bar-manager #"BarManager\|(.*)"]
    [:mute #"In-game mute added for (.*) by (.*) \((.*)\)"]
+   [:cancelling-vote #"\* Cancelling \"(.*)\" vote \((.)\)"]
    [:game-starting-cancel #"Game starting, cancelling \"(.*)\" vote"]
    [:stopped #"Server stopped \((.*)\)"]
    [:award #" (.*) award:\s+(.*)\s+\((.*)\)(.*)"]

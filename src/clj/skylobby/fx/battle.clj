@@ -989,7 +989,7 @@
         spads-messages (->> host-ex-messages
                             (filter :spads))
         vote-messages (->> spads-messages
-                           (filter (comp #{:called-vote :game-starting-cancel :no-vote :vote-cancelled
+                           (filter (comp #{:called-vote :cancelling-vote :game-starting-cancel :no-vote :vote-cancelled
                                            :vote-cancelled-game-launch :vote-failed :vote-passed :vote-progress}
                                          :spads-message-type
                                          :spads))
@@ -1013,7 +1013,9 @@
                                                                        :n n
                                                                        :nt nt
                                                                        :remaining remaining}))
-                             (#{:game-starting-cancel :no-vote :vote-cancelled :vote-cancelled-game-launch :vote-failed :vote-passed} spads-message-type) nil
+                             (#{:cancelling-vote :game-starting-cancel :no-vote :vote-cancelled
+                                :vote-cancelled-game-launch :vote-failed :vote-passed}
+                               spads-message-type) nil
                              :else prev)))
                        nil
                        (reverse vote-messages))]
@@ -1109,7 +1111,7 @@
             :style {:-fx-font-size 18}
             :children
             (->> vote-messages
-                 (filter (comp #{:called-vote :game-starting-cancel :vote-cancelled :vote-failed :vote-passed} :spads-message-type :spads))
+                 (filter (comp #{:called-vote :cancelling-vote :game-starting-cancel :vote-cancelled :vote-failed :vote-passed} :spads-message-type :spads))
                  (map
                    (fn [{:keys [spads timestamp]}]
                      (let [{:keys [spads-message-type vote-data]} spads]
@@ -1125,6 +1127,7 @@
                                             :called-vote "mdi-phone:16:blue"
                                             :vote-passed "mdi-phone-incoming:16:green"
                                             :vote-failed "mdi-phone-missed:16:red"
+                                            :cancelling-vote "mdi-phone-minus:16:gold"
                                             :vote-cancelled "mdi-phone-minus:16:gold"
                                             :vote-cancelled-game-launch "mdi-phone-minus:16:gold"
                                             :game-starting-cancel "mdi-phone-minus:16:gold"
