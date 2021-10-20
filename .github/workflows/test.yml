@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: DeLaGuardo/setup-graalvm@5.0
         with:
-          graalvm-version: 'vm-21.2.0'
+          graalvm-version: 'vm-21.3.0'
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: DeLaGuardo/setup-graalvm@5.0
         with:
-          graalvm-version: 'vm-21.2.0'
+          graalvm-version: 'vm-21.3.0'
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
