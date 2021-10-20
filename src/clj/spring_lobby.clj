@@ -13,7 +13,6 @@
     [clojure.set]
     [clojure.string :as string]
     [crypto.random]
-    [diehard.core :as dh]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -68,15 +67,12 @@
 (set! *warn-on-reflection* true)
 
 
-(declare limit-download-status download-http-resource)
+(declare download-http-resource)
 
 
 (def app-version (u/app-version))
 
 (def wait-init-tasks-ms 20000)
-
-(dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
-
 
 (def start-pos-r 10.0)
 
