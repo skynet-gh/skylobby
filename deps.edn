@@ -94,8 +94,45 @@
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
    :main-opts ["-m" "skylobby.cli"]}
-  :skylobby-cli-native
-  {:replace-paths ["dev/clj/graal" "graal/clj" "native-res"]
+  :skylobby-cli-native-linux ; TODO dedup
+  {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/linux"]
+   :main-opts ["-m" "native-image" "skylobby.cli" "--no-fallback" "--allow-incomplete-classpath"
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
+               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+   :replace-deps
+   {
+    clj.native-image/clj.native-image
+    {:git/url "https://github.com/taylorwood/clj.native-image.git"
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
+    clj-http/clj-http {:mvn/version "3.12.3"}
+    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
+    com.github.clj-easy/graal-config-clj-http
+    {:git/url "https://github.com/clj-easy/graal-config"
+     :git/sha "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :deps/root "config/clj-http/clj-http"}
+    com.github.clj-easy/graal-config-nippy
+    {:git/url   "https://github.com/clj-easy/graal-config"
+     :git/sha   "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :deps/root "config/com.taoensso/nippy"}
+    com.taoensso/nippy {:mvn/version "3.1.1"}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    commons-io/commons-io {:mvn/version "2.11.0"}
+    jarohen/chime {:mvn/version "0.3.3"}
+    me.raynes/fs {:mvn/version "1.4.6"}
+    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
+    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+    org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.clojure/core.async {:mvn/version "1.3.622"}
+    org.clojure/tools.cli {:mvn/version "1.0.206"}
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}}}
+  :skylobby-cli-native-windows ; TODO dedup
+  {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/windows"]
    :main-opts ["-m" "native-image" "skylobby.cli" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
