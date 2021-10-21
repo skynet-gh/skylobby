@@ -4,55 +4,55 @@
   "methods":[
     {"name":"booleanValue","parameterTypes":[] }, 
     {"name":"valueOf","parameterTypes":["boolean"] }
-  ]
-},
+  ]}
+,
 {
   "name":"java.lang.Double",
-  "methods":[{"name":"valueOf","parameterTypes":["double"] }]
-},
+  "methods":[{"name":"valueOf","parameterTypes":["double"] }]}
+,
 {
   "name":"java.lang.Integer",
   "methods":[
     {"name":"intValue","parameterTypes":[] }, 
     {"name":"longValue","parameterTypes":[] }, 
     {"name":"valueOf","parameterTypes":["int"] }
-  ]
-},
+  ]}
+,
 {
   "name":"java.lang.Long",
-  "methods":[{"name":"valueOf","parameterTypes":["long"] }]
-},
+  "methods":[{"name":"valueOf","parameterTypes":["long"] }]}
+,
 {
-  "name":"java.lang.OutOfMemoryError"
-},
+  "name":"java.lang.OutOfMemoryError"}
+,
 {
-  "name":"java.lang.String"
-},
+  "name":"java.lang.String"}
+,
 {
   "name":"java.util.Date",
-  "methods":[{"name":"<init>","parameterTypes":["long"] }]
-},
+  "methods":[{"name":"<init>","parameterTypes":["long"] }]}
+,
 {
   "name":"net.sf.sevenzipjbinding.ArchiveFormat",
   "fields":[
     {"name":"codecIndex"}, 
     {"name":"methodName"}
-  ]
-},
+  ]}
+,
 {
   "name":"net.sf.sevenzipjbinding.ExtractAskMode",
-  "methods":[{"name":"getExtractAskModeByIndex","parameterTypes":["int"] }]
-},
+  "methods":[{"name":"getExtractAskModeByIndex","parameterTypes":["int"] }]}
+,
 {
   "name":"net.sf.sevenzipjbinding.ExtractOperationResult",
-  "methods":[{"name":"getOperationResult","parameterTypes":["int"] }]
-},
+  "methods":[{"name":"getOperationResult","parameterTypes":["int"] }]}
+,
 {
-  "name":"net.sf.sevenzipjbinding.IArchiveOpenVolumeCallback"
-},
+  "name":"net.sf.sevenzipjbinding.IArchiveOpenVolumeCallback"}
+,
 {
-  "name":"net.sf.sevenzipjbinding.ICryptoGetTextPassword"
-},
+  "name":"net.sf.sevenzipjbinding.ICryptoGetTextPassword"}
+,
 {
   "name":"net.sf.sevenzipjbinding.impl.InArchiveImpl",
   "fields":[
@@ -63,15 +63,15 @@
   "methods":[
     {"name":"<init>","parameterTypes":[] }, 
     {"name":"setArchiveFormat","parameterTypes":["java.lang.String"] }
-  ]
-},
+  ]}
+,
 {
   "name":"net.sf.sevenzipjbinding.impl.RandomAccessFileInStream",
   "methods":[
     {"name":"read","parameterTypes":["byte[]"] }, 
     {"name":"seek","parameterTypes":["long","int"] }
-  ]
-},
+  ]}
+,
 {
   "name":"skylobby.fs.ExtractToDiskCallback",
   "methods":[
@@ -80,10 +80,10 @@
     {"name":"setCompleted","parameterTypes":["long"] }, 
     {"name":"setOperationResult","parameterTypes":["net.sf.sevenzipjbinding.ExtractOperationResult"] }, 
     {"name":"setTotal","parameterTypes":["long"] }
-  ]
-},
+  ]}
+,
 {
   "name":"skylobby.fs.OutToOutStream",
-  "methods":[{"name":"write","parameterTypes":["byte[]"] }]
-}
+  "methods":[{"name":"write","parameterTypes":["byte[]"] }]}
+
 ]
