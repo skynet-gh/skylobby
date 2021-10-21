@@ -12,6 +12,9 @@
   "name":"[Ljava.lang.String;"}
 ,
 {
+  "name":"[Ljava.nio.file.attribute.FileAttribute;"}
+,
+{
   "name":"[Lsun.security.pkcs.SignerInfo;"}
 ,
 {
