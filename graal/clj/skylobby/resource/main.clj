@@ -27,6 +27,8 @@
 
 
 (defn -main [& args]
+  ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-amd64/lib7-Zip-JBinding.so")
+  ;(System/loadLibrary "7-Zip-JBinding")
   (let [{:keys [arguments errors options] :as parsed} (cli/parse-opts args cli-options)]
     (println parsed)
     (if errors
@@ -47,15 +49,18 @@
             (println "setting app root override to" app-root-override)
             (alter-var-root #'fs/app-root-override (constantly app-root-override)))
           (println (str u/app-name " " "todo version"))
-          (let [{:keys [downloadables-by-url]} (config/slurp-edn "downloadables.edn")
-                spring-root (if (contains? options :spring-root)
-                              (fs/file (:spring-root options))
-                              (fs/default-spring-root))]
+          (let [{:keys [downloadables-by-url]} (config/slurp-edn "downloadables.edn")]
             (if-let [spring-name (string/join " " (rest arguments))]
-              (let [_ (println "Looking for" spring-name)
+              (let [target (fs/file ".")
+                    _ (println "Looking for" spring-name)
                     _ (println (count downloadables-by-url) "downloads")
                     matches (->> downloadables-by-url
-                                 (filter (comp (partial resource/could-be-this-map? spring-name) second)))]
+                                 (filter
+                                   (comp (some-fn
+                                           (partial resource/could-be-this-engine? spring-name)
+                                           (partial resource/could-be-this-mod? spring-name)
+                                           (partial resource/could-be-this-map? spring-name))
+                                         second)))]
                 (if (seq matches)
                   (do
                     (println "Matching resources:")
@@ -63,8 +68,8 @@
                     (let [download (second (first matches))
                           state-atom (atom {})
                           url (:download-url download)
-                          dest (resource/resource-dest (fs/file ".") download)]
-                      (println "Downloading" url "to" dest)
+                          download-to (resource/resource-dest target download)]
+                      (println "Downloading" url "to" download-to)
                       (let [chimer
                             (chime/chime-at
                               (chime/periodic-seq
@@ -82,9 +87,15 @@
                                  (log/error e "Error printing status")
                                  true)})]
                         (try
-                          (http/download-file state-atom url dest)
+                          (http/download-file state-atom url download-to)
+                          (when (= :spring-lobby/engine (:resource-type download))
+                            (log/info "Extracting engine")
+                            (let [extract-to (fs/file target "engine" (fs/filename download-to))]
+                              (fs/extract-7z-fast download-to extract-to)))
                           (catch Exception e
                             (log/error e "Error downloading"))
+                          (catch Throwable e
+                            (log/error e "Critical error downloading"))
                           (finally
                             (.close chimer)
                             (System/exit 0))))))

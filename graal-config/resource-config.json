@@ -1,0 +1,18 @@
+{
+  "resources": {
+    "includes": [
+      { "pattern": "Linux-amd64/lib7-Zip-JBinding.so" },
+      { "pattern": "Linux-amd64/sevenzipjbinding-lib.properties" },
+      { "pattern": "Linux-i386/lib7-Zip-JBinding.so" },
+      { "pattern": "Linux-i386/sevenzipjbinding-lib.properties" },
+      { "pattern": "Mac-x86_64/lib7-Zip-JBinding.dylib" },
+      { "pattern": "Mac-x86_64/sevenzipjbinding-lib.properties" },
+      { "pattern": "sevenzipjbinding-platforms.properties" },
+      { "pattern": "Windows-amd64/lib7-Zip-JBinding.dll" },
+      { "pattern": "Windows-amd64/sevenzipjbinding-lib.properties" },
+      { "pattern": "Windows-x86/lib7-Zip-JBinding.dll" },
+      { "pattern": "Windows-x86/sevenzipjbinding-lib.properties" }
+    ]
+  },
+  "bundles": []
+}

@@ -5,17 +5,66 @@
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.io File)
+    (java.io File FileOutputStream OutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
     (javax.imageio ImageIO)
-    (org.apache.commons.io FilenameUtils FileUtils)))
+    (net.sf.sevenzipjbinding ArchiveFormat IArchiveExtractCallback IInArchive ISequentialOutStream
+                             PropID SevenZip SevenZipException)
+    (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
+    (org.apache.commons.io FilenameUtils FileUtils)
+    (org.apache.commons.compress.archivers.sevenz SevenZArchiveEntry SevenZFile SevenZFileOptions)))
 
 
 (set! *warn-on-reflection* true)
 
 
+(declare file canonical-path)
+
+
 (def ^:dynamic app-root-override nil)
 (def ^:dynamic replay-sources-override nil)
+
+
+(def is-7z-initialized (atom false))
+
+
+(def lock (Object.))
+
+
+(defn sevenz-lib-filename []
+  ; TODO windows, mac
+  "lib7-Zip-JBinding.so")
+
+(defn init-7z! []
+  (locking lock
+    ;(println (SevenZip/getPlatformBestMatch))
+    ;(log/info "Initializing 7zip")
+    ;(System/load "/home/skynet/git/skynet/skylobby/native/lib7-Zip-JBinding.so")
+    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-i386/lib7-Zip-JBinding.so")
+    ;(println (SevenZip/isInitializedSuccessfully))
+    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-amd64")
+    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-amd64/lib7-Zip-JBinding.so")
+    ;(System/loadLibrary "7-Zip-JBinding")
+    ;(System/loadLibrary "7-Zip-JBinding")
+    ;(System/setProperty "sevenzip.no_doprivileged_initialization" "1")
+    #_
+    (println (System/getProperty "java.library.path"))
+    #_
+    (if-let [resource (io/resource (sevenz-lib-filename))]
+      (let [f (file (sevenz-lib-filename))]
+        (FileUtils/copyURLToFile resource f)
+        (clojure.lang.RT/load (canonical-path f)))
+      (clojure.lang.RT/loadLibrary "7-Zip-JBinding"))
+    #_
+    (SevenZip/initLoadedLibraries)
+    ;(println (SevenZip/isInitializedSuccessfully))
+    (SevenZip/initSevenZipFromPlatformJAR)
+    ;(println (SevenZip/isInitializedSuccessfully))
+    ;(println (SevenZip/getLastInitializationException))
+    ;(println (SevenZip/getUsedPlatform))
+    (reset! is-7z-initialized true)))
+
+;(init-7z!)
 
 
 (def app-folder (str "." u/app-name))
@@ -377,6 +426,115 @@
     (if (string/includes? fname ".")
       (subs fname 0 (.lastIndexOf fname "."))
       fname)))
+
+(defn- close-7z-stream [callback-state]
+  (when-let [^OutputStream output-stream (:stream @callback-state)]
+    (try
+      (.close output-stream)
+      (catch Exception e
+        (log/error e "Error closing output stream")
+        (throw (SevenZipException. "Error closing output stream"))))))
+
+(deftype OutToOutStream [^java.io.OutputStream output-stream]
+  ISequentialOutStream
+  (write [_this data]
+    (.write output-stream data 0 (count data))
+    (count data)))
+
+(deftype ExtractToDiskCallback [^IInArchive archive callback-state dest]
+  IArchiveExtractCallback
+  (getStream [_this index _extract-ask-mode]
+    (swap! callback-state assoc :index index)
+    (close-7z-stream callback-state)
+    (try
+      (let [path (str (.getProperty archive index PropID/PATH))
+            to (io/file dest path)
+            is-folder (.getProperty archive index PropID/IS_FOLDER)]
+        (if is-folder
+          (do
+            (log/debug "Creating dir" to)
+            (FileUtils/forceMkdir to))
+          (do
+            (FileUtils/forceMkdir (.getParentFile to))
+            (log/debug "Stream for index" index "to" to)
+            (let [fos (FileOutputStream. to)] ; not with-open
+              (swap! callback-state assoc :stream fos)
+              (->OutToOutStream fos)))))
+      (catch Throwable e
+        (log/error e "Error getting stream for item" index))))
+  (prepareOperation [_this extract-ask-mode]
+    (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+    (log/trace "preparing" extract-ask-mode))
+  (setOperationResult [_this extract-operation-result]
+    (close-7z-stream callback-state)
+    (swap! callback-state assoc :operation-result extract-operation-result)
+    (log/trace "result" extract-operation-result))
+  (setTotal [_this total]
+    (swap! callback-state assoc :total total)
+    (log/trace "total" total))
+  (setCompleted [_this complete]
+    (swap! callback-state assoc :complete complete)
+    (log/trace "completed" complete)))
+
+(defn extract-7z-fast
+  ([^File f]
+   (extract-7z-fast f (io/file (parent-file f) (without-extension (filename f)))))
+  ([^File f ^File dest]
+   (when-not @is-7z-initialized
+     (init-7z!))
+   (let [before (u/curr-millis)]
+     (log/info "Extracting" f "to" dest)
+     (FileUtils/forceMkdir dest)
+     (with-open [raf (new RandomAccessFile f "r")
+                 rafis (new RandomAccessFileInStream raf)
+                 archive (SevenZip/openInArchive ArchiveFormat/SEVEN_ZIP rafis)]
+       (log/debug f "is of format" (.getArchiveFormat archive)
+                  "and has" (.getNumberOfItems archive) "items")
+       ; http://sevenzipjbind.sourceforge.net/javadoc/net/sf/sevenzipjbinding/IInArchive.html#extract(int[],%20boolean,%20net.sf.sevenzipjbinding.IArchiveExtractCallback)
+       (let [callback-state (atom {})]
+         (.extract archive
+                   nil ; all items
+                   false ; not test mode
+                   ; http://sevenzipjbind.sourceforge.net/javadoc/net/sf/sevenzipjbinding/IArchiveExtractCallback.html
+                   ; https://gist.github.com/borisbrodski/6120309
+                   (->ExtractToDiskCallback archive callback-state dest))))
+     (log/info "Finished extracting" f "to" dest "in" (- (u/curr-millis) before) "ms"))))
+
+
+(defn extract-7z-apache
+  ([^File f]
+   (extract-7z-apache f (io/file (parent-file f) (without-extension (filename f)))))
+  ([^File f ^File dest]
+   (log/info "Extracting" f "to" dest)
+   (FileUtils/forceMkdir dest)
+   (let [options-builder (doto (SevenZFileOptions/builder)
+                           (.withTryToRecoverBrokenArchives true)
+                           (.withUseDefaultNameForUnnamedEntries true))
+         ^SevenZFileOptions options (.build options-builder)
+         sevenz-file (new SevenZFile f options)]
+     (loop []
+       (when-let [^SevenZArchiveEntry entry (try
+                                              (.getNextEntry sevenz-file)
+                                              (catch Exception e
+                                                (log/error e "Error getting next entry")
+                                                :skip))]
+         (if (not= :skip entry)
+           (let [
+                 size (.getSize entry)
+                 content (byte-array size)
+                 entry-name (.getName entry)
+                 to (io/file dest entry-name)]
+             (println "Reading" entry-name "size" size)
+             (.read sevenz-file content 0 size)
+             (if (.isDirectory entry)
+               (FileUtils/forceMkdir to)
+               (do
+                 (FileUtils/forceMkdir (.getParentFile to))
+                 (with-open [fos (FileOutputStream. to)]
+                   (.write fos content 0 size)))))
+           (println "Skip"))
+         (recur))))))
+
 
 (defn sync-version-to-engine-version
   "Returns the Spring engine version from a sync version. For some reason, engine '103.0' has sync

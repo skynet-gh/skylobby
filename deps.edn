@@ -26,6 +26,7 @@
   expound/expound {:mvn/version "0.8.10"}
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
+  org.apache.commons/commons-compress {:mvn/version "1.21"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   hashp/hashp {:mvn/version "0.2.1"}
   instaparse/instaparse {:mvn/version "1.4.10"}
@@ -85,11 +86,32 @@
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.902"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :with-graal {:extra-paths ["graal/clj"]}
+  :skyres
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.2" :git/sha "226fb52"}}
+   :ns-default skyres}
   :skyres-native
-  {:extra-paths ["graal/clj"]
-   :main-opts ["-m" "clj.native-image" "skylobby.resource.main" "--initialize-at-build-time"
+  {:extra-paths ["graal/clj" "native-res"]
+   :main-opts ["-m" "clj.native-image" "skylobby.resource.main" ;"--initialize-at-build-time"
                "-H:+ReportExceptionStackTraces" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               ;"--initialize-at-run-time=net.sf.sevenzipjbinding.SevenZip"
+               ;"-H:+JNI"
+               ;"-H:CLibraryPath='/home/skynet/git/skynet/skylobby/7zip/Linux-amd64/lib7-Zip-JBinding.so'"
+               ;"-H:CLibraryPath=/home/skynet/git/skynet/skylobby/7zip/Linux-amd64"
+               ;"-H:CLibraryPath=/home/skynet/git/skynet/skylobby/7zip/Windows-amd64"
+               ;"-H:AdditionalLinkerOptions=/home/skynet/git/skynet/skylobby/native/lib7-Zip-JBinding.so"
+               "-H:NumberOfThreads=1"
+               ;"-H:ResourceConfigurationFiles=graal-config/resource-config.json"
+               ;"-H:JNIConfigurationFiles=graal-config/jni-config.json"
+               ;"-H:ReflectionConfigurationFiles=graal-config/reflect-config.json"
+               "-H:+ReportExceptionStackTraces"
+               ;"-H:+StaticExecutableWithDynamicLibC"
+               ;"-H:+PlatformInterfaceCompatibilityMode"
+               ;"--features=NativeFeature"
+               ;"--class-path=7zip"
+               ;"-H:CLibraryPath=native"
+               ;"-Djava.library.path=/home/skynet/git/skynet/skylobby/native"
+               ;"--verbose"
                ;"--trace-object-instantiation=java.security.SecureRandom"
                "-H:Name=skyres"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
@@ -100,6 +122,7 @@
      :sha "34961b838e1875e72da5485fd5177aff8a0b2b1a"}
     clj-http/clj-http {:mvn/version "3.12.3"}
     clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.github.clj-easy/graal-config-clj-http
     {:git/url "https://github.com/clj-easy/graal-config"
      :git/sha "78b95a3eb6d2de866358c9d224df669d94e0c681"
@@ -114,7 +137,14 @@
     diehard/diehard {:mvn/version "0.10.4"}
     jarohen/chime {:mvn/version "0.3.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
-    org.clojure/tools.cli {:mvn/version "1.0.206"}}}
+    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
+    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+    org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.clojure/tools.cli {:mvn/version "1.0.206"}
+    ;org.graalvm.nativeimage/svm {:mvn/version "21.2.0"}
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}}}
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps

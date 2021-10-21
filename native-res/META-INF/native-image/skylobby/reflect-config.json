@@ -1,0 +1,21 @@
+[
+{
+  "name":"char[]"
+},
+{
+  "name":"java.lang.Integer"
+},
+{
+  "name":"java.lang.Long"
+},
+{
+  "name":"java.lang.Object[]"
+},
+{
+  "name":"java.lang.String"
+},
+{
+  "name":"sun.security.provider.SHA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+}
+]
