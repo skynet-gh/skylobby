@@ -7,6 +7,7 @@
   (:import
     (java.io File FileOutputStream OutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
+    (java.nio.file.attribute FileAttribute)
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ArchiveFormat IArchiveExtractCallback IInArchive ISequentialOutStream
                              PropID SevenZip SevenZipException)
@@ -37,7 +38,9 @@
 
 (defn init-7z! []
   (locking lock
-    (SevenZip/initSevenZipFromPlatformJAR)
+    (let [^"[Ljava.nio.file.attribute.FileAttribute;" attributes (into-array FileAttribute [])
+          temp-dir (.toFile (Files/createTempDirectory "skylobby-7z" attributes))]
+      (SevenZip/initSevenZipFromPlatformJAR temp-dir))
     (reset! is-7z-initialized true)))
 
 
