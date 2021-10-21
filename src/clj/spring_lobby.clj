@@ -70,8 +70,6 @@
 (declare download-http-resource)
 
 
-(def app-version (u/app-version))
-
 (def wait-init-tasks-ms 20000)
 
 (def start-pos-r 10.0)

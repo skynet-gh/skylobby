@@ -1218,15 +1218,12 @@
       (replays-window-impl state))))
 
 
-(def app-version (u/app-version))
-
-
 (defn standalone-replay-window
   [{:fx/keys [context]}]
   (let [{:keys [width height]} (skylobby.fx/get-screen-bounds)]
     {:fx/type :stage
      :showing true
-     :title (str "skyreplays " app-version)
+     :title (str "skyreplays " u/app-version)
      :icons skylobby.fx/icons
      :x 100
      :y 100

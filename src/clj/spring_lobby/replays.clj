@@ -16,10 +16,6 @@
 (set! *warn-on-reflection* true)
 
 
-(def app-version
-  (u/app-version))
-
-
 (defn replays-on-close-request
   [^Event e]
   (log/debug "Replays window close request" e)
@@ -34,7 +30,7 @@
     {:fx/type fx.replay/replays-window
      :on-close-request replays-on-close-request
      :settings-button true
-     :title (str "skyreplays " app-version)}
+     :title (str "skyreplays " u/app-version)}
     {:fx/type fx.settings/settings-window}]})
 
 

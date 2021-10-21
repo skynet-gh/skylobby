@@ -71,22 +71,22 @@
 (defn manifest-version []
   (try
     (when-let [clazz (Class/forName main-class-name)]
-      (log/debug "Discovered class" clazz)
+      (log/trace "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
-        (log/debug "Discovered location" loc)
+        (log/trace "Discovered location" loc)
         (-> (str "jar:" loc "!/META-INF/MANIFEST.MF")
             URL. .openStream Manifest. .getMainAttributes
             (.getValue "Build-Number"))))
     (catch ClassNotFoundException _e
-      (log/info "Class not found, assuming running in dev and not as a jar"))
+      (log/trace "Class not found, assuming running in dev and not as a jar"))
     (catch Exception e
-      (log/debug e "Unable to read version from manifest"))))
+      (log/trace e "Unable to read version from manifest"))))
 
 (defn short-git-commit [git-commit-id]
   (when-not (string/blank? git-commit-id)
     (subs git-commit-id 0 (min 7 (count git-commit-id)))))
 
-(defn app-version []
+(defn get-app-version []
   (or (manifest-version)
       (try
         (str "git:" (short-git-commit (git/tag-or-latest-id (io/file "."))))
@@ -97,6 +97,8 @@
         (catch Exception e
           (log/debug e "Error getting version from file")))
       "UNKNOWN"))
+
+(def app-version (get-app-version))
 
 (defn hardware-client-id []
   (try
@@ -460,9 +462,7 @@
 
 
 (defn agent-string []
-  (str app-name
-       "-"
-       (app-version)))
+  (str app-name "-" app-version))
 
 (defn user-agent [override]
   (if-not (string/blank? override)

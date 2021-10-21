@@ -26,7 +26,6 @@
 (set! *warn-on-reflection* true)
 
 
-(def app-version (u/app-version))
 (def screen-bounds (skylobby.fx/get-screen-bounds))
 
 
@@ -94,7 +93,7 @@
        :desc
        {:fx/type :stage
         :showing true
-        :title (str "skylobby " app-version)
+        :title (str "skylobby " u/app-version)
         :icons skylobby.fx/icons
         :maximized (boolean
                      (or window-maximized
