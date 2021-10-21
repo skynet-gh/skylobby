@@ -9,6 +9,25 @@
 (set! *warn-on-reflection* true)
 
 
+(def max-tries 5)
+
+(def resource-types
+  [:spring-lobby/engine :spring-lobby/map :spring-lobby/mod :spring-lobby/sdp])
+
+
+(defn mod-dependencies [mod-name]
+  (if (and mod-name (string/starts-with? mod-name "Evolution RTS"))
+    ["Evolution RTS Music Addon v2"]
+    nil))
+
+(defn mod-repo-name [mod-name]
+  (or (when mod-name
+        (cond
+          (string/includes? mod-name "Beyond All Reason") "byar"
+          :else nil))
+      "i18n"))
+
+
 (defn resource-dest
   [root {:keys [resource-filename resource-file resource-type]}]
   (let [filename (or resource-filename
@@ -184,3 +203,99 @@
                   (replace-all (normalize-mod resource-filename) mod-aliases))
                (= (replace-all (normalize-mod-harder mod-name) mod-aliases-harder)
                   (replace-all (normalize-mod-harder resource-filename) mod-aliases-harder)))))))
+
+
+(defn same-resource-file? [resource1 resource2]
+  (boolean
+    (and (:resource-file resource1)
+         (= (:resource-file resource1)
+            (:resource-file resource2)))))
+
+(defn same-resource-filename? [resource1 resource2]
+  (boolean
+    (and (:resource-filename resource1)
+         (= (:resource-filename resource1)
+            (:resource-filename resource2)))))
+
+
+(defn details?
+  "Returns true if the given possible resource details have content, false otherwise."
+  [details]
+  (boolean
+    (and
+      details
+      (seq details)
+      (not (:error details)))))
+
+(defn details-cache-key [resource]
+  (fs/canonical-path (:file resource)))
+
+(defn cached-details [cache resource]
+  (when-let [k (details-cache-key resource)]
+    (get cache k)))
+
+
+(defn- parse-mod-name-git [mod-name]
+  (or (re-find #"(.+)\s([0-9a-f]+)$" mod-name)
+      (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)
+      (re-find #"(.+)\s(\$VERSION)$" mod-name)))
+
+(defn mod-name-sans-git [mod-name]
+  (when mod-name
+    (if-let [[_all mod-prefix _git] (parse-mod-name-git mod-name)]
+      mod-prefix
+      mod-name)))
+
+(defn mod-name-git-no-ref [mod-name]
+  (when mod-name
+    (when-let [[_all mod-prefix _git] (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)]
+      (str mod-prefix " git:"))))
+
+(defn sync-status [server-data spring mod-details map-details]
+  (let [battle-id (-> server-data :battle :battle-id)
+        battle (-> server-data :battles (get battle-id))
+        engines (:engines spring)
+        engine (:battle-version battle)
+        engine-details (->> engines (filter (comp #{engine} :engine-version)) first)
+
+        mod-name (:battle-modname battle)
+        mod-sans-git (mod-name-sans-git mod-name)
+        mod-name-set (set [mod-name mod-sans-git])
+        filter-fn (comp mod-name-set mod-name-sans-git :mod-name)
+        mods (:mods spring)
+        mod-index (->> mods (filter filter-fn) first)
+        mod-details (-> mod-details (get (fs/canonical-path (:file mod-index))))
+
+        map-name (:battle-map battle)
+        maps (:maps spring)
+        map-index (->> maps (filter (comp #{map-name} :map-name)) first)
+        map-details (-> map-details (get (fs/canonical-path (:file map-index))))]
+    (boolean
+      (and map-index
+           (details? map-details)
+           mod-index
+           (details? mod-details)
+           (seq engine-details)))))
+
+(defn spring-root-resources [spring-root by-spring-root]
+  (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
+        {:keys [engines maps mods]} spring-root-data
+        maps (filter :map-name maps)
+        mods (filter :mod-name mods)
+        git-mods (->> mods
+                      (filter :mod-name)
+                      (filter (comp #(string/includes? % "git:") :mod-name))
+                      (map (juxt (comp mod-name-git-no-ref :mod-name) identity))
+                      (filter first)
+                      (into {}))
+        mods-by-name (->> mods
+                          (map (juxt :mod-name identity))
+                          (into {})
+                          (merge git-mods))]
+    {:spring-isolation-dir spring-root
+     :engines engines
+     :engines-by-version (into {} (map (juxt :engine-version identity) engines))
+     :maps maps
+     :maps-by-name (into {} (map (juxt :map-name identity) maps))
+     :mods mods
+     :mods-by-name mods-by-name}))

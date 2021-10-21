@@ -3,11 +3,11 @@
     [clojure.java.io :as io]
     [clojure.test :refer [deftest is]]
     [skylobby.resource :as resource]
-    [spring-lobby.fs :as fs]))
+    [skylobby.fs :as fs]))
 
 
 (deftest resource-dest
-  (let [root (fs/default-isolation-dir)]
+  (let [root (fs/default-spring-root)]
     (is (= nil
            (resource/resource-dest root nil)))
     (is (= (io/file (fs/download-dir) "engine" "104.0.1-1759-g77857fe bar")

@@ -52,18 +52,21 @@
       (-> http/default-middleware
           (insert-after http/wrap-url wrap-downloaded-bytes-counter)
           (conj http/wrap-lower-case-headers))
-      (let [request (http/get url {:as :stream})
-            ^String content-length (get-in request [:headers "content-length"] "0")
+      (let [response (http/get url
+                               {:as :stream
+                                :conn-timeout 10000
+                                :socket-timeout 10000})
+            ^String content-length (get-in response [:headers "content-length"] "0")
             length (Integer/valueOf content-length)
             buffer-size (* 1024 10)]
         (swap! state-atom update-in [:http-download url]
                merge
                {:current 0
                 :total length})
-        (with-open [^java.io.InputStream input (:body request)
+        (with-open [^java.io.InputStream input (:body response)
                     output (io/output-stream dest-file)]
           (let [buffer (make-array Byte/TYPE buffer-size)
-                ^CountingInputStream counter (:downloaded-bytes-counter request)]
+                ^CountingInputStream counter (:downloaded-bytes-counter response)]
             (loop []
               (let [size (.read input buffer)]
                 (when (pos? size)

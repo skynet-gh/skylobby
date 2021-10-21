@@ -55,7 +55,7 @@
   version-clj/version-clj {:mvn/version "2.0.2"}}
  :aliases
  {:nrepl
-  {:extra-paths ["src/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
+  {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.27.2"}
     cider/orchard {:mvn/version "0.7.3"}
