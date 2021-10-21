@@ -279,8 +279,6 @@
           (when (not= old-state new-state)
             (swap! ui-state-atom fx/reset-context new-state)))))))
 
-(add-ui-state-watcher *state *ui-state)
-
 
 (def ^:dynamic disable-update-check false)
 

@@ -123,6 +123,7 @@
                                (:chat-channel options))}))]
               (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
               (reset! spring-lobby/*state state)
+              (spring-lobby/add-ui-state-watcher spring-lobby/*state spring-lobby/*ui-state)
               (let [previous-css (css/register :skylobby.fx/current
                                     (or (:css state)
                                         skylobby.fx/default-style-data))
