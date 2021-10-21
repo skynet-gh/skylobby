@@ -1,14 +1,14 @@
-(ns skyres
+(ns skylobby-cli
   (:require
     [clojure.tools.build.api :as b]))
 
 
-(def lib 'skylobby/skyres)
+(def lib 'skylobby/skylobby-cli)
 (def version "0.0.1")
 (def src-dir "graal/clj")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
-                            :aliases [:skyres-native]}))
+                            :aliases [:skylobby-cli-native]}))
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
 
 
@@ -25,4 +25,4 @@
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis basis
-           :main 'skylobby.resource.main}))
+           :main 'skylobby.cli}))

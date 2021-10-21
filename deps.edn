@@ -55,7 +55,7 @@
   version-clj/version-clj {:mvn/version "2.0.2"}}
  :aliases
  {:nrepl
-  {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
+  {:extra-paths ["src/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.27.2"}
     cider/orchard {:mvn/version "0.7.3"}
@@ -75,23 +75,25 @@
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}
   :uberjar
-  {:extra-paths ["dev/clj/jar"]
+  {:extra-paths ["src/clj" "dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
     org.clojure/tools.deps.alpha {:mvn/version "0.12.1048"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
-  {:extra-paths ["test/clj"]
+  {:extra-paths ["src/clj" "test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.902"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
-  :with-graal {:extra-paths ["graal/clj"]}
-  :skyres
+  :skylobby-cli
   {:deps {io.github.clojure/tools.build {:git/tag "v0.6.2" :git/sha "226fb52"}}
-   :ns-default skyres}
-  :skyres-native
-  {:extra-paths ["graal/clj" "native-res"]
-   :main-opts ["-m" "clj.native-image" "skylobby.resource.main"
+   :ns-default skylobby-cli}
+  :skylobby-cli-main
+  {:replace-paths ["graal/clj"]
+   :main-opts ["-m" "skylobby.cli"]}
+  :skylobby-cli-native
+  {:replace-paths ["graal/clj" "native-res"]
+   :main-opts ["-m" "clj.native-image" "skylobby.cli"
                "-H:+ReportExceptionStackTraces" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
                "-H:NumberOfThreads=1" "-H:+ReportExceptionStackTraces"

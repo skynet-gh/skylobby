@@ -1,8 +1,31 @@
 (ns skylobby.spring
   (:require
     [clojure.java.io :as io]
+    [clojure.string :as string]
+    clojure.walk
     [skylobby.fs :as fs]
     [taoensso.timbre :as log]))
+
+
+(defn script-txt-inner
+  ([kv]
+   (script-txt-inner "" kv))
+  ([tabs [k v]]
+   (str tabs
+        (if (map? v)
+          (str "[" (name k ) "]\n" tabs "{\n"
+               (apply str (map (partial script-txt-inner (str tabs "\t")) (sort-by (comp str first) v)))
+               tabs "}\n")
+          (str (name k) " = " v ";"))
+        "\n")))
+
+; https://springrts.com/wiki/Script.txt
+; https://github.com/spring/spring/blob/104.0/doc/StartScriptFormat.txt
+; https://github.com/springlobby/springlobby/blob/master/src/spring.cpp#L284-L590
+(defn script-txt
+  "Given data for a battle, return contents of a script.txt file for Spring."
+  ([script-data]
+   (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))
 
 
 (defn start-game
@@ -22,6 +45,7 @@
                    script-file-param]
           runtime (Runtime/getRuntime)
           _ (log/info "Running '" command "'")
+          _ (log/info "Copy paste Spring command: '" (with-out-str (println (string/join " " command))) "'")
           ^"[Ljava.lang.String;" cmdarray (into-array String command)
           ^"[Ljava.lang.String;" envp (into-array String [])
           process (.exec runtime cmdarray envp spring-root)]

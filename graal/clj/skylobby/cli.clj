@@ -1,4 +1,4 @@
-(ns skylobby.resource.main
+(ns skylobby.cli
   (:require
     [chime.core :as chime]
     [clojure.core.async :as async]
@@ -65,7 +65,9 @@
     (let [_ (println "Looking for downloads")
           {:keys [downloadables-by-url]} (config/slurp-edn "downloadables.edn")]
       (println "Found" (count downloadables-by-url) "downloads")
-      (let [target (fs/file ".")
+      (let [
+            target (fs/file (or (:spring-root options)
+                                "."))
             _ (println "Looking for" spring-name)
             download (matching-download downloadables-by-url spring-name)]
         (if download
@@ -118,7 +120,9 @@
   (let [_ (println "Looking for downloads")
         {:keys [downloadables-by-url]} (config/slurp-edn "downloadables.edn")]
     (println "Found" (count downloadables-by-url) "downloads")
-    (let [target (fs/file ".")
+    (let [
+          target (fs/file (or (:spring-root options)
+                              "."))
           engine (:engine options)
           mod-name (:game options)
           map-name (:map options)
@@ -166,7 +170,7 @@
           (System/exit 0))))))
 
 
-(defn play [scenario options]
+(defn play [_scenario options]
   (let [engine (:engine options)
         mod-name (:game options)
         map-name (:map options)
@@ -177,10 +181,40 @@
                         (filter
                           (fn [dir]
                             (resource/could-be-this-engine? engine {:resource-filename (fs/filename dir)})))
-                        first)]
-    (println spring-root)
-    (println engine-dir)))
-    ;(spring/start-game engine-dir spring-root)))
+                        first)
+        script-data {:game
+                     {:ai1
+                      {:host 0
+                       :isfromdemo 0
+                       :name "bot1"
+                       :shortname "NullAI"
+                       :team 1
+                       :version "0.1"}
+                      :allyteam0 {:numallies 0}
+                      :allyteam1 {:numallies 0}
+                      :gametype mod-name
+                      :hostport true
+                      :ishost 1
+                      :mapname map-name
+                      :modoptions {}
+                      :myplayername "player"
+                      :player0
+                      {:isfromdemo 0
+                       :name "player"
+                       :spectator 0
+                       :team 0}
+                      :startpostype 1
+                      :team0
+                      {:allyteam 0
+                       :rgbcolor "0.8 0.0 0.0"
+                       :teamleader 0}
+                      :team1
+                      {:allyteam 1
+                       :rgbcolor "0.0 0.3 1.0"
+                       :teamleader 0}}}]
+    (spit (fs/file spring-root "script.txt") (spring/script-txt script-data))
+    (spring/start-game {:engine-dir engine-dir :spring-root spring-root})
+    (System/exit 0)))
 
 
 (defn -main [& args]
