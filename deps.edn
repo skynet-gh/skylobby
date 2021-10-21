@@ -116,7 +116,6 @@
     com.taoensso/nippy {:mvn/version "3.1.1"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
     commons-io/commons-io {:mvn/version "2.11.0"}
-    diehard/diehard {:mvn/version "0.10.4"}
     jarohen/chime {:mvn/version "0.3.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
