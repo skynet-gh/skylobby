@@ -1,4 +1,4 @@
-{:paths ["src/clj" "resources"]
+{:paths ["resources"]
  :mvn/repos
  {"local" {:url "file:./repo"}
   "jcenter" {:url "https://jcenter.bintray.com/"}}
@@ -16,6 +16,7 @@
   clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
+  com.taoensso/nippy {:mvn/version "3.1.1"}
   com.taoensso/timbre {:mvn/version "5.1.2"}
   com.taoensso/tufte {:mvn/version "2.2.0"}
   commons-io/commons-io {:mvn/version "2.11.0"}
@@ -72,6 +73,48 @@
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}
+  :uberjar
+  {:extra-paths ["dev/clj/jar"]
+   :extra-deps
+   {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1048"}
+    seancorfield/depstar {:mvn/version "1.1.136"}}
+   :main-opts ["-m" "uberjar"]}
+  :kaocha
+  {:extra-paths ["test/clj"]
+   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.902"}}
+   :main-opts ["-m" "kaocha.runner" "--watch"]}
+  :with-graal {:extra-paths ["graal/clj"]}
+  :skyres-native
+  {:extra-paths ["graal/clj"]
+   :main-opts ["-m" "clj.native-image" "skylobby.resource.main" "--initialize-at-build-time"
+               "-H:+ReportExceptionStackTraces" "--no-fallback" "--allow-incomplete-classpath"
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               ;"--trace-object-instantiation=java.security.SecureRandom"
+               "-H:Name=skyres"]
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+   :replace-deps
+   {
+    clj.native-image/clj.native-image
+    {:git/url "https://github.com/taylorwood/clj.native-image.git"
+     :sha "34961b838e1875e72da5485fd5177aff8a0b2b1a"}
+    clj-http/clj-http {:mvn/version "3.12.3"}
+    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    com.github.clj-easy/graal-config-clj-http
+    {:git/url "https://github.com/clj-easy/graal-config"
+     :git/sha "78b95a3eb6d2de866358c9d224df669d94e0c681"
+     :deps/root "config/clj-http/clj-http"}
+    com.github.clj-easy/graal-config-nippy
+    {:git/url   "https://github.com/clj-easy/graal-config"
+     :git/sha   "78b95a3eb6d2de866358c9d224df669d94e0c681"
+     :deps/root "config/com.taoensso/nippy"}
+    com.taoensso/nippy {:mvn/version "3.1.1"}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    commons-io/commons-io {:mvn/version "2.11.0"}
+    diehard/diehard {:mvn/version "0.10.4"}
+    jarohen/chime {:mvn/version "0.3.3"}
+    me.raynes/fs {:mvn/version "1.4.6"}
+    org.clojure/tools.cli {:mvn/version "1.0.206"}}}
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
@@ -96,17 +139,6 @@
    :extra-deps {com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
                 pjstadig/humane-test-output {:mvn/version "0.11.0"}}
    :main-opts ["-m" "tests"]}
-  :uberjar
-  {:extra-paths ["dev/clj/jar"]
-   :extra-deps
-   {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1048"}
-    seancorfield/depstar {:mvn/version "1.1.136"}}
-   :main-opts ["-m" "uberjar"]}
-  :kaocha
-  {:extra-paths ["test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.937"}}
-   :main-opts ["-m" "kaocha.runner" "--watch"]}
   :test-once
   {:extra-paths ["test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.937"}}

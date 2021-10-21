@@ -9,8 +9,11 @@
 /.nrepl-port
 /.project
 /.settings/
+/classes/
 /dist/
 /pom.xml
 /skylobby-*.msi
+/skyres
 /target/
 /trace.edn
+/*.build_artifacts.txt
