@@ -141,7 +141,26 @@
       remove-v-before-number))
 
 (def mod-aliases
-  {"Total Atomization Prime" "TAPrime"})
+  [["total_atomization_prime" "taprime"]
+   ["total_atomization_prime" "tap"]
+   ["evolution_rts" "evo_rts"]
+   ["evolution_rts" "evo"]
+   ["tech_annihilation" "techa"]
+   ["balanced_annihilation" "ba"]
+   ["beyond_all_reason" "bar"]
+   ["beyond_all_reason" "byar"]
+   ["metal_factions" "mf"]])
+
+(def mod-aliases-harder
+  [["totalatomizationprime" "taprime"]
+   ["totalatomizationprime" "tap"]
+   ["evolutionrts" "evorts"]
+   ["evolutionrts" "evo"]
+   ["techannihilation" "techa"]
+   ["balancedannihilation" "ba"]
+   ["beyondallreason" "bar"]
+   ["beyondallreason" "byar"]
+   ["metalfactions" "mf"]])
 
 (defn replace-all [s rs]
   (reduce
@@ -161,5 +180,7 @@
                   (normalize-mod resource-filename))
                (= (normalize-mod-harder mod-name)
                   (normalize-mod-harder resource-filename))
-               (= (normalize-mod (replace-all mod-name mod-aliases))
-                  (normalize-mod (replace-all resource-filename mod-aliases))))))))
+               (= (replace-all (normalize-mod mod-name) mod-aliases)
+                  (replace-all (normalize-mod resource-filename) mod-aliases))
+               (= (replace-all (normalize-mod-harder mod-name) mod-aliases-harder)
+                  (replace-all (normalize-mod-harder resource-filename) mod-aliases-harder)))))))

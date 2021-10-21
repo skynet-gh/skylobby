@@ -2,18 +2,17 @@
   (:require
     [clj-http.client :as http]
     [clojure.java.io :as io]
-    [diehard.core :as dh]
     [me.raynes.fs :as raynes-fs]
     [skylobby.fs :as fs]
+    [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (org.apache.commons.io.input CountingInputStream)))
 
 
-(declare limit-download-status)
-
-
-(dh/defratelimiter limit-download-status {:rate 1}) ; one update per second
+(def progress-update-frequency-millis 1000)
+(def last-progress-update
+  (atom {}))
 
 
 ; https://github.com/dakrone/clj-http/pull/220/files
@@ -71,17 +70,19 @@
                   (.write output buffer 0 size)
                   (when counter
                     (try
-                      (dh/with-rate-limiter {:ratelimiter limit-download-status
-                                             :max-wait-ms 0}
-                        (let [current (.getByteCount counter)]
+                      (let [last-updated (get @last-progress-update url)
+                            now (u/curr-millis)]
+                        (when (or (not last-updated)
+                                  (< progress-update-frequency-millis (- now last-updated)))
+                          (swap! last-progress-update assoc url now)
                           (swap! state-atom update-in [:http-download url]
                                  merge
-                                 {:current current
+                                 {:current (.getByteCount counter)
                                   :total length})))
                       (catch Exception e
-                        (when-not (:throttled (ex-data e))
-                          (log/warn e "Error updating download status")))))
-                  (recur))))))))
+                        (log/warn e "Error updating download status"))))
+                  (recur))))
+            (swap! state-atom assoc-in [:http-download url :done] true)))))
     (catch Exception e
       (log/error e "Error downloading" url "to" dest-file)
       (raynes-fs/delete dest-file))

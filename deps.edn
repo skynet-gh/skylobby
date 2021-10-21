@@ -91,28 +91,10 @@
    :ns-default skyres}
   :skyres-native
   {:extra-paths ["graal/clj" "native-res"]
-   :main-opts ["-m" "clj.native-image" "skylobby.resource.main" ;"--initialize-at-build-time"
+   :main-opts ["-m" "clj.native-image" "skylobby.resource.main"
                "-H:+ReportExceptionStackTraces" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               ;"--initialize-at-run-time=net.sf.sevenzipjbinding.SevenZip"
-               ;"-H:+JNI"
-               ;"-H:CLibraryPath='/home/skynet/git/skynet/skylobby/7zip/Linux-amd64/lib7-Zip-JBinding.so'"
-               ;"-H:CLibraryPath=/home/skynet/git/skynet/skylobby/7zip/Linux-amd64"
-               ;"-H:CLibraryPath=/home/skynet/git/skynet/skylobby/7zip/Windows-amd64"
-               ;"-H:AdditionalLinkerOptions=/home/skynet/git/skynet/skylobby/native/lib7-Zip-JBinding.so"
-               "-H:NumberOfThreads=1"
-               ;"-H:ResourceConfigurationFiles=graal-config/resource-config.json"
-               ;"-H:JNIConfigurationFiles=graal-config/jni-config.json"
-               ;"-H:ReflectionConfigurationFiles=graal-config/reflect-config.json"
-               "-H:+ReportExceptionStackTraces"
-               ;"-H:+StaticExecutableWithDynamicLibC"
-               ;"-H:+PlatformInterfaceCompatibilityMode"
-               ;"--features=NativeFeature"
-               ;"--class-path=7zip"
-               ;"-H:CLibraryPath=native"
-               ;"-Djava.library.path=/home/skynet/git/skynet/skylobby/native"
-               ;"--verbose"
-               ;"--trace-object-instantiation=java.security.SecureRandom"
+               "-H:NumberOfThreads=1" "-H:+ReportExceptionStackTraces"
                "-H:Name=skyres"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
    :replace-deps
@@ -140,8 +122,8 @@
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.clojure/core.async {:mvn/version "1.3.622"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
-    ;org.graalvm.nativeimage/svm {:mvn/version "21.2.0"}
     org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
     org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
     org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}}}

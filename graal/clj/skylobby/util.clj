@@ -26,9 +26,11 @@
     (FileUtils/byteCountToDisplaySize (long n))))
 
 (defn download-progress
-  [{:keys [current total]}]
-  (if (and current total)
-    (str (format-bytes current)
-         " / "
-         (format-bytes total))
-    "Downloading..."))
+  [{:keys [current done total]}]
+  (if done
+    (str (when total (format-bytes total)) " complete")
+    (if (and current total)
+      (str (format-bytes current)
+           " / "
+           (format-bytes total))
+      "Downloading...")))

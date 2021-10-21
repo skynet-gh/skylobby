@@ -37,34 +37,8 @@
 
 (defn init-7z! []
   (locking lock
-    ;(println (SevenZip/getPlatformBestMatch))
-    ;(log/info "Initializing 7zip")
-    ;(System/load "/home/skynet/git/skynet/skylobby/native/lib7-Zip-JBinding.so")
-    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-i386/lib7-Zip-JBinding.so")
-    ;(println (SevenZip/isInitializedSuccessfully))
-    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-amd64")
-    ;(System/load "/home/skynet/git/skynet/skylobby/7zip/Linux-amd64/lib7-Zip-JBinding.so")
-    ;(System/loadLibrary "7-Zip-JBinding")
-    ;(System/loadLibrary "7-Zip-JBinding")
-    ;(System/setProperty "sevenzip.no_doprivileged_initialization" "1")
-    #_
-    (println (System/getProperty "java.library.path"))
-    #_
-    (if-let [resource (io/resource (sevenz-lib-filename))]
-      (let [f (file (sevenz-lib-filename))]
-        (FileUtils/copyURLToFile resource f)
-        (clojure.lang.RT/load (canonical-path f)))
-      (clojure.lang.RT/loadLibrary "7-Zip-JBinding"))
-    #_
-    (SevenZip/initLoadedLibraries)
-    ;(println (SevenZip/isInitializedSuccessfully))
     (SevenZip/initSevenZipFromPlatformJAR)
-    ;(println (SevenZip/isInitializedSuccessfully))
-    ;(println (SevenZip/getLastInitializationException))
-    ;(println (SevenZip/getUsedPlatform))
     (reset! is-7z-initialized true)))
-
-;(init-7z!)
 
 
 (def app-folder (str "." u/app-name))
