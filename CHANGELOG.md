@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.18]
+
+- Add max tries to springfiles auto download
+- Improve feedback from springfiles downloading
+- Spread out auto connect and do not focus server tabs
+- Move replays download to separate window
+
 ### [0.6.17]
 
 - Attempt to fix issue with auto get resources and rapid
