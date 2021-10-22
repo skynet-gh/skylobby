@@ -138,6 +138,8 @@
       {:fx/type fx.chat/chat-window
        :screen-bounds screen-bounds}
       {:fx/type fx.battles-window/battles-window-view
+       :screen-bounds screen-bounds}
+      {:fx/type fx.replay/download-replays-window
        :screen-bounds screen-bounds}]}))
 
 (defn root-view [state]
