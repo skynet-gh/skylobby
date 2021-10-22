@@ -75,14 +75,14 @@
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}
   :uberjar
-  {:extra-paths ["src/clj" "dev/clj/jar"]
+  {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
     org.clojure/tools.deps.alpha {:mvn/version "0.12.1053"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
-  {:extra-paths ["src/clj" "test/clj"]
+  {:extra-paths ["src/clj" "graal/clj" "test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.937"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
@@ -193,14 +193,14 @@
                 pjstadig/humane-test-output {:mvn/version "0.11.0"}}
    :main-opts ["-m" "tests"]}
   :test-once
-  {:extra-paths ["test/clj"]
+  {:extra-paths ["src/clj" "graal/clj" "test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.937"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
-  {:extra-paths ["test/clj"]}
+  {:extra-paths ["src/clj" "graal/clj" "test/clj"]}
   ; https://github.com/kiramclean/morphy/blob/main/deps.edn
   :coverage
-  {:extra-paths ["test/clj"]
+  {:extra-paths ["src/clj" "graal/clj" "test/clj"]
    :extra-deps {cloverage/cloverage {:mvn/version "1.2.2"}}
    :main-opts ["-m" "cloverage.coverage" "-p" "src/clj" "-s" "test/clj" "--codecov"]}
   ; https://github.com/cljfx/cljfx/blob/9a3c696d6f18828d35e4d1f4d71e8104b7a85576/deps.edn#L27-L28
