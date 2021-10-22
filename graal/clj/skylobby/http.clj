@@ -44,7 +44,11 @@
                    :downloaded-bytes-counter counter}))))
 
 (defn download-file [state-atom url dest-file]
-  (swap! state-atom assoc-in [:http-download url] {:running true})
+  (swap! state-atom update-in [:http-download url]
+    (fn [data]
+      (-> data
+          (assoc :running true)
+          (update :tries (fnil inc 0)))))
   (log/info "Request to download" url "to" dest-file)
   (try
     (fs/make-parent-dirs dest-file)

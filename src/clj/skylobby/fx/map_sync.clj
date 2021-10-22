@@ -6,6 +6,7 @@
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
     [spring-lobby.fs :as fs]
+    [spring-lobby.http :as http]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
@@ -118,25 +119,39 @@
                      springfiles-searched (contains? springfiles-search-results springname)
                      springfiles-search-result (get springfiles-search-results springname)
                      springfiles-mirror-set (set (:mirrors springfiles-search-result))
+                     dest-exists (some
+                                   (fn [url]
+                                     (let [filename (http/filename url)
+                                           dest (resource/resource-dest spring-isolation-dir {:resource-filename filename
+                                                                                              :resource-type :spring-lobby/map})]
+                                       (when (fs/file-exists? file-cache dest)
+                                         dest)))
+                                   springfiles-mirror-set)
                      springfiles-download (->> http-download
                                                (filter (comp springfiles-mirror-set first))
                                                first
                                                second)
                      springfiles-in-progress (or (:running springfiles-download)
-                                                 (some springfiles-mirror-set http-download-tasks))]
+                                                 (some springfiles-mirror-set http-download-tasks))
+                     severity (if dest-exists -1 2)]
                  (when springname
-                   [{:severity 2
+                   [{:severity severity
                      :text "springfiles"
                      :human-text (if springfiles-in-progress
                                    (u/download-progress springfiles-download)
                                    (if springfiles-searched
                                      (if springfiles-search-result
-                                       "Download from springfiles"
+                                       (if dest-exists
+                                         (str "Downloaded " (fs/filename dest-exists))
+                                         "Download from springfiles")
                                        "Not found on springfiles")
                                      "Search springfiles"))
+                     :tooltip (when dest-exists
+                                (str "Downloaded to " (fs/canonical-path dest-exists)))
                      :in-progress springfiles-in-progress
                      :action
-                     (when (or (not springfiles-searched) springfiles-search-result)
+                     (when (or (not springfiles-searched)
+                               (and springfiles-search-result (not dest-exists)))
                        {:event/type :spring-lobby/add-task
                         :task
                         (if springfiles-searched
