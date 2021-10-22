@@ -897,10 +897,99 @@
                             springfiles-maps-download-source)}}))])}})}}])}}}}))
 
 
+(defn download-replays-window [{:fx/keys [context]}]
+  (let [
+        show (boolean (fx/sub-val context :show-download-replays))
+        index-downloads-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replays)
+        downloading (boolean (seq index-downloads-tasks))
+        bar-replays-page (fx/sub-val context :bar-replays-page)
+        page (u/to-number bar-replays-page)
+        new-online-replays-count (fx/sub-val context :new-online-replays-count)]
+    {:fx/type :stage
+     :showing show
+     :title (str u/app-name " Download Replays")
+     :icons skylobby.fx/icons
+     :on-close-request {:event/type :spring-lobby/dissoc
+                        :key :show-download-replays}
+     :height 480
+     :width 600
+     :scene
+     {:fx/type :scene
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root
+      {:fx/type :h-box
+       :children
+       [{:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :v-box
+         :children
+         [{:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :style {:-fx-font-size 16}
+           :children
+           [
+            {:fx/type :button
+             :style {:-fx-font-size 16}
+             :text (if downloading
+                     " Getting Online BAR Replays... "
+                     " Get Online BAR Replays")
+             :on-action {:event/type :spring-lobby/add-task
+                         :task {:spring-lobby/task-type :spring-lobby/download-bar-replays
+                                :page page}}
+             :disable downloading
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-download:16:white"}}
+            {:fx/type :label
+             :text " Page: "}
+            {:fx/type :text-field
+             :text (str page)
+             :style {:-fx-max-width 56}
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :bar-replays-page}}]}
+          {:fx/type :label
+           :style {:-fx-font-size 16}
+           :text (str (when new-online-replays-count
+                        (str " Got " new-online-replays-count " new")))}
+          {:fx/type :label
+           :style {:-fx-font-size 20}
+           :text "Spring Official Replays"}
+          (let [url "https://replays.springrts.com/"]
+            {:fx/type :hyperlink
+             :style {:-fx-font-size 18}
+             :text url
+             :on-action {:event/type :spring-lobby/desktop-browse-url
+                         :url url}})
+          {:fx/type :label
+           :style {:-fx-font-size 20}
+           :text "BAR Replays"}
+          (let [url "https://bar-rts.com/replays"]
+            {:fx/type :hyperlink
+             :style {:-fx-font-size 18}
+             :text url
+             :on-action {:event/type :spring-lobby/desktop-browse-url
+                         :url url}})
+          {:fx/type :label
+           :style {:-fx-font-size 20}
+           :text "Spring Fight Club Replays"}
+          (let [url "http://replays.springfightclub.com/"]
+            {:fx/type :hyperlink
+             :style {:-fx-font-size 18}
+             :text url
+             :on-action {:event/type :spring-lobby/desktop-browse-url
+                         :url url}})
+          {:fx/type :pane
+           :v-box/vgrow :always}]}
+        {:fx/type :pane
+         :h-box/hgrow :always}]}}}))
+
+
 (defn replays-window-impl
   [{:fx/keys [context]
     :keys [on-close-request screen-bounds title]}]
-  (let [bar-replays-page (fx/sub-val context :bar-replays-page)
+  (let [
         extra-replay-sources (fx/sub-val context :extra-replay-sources)
         filter-replay (fx/sub-val context :filter-replay)
         filter-replay-max-players (fx/sub-val context :filter-replay-max-players)
@@ -909,7 +998,6 @@
         filter-replay-source (fx/sub-val context :filter-replay-source)
         filter-replay-type (fx/sub-val context :filter-replay-type)
         filtered-replays (fx/sub-val context :filtered-replays)
-        new-online-replays-count (fx/sub-val context :new-online-replays-count)
         online-bar-replays (fx/sub-val context :online-bar-replays)
         parsed-replays-by-path (fx/sub-val context :parsed-replays-by-path)
         replays-filter-specs (fx/sub-val context :replays-filter-specs)
@@ -959,7 +1047,6 @@
                                sort)
               selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
               refresh-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-replays)
-              index-downloads-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replays)
               sources (replay-sources {:extra-replay-sources extra-replay-sources})]
           {:fx/type :v-box
            :style {:-fx-font-size 14}
@@ -1150,29 +1237,13 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-refresh:16:white"}})]
-                  (let [downloading (boolean (seq index-downloads-tasks))
-                        page (u/to-number bar-replays-page)]
-                    [{:fx/type :button
-                      :text (if downloading
-                              " Getting Online BAR Replays... "
-                              " Get Online BAR Replays")
-                      :on-action {:event/type :spring-lobby/add-task
-                                  :task {:spring-lobby/task-type :spring-lobby/download-bar-replays
-                                         :page page}}
-                      :disable downloading
-                      :graphic
-                      {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-download:16:white"}}
-                     {:fx/type :label
-                      :text " Page: "}
-                     {:fx/type :text-field
-                      :text (str page)
-                      :style {:-fx-max-width 56}
-                      :on-text-changed {:event/type :spring-lobby/assoc
-                                        :key :bar-replays-page}}
-                     {:fx/type :label
-                      :text (str (when new-online-replays-count
-                                   (str " Got " new-online-replays-count " new")))}]))}
+                  [{:fx/type :button
+                    :text " Download"
+                    :on-action {:event/type :spring-lobby/assoc
+                                :key :show-download-replays}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-download:16:white"}}])}
                 {:fx/type :pane
                  :h-box/hgrow :sometimes}
                 {:fx/type :button
@@ -1218,15 +1289,12 @@
       (replays-window-impl state))))
 
 
-(def app-version (u/app-version))
-
-
 (defn standalone-replay-window
   [{:fx/keys [context]}]
   (let [{:keys [width height]} (skylobby.fx/get-screen-bounds)]
     {:fx/type :stage
      :showing true
-     :title (str "skyreplays " app-version)
+     :title (str "skyreplays " u/app-version)
      :icons skylobby.fx/icons
      :x 100
      :y 100

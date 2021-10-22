@@ -111,6 +111,8 @@
   {
    ".styled-text-area"
    {:-fx-background-color "rgb(50, 50, 50)"}
+   ".hyperlink"
+   {:-fx-text-fill "rgb(128, 128, 128)"}
    ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"

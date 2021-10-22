@@ -16,10 +16,6 @@
 (set! *warn-on-reflection* true)
 
 
-(def app-version
-  (u/app-version))
-
-
 (defn replays-on-close-request
   [^Event e]
   (log/debug "Replays window close request" e)
@@ -34,7 +30,7 @@
     {:fx/type fx.replay/replays-window
      :on-close-request replays-on-close-request
      :settings-button true
-     :title (str "skyreplays " app-version)}
+     :title (str "skyreplays " u/app-version)}
     {:fx/type fx.settings/settings-window}]})
 
 
@@ -65,6 +61,7 @@
           state (assoc (spring-lobby/initial-state) :show-replays true :standalone true)]
       (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
       (reset! spring-lobby/*state state)
+      (spring-lobby/add-ui-state-watcher spring-lobby/*state spring-lobby/*ui-state)
       (create-renderer))
     (spring-lobby/init-async spring-lobby/*state)
     (log/info "Main finished in" (- (u/curr-millis) before) "ms")))

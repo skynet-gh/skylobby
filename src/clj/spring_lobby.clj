@@ -70,8 +70,6 @@
 (declare download-http-resource)
 
 
-(def app-version (u/app-version))
-
 (def wait-init-tasks-ms 20000)
 
 (def start-pos-r 10.0)
@@ -280,8 +278,6 @@
         (tufte/p :ui-state
           (when (not= old-state new-state)
             (swap! ui-state-atom fx/reset-context new-state)))))))
-
-(add-ui-state-watcher *state *ui-state)
 
 
 (def ^:dynamic disable-update-check false)
@@ -526,6 +522,9 @@
             {}
             by-server)))))
 
+(defn springfiles-url [springfiles-search-result]
+  (let [{:keys [mirrors]} springfiles-search-result]
+    (rand-nth mirrors)))
 
 (defn server-auto-resources [_old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
@@ -537,7 +536,7 @@
                            sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
                        (not= 1 sync-status))))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
-        (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache importables-by-path
+        (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
                       rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
@@ -618,6 +617,8 @@
                           (filter (comp #{battle-modname} :mod-name))
                           first
                           not)
+              springfiles-search-result (get springfiles-search-results battle-map)
+              springfiles-url (springfiles-url springfiles-search-result)
               tasks [(when
                        (and (= battle-version (:battle-version old-battle-details))
                             (not engine-details))
@@ -674,7 +675,8 @@
                          (and battle-map
                               (not map-importable)
                               (not map-downloadable)
-                              (get springfiles-search-results battle-map)
+                              springfiles-search-result
+                              ((fnil < 0) (:tries (get http-download springfiles-url)) resource/max-tries)
                               (not download-springfiles-map-task)
                               (not (::refresh-maps tasks-by-type)))
                          (do
@@ -2549,7 +2551,7 @@
           (update-disconnected! *state server-key)))
       nil)))
 
-(defmethod event-handler ::connect [{:keys [server server-key password username] :as state}]
+(defmethod event-handler ::connect [{:keys [no-focus server server-key password username] :as state}]
   (future
     (try
       (let [[server-url server-opts] server
@@ -2562,11 +2564,13 @@
                                :username username)]
         (swap! *state
                (fn [state]
-                 (-> state
-                     (assoc :selected-server-tab server-key)
-                     (update-in [:by-server server-key]
-                       assoc :client-data client-data
-                             :server server))))
+                 (cond-> state
+                         true
+                         (update-in [:by-server server-key]
+                           assoc :client-data client-data
+                                 :server server)
+                         (not no-focus)
+                         (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))
       (catch Exception e
         (log/error e "Error connecting")))))
@@ -4006,17 +4010,20 @@
 (defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
   (log/info "Request to download" downloadable)
   (future
-    (deref
-      (event-handler
-        {:event/type ::http-download
-         :dest (or dest
-                   (resource/resource-dest spring-isolation-dir downloadable))
-         :url (:download-url downloadable)}))
-    (case (:resource-type downloadable)
-      ::map (refresh-maps-all-spring-roots)
-      ::mod (refresh-mods-all-spring-roots)
-      ::engine (refresh-engines-all-spring-roots)
-      nil)))
+    (try
+      (deref
+        (event-handler
+          {:event/type ::http-download
+           :dest (or dest
+                     (resource/resource-dest spring-isolation-dir downloadable))
+           :url (:download-url downloadable)}))
+      (case (:resource-type downloadable)
+        ::map (refresh-maps-all-spring-roots)
+        ::mod (refresh-mods-all-spring-roots)
+        ::engine (refresh-engines-all-spring-roots)
+        nil)
+      (catch Exception e
+        (log/error e "Error downloading")))))
 
 (defmethod task-handler ::http-downloadable
   [task]
@@ -4076,15 +4083,15 @@
     (log/warn "No springname to search springfiles" e)))
 
 (defmethod task-handler ::download-springfiles
-  [{:keys [resource-type search-result springname spring-isolation-dir]}]
-  (if-let [{:keys [filename mirrors] :as search-result} (or search-result
-                                                            (search-springfiles springname))]
-    (do
-      (swap! *state assoc-in [:springfiles-search-results springname] search-result)
-      (log/info "Found details for" springname "on springfiles" search-result)
+  [{:keys [resource-type search-result springname spring-isolation-dir url]}]
+  (if-let [{:keys [filename] :as search-result} (or search-result
+                                                    (task-handler {::task-type ::search-springfiles
+                                                                   :springname springname}))]
+    (let [url (or url
+                  (springfiles-url search-result))]
       (add-task! *state
         {::task-type ::http-downloadable
-         :downloadable {:download-url (rand-nth mirrors)
+         :downloadable {:download-url url
                         :resource-filename filename
                         :resource-type resource-type}
          :springname springname
@@ -4839,12 +4846,16 @@
                                           :username username})]
             (if (contains? by-server server-key)
               (log/warn "Already connected to" server-key)
-              @(event-handler
-                 (merge
-                   {:event/type ::connect
-                    :server server
-                    :server-key server-key}
-                   login)))))))))
+              (do
+                @(event-handler
+                   (merge
+                     {:event/type ::connect
+                      :no-focus true
+                      :server server
+                      :server-key server-key}
+                     login))
+                (async/<!! (async/timeout 1000))))))))))
+
 
 (defmethod task-handler ::auto-connect-servers [_]
   (auto-connect-servers *state))

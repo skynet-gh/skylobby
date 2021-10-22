@@ -40,7 +40,8 @@
            :children
            [
             {:fx/type :h-box
-             :style {:-fx-font-size 18}
+             :style {:-fx-font-size 18
+                     :-fx-padding 4}
              :children
              [
               {:fx/type :check-box
@@ -50,7 +51,8 @@
               {:fx/type :label
                :text " Disable tasks"}]}
             {:fx/type :h-box
-             :style {:-fx-font-size 18}
+             :style {:-fx-font-size 18
+                     :-fx-padding 4}
              :children
              [
               {:fx/type :check-box
@@ -59,8 +61,10 @@
                                      :key :disable-tasks-while-in-game}}
               {:fx/type :label
                :text " Disable tasks while in game"}]}
+            {:fx/type :pane
+             :pref-height 8}
             {:fx/type :label
-             :text "Workers"
+             :text " Workers"
              :style {:-fx-font-size 24}}
             {:fx/type :h-box
              :alignment :center-left
@@ -72,8 +76,9 @@
                   (concat
                     [{:fx/type :label
                       :style {:-fx-font-size 20}
-                      :text (str " " k ": ")}
+                      :text (str "  " k)}
                      {:fx/type :text-area
+                      :v-box/vgrow :always
                       :editable false
                       :wrap-text true
                       :text (if v
@@ -88,8 +93,10 @@
                                       :task-kind k
                                       :task-thread task-thread}}])))})
                (fx/sub-val context :current-tasks))}
+            {:fx/type :pane
+             :pref-height 8}
             {:fx/type :label
-             :text "Task Queue"
+             :text " Task Queue"
              :style {:-fx-font-size 24}}
             {:fx/type :table-view
              :v-box/vgrow :always

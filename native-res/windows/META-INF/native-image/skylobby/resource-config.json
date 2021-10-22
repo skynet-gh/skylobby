@@ -1,0 +1,21 @@
+{
+  "resources":{
+  "includes":[
+    {
+      "pattern":"\\QWindows-amd64/lib7-Zip-JBinding.dll\\E"
+    }, 
+    {
+      "pattern":"\\QWindows-amd64/sevenzipjbinding-lib.properties\\E"
+    }, 
+    {
+      "pattern":"\\Qmozilla/public-suffix-list.txt\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/apache/http/client/version.properties\\E"
+    }, 
+    {
+      "pattern":"\\Qsevenzipjbinding-platforms.properties\\E"
+    }
+  ]},
+  "bundles":[]
+}

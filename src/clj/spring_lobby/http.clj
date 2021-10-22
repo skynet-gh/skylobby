@@ -252,7 +252,7 @@
     :spring-lobby/map
     :else nil))
 
-(defn filename [url]
+(defn filename [url] ; TODO use java.net.URI/parse and .getPath
   (when url
     (last (string/split url #"/"))))
 
@@ -528,7 +528,11 @@
                    :downloaded-bytes-counter counter}))))
 
 (defn download-file [state-atom url dest-file]
-  (swap! state-atom assoc-in [:http-download url] {:running true})
+  (swap! state-atom update-in [:http-download url]
+    (fn [data]
+      (-> data
+          (assoc :running true)
+          (update :tries (fnil inc 0)))))
   (log/info "Request to download" url "to" dest-file)
   (future
     (try
@@ -537,7 +541,9 @@
         (-> http/default-middleware
             (insert-after http/wrap-url wrap-downloaded-bytes-counter)
             (conj http/wrap-lower-case-headers))
-        (let [request (http/get url {:as :stream})
+        (let [request (http/get url {:as :stream
+                                     :conn-timeout 10000
+                                     :socket-timeout 10000})
               ^String content-length (get-in request [:headers "content-length"] "0")
               length (Integer/valueOf content-length)
               buffer-size (* 1024 10)]
@@ -568,6 +574,7 @@
                           (log/warn e "Error updating download status"))))
                     (recur))))))))
       (catch Exception e
+        (swap! state-atom assoc-in [:http-download url :error] e)
         (log/error e "Error downloading" url "to" dest-file)
         (raynes-fs/delete dest-file))
       (finally

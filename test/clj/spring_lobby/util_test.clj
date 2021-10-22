@@ -169,9 +169,3 @@
 (deftest base64-md5
   (is (= "1B2M2Y8AsgTpgAmY7PhCfg=="
          (u/base64-md5 ""))))
-
-
-(deftest agent-string
-  (is (= "skylobby-git:1234567"
-         (with-redefs [u/short-git-commit (constantly "1234567")]
-           (u/agent-string)))))

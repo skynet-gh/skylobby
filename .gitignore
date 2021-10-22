@@ -1,4 +1,6 @@
 *.orig
+/*.dll
+/*.exe
 /*.jar
 /*.log*
 /.calva/
@@ -9,8 +11,12 @@
 /.nrepl-port
 /.project
 /.settings/
+/classes/
 /dist/
+/native-image-args
 /pom.xml
 /skylobby-*.msi
+/skyres
 /target/
 /trace.edn
+/*.build_artifacts.txt
