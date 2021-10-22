@@ -2545,7 +2545,7 @@
           (update-disconnected! *state server-key)))
       nil)))
 
-(defmethod event-handler ::connect [{:keys [server server-key password username] :as state}]
+(defmethod event-handler ::connect [{:keys [no-focus server server-key password username] :as state}]
   (future
     (try
       (let [[server-url server-opts] server
@@ -2558,11 +2558,13 @@
                                :username username)]
         (swap! *state
                (fn [state]
-                 (-> state
-                     (assoc :selected-server-tab server-key)
-                     (update-in [:by-server server-key]
-                       assoc :client-data client-data
-                             :server server))))
+                 (cond-> state
+                         true
+                         (update-in [:by-server server-key]
+                           assoc :client-data client-data
+                                 :server server)
+                         (not no-focus)
+                         (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))
       (catch Exception e
         (log/error e "Error connecting")))))
@@ -4835,12 +4837,16 @@
                                           :username username})]
             (if (contains? by-server server-key)
               (log/warn "Already connected to" server-key)
-              @(event-handler
-                 (merge
-                   {:event/type ::connect
-                    :server server
-                    :server-key server-key}
-                   login)))))))))
+              (do
+                @(event-handler
+                   (merge
+                     {:event/type ::connect
+                      :no-focus true
+                      :server server
+                      :server-key server-key}
+                     login))
+                (async/<!! (async/timeout 1000))))))))))
+
 
 (defmethod task-handler ::auto-connect-servers [_]
   (auto-connect-servers *state))
