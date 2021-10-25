@@ -7,10 +7,10 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.http :as http]
     [skylobby.resource :as resource]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
-    [spring-lobby.http :as http]
     [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
