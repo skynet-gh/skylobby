@@ -3930,7 +3930,9 @@
     (swap! *state assoc
            :sdp-files sdp-files
            :rapid-packages packages
-           :rapid-update false)))
+           :rapid-update false)
+    (add-task! *state {::task-type ::refresh-mods})))
+
 
 (defmethod event-handler ::rapid-repo-change
   [{:fx/keys [event]}]
