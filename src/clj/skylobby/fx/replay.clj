@@ -143,8 +143,8 @@
         replay-minimap-type (fx/sub-val context :replay-minimap-type)
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
-        selected-replay-details (or (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))
-                                    selected-replay)
+        full-replay-details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))
+        selected-replay-details (or full-replay-details selected-replay)
         script-data (-> selected-replay-details :body :script-data)
         game (:game script-data)
         selected-engine-version (:replay-engine-version selected-replay)
@@ -262,6 +262,7 @@
                      :map-name map-name
                      :spring-isolation-dir spring-isolation-dir}]}]
     {:fx/type :h-box
+     :style {:-fx-font-size 16}
      :alignment :center-left
      :children
      [{:fx/type :split-pane
@@ -321,8 +322,8 @@
          (concat
            (when show-sync-left
              [sync-pane])
-           (if (not= selected-replay selected-replay-details)
-             (let [{:keys [chat-log player-num-to-name]} (-> selected-replay-details :body :demo-stream)]
+           (if full-replay-details
+             (let [{:keys [chat-log player-num-to-name]} (-> full-replay-details :body :demo-stream)]
                [{:fx/type :label
                  :text "Chat log"
                  :style {:-fx-font-size 20}}

@@ -1,6 +1,7 @@
 (ns spring-lobby.replays
   (:require
     [cljfx.api :as fx]
+    skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.settings :as fx.settings]
     spring-lobby
@@ -16,6 +17,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def screen-bounds (skylobby.fx/get-screen-bounds))
+
+
 (defn replays-on-close-request
   [^Event e]
   (log/debug "Replays window close request" e)
@@ -29,6 +33,7 @@
    [
     {:fx/type fx.replay/replays-window
      :on-close-request replays-on-close-request
+     :screen-bounds screen-bounds
      :settings-button true
      :title (str "skyreplays " u/app-version)}
     {:fx/type fx.settings/settings-window}]})
