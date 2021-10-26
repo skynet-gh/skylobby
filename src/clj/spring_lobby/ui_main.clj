@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     [cljfx.css :as css]
     clojure.core.async
+    [clojure.core.cache :as cache]
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
     skylobby.fx
@@ -45,6 +46,23 @@
    [nil "--window-maximized" "Start with the main window maximized"]])
 
 
+(defn parse-replay-file [args]
+  (let [
+        first-arg-as-file (some-> args first fs/file)
+        first-arg-filename (fs/filename first-arg-as-file)
+        all-args-as-file (fs/file (string/join " " args))
+        all-args-filename (fs/filename all-args-as-file)
+        single-arg-file (and (not (string/blank? first-arg-filename))
+                             (string/ends-with? first-arg-filename ".sdfz")
+                             (fs/exists? first-arg-as-file))]
+    (if single-arg-file
+      first-arg-as-file
+      (when (and (not (string/blank? all-args-filename))
+                 (string/ends-with? all-args-filename ".sdfz")
+                 (fs/exists? all-args-as-file))
+        all-args-as-file))))
+
+
 (defn -main [& args]
   (let [{:keys [arguments errors options]} (cli/parse-opts args cli-options)]
     (if errors
@@ -52,11 +70,8 @@
         (println "Error parsing arguments:\n\n"
                  (string/join \newline errors))
         (System/exit -1))
-      (let [first-arg-as-file (some-> arguments first fs/file)
-            first-arg-filename (fs/filename first-arg-as-file)
-            opening-replay? (and (not (string/blank? first-arg-filename))
-                                 (string/ends-with? first-arg-filename ".sdfz")
-                                 (fs/exists? first-arg-as-file))]
+      (let [replay-file (parse-replay-file arguments)
+            opening-replay? (some? replay-file)]
         (try
           (when-let [dest (fs/file (:update-copy-jar options))]
             (when-let [jar-file (u/jar-file)]
@@ -80,7 +95,6 @@
                                             replay-sources)]
               (log/info "Replacing replay sources with" (pr-str replay-sources-override))
               (alter-var-root #'fs/replay-sources-override (constantly replay-sources-override))))
-          (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
           (let [before (u/curr-millis)]
             (log/info "UI Main")
             (Platform/setImplicitExit true)
@@ -146,12 +160,17 @@
               opening-replay?
               (let [
                     _ (fs/init-7z!)
-                    selected-replay (sdfz/parse-replay first-arg-as-file)]
+                    replay-details (sdfz/parse-replay replay-file {:details true :parse-stream true})
+                    replay-path (fs/canonical-path replay-file)]
                 (log/info "Opening replay view")
                 (swap! spring-lobby/*state
-                       assoc
-                       :selected-replay selected-replay
-                       :selected-replay-file first-arg-as-file)
+                  (fn [state]
+                    (-> state
+                        (assoc :parsed-replays-by-path {replay-path replay-details}
+                               :selected-replay replay-details
+                               :selected-replay-file replay-file
+                               :single-replay-view true)
+                        (update :replay-details cache/miss replay-path replay-details))))
                 (spring-lobby/replay-map-and-mod-details-watcher nil spring-lobby/*state nil @spring-lobby/*state)
                 (let [r (fx/create-renderer
                           :middleware (comp

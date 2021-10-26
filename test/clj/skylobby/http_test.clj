@@ -1,8 +1,8 @@
-(ns spring-lobby.http-test
+(ns skylobby.http-test
   (:require
     [clojure.test :refer [deftest is]]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.http :as http]))
+    [skylobby.fs :as fs]
+    [skylobby.http :as http]))
 
 
 (deftest detect-engine-branch

@@ -3,8 +3,8 @@
     [cheshire.core :as json]
     [clj-http.client :as clj-http]
     [clojure.java.io :as io]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.http :as http]
+    [skylobby.fs :as fs]
+    [skylobby.http :as http]
     [taoensso.timbre :as log]))
 
 

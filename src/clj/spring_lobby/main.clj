@@ -2,7 +2,6 @@
   (:require
     [clj-http.client :as clj-http]
     clojure.core.async
-    [clojure.string :as string]
     [clojure.tools.cli :as cli]
     [spring-lobby.ui-main :as ui-main]
     [spring-lobby.fs :as fs]
@@ -18,20 +17,18 @@
 
 
 (defn -main [& args]
-  (log/info "Main")
+  (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
+  (log/info "Main" (pr-str args))
   (let [{:keys [arguments]} (cli/parse-opts args cli-options)
-        first-arg-as-file (some-> arguments first fs/file)
-        first-arg-filename (fs/filename first-arg-as-file)
-        opening-replay? (and (not (string/blank? first-arg-filename))
-                             (string/ends-with? first-arg-filename ".sdfz")
-                             (fs/exists? first-arg-as-file))]
+        replay-file (ui-main/parse-replay-file arguments)
+        opening-replay? (some? replay-file)]
     (try
       (if (and opening-replay? (not (u/is-port-open? u/ipc-port)))
         (do
           (log/info "Sending IPC to existing skylobby instance on port" u/ipc-port)
           (clj-http/post
             (str "http://localhost:" u/ipc-port "/replay")
-            {:query-params {:path (fs/canonical-path first-arg-as-file)}})
+            {:query-params {:path (fs/canonical-path replay-file)}})
           (System/exit 0))
         (apply ui-main/-main args))
       (catch Throwable t

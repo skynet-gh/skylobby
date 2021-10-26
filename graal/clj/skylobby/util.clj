@@ -1,5 +1,7 @@
 (ns skylobby.util
   (:import
+    (java.net InetAddress NetworkInterface ServerSocket URL URLDecoder URLEncoder)
+    (java.nio.charset StandardCharsets)
     (org.apache.commons.io FileUtils)))
 
 
@@ -34,3 +36,7 @@
            " / "
            (format-bytes total))
       "Downloading...")))
+
+
+(defn decode [^String s]
+  (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))

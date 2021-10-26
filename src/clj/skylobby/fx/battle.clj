@@ -214,6 +214,41 @@
         by-section)}}))
 
 
+(defn sync-button [{:fx/keys [context]
+                    :keys [server-key]}]
+  (let [
+        my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
+        my-sync-status (int (or (:sync my-battle-status) 0))
+        sync-button-style (assoc
+                            (dissoc
+                              (case my-sync-status
+                                1 ok-severity
+                                2 error-severity
+                                ; else
+                                warn-severity)
+                              :-fx-background-color)
+                            :-fx-font-size 14)
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
+        indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)]
+    {:fx/type :button
+     :text (str
+             " "
+             (case my-sync-status
+               1 "synced"
+               2 "unsynced"
+               ; else
+               "syncing")
+             " ")
+     :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                 :map-resource indexed-map
+                 :mod-resource indexed-mod}
+     :style sync-button-style}))
+
+
 (defn battle-buttons
   [{:fx/keys [context]
     :keys [server-key my-player team-counts team-skills]}]
@@ -293,19 +328,8 @@
                        [{:fx/type :h-box
                          :alignment :center-left
                          :children
-                         [{:fx/type :button
-                           :text (str
-                                   " "
-                                   (case my-sync-status
-                                     1 "synced"
-                                     2 "unsynced"
-                                     ; else
-                                     "syncing")
-                                   " ")
-                           :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                                       :map-resource indexed-map
-                                       :mod-resource indexed-mod}
-                           :style sync-button-style}
+                         [{:fx/type sync-button
+                           :server-key server-key}
                           {:fx/type :button
                            :graphic {:fx/type font-icon/lifecycle
                                      :icon-literal (if battle-resource-details
@@ -1380,7 +1404,14 @@
                                   :on-selected-changed {:event/type :spring-lobby/assoc
                                                         :key :auto-get-resources}}
                                  {:fx/type :label
-                                  :text " Auto import or download resources"}]}]))})]
+                                  :text " Auto import or download resources"}]}
+                               {:fx/type :h-box
+                                :alignment :center-left
+                                :children
+                                [{:fx/type :label
+                                  :text "Force sync check: "}
+                                 {:fx/type sync-button
+                                  :server-key server-key}]}]))})]
     {:fx/type :v-box
      :children
      [

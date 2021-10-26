@@ -26,6 +26,7 @@
     [skylobby.fx.download :as fx.download]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
+    [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
     [spring-lobby.battle :as battle]
@@ -37,7 +38,6 @@
     [spring-lobby.fs.sdfz :as replay]
     [spring-lobby.fs.smf :as fs.smf]
     [spring-lobby.git :as git]
-    [spring-lobby.http :as http]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
@@ -830,8 +830,9 @@
 
 
 (defn replay-map-and-mod-details-watcher [_k state-atom old-state new-state]
-  (when (not= (replay-map-and-mod-details-relevant-keys old-state)
-              (replay-map-and-mod-details-relevant-keys new-state))
+  (when (or (not= (replay-map-and-mod-details-relevant-keys old-state)
+                  (replay-map-and-mod-details-relevant-keys new-state))
+            (:single-replay-view new-state))
     (try
       (let [old-selected-replay-file (:selected-replay-file old-state)
             old-replay-id (:selected-replay-id old-state)
@@ -877,24 +878,28 @@
 
             tasks [
                    (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-mod new-mod))
+                                      (not= old-mod new-mod)
+                                      (:single-replay-view new-state))
                                   (and (not (string/blank? new-mod))
                                        (or (not (resource/details? mod-details))
                                            mod-changed)))
                              (and
-                               (not (some filter-fn old-mods))
+                               (or (not (some filter-fn old-mods))
+                                   (:single-replay-view new-state))
                                mod-exists))
                      {::task-type ::mod-details
                       :mod-name new-mod
                       :mod-file (:file mod-exists)
                       :use-git-mod-version (:use-git-mod-version new-state)})
                    (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-map new-map))
+                                      (not= old-map new-map)
+                                      (:single-replay-view new-state))
                                   (and (not (string/blank? new-map))
                                        (or (not (resource/details? map-details))
                                            map-changed)))
                              (and
-                               (not (some (comp #{new-map} :map-name) old-maps))
+                               (or (not (some (comp #{new-map} :map-name) old-maps))
+                                   (:single-replay-view new-state))
                                map-exists))
                      {::task-type ::map-details
                       :map-name new-map
@@ -3930,7 +3935,9 @@
     (swap! *state assoc
            :sdp-files sdp-files
            :rapid-packages packages
-           :rapid-update false)))
+           :rapid-update false)
+    (add-task! *state {::task-type ::refresh-mods})))
+
 
 (defmethod event-handler ::rapid-repo-change
   [{:fx/keys [event]}]

@@ -12,3 +12,4 @@
 --add-launcher skylobby-highmem="resources/skylobby-highmem.properties"
 --add-launcher skylobby-lowmem="resources/skylobby-lowmem.properties"
 --add-launcher skylobby-vlowmem="resources/skylobby-vlowmem.properties"
+--add-launcher skylobby-console="resources/skylobby-console.properties"

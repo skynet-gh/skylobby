@@ -24,6 +24,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.19]
+
+- Refresh mods after rapid package update
+- Add force sync check label and button
+- Fix replay file association when replay has spaces
+- Fix standalone replays window
+- Add handler for tei battle rename
+
 ### [0.6.18]
 
 - Add max tries to springfiles auto download
