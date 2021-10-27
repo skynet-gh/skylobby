@@ -1,4 +1,5 @@
 *.orig
+/*.bin
 /*.dll
 /*.exe
 /*.jar
