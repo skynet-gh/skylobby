@@ -220,7 +220,8 @@
                                            (string/includes? (string/lower-case user-agent) filter-lc)))
                                   true))))]
     {:fx/type :v-box
-     :style {:-fx-min-width "460"}
+     :style {:-fx-min-width 460
+             :-fx-min-height 128}
      :children
      [{:fx/type :h-box
        :alignment :center-left

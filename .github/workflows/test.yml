@@ -29,7 +29,7 @@ jobs:
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.986'
+          cli: '1.10.3.998'
 
       - run: clojure -M:test:headless:runner
 
@@ -47,7 +47,7 @@ jobs:
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
-          cli: '1.10.3.986'
+          cli: '1.10.3.998'
 
       - run: clojure -M:coverage:headless
       - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json

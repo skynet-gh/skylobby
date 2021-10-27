@@ -240,7 +240,8 @@
                          (catch Exception e
                            (log/error e "Error in print loop"))
                          (finally
-                           (chimer)))))]
+                           (when chimer
+                             (.close chimer))))))]
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 (defn login

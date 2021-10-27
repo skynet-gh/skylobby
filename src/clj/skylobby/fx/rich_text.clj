@@ -4,10 +4,8 @@
     [cljfx.fx.region :as fx.region]
     [cljfx.lifecycle :as lifecycle]
     [cljfx.mutator :as mutator]
-    [cljfx.prop :as prop]
-    [taoensso.timbre :as log])
+    [cljfx.prop :as prop])
   (:import
-    (javafx.scene.control IndexRange)
     (org.fxmisc.flowless VirtualizedScrollPane)
     (org.fxmisc.richtext InlineCssTextArea StyleClassedTextArea)
     (org.fxmisc.richtext.model StyledDocument)))
@@ -17,35 +15,6 @@
 
 
 (def auto-scroll-threshold 80)
-
-
-(def props
-  (merge
-    fx.region/props
-    (composite/props StyleClassedTextArea
-      :document (prop/make
-                  (mutator/setter
-                    (fn [^StyleClassedTextArea area ^StyledDocument document]
-                      (let [
-                            length (.getLength area)]
-                        (if document
-                          (let [
-                                new-length (.length document)
-                                diff (- new-length length)]
-                            (if (pos? diff)
-                              (.replace area length length (.subSequence document (IndexRange. length new-length)))
-                              (do
-                                (log/warn "New document is shorted than old one:" new-length "was" length)
-                                (.replace area 0 length document))))
-                          (.deleteText area 0 length)))))
-                  lifecycle/scalar)
-      :editable [:setter lifecycle/scalar :default false]
-      :wrap-text [:setter lifecycle/scalar :default true])))
-
-(def lifecycle
-  (composite/describe StyleClassedTextArea
-    :ctor []
-    :props props))
 
 
 (def props-fast
@@ -70,13 +39,17 @@
                             [new-lines new-document-fn auto-scroll] new-value
                             diff-lines (drop (count old-lines) new-lines)]
                         (when (seq diff-lines)
-                          (let [index-range (.getSelection area)]
+                          (let [index-range (.getSelection area)
+                                select-start (.getStart index-range)
+                                select-end (.getEnd index-range)]
                             (.appendText area "\n")
                             (.append area (new-document-fn diff-lines))
-                            (when auto-scroll
-                              (let [^VirtualizedScrollPane parent (.getParent area)]
-                                (.scrollYBy parent ##Inf)))
-                            (.selectRange area (.getStart index-range) (.getEnd index-range))))))
+                            (if (not= select-start select-end)
+                              (.selectRange area select-start select-end)
+                              (when auto-scroll
+                                (.layout area)
+                                (let [last-para-index (max 0 (dec (count (.getParagraphs area))))]
+                                  (.showParagraphAtBottom area last-para-index))))))))
                     (retract! [_ instance _ _]
                       (let [^StyleClassedTextArea area instance]
                         (.deleteText area 0 (.getLength area)))))

@@ -73,11 +73,11 @@
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created (fn [^VirtualizedScrollPane scroll-pane]
                  (.layout scroll-pane)
-                 (some-> scroll-pane .getParent .layout)
                  (.scrollYBy scroll-pane ##Inf)
                  (let [
                        scroll-on-change (reify javafx.beans.value.ChangeListener
                                           (changed [this _observable _old-value _new-value]
+                                            (.layout scroll-pane)
                                             (.scrollYBy scroll-pane ##Inf)))
                        width-property (.widthProperty scroll-pane)
                        height-property (.heightProperty scroll-pane)]

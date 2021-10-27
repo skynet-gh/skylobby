@@ -42,6 +42,7 @@
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.util :as u]
+    [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
     [version-clj.core :as version])
@@ -105,32 +106,57 @@
   (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
 
 
-(defn- slurp-config-edn
+; https://github.com/ptaoussanis/nippy#custom-types-v21
+(nippy/extend-freeze File :skylobby/file
+  [^File x data-output]
+  (.writeUTF data-output (fs/canonical-path x)))
+(nippy/extend-thaw :skylobby/file
+  [data-input]
+  (io/file (.readUTF data-input)))
+
+(nippy/extend-freeze URL :skylobby/url
+  [^File x data-output]
+  (.writeUTF data-output (str x)))
+(nippy/extend-thaw :skylobby/url
+  [data-input]
+  (URL. (.readUTF data-input)))
+
+
+(defn nippy-filename [edn-filename]
+  (when edn-filename
+    (string/replace edn-filename #"\.edn$" ".bin")))
+
+(defn slurp-config-edn
   "Returns data loaded from a .edn file in this application's root directory."
-  [edn-filename]
+  [{:keys [filename nippy]}]
   (try
-    (let [config-file (fs/config-file edn-filename)]
-      (log/info "Slurping config edn from" config-file)
-      (when (fs/exists? config-file)
-        (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
-          (if (map? data)
-            (do
-              (try
-                (log/info "Backing up config file that we could parse")
-                (fs/copy config-file (fs/config-file (str edn-filename ".known-good")))
-                (catch Exception e
-                  (log/error e "Error backing up config file")))
-              data)
-            (do
-              (log/warn "Config file data from" edn-filename "is not a map")
-              {})))))
+    (let [nippy-file (fs/config-file (nippy-filename filename))]
+      (if (and nippy (fs/exists? nippy-file))
+        (do
+          (log/info "Slurping config nippy from" nippy-file)
+          (nippy/thaw-from-file nippy-file))
+        (let [config-file (fs/config-file filename)]
+          (log/info "Slurping config edn from" config-file)
+          (when (fs/exists? config-file)
+            (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
+              (if (map? data)
+                (do
+                  (try
+                    (log/info "Backing up config file that we could parse")
+                    (fs/copy config-file (fs/config-file (str filename ".known-good")))
+                    (catch Exception e
+                      (log/error e "Error backing up config file")))
+                  data)
+                (do
+                  (log/warn "Config file data from" filename "is not a map")
+                  {})))))))
     (catch Exception e
-      (log/warn e "Exception loading app edn file" edn-filename)
+      (log/warn e "Exception loading app edn file" filename)
       (try
         (log/info "Copying bad config file for debug")
-        (fs/copy (fs/config-file edn-filename) (fs/config-file (str edn-filename ".debug")))
+        (fs/copy (fs/config-file filename) (fs/config-file (str filename ".debug")))
         (catch Exception e
-          (log/warn e "Exception copying bad edn file" edn-filename)))
+          (log/warn e "Exception copying bad edn file" filename)))
       {})))
 
 
@@ -139,7 +165,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-title :battle-password :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -163,7 +189,7 @@
   (select-keys state
     [:downloadables-by-url :downloadables-last-updated]))
 
-(defn- select-rapid [state]
+(defn select-rapid [state]
   (select-keys state
     [:rapid-data-by-hash :rapid-data-by-id :rapid-data-by-version :rapid-packages :rapid-repos
      :rapid-updated :rapid-versions :sdp-files]))
@@ -183,9 +209,15 @@
    {:select-fn select-downloadables
     :filename "downloadables.edn"}
    {:select-fn select-rapid
-    :filename "rapid.edn"}
+    :filename "rapid.edn"
+    :nippy true}
    {:select-fn select-replays
     :filename "replays.edn"}])
+
+(def parsed-replays-config
+  {:select-fn #(select-keys % [:invalid-replay-paths :parsed-replays-by-path])
+   :filename "parsed-replays.edn"
+   :nippy true})
 
 
 (def default-servers
@@ -213,6 +245,8 @@
   (merge
     {:auto-get-resources true
      :battle-as-tab true
+     :battle-layout "horizontal"
+     :battles-layout "horizontal"
      :battle-players-color-type "player"
      :battle-resource-details true
      :chat-highlight-username true
@@ -238,9 +272,8 @@
     (apply
       merge
       (doall
-        (map
-          (comp slurp-config-edn :filename) state-to-edn)))
-    (slurp-config-edn "parsed-replays.edn")
+        (map slurp-config-edn state-to-edn)))
+    (slurp-config-edn parsed-replays-config)
     {:tasks-by-kind {}
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      :file-events (initial-file-events)
@@ -285,27 +318,31 @@
 (def ^:dynamic main-args nil)
 
 
-(defn- spit-app-edn
+(defn spit-app-edn
   "Writes the given data as edn to the given file in the application directory."
   ([data filename]
    (spit-app-edn data filename nil))
-  ([data filename {:keys [pretty]}]
-   (let [output (if pretty
-                  (with-out-str (pprint (if (map? data)
-                                          (into (sorted-map) data)
-                                          data)))
-                  (pr-str data))
-         parsable (try
-                    (edn/read-string {:readers custom-readers} output)
-                    true
-                    (catch Exception e
-                      (log/error e "Config EDN for" filename "does not parse, keeping old file")))
-         file (fs/config-file (if parsable
-                                filename
-                                (str filename ".bad")))]
-     (fs/make-parent-dirs file)
-     (log/info "Spitting edn to" file)
-     (spit file output))))
+  ([data filename {:keys [nippy pretty]}]
+   (let [file (fs/config-file filename)]
+     (fs/make-parent-dirs file))
+   (if nippy
+     (let [file (fs/config-file (nippy-filename filename))]
+       (nippy/freeze-to-file file data))
+     (let [output (if pretty
+                    (with-out-str (pprint (if (map? data)
+                                            (into (sorted-map) data)
+                                            data)))
+                    (pr-str data))
+           parsable (try
+                      (edn/read-string {:readers custom-readers} output)
+                      true
+                      (catch Exception e
+                        (log/error e "Config EDN for" filename "does not parse, keeping old file")))
+           file (fs/config-file (if parsable
+                                  filename
+                                  (str filename ".bad")))]
+       (log/info "Spitting edn to" file)
+       (spit file output)))))
 
 
 (defn- spit-state-config-to-edn [old-state new-state]
@@ -1441,8 +1478,9 @@
           (log/info "No valid replays left to parse")
           (when (seq this-round)
             (spit-app-edn
-              (select-keys new-state [:invalid-replay-paths :parsed-replays-by-path])
-              "parsed-replays.edn"))
+              ((:select-fn parsed-replays-config) new-state)
+              (:filename parsed-replays-config)
+              parsed-replays-config))
           (add-task! state-atom {::task-type ::refresh-replay-resources}))))))
 
 (defn- refresh-replay-resources
@@ -4491,7 +4529,7 @@
           (re-find #"^/unignore" message)
           (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
             (set-ignore server-key username false {:channel-name channel-name}))
-          (re-find #"^/msg" message)
+          (or (re-find #"^/msg" message) (re-find #"^/message" message))
           (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
             @(event-handler
                (merge e

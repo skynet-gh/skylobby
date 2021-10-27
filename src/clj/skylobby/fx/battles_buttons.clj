@@ -13,6 +13,11 @@
 
 (def matchmaking-compflag "matchmaking")
 
+(def battles-layouts
+  [
+   "vertical"
+   "horizontal"])
+
 
 (defn- battles-buttons-view-impl
   [{:fx/keys [context]}]
@@ -66,7 +71,14 @@
                        :key :show-chat-window}
            :graphic
            {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-window-maximize:16:white"}}]
+            :icon-literal "mdi-window-maximize:16:white"}}
+          {:fx/type :label
+           :text " Orientation: "}
+          {:fx/type :combo-box
+           :value (fx/sub-val context :battles-layout)
+           :items battles-layouts
+           :on-value-changed {:event/type :spring-lobby/assoc
+                              :key :battles-layout}}]
          #_
          [{:fx/type :label
            :text " Resources: "}

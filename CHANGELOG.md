@@ -24,6 +24,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.6.20]
+
+- Fix chat and console auto scroll
+- Add layout orientation picker for battles/users
+- Switch large config files to nippy for performance
+
 ### [0.6.19]
 
 - Refresh mods after rapid package update
