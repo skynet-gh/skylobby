@@ -497,114 +497,122 @@
        [{:fx/type :h-box
          :alignment :center-left
          :children
-         (concat
-           [{:fx/type :pane
-             :h-box/hgrow :always}]
-           (when (and (not (:mode my-battle-status))
-                      (not singleplayer))
-             [{:fx/type :check-box
-               :selected (boolean auto-launch)
-               :style {:-fx-padding "10px"}
-               :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                     :path [:by-server server-key :auto-launch]}}
-              {:fx/type :label
-               :text "Auto Launch "}])
-           (when (not singleplayer)
-             [(let [am-away (:away my-client-status)]
-                {:fx/type :combo-box
-                 :value (if am-away "Away" "Here")
-                 :items ["Away" "Here"]
-                 :on-value-changed {:event/type :spring-lobby/on-change-away
-                                    :client-data (when-not singleplayer client-data)
-                                    :client-status (assoc my-client-status :away (not am-away))}})])
-           [{:fx/type :combo-box
-             :value (if am-spec
-                      "Spectating"
-                      "Playing")
-             :items ["Spectating" "Playing"]
-             :on-value-changed {:event/type :spring-lobby/on-change-spectate
-                                :client-data (when-not singleplayer client-data)
-                                :is-me true
-                                :is-bot false
-                                :id my-player
-                                :ready-on-unspec ready-on-unspec
-                                :server-key server-key}}])}
+         (if (and (not (:mode my-battle-status))
+                  (not singleplayer))
+           [{:fx/type :check-box
+             :selected (boolean auto-launch)
+             :style {:-fx-padding "10px"}
+             :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                   :path [:by-server server-key :auto-launch]}}
+            {:fx/type :label
+             :text "Auto Launch "}]
+           [])}
+        {:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         (if (not singleplayer)
+           [(let [am-away (:away my-client-status)]
+              {:fx/type :combo-box
+               :value (if am-away "Away" "Here")
+               :items ["Away" "Here"]
+               :on-value-changed {:event/type :spring-lobby/on-change-away
+                                  :client-data (when-not singleplayer client-data)
+                                  :client-status (assoc my-client-status :away (not am-away))}})]
+           [])}
+        {:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 16}
+         :children
+         [{:fx/type :combo-box
+           :value (if am-spec
+                    "Spectating"
+                    "Playing")
+           :items ["Spectating" "Playing"]
+           :on-value-changed {:event/type :spring-lobby/on-change-spectate
+                              :client-data (when-not singleplayer client-data)
+                              :is-me true
+                              :is-bot false
+                              :id my-player
+                              :ready-on-unspec ready-on-unspec
+                              :server-key server-key}}]}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 24}
          :children
-         (concat
-           (if-not am-spec
-             [{:fx/type :check-box
-               :selected (-> my-battle-status :ready boolean)
-               :style {:-fx-padding "10px"}
-               :on-selected-changed {:event/type :spring-lobby/battle-ready-change
-                                     :client-data client-data
-                                     :username username
-                                     :battle-status my-battle-status
-                                     :team-color my-team-color}}
-              {:fx/type :label
-               :text " Ready "}]
-             [{:fx/type :check-box
-               :selected (boolean auto-unspec)
-               :style {:-fx-padding "10px"
-                       :-fx-font-size 15}
-               :on-selected-changed
-               {:event/type :spring-lobby/auto-unspec
-                :client-data (when-not singleplayer client-data)
-                :is-me true
-                :is-bot false
-                :id my-player
-                :ready-on-unspec ready-on-unspec
-                :server-key server-key}}
-              {:fx/type :label
-               :style {:-fx-font-size 15}
-               :text "Auto Unspec "}])
-           [
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type tooltip-nofocus/lifecycle
-               :show-delay skylobby.fx/tooltip-show-delay
-               :style {:-fx-font-size 12}
-               :text (cond
-                       am-host "You are the host, start the game"
-                       host-ingame "Join game in progress"
-                       :else (str "Call vote to start the game"))}}
-             :desc
-             {:fx/type :button
-              :text (cond
-                      (and spring-running (not singleplayer))
-                      "Game running"
-                      (and am-spec (not host-ingame) (not singleplayer))
-                      "Game not running"
-                      :else
-                      (str (if (and (not singleplayer) (or host-ingame am-spec))
-                             "Join" "Start")
-                           " Game"))
-              :disable (boolean
-                         (or spring-running
-                             (and (not singleplayer)
-                                  (or (and (not host-ingame) am-spec)
-                                      (not in-sync)))))
-              :on-action
-              (merge
-                {:event/type :spring-lobby/start-battle}
-                (fx/sub-ctx context sub/spring-resources spring-root)
-                {:battle battle
-                 :battles battles
-                 :users users
-                 :username username}
-                {:am-host am-host
-                 :am-spec am-spec
-                 :battle-status my-battle-status
-                 :channel-name channel-name
-                 :client-data client-data
-                 :host-ingame host-ingame
-                 :singleplayer singleplayer
-                 :spring-isolation-dir spring-root})}}])}
+         (if-not am-spec
+           [{:fx/type :check-box
+             :selected (-> my-battle-status :ready boolean)
+             :style {:-fx-padding "10px"}
+             :on-selected-changed {:event/type :spring-lobby/battle-ready-change
+                                   :client-data client-data
+                                   :username username
+                                   :battle-status my-battle-status
+                                   :team-color my-team-color}}
+            {:fx/type :label
+             :text " Ready "}]
+           [{:fx/type :check-box
+             :selected (boolean auto-unspec)
+             :style {:-fx-padding "10px"
+                     :-fx-font-size 15}
+             :on-selected-changed
+             {:event/type :spring-lobby/auto-unspec
+              :client-data (when-not singleplayer client-data)
+              :is-me true
+              :is-bot false
+              :id my-player
+              :ready-on-unspec ready-on-unspec
+              :server-key server-key}}
+            {:fx/type :label
+             :style {:-fx-font-size 15}
+             :text "Auto Unspec "}])}
+        {:fx/type :h-box
+         :alignment :center-left
+         :style {:-fx-font-size 24}
+         :children
+         [
+          {:fx/type fx.ext.node/with-tooltip-props
+           :props
+           {:tooltip
+            {:fx/type tooltip-nofocus/lifecycle
+             :show-delay skylobby.fx/tooltip-show-delay
+             :style {:-fx-font-size 12}
+             :text (cond
+                     am-host "You are the host, start the game"
+                     host-ingame "Join game in progress"
+                     :else (str "Call vote to start the game"))}}
+           :desc
+           {:fx/type :button
+            :text (cond
+                    (and spring-running (not singleplayer))
+                    "Game running"
+                    (and am-spec (not host-ingame) (not singleplayer))
+                    "Game not running"
+                    :else
+                    (str (if (and (not singleplayer) (or host-ingame am-spec))
+                           "Join" "Start")
+                         " Game"))
+            :disable (boolean
+                       (or spring-running
+                           (and (not singleplayer)
+                                (or (and (not host-ingame) am-spec)
+                                    (not in-sync)))))
+            :on-action
+            (merge
+              {:event/type :spring-lobby/start-battle}
+              (fx/sub-ctx context sub/spring-resources spring-root)
+              {:battle battle
+               :battles battles
+               :users users
+               :username username}
+              {:am-host am-host
+               :am-spec am-spec
+               :battle-status my-battle-status
+               :channel-name channel-name
+               :client-data client-data
+               :host-ingame host-ingame
+               :singleplayer singleplayer
+               :spring-isolation-dir spring-root})}}]}
         {:fx/type :label
          :style {:-fx-font-size 24}
          :text (str " "
