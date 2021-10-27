@@ -60,7 +60,8 @@
                               reverse
                               doall)]
     {:fx/type :v-box
-     :style {:-fx-font-size 16}
+     :style {:-fx-font-size 16
+             :-fx-min-height 128}
      :children
      [{:fx/type :h-box
        :alignment :center-left

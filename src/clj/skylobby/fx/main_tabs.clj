@@ -181,15 +181,19 @@
           {:fx/type :v-box
            :children
            [
-            {:fx/type :split-pane
-             :v-box/vgrow :always
-             :divider-positions [0.99]
-             :items
-             [
-              {:fx/type fx.battles-table/battles-table
+            (let [vertical (= "vertical" (fx/sub-val context :battles-layout))]
+              {:fx/type :split-pane
+               :orientation (if vertical
+                              :vertical
+                              :horizontal)
                :v-box/vgrow :always
-               :server-key server-key}
-              users-view]}
+               :divider-positions [(if vertical 0.75 0.99)]
+               :items
+               [
+                {:fx/type fx.battles-table/battles-table
+                 :v-box/vgrow :always
+                 :server-key server-key}
+                users-view]})
             {:fx/type fx.battles-buttons/battles-buttons-view
              :server-key server-key}]}}]
         [{:fx/type :tab
