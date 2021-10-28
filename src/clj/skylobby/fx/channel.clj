@@ -3,7 +3,7 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
@@ -15,6 +15,18 @@
 
 
 (set! *warn-on-reflection* true)
+
+
+(def known-spads-commands
+  [
+   "!map"
+   "!notify"
+   "!pick"
+   "!ring"
+   "!set"
+   "!status"
+   "!vote"
+   "!wakeup"])
 
 
 (def default-font-size 18)
@@ -172,8 +184,10 @@
 
 (defn- channel-view-input
   [{:fx/keys [context]
-    :keys [channel-name server-key]}]
-  (let [client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+    :keys [channel-name server-key usernames]}]
+  (let [
+        chat-auto-complete (fx/sub-val context :chat-auto-complete)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])
         is-battle-channel (u/battle-channel-name? channel-name)
         mute-path [:mute server-key (if is-battle-channel :battle channel-name)]
@@ -189,20 +203,28 @@
                      :client-data client-data
                      :message message-draft
                      :server-key server-key}}
-        {:fx/type :text-field
-         :id "channel-text-field"
+        {:fx/type ext-recreate-on-key-changed
+         :key chat-auto-complete
          :h-box/hgrow :always
-         :text (str message-draft)
-         :on-text-changed {:event/type :spring-lobby/assoc-in
-                           :path [:by-server server-key :message-drafts channel-name]}
-         :on-action {:event/type :spring-lobby/send-message
-                     :channel-name channel-name
-                     :client-data client-data
-                     :message message-draft
-                     :server-key server-key}
-         :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                          :channel-name channel-name
-                          :server-key server-key}}]
+         :desc
+         (let [text-field {:fx/type :text-field
+                           :id "channel-text-field"
+                           :text (str message-draft)
+                           :on-text-changed {:event/type :spring-lobby/assoc-in
+                                             :path [:by-server server-key :message-drafts channel-name]}
+                           :on-action {:event/type :spring-lobby/send-message
+                                       :channel-name channel-name
+                                       :client-data client-data
+                                       :message message-draft
+                                       :server-key server-key}
+                           :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                                            :channel-name channel-name
+                                            :server-key server-key}}]
+           (if chat-auto-complete
+             {:fx/type ext-with-auto-complete-word
+              :props {:auto-complete (concat known-spads-commands (map u/sanitize-filter usernames))}
+              :desc text-field}
+             text-field))}]
        (when is-battle-channel
          [{:fx/type :button
            :text ""
@@ -272,7 +294,7 @@
 
 
 (defn channel-view-impl
-  [{:keys [channel-name hide-users server-key]}]
+  [{:keys [channel-name hide-users server-key usernames]}]
   {:fx/type :h-box
    :children
    (concat
@@ -286,7 +308,8 @@
          :server-key server-key}
         {:fx/type channel-view-input
          :channel-name channel-name
-         :server-key server-key}]}]
+         :server-key server-key
+         :usernames usernames}]}]
      (when (and (not hide-users)
                 channel-name
                 (not (string/starts-with? channel-name "@")))

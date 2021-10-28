@@ -1270,7 +1270,8 @@
                          :h-box/hgrow :always
                          :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
                          :hide-users true
-                         :server-key server-key}]
+                         :server-key server-key
+                         :usernames (keys (or (fx/sub-val context get-in [:by-server server-key :battle :users]) {}))}]
                        (when (not= "vertical" battle-layout)
                          [{:fx/type battle-votes
                            :battle-layout battle-layout

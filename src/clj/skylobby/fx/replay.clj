@@ -61,9 +61,6 @@
     (reduce max 0 coll)))
 
 
-(defn sanitize-replay-filter [s]
-  (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))
-
 ; https://github.com/Jazcash/sdfz-demo-parser/blob/a4391f14ee4bc08aedb5434d66cf99ad94913597/src/demo-parser.ts#L233
 (defn- format-chat-dest [dest-type]
   (when (and (not= :global dest-type)

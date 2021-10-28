@@ -4,11 +4,15 @@
     [cljfx.component :as fx.component]
     [cljfx.lifecycle :as fx.lifecycle]
     [cljfx.mutator :as fx.mutator]
-    [cljfx.prop :as fx.prop])
+    [cljfx.prop :as fx.prop]
+    [clojure.string :as string]
+    [spring-lobby.util :as u])
   (:import
     (javafx.beans.value ChangeListener)
     (javafx.scene Node)
-    (javafx.scene.control ScrollPane TableView TextArea)
+    (javafx.scene.control ScrollPane TableView TextArea TextField)
+    (javafx.util Callback)
+    (org.controlsfx.control.textfield AutoCompletionBinding$ISuggestionRequest TextFields)
     (org.fxmisc.flowless VirtualizedScrollPane)))
 
 
@@ -34,6 +38,47 @@
             (fx.lifecycle/create this this-desc opts))))
     (delete [_ component opts]
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
+(def ext-with-auto-complete
+  (fx.lifecycle/make-ext-with-props
+    fx.lifecycle/dynamic
+    {:auto-complete (fx.prop/make
+                      (fx.mutator/setter
+                        (fn [^TextField text-field ^java.util.List suggestions]
+                          (TextFields/bindAutoCompletion text-field suggestions)))
+                      fx.lifecycle/scalar
+                      :default [])}))
+
+(def ext-with-auto-complete-word
+  (fx.lifecycle/make-ext-with-props
+    fx.lifecycle/dynamic
+    {:auto-complete (fx.prop/make
+                      (fx.mutator/setter
+                        (fn [^TextField text-field suggestions]
+                          (let [bind
+                                (TextFields/bindAutoCompletion
+                                  text-field
+                                  (reify Callback
+                                    (call [this request]
+                                      (let [^AutoCompletionBinding$ISuggestionRequest request request
+                                            user-text (.getUserText request)
+                                            split (string/split user-text #"\s+" -1)
+                                            last-word (last split)
+                                            prefix (drop-last split)]
+                                        (if (string/blank? last-word)
+                                          []
+                                          (->> suggestions
+                                               (filter
+                                                 (fn [suggestion]
+                                                   (and (not= suggestion last-word)
+                                                        (string/starts-with?
+                                                          suggestion
+                                                          (u/sanitize-filter last-word)))))
+                                               (map (partial str (when (seq prefix) (str (string/join " " prefix) " "))))))))))]
+                            (.setDelay bind 50))))
+                      fx.lifecycle/scalar
+                      :default [])}))
+
 
 ; https://github.com/cljfx/cljfx/issues/51#issuecomment-583974585
 (def with-scroll-text-prop

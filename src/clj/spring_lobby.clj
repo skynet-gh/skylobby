@@ -165,7 +165,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -249,6 +249,7 @@
      :battles-layout "horizontal"
      :battle-players-color-type "player"
      :battle-resource-details true
+     :chat-auto-complete true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :highlight-tabs-with-new-battle-messages true
@@ -1210,7 +1211,7 @@
                                                    (mapcat identity (:replay-allyteam-player-names replay))
                                                    (when replays-filter-specs
                                                      (:replay-spec-names replay)))
-                                         players (map fx.replay/sanitize-replay-filter players)]
+                                         players (map u/sanitize-filter players)]
                                      (every?
                                        (some-fn
                                          (partial includes-term? (:replay-id replay))
