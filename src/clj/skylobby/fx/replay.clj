@@ -89,7 +89,10 @@
 
 (defn chat-log-document [chat-log {:keys [player-name-to-color player-num-to-name]}]
   (let [
-        builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+        builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")
+        chat-log (remove
+                   (comp #(string/starts-with? % "SPRINGIE:") :message)
+                   chat-log)]
     (doseq [chat chat-log]
       (let [{:keys [from dest message]} chat
             player (get player-num-to-name from)
