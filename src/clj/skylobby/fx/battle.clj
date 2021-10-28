@@ -262,7 +262,7 @@
         bot-version (fx/sub-val context :bot-version)
         battle-resource-details (fx/sub-val context :battle-resource-details)
         auto-unspec (fx/sub-val context get-in [:by-server server-key :auto-unspec])
-        auto-launch (fx/sub-val context get-in [:by-server server-key :auto-launch])
+        auto-launch (fx/sub-val context get-in [:auto-launch server-key])
         battle (fx/sub-val context get-in [:by-server server-key :battle])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -503,7 +503,7 @@
              :selected (boolean auto-launch)
              :style {:-fx-padding "10px"}
              :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:by-server server-key :auto-launch]}}
+                                   :path [:auto-launch server-key]}}
             {:fx/type :label
              :text "Auto Launch "}]
            [])}
