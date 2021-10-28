@@ -664,7 +664,7 @@
                        :graphic
                        {:fx/type font-icon/lifecycle
                         :icon-literal "mdi-folder:16:white"}}])
-                   (when-let [id (:id i)]
+                   (when-let [id (:replay-id i)]
                      (let [mod-version (:replay-mod-name i)]
                        (when (and (not (string/blank? mod-version))
                                   (string/starts-with? mod-version "Beyond All Reason"))
