@@ -221,7 +221,8 @@
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)
         [prev curr] (swap-vals! state-atom update-in [:by-server server-key]
                       (fn [{:keys [client-data] :as server-data}]
-                        (let [is-my-battle (when-let [battle (:battle server-data)]
+                        (let [battle (:battle server-data)
+                              is-my-battle (when battle
                                              (= battle-id (:battle-id battle)))
                               is-me (= username (:username server-data))
                               unified (-> client-data :compflags (contains? "u"))]
@@ -236,6 +237,8 @@
                                           :timestamp (u/curr-millis)
                                           :message-type :leave
                                           :username username})
+                                  (and is-me is-my-battle)
+                                  (assoc-in [:old-battles battle-id] battle)
                                   is-me
                                   (dissoc :battle :auto-unspec)))))
           {:keys [battle client-data] :as server-data} (-> prev :by-server (get server-key))

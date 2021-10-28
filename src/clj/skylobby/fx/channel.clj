@@ -184,7 +184,7 @@
 
 (defn- channel-view-input
   [{:fx/keys [context]
-    :keys [channel-name server-key usernames]}]
+    :keys [channel-name disable server-key usernames]}]
   (let [
         chat-auto-complete (fx/sub-val context :chat-auto-complete)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -198,6 +198,7 @@
      (concat
        [{:fx/type :button
          :text "Send"
+         :disable (boolean disable)
          :on-action {:event/type :spring-lobby/send-message
                      :channel-name channel-name
                      :client-data client-data
@@ -208,6 +209,7 @@
          :h-box/hgrow :always
          :desc
          (let [text-field {:fx/type :text-field
+                           :disable (boolean disable)
                            :id "channel-text-field"
                            :text (str message-draft)
                            :on-text-changed {:event/type :spring-lobby/assoc-in
@@ -294,7 +296,7 @@
 
 
 (defn channel-view-impl
-  [{:keys [channel-name hide-users server-key usernames]}]
+  [{:keys [channel-name disable hide-users server-key usernames]}]
   {:fx/type :h-box
    :children
    (concat
@@ -308,6 +310,7 @@
          :server-key server-key}
         {:fx/type channel-view-input
          :channel-name channel-name
+         :disable disable
          :server-key server-key
          :usernames usernames}]}]
      (when (and (not hide-users)

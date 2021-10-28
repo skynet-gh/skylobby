@@ -91,6 +91,7 @@
               ready-on-unspec (fx/sub-val context :ready-on-unspec)
               ring-sound-file (fx/sub-val context :ring-sound-file)
               ring-volume (fx/sub-val context :ring-volume)
+              show-closed-battles (fx/sub-val context :show-closed-battles)
               show-team-skills (fx/sub-val context :show-team-skills)
               spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
               spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
@@ -368,7 +369,16 @@
                     :on-selected-changed {:event/type :spring-lobby/assoc
                                           :key :increment-ids}}
                    {:fx/type :label
-                    :text " Number team and player ids starting at one"}]}]}
+                    :text " Number team and player ids starting at one"}]}
+                 {:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean show-closed-battles)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :show-closed-battles}}
+                   {:fx/type :label
+                    :text " Show closed battles as tabs"}]}]}
              {:fx/type :v-box
               :min-width 580
               :max-width 580
