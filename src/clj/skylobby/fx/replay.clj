@@ -17,6 +17,7 @@
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.http :as http]
@@ -237,33 +238,42 @@
         replay-id-downloads (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replay)
                                  (map :id)
                                  set)
-        sync-pane {:fx/type :flow-pane
-                   :vgap 5
-                   :hgap 5
-                   :padding 5
-                   :children
-                   [(if-let [id (:id selected-replay)]
-                      (let [in-progress (contains? replay-id-downloads id)]
-                        {:fx/type :button
-                         :style {:-fx-font-size 20}
-                         :text (if in-progress
-                                 "Downloading..."
-                                 "Download replay")
-                         :disable (boolean in-progress)
-                         :on-action {:event/type :spring-lobby/add-task
-                                     :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
-                                            :id id
-                                            :spring-isolation-dir spring-isolation-dir}}})
-                      {:fx/type engine-sync-pane
-                       :engine-version selected-engine-version
-                       :spring-isolation-dir spring-isolation-dir})
-                    {:fx/type mod-sync-pane
-                     :engine-version selected-engine-version
-                     :mod-name mod-name
-                     :spring-isolation-dir spring-isolation-dir}
-                    {:fx/type map-sync-pane
-                     :map-name map-name
-                     :spring-isolation-dir spring-isolation-dir}]}]
+        sync-pane
+        {:fx/type :v-box
+         :children
+         [
+          {:fx/type :flow-pane
+           :vgap 5
+           :hgap 5
+           :padding 5
+           :children
+           [(if-let [id (:id selected-replay)]
+              (let [in-progress (contains? replay-id-downloads id)]
+                {:fx/type :button
+                 :style {:-fx-font-size 20}
+                 :text (if in-progress
+                         "Downloading..."
+                         "Download replay")
+                 :disable (boolean in-progress)
+                 :on-action {:event/type :spring-lobby/add-task
+                             :task {:spring-lobby/task-type :spring-lobby/download-bar-replay
+                                    :id id
+                                    :spring-isolation-dir spring-isolation-dir}}})
+              {:fx/type engine-sync-pane
+               :engine-version selected-engine-version
+               :spring-isolation-dir spring-isolation-dir})
+            {:fx/type mod-sync-pane
+             :engine-version selected-engine-version
+             :mod-name mod-name
+             :spring-isolation-dir spring-isolation-dir}
+            {:fx/type map-sync-pane
+             :map-name map-name
+             :spring-isolation-dir spring-isolation-dir}]}
+          {:fx/type :button
+           :text " Refresh "
+           :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                       :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
+                       :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}]}]
     {:fx/type :h-box
      :style {:-fx-font-size 16}
      :alignment :center-left
