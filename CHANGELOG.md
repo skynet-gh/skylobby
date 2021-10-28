@@ -24,6 +24,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.0]
+
+- Get auto update working on Windows
+
 ### [0.6.20]
 
 - Fix chat and console auto scroll
