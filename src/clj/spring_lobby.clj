@@ -249,7 +249,7 @@
      :battles-layout "horizontal"
      :battle-players-color-type "player"
      :battle-resource-details true
-     :chat-auto-complete true
+     :chat-auto-complete false
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :highlight-tabs-with-new-battle-messages true
