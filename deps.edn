@@ -41,6 +41,7 @@
   org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
+  org.controlsfx/controlsfx {:mvn/version "11.1.0"}
   org.fxmisc.flowless/flowless {:mvn/version "0.6.7"}
   org.fxmisc.richtext/richtextfx {:mvn/version "0.10.7"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.2.0"}
@@ -115,11 +116,11 @@
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.github.clj-easy/graal-config-clj-http
     {:git/url "https://github.com/clj-easy/graal-config"
-     :git/sha "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
      :deps/root "config/clj-http/clj-http"}
     com.github.clj-easy/graal-config-nippy
     {:git/url   "https://github.com/clj-easy/graal-config"
-     :git/sha   "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
      :deps/root "config/com.taoensso/nippy"}
     com.taoensso/nippy {:mvn/version "3.1.1"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
@@ -152,11 +153,11 @@
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.github.clj-easy/graal-config-clj-http
     {:git/url "https://github.com/clj-easy/graal-config"
-     :git/sha "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
      :deps/root "config/clj-http/clj-http"}
     com.github.clj-easy/graal-config-nippy
     {:git/url   "https://github.com/clj-easy/graal-config"
-     :git/sha   "fb4d4eab7ad71de2ece03ef3a38d1d9783d9789d"
+     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
      :deps/root "config/com.taoensso/nippy"}
     com.taoensso/nippy {:mvn/version "3.1.1"}
     com.taoensso/timbre {:mvn/version "5.1.2"}

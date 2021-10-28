@@ -244,11 +244,14 @@
   (or (get (fx/sub-val context :parsed-replays-by-path) (fs/canonical-path (fx/sub-val context :selected-replay-file)))
       (get (fx/sub-val context :online-bar-replays) (fx/sub-val context :selected-replay-id))))
 
-(defn battle-channel-sub [context server-key]
-  (let [battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
-        channel-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :channel-name])]
-    (or channel-name
-        (str "__battle__" battle-id))))
+(defn battle-channel-sub
+  ([context server-key]
+   (battle-channel-sub context server-key (fx/sub-val context get-in [:by-server server-key :battle :battle-id])))
+  ([context server-key battle-id]
+   (let [
+         channel-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :channel-name])]
+     (or channel-name
+         (str "__battle__" battle-id)))))
 
 
 (def icons

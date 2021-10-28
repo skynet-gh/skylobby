@@ -262,7 +262,7 @@
         bot-version (fx/sub-val context :bot-version)
         battle-resource-details (fx/sub-val context :battle-resource-details)
         auto-unspec (fx/sub-val context get-in [:by-server server-key :auto-unspec])
-        auto-launch (fx/sub-val context get-in [:by-server server-key :auto-launch])
+        auto-launch (fx/sub-val context get-in [:auto-launch server-key])
         battle (fx/sub-val context get-in [:by-server server-key :battle])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -503,7 +503,7 @@
              :selected (boolean auto-launch)
              :style {:-fx-padding "10px"}
              :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:by-server server-key :auto-launch]}}
+                                   :path [:auto-launch server-key]}}
             {:fx/type :label
              :text "Auto Launch "}]
            [])}
@@ -1199,14 +1199,17 @@
 
 (defn battle-view-impl
   [{:fx/keys [context]
-    :keys [server-key]}]
+    :keys [battle-id server-key]}]
   (let [
         battle-layout (fx/sub-val context :battle-layout)
         divider-positions (fx/sub-val context :divider-positions)
         pop-out-chat (fx/sub-val context :pop-out-chat)
         server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
-        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
-        scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+        old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
+        battle-id (or battle-id
+                      (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
+        scripttags (or (:scripttags old-battle)
+                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
         engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
         mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
         map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
@@ -1221,11 +1224,15 @@
                                         :indexed indexed-mod
                                         :details indexed-mod}))))
         engine-file (:file engine-details)
+        battle-users (or (:users old-battle)
+                         (fx/sub-val context get-in [:by-server server-key :battle :users]))
+        battle-bots (or (:bots old-battle)
+                        (fx/sub-val context get-in [:by-server server-key :battle :bots]))
         players (battle-players-and-bots
                   {:users (fx/sub-val context get-in [:by-server server-key :users])
                    :battle
-                   {:bots (fx/sub-val context get-in [:by-server server-key :battle :bots])
-                    :users (fx/sub-val context get-in [:by-server server-key :battle :users])}})
+                   {:bots battle-bots
+                    :users battle-users}})
         username (fx/sub-val context get-in [:by-server server-key :username])
         my-player (->> players
                        (filter (comp #{username} :username))
@@ -1257,20 +1264,24 @@
                         battle-layout
                         (first battle-layouts))
         show-vote-log (fx/sub-val context :show-vote-log)
-        battle-buttons {:fx/type battle-buttons
-                        :server-key server-key
-                        :my-player my-player
-                        :team-counts team-counts
-                        :team-skills team-skills}
+        battle-buttons (if-not old-battle
+                         {:fx/type battle-buttons
+                          :server-key server-key
+                          :my-player my-player
+                          :team-counts team-counts
+                          :team-skills team-skills}
+                         {:fx/type :pane})
         battle-chat {:fx/type :h-box
                      :children
                      (concat
                        [
                         {:fx/type fx.channel/channel-view
                          :h-box/hgrow :always
-                         :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+                         :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key battle-id)
+                         :disable old-battle
                          :hide-users true
-                         :server-key server-key}]
+                         :server-key server-key
+                         :usernames (keys (or battle-users {}))}]
                        (when (not= "vertical" battle-layout)
                          [{:fx/type battle-votes
                            :battle-layout battle-layout
@@ -1419,7 +1430,10 @@
                                 [{:fx/type :label
                                   :text "Force sync check: "}
                                  {:fx/type sync-button
-                                  :server-key server-key}]}]))})]
+                                  :server-key server-key}]}]))})
+        resources-pane (if-not old-battle
+                         resources-pane
+                         {:fx/type :pane})]
     {:fx/type :v-box
      :children
      [

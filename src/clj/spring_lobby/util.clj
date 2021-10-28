@@ -589,3 +589,7 @@
     (string/replace
       (string/lower-case (str e))
       #"[_\s]+" "-")))
+
+
+(defn sanitize-filter [s]
+  (-> s (string/replace #"[^\p{Alnum}]" "") string/lower-case))

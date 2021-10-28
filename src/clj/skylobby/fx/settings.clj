@@ -65,6 +65,7 @@
       :root
       (if show-settings-window
         (let [
+              chat-auto-complete (fx/sub-val context :chat-auto-complete)
               chat-font-size (fx/sub-val context :chat-font-size)
               extra-import-name (fx/sub-val context :extra-import-name)
               extra-import-path (fx/sub-val context :extra-import-path)
@@ -90,6 +91,7 @@
               ready-on-unspec (fx/sub-val context :ready-on-unspec)
               ring-sound-file (fx/sub-val context :ring-sound-file)
               ring-volume (fx/sub-val context :ring-volume)
+              show-closed-battles (fx/sub-val context :show-closed-battles)
               show-team-skills (fx/sub-val context :show-team-skills)
               spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
               spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
@@ -136,20 +138,28 @@
                     :graphic
                     {:fx/type font-icon/lifecycle
                      :icon-literal "mdi-file-find:16"}}]}]
-                (when-not (string/blank? (str spring-isolation-dir-draft))
+                (when spring-isolation-dir-draft
                   (let [valid (try
-                                (Paths/get (some-> spring-isolation-dir-draft str fs/file .toURI))
+                                (and (not (string/blank? spring-isolation-dir-draft))
+                                     (Paths/get (some-> spring-isolation-dir-draft str fs/file .toURI)))
                                 (catch Exception e
                                   (log/trace e "Invalid spring path" spring-isolation-dir-draft)))]
-                    [{:fx/type :button
-                      :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
-                      :disable (boolean (not valid))
-                      :text (if valid
-                              "Save new spring dir"
-                              "Invalid spring dir")
-                      :graphic
-                      {:fx/type font-icon/lifecycle
-                       :icon-literal "mdi-content-save:16:white"}}]))
+                    [{:fx/type :h-box
+                      :children
+                      [
+                       {:fx/type :button
+                        :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
+                        :disable (boolean (not valid))
+                        :text (if valid
+                                "Save new spring dir"
+                                "Invalid spring dir")
+                        :graphic
+                        {:fx/type font-icon/lifecycle
+                         :icon-literal "mdi-content-save:16:white"}}
+                       {:fx/type :button
+                        :on-action {:event/type :spring-lobby/dissoc
+                                    :key :spring-isolation-dir-draft}
+                        :text "Cancel"}]}]))
                 [{:fx/type :h-box
                   :alignment :center-left
                   :children
@@ -188,6 +198,15 @@
                  {:fx/type :label
                   :text " Chat"
                   :style {:-fx-font-size 24}}
+                 {:fx/type :h-box
+                  :style {:-fx-font-size 18}
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean chat-auto-complete)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :chat-auto-complete}}
+                   {:fx/type :label
+                    :text " Auto complete suggestions"}]}
                  {:fx/type :h-box
                   :style {:-fx-font-size 18}
                   :children
@@ -350,7 +369,16 @@
                     :on-selected-changed {:event/type :spring-lobby/assoc
                                           :key :increment-ids}}
                    {:fx/type :label
-                    :text " Number team and player ids starting at one"}]}]}
+                    :text " Number team and player ids starting at one"}]}
+                 {:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [{:fx/type :check-box
+                    :selected (boolean show-closed-battles)
+                    :on-selected-changed {:event/type :spring-lobby/assoc
+                                          :key :show-closed-battles}}
+                   {:fx/type :label
+                    :text " Show closed battles as tabs"}]}]}
              {:fx/type :v-box
               :min-width 580
               :max-width 580

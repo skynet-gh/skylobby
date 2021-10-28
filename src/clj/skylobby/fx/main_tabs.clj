@@ -266,7 +266,22 @@
              [
               {:fx/type fx.matchmaking/matchmaking-view
                :server-key server-key}
-              users-view]}}]))}}))
+              users-view]}}])
+       (when (fx/sub-val context :show-closed-battles)
+         (map
+           (fn [[battle-id _battle]]
+             {:fx/type :tab
+              :graphic {:fx/type :label
+                        :text (str "(old) battle " battle-id)}
+              :closable true
+              :on-close-request {:event/type :spring-lobby/dissoc-in
+                                 :path [:by-server server-key :old-battles battle-id]}
+              :id (str "old-battle-" battle-id)
+              :content
+              {:fx/type fx.battle/battle-view
+               :battle-id battle-id
+               :server-key server-key}})
+           (fx/sub-val context get-in [:by-server server-key :old-battles]))))}}))
 
 (defn main-tab-view [state]
   (tufte/profile {:dynamic? true

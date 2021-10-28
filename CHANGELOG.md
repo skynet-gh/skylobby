@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.1]
+
+- Add auto complete to chat input
+- Add setting to show battles you have left
+- Hide SPRINGIE messages in ZK replay chat log
+- Persist auto launch per server
+
 ### [0.7.0]
 
 - Get auto update working on Windows

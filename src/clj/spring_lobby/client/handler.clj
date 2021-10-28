@@ -135,7 +135,8 @@
                                          (assoc :game-start-time now)
                                          (and prev-status (not (:away prev-status)) (:away decoded-status))
                                          (assoc :away-start-time now)))))
-        {:keys [auto-launch battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
+        auto-launch (get-in prev-state [:auto-launch server-key])
+        {:keys [battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
     (if-not (= (get-in battles [(:battle-id battle) :host-username]) username)
       (log/debug "Short circuiting CLIENTSTATUS handler since not battle host")
       (if-not (contains? (:users battle) username)
@@ -220,7 +221,8 @@
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)
         [prev curr] (swap-vals! state-atom update-in [:by-server server-key]
                       (fn [{:keys [client-data] :as server-data}]
-                        (let [is-my-battle (when-let [battle (:battle server-data)]
+                        (let [battle (:battle server-data)
+                              is-my-battle (when battle
                                              (= battle-id (:battle-id battle)))
                               is-me (= username (:username server-data))
                               unified (-> client-data :compflags (contains? "u"))]
@@ -235,6 +237,8 @@
                                           :timestamp (u/curr-millis)
                                           :message-type :leave
                                           :username username})
+                                  (and is-me is-my-battle)
+                                  (assoc-in [:old-battles battle-id] battle)
                                   is-me
                                   (dissoc :battle :auto-unspec)))))
           {:keys [battle client-data] :as server-data} (-> prev :by-server (get server-key))

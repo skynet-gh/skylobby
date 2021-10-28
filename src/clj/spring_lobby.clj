@@ -165,13 +165,13 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name
    :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec
-   :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-team-skills :show-vote-log :spring-isolation-dir
+   :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -249,6 +249,7 @@
      :battles-layout "horizontal"
      :battle-players-color-type "player"
      :battle-resource-details true
+     :chat-auto-complete true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :highlight-tabs-with-new-battle-messages true
@@ -1210,7 +1211,7 @@
                                                    (mapcat identity (:replay-allyteam-player-names replay))
                                                    (when replays-filter-specs
                                                      (:replay-spec-names replay)))
-                                         players (map fx.replay/sanitize-replay-filter players)]
+                                         players (map u/sanitize-filter players)]
                                      (every?
                                        (some-fn
                                          (partial includes-term? (:replay-id replay))
@@ -2858,7 +2859,12 @@
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
       (message/send-message *state client-data "LEAVEBATTLE")
-      (swap! *state update-in [:by-server server-key] dissoc :auto-unspec :battle)
+      (swap! *state update-in [:by-server server-key]
+        (fn [server-data]
+          (let [battle (:battle server-data)]
+            (-> server-data
+                (assoc-in [:old-battles (:battle-id battle)] battle)
+                (dissoc :auto-unspec :battle)))))
       (catch Exception e
         (log/error e "Error leaving battle")))))
 
