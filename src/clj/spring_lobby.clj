@@ -2184,7 +2184,7 @@
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
-(defn restart-command [old-jar new-jar]
+(defn restart-command [_old-jar new-jar]
   (when-let [java-or-exe (u/process-command)]
     (let [^List vm-args (vec (u/vm-args))
           i (.indexOf vm-args "-jar")
@@ -2201,31 +2201,49 @@
         [java-or-exe]
         (when is-java with-new-jar)
         (when is-java [u/main-class-name])
-        main-args
-        (when old-jar ["--update-copy-jar" (fs/canonical-path old-jar)])))))
+        main-args))))
+        ;(when old-jar ["--update-copy-jar" (fs/canonical-path old-jar)])))))
 
 (defn restart-process [old-jar new-jar]
   (when new-jar
-    (when-let [^List cmd (restart-command old-jar new-jar)]
-      (log/info "Adding shutdown hook to run new jar")
-      ; https://stackoverflow.com/a/5747843/984393
-      (.addShutdownHook
-        (Runtime/getRuntime)
-        (Thread.
-          (fn []
-            ; https://stackoverflow.com/a/48992863/984393
-            (log/info "Running" (pr-str cmd))
-            (let [proc (ProcessBuilder. cmd)]
-              (.inheritIO proc)
-              (.start proc)))))
-      (log/info "Exiting for update")
-      (System/exit 0))))
+    (log/info "Adding shutdown hook to run new jar")
+    ; https://stackoverflow.com/a/5747843
+    (.addShutdownHook
+      (Runtime/getRuntime)
+      (Thread.
+        (fn []
+          ; https://stackoverflow.com/a/48992863
+          (let [
+                process-command (u/process-command)
+                program-folder (if (u/is-java? process-command)
+                                  (fs/parent-file old-jar)
+                                  (fs/file (fs/parent-file (fs/file process-command)) "app"))
+                jar-to (if old-jar old-jar (fs/file program-folder "skylobby.jar"))
+                elevate-path (fs/canonical-path (fs/file program-folder "Elevate.exe"))
+                copy-bat-file (fs/file (fs/download-dir) "copy_jar.bat")
+                copy-and-start-bat-file (fs/file (fs/download-dir) "copy_and_start.bat")
+                new-process-command (if (u/is-java? process-command)
+                                      (str "\"" (u/process-command) "\" -server " (string/join " " (u/vm-args)) " -jar \"" (fs/canonical-path jar-to) "\"")
+                                      (str "\"" process-command "\""))]
+            (spit copy-bat-file
+              (str "copy \"" (fs/canonical-path new-jar) "\" \"" (fs/canonical-path jar-to) "\""))
+            (spit copy-and-start-bat-file
+              (str "\"" elevate-path "\" -wait \"" (fs/canonical-path copy-bat-file) "\"" \newline
+                   new-process-command))
+            (let [^List cmd [(fs/canonical-path copy-and-start-bat-file)]]
+              (log/info "Running" (pr-str cmd))
+              (let [proc (ProcessBuilder. cmd)]
+                (.inheritIO proc)
+                (.start proc)))))))
+    (log/info "Exiting for update")
+    (System/exit 0)))
 
-(defmethod task-handler ::download-app-update-and-restart [{:keys [downloadable version]}]
-  (let [jar-file (or (u/jar-file)
-                     (fs/file "skylobby.jar")) ; TODO remove?
-        dest (fs/file (str (fs/canonical-path jar-file) "-to-" version ".jar"))]
-    (if dest
+(defmethod task-handler ::download-app-update-and-restart [{:keys [downloadable]}]
+  (let [jar-file (u/jar-file)
+        dest (fs/file (fs/download-dir) (http/filename (:download-url downloadable)))]
+    (cond
+      (not dest) (log/error "Could not determine download dest" {:downloadable downloadable :jar-file jar-file})
+      :else
       (do
         (log/info "Downloading app update" (:download-url downloadable) "to" dest)
         @(download-http-resource
@@ -2233,8 +2251,7 @@
             :dest dest})
         (if (fs/exists? dest)
           (restart-process jar-file dest)
-          (log/error "Downloaded update file does not exist")))
-      (log/error "Could not determine download dest" {:jar-file jar-file}))))
+          (log/error "Downloaded update file does not exist"))))))
 
 (defn- check-app-update [state-atom]
   (let [versions
@@ -2299,7 +2316,7 @@
          chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+             (java-time/plus (java-time/instant) (java-time/duration 15 :seconds))
              (java-time/duration (or duration 3) :seconds))
            (fn [_chimestamp]
              (let [old-state @old-state-atom
@@ -4048,20 +4065,13 @@
   @(event-handler (assoc task :event/type ::rapid-download)))
 
 
-(defmethod event-handler ::http-download
-  [{:keys [dest url]}]
-  (http/download-file *state url dest))
-
 (defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
   (log/info "Request to download" downloadable)
   (future
     (try
-      (deref
-        (event-handler
-          {:event/type ::http-download
-           :dest (or dest
-                     (resource/resource-dest spring-isolation-dir downloadable))
-           :url (:download-url downloadable)}))
+      (let [url (:download-url downloadable)
+            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))]
+        (http/download-file *state url dest))
       (case (:resource-type downloadable)
         ::map (refresh-maps-all-spring-roots)
         ::mod (refresh-mods-all-spring-roots)

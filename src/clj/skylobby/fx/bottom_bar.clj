@@ -36,8 +36,7 @@
                                  "windows.msi"
                                  "linux-amd64.deb"))
             download (get (fx/sub-val context :http-download) url)
-            running (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-app-update-and-restart))
-            is-java (fx/sub-val context :is-java)]
+            running (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-app-update-and-restart))]
         {:fx/type :h-box
          :alignment :center-left
          :children
@@ -48,7 +47,7 @@
                    (str "Update to " latest))
            :disable (boolean running)
            :on-action
-           (if is-java
+           (if (fs/windows?)
              {:event/type :spring-lobby/add-task
               :task {:spring-lobby/task-type :spring-lobby/download-app-update-and-restart
                      :downloadable {:download-url url}

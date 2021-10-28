@@ -564,8 +564,11 @@
   (-> (java.lang.ProcessHandle/current) .info .command (.orElse nil)))
 
 (defn is-java? [command]
-  (or (string/ends-with? command "java")
-      (string/ends-with? command "java.exe")))
+  (when (string? command)
+    (or
+      (string/ends-with? command "java")
+      (string/ends-with? command "java.exe")
+      (string/ends-with? command "javaw.exe"))))
 
 
 (defn matchmaking? [server-data]
