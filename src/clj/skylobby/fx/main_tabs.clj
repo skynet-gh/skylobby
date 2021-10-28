@@ -117,6 +117,12 @@
         main-tab-ids (if matchmaking
                        matchmaking-tab-ids
                        no-matchmaking-tab-ids)
+        show-closed-battles (fx/sub-val context :show-closed-battles)
+        old-battles (fx/sub-val context get-in [:by-server server-key :old-battles])
+        main-tab-ids (concat
+                       main-tab-ids
+                       (when show-closed-battles
+                         (map first old-battles)))
         in-battle (and battle-id
                        (not pop-out-battle))
         show-battle-tab (and in-battle battle-as-tab)
@@ -267,7 +273,7 @@
               {:fx/type fx.matchmaking/matchmaking-view
                :server-key server-key}
               users-view]}}])
-       (when (fx/sub-val context :show-closed-battles)
+       (when show-closed-battles
          (map
            (fn [[battle-id _battle]]
              {:fx/type :tab
@@ -281,7 +287,7 @@
               {:fx/type fx.battle/battle-view
                :battle-id battle-id
                :server-key server-key}})
-           (fx/sub-val context get-in [:by-server server-key :old-battles]))))}}))
+           old-battles)))}}))
 
 (defn main-tab-view [state]
   (tufte/profile {:dynamic? true
