@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.2]
+
+- Fix issue with download source updates
+- Fix issue with http download window
+- Fix issue with clicking old battle tabs
+- Improve visual feedback when updating downloads
+
 ### [0.7.1]
 
 - Add auto complete to chat input

@@ -249,7 +249,7 @@
      :battles-layout "horizontal"
      :battle-players-color-type "player"
      :battle-resource-details true
-     :chat-auto-complete true
+     :chat-auto-complete false
      :chat-highlight-username true
      :disable-tasks-while-in-game true
      :highlight-tabs-with-new-battle-messages true
@@ -297,7 +297,7 @@
   (atom
     (fx/create-context
       {}
-      (cache-factory-with-threshold cache/lru-cache-factory 2048))))
+      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
 
 (def main-stage-atom (atom nil))
 
@@ -2269,6 +2269,13 @@
         (swap! state-atom assoc :app-update-available {:current current-version
                                                        :latest latest-version}))
       (log/info "No update available, or not running a jar. Latest:" latest-version "current" current-version))))
+
+(defmethod event-handler ::check-app-update [_e]
+  (future
+    (try
+      (check-app-update *state)
+      (catch Exception e
+        (log/error e "Error checking for app update")))))
 
 (defn- check-app-update-chimer-fn [state-atom]
   (log/info "Starting app update check chimer")

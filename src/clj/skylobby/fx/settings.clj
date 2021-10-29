@@ -108,7 +108,8 @@
             :padding 5
             :style {:-fx-font-size 16}
             :children
-            [{:fx/type :v-box
+            [
+             {:fx/type :v-box
               :min-width 580
               :max-width 580
               :children
@@ -900,7 +901,20 @@
                                              :path [:hide-spads-messages message-type]}}
                       {:fx/type :label
                        :text (str " " message-type)}]})
-                  spads/message-types)}]}]}})
+                  spads/message-types)}]}
+             {:fx/type :v-box
+              :min-width 580
+              :pref-width 580
+              :max-width 580
+              :children
+              [
+               {:fx/type :button
+                :on-action {:event/type :spring-lobby/check-app-update}
+                :style-class ["button" "skylobby-normal"]
+                :text "Check for skylobby update"
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-refresh"}}]}]}})
        {:fx/type :pane
         :pref-width settings-window-width
         :pref-height settings-window-height})}}))

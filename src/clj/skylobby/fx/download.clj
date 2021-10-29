@@ -147,7 +147,7 @@
                                            (if download-type
                                              (= download-type resource-type)
                                              true)))
-                                 (sort-by :resource-filename String/CASE_INSENSITIVE_ORDER))]
+                                 (sort-by (comp #(or % "") :resource-filename) String/CASE_INSENSITIVE_ORDER))]
           {:fx/type :v-box
            :style {:-fx-font-size 16}
            :children

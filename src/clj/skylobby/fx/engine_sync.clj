@@ -38,7 +38,10 @@
         engine-update-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
         extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
                            (map (comp fs/canonical-path :file))
-                           set)]
+                           set)
+        download-source-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
+                                          (map :download-source-name)
+                                          set)]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Engine"
@@ -68,7 +71,11 @@
                                  first)
                url (:download-url downloadable)
                download (get http-download url)
-               in-progress (:running download)
+               download-source-name (engine-download-source engine-version)
+               in-progress (or (:running download)
+                               (and (not downloadable)
+                                    download-source-name
+                                    (contains? download-source-update-tasks download-source-name)))
                dest (resource/resource-dest spring-isolation-dir downloadable)
                dest-path (fs/canonical-path dest)
                dest-exists (fs/file-exists? file-cache dest)
@@ -76,8 +83,7 @@
                resource-filename (:resource-filename downloadable)
                extract-target (when (and spring-isolation-dir resource-filename)
                                 (io/file spring-isolation-dir "engine" (fs/without-extension resource-filename)))
-               extract-exists (fs/file-exists? file-cache extract-target)
-               download-source-name (engine-download-source engine-version)]
+               extract-exists (fs/file-exists? file-cache extract-target)]
            (concat
              [{:severity severity
                :text "download"
@@ -91,7 +97,9 @@
                                  (str "Update download source " download-source-name)
                                  "No download found")))
                :tooltip (if in-progress
-                          (str "Downloading " (u/download-progress download))
+                          (if (and (not downloadable) download-source-name)
+                            (str "Updating download source " download-source-name)
+                            (str "Downloading " (u/download-progress download)))
                           (if dest-exists
                             (str "Downloaded to " dest-path)
                             (str "Download " url)))

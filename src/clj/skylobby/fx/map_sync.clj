@@ -115,6 +115,9 @@
                                   :spring-isolation-dir spring-isolation-dir}})}))
                  downloadables)
                (let [
+                     springfiles-download-tasks (->> (get tasks-by-type :spring-lobby/download-springfiles)
+                                                     (map :springname)
+                                                     set)
                      springname map-name
                      springfiles-searched (contains? springfiles-search-results springname)
                      springfiles-search-result (get springfiles-search-results springname)
@@ -132,7 +135,8 @@
                                                first
                                                second)
                      springfiles-in-progress (or (:running springfiles-download)
-                                                 (some springfiles-mirror-set http-download-tasks))
+                                                 (some springfiles-mirror-set http-download-tasks)
+                                                 (contains? springfiles-download-tasks map-name))
                      severity (if dest-exists -1 2)]
                  (when springname
                    [{:severity severity

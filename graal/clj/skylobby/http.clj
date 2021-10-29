@@ -144,7 +144,8 @@
       (let [uri (java.net.URI. url)]
         (last (string/split (.getPath uri) #"/")))
       (catch Exception e
-        (log/error e "Error parsing url" url)))))
+        (log/error e "Error parsing url" url)
+        (last (string/split url #"/"))))))
 
 (defn bar-replay-download-url [filename-or-id]
   (str bar-replays-api-url filename-or-id))
@@ -223,9 +224,10 @@
 (defn bar-engine-filename?
   [filename]
   (boolean
-    (or
-      (re-find bar-engine-re filename)
-      (re-find bar-105-engine-re filename))))
+    (when filename
+      (or
+        (re-find bar-engine-re filename)
+        (re-find bar-105-engine-re filename)))))
 
 (def bar-platforms
   {"linux64" "linux-64"
