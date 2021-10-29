@@ -24,6 +24,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.4]
+
+- Move singleplayer battle to a tab
+
 ### [0.7.3]
 
 - Move add bot buttons to popup window
