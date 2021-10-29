@@ -100,6 +100,8 @@
 (def matchmaking-tab-ids
   ["battles" "chat" "console" "matchmaking"])
 
+(defn old-battle-tab-id [battle-id]
+  (str "old-battle-" battle-id))
 
 (defn- main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]
@@ -119,14 +121,14 @@
                        no-matchmaking-tab-ids)
         show-closed-battles (fx/sub-val context :show-closed-battles)
         old-battles (fx/sub-val context get-in [:by-server server-key :old-battles])
-        main-tab-ids (concat
-                       main-tab-ids
-                       (when show-closed-battles
-                         (map first old-battles)))
         in-battle (and battle-id
                        (not pop-out-battle))
         show-battle-tab (and in-battle battle-as-tab)
-        main-tab-ids (concat (when show-battle-tab ["battle"]) main-tab-ids)
+        main-tab-ids (concat
+                       (when show-battle-tab ["battle"])
+                       main-tab-ids
+                       (when show-closed-battles
+                         (map (comp old-battle-tab-id first) old-battles)))
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)
@@ -282,7 +284,7 @@
               :closable true
               :on-close-request {:event/type :spring-lobby/dissoc-in
                                  :path [:by-server server-key :old-battles battle-id]}
-              :id (str "old-battle-" battle-id)
+              :id (old-battle-tab-id battle-id)
               :content
               {:fx/type fx.battle/battle-view
                :battle-id battle-id

@@ -48,6 +48,7 @@
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
+        am-spec (fx/sub-ctx context sub/am-spec server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -597,7 +598,7 @@
                       :key (u/nickname i)
                       :desc
                       {:fx/type :text-field
-                       :disable (not am-host)
+                       :disable (boolean am-spec)
                        :text-formatter
                        {:fx/type :text-formatter
                         :value-converter :integer
