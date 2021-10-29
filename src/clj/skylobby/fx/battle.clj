@@ -584,8 +584,19 @@
                                                         {:fx/type :combo-box
                                                          :value bot-version
                                                          :disable (string/blank? bot-name)
-                                                         :on-value-changed {:event/type :spring-lobby/change-bot-version}
+                                                         :on-value-changed {:event/type :spring-lobby/assoc
+                                                                            :key :bot-version}
                                                          :items (or bot-versions [])}}]}
+                                                     {:fx/type :h-box
+                                                      :alignment :center-left
+                                                      :children
+                                                      [{:fx/type :label
+                                                        :text " Name: "}
+                                                       {:fx/type :text-field
+                                                        :prompt-text "AI Name"
+                                                        :text (str bot-username)
+                                                        :on-text-changed {:event/type :spring-lobby/assoc
+                                                                          :key :bot-username}}]}
                                                      {:fx/type :button
                                                       :text "Add"
                                                       :disable (or (and am-spec (not singleplayer))
