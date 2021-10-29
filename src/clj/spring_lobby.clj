@@ -2220,7 +2220,7 @@
                                   (fs/parent-file old-jar)
                                   (fs/file (fs/parent-file (fs/file process-command)) "app"))
                 jar-to (if old-jar old-jar (fs/file program-folder "skylobby.jar"))
-                elevate-path (fs/canonical-path (fs/file program-folder "Elevate.exe"))
+                elevate-file (fs/file program-folder "Elevate.exe")
                 copy-bat-file (fs/file (fs/download-dir) "copy_jar.bat")
                 copy-and-start-bat-file (fs/file (fs/download-dir) "copy_and_start.bat")
                 new-process-command (if (u/is-java? process-command)
@@ -2229,7 +2229,9 @@
             (spit copy-bat-file
               (str "copy \"" (fs/canonical-path new-jar) "\" \"" (fs/canonical-path jar-to) "\""))
             (spit copy-and-start-bat-file
-              (str "\"" elevate-path "\" -wait \"" (fs/canonical-path copy-bat-file) "\"" \newline
+              (str (if (fs/exists? elevate-file)
+                     (str "\"" (fs/canonical-path elevate-file) "\" -wait \"" (fs/canonical-path copy-bat-file) "\"" \newline)
+                     (str "\"" (fs/canonical-path copy-bat-file) "\"" \newline))
                    new-process-command))
             (let [^List cmd [(fs/canonical-path copy-and-start-bat-file)]]
               (log/info "Running" (pr-str cmd))
