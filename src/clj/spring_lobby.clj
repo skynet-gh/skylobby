@@ -2908,6 +2908,7 @@
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
                (-> state
+                   (assoc :selected-server-tab "singleplayer")
                    (assoc-in [:by-server :local :client-data] nil)
                    (assoc-in [:by-server :local :server-key] :local)
                    (assoc-in [:by-server :local :username] username)
@@ -2921,7 +2922,7 @@
                               :users {username {:battle-status (assoc cu/default-battle-status :mode true)
                                                 :team-color (first color/ffa-colors-spring)}}}))))
       (catch Exception e
-        (log/error e "Error joining battle")))))
+        (log/error e "Error starting singleplayer battle")))))
 
 (defn- update-filter-fn [^javafx.scene.input.KeyEvent event]
   (fn [x]

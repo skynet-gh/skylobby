@@ -1608,24 +1608,25 @@
                            :client-data (fx/sub-val context get-in [:by-server server-key :client-data])
                            :server-key server-key}}
               {:fx/type :pane
-               :h-box/margin 4}
-              (if (fx/sub-val context :pop-out-battle)
-                {:fx/type :button
-                 :text "Pop In Battle "
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-window-maximize:16:white"}
-                 :on-action {:event/type :spring-lobby/dissoc
-                             :key :pop-out-battle}}
-                {:fx/type :button
-                 :text "Pop Out Battle "
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-open-in-new:16:white"}
-                 :on-action {:event/type :spring-lobby/assoc
-                             :key :pop-out-battle
-                             :value true}})
-              {:fx/type :pane
+               :h-box/margin 4}]
+             (when-not singleplayer
+               [(if (fx/sub-val context :pop-out-battle)
+                  {:fx/type :button
+                   :text "Pop In Battle "
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-window-maximize:16:white"}
+                   :on-action {:event/type :spring-lobby/dissoc
+                               :key :pop-out-battle}}
+                  {:fx/type :button
+                   :text "Pop Out Battle "
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-open-in-new:16:white"}
+                   :on-action {:event/type :spring-lobby/assoc
+                               :key :pop-out-battle
+                               :value true}})])
+             [{:fx/type :pane
                :h-box/margin 4}]
              (when-not singleplayer
                [(if pop-out-chat

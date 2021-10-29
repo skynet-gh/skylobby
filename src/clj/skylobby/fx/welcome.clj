@@ -3,7 +3,6 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
@@ -254,72 +253,33 @@
 
 
 (defn- welcome-view-impl
-  [{:fx/keys [context]}]
-  (let [show-local (and (fx/sub-val context get-in [:by-server :local :battle :battle-id])
-                        (not (fx/sub-val context :pop-out-battle)))]
-    {:fx/type :v-box
-     :alignment :center
-     :style {:-fx-font-size 20}
+  [_state]
+  {:fx/type :v-box
+   :alignment :center
+   :style {:-fx-font-size 20}
+   :children
+   [
+    {:fx/type :pane
+     :v-box/vgrow :always}
+    {:fx/type :h-box
      :children
-     (concat
-       (when-not show-local
-         [{:fx/type :pane
-           :v-box/vgrow :always}])
-       [
-        (if show-local
-          {:fx/type :split-pane
-           :divider-positions [0]
-           :orientation :vertical
-           :v-box/vgrow :always
-           :items
-           [{:fx/type :v-box
-             :children
-             [
-              {:fx/type :pane
-               :v-box/vgrow :always}
-              {:fx/type :h-box
-               :children
-               [
-                {:fx/type :pane
-                 :h-box/hgrow :always}
-                {:fx/type singleplayer-buttons}
-                {:fx/type multiplayer-buttons}
-                {:fx/type :pane
-                 :h-box/hgrow :always}]}
-              {:fx/type :pane
-               :v-box/vgrow :always}]}
-            {:fx/type :v-box
-             :children
-             [{:fx/type :h-box
-               :alignment :center-left
-               :children
-               [{:fx/type :button
-                 :text "Close Singleplayer Battle"
-                 :on-action {:event/type :spring-lobby/dissoc-in
-                             :path [:by-server :local :battle]}}]}
-              {:fx/type fx.battle/battle-view
-               :v-box/vgrow :always
-               :server-key :local}]}]}
-          {:fx/type :h-box
-           :children
-           [
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :h-box
-             :spacing 100
-             :children
-             [{:fx/type :pane
-               :h-box/hgrow :always}
-              {:fx/type singleplayer-buttons}
-              {:fx/type multiplayer-buttons}
-              {:fx/type :pane
-               :h-box/hgrow :always}]}
-            {:fx/type :pane
-             :h-box/hgrow :always}]})]
-       (when-not show-local
-         [{:fx/type :pane
-           :v-box/vgrow :always}])
-       [{:fx/type fx.bottom-bar/bottom-bar}])}))
+     [
+      {:fx/type :pane
+       :h-box/hgrow :always}
+      {:fx/type :h-box
+       :spacing 100
+       :children
+       [{:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type singleplayer-buttons}
+        {:fx/type multiplayer-buttons}
+        {:fx/type :pane
+         :h-box/hgrow :always}]}
+      {:fx/type :pane
+       :h-box/hgrow :always}]}
+    {:fx/type :pane
+     :v-box/vgrow :always}
+    {:fx/type fx.bottom-bar/bottom-bar}]})
 
 (defn welcome-view [state]
   (tufte/profile {:dynamic? true
