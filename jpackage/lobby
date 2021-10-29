@@ -4,7 +4,7 @@
 --name "skylobby"
 --main-class "spring_lobby.main"
 --vendor "skynet"
---java-options "-Xmx2g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
+--java-options "-server -Xmx2g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
 --resource-dir "jpackage/resources"
 --file-associations "resources/FAsdfz.properties"
 --add-launcher skyreplays="resources/skyreplays.properties"
