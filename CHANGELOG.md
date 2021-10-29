@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.3]
+
+- Move add bot buttons to popup window
+- Add back bot name input
+- Actually fix clicking old battle tabs
+- Standardize font icon sizes in battle buttons
+
 ### [0.7.2]
 
 - Fix issue with download source updates

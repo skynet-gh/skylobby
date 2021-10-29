@@ -30,6 +30,7 @@
 
 
 (def default-font-size 18)
+(def font-icon-size 20)
 
 (defn font-size-or-default [font-size]
   (int (or (when (number? font-size) font-size)
@@ -198,7 +199,7 @@
      (concat
        [{:fx/type :button
          :text "Send"
-         :disable (boolean disable)
+         :disable (boolean (or disable (string/blank? message-draft)))
          :on-action {:event/type :spring-lobby/send-message
                      :channel-name channel-name
                      :client-data client-data
@@ -242,8 +243,8 @@
            :graphic
            {:fx/type font-icon/lifecycle
             :icon-literal (if mute-ring
-                            "mdi-volume-off:16:red"
-                            "mdi-volume-high:16:white")}}])
+                            (str "mdi-volume-off:" font-icon-size ":red")
+                            (str "mdi-volume-high:" font-icon-size ":white"))}}])
        [{:fx/type :button
          :text ""
          :tooltip
@@ -258,8 +259,8 @@
          :graphic
          {:fx/type font-icon/lifecycle
           :icon-literal (if mute
-                          "mdi-message-bulleted-off:16:red"
-                          "mdi-message:16:white")}}])}))
+                          (str "mdi-message-bulleted-off:" font-icon-size ":red")
+                          (str "mdi-message:" font-icon-size ":white"))}}])}))
 
 (defn- channel-view-users
   [{:fx/keys [context]

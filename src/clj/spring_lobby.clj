@@ -3130,6 +3130,7 @@
 
 (defmethod event-handler ::add-bot
   [{:keys [battle bot-username bot-name bot-version client-data side-indices singleplayer username]}]
+  (swap! *state dissoc :show-add-bot)
   (future
     (try
       (let [existing-bots (keys (:bots battle))
@@ -3164,10 +3165,6 @@
       (catch Exception e
         (log/error e "Error adding bot")))))
 
-(defmethod event-handler ::change-bot-username
-  [{:fx/keys [event]}]
-  (swap! *state assoc :bot-username event))
-
 (defmethod event-handler ::change-bot-name
   [{:keys [bots] :fx/keys [event]}]
   (let [bot-name event
@@ -3176,10 +3173,6 @@
                         first
                         :bot-version)]
     (swap! *state assoc :bot-name bot-name :bot-version bot-version)))
-
-(defmethod event-handler ::change-bot-version
-  [{:fx/keys [event]}]
-  (swap! *state assoc :bot-version event))
 
 
 (defmethod event-handler ::start-battle
