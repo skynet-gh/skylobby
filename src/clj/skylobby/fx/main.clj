@@ -3,6 +3,8 @@
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     skylobby.fx
+    [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
     [taoensso.tufte :as tufte]))
@@ -14,7 +16,12 @@
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
-        tab-ids (concat ["local"] valid-server-keys #_(when (seq valid-server-keys) ["multi"]))
+        show-singleplayer (fx/sub-val context get-in [:by-server :local :battle :battle-id])
+        tab-ids (concat
+                  ["welcome"]
+                  (when show-singleplayer ["singleplayer"])
+                  valid-server-keys)
+                  ;#_(when (seq valid-server-keys) ["multi"]))
         tab-id-set (set tab-ids)
         selected-server-tab (fx/sub-val context :selected-server-tab)
         selected-index (or (when (contains? tab-id-set selected-server-tab)
@@ -43,14 +50,31 @@
         :tabs
         (concat
           [{:fx/type :tab
-            :id "local"
+            :id "welcome"
             :closable false
             :graphic {:fx/type :label
-                      :text "local"
+                      :text "welcome"
                       :style {:-fx-font-size 18}}
             :content
             {:fx/type fx.welcome/welcome-view
              :v-box/vgrow :always}}]
+          (when show-singleplayer
+            [{:fx/type :tab
+              :id "singleplayer"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "singleplayer"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/dissoc-in
+                                 :path [:by-server :local :battle]}
+              :content
+              {:fx/type :v-box
+               :children
+               [
+                {:fx/type fx.battle/battle-view
+                 :v-box/vgrow :always
+                 :server-key :local}
+                {:fx/type fx.bottom-bar/bottom-bar}]}}])
           (mapv
             (fn [server-key]
               (let [classes (if (and (not= server-key selected-server-tab)

@@ -43,7 +43,7 @@
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
-        show-battle-window (boolean (and pop-out-battle battle-id))]
+        show-battle-window (boolean (and pop-out-battle battle-id (not= :local server-key)))]
     {:fx/type fx/ext-on-instance-lifecycle
      :on-created (fn [node]
                    (skylobby.fx/add-maximized-listener :battle node)
