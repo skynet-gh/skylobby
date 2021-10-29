@@ -3130,6 +3130,7 @@
 
 (defmethod event-handler ::add-bot
   [{:keys [battle bot-username bot-name bot-version client-data side-indices singleplayer username]}]
+  (swap! *state dissoc :show-add-bot)
   (future
     (try
       (let [existing-bots (keys (:bots battle))
