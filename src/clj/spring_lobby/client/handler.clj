@@ -159,7 +159,8 @@
             :else
             (start-game-if-synced state-atom prev-state server-data)))))))
 
-(defn do-auto-unspec [state-atom client-data me]
+(defn do-auto-unspec
+  [state-atom client-data {:keys [battle-status ready-on-unspec team-color]}]
   (try
     (if (auto-unspec-ready?)
       (do
@@ -167,9 +168,9 @@
         (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
-                 (assoc (:battle-status me) :mode true))
+                 (assoc battle-status :mode true :ready (boolean ready-on-unspec)))
                " "
-               (or (:team-color me) 0)))
+               (or team-color 0)))
         (reset! last-auto-unspec-atom (u/curr-millis)))
       (log/info "Too soon to auto unspec"))
     (catch Exception e
@@ -202,7 +203,7 @@
             (when (and (not= username my-username)
                        (not (get-in me [:battle-status :mode]))
                        (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
-              (do-auto-unspec state-atom client-data me))))))))
+              (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -251,7 +252,7 @@
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (do-auto-unspec state-atom client-data me))))
+        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))
 
 
 (defmethod handle "JOIN" [state-atom server-key m]
@@ -345,7 +346,7 @@
                auto-unspec
                (teamsize-changed-message? message)
                (-> me :battle-status :mode not))
-      (do-auto-unspec state-atom client-data me))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
 
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
@@ -385,7 +386,7 @@
                auto-unspec
                (-> me :battle-status :mode not)
                (teamsize-changed-message? message))
-      (do-auto-unspec state-atom client-data me))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
