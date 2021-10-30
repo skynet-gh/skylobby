@@ -112,35 +112,80 @@
         {:fx/type :scene
          :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
          :root {:fx/type fx.main/main-window}}}}
-      {:fx/type battle-window}
-      {:fx/type fx.download/download-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.host-battle/host-battle-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.import/import-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.maps/maps-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.rapid/rapid-download-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.replay/replays-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.server/servers-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.register/register-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.settings/settings-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.tasks/tasks-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.battle-chat/battle-chat-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.chat/chat-window
-       :screen-bounds screen-bounds}
-      {:fx/type fx.battles-window/battles-window-view
-       :screen-bounds screen-bounds}
-      {:fx/type fx.replay/download-replays-window
-       :screen-bounds screen-bounds}]}))
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :pop-out-battle))
+       :desc
+       {:fx/type battle-window}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-downloader))
+       :desc
+       {:fx/type fx.download/download-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-host-battle-window))
+       :desc
+       {:fx/type fx.host-battle/host-battle-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-importer))
+       :desc
+       {:fx/type fx.import/import-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-maps))
+       :desc
+       {:fx/type fx.maps/maps-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-rapid-downloader))
+       :desc
+       {:fx/type fx.rapid/rapid-download-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-replays))
+       :desc
+       {:fx/type fx.replay/replays-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-servers-window))
+       :desc
+       {:fx/type fx.server/servers-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-register-window))
+       :desc
+       {:fx/type fx.register/register-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-settings-window))
+       :desc
+       {:fx/type fx.settings/settings-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-tasks-window))
+       :desc
+       {:fx/type fx.tasks/tasks-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :pop-out-chat))
+       :desc
+       {:fx/type fx.battle-chat/battle-chat-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-chat-window))
+       :desc
+       {:fx/type fx.chat/chat-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-battles-window))
+       :desc
+       {:fx/type fx.battles-window/battles-window-view
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-download-replays))
+       :desc
+       {:fx/type fx.replay/download-replays-window
+        :screen-bounds screen-bounds}}]}))
 
 (defn root-view [state]
   (tufte/profile {:dynamic? true
