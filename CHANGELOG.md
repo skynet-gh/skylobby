@@ -24,6 +24,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.5]
+
+- Fix an issue when windows are minimzed then reopened
+
 ### [0.7.4]
 
 - Move singleplayer battle to a tab
