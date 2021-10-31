@@ -2968,10 +2968,14 @@
     (try
       (let [desktop (Desktop/getDesktop)]
         (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
-          (.browseFileDirectory desktop file)
+          (if (fs/is-directory? file)
+            (.browseFileDirectory desktop (fs/file file "dne"))
+            (.browseFileDirectory desktop file))
           (if (fs/wsl-or-windows?)
-            (let [runtime (Runtime/getRuntime) ; TODO hacky?
-                  command ["explorer.exe" (fs/wslpath (fs/parent-file file))]
+            (let [runtime (Runtime/getRuntime)
+                  command ["explorer.exe" (if (fs/is-directory? file)
+                                            (fs/wslpath file)
+                                            (str "/select," (fs/wslpath file)))]
                   ^"[Ljava.lang.String;" cmdarray (into-array String command)]
               (log/info "Running" (pr-str command))
               (.exec runtime cmdarray nil nil))
