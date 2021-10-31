@@ -35,6 +35,8 @@
 
 (def init-state (atom nil))
 
+(def headless (atom false))
+
 ; prevent duplicate refreshes
 
 (def refreshing (atom false))
@@ -98,9 +100,10 @@
     (alter-var-root (find-var 'spring-lobby/*ui-state) (constantly *ui-state))
     (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))]
       (add-ui-state-watcher-fn *state *ui-state))
-    (if-not renderer
-      (create-renderer)
-      (println "Renderer already exists"))
+    (when-not @headless
+      (if-not renderer
+        (create-renderer)
+        (println "Renderer already exists")))
     (require 'spring-lobby.client)
     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
     (try
@@ -155,47 +158,54 @@
   context)
 
 
-(defn init []
-  (try
-    [datafy pprint chime/chime-at string/split edn/read-string http/get]
-    (hawk/watch! [{:paths ["src/clj" "graal/clj" "test/clj"]
-                   :handler refresh-on-file-change}])
-    (require 'skylobby.fx.root)
-    (require 'spring-lobby)
-    (require 'spring-lobby.fs)
-    (require 'skylobby.fx)
-    (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
-      (future
-        (try
-          (println "Initializing 7zip")
-          (init-7z-fn)
-          (println "Finished initializing 7zip")
-          (catch Throwable e
-            (println e)))))
-    (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
-    (alter-var-root #'*ui-state (constantly (var-get (find-var 'spring-lobby/*ui-state))))
-    (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))
-          initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
-          initial-state (initial-state-fn)]
-      (remove-watch *state :ui-state) ; to prevent leak
-      (add-ui-state-watcher-fn *state *ui-state)
-      (reset! *state initial-state)
-      (swap! *state assoc :css (css/register :skylobby.fx/current
-                                 (or (:css initial-state)
-                                     (var-get (find-var 'skylobby.fx/default-style-data))))))
-    ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
-    (require 'spring-lobby.client)
-    (require 'spring-lobby.client.handler)
-    (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
-    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
-    (require 'spring-lobby)
-    (let [init-fn (var-get (find-var 'spring-lobby/init))]
-      (reset! init-state (init-fn *state))
-      (create-renderer))
-    (catch Throwable e
-      (println e)
-      (.printStackTrace e)
-      (throw e))))
+(defn init
+  ([]
+   (init nil))
+  ([{:keys [arguments]}]
+   (when (= "headless" (first arguments))
+     (reset! headless true))
+   (try
+     [datafy pprint chime/chime-at string/split edn/read-string http/get]
+     (hawk/watch! [{:paths ["src/clj" "graal/clj" "test/clj"]
+                    :handler refresh-on-file-change}])
+     (require 'spring-lobby)
+     (require 'spring-lobby.fs)
+     (when-not @headless
+       (require 'skylobby.fx.root)
+       (require 'skylobby.fx))
+     (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
+       (future
+         (try
+           (println "Initializing 7zip")
+           (init-7z-fn)
+           (println "Finished initializing 7zip")
+           (catch Throwable e
+             (println e)))))
+     (alter-var-root #'*state (constantly (var-get (find-var 'spring-lobby/*state))))
+     (alter-var-root #'*ui-state (constantly (var-get (find-var 'spring-lobby/*ui-state))))
+     (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))
+           initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
+           initial-state (initial-state-fn)]
+       (remove-watch *state :ui-state) ; to prevent leak
+       (add-ui-state-watcher-fn *state *ui-state)
+       (reset! *state initial-state)
+       (swap! *state assoc :css (css/register :skylobby.fx/current
+                                  (or (:css initial-state)
+                                      (var-get (find-var 'skylobby.fx/default-style-data))))))
+     ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
+     (require 'spring-lobby.client)
+     (require 'spring-lobby.client.handler)
+     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
+     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+     (require 'spring-lobby)
+     (let [init-fn (var-get (find-var 'spring-lobby/init))]
+       (reset! init-state (init-fn *state))
+       (when-not @headless
+         (create-renderer)))
+     (catch Throwable e
+       (println e)
+       (.printStackTrace e)
+       (throw e)))))
 
 
 (defn add-dependencies [coordinates]

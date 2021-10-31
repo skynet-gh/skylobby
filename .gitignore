@@ -12,9 +12,11 @@
 /.nrepl-port
 /.project
 /.settings/
+/.shadow-cljs/
 /classes/
 /dist/
 /native-image-args
+/node_modules/
 /pom.xml
 /skylobby-*.msi
 /skyres

@@ -2,6 +2,7 @@
   (:require
     [cider.nrepl]
     [clojure.string :as string]
+    [clojure.tools.cli :as cli]
     hashp.core
     [io.aviso.repl]
     [nrepl.cmdline]
@@ -52,28 +53,31 @@
    'cider.nrepl/wrap-undef
    'cider.nrepl/wrap-version])
 
-(defn -main [& _args]
-  (log-to-file)
-  (disable-print-log)
-  (future
-    (nrepl.cmdline/-main
-      "--middleware"
-      (str "[" (string/join "," middleware) "]")
-      ;"--interactive"
-      "--color"))
-  (user/init)
-  (loop []
-    (when
-      (try
-        (println "Trying to start REPLy")
-        (reply.main/launch-nrepl
-          {:attach (slurp ".nrepl-port")
-           :caught io.aviso.repl/pretty-pst
-           :color true})
-        false
-        (catch Exception _e
-          (println "Error connecting REPLy, sleeping")
-          (Thread/sleep 500)
-          true))
-      (recur)))
-  (System/exit 0))
+(def cli-options [])
+
+(defn -main [& args]
+  (let [parsed (cli/parse-opts args cli-options)]
+    (log-to-file)
+    (disable-print-log)
+    (future
+      (nrepl.cmdline/-main
+        "--middleware"
+        (str "[" (string/join "," middleware) "]")
+        ;"--interactive"
+        "--color"))
+    (user/init parsed)
+    (loop []
+      (when
+        (try
+          (println "Trying to start REPLy")
+          (reply.main/launch-nrepl
+            {:attach (slurp ".nrepl-port")
+             :caught io.aviso.repl/pretty-pst
+             :color true})
+          false
+          (catch Exception _e
+            (println "Error connecting REPLy, sleeping")
+            (Thread/sleep 500)
+            true))
+        (recur)))
+    (System/exit 0)))

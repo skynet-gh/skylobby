@@ -28,6 +28,7 @@
     [skylobby.fx.replay :as fx.replay]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
+    [skylobby.server :as server]
     [skylobby.task :as task]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
@@ -4763,39 +4764,18 @@
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
 
 
-(defn ipc-handler
-  ([req]
-   (ipc-handler *state req))
-  ([state-atom req]
-   (log/info "IPC handler request" req)
-   (cond
-     (= "/replay" (:uri req))
-     (let [path (-> req :params :path)]
-       (if-let [file (fs/file path)]
-         (let [parsed-replay (replay/parse-replay file)]
-           (log/info "Loading replay from IPC" path)
-           (swap! state-atom
-             (fn [state]
-               (-> state
-                   (assoc :show-replays true
-                          :selected-replay parsed-replay
-                          :selected-replay-file file)
-                   (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
-         (log/warn "Unable to coerce to file" path)))
-     :else
-     (log/info "Nothing to do for IPC request" req))
-   {:status 200
-    :headers {"content-type" "text/plain"}
-    :body "ok"}))
-
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
+  (when-let [{:keys [ipc-server]} @*state]
+    (when ipc-server
+      (.close ipc-server)))
   (if (u/is-port-open? u/ipc-port)
     (do
       (log/info "Starting IPC server on port" u/ipc-port)
-      (let [server (aleph-http/start-server
-                     (-> (partial ipc-handler *state)
+      (let [handler (server/handler *state)
+            server (aleph-http/start-server
+                     (-> handler
                          wrap-keyword-params
                          wrap-params)
                      {:socket-address
