@@ -135,7 +135,9 @@
                                          (assoc :game-start-time now)
                                          (and prev-status (not (:away prev-status)) (:away decoded-status))
                                          (assoc :away-start-time now)))))
-        auto-launch (get-in prev-state [:auto-launch server-key])
+        auto-launch (if (contains? (:auto-launch prev-state) server-key)
+                      (get-in prev-state [:auto-launch server-key])
+                      true)
         {:keys [battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
     (if-not (= (get-in battles [(:battle-id battle) :host-username]) username)
       (log/debug "Short circuiting CLIENTSTATUS handler since not battle host")
