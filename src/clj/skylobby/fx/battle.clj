@@ -841,8 +841,12 @@
            :minimap-type-key :minimap-type}
           {:fx/type :v-box
            :children
-           [{:fx/type :flow-pane
-             ;:alignment :center-left
+           [
+            {:fx/type :label
+             :text (str
+                     (when-let [description (-> battle-map-details :mapinfo :description)]
+                       description))}
+            {:fx/type :flow-pane
              :children
              [
               {:fx/type :label
@@ -858,39 +862,37 @@
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :minimap-type}}
               {:fx/type :label
-               :text (str " Size: "
+               :text (str " Map size: "
                           (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                             (str
                               (when map-width (quot map-width 64))
                               " x "
                               (when map-height (quot map-height 64)))))}]}
-            {:fx/type :label
-             :text (str
-                     (when-let [description (-> battle-map-details :mapinfo :description)]
-                       description))}
-            {:fx/type :h-box
-             :style {:-fx-max-width minimap-size}
-             :children
-             (let [{:keys [battle-status]} (-> battle :users (get username))]
-               [{:fx/type maps-view
-                 :disable (and (not singleplayer) am-spec)
-                 :map-name map-name
-                 :spring-isolation-dir spring-isolation-dir
-                 :on-value-changed
-                 (cond
-                   singleplayer
-                   {:event/type :spring-lobby/assoc-in
-                    :path [:by-server :local :battles :singleplayer :battle-map]}
-                   am-host
-                   {:event/type :spring-lobby/battle-map-change
-                    :client-data client-data}
-                   :else
-                   {:event/type :spring-lobby/suggest-battle-map
-                    :battle-status battle-status
-                    :channel-name channel-name
-                    :client-data client-data})}])}
+            (let [{:keys [battle-status]} (-> battle :users (get username))]
+              {:fx/type maps-view
+               :action-disable-rotate {:event/type :spring-lobby/send-message
+                                       :channel-name channel-name
+                                       :client-data client-data
+                                       :message "!rotationEndGame off"
+                                       :server-key server-key}
+               :disable (and (not singleplayer) am-spec)
+               :flow true
+               :map-name map-name
+               :spring-isolation-dir spring-isolation-dir
+               :on-value-changed
+               (cond
+                 singleplayer
+                 {:event/type :spring-lobby/assoc-in
+                  :path [:by-server :local :battles :singleplayer :battle-map]}
+                 am-host
+                 {:event/type :spring-lobby/battle-map-change
+                  :client-data client-data}
+                 :else
+                 {:event/type :spring-lobby/suggest-battle-map
+                  :battle-status battle-status
+                  :channel-name channel-name
+                  :client-data client-data})})
             {:fx/type :flow-pane
-             ;:alignment :center-left
              :children
              (concat
                [{:fx/type :label
