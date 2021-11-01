@@ -1,6 +1,7 @@
 (ns skylobby.server
   (:require
     aleph.http
+    [clojure.java.io :as io]
     [hiccup.core :as hiccup]
     [muuntaja.core :as m]
     [reitit.ring :as ring]
@@ -11,11 +12,15 @@
     [reitit.ring.middleware.parameters :as parameters]
     [ring.middleware.anti-forgery :as anti-forgery]
     [ring.middleware.content-type :as content-type]
+    [skylobby.event :as event]
     [skylobby.fs :as fs]
     [spring-lobby.fs.sdfz :as replay]
     [taoensso.sente :as sente]
     [taoensso.sente.server-adapters.aleph :refer (get-sch-adapter)]
     [taoensso.timbre :as log]))
+
+
+(def ^:dynamic *state nil)
 
 
 ; sente  https://github.com/ptaoussanis/sente/blob/master/example-project/src/example/server.clj
@@ -25,7 +30,8 @@
                     (get-sch-adapter)
                     {:authorized?-fn nil
                      :csrf-token-fn nil ; TODO
-                     :packer packer})
+                     :packer packer
+                     :wrap-recv-evs? false})
       {:keys [ch-recv send-fn connected-uids ajax-post-fn ajax-get-or-ws-handshake-fn]} chsk-server]
   (def ring-ajax-post ajax-post-fn)
   (def ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn)
@@ -46,6 +52,7 @@
 (defn event-msg-handler
   "Wraps `-event-msg-handler` with logging, error catching, etc."
   [{:as ev-msg :keys [id ?data event]}]
+  (log/info id ?data event)
   (-event-msg-handler ev-msg)) ; Handle event-msgs on a single thread
 
 (defmethod -event-msg-handler
@@ -53,9 +60,63 @@
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
   (let [session (:session ring-req)
         uid     (:uid     session)]
-    (log/debugf "Unhandled event: %s" event)
+    (log/warnf "Unhandled event: %s" event)
     (when ?reply-fn
       (?reply-fn {:umatched-event-as-echoed-from-server event}))))
+
+
+(def server-key "[Z]kynet@bar.teifion.co.uk:8201")
+
+(defmethod -event-msg-handler
+  :skylobby/get
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)]
+    (log/info "Get" ?data)
+    (when ?reply-fn
+      (?reply-fn get @*state ?data))))
+
+(defmethod -event-msg-handler
+  :skylobby/get-in
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)]
+    (log/info "Get in" ?data)
+    (when ?reply-fn
+      (?reply-fn (get-in @*state ?data)))))
+
+(defmethod -event-msg-handler
+  :skylobby/get-servers
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)]
+    (log/info "Get servers data" ?data)
+    (when ?reply-fn
+      (let [state @*state
+            response {
+                      :active-servers (->> state
+                                           :by-server
+                                           (map
+                                             (fn [[server-id server-data]]
+                                               (let [client-data (:client-data server-data)]
+                                                 {:server-id server-id
+                                                  :accepted (:accepted server-data)
+                                                  :client? (boolean (:client client-data))
+                                                  :client-deferred? (boolean (:client-deferred client-data))
+                                                  :server-url (:server-url client-data)
+                                                  :username (:username client-data)}))))
+                      :logins (:logins state)
+                      :servers (:servers state)}]
+        (?reply-fn response)))))
+
+(defmethod -event-msg-handler
+  :skylobby/join-battle
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)
+        [server-key battle-id] ?data
+        server-data (get-in @*state [:by-server server-key])]
+    (event/join-battle *state (assoc server-data :selected-battle battle-id))))
 
 
 (sente/start-server-chsk-router!
@@ -72,8 +133,6 @@
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
-      [:p [:strong "Step 2: "] " observe std-out (for server output) and below (for client output):"]
-      [:textarea#output {:style "width: 100%; height: 200px;"}]
       [:link {:rel "stylesheet" :href "https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"}]
       [:script {:src "/js/main.js"}]])
    :headers {"Content-Type" "text/html"}})
@@ -89,6 +148,7 @@
     {:status 200 :session (assoc session :uid user-id)}))
 
 (defn handler [state-atom]
+  (alter-var-root #'*state (constantly state-atom))
   (ring/ring-handler
     (ring/router
       [
@@ -116,6 +176,20 @@
                                                   :selected-replay-file file)
                                            (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
                                  (log/warn "Unable to coerce to file" path)))}]]
+       ["/minimap-image" {:get {:parameters {:query {:map-name string?}}}
+                                                     ;:minimap-type string?}}}
+                          :handler (fn [{{{:keys [map-name minimap-type]} :query} :parameters}]
+                                     (log/info "Serving minimap image for" map-name "type" minimap-type)
+                                     (try
+                                       (let [f (fs/minimap-image-cache-file map-name (when minimap-type {:minimap-type minimap-type}))]
+                                         {:status 200
+                                          :headers {"Content-Type" "image/png"}
+                                          :body (io/input-stream f)})
+                                       (catch Exception e
+                                         (log/error e "Error in minimap image handler")
+                                         {:status 500
+                                          :headers {"Content-Type" "text/html"}
+                                          :body (str "Error getting minimap image for" map-name "type" minimap-type)})))}]
        ["/*" (ring/create-resource-handler {:not-found-handler index})]]
       {:conflicts (constantly nil)
        :data {:coercion   reitit.coercion.spec/coercion

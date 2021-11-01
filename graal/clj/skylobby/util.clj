@@ -40,3 +40,7 @@
 
 (defn decode [^String s]
   (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))
+
+
+(defn server-key [{:keys [server-url username]}]
+  (str username "@" server-url))
