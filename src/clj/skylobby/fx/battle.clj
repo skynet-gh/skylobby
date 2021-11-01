@@ -115,7 +115,7 @@
                 {:fx/type :label
                  :text (or (some-> i :key name str)
                            "")}
-                (when-let [v (-> scripttags :game :modoptions (get (:key i)))]
+                (when-let [v (get-in scripttags ["game" "modoptions" (some-> i :key name str)])]
                   (when (not (spring-script/tag= i v))
                     {:style {:-fx-font-weight :bold}})))}})}}
         {:fx/type :table-column
@@ -125,7 +125,7 @@
          {:fx/cell-type :table-cell
           :describe
           (fn [i]
-            (let [v (-> scripttags :game :modoptions (get (:key i)))]
+            (let [v (get-in scripttags ["game" "modoptions" (some-> i :key name str)])]
               (case (:type i)
                 "bool"
                 {:text ""
@@ -630,9 +630,9 @@
                 {:fx/type :combo-box
                  :prompt-text " < host a replay > "
                  :style {:-fx-max-width 300}
-                 :value (-> scripttags :game :demofile)
+                 :value (get-in scripttags ["game" "demofile"])
                  :on-value-changed {:event/type :spring-lobby/assoc-in
-                                    :path [:by-server server-key :battle :scripttags :game :demofile]}
+                                    :path [:by-server server-key :battle :scripttags "game" "demofile"]}
                  :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
                  :on-hidden {:event/type :spring-lobby/dissoc
                              :key :filter-host-replay}
@@ -645,10 +645,10 @@
                              reverse
                              (mapv first))
                  :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]))
-           (when (-> scripttags :game :demofile)
+           (when (get-in scripttags ["game" "demofile"])
              [{:fx/type :button
                :on-action {:event/type :spring-lobby/dissoc-in
-                           :path [:battle :scripttags :game :demofile]}
+                           :path [:battle :scripttags "game" "demofile"]}
                :graphic
                {:fx/type font-icon/lifecycle
                 :icon-literal (str "mdi-close:" font-icon-size ":white")}}]))}
@@ -919,8 +919,7 @@
                    :text "Clear boxes"
                    :disable (and (not singleplayer) am-spec)
                    :on-action {:event/type :spring-lobby/clear-start-boxes
-                               :allyteam-ids (->> scripttags
-                                                  :game
+                               :allyteam-ids (->> (get scripttags "game")
                                                   (filter (comp #(string/starts-with? % "allyteam") name first))
                                                   (map
                                                     (fn [[teamid _team]]
@@ -1415,8 +1414,10 @@
                                   0
                                   (mapv
                                     (fn [{:keys [username]}]
-                                      (let [username-kw (when username (keyword (string/lower-case username)))
-                                            skill (some-> scripttags :game :players (get username-kw) :skill u/parse-skill u/round)]
+                                      (let [username-lc (when username (string/lower-case username))
+                                            skill (some-> (get-in scripttags ["game" "players" username-lc "skill"])
+                                                          u/parse-skill
+                                                          u/round)]
                                         skill))
                                     players)))))
         players-table {:fx/type players-table

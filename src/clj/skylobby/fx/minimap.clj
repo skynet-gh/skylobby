@@ -4,6 +4,7 @@
     [clojure.java.io :as io]
     clojure.set
     [clojure.string :as string]
+    clojure.walk
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
@@ -28,7 +29,7 @@
 
 (defn minimap-start-boxes
   [scale minimap-width minimap-height scripttags drag-allyteam]
-  (let [game (:game scripttags)
+  (let [game (get scripttags "game")
         allyteams (->> game
                        (filter (comp #(string/starts-with? % "allyteam") name first))
                        (map
@@ -39,7 +40,7 @@
     (conj
       (->> allyteams
            (map
-             (fn [[id {:keys [startrectbottom startrectleft startrectright startrecttop]}]]
+             (fn [[id {:strs [startrectbottom startrectleft startrectright startrecttop]}]]
                (when (and id
                           (number? startrectleft)
                           (number? startrecttop)
@@ -73,16 +74,15 @@
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         team-by-key (->> teams
                          (map second)
-                         (map (juxt (comp spring/team-name :id :battle-status) identity))
+                         (map (juxt (comp spring/team-str spring/team-name :id :battle-status) identity))
                          (into {}))
-        battle-team-keys (spring/team-keys teams)
-        map-teams (spring/map-teams map-details)
+        map-teams (clojure.walk/stringify-keys (spring/map-teams map-details))
         missing-teams (clojure.set/difference
-                        (set (map spring/normalize-team battle-team-keys))
-                        (set (map (comp spring/normalize-team first) map-teams)))
+                        (set (map spring/team-str (spring/team-keys teams)))
+                        (set (map (comp spring/team-str first) map-teams)))
         midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
-        choose-before-game (= "3" (some-> scripttags :game :startpostype str))
+        choose-before-game (= "3" (str (get-in scripttags ["game" "startpostype"])))
         all-teams (if choose-before-game
                     (concat map-teams (map (fn [team] [team {}]) missing-teams))
                     map-teams)]
@@ -92,16 +92,16 @@
                (number? minimap-height))
       (->> all-teams
            (map
-             (fn [[team-kw {:keys [startpos]}]]
-               (let [{:keys [x z]} startpos
+             (fn [[team-kw {:strs [startpos]}]]
+               (let [{:strs [x z]} startpos
                      [_all team] (re-find #"(\d+)" (name team-kw))
-                     normalized (spring/normalize-team team-kw)
+                     normalized (spring/team-str team-kw)
                      scriptx (when choose-before-game
-                               (some-> scripttags :game normalized :startposx u/to-number))
+                               (some-> (get-in scripttags ["game" normalized "startposx"]) u/to-number))
                      scriptz (when choose-before-game
-                               (some-> scripttags :game normalized :startposz u/to-number))
+                               (some-> (get-in scripttags ["game" normalized "startposz"]) u/to-number))
                      scripty (when choose-before-game
-                               (some-> scripttags :game normalized :startposy u/to-number))
+                               (some-> (get-in scripttags ["game" normalized "startposy"]) u/to-number))
                      ; ^ SpringLobby seems to use startposy
                      x (or scriptx x midx)
                      z (or scriptz scripty z midz)]
@@ -115,7 +115,7 @@
                            (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
                               (/ u/start-pos-r 2))))
                     :team team
-                    :color (or (-> team-by-key team-kw :team-color u/spring-color-to-javafx)
+                    :color (or (some-> team-by-key (get normalized) :team-color u/spring-color-to-javafx)
                                Color/WHITE)}))))
            (filter some?)
            doall))))
@@ -139,6 +139,7 @@
         map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         scripttags (or scripttags
                        (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
+        scripttags (clojure.walk/stringify-keys scripttags)
         minimap-size (fx/sub-val context :minimap-size)
         minimap-type (fx/sub-val context minimap-type-key)
         {:keys [smf]} map-details
@@ -156,10 +157,7 @@
                     (spring/battle-details {:battle (fx/sub-val context get-in [:by-server server-key :battle])}))))
         starting-points (minimap-starting-points teams map-details scripttags minimap-scale minimap-width minimap-height)
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
-        startpostype (->> scripttags
-                          :game
-                          :startpostype
-                          spring/startpostype-name)
+        startpostype (spring/startpostype-name (get-in scripttags ["game" "startpostype"]))
         singleplayer (= server-key :local)
         cached-minimap-updated (fx/sub-val context get-in [:cached-minimap-updated (fs/canonical-path (:file map-details))])]
     {:fx/type :stack-pane

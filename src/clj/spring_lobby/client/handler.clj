@@ -33,9 +33,9 @@
 
 
 (def default-scripttags ; TODO read these from lua in map, mod/game, and engine
-  {:game
-   {:startpostype 1
-    :modoptions {}}})
+  {"game"
+   {"startpostype" 1
+    "modoptions" {}}})
 
 
 (defmulti handle
@@ -709,8 +709,8 @@
 
 (defmethod handle "ADDSTARTRECT" [state-atom server-url m]
   (let [[_all allyteam left top right bottom] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+)" m)
-        allyteam-kw (keyword (str "allyteam" allyteam))]
-    (swap! state-atom update-in [:by-server server-url :battle :scripttags :game allyteam-kw]
+        allyteam-str (str "allyteam" allyteam)]
+    (swap! state-atom update-in [:by-server server-url :battle :scripttags "game" allyteam-str]
            (fn [allyteam]
              (assoc allyteam
                     :startrectleft (normalize-startrect left)
@@ -720,8 +720,8 @@
 
 (defmethod handle "REMOVESTARTRECT" [state-atom server-url m]
   (let [[_all allyteam] (re-find #"\w+ (\w+)" m)
-        allyteam-kw (keyword (str "allyteam" allyteam))]
-    (swap! state-atom update-in [:by-server server-url :battle :scripttags :game allyteam-kw]
+        allyteam-str (str "allyteam" allyteam)]
+    (swap! state-atom update-in [:by-server server-url :battle :scripttags "game" allyteam-str]
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 
