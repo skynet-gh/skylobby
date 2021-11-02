@@ -47,7 +47,7 @@
 
 
 (defn parse-scripttag-key [scripttag-key]
-  (map keyword (string/split scripttag-key #"/")))
+  (string/split scripttag-key #"/"))
 
 (defn parse-scripttags [raw-scripttags]
   (->> (string/split raw-scripttags #"\t")

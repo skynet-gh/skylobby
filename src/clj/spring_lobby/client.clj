@@ -49,11 +49,6 @@
     [server-url default-port]))
 
 
-(def default-scripttags ; TODO read these from lua in map, mod/game, and engine
-  {:game
-   {:startpostype 1
-    :modoptions {}}})
-
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
 (def protocol

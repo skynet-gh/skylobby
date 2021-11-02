@@ -33,9 +33,9 @@
 
 
 (def default-scripttags ; TODO read these from lua in map, mod/game, and engine
-  {:game
-   {:startpostype 1
-    :modoptions {}}})
+  {"game"
+   {"startpostype" 1
+    "modoptions" {}}})
 
 
 (defmulti handle
@@ -135,7 +135,9 @@
                                          (assoc :game-start-time now)
                                          (and prev-status (not (:away prev-status)) (:away decoded-status))
                                          (assoc :away-start-time now)))))
-        auto-launch (get-in prev-state [:auto-launch server-key])
+        auto-launch (if (contains? (:auto-launch prev-state) server-key)
+                      (get-in prev-state [:auto-launch server-key])
+                      true)
         {:keys [battle battles users] :as server-data} (-> prev-state :by-server (get server-key))]
     (if-not (= (get-in battles [(:battle-id battle) :host-username]) username)
       (log/debug "Short circuiting CLIENTSTATUS handler since not battle host")
@@ -159,7 +161,8 @@
             :else
             (start-game-if-synced state-atom prev-state server-data)))))))
 
-(defn do-auto-unspec [state-atom client-data me]
+(defn do-auto-unspec
+  [state-atom client-data {:keys [battle-status ready-on-unspec team-color]}]
   (try
     (if (auto-unspec-ready?)
       (do
@@ -167,9 +170,9 @@
         (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
-                 (assoc (:battle-status me) :mode true))
+                 (assoc battle-status :mode true :ready (boolean ready-on-unspec)))
                " "
-               (or (:team-color me) 0)))
+               (or team-color 0)))
         (reset! last-auto-unspec-atom (u/curr-millis)))
       (log/info "Too soon to auto unspec"))
     (catch Exception e
@@ -202,7 +205,7 @@
             (when (and (not= username my-username)
                        (not (get-in me [:battle-status :mode]))
                        (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
-              (do-auto-unspec state-atom client-data me))))))))
+              (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -251,7 +254,7 @@
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (do-auto-unspec state-atom client-data me))))
+        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))
 
 
 (defmethod handle "JOIN" [state-atom server-key m]
@@ -345,7 +348,7 @@
                auto-unspec
                (teamsize-changed-message? message)
                (-> me :battle-status :mode not))
-      (do-auto-unspec state-atom client-data me))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
 
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
@@ -385,7 +388,7 @@
                auto-unspec
                (-> me :battle-status :mode not)
                (teamsize-changed-message? message))
-      (do-auto-unspec state-atom client-data me))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
@@ -706,8 +709,8 @@
 
 (defmethod handle "ADDSTARTRECT" [state-atom server-url m]
   (let [[_all allyteam left top right bottom] (re-find #"\w+ (\w+) (\w+) (\w+) (\w+) (\w+)" m)
-        allyteam-kw (keyword (str "allyteam" allyteam))]
-    (swap! state-atom update-in [:by-server server-url :battle :scripttags :game allyteam-kw]
+        allyteam-str (str "allyteam" allyteam)]
+    (swap! state-atom update-in [:by-server server-url :battle :scripttags "game" allyteam-str]
            (fn [allyteam]
              (assoc allyteam
                     :startrectleft (normalize-startrect left)
@@ -717,8 +720,8 @@
 
 (defmethod handle "REMOVESTARTRECT" [state-atom server-url m]
   (let [[_all allyteam] (re-find #"\w+ (\w+)" m)
-        allyteam-kw (keyword (str "allyteam" allyteam))]
-    (swap! state-atom update-in [:by-server server-url :battle :scripttags :game allyteam-kw]
+        allyteam-str (str "allyteam" allyteam)]
+    (swap! state-atom update-in [:by-server server-url :battle :scripttags "game" allyteam-str]
            (fn [allyteam]
              (dissoc allyteam :startrectleft :startrecttop :startrectright :startrectbottom)))))
 

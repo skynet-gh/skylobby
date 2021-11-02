@@ -2920,7 +2920,7 @@
                                                                          :host-username username})
                    (assoc-in [:by-server :local :battle]
                              {:battle-id :singleplayer
-                              :scripttags {:game {:startpostype 0}}
+                              :scripttags {"game" {"startpostype" 0}}
                               :users {username {:battle-status (assoc cu/default-battle-status :mode true)
                                                 :team-color (first color/ffa-colors-spring)}}}))))
       (catch Exception e
@@ -2968,10 +2968,14 @@
     (try
       (let [desktop (Desktop/getDesktop)]
         (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
-          (.browseFileDirectory desktop file)
+          (if (fs/is-directory? file)
+            (.browseFileDirectory desktop (fs/file file "dne"))
+            (.browseFileDirectory desktop file))
           (if (fs/wsl-or-windows?)
-            (let [runtime (Runtime/getRuntime) ; TODO hacky?
-                  command ["explorer.exe" (fs/wslpath (fs/parent-file file))]
+            (let [runtime (Runtime/getRuntime)
+                  command ["explorer.exe" (if (fs/is-directory? file)
+                                            (fs/wslpath file)
+                                            (str "/select," (fs/wslpath file)))]
                   ^"[Ljava.lang.String;" cmdarray (into-array String command)]
               (log/info "Running" (pr-str command))
               (.exec runtime cmdarray nil nil))
@@ -3301,10 +3305,10 @@
                 team-data {:startposx x
                            :startposy z ; for SpringLobby bug
                            :startposz z}
-                scripttags {:game {(keyword (str "team" team)) team-data}}]
+                scripttags {"game" {(str "team" team) team-data}}]
             (if singleplayer
               (swap! *state update-in
-                     [:by-server :local :battle :scripttags :game (keyword (str "team" team))]
+                     [:by-server :local :battle :scripttags "game" (str "team" team)]
                      merge team-data)
               (message/send-message *state client-data
                 (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
@@ -3320,7 +3324,7 @@
             (if (and (< min-box-size (- right left))
                      (< min-box-size (- bottom top)))
               (if singleplayer
-                (swap! *state update-in [:by-server :local :battle :scripttags :game (keyword (str "allyteam" allyteam-id))]
+                (swap! *state update-in [:by-server :local :battle :scripttags "game" (str "allyteam" allyteam-id)]
                        (fn [allyteam]
                          (assoc allyteam
                                 :startrectleft left
@@ -3348,7 +3352,7 @@
                 (do
                   (log/info "Clearing box" target)
                   (if singleplayer
-                    (swap! *state update-in [:by-server :local :battle :scripttags :game] dissoc (keyword (str "allyteam" target)))
+                    (swap! *state update-in [:by-server :local :battle :scripttags "game"] dissoc (str "allyteam" target))
                     (if am-host
                       (message/send-message *state client-data (str "REMOVESTARTRECT " target))
                       (event-handler
@@ -3692,8 +3696,8 @@
         (swap! *state
                (fn [state]
                  (-> state
-                     (assoc-in [:by-server :local :scripttags :game :startpostype] startpostype)
-                     (assoc-in [:by-server :local :battle :scripttags :game :startpostype] startpostype))))
+                     (assoc-in [:by-server :local :scripttags "game" "startpostype"] startpostype)
+                     (assoc-in [:by-server :local :battle :scripttags "game" "startpostype"] startpostype))))
         (message/send-message *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
@@ -3704,13 +3708,13 @@
   [{:keys [client-data server-key]}]
   (let [team-ids (take 16 (iterate inc 0))
         scripttag-keys (map (fn [i] (str "game/team" i)) team-ids)
-        team-kws (map #(keyword (str "team" %)) team-ids)
+        team-kws (map #(str "team" %) team-ids)
         dissoc-fn #(apply dissoc % team-kws)]
     (swap! *state update-in [:by-server server-key]
            (fn [state]
              (-> state
-                 (update-in [:scripttags :game] dissoc-fn)
-                 (update-in [:battle :scripttags :game] dissoc-fn))))
+                 (update-in [:scripttags "game"] dissoc-fn)
+                 (update-in [:battle :scripttags "game"] dissoc-fn))))
     (message/send-message *state
       client-data
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
@@ -3718,12 +3722,12 @@
 (defmethod event-handler ::clear-start-boxes
   [{:keys [allyteam-ids client-data server-key]}]
   (doseq [allyteam-id allyteam-ids]
-    (let [allyteam-kw (keyword (str "allyteam" allyteam-id))]
+    (let [allyteam-str (str "allyteam" allyteam-id)]
       (swap! *state update-in [:by-server server-key]
              (fn [state]
                (-> state
-                   (update-in [:scripttags :game] dissoc allyteam-kw)
-                   (update-in [:battle :scripttags :game] dissoc allyteam-kw)))))
+                   (update-in [:scripttags "game"] dissoc allyteam-str)
+                   (update-in [:battle :scripttags "game"] dissoc allyteam-str)))))
     (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
 (defmethod event-handler ::modoption-change
@@ -3735,8 +3739,8 @@
       (swap! *state
              (fn [state]
                (-> state
-                   (assoc-in [:by-server :local :scripttags :game :modoptions modoption-key] (str event))
-                   (assoc-in [:by-server :local :battle :scripttags :game :modoptions modoption-key] (str event)))))
+                   (assoc-in [:by-server :local :scripttags "game" "modoptions" modoption-key] (str event))
+                   (assoc-in [:by-server :local :battle :scripttags "game" "modoptions" modoption-key] (str event)))))
       (if am-host
         (message/send-message *state client-data (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
         (event-handler

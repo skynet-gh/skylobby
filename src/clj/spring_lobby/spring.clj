@@ -85,6 +85,12 @@
   (let [[_all team] (re-find #"(\d+)" (name team-kw))]
     (keyword (str "team" team))))
 
+(defn team-str
+  "Returns \"team1\" from either :team1, :1, \"1\", or \"team1\"."
+  [team-kw]
+  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
+    (str "team" team)))
+
 (defn map-teams [map-details]
   (or (->> map-details :mapinfo :teams
            (map
@@ -107,7 +113,7 @@
 
 (defn script-data-client
   [battle {:keys [game]}]
-  (let [hostip-override (-> battle :scripttags :game :hostip)]
+  (let [hostip-override (get-in battle [:scripttags "game" "hostip"])]
     {:game
      {:hostip (if (string/blank? hostip-override)
                 (:battle-ip battle)

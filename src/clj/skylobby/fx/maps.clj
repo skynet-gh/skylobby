@@ -38,7 +38,7 @@
 
 (defn maps-view-impl
   [{:fx/keys [context]
-    :keys [disable flow map-name on-value-changed spring-isolation-dir suggest]
+    :keys [action-disable-rotate disable flow map-name on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
   (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
         http-download (fx/sub-val context :http-download)
@@ -153,7 +153,21 @@
                         :task {:spring-lobby/task-type :spring-lobby/refresh-maps}}
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh:16:white"}}}])})))
+             :icon-literal "mdi-refresh:16:white"}}}]
+        (when action-disable-rotate
+          [{:fx/type fx.ext.node/with-tooltip-props
+            :props
+            {:tooltip
+             {:fx/type tooltip-nofocus/lifecycle
+              :show-delay skylobby.fx/tooltip-show-delay
+              :text "Disable map rotation"}}
+            :desc
+            {:fx/type :button
+             :on-action action-disable-rotate
+             :graphic
+             {:fx/type font-icon/lifecycle
+              :icon-literal "mdi-lock:16:white"}}}]))})))
+
 
 (defn maps-view [state]
   (tufte/profile {:dynamic? true

@@ -72,17 +72,17 @@
 
         players-with-skill (map
                              (fn [{:keys [skill skilluncertainty username] :as player}]
-                               (let [username-kw (when username (keyword (string/lower-case username)))
-                                     tags (some-> scripttags :game :players (get username-kw))
+                               (let [username-lc (when username (string/lower-case username))
+                                     tags (get-in scripttags ["game" "players" username-lc])
                                      uncertainty (or (try (u/to-number skilluncertainty)
                                                           (catch Exception e
                                                             (log/debug e "Error parsing skill uncertainty")))
-                                                     (try (u/to-number (:skilluncertainty tags))
+                                                     (try (u/to-number (get tags "skilluncertainty"))
                                                           (catch Exception e
                                                             (log/debug e "Error parsing skill uncertainty")))
                                                      3)]
                                  (assoc player
-                                        :skill (or skill (:skill tags))
+                                        :skill (or skill (get tags "skill"))
                                         :skilluncertainty uncertainty)))
                              players)
         incrementing-cell (fn [id]

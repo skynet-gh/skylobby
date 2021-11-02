@@ -183,6 +183,26 @@
     (tufte/p :channel-view-history
       (channel-view-history-impl state))))
 
+
+(defn channel-view-text [{:fx/keys [context] :keys [channel-name disable server-key]}]
+  (let [
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])]
+    {:fx/type :text-field
+     :disable (boolean disable)
+     :id "channel-text-field"
+     :text (str message-draft)
+     :on-text-changed {:event/type :spring-lobby/assoc-in
+                       :path [:by-server server-key :message-drafts channel-name]}
+     :on-action {:event/type :spring-lobby/send-message
+                 :channel-name channel-name
+                 :client-data client-data
+                 :message message-draft
+                 :server-key server-key}
+     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                      :channel-name channel-name
+                      :server-key server-key}}))
+
 (defn- channel-view-input
   [{:fx/keys [context]
     :keys [channel-name disable server-key usernames]}]
@@ -209,25 +229,17 @@
          :key chat-auto-complete
          :h-box/hgrow :always
          :desc
-         (let [text-field {:fx/type :text-field
-                           :disable (boolean disable)
-                           :id "channel-text-field"
-                           :text (str message-draft)
-                           :on-text-changed {:event/type :spring-lobby/assoc-in
-                                             :path [:by-server server-key :message-drafts channel-name]}
-                           :on-action {:event/type :spring-lobby/send-message
-                                       :channel-name channel-name
-                                       :client-data client-data
-                                       :message message-draft
-                                       :server-key server-key}
-                           :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                                            :channel-name channel-name
-                                            :server-key server-key}}]
-           (if chat-auto-complete
-             {:fx/type ext-with-auto-complete-word
-              :props {:auto-complete (concat known-spads-commands (map u/sanitize-filter usernames))}
-              :desc text-field}
-             text-field))}]
+         (if chat-auto-complete
+           {:fx/type ext-with-auto-complete-word
+            :props {:auto-complete (concat known-spads-commands (map u/sanitize-filter usernames))}
+            :desc {:fx/type channel-view-text
+                   :channel-name channel-name
+                   :disable disable
+                   :server-key server-key}}
+           {:fx/type channel-view-text
+            :channel-name channel-name
+            :disable disable
+            :server-key server-key})}]
        (when is-battle-channel
          [{:fx/type :button
            :text ""

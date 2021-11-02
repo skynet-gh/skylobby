@@ -51,10 +51,7 @@
 
 (defn startpostype [context server-key]
   (let [scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])]
-    (->> scripttags
-         :game
-         :startpostype
-         spring/startpostype-name)))
+    (spring/startpostype-name (get-in scripttags ["game" "startpostype"]))))
 
 (defn spring-resources [context spring-root]
   (resource/spring-root-resources spring-root (fx/sub-val context :by-spring-root)))
