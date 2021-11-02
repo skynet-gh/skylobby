@@ -542,10 +542,6 @@
              :refs {::add-bot-button
                     {:fx/type :button
                      :text "Add AI"
-                     :disable (or (and am-spec (not singleplayer))
-                                  (string/blank? bot-username)
-                                  (string/blank? bot-name)
-                                  (string/blank? bot-version))
                      :on-action {:event/type :spring-lobby/toggle
                                  :key :show-add-bot}}}
              :desc {:fx/type fx/ext-let-refs
@@ -602,8 +598,7 @@
                                                                           :key :bot-username}}]}
                                                      {:fx/type :button
                                                       :text "Add"
-                                                      :disable (or (and am-spec (not singleplayer))
-                                                                   (string/blank? bot-username)
+                                                      :disable (or (string/blank? bot-username)
                                                                    (string/blank? bot-name)
                                                                    (string/blank? bot-version))
                                                       :on-action
