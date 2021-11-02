@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.6]
+
+- Fix Add AI button disabled when it shouldn't be
+- Add button to disable spads map rotate
+- Make auto launch enabled by default
+- Fix auto unspec not using desired ready state
+
 ### [0.7.5]
 
 - Fix an issue when windows are minimzed then reopened
