@@ -2890,7 +2890,7 @@
           (swap! *state
             (fn [state]
               (-> state
-                  (assoc :battle {})
+                  (assoc-in [:by-server server-key :battle] {})
                   (update-in [:by-server server-key] dissoc :selected-battle)
                   (assoc-in [:selected-tab-main server-key] "battle"))))
           (message/send-message *state client-data
