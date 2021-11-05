@@ -50,7 +50,12 @@
 (defmethod -event-msg-handler
   :default ; Default/fallback case (no other matching handler)
   [{:as ev-msg :keys [event]}]
-  (log/warn "Unhandled event: %s" event))
+  (log/warnf "Unhandled event: %s" event))
+
+(defmethod -event-msg-handler
+  :chsk/ws-ping
+  [{:as ev-msg :keys [event]}]
+  (log/debugf "WebSocket ping: %s" event))
 
 (defmethod -event-msg-handler :chsk/state
   [{:as ev-msg :keys [?data]}]
@@ -109,7 +114,9 @@
       (fn [reply]
         (log/trace "Servers reply" reply)
         (if (sente/cb-success? reply)
-          (rf/dispatch [::assoc :servers reply])
+          (do
+            (log/info "Got servers" reply)
+            (rf/dispatch [::assoc :servers reply]))
           (log/error reply))))
     db))
 
@@ -146,9 +153,24 @@
           (if (sente/cb-success? reply)
             (do
               (rf/dispatch [::assoc :battle reply])
-              (rf/dispatch [::get-chat server-key (battle-channel-name reply)]))
+              (rf/dispatch [::poll-chat server-key (battle-channel-name reply)]))
             (log/error reply)))))
     db))
+
+(rf/reg-event-db ::poll-chat
+  (fn [db [_t server-key channel-name]]
+    (rf/dispatch-sync [::clear-chat-poll])
+    (let [interval (js/setInterval
+                     #(rf/dispatch [::get-chat server-key channel-name])
+                     3000)]
+      (rf/dispatch [::get-chat server-key channel-name])
+      (assoc db :poll-chat-interval interval))))
+
+(rf/reg-event-db ::clear-chat-poll
+  (fn [db _event]
+    (when-let [interval (:poll-chat-interval db)]
+      (js/clearInterval interval))
+    (dissoc db :poll-chat-interval)))
 
 (rf/reg-event-db ::get-chat
   (fn [db [_t server-key channel-name]]
@@ -170,6 +192,30 @@
       5000)
     db))
 
+(rf/reg-event-db ::connect-server
+  (fn [db [_t server-url]]
+    (chsk-send!
+      [:skylobby/connect-server {:server-url server-url}]
+      5000)
+    db))
+
+(rf/reg-event-db ::start-battle
+  (fn [db [_t server-key]]
+    (chsk-send!
+      [:skylobby/start-battle {:server-key server-key}]
+      5000)
+    db))
+
+(rf/reg-event-db ::send-message
+  (fn [db [_t server-key channel-name message]]
+    (log/info "Sending message in" server-key channel-name ": " message)
+    (chsk-send!
+      [:skylobby/send-message {:server-key server-key
+                               :channel-name channel-name
+                               :message message}]
+      5000)
+    db))
+
 
 (rf/reg-event-db ::assoc
   (fn [db [_t k v]]
@@ -182,6 +228,10 @@
 (rf/reg-sub ::current-route
   (fn [db]
     (:current-route db)))
+
+(rf/reg-sub ::servers
+  (fn [db]
+    (:servers db)))
 
 (rf/reg-sub ::battles
   (fn [db]
@@ -215,26 +265,32 @@
      "Refresh"]]
    [:div {:class "flex justify-center"}
     [:table
+     {:style {:flex-grow 1}}
      [:thead
       [:tr
-       [:th "ID"]
-       [:th "Title"]
-       [:th "Owner"]
-       [:th "Map"]
-       [:th "Game"]
-       [:th "Engine"]
-       [:th "Locked?"]]]
+       [:th "Alias"]
+       [:th "URL"]
+       [:th "Username"]
+       [:th "Password"]
+       [:th "Actions"]]]
      [:tbody
-      (for [[battle-id battle] (listen [::battles])]
-         ^{:key battle-id}
-         [:tr
-          [:td battle-id]
-          [:td (:battle-title battle)]
-          [:td (:host-username battle)]
-          [:td (:battle-map battle)]
-          [:td (:battle-modname battle)]
-          [:td (str (:battle-engine battle) " " (:battle-version battle))]
-          [:td (:battle-locked battle)]])]]]])
+      (let [{:keys [active-servers logins servers]} (listen [::servers])]
+        (for [[server-url server-config] servers]
+          ^{:key server-url}
+          [:tr
+           [:td (:alias server-config)]
+           [:td server-url]
+           [:td
+            [:input
+             {:value (get-in logins [server-url :username])}]]
+           [:td
+            [:input
+             {:type "password"
+              :value (get-in logins [server-url :password])}]]
+           [:td
+            [:button
+             {:on-click #(rf/dispatch [::connect-server server-url])}
+             "Login"]]]))]]]])
 
 (defn href
   "Return relative url for given route. Url can be used in HTML links."
@@ -272,6 +328,7 @@
        "Refresh"]]
      [:div {:class "flex justify-center"}
       [:table
+       {:style {:flex-grow 1}}
        [:thead
         [:tr
          [:th "Actions"]
@@ -305,78 +362,103 @@
 
 
 (defn room-page [current-route]
-  [:div
-   [server-nav current-route]
-   (let [{:keys [parameters]} current-route
-         server-url (-> parameters :path :server-url)
-         username (-> parameters :query :username)
-         server-key (server-key server-url username)]
+  (let [{:keys [parameters]} current-route
+        server-url (-> parameters :path :server-url)
+        username (-> parameters :query :username)
+        server-key (server-key server-url username)
+        battle (listen [::battle])]
+    [:div {:class "flex-column"}
+     [server-nav current-route]
      [:div {:class "flex justify-center"}
       [:button
        {:on-click
         (fn []
          (rf/dispatch [::get-battle server-url username])
          (rf/dispatch [::get-battles server-url username]))}
-       "Refresh"]])
-   (let [battle (listen [::battle])
-         battles (listen [::battles])
-         battle-details (get battles (:battle-id battle))
-         map-name (:battle-map battle-details)]
-     (log/info (keys battle))
-     (log/info (keys battle-details))
+       "Refresh"]]
+     (let [battles (listen [::battles])
+           battle-details (get battles (:battle-id battle))
+           map-name (:battle-map battle-details)]
+       [:div {:class "flex justify-center"}
+        [:table
+         {:style
+          {:flex-grow 1
+           :overflow-y "scroll"
+           :height "256px"
+           :width "100%"
+           :display "block"}}
+         [:thead
+          [:tr
+           [:th {:style {:max-width "99%"}} "Nickname"]
+           [:th "Skill"]
+           [:th "Ally"]
+           [:th "Team"]
+           [:th "Color"]
+           [:th "Spectator"]
+           [:th "Faction"]
+           [:th "Rank"]
+           [:th "Country"]
+           [:th "Bonus"]]]
+         [:tbody
+          (for [[username user] (:users battle)]
+             ^{:key username}
+             [:tr
+              [:td {:style {:max-width "99%"}} username]
+              [:td (:skill user)]
+              [:td (:ally (:battle-status user))]
+              [:td (:team (:battle-status user))]
+              [:td (:team-color user)]
+              [:td (:mode (:battle-status user))]
+              [:td (:side (:battle-status user))]
+              [:td (:rank user)]
+              [:td (:country user)]
+              [:td (:handicap (:battle-status user))]])]]
+        [:img
+         {:src (str "http://localhost:12345/minimap-image?map-name=" map-name)
+          :alt (str map-name)
+          :style {:max-width "256px"
+                  :max-height "256px"}}]])
      [:div {:class "flex justify-center"}
-      [:table
-       [:thead
-        [:tr
-         [:th "Nickname"]
-         [:th "Skill"]
-         [:th "Ally"]
-         [:th "Team"]
-         [:th "Color"]
-         [:th "Spectator"]
-         [:th "Faction"]
-         [:th "Rank"]
-         [:th "Country"]
-         [:th "Bonus"]]]
-       [:tbody
-        (for [[username user] (:users battle)]
-           ^{:key username}
-           [:tr
-            [:td username]
-            [:td (:skill user)]
-            [:td (:ally (:battle-status user))]
-            [:td (:team (:battle-status user))]
-            [:td (:team-color user)]
-            [:td (:mode (:battle-status user))]
-            [:td (:side (:battle-status user))]
-            [:td (:rank user)]
-            [:td (:country user)]
-            [:td (:handicap (:battle-status user))]])]]
-      [:img
-       {:src (str "http://localhost:12345/minimap-image?map-name=" map-name)
-        :alt (str map-name)
-        :style {:max-width "256px"
-                :max-height "256px"}}]])
-   (let [chat (listen [::chat])]
-     [:div {:class "flex justify-center"}
-      [:textarea
-       {:readonly true
-        :rows 16
-        :style {:flex-grow 1
-                :font-family "Monospace"
-                :resize "none"}
-        :value
-        (->> chat
-             :messages
-             reverse
-             (map
-               (fn [{:keys [username text]}]
-                 (str username ": " text)))
-             (string/join "\n"))
-        :wrap "soft"}]])
-   [:div {:class "flex justify-center"}
-    [:input
-     {:style {:flex-grow 1}}]]])
+      [:button
+       {:on-click #(rf/dispatch [::start-battle server-key])}
+       "Join Game"]]
+     (let [chat (listen [::chat])]
+       [:div {:class "flex justify-center"}
+        [:textarea
+         {:readonly true
+          :rows 16
+          :style {:flex-grow 1
+                  :font-family "Monospace"
+                  :resize "none"}
+          :value
+          (->> chat
+               :messages
+               reverse
+               (map
+                 (fn [{:keys [username text]}]
+                   (str username ": " text)))
+               (string/join "\n"))
+          :wrap "soft"}]])
+     [:form#chat
+      {:on-submit (fn [event]
+                    (.preventDefault event)
+                    (let [form (.getElementById js/document "chat")
+                          form-data (new js/FormData form)
+                          message (.get form-data "chat-message")
+                          channel-name (battle-channel-name battle)]
+                      (if-not (string/blank? message)
+                        (rf/dispatch [::send-message server-key channel-name message])
+                        (log/warn "Attempt to send blank message" server-key channel-name message))))}
+      [:div {:class "flex justify-center"}
+       [:button
+        {:type "submit"}
+        "Send"]
+       [:input
+        {:auto-focus true
+         :autocomplete "off"
+         :name "chat-message"
+         :style {:flex-grow 1}
+         :type "text"}]]]]))
 
 
 (defn server-page [current-route]
@@ -386,7 +468,6 @@
     [:button
      {:on-click #(rf/dispatch [::get-servers])}
      "Refresh"]]])
-   ;(let [match (:rfc/identity current-route)])])
 
 
 (rf/reg-fx :push-state
@@ -447,7 +528,9 @@
                  (js/console.log "Entering room")
                  (rf/dispatch [::get-battles (get-in params [:path :server-url]) (get-in params [:query :username])])
                  (rf/dispatch [::get-battle (get-in params [:path :server-url]) (get-in params [:query :username])]))
-        :stop  (fn [& _params] (js/console.log "Leaving room"))}]}]]])
+        :stop  (fn [& _params]
+                 (js/console.log "Leaving room")
+                 (rf/dispatch [::clear-chat-poll]))}]}]]])
 
 
 (defn on-navigate [new-match]

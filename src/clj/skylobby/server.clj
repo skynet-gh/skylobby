@@ -14,6 +14,7 @@
     [ring.middleware.content-type :as content-type]
     [skylobby.event :as event]
     [skylobby.fs :as fs]
+    [skylobby.util :as u]
     [spring-lobby.fs.sdfz :as replay]
     [taoensso.sente :as sente]
     [taoensso.sente.server-adapters.aleph :refer (get-sch-adapter)]
@@ -117,6 +118,52 @@
         [server-key battle-id] ?data
         server-data (get-in @*state [:by-server server-key])]
     (event/join-battle *state (assoc server-data :selected-battle battle-id))))
+
+(defmethod -event-msg-handler
+  :skylobby/connect-server
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)
+        {:keys [server-url]} ?data
+        {:keys [logins servers]} @*state
+        login (get logins server-url)
+        username (:username login)
+        server-key (u/server-key {:server-url server-url
+                                  :username username})]
+    (event/connect *state {:server [server-url (get servers server-url)]
+                           :server-key server-key
+                           :password (:password login)
+                           :username username})))
+
+(defmethod -event-msg-handler
+  :skylobby/start-battle
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)
+        {:keys [server-key]} ?data
+        {:keys [by-server]} @*state
+        {:keys [battle client-data] :as server-data} (get by-server server-key)
+        me (:username client-data)
+        my-battle-status (get-in battle [:users me :battle-status])]
+    (event/start-battle *state (assoc server-data
+                                      :am-host false ; TODO
+                                      :am-spec true ; TODO
+                                      :battle-status my-battle-status
+                                      :channel-name (u/battle-channel-name battle)
+                                      :host-ingame true))))
+
+(defmethod -event-msg-handler
+  :skylobby/send-message
+  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
+  (let [session (:session ring-req)
+        uid     (:uid     session)
+        {:keys [server-key channel-name message]} ?data
+        {:keys [by-server]} @*state
+        {:keys [client-data]} (get by-server server-key)]
+    (event/send-message *state {:channel-name channel-name
+                                :client-data client-data
+                                :message message
+                                :server-key server-key})))
 
 
 (sente/start-server-chsk-router!

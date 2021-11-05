@@ -1,12 +1,88 @@
 (ns skylobby.event
   (:require
     [clojure.core.async :as async]
+    [clojure.string :as string]
     crypto.random
-    [spring-lobby.client.message :as message]
+    [manifold.stream :as s]
     [skylobby.util :as u]
-    [taoensso.timbre :as log]))
+    [spring-lobby.client :as client]
+    [spring-lobby.client.message :as message]
+    [spring-lobby.spring :as spring]
+    [taoensso.timbre :as log])
+  (:import
+    (manifold.stream SplicedStream)))
 
 
+(defn- update-disconnected!
+  [state-atom server-key]
+  (log/info "Disconnecting from" (pr-str server-key))
+  (let [[old-state _new-state] (swap-vals! state-atom
+                                 (fn [state]
+                                   (-> state
+                                       (update :by-server dissoc server-key)
+                                       (update :needs-focus dissoc server-key))))
+        {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
+    (if client-data
+      (client/disconnect state-atom client-data)
+      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No client to disconnect!"))
+    (if ping-loop
+      (future-cancel ping-loop)
+      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No ping loop to cancel!"))
+    (if print-loop
+      (future-cancel print-loop)
+      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No print loop to cancel!")))
+  nil)
+
+(defn- do-connect
+  [state-atom {:keys [client-data server] :as state}]
+  (let [{:keys [client-deferred server-key]} client-data]
+    (future
+      (try
+        (let [^SplicedStream client @client-deferred]
+          (s/on-closed client
+            (fn []
+              (log/info "client closed")
+              (update-disconnected! state-atom server-key)))
+          (s/on-drained client
+            (fn []
+              (log/info "client drained")
+              (update-disconnected! state-atom server-key)))
+          (if (s/closed? client)
+            (log/warn "client was closed on create")
+            (let [[server-url _server-data] server
+                  client-data (assoc client-data :client client)]
+              (log/info "Connecting to" server-key)
+              (swap! state-atom
+                (fn [state]
+                  (-> state
+                      (update :login-error dissoc server-url)
+                      (assoc-in [:by-server server-key :client-data :client] client))))
+              (client/connect state-atom (assoc state :client-data client-data)))))
+        (catch Exception e
+          (log/error e "Connect error")
+          (swap! state-atom assoc-in [:by-server server-key :login-error] (str (.getMessage e)))
+          (update-disconnected! state-atom server-key)))
+      nil)))
+
+(defn connect [state-atom {:keys [no-focus server server-key password username] :as state}]
+  (let [[server-url server-opts] server
+        client-data (client/client server-url server-opts)
+        client-data (assoc client-data
+                           :server-key server-key
+                           :server-url server-url
+                           :ssl (:ssl (second server))
+                           :password password
+                           :username username)]
+    (swap! state-atom
+           (fn [state]
+             (cond-> state
+                     true
+                     (update-in [:by-server server-key]
+                       assoc :client-data client-data
+                             :server server)
+                     (not no-focus)
+                     (assoc :selected-server-tab server-key))))
+    (do-connect state-atom (assoc state :client-data client-data))))
 
 (defn leave-battle [state-atom {:keys [client-data server-key]}]
   (swap! state-atom assoc-in [:last-battle server-key :should-rejoin] false)
@@ -37,3 +113,86 @@
                (str " *"))
              " " (crypto.random/hex 6))))
     (log/warn "No battle to join" opts)))
+
+
+(defn set-ignore
+  ([state-atom server-key username ignore]
+   (set-ignore state-atom server-key username ignore nil))
+  ([state-atom server-key username ignore {:keys [channel-name]}]
+   (swap! state-atom
+     (fn [state]
+       (let [channel-name (or channel-name
+                              (u/visible-channel state server-key))]
+         (-> state
+             (assoc-in [:ignore-users server-key username] ignore)
+             (update-in [:by-server server-key :channels channel-name :messages] conj {:text (str (if ignore "Ignored " "Unignored ") username)
+                                                                                       :timestamp (u/curr-millis)
+                                                                                       :message-type :info})))))))
+
+(defn send-message [state-atom {:keys [channel-name client-data message server-key] :as e}]
+  (swap! state-atom update-in [:by-server server-key]
+    (fn [server-data]
+      (-> server-data
+          (update :message-drafts dissoc channel-name)
+          (update-in [:channels channel-name :sent-messages] conj message)
+          (assoc-in [:channels channel-name :history-index] u/default-history-index))))
+  (cond
+    (string/blank? channel-name)
+    (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
+    (string/blank? message)
+    (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
+    :else
+    (cond
+      (re-find #"^/ingame" message) (message/send-message state-atom client-data "GETUSERINFO")
+      (re-find #"^/ignore" message)
+      (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
+        (set-ignore state-atom server-key username true {:channel-name channel-name}))
+      (re-find #"^/unignore" message)
+      (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
+        (set-ignore state-atom server-key username false {:channel-name channel-name}))
+      (or (re-find #"^/msg" message) (re-find #"^/message" message))
+      (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
+        (send-message state-atom
+          (merge e
+            {:channel-name (str "@" user)
+             :message message})))
+      (re-find #"^/rename" message)
+      (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
+       (swap! state-atom update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
+                                                                                                  :timestamp (u/curr-millis)
+                                                                                                  :message-type :info}
+        (message/send-message state-atom client-data (str "RENAMEACCOUNT " new-username))))
+      :else
+      (let [[private-message username] (re-find #"^@(.*)$" channel-name)
+            unified (-> client-data :compflags (contains? "u"))]
+        (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+          (if private-message
+            (message/send-message state-atom client-data (str "SAYPRIVATEEX " username " " message))
+            (if (and (not unified) (u/battle-channel-name? channel-name))
+              (message/send-message state-atom client-data (str "SAYBATTLEEX " message))
+              (message/send-message state-atom client-data (str "SAYEX " channel-name " " message))))
+          (if private-message
+            (message/send-message state-atom client-data (str "SAYPRIVATE " username " " message))
+            (if (and (not unified) (u/battle-channel-name? channel-name))
+              (message/send-message state-atom client-data (str "SAYBATTLE " message))
+              (message/send-message state-atom client-data (str "SAY " channel-name " " message)))))))))
+
+(defn start-battle
+  [state-atom {:keys [am-host am-spec battle-status channel-name client-data host-ingame] :as state}]
+  (when-not (:mode battle-status)
+    (if (and (:server-url client-data)
+             (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
+                 (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
+      (send-message state-atom
+        {:channel-name channel-name
+         :client-data client-data
+         :message (str "!joinas spec")})
+      (log/info "Skipping !joinas spec for this server"))
+    (async/<!! (async/timeout 1000)))
+  (if (or am-host am-spec host-ingame)
+    (spring/start-game state-atom state)
+    (send-message state-atom
+      {
+       :channel-name channel-name
+       :client-data client-data
+       :message (str "!cv start")})))
