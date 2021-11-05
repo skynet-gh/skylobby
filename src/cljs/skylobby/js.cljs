@@ -107,7 +107,7 @@
 
 (rf/reg-event-db ::get-servers
   (fn [db _event]
-    (log/info "Getting servers")
+    (log/debug "Getting servers")
     (chsk-send!
       [:skylobby/get-servers]
       5000
@@ -115,7 +115,7 @@
         (log/trace "Servers reply" reply)
         (if (sente/cb-success? reply)
           (do
-            (log/info "Got servers" reply)
+            (log/trace "Got servers" reply)
             (rf/dispatch [::assoc :servers reply]))
           (log/error reply))))
     db))
@@ -135,6 +135,19 @@
           (if (sente/cb-success? reply)
             (rf/dispatch [::assoc :battles reply])
             (log/error reply)))))
+    db))
+
+(rf/reg-event-db ::get-my-channels
+  (fn [db [_t server-key]]
+    (log/info "Getting my channels for" server-key)
+    (chsk-send!
+      [:skylobby/get-in [:by-server server-key :my-channels]]
+      5000
+      (fn [reply]
+        (log/trace "My channels reply for" server-key reply)
+        (if (sente/cb-success? reply)
+          (rf/dispatch [::assoc :my-channels reply])
+          (log/error reply))))
     db))
 
 (defn battle-channel-name [{:keys [battle-id channel-name]}]
@@ -159,7 +172,7 @@
 
 (rf/reg-event-db ::poll-chat
   (fn [db [_t server-key channel-name]]
-    (rf/dispatch-sync [::clear-chat-poll])
+    (rf/dispatch [::clear-chat-poll])
     (let [interval (js/setInterval
                      #(rf/dispatch [::get-chat server-key channel-name])
                      3000)]
@@ -214,7 +227,7 @@
                                :channel-name channel-name
                                :message message}]
       5000)
-    db))
+    (assoc db :chat-message "")))
 
 
 (rf/reg-event-db ::assoc
@@ -245,10 +258,17 @@
   (fn [db]
     (:chat db)))
 
+(rf/reg-sub ::my-channels
+  (fn [db]
+    (:my-channels db)))
 
 (rf/reg-sub ::active-servers
   (fn [db]
     (get-in db [:servers :active-servers])))
+
+(rf/reg-sub ::chat-message
+  (fn [db]
+    (:chat-message db)))
 
 
 (defn listen [query-v]
@@ -306,7 +326,7 @@
         server-url (-> parameters :path :server-url)
         username (-> parameters :query :username)]
     [:div {:class "flex justify-center"}
-     (for [route-name [::battles ::room]]
+     (for [route-name [::battles ::channels ::room]]
        [:div {:key route-name
               :class "pa3"}
         (when (= route-name (-> current-route :data :name))
@@ -320,8 +340,6 @@
         server-key (server-key server-url username)]
     [:div
      [server-nav current-route]
-     [:div {:class "flex justify-center"}
-      [:h1 "Battles"]]
      [:div {:class "flex justify-center"}
       [:button
        {:on-click #(rf/dispatch [::get-battles server-url username])}
@@ -360,6 +378,100 @@
             [:td (str (:battle-engine battle) " " (:battle-version battle))]
             [:td (:host-username battle)]])]]]]))
 
+(defn my-channels-nav [{:keys [server-url username] :as params}]
+  (log/info (listen [::my-channels]))
+  [:div {:class "flex justify-center"}
+   (for [[channel-name _] (listen [::my-channels])]
+     [:div {:key channel-name
+            :class "pa3"}
+      (when (= channel-name (:channel-name params))
+        "> ")
+      [:a {:href (href ::chat {:server-url server-url :channel-name channel-name} {:username username})} channel-name]])])
+
+(defn chat-history []
+  (let [chat (listen [::chat])]
+    [:textarea
+     {:readonly true
+      :rows 16
+      :style {:flex-grow 1
+              :font-family "Monospace"
+              :resize "none"}
+      :value
+      (->> chat
+           :messages
+           reverse
+           (map
+             (fn [{:keys [username text]}]
+               (str username ": " text)))
+           (string/join "\n"))
+      :wrap "soft"}]))
+
+(def auto-scroll-chat-history
+  (with-meta chat-history
+    {:component-did-update
+     (fn [this]
+       (let [node (rdom/dom-node this)]
+         (set! (.-scrollTop node) (.-scrollHeight node))))}))
+
+(defn chat-view [{:keys [channel-name server-key]}]
+  [:div
+   [:div {:class "flex justify-center"}
+    [auto-scroll-chat-history]]
+   [:form#chat
+    {:on-submit (fn [event]
+                  (.preventDefault event)
+                  (let [form (.getElementById js/document "chat")
+                        form-data (new js/FormData form)
+                        message (.get form-data "chat-message")]
+                    (if-not (string/blank? message)
+                      (rf/dispatch [::send-message server-key channel-name message])
+                      (log/warn "Attempt to send blank message" server-key channel-name message))))
+     :style {:margin-bottom 0}}
+    [:div {:class "flex justify-center"}
+     [:button
+      {:type "submit"}
+      "Send"]
+     [:input
+      {:auto-focus true
+       :autoComplete "off"
+       :name "chat-message"
+       :on-change #(rf/dispatch [::assoc :chat-message (-> % .-target .-value)])
+       :style {:flex-grow 1}
+       :type "text"
+       :value (listen [::chat-message])}]]]])
+
+(defn channels-page [current-route]
+  (let [{:keys [parameters]} current-route
+        server-url (-> parameters :path :server-url)
+        channel-name (-> parameters :path :channel-name)
+        username (-> parameters :query :username)
+        server-key (server-key server-url username)]
+    [:div
+     [server-nav current-route]
+     [:div {:class "flex justify-center"}
+      [:button
+       {:on-click #(rf/dispatch [::get-my-channels server-key])}
+       "Refresh"]]
+     [:div {:class "flex justify-center"}
+      [my-channels-nav {:channel-name channel-name :server-url server-url :username username}]]]))
+
+(defn chat-page [current-route]
+  (let [{:keys [parameters]} current-route
+        server-url (-> parameters :path :server-url)
+        channel-name (-> parameters :path :channel-name)
+        username (-> parameters :query :username)
+        server-key (server-key server-url username)]
+    [:div
+     [server-nav current-route]
+     [:div {:class "flex justify-center"}
+      [:button
+       {:on-click #(rf/dispatch [::get-chat server-key channel-name])}
+       "Refresh"]]
+     [:div {:class "flex justify-center"}
+      [my-channels-nav {:channel-name channel-name :server-url server-url :username username}]]
+     (when-not (string/blank? channel-name)
+       [chat-view {:channel-name channel-name :server-key server-key}])]))
+
 
 (defn room-page [current-route]
   (let [{:keys [parameters]} current-route
@@ -381,7 +493,8 @@
            map-name (:battle-map battle-details)]
        [:div {:class "flex justify-center"}
         [:table
-         {:style
+         {:class "flex"
+          :style
           {:flex-grow 1
            :overflow-y "scroll"
            :height "256px"
@@ -413,52 +526,20 @@
               [:td (:rank user)]
               [:td (:country user)]
               [:td (:handicap (:battle-status user))]])]]
+        [:div
+         {:style {:width "256px"
+                  :height "256px"}}]
         [:img
          {:src (str "http://localhost:12345/minimap-image?map-name=" map-name)
           :alt (str map-name)
-          :style {:max-width "256px"
-                  :max-height "256px"}}]])
+          :style {:width "100%"
+                  :height "100%"
+                  :object-fit "contain"}}]])
      [:div {:class "flex justify-center"}
       [:button
        {:on-click #(rf/dispatch [::start-battle server-key])}
        "Join Game"]]
-     (let [chat (listen [::chat])]
-       [:div {:class "flex justify-center"}
-        [:textarea
-         {:readonly true
-          :rows 16
-          :style {:flex-grow 1
-                  :font-family "Monospace"
-                  :resize "none"}
-          :value
-          (->> chat
-               :messages
-               reverse
-               (map
-                 (fn [{:keys [username text]}]
-                   (str username ": " text)))
-               (string/join "\n"))
-          :wrap "soft"}]])
-     [:form#chat
-      {:on-submit (fn [event]
-                    (.preventDefault event)
-                    (let [form (.getElementById js/document "chat")
-                          form-data (new js/FormData form)
-                          message (.get form-data "chat-message")
-                          channel-name (battle-channel-name battle)]
-                      (if-not (string/blank? message)
-                        (rf/dispatch [::send-message server-key channel-name message])
-                        (log/warn "Attempt to send blank message" server-key channel-name message))))}
-      [:div {:class "flex justify-center"}
-       [:button
-        {:type "submit"}
-        "Send"]
-       [:input
-        {:auto-focus true
-         :autocomplete "off"
-         :name "chat-message"
-         :style {:flex-grow 1}
-         :type "text"}]]]]))
+     [chat-view {:channel-name (battle-channel-name battle) :server-key server-key}]]))
 
 
 (defn server-page [current-route]
@@ -485,10 +566,11 @@
      [{;; Do whatever initialization needed for home page
        ;; I.e (re-frame/dispatch [::events/load-something-with-ajax])
        :start (fn [& _params]
-                (js/console.log "Entering servers page")
+                (log/info "Entering servers page")
                 (rf/dispatch [::get-servers]))
        ;; Teardown can be done here.
-       :stop  (fn [& _params] (js/console.log "Leaving servers page"))}]}]
+       :stop  (fn [& _params]
+                (log/info "Leaving servers page"))}]}]
    ["server/:server-url"
     {
      :view      server-page
@@ -498,9 +580,9 @@
      [{:parameters {:path [:server-url]
                     :query [:username]}
        :start (fn [{:keys [path query]}]
-                (js/console.log "Entering page server" (:server-url path) "as user" (:username query)))
+                (log/info "Entering page server" (:server-url path) "as user" (:username query)))
        :stop  (fn [{:keys [path query]}]
-                (js/console.log "Leaving page server" (:server-url path) "as user" (:username query)))}]}
+                (log/info "Leaving page server" (:server-url path) "as user" (:username query)))}]}
     ["/battles"
      {:name      ::battles
       :view      battles-page
@@ -511,11 +593,43 @@
         :parameters {:path [:server-url]
                      :query [:username]}
         :start (fn [params]
-                 (js/console.log "Entering battles page")
-                 (log/info params)
-                 (rf/dispatch [::get-battles (get-in params [:path :server-url]) (get-in params [:query :username])]))
+                 (let [server-url (get-in params [:path :server-url])
+                       username (get-in params [:query :username])]
+                   (log/info "Entering battles page" server-url)
+                   (rf/dispatch [::get-battles server-url username])))
         ;; Teardown can be done here.
-        :stop  (fn [& _params] (js/console.log "Leaving battles page"))}]}]
+        :stop  (fn [& _params]
+                 (log/info "Leaving battles page"))}]}]
+    ["/channels"
+     {:name      ::channels
+      :view      channels-page
+      :controllers
+      [{
+        :parameters {:path [:server-url :channel-name]
+                     :query [:username]}
+        :start (fn [params]
+                 (let [server-key (server-key (get-in params [:path :server-url]) (get-in params [:query :username]))]
+                   (log/info "Entering channels page" server-key)
+                   (rf/dispatch [::get-my-channels server-key])))
+        :stop  (fn [_params]
+                 (log/info "Leaving channels page"))}]}]
+    ["/chat/:channel-name"
+     {:name      ::chat
+      :view      chat-page
+      :parameters {:path {:channel-name string?}}
+      :controllers
+      [{
+        :parameters {:path [:server-url :channel-name]
+                     :query [:username]}
+        :start (fn [params]
+                 (let [server-key (server-key (get-in params [:path :server-url]) (get-in params [:query :username]))
+                       channel-name (get-in params [:path :channel-name])]
+                   (log/info "Entering chat page" server-key channel-name)
+                   (rf/dispatch [::get-my-channels server-key])
+                   (rf/dispatch [::poll-chat server-key channel-name])))
+        :stop  (fn [_params]
+                 (log/info "Leaving chat page")
+                 (rf/dispatch [::clear-chat-poll]))}]}]
     ["/room"
      {:name      ::room
       :view      room-page
@@ -525,11 +639,13 @@
         :parameters {:path [:server-url]
                      :query [:username]}
         :start (fn [params]
-                 (js/console.log "Entering room")
-                 (rf/dispatch [::get-battles (get-in params [:path :server-url]) (get-in params [:query :username])])
-                 (rf/dispatch [::get-battle (get-in params [:path :server-url]) (get-in params [:query :username])]))
+                 (let [server-url (get-in params [:path :server-url])
+                       username (get-in params [:query :username])]
+                   (log/info "Entering room")
+                   (rf/dispatch [::get-battles server-url username])
+                   (rf/dispatch [::get-battle server-url username])))
         :stop  (fn [& _params]
-                 (js/console.log "Leaving room")
+                 (log/info "Leaving room")
                  (rf/dispatch [::clear-chat-poll]))}]}]]])
 
 
@@ -543,38 +659,33 @@
     {:data {:coercion rss/coercion}}))
 
 (defn init-routes! []
-  (js/console.log "initializing routes")
+  (log/info "Initializing routes")
   (rfe/start!
     router
     on-navigate
     {:use-fragment false}))
 
 
-(defn nav [{:keys [router current-route]}]
-  [:div
-   [:div {:class "flex justify-center"}
-    (let [route-name ::servers]
-      [:div {:key route-name
-             :class "pa3"}
-       (when (= route-name (-> current-route :data :name))
-         "> ")
-       ;; Create a normal links that user can click
-       [:a {:href (href route-name)} "Servers"]])
-    (for [{:keys [server-id server-url username]} (filter :server-id (listen [::active-servers]))]
-      [:div {:key server-id
-             :class "pa3"}
-       [:a {:href (href ::battles {:server-url server-url} {:username username})} server-id]])]
-   #_
-   [:div {:class "flex justify-center"}
-    (for [route-name [::battles ::room]
-          :let       [route (r/match-by-name router route-name)
-                      text (-> route :data :link-text)]]
-      [:div {:key route-name
-             :class "pa3"}
-       (when (= route-name (-> current-route :data :name))
-         "> ")
-       ;; Create a normal links that user can click
-       [:a {:href (href route-name)} text]])]])
+(defn nav [{:keys [current-route]}]
+  (let [{:keys [parameters]} current-route
+        server-url (-> parameters :path :server-url)
+        username (-> parameters :query :username)
+        server-key (server-key server-url username)]
+    [:div
+     [:div {:class "flex justify-center"}
+      (let [route-name ::servers]
+        [:div {:key route-name
+               :class "pa3"}
+         (when (= route-name (-> current-route :data :name))
+           "> ")
+         [:a {:href (href route-name)} "Servers"]])
+      (for [{:keys [server-id server-url username]} (filter :server-id (listen [::active-servers]))]
+        [:div {:key server-id
+               :class "pa3"}
+         (when (= server-id server-key)
+           "> ")
+         [:a {:href (href ::battles {:server-url server-url} {:username username})} server-id]])]]))
+
 
 (defn router-component [{:keys [router]}]
   (let [current-route (listen [::current-route])]
