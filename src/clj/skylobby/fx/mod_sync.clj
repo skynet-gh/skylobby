@@ -64,15 +64,14 @@
         canonical-path (fs/canonical-path mod-file)
         download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
                                    (map (juxt (comp :download-url :downloadable) identity))
-                                   (into {}))]
+                                   (into {}))
+        refresh-in-progress (seq refresh-mods-tasks)]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Game"
      :browse-action {:event/type :spring-lobby/desktop-browse-dir
                      :file (fs/mods-dir spring-isolation-dir)}
-     :refresh-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/refresh-mods}}
-     :refresh-in-progress (seq mod-update-tasks)
+     :in-progress refresh-in-progress
      :issues
      (concat
        (let [severity (if no-mod-details
@@ -272,7 +271,13 @@
                           :task
                           {:spring-lobby/task-type :spring-lobby/import
                            :importable importable
-                           :spring-isolation-dir spring-isolation-dir}})}])))
+                           :spring-isolation-dir spring-isolation-dir}})}])
+          (when refresh-in-progress
+            [{:severity -1
+              :text "refresh"
+              :human-text "Refreshing games"
+              :tooltip "Refreshing games"
+              :in-progress true}])))
        (when (= :directory
                 (::fs/source indexed-mod))
          (let [battle-mod-git-ref (u/mod-git-ref mod-name)
