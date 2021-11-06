@@ -24,6 +24,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.9]
+
+- Fix engine download source button
+- Add engine source update to auto resources
+
 ### [0.7.8]
 
 - Split rapid data by spring root to prevent conflicts
