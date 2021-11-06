@@ -7,6 +7,7 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.util :as u]
@@ -26,6 +27,9 @@
         battle (fx/sub-val context get-in [:by-server server-key :battle])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        server-url (:server-url client-data)
+        spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
+        {:keys [engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         users (fx/sub-val context get-in [:by-server server-key :users])
         filter-lc (when-not (string/blank? filter-battles)
@@ -141,11 +145,26 @@
                               {:fx/type :label
                                :text (str battle-title "\n")}
                               {:fx/type :label
-                               :text (str "Map: " battle-map)}
+                               :text (str "Map: " battle-map)
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (if (contains? maps-by-name battle-map)
+                                                "mdi-check:16:green"
+                                                "mdi-close:16:red")}}
                               {:fx/type :label
-                               :text (str "Game: " battle-modname)}
+                               :text (str "Game: " battle-modname)
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (if (contains? mods-by-name battle-modname)
+                                                "mdi-check:16:green"
+                                                "mdi-close:16:red")}}
                               {:fx/type :label
-                               :text (str "Engine: " battle-engine " " battle-version "\n")}
+                               :text (str "Engine: " battle-engine " " battle-version "\n")
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal (if (contains? engines-by-version battle-version)
+                                                "mdi-check:16:green"
+                                                "mdi-close:16:red")}}
                               {:fx/type :label
                                :text (str "Players:\n\n")}]
                              (->> battle-users
@@ -195,7 +214,14 @@
            :cell-value-factory :battle-modname
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [battle-modname] {:text (str battle-modname)})}}
+            :describe
+            (fn [battle-modname]
+              {:text (str battle-modname)
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal (if (contains? mods-by-name battle-modname)
+                                "mdi-check:16:green"
+                                "mdi-close:16:red")}})}}
           {:fx/type :table-column
            :text "Status"
            :resizable false
@@ -240,7 +266,14 @@
            :cell-value-factory :battle-map
            :cell-factory
            {:fx/cell-type :table-cell
-            :describe (fn [battle-map] {:text (str battle-map)})}}
+            :describe
+            (fn [battle-map]
+              {:text (str battle-map)
+               :graphic
+               {:fx/type font-icon/lifecycle
+                :icon-literal (if (contains? maps-by-name battle-map)
+                                "mdi-check:16:green"
+                                "mdi-close:16:red")}})}}
           {:fx/type :table-column
            :text "Play (Spec)"
            :resizable false
