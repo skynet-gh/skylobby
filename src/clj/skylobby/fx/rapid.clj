@@ -5,12 +5,12 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.ext :refer [ext-table-column-auto-size]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.fs :as fs]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -46,12 +46,17 @@
               rapid-download (fx/sub-val context :rapid-download)
               rapid-filter (fx/sub-val context :rapid-filter)
               rapid-repo (fx/sub-val context :rapid-repo)
-              rapid-repos (fx/sub-val context :rapid-repos)
-              rapid-versions (fx/sub-val context :rapid-versions)
-              rapid-packages (fx/sub-val context :rapid-packages)
-              sdp-files (fx/sub-val context :sdp-files)
               spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+              spring-root (fx/sub-val context :rapid-spring-root)
+              spring-root-path (fs/canonical-path spring-root)
+              rapid-repos (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-repos])
+              rapid-versions (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-versions])
+              rapid-packages (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-packages])
+              sdp-files (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :sdp-files])
               engines (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :engines])
+              servers (fx/sub-val context :servers)
+              spring-roots (fs/spring-roots {:servers servers :spring-isolation-dir spring-isolation-dir})
+              spring-roots-paths (mapv fs/canonical-path spring-roots)
               tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
               sdp-files (or sdp-files [])
               sdp-hashes (set (map rapid/sdp-hash sdp-files))
@@ -94,19 +99,38 @@
              :alignment :center-left
              :children
              [{:fx/type :label
+               :text " Spring root: "}
+              {:fx/type ext-recreate-on-key-changed
+               :key (str spring-root-path spring-roots-paths)
+               :desc
+               {:fx/type :combo-box
+                :value spring-root
+                :items (or spring-roots [])
+                :cell-factory
+                {:fx/cell-type :list-cell
+                 :describe (fn [f] {:text (str f)})}
+                :on-value-changed {:event/type :spring-lobby/assoc
+                                   :key :rapid-spring-root}}}]}
+            {:fx/type :h-box
+             :style {:-fx-font-size 16}
+             :alignment :center-left
+             :children
+             [{:fx/type :label
                :text " Engine for pr-downloader: "}
               {:fx/type :combo-box
                :value (str engine-version)
                :items (or (seq sorted-engine-versions)
                           [])
-               :on-value-changed {:event/type :spring-lobby/version-change}}
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :engine-version}}
               {:fx/type :button
                :text (if rapid-updating " Refreshing..." " Refresh ")
                :disable (boolean rapid-updating)
                :on-action {:event/type :spring-lobby/add-task
                            :task {:spring-lobby/task-type :spring-lobby/update-rapid
                                   :force true
-                                  :rapid-repo rapid-repo}}
+                                  :rapid-repo rapid-repo
+                                  :spring-isolation-dir spring-root}}
                :graphic
                {:fx/type font-icon/lifecycle
                 :icon-literal "mdi-refresh:16:white"}}]}

@@ -79,14 +79,16 @@
            :text (str battle-title)
            :prompt-text "Battle Title"
            :on-action host-battle-action
-           :on-text-changed {:event/type :spring-lobby/battle-title-change}}
+           :on-text-changed {:event/type :spring-lobby/assoc
+                             :key :battle-title}}
           {:fx/type :label
            :text " Battle Password: "}
           {:fx/type :text-field
            :text (str battle-password)
            :prompt-text "Battle Password"
            :on-action host-battle-action
-           :on-text-changed {:event/type :spring-lobby/battle-password-change}}
+           :on-text-changed {:event/type :spring-lobby/assoc
+                             :key :battle-password}}
           {:fx/type :h-box
            :children
            [
