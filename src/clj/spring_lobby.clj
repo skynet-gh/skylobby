@@ -23,7 +23,8 @@
     [skylobby.discord :as discord]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
-    [skylobby.fx.download :as fx.download]
+    [skylobby.fx.download :as fx.download :refer [download-sources-by-name]]
+    [skylobby.fx.engine-sync :as fx.engine-sync]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.http :as http]
@@ -649,6 +650,11 @@
                           not)
               springfiles-search-result (get springfiles-search-results battle-map)
               springfiles-url (springfiles-url springfiles-search-result)
+              download-source-tasks (->> all-tasks
+                                         (filter (comp #{::update-downloadables}))
+                                         (map :download-source-name)
+                                         set)
+              engine-download-source-name (fx.engine-sync/engine-download-source battle-version)
               tasks [(when
                        (and (= battle-version (:battle-version old-battle-details))
                             (not engine-details))
@@ -670,8 +676,20 @@
                            {::task-type ::download-and-extract
                             :downloadable engine-downloadable
                             :spring-isolation-dir spring-root})
+                         (and (not engine-importable)
+                              (not engine-downloadable)
+                              engine-download-source-name
+                              (check-cooldown cooldowns [:download-source engine-download-source-name])
+                              (not (contains? download-source-tasks engine-download-source-name)))
+                         (do
+                           (log/info "Adding task to update download source" engine-download-source-name "looking for" battle-version)
+                           (merge
+                             {::task-type :spring-lobby/update-downloadables
+                              :force true}
+                             (get download-sources-by-name engine-download-source-name)))
                          :else
-                         nil))
+                         (when battle-version
+                           (log/info "Nothing to do to auto get engine" battle-version))))
                      (when
                        (and (= battle-map (:battle-map old-battle-details))
                             no-map)
@@ -745,7 +763,8 @@
                             :downloadable mod-downloadable
                             :spring-isolation-dir spring-root})
                          :else
-                         nil))
+                         (when battle-modname
+                           (log/info "Nothing to do to auto get engine" battle-modname))))
                      (when
                        (and no-mod
                             (not rapid-id)
@@ -4260,6 +4279,7 @@
                           (remove (comp #{download-source-name} :download-source-name second))
                           (into {}))
                      downloadables-by-url)))
+          (update-cooldown *state [:download-source download-source-name])
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
 

@@ -128,13 +128,13 @@
                  :tooltip (str "Click to extract " dest-path)
                  :action {:event/type :spring-lobby/extract-7z
                           :file dest
-                          :dest extract-target}}])))
-         (when refresh-in-progress
-           [{:severity -1
-             :text "refresh"
-             :human-text "Refreshing engines"
-             :tooltip "Refreshing engines"
-             :in-progress true}]))
+                          :dest extract-target}}]))))
+       (when refresh-in-progress
+         [{:severity -1
+           :text "refresh"
+           :human-text "Refreshing engines"
+           :tooltip "Refreshing engines"
+           :in-progress true}])
        (when (and (not engine-details) (not (engine-download-source engine-version)))
          (let [springname (str "Spring " engine-version)
                springfiles-searched (contains? springfiles-search-results springname)
