@@ -328,6 +328,7 @@
                                        (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
                        :graphic
                        {:fx/type :h-box
+                        :alignment :center-left
                         :children
                         (concat
                           (when-not singleplayer
