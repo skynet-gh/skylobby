@@ -1018,9 +1018,12 @@
               (-> state
                   (update :tasks-by-kind
                     add-multiple-tasks
-                    [{::task-type ::refresh-engines}
-                     {::task-type ::refresh-mods}
-                     {::task-type ::refresh-maps}
+                    [{::task-type ::refresh-engines
+                      :spring-root spring-isolation-dir}
+                     {::task-type ::refresh-mods
+                      :spring-root spring-isolation-dir}
+                     {::task-type ::refresh-maps
+                      :spring-root spring-isolation-dir}
                      {::task-type ::scan-imports
                       :sources (fx.import/import-sources extra-import-sources)}
                      {::task-type ::update-rapid
@@ -1692,6 +1695,7 @@
      (when next-round
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
        (add-task! state-atom {::task-type ::refresh-mods
+                              :spring-root spring-root
                               :todo (count next-round)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
@@ -1824,6 +1828,7 @@
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
          (add-task! state-atom {::task-type ::refresh-maps
+                                :spring-root spring-root
                                 :todo next-round-count}))
        (add-task! state-atom {::task-type ::update-cached-minimaps}))
      {:todo-count next-round-count})))
@@ -2371,8 +2376,10 @@
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
 
-(defmethod task-handler ::refresh-engines [_]
-  (refresh-engines-all-spring-roots))
+(defmethod task-handler ::refresh-engines [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-engines *state spring-root)
+    (refresh-engines-all-spring-roots)))
 
 
 (defn refresh-mods-all-spring-roots []
@@ -2381,8 +2388,10 @@
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
 
-(defmethod task-handler ::refresh-mods [_]
-  (refresh-mods-all-spring-roots))
+(defmethod task-handler ::refresh-mods [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-mods *state spring-root)
+    (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
   (let [spring-roots (spring-roots @*state)]
@@ -2390,8 +2399,10 @@
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
 
-(defmethod task-handler ::refresh-maps [_]
-  (refresh-maps-all-spring-roots))
+(defmethod task-handler ::refresh-maps [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-maps *state spring-root)
+    (refresh-maps-all-spring-roots)))
 
 
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
@@ -4008,7 +4019,8 @@
            :sdp-files sdp-files
            :rapid-packages packages
            :rapid-update false)
-    (add-task! *state {::task-type ::refresh-mods})))
+    (add-task! *state {::task-type ::refresh-mods
+                       :spring-root spring-isolation-dir})))
 
 
 (defmethod event-handler ::rapid-repo-change
@@ -4073,7 +4085,8 @@
       (finally
         (add-tasks! *state [{::task-type ::update-rapid-packages
                              :spring-isolation-dir spring-isolation-dir}
-                            {::task-type ::refresh-mods}])
+                            {::task-type ::refresh-mods
+                             :spring-root spring-isolation-dir}])
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
         (update-cooldown *state [:rapid rapid-id])
         (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))))))
@@ -4283,7 +4296,7 @@
 
 
 (defmethod event-handler ::clear-map-and-mod-details
-  [{:keys [map-resource mod-resource]}]
+  [{:keys [map-resource mod-resource spring-root]}]
   (let [map-key (resource/details-cache-key map-resource)
         mod-key (resource/details-cache-key mod-resource)]
     (swap! *state
@@ -4293,9 +4306,12 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (add-tasks! *state [{::task-type ::refresh-engines}
-                        {::task-type ::refresh-mods}
-                        {::task-type ::refresh-maps}])))
+    (add-tasks! *state [{::task-type ::refresh-engines
+                         :spring-root spring-root}
+                        {::task-type ::refresh-mods
+                         :spring-root spring-root}
+                        {::task-type ::refresh-maps
+                         :spring-root spring-root}])))
 
 
 (defmethod event-handler ::import-source-change
