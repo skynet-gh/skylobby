@@ -24,6 +24,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.8]
+
+- Split rapid data by spring root to prevent conflicts
+- Add spring root for refresh tasks to improve speed
+- Add indication when resources are refreshing
+- Add icons showing resource status for battles
+
 ### [0.7.7]
 
 - Fix color picker
