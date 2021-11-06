@@ -450,14 +450,14 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[team-color i]]
+              (fn [[team-color nickname i]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :color
                     {:text ""
                      :graphic
                      {:fx/type ext-recreate-on-key-changed
-                      :key (u/nickname i)
+                      :key nickname
                       :desc
                       {:fx/type :color-picker
                        :value (u/spring-color-to-javafx team-color)

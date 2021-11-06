@@ -28,6 +28,7 @@
     [skylobby.fx.replay :as fx.replay]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
+    [skylobby.server :as server]
     [skylobby.task :as task]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
@@ -1022,7 +1023,8 @@
                      {::task-type ::refresh-maps}
                      {::task-type ::scan-imports
                       :sources (fx.import/import-sources extra-import-sources)}
-                     {::task-type ::update-rapid}
+                     {::task-type ::update-rapid
+                      :spring-isolation-dir spring-isolation-dir}
                      {::task-type ::refresh-replays}]))))))
       (catch Exception e
         (log/error e "Error in :spring-isolation-dir-changed state watcher")))))
@@ -2890,7 +2892,7 @@
           (swap! *state
             (fn [state]
               (-> state
-                  (assoc :battle {})
+                  (assoc-in [:by-server server-key :battle] {})
                   (update-in [:by-server server-key] dissoc :selected-battle)
                   (assoc-in [:selected-tab-main server-key] "battle"))))
           (message/send-message *state client-data
@@ -3974,11 +3976,13 @@
                                                 (map (juxt :id identity) rapid-versions)))))))
               (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
-    (add-task! *state
-      (merge
-        {::task-type ::update-rapid-packages}
-        (when spring-isolation-dir
-          {:spring-isolation-dir spring-isolation-dir})))))
+    (add-tasks! *state
+      [
+       (merge
+         {::task-type ::update-rapid-packages}
+         (when spring-isolation-dir
+           {:spring-isolation-dir spring-isolation-dir}))
+       {::task-type ::refresh-mods}])))
 
 (defmethod task-handler ::update-rapid-packages
   [{:keys [spring-isolation-dir]}]
@@ -4062,16 +4066,17 @@
                     (log/info "(pr-downloader" rapid-id "err)" line)
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
-          (.waitFor process)
-          (update-cooldown *state [:rapid rapid-id])
-          (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))
-          (add-tasks! *state [{::task-type ::update-rapid-packages}
-                              {::task-type ::refresh-mods}])))
+          (.waitFor process)))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
-        (swap! *state assoc-in [:rapid-download rapid-id :running] false)))))
+        (add-tasks! *state [{::task-type ::update-rapid-packages
+                             :spring-isolation-dir spring-isolation-dir}
+                            {::task-type ::refresh-mods}])
+        (swap! *state assoc-in [:rapid-download rapid-id :running] false)
+        (update-cooldown *state [:rapid rapid-id])
+        (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))))))
 
 (defmethod task-handler ::rapid-download
   [task]
@@ -4763,39 +4768,18 @@
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
 
 
-(defn ipc-handler
-  ([req]
-   (ipc-handler *state req))
-  ([state-atom req]
-   (log/info "IPC handler request" req)
-   (cond
-     (= "/replay" (:uri req))
-     (let [path (-> req :params :path)]
-       (if-let [file (fs/file path)]
-         (let [parsed-replay (replay/parse-replay file)]
-           (log/info "Loading replay from IPC" path)
-           (swap! state-atom
-             (fn [state]
-               (-> state
-                   (assoc :show-replays true
-                          :selected-replay parsed-replay
-                          :selected-replay-file file)
-                   (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
-         (log/warn "Unable to coerce to file" path)))
-     :else
-     (log/info "Nothing to do for IPC request" req))
-   {:status 200
-    :headers {"content-type" "text/plain"}
-    :body "ok"}))
-
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
+  (when-let [{:keys [ipc-server]} @*state]
+    (when ipc-server
+      (.close ipc-server)))
   (if (u/is-port-open? u/ipc-port)
     (do
       (log/info "Starting IPC server on port" u/ipc-port)
-      (let [server (aleph-http/start-server
-                     (-> (partial ipc-handler *state)
+      (let [handler (server/handler *state)
+            server (aleph-http/start-server
+                     (-> handler
                          wrap-keyword-params
                          wrap-params)
                      {:socket-address
@@ -4852,10 +4836,8 @@
            (add-task! state-atom {::task-type ::refresh-mods})
            (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-maps})
-           ;(async/<!! (async/timeout wait-init-tasks-ms))
-           ;(add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::update-rapid})
+           (add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
@@ -4895,7 +4877,6 @@
     (add-task! state-atom {::task-type ::refresh-engines})
     (add-task! state-atom {::task-type ::refresh-mods})
     (add-task! state-atom {::task-type ::refresh-maps})
-    (add-task! state-atom {::task-type ::update-rapid})
     (event-handler {:event/type ::update-all-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished standalone replay init")

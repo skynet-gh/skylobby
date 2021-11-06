@@ -24,6 +24,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.7]
+
+- Fix color picker
+- Attempt to fix issues with auto get resources
+- Start work on lightweight web UI
+
 ### [0.7.6]
 
 - Fix Add AI button disabled when it shouldn't be
