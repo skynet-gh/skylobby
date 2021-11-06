@@ -30,15 +30,19 @@
    2 error-severity})
 
 (defn sync-pane
-  [{:keys [issues resource]}]
+  [{:keys [in-progress issues resource]}]
   (let [worst-severity (reduce
                          (fn [worst {:keys [severity]}]
                            (max worst severity))
                          -1
-                         issues)]
+                         issues)
+        overall-severity (if in-progress
+                           (min 1 worst-severity)
+                           worst-severity)
+        overall-in-progress in-progress]
     {:fx/type :v-box
      :style (merge
-              (get severity-styles worst-severity)
+              (get severity-styles overall-severity)
               {:-fx-background-radius 3
                :-fx-border-color "#666666"
                :-fx-border-radius 3
@@ -53,10 +57,13 @@
                       " status:"))
          :style {:-fx-font-size 16}}]
        (map
-         (fn [{:keys [action in-progress human-text severity text tooltip]}]
+         (fn [{:keys [action in-progress human-text severity text tooltip] :or {severity 2}}]
            (let [font-style {:-fx-font-size 12}
                  display-text (or human-text
-                                  (str text " " resource))]
+                                  (str text " " resource))
+                 issue-severity (if overall-in-progress
+                                  overall-severity
+                                  severity)]
              {:fx/type fx.ext.node/with-tooltip-props
               :props
               (when tooltip
@@ -81,14 +88,16 @@
                            "exclamation"))
                        ":16:"
                        "white")}}
-                (let [style (get severity-styles severity error-severity)]
+                (let [style (get severity-styles issue-severity)]
                   {:fx/type :v-box
                    :style (merge style font-style)
                    :children
-                   [{:fx/type :button
-                     :style (dissoc style :-fx-background-color)
-                     :v-box/margin 8
-                     :text display-text
-                     :disable (boolean in-progress)
-                     :on-action action}]}))}))
+                   [(merge
+                      {:fx/type :button
+                       :v-box/margin 8
+                       :text display-text
+                       :disable (boolean in-progress)
+                       :on-action action}
+                      (when style
+                        {:style (dissoc style :-fx-background-color)}))]}))}))
          issues))}))

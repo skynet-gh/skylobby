@@ -736,3 +736,13 @@
         status-by-path (file-cache-by-path statuses)]
     (swap! state-atom update :file-cache merge status-by-path)
     status-by-path))
+
+
+(defn spring-roots [{:keys [spring-isolation-dir servers]}]
+  (set
+    (filter some?
+      (concat
+        [spring-isolation-dir]
+        (map
+          (comp file :spring-isolation-dir second)
+          servers)))))

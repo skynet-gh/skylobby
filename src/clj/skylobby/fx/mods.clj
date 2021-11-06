@@ -41,7 +41,8 @@
         mods (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :mods])
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
-        games (filter :is-game mods)]
+        games (filter :is-game mods)
+        spring-root-path (fs/canonical-path spring-isolation-dir)]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -58,7 +59,7 @@
                  (map
                    (fn [{:keys [mod-name source version]}]
                      (let [downloadable (case source
-                                          :rapid (:id (fx/sub-val context [:rapid-data-by-id version]))
+                                          :rapid (:id (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-id version]))
                                           :http (->> downloadables
                                                      (filter (partial resource/could-be-this-mod? version))
                                                      first)

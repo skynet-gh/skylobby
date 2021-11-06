@@ -87,6 +87,6 @@
 ; battles
 
 (defmethod handler/handle "s.battle.update_lobby_title" [state-atom server-key m]
-  (if-let [[_all battle-id battle-title] (re-find #"[^\s]+ ([^\t]+)\t([^\t]+)" m)]
+  (if-let [[_all battle-id battle-title] (re-find #"[^\s]+ ([^\s]+)\s([^\t]+)" m)]
     (swap! state-atom assoc-in [:by-server server-key :battles battle-id :battle-title] battle-title)
     (log/error "Error parsing battle rename message")))

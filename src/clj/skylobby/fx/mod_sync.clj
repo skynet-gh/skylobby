@@ -42,7 +42,8 @@
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
         importables-by-path (fx/sub-val context :importables-by-path)
-        rapid-data-by-version (fx/sub-val context :rapid-data-by-version)
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
         rapid-downloads-by-id (fx/sub-val context :rapid-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
@@ -64,15 +65,14 @@
         canonical-path (fs/canonical-path mod-file)
         download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
                                    (map (juxt (comp :download-url :downloadable) identity))
-                                   (into {}))]
+                                   (into {}))
+        refresh-in-progress (seq refresh-mods-tasks)]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Game"
      :browse-action {:event/type :spring-lobby/desktop-browse-dir
                      :file (fs/mods-dir spring-isolation-dir)}
-     :refresh-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/refresh-mods}}
-     :refresh-in-progress (seq mod-update-tasks)
+     :in-progress refresh-in-progress
      :issues
      (concat
        (let [severity (if no-mod-details
@@ -272,7 +272,13 @@
                           :task
                           {:spring-lobby/task-type :spring-lobby/import
                            :importable importable
-                           :spring-isolation-dir spring-isolation-dir}})}])))
+                           :spring-isolation-dir spring-isolation-dir}})}])
+          (when refresh-in-progress
+            [{:severity -1
+              :text "refresh"
+              :human-text "Refreshing games"
+              :tooltip "Refreshing games"
+              :in-progress true}])))
        (when (= :directory
                 (::fs/source indexed-mod))
          (let [battle-mod-git-ref (u/mod-git-ref mod-name)

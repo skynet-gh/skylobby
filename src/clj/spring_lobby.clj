@@ -30,6 +30,7 @@
     [skylobby.resource :as resource]
     [skylobby.server :as server]
     [skylobby.task :as task]
+    skylobby.fs
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
@@ -192,8 +193,7 @@
 
 (defn select-rapid [state]
   (select-keys state
-    [:rapid-data-by-hash :rapid-data-by-id :rapid-data-by-version :rapid-packages :rapid-repos
-     :rapid-updated :rapid-versions :sdp-files]))
+    [:rapid-by-spring-root]))
 
 (defn- select-replays [state]
   (select-keys state
@@ -457,16 +457,6 @@
     (log/warn "Unable to determine task kind to cancel for" task)))
 
 
-(defn spring-roots [{:keys [spring-isolation-dir servers]}]
-  (set
-    (filter some?
-      (concat
-        [spring-isolation-dir]
-        (map
-          (comp fs/file :spring-isolation-dir second)
-          servers)))))
-
-
 (defn- battle-map-details-relevant-keys [state]
   (-> state
       (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks-by-kind])
@@ -576,12 +566,13 @@
                        (not= 1 sync-status))))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
-                      rapid-data-by-version servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
+                      rapid-by-spring-root servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                               spring-isolation-dir)
               spring-root-path (fs/canonical-path spring-root)
+              {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
               {:keys [engines maps mods]} (-> new-state :by-spring-root (get spring-root-path))
               old-battle-details (-> old-server :battles (get (-> old-server :battle :battle-id)))
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
@@ -1018,9 +1009,12 @@
               (-> state
                   (update :tasks-by-kind
                     add-multiple-tasks
-                    [{::task-type ::refresh-engines}
-                     {::task-type ::refresh-mods}
-                     {::task-type ::refresh-maps}
+                    [{::task-type ::refresh-engines
+                      :spring-root spring-isolation-dir}
+                     {::task-type ::refresh-mods
+                      :spring-root spring-isolation-dir}
+                     {::task-type ::refresh-maps
+                      :spring-root spring-isolation-dir}
                      {::task-type ::scan-imports
                       :sources (fx.import/import-sources extra-import-sources)}
                      {::task-type ::update-rapid
@@ -1692,6 +1686,7 @@
      (when next-round
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
        (add-task! state-atom {::task-type ::refresh-mods
+                              :spring-root spring-root
                               :todo (count next-round)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
@@ -1824,6 +1819,7 @@
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
          (add-task! state-atom {::task-type ::refresh-maps
+                                :spring-root spring-root
                                 :todo next-round-count}))
        (add-task! state-atom {::task-type ::update-cached-minimaps}))
      {:todo-count next-round-count})))
@@ -2366,32 +2362,38 @@
 
 
 (defn refresh-engines-all-spring-roots []
-  (let [spring-roots (spring-roots @*state)]
+  (let [spring-roots (skylobby.fs/spring-roots @*state)]
     (log/info "Reconciling engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
 
-(defmethod task-handler ::refresh-engines [_]
-  (refresh-engines-all-spring-roots))
+(defmethod task-handler ::refresh-engines [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-engines *state spring-root)
+    (refresh-engines-all-spring-roots)))
 
 
 (defn refresh-mods-all-spring-roots []
-  (let [spring-roots (spring-roots @*state)]
+  (let [spring-roots (skylobby.fs/spring-roots @*state)]
     (log/info "Reconciling mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
 
-(defmethod task-handler ::refresh-mods [_]
-  (refresh-mods-all-spring-roots))
+(defmethod task-handler ::refresh-mods [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-mods *state spring-root)
+    (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
-  (let [spring-roots (spring-roots @*state)]
+  (let [spring-roots (skylobby.fs/spring-roots @*state)]
     (log/info "Reconciling maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
 
-(defmethod task-handler ::refresh-maps [_]
-  (refresh-maps-all-spring-roots))
+(defmethod task-handler ::refresh-maps [{:keys [spring-root]}]
+  (if spring-root
+    (refresh-maps *state spring-root)
+    (refresh-maps-all-spring-roots)))
 
 
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
@@ -3046,29 +3048,6 @@
                       :event/type ::update-css}))
     (log/warn "Custom CSS file does not exist" file)))
 
-
-(defmethod event-handler ::battle-password-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :battle-password event))
-
-(defmethod event-handler ::battle-title-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :battle-title event))
-
-
-(defmethod event-handler ::version-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :engine-version event))
-
-(defmethod event-handler ::mod-change
-  [{:fx/keys [event]}]
-  (swap! *state assoc :mod-name event))
-
-(defmethod event-handler ::map-change
-  [{:fx/keys [event] :keys [map-name] :as e}]
-  (log/info e)
-  (let [map-name (or map-name event)]
-    (swap! *state assoc :map-name map-name)))
 
 (defmethod event-handler ::map-window-action
   [{:keys [on-change-map]}]
@@ -3961,34 +3940,38 @@
       (swap! *state
         (fn [state]
           (-> state
-              (assoc :rapid-updated (u/curr-millis))
-              (assoc :rapid-repos rapid-repos)
-              (update :rapid-data-by-hash merge rapid-data-by-hash)
-              (update :rapid-data-by-id merge rapid-data-by-id)
-              (update :rapid-data-by-version merge rapid-data-by-version)
-              (update :rapid-versions (fn [old-versions]
-                                        (set
-                                          (vals
-                                            (merge
-                                              (into {}
-                                                (map (juxt :id identity) old-versions))
-                                              (into {}
-                                                (map (juxt :id identity) rapid-versions)))))))
+              (update-in [:rapid-by-spring-root (fs/canonical-path spring-isolation-dir)]
+                (fn [rapid]
+                  (-> rapid
+                      (assoc :rapid-updated (u/curr-millis))
+                      (assoc :rapid-repos rapid-repos)
+                      (update :rapid-data-by-hash merge rapid-data-by-hash)
+                      (update :rapid-data-by-id merge rapid-data-by-id)
+                      (update :rapid-data-by-version merge rapid-data-by-version)
+                      (update :rapid-versions (fn [old-versions]
+                                                (set
+                                                  (vals
+                                                    (merge
+                                                      (into {}
+                                                        (map (juxt :id identity) old-versions))
+                                                      (into {}
+                                                        (map (juxt :id identity) rapid-versions))))))))))
               (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
     (add-tasks! *state
       [
        (merge
-         {::task-type ::update-rapid-packages}
-         (when spring-isolation-dir
-           {:spring-isolation-dir spring-isolation-dir}))
+         {::task-type ::update-rapid-packages
+          :spring-isolation-dir spring-isolation-dir})
        {::task-type ::refresh-mods}])))
 
 (defmethod task-handler ::update-rapid-packages
   [{:keys [spring-isolation-dir]}]
   (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-data-by-hash] :as state} @*state
+  (let [{:keys [rapid-by-spring-root] :as state} @*state
         spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        {:keys [rapid-data-by-hash]} (get rapid-by-spring-root spring-root-path)
         sdp-files (doall (rapid/sdp-files spring-isolation-dir))
         packages (->> sdp-files
                       (filter some?)
@@ -4004,11 +3987,13 @@
                       (sort-by :version version/version-compare)
                       reverse
                       doall)]
-    (swap! *state assoc
+    (swap! *state update-in [:rapid-by-spring-root spring-root-path]
+           assoc
            :sdp-files sdp-files
            :rapid-packages packages
            :rapid-update false)
-    (add-task! *state {::task-type ::refresh-mods})))
+    (add-task! *state {::task-type ::refresh-mods
+                       :spring-root spring-isolation-dir})))
 
 
 (defmethod event-handler ::rapid-repo-change
@@ -4073,7 +4058,8 @@
       (finally
         (add-tasks! *state [{::task-type ::update-rapid-packages
                              :spring-isolation-dir spring-isolation-dir}
-                            {::task-type ::refresh-mods}])
+                            {::task-type ::refresh-mods
+                             :spring-root spring-isolation-dir}])
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
         (update-cooldown *state [:rapid rapid-id])
         (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))))))
@@ -4283,7 +4269,7 @@
 
 
 (defmethod event-handler ::clear-map-and-mod-details
-  [{:keys [map-resource mod-resource]}]
+  [{:keys [map-resource mod-resource spring-root]}]
   (let [map-key (resource/details-cache-key map-resource)
         mod-key (resource/details-cache-key mod-resource)]
     (swap! *state
@@ -4293,9 +4279,12 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (add-tasks! *state [{::task-type ::refresh-engines}
-                        {::task-type ::refresh-mods}
-                        {::task-type ::refresh-maps}])))
+    (add-tasks! *state [{::task-type ::refresh-engines
+                         :spring-root spring-root}
+                        {::task-type ::refresh-mods
+                         :spring-root spring-root}
+                        {::task-type ::refresh-maps
+                         :spring-root spring-root}])))
 
 
 (defmethod event-handler ::import-source-change

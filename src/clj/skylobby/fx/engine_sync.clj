@@ -41,13 +41,12 @@
                            set)
         download-source-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
                                           (map :download-source-name)
-                                          set)]
+                                          set)
+        refresh-in-progress (seq engine-update-tasks)]
     {:fx/type sync-pane
      :h-box/margin 8
      :resource "Engine"
-     :refresh-action {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/refresh-engines}}
-     :refresh-in-progress (seq engine-update-tasks)
+     :in-progress refresh-in-progress
      :browse-action {:event/type :spring-lobby/desktop-browse-dir
                      :file (or engine-file
                                (fs/engines-dir spring-isolation-dir))}
@@ -129,7 +128,13 @@
                  :tooltip (str "Click to extract " dest-path)
                  :action {:event/type :spring-lobby/extract-7z
                           :file dest
-                          :dest extract-target}}]))))
+                          :dest extract-target}}])))
+         (when refresh-in-progress
+           [{:severity -1
+             :text "refresh"
+             :human-text "Refreshing engines"
+             :tooltip "Refreshing engines"
+             :in-progress true}]))
        (when (and (not engine-details) (not (engine-download-source engine-version)))
          (let [springname (str "Spring " engine-version)
                springfiles-searched (contains? springfiles-search-results springname)
