@@ -258,12 +258,17 @@
 
 
 (defmethod handle "JOIN" [state-atom server-key m]
-  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
+  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)
+        battle-channel? (u/battle-channel-name? channel-name)]
     (swap! state-atom
       (fn [state]
-        (-> state
-            (assoc-in [:selected-tab-channel server-key] channel-name)
-            (assoc-in [:by-server server-key :my-channels channel-name] {}))))))
+        (let [focus-chat (:focus-chat-on-message state)
+              selected-tab-channel (get-in state [:selected-tab-channel server-key])]
+          (cond-> state
+                  true
+                  (assoc-in [:by-server server-key :my-channels channel-name] {})
+                  (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
+                  (assoc-in [:selected-tab-channel server-key] channel-name)))))))
 
 (defmethod handle "JOINFAILED" [state-atom server-key m]
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
