@@ -2633,6 +2633,25 @@
         (log/error e "Error leaving channel" channel-name)))))
 
 
+(defmethod event-handler ::friend-request [{:keys [client-data username]}]
+  (message/send-message *state client-data (str "FRIENDREQUEST userName=" username)))
+
+(defmethod event-handler ::unfriend [{:keys [client-data username]}]
+  (message/send-message *state client-data (str "UNFRIEND userName=" username))
+  (let [server-key (u/server-key client-data)]
+    (swap! *state update-in [:by-server server-key :friends] dissoc username)))
+
+(defmethod event-handler ::accept-friend-request [{:keys [client-data username]}]
+  (message/send-message *state client-data (str "ACCEPTFRIENDREQUEST userName=" username))
+  (let [server-key (u/server-key client-data)]
+    (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
+
+(defmethod event-handler ::decline-friend-request [{:keys [client-data username]}]
+  (message/send-message *state client-data (str "DECLINEFRIENDREQUEST userName=" username))
+  (let [server-key (u/server-key client-data)]
+    (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
+
+
 (defn- update-disconnected!
   [state-atom server-key]
   (log/info "Disconnecting from" (pr-str server-key))
