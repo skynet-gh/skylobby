@@ -24,6 +24,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.10]
+
+- Rework auto resources for rapid
+- Delete sdp files if they are invalid
+- Update BAR server url
+
 ### [0.7.9]
 
 - Fix engine download source button
