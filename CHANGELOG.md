@@ -7,12 +7,11 @@ Notable changes and todo list.
 Future Features:
 
 - Query auto hosts for battle details
-- Friends list support
 - Visually group teams in players table
 - Arbitrary engine directories
 - Open battle links
 - First run intro window
-- Highlight window and tabs when rang or new direct message
+- Highlight window when rang or new direct message
 - Add new butler downloader system
 - Chat URL highlighting and clicking
 - Zero-K server protocol
@@ -23,6 +22,12 @@ Future Features:
 
 
 ## Actual changelog
+
+### [0.7.11]
+
+- Add support for friends list
+- Add minimap size to persistent config
+- Stop rendering chat and console when server tab not selected
 
 ### [0.7.10]
 
