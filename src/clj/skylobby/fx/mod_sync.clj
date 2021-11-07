@@ -258,7 +258,7 @@
                    resource-file (:resource-file importable)
                    dest (resource/resource-dest spring-isolation-dir importable)
                    dest-exists (fs/file-exists? file-cache dest)]
-               (when (or importable (not downloadable))
+               (when importable
                  [{:severity (if dest-exists -1 2)
                    :text "import"
                    :human-text (if importable

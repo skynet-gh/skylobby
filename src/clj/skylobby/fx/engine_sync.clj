@@ -36,6 +36,9 @@
         importables-by-path (fx/sub-val context :importables-by-path)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         engine-update-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
+        download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
+                            (map (comp :download-url :downloadable))
+                            set)
         extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
                            (map (comp fs/canonical-path :file))
                            set)
@@ -72,6 +75,7 @@
                download (get http-download url)
                download-source-name (engine-download-source engine-version)
                in-progress (or (:running download)
+                               (contains? download-tasks url)
                                (and (not downloadable)
                                     download-source-name
                                     (contains? download-source-update-tasks download-source-name)))
@@ -181,13 +185,8 @@
                {:keys [import-source-name resource-file]} importable
                resource-path (fs/canonical-path resource-file)
                dest (resource/resource-dest spring-isolation-dir importable)
-               dest-exists (fs/file-exists? file-cache dest)
-               downloadable (->> downloadables-by-url
-                                 vals
-                                 (filter (comp #{:spring-lobby/engine} :resource-type))
-                                 (filter (partial resource/could-be-this-engine? engine-version))
-                                 first)]
-           (when (or importable (not downloadable))
+               dest-exists (fs/file-exists? file-cache dest)]
+           (when importable
              [{:severity (if dest-exists -1 2)
                :text "import"
                :human-text (if importable

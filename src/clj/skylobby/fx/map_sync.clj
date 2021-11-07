@@ -183,7 +183,7 @@
                                      (contains? imports resource-path)))
                    dest (resource/resource-dest spring-isolation-dir importable)
                    dest-exists (fs/file-exists? file-cache dest)]
-               (when (or importable (empty? downloadables))
+               (when importable
                  [{:severity (if dest-exists -1 2)
                    :text "import"
                    :human-text (if importable
