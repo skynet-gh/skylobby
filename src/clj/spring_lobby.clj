@@ -228,12 +228,12 @@
    {:host "lobby.springrts.com"
     :port 8200
     :alias "Spring Official"}
-   "bar.teifion.co.uk:8200"
+   "server2.beyondallreason.info:8200"
    {:host "bar.teifion.co.uk"
     :port 8200
     :alias "Beyond All Reason"}
-   "bar.teifion.co.uk:8201"
-   {:host "bar.teifion.co.uk"
+   "server2.beyondallreason.info:8201"
+   {:host "server2.beyondallreason.info"
     :port 8201
     :alias "Beyond All Reason (SSL)"
     :ssl true}
