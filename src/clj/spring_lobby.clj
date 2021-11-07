@@ -17,6 +17,7 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
+    [me.raynes.fs :as raynes-fs]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
@@ -371,18 +372,24 @@
 (defn- read-mod-data
   ([f]
    (read-mod-data f nil))
-  ([f opts]
-   (try
-     (let [mod-data
-           (if (string/ends-with? (fs/filename f) ".sdp")
-             (rapid/read-sdp-mod f opts)
-             (fs/read-mod-file f opts))
-           name-and-version (u/mod-name-and-version mod-data opts)]
-       (merge mod-data name-and-version))
-     (catch Exception e
-       (log/warn e "Error reading mod details")
-       {:file f
-        :error true}))))
+  ([f {:keys [delete-invalid-sdp] :as opts}]
+   (let [filename (fs/filename f)
+         is-sdp (and (string? filename)
+                     (string/ends-with? filename ".sdp"))]
+     (try
+       (let [mod-data
+             (if (string/ends-with? (fs/filename f) ".sdp")
+               (rapid/read-sdp-mod f opts)
+               (fs/read-mod-file f opts))
+             name-and-version (u/mod-name-and-version mod-data opts)]
+         (merge mod-data name-and-version))
+       (catch Exception e
+         (log/warn e "Error reading mod details")
+         (when (and delete-invalid-sdp is-sdp)
+           (log/info "Deleting invalid sdp file" f)
+           (raynes-fs/delete f))
+         {:file f
+          :error true})))))
 
 
 (defn- update-mod
@@ -579,6 +586,8 @@
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
               rapid-data (get rapid-data-by-version battle-modname)
               rapid-id (:id rapid-data)
+              sdp-file (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))
+              sdp-file-exists (fs/exists? sdp-file)
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
@@ -689,7 +698,14 @@
                              (get download-sources-by-name engine-download-source-name)))
                          :else
                          (when battle-version
-                           (log/info "Nothing to do to auto get engine" battle-version))))
+                           (log/info "Nothing to do to auto get engine" battle-version
+                             (with-out-str
+                               (pprint
+                                 {:importable engine-importable
+                                  :downloadable engine-downloadable
+                                  :download-source-name engine-download-source-name
+                                  :download-task engine-download-task
+                                  :spring-root spring-root}))))))
                      (when
                        (and (= battle-map (:battle-map old-battle-details))
                             no-map)
@@ -745,8 +761,18 @@
                               (not rapid-task)
                               (not update-rapid-task)
                               engine-file
-                              (not (fs/file-exists? file-cache (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))))
-                              (check-cooldown cooldowns [:rapid (:id rapid-data)]))
+                              sdp-file-exists)
+                         (do
+                           (log/info "Refreshing mods to pick up" sdp-file)
+                           {::task-type ::refresh-mods
+                            :delete-invalid-sdp true
+                            :spring-root spring-root})
+                         (and rapid-id
+                              (not rapid-task)
+                              (not update-rapid-task)
+                              engine-file
+                              (not sdp-file-exists)
+                              (check-cooldown cooldowns [:rapid rapid-id]))
                          (do
                            (log/info "Adding task to auto download rapid" rapid-id)
                            {::task-type ::rapid-download
@@ -762,9 +788,28 @@
                            {::task-type ::http-downloadable
                             :downloadable mod-downloadable
                             :spring-isolation-dir spring-root})
+                         (and (not rapid-id)
+                              (not rapid-task)
+                              (not update-rapid-task)
+                              (check-cooldown cooldowns [:update-rapid spring-root-path]))
+                         (do
+                           (log/info "Adding task to update rapid looking for" battle-modname)
+                           {::task-type ::update-rapid
+                            :engine-version battle-version
+                            :mod-name battle-modname
+                            :spring-isolation-dir spring-root})
                          :else
                          (when battle-modname
-                           (log/info "Nothing to do to auto get engine" battle-modname))))
+                           (log/info "Nothing to do to auto get game" battle-modname
+                             (with-out-str
+                               (pprint
+                                 {:downloadable mod-downloadable
+                                  :download-task mod-download-task
+                                  :engine-file engine-file
+                                  :rapid-data rapid-data
+                                  :sdp-file sdp-file
+                                  :sdp-file-exists sdp-file-exists
+                                  :spring-root spring-root}))))))
                      (when
                        (and no-mod
                             (not rapid-id)
@@ -1577,7 +1622,7 @@
   ([state-atom]
    (refresh-engines state-atom nil))
   ([state-atom spring-root]
-   (log/info "Reconciling engines")
+   (log/info "Refreshing engines in" spring-root)
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
@@ -1628,7 +1673,9 @@
   ([state-atom]
    (refresh-mods state-atom nil))
   ([state-atom spring-root]
-   (log/info "Reconciling mods")
+   (refresh-mods state-atom spring-root nil))
+  ([state-atom spring-root {:keys [delete-invalid-sdp]}]
+   (log/info "Refreshing mods in" spring-root)
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir use-git-mod-version] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
@@ -1685,7 +1732,7 @@
        (log/info "Adding" (count this-round) "mods this iteration"))
      (doseq [file this-round]
        (log/info "Reading mod from" file)
-       (update-mod *state spring-root-path file {:use-git-mod-version use-git-mod-version})) ; TODO inline?
+       (update-mod *state spring-root-path file {:delete-invalid-sdp delete-invalid-sdp :use-git-mod-version use-git-mod-version}))
      (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
      (swap! state-atom
             (fn [state]
@@ -1759,7 +1806,7 @@
   ([state-atom]
    (refresh-maps state-atom nil))
   ([state-atom spring-root]
-   (log/info "Reconciling maps")
+   (log/info "Refreshing maps in" spring-root)
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
@@ -2382,7 +2429,7 @@
 
 (defn refresh-engines-all-spring-roots []
   (let [spring-roots (skylobby.fs/spring-roots @*state)]
-    (log/info "Reconciling engines in" (pr-str spring-roots))
+    (log/info "Refreshing engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
 
@@ -2394,18 +2441,18 @@
 
 (defn refresh-mods-all-spring-roots []
   (let [spring-roots (skylobby.fs/spring-roots @*state)]
-    (log/info "Reconciling mods in" (pr-str spring-roots))
+    (log/info "Refreshing mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
 
-(defmethod task-handler ::refresh-mods [{:keys [spring-root]}]
+(defmethod task-handler ::refresh-mods [{:keys [delete-invalid-sdp spring-root]}]
   (if spring-root
-    (refresh-mods *state spring-root)
+    (refresh-mods *state spring-root {:delete-invalid-sdp delete-invalid-sdp})
     (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
   (let [spring-roots (skylobby.fs/spring-roots @*state)]
-    (log/info "Reconciling maps in" (pr-str spring-roots))
+    (log/info "Refreshing maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
 
@@ -3977,6 +4024,7 @@
                                                         (map (juxt :id identity) rapid-versions))))))))))
               (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
+    (update-cooldown *state [:update-rapid (fs/canonical-path spring-isolation-dir)])
     (add-tasks! *state
       [
        (merge
