@@ -158,6 +158,8 @@
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
     (message/send-message state-atom client-data "CHANNELS")
+    (message/send-message state-atom client-data "FRIENDLIST")
+    (message/send-message state-atom client-data "FRIENDREQUESTLIST")
     (when (u/matchmaking? server-data)
       (message/send-message state-atom client-data "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]

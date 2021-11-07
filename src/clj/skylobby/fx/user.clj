@@ -21,6 +21,7 @@
   (let [ignore-users (fx/sub-val context :ignore-users)
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        friends (fx/sub-val context get-in [:by-server server-key :friends])
         battles-by-users (->> battles
                               vals
                               (mapcat
@@ -36,6 +37,8 @@
                  vals
                  (filter :username)
                  (sort-by :username String/CASE_INSENSITIVE_ORDER)
+                 (map (fn [{:keys [username] :as user}]
+                        (assoc-in user [:client-status :friend] (contains? friends username))))
                  vec)
      :desc
      {:fx/type :table-view
@@ -66,6 +69,17 @@
                                            :battle battle
                                            :client-data client-data
                                            :selected-battle battle-id}}])
+                           (if (contains? friends username)
+                             [{:fx/type :menu-item
+                               :text "Unfriend"
+                               :on-action {:event/type :spring-lobby/unfriend
+                                           :client-data client-data
+                                           :username username}}]
+                             [{:fx/type :menu-item
+                               :text "Friend"
+                               :on-action {:event/type :spring-lobby/friend-request
+                                           :client-data client-data
+                                           :username username}}])
                            (when (= "SLDB" username)
                              [{:fx/type :menu-item
                                :text "!help"
@@ -133,7 +147,7 @@
         :text "Status"
         :resizable false
         :pref-width 56
-        :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame])
+        :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame :friend])
         :cell-factory
         {:fx/cell-type :table-cell
          :describe
@@ -150,11 +164,13 @@
                    (cond
                      (:bot status) "robot"
                      (:access status) "account-key"
+                     (:friend status) "account-star"
                      :else "account")
                    ":16:"
                    (cond
                      (:bot status) "grey"
                      (:access status) "orange"
+                     (:friend status) "green"
                      :else "white"))}]
                (when (:ingame status)
                  [{:fx/type font-icon/lifecycle

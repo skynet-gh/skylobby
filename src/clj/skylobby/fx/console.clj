@@ -56,46 +56,49 @@
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         console-auto-scroll (fx/sub-val context :console-auto-scroll)
         console-log (fx/sub-val context get-in [:by-server server-key :console-log])
-        console-message-draft (fx/sub-val context get-in [:by-server server-key :console-message-draft])]
+        console-message-draft (fx/sub-val context get-in [:by-server server-key :console-message-draft])
+        selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])]
     {:fx/type :v-box
      :children
-     [
-      {:fx/type ext-recreate-on-key-changed
-       :key {:server-key server-key}
-       :v-box/vgrow :always
-       :desc
-       {:fx/type ext-scroll-on-create
-        :desc
-        {:fx/type fx.virtualized-scroll-pane/lifecycle
-         :event-filter {:event/type :spring-lobby/filter-console-scroll}
-         :content
-         {:fx/type fx.rich-text/lifecycle-fast
-          :editable false
-          :style {:-fx-font-family skylobby.fx/monospace-font-family
-                  :-fx-font-size default-font-size}
-          :wrap-text true
-          :document [(reverse console-log) console-document console-auto-scroll]}}}}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :button
-         :text "Send"
-         :on-action {:event/type :spring-lobby/send-console
-                     :client-data client-data
-                     :message console-message-draft
-                     :server-key server-key}}
-        {:fx/type :text-field
-         :h-box/hgrow :always
-         :id "console-text-field"
-         :text (str console-message-draft)
-         :on-text-changed {:event/type :spring-lobby/assoc-in
-                           :path [:by-server server-key :console-message-draft]}
-         :on-action {:event/type :spring-lobby/send-console
-                     :client-data client-data
-                     :message console-message-draft
-                     :server-key server-key}
-         :on-key-pressed {:event/type :spring-lobby/on-console-key-pressed
-                          :server-key server-key}}]}]}))
+     (if (= "console" selected-tab-main)
+       [
+        {:fx/type ext-recreate-on-key-changed
+         :key {:server-key server-key}
+         :v-box/vgrow :always
+         :desc
+         {:fx/type ext-scroll-on-create
+          :desc
+          {:fx/type fx.virtualized-scroll-pane/lifecycle
+           :event-filter {:event/type :spring-lobby/filter-console-scroll}
+           :content
+           {:fx/type fx.rich-text/lifecycle-fast
+            :editable false
+            :style {:-fx-font-family skylobby.fx/monospace-font-family
+                    :-fx-font-size default-font-size}
+            :wrap-text true
+            :document [(reverse console-log) console-document console-auto-scroll]}}}}
+        {:fx/type :h-box
+         :alignment :center-left
+         :children
+         [{:fx/type :button
+           :text "Send"
+           :on-action {:event/type :spring-lobby/send-console
+                       :client-data client-data
+                       :message console-message-draft
+                       :server-key server-key}}
+          {:fx/type :text-field
+           :h-box/hgrow :always
+           :id "console-text-field"
+           :text (str console-message-draft)
+           :on-text-changed {:event/type :spring-lobby/assoc-in
+                             :path [:by-server server-key :console-message-draft]}
+           :on-action {:event/type :spring-lobby/send-console
+                       :client-data client-data
+                       :message console-message-draft
+                       :server-key server-key}
+           :on-key-pressed {:event/type :spring-lobby/on-console-key-pressed
+                            :server-key server-key}}]}]
+       [])}))
 
 (defn console-view
   [state]

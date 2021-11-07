@@ -258,12 +258,17 @@
 
 
 (defmethod handle "JOIN" [state-atom server-key m]
-  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
+  (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)
+        battle-channel? (u/battle-channel-name? channel-name)]
     (swap! state-atom
       (fn [state]
-        (-> state
-            (assoc-in [:selected-tab-channel server-key] channel-name)
-            (assoc-in [:by-server server-key :my-channels channel-name] {}))))))
+        (let [focus-chat (:focus-chat-on-message state)
+              selected-tab-channel (get-in state [:selected-tab-channel server-key])]
+          (cond-> state
+                  true
+                  (assoc-in [:by-server server-key :my-channels channel-name] {})
+                  (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
+                  (assoc-in [:selected-tab-channel server-key] channel-name)))))))
 
 (defmethod handle "JOINFAILED" [state-atom server-key m]
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
@@ -739,6 +744,40 @@
 
 (defmethod handle "CHANNELS" [_state-atom _server-url _m]
   (log/info "Ignoring unused CHANNELS command"))
+
+
+(defmethod handle "FRIENDLISTBEGIN" [_state-atom _server-key _m]
+  (log/info "Ignoring unused FRIENDLISTBEGIN command"))
+
+(defmethod handle "FRIENDLISTEND" [_state-atom _server-key _m]
+  (log/info "Ignoring unused FRIENDLISTEND command"))
+
+
+(defn handle-friend [state-atom server-key username]
+  (swap! state-atom update-in [:by-server server-key]
+    (fn [server-data]
+      (-> server-data
+          (assoc-in [:friends username] {})
+          (update :friend-requests dissoc username)))))
+
+(defmethod handle "FRIEND" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (handle-friend state-atom server-key username)))
+
+(defmethod handle "FRIENDLIST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (handle-friend state-atom server-key username)))
+
+
+(defmethod handle "FRIENDREQUESTLISTBEGIN" [_state-atom _server-key _m]
+  (log/info "Ignoring unused FRIENDREQUESTLISTBEGIN command"))
+
+(defmethod handle "FRIENDREQUESTLISTEND" [_state-atom _server-key _m]
+  (log/info "Ignoring unused FRIENDREQUESTLISTEND command"))
+
+(defmethod handle "FRIENDREQUESTLIST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
 
 
 (defmethod handle "OK" [state-atom server-key m]

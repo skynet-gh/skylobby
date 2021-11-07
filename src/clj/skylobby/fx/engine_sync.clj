@@ -36,6 +36,9 @@
         importables-by-path (fx/sub-val context :importables-by-path)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         engine-update-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
+        download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
+                            (map (comp :download-url :downloadable))
+                            set)
         extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
                            (map (comp fs/canonical-path :file))
                            set)
@@ -72,6 +75,7 @@
                download (get http-download url)
                download-source-name (engine-download-source engine-version)
                in-progress (or (:running download)
+                               (contains? download-tasks url)
                                (and (not downloadable)
                                     download-source-name
                                     (contains? download-source-update-tasks download-source-name)))
@@ -182,23 +186,24 @@
                resource-path (fs/canonical-path resource-file)
                dest (resource/resource-dest spring-isolation-dir importable)
                dest-exists (fs/file-exists? file-cache dest)]
-           [{:severity (if dest-exists -1 2)
-             :text "import"
-             :human-text (if importable
-                           (str "Import from " import-source-name)
-                           "No import found")
-             :tooltip (if importable
-                        (str "Copy engine dir from " import-source-name " at " resource-path)
-                        (str "No local import found for " engine-version))
-             :in-progress (-> copying (get resource-path) :status)
-             :action
-             (when (and importable
-                        (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir importable))))
-               {:event/type :spring-lobby/add-task
-                :task
-                {:spring-lobby/task-type :spring-lobby/import
-                 :importable importable
-                 :spring-isolation-dir spring-isolation-dir}})}])))}))
+           (when importable
+             [{:severity (if dest-exists -1 2)
+               :text "import"
+               :human-text (if importable
+                             (str "Import from " import-source-name)
+                             "No import found")
+               :tooltip (if importable
+                          (str "Copy engine dir from " import-source-name " at " resource-path)
+                          (str "No local import found for " engine-version))
+               :in-progress (-> copying (get resource-path) :status)
+               :action
+               (when (and importable
+                          (not (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir importable))))
+                 {:event/type :spring-lobby/add-task
+                  :task
+                  {:spring-lobby/task-type :spring-lobby/import
+                   :importable importable
+                   :spring-isolation-dir spring-isolation-dir}})}]))))}))
 
 (defn engine-sync-pane [state]
   (tufte/profile {:dynamic? true

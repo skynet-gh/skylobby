@@ -309,29 +309,32 @@
 
 
 (defn channel-view-impl
-  [{:keys [channel-name disable hide-users server-key usernames]}]
-  {:fx/type :h-box
-   :children
-   (concat
-     [{:fx/type :v-box
-       :h-box/hgrow :always
-       :style {:-fx-font-size 16}
-       :children
-       [{:fx/type channel-view-history
-         :v-box/vgrow :always
-         :channel-name channel-name
-         :server-key server-key}
-        {:fx/type channel-view-input
-         :channel-name channel-name
-         :disable disable
-         :server-key server-key
-         :usernames usernames}]}]
-     (when (and (not hide-users)
-                channel-name
-                (not (string/starts-with? channel-name "@")))
-       [{:fx/type channel-view-users
-         :channel-name channel-name
-         :server-key server-key}]))})
+  [{:fx/keys [context] :keys [channel-name disable hide-users server-key usernames]}]
+  (let [selected-server-tab (fx/sub-val context :selected-server-tab)]
+    {:fx/type :h-box
+     :children
+     (if (= server-key selected-server-tab)
+       (concat
+         [{:fx/type :v-box
+           :h-box/hgrow :always
+           :style {:-fx-font-size 16}
+           :children
+           [{:fx/type channel-view-history
+             :v-box/vgrow :always
+             :channel-name channel-name
+             :server-key server-key}
+            {:fx/type channel-view-input
+             :channel-name channel-name
+             :disable disable
+             :server-key server-key
+             :usernames usernames}]}]
+         (when (and (not hide-users)
+                    channel-name
+                    (not (string/starts-with? channel-name "@")))
+           [{:fx/type channel-view-users
+             :channel-name channel-name
+             :server-key server-key}]))
+       [])}))
 
 
 (defn channel-view
