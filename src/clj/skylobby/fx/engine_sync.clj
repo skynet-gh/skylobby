@@ -87,7 +87,9 @@
              [{:severity severity
                :text "download"
                :human-text (if in-progress
-                             (u/download-progress download)
+                             (if (and (not downloadable) download-source-name)
+                               (str "Updating download source " download-source-name)
+                               (u/download-progress download))
                              (if downloadable
                                (if dest-exists
                                  (str "Downloaded " (fs/filename dest))
