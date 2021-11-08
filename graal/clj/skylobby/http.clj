@@ -160,10 +160,18 @@
 
 (defn guess-resource-type [url]
   (cond
-    (spring-resource? url) :spring-lobby/map ; TODO mods?
-    (seven-zip? url) :spring-lobby/engine ; TODO
+    (spring-resource? url) :spring-lobby/map
+    (seven-zip? url) :spring-lobby/engine
     :else
     nil))
+
+(defn maps-only [url]
+  (when (and url (spring-resource? url))
+    :spring-lobby/map))
+
+(defn mods-only [url]
+  (when (and url (spring-resource? url))
+    :spring-lobby/mod))
 
 (defn- by-tag [element tag]
   (->> element
@@ -352,9 +360,6 @@
 (defn springlauncher-resource-type [url]
   (cond
     (not url) nil
-    (and (string/starts-with? url "engines/")
-         (seven-zip? url))
-    :spring-lobby/engine
     (and (string/starts-with? url "maps/")
          (spring-resource? url))
     :spring-lobby/map

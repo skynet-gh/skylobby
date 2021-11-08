@@ -6,12 +6,13 @@
     [clojure.java.io :as io]
     [clojure.set]
     [clojure.string :as string]
-    [clojure.walk]
+    clojure.walk
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
+    [spring-lobby.sound :as sound]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -61,7 +62,7 @@
       (str (unit-rgb b) " " (unit-rgb g) " " (unit-rgb r))))) ; Spring lobby uses bgr
 
 (defn team-name [id]
-  (keyword (str "team" id)))
+  (str "team" id))
 
 (defn players-and-bots
   "Returns the non-spectating players and bots in a battle."
@@ -114,14 +115,14 @@
 (defn script-data-client
   [battle {:keys [game]}]
   (let [hostip-override (get-in battle [:scripttags "game" "hostip"])]
-    {:game
-     {:hostip (if (string/blank? hostip-override)
-                (:battle-ip battle)
-                hostip-override)
-      :hostport (:battle-port battle)
-      :ishost 0
-      :myplayername (:myplayername game)
-      :mypasswd (:script-password battle)}}))
+    {"game"
+     {"hostip" (if (string/blank? hostip-override)
+                 (:battle-ip battle)
+                 hostip-override)
+      "hostport" (:battle-port battle)
+      "ishost" 0
+      "myplayername" (get game "myplayername")
+      "mypasswd" (:script-password battle)}}))
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
@@ -147,7 +148,7 @@
                                        :startposz (:z startpos)}]))
                                  (filter existing-team?)
                                  (into {}))}
-         startpostype (-> battle :scripttags :game :startpostype str)
+         startpostype (get-in battle [:scripttags "game" "startpostype" str])
          team-ids (->> battle
                        players-and-bots
                        (map (comp :id :battle-status second))
@@ -163,13 +164,13 @@
          default-map-teams)
        (update
          (:scripttags battle)
-         :game
+         "game"
          (fn [game]
            (let [all-modoptions (->> mod-details
                                      :modoptions
                                      (map second)
                                      (remove (comp #{"section"} :type)))]
-             (->> (update game :modoptions
+             (->> (update game "modoptions"
                           (fn [modoptions]
                             (->> all-modoptions
                                  (map
@@ -180,35 +181,35 @@
                                  (into {}))))
                   (filter existing-team?)
                   (into {})))))
-       {:game
+       {"game"
         (into
           (merge
-            {:ishost (if is-host 1 0)}
+            {"ishost" (if is-host 1 0)}
             (when-let [gametype (if-let [modinfo (:modinfo mod-details)]
                                   (str (:name modinfo) " " (:version modinfo))
                                   (:battle-modname battle))]
               (let [gametype (u/mod-name-fix-git gametype)]
-                {:gametype gametype}))
+                {"gametype" gametype}))
             (when-let [hostip (:battle-ip battle)]
               (when-not is-host
-                {:hostip hostip}))
+                {"hostip" hostip}))
             (if-let [hostport (:battle-port battle)]
-              {:hostport hostport}
+              {"hostport" hostport}
               (when singleplayer
-                {:hostport (u/open-port)}))
+                {"hostport" (u/open-port)}))
             (when-let [mapname (:battle-map battle)]
-              {:mapname mapname}))
+              {"mapname" mapname}))
           (concat
             (map
               (fn [[player {:keys [battle-status user]}]]
                 (let [team (-> battle-status :id actual-team-id)
                       spectator (if (:mode battle-status) 0 1)]
-                  [(keyword (str "player" team))
-                   {:name player
-                    :team team
-                    :isfromdemo 0 ; TODO replays
-                    :spectator spectator
-                    :countrycode (:country user)}]))
+                  [(str "player" team)
+                   {"name" player
+                    "team" team
+                    "isfromdemo" 0  ; TODO replays
+                    "spectator" spectator
+                    "countrycode" (:country user)}]))
               (:users battle))
             (map
               (fn [[_player {:keys [battle-status team-color owner]}]]
@@ -218,28 +219,28 @@
                                     team-id)
                       side (:side battle-status)]
                     [(team-name team-id)
-                     {:teamleader team-leader
-                      :handicap (:handicap battle-status)
-                      :allyteam (:ally battle-status)
-                      :rgbcolor (format-color team-color)
-                      :side (get sides side side)}]))
+                     {"teamleader" team-leader
+                      "handicap" (:handicap battle-status)
+                      "allyteam" (:ally battle-status)
+                      "rgbcolor" (format-color team-color)
+                      "side" (get sides side side)}]))
               teams)
             (map
               (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
                 (let [team (-> battle-status :id actual-team-id)
                       host (-> battle :users (get owner) :battle-status :id actual-team-id)]
-                  [(keyword (str "ai" team))
-                   {:name bot-name
-                    :shortname ai-name
-                    :version ai-version
-                    :host host
-                    :isfromdemo 0 ; TODO replays
-                    :team team
-                    :options {}}])) ; TODO ai options
+                  [(str "ai" team)
+                   {"name" bot-name
+                    "shortname" ai-name
+                    "version" ai-version
+                    "host" host
+                    "isfromdemo" 0  ; TODO replays
+                    "team" team
+                    "options" {}}]))  ; TODO ai options
               (:bots battle))
             (map
               (fn [ally]
-                [(keyword (str "allyteam" ally)) {:numallies 0}])
+                [(str "allyteam" ally) {"numallies" 0}])
               ally-teams)
             (:game opts)))}))))
 
@@ -295,9 +296,10 @@
 (defn mod-sides [mod-details]
   (->> mod-details
        :sidedata
+       clojure.walk/stringify-keys
        (filter parse-side-key)
        (sort-by parse-side-key)
-       (map (comp :name second))
+       (map (comp #(get % "name") second))
        (map-indexed vector)
        (into {})))
 
@@ -305,7 +307,7 @@
   (let [battle (battle-details state)
         script (script-data battle
                  {:is-host (= username (:host-username battle))
-                  :game {:myplayername username}
+                  :game {"myplayername" username}
                   :map-details battle-map-details
                   :mod-details battle-mod-details
                   :sides (mod-sides battle-mod-details)
@@ -464,7 +466,10 @@
                                  timeline (Timeline. keyframes)]
                              (.play timeline)))
                          (when (not media-player)
-                           (log/info "No media player to resume"))))
+                           (log/info "No media player to resume")))
+                       (let [{:keys [ring-when-game-ends] :as state} @state-atom]
+                         (when ring-when-game-ends
+                           (sound/play-ring state))))
         set-ingame (fn [ingame]
                      (client/send-message state-atom client-data
                        (str "MYSTATUS "

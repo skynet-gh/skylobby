@@ -76,7 +76,9 @@
                          (map second)
                          (map (juxt (comp spring/team-str spring/team-name :id :battle-status) identity))
                          (into {}))
-        map-teams (clojure.walk/stringify-keys (spring/map-teams map-details))
+        map-teams (clojure.walk/stringify-keys
+                    (into {}
+                      (spring/map-teams map-details)))
         missing-teams (clojure.set/difference
                         (set (map spring/team-str (spring/team-keys teams)))
                         (set (map (comp spring/team-str first) map-teams)))

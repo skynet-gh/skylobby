@@ -653,6 +653,10 @@
                                      (filter (comp #{::http-downloadable} ::task-type))
                                      (filter (comp (partial resource/same-resource-filename? mod-downloadable) :downloadable))
                                      first)
+              mod-refresh-tasks (->> all-tasks
+                                     (filter (comp #{::refresh-mods} ::task-type))
+                                     (map (comp fs/canonical-path :spring-root))
+                                     set)
               no-mod (->> mods
                           (filter (comp #{battle-modname} :mod-name))
                           first
@@ -760,12 +764,14 @@
                          (and rapid-id
                               (not rapid-task)
                               (not update-rapid-task)
+                              (not (contains? mod-refresh-tasks spring-root-path))
                               engine-file
                               sdp-file-exists)
                          (do
                            (log/info "Refreshing mods to pick up" sdp-file)
                            {::task-type ::refresh-mods
                             :delete-invalid-sdp true
+                            :priorites [sdp-file]
                             :spring-root spring-root})
                          (and rapid-id
                               (not rapid-task)
@@ -806,6 +812,7 @@
                                  {:downloadable mod-downloadable
                                   :download-task mod-download-task
                                   :engine-file engine-file
+                                  :refresh-tasks mod-refresh-tasks
                                   :rapid-data rapid-data
                                   :sdp-file sdp-file
                                   :sdp-file-exists sdp-file-exists
@@ -1674,7 +1681,7 @@
    (refresh-mods state-atom nil))
   ([state-atom spring-root]
    (refresh-mods state-atom spring-root nil))
-  ([state-atom spring-root {:keys [delete-invalid-sdp]}]
+  ([state-atom spring-root {:keys [delete-invalid-sdp priorities]}]
    (log/info "Refreshing mods in" spring-root)
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir use-git-mod-version] :as state} @state-atom
@@ -1710,7 +1717,8 @@
                                  #(resource/could-be-this-mod? % resource)
                                  battle-mods))
                              (fn [f]
-                               {:resource-filename (fs/filename f)}))))
+                               {:resource-filename (fs/filename f)})))
+                         (concat priorities))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
          this-round (concat priorities (take mods-batch-size todo))
          all-paths (set (filter some? (map (comp fs/canonical-path :file) mods)))
@@ -2445,9 +2453,9 @@
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
 
-(defmethod task-handler ::refresh-mods [{:keys [delete-invalid-sdp spring-root]}]
+(defmethod task-handler ::refresh-mods [{:keys [spring-root] :as opts}]
   (if spring-root
-    (refresh-mods *state spring-root {:delete-invalid-sdp delete-invalid-sdp})
+    (refresh-mods *state spring-root opts)
     (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
@@ -4336,16 +4344,21 @@
         (let [downloadables (resources-fn source)
               downloadables-by-url (->> downloadables
                                         (map (juxt :download-url identity))
-                                        (into {}))]
+                                        (into {}))
+              all-download-source-names (set (keys download-sources-by-name))]
           (log/info "Found downloadables from" download-source-name "at" url
                     (frequencies (map :resource-type downloadables)))
           (swap! *state update :downloadables-by-url
                  (fn [old]
-                   (merge
-                     (->> old
-                          (remove (comp #{download-source-name} :download-source-name second))
-                          (into {}))
-                     downloadables-by-url)))
+                   (let [invalid-download-source (remove (comp all-download-source-names :download-source-name second) old)]
+                     (when (seq invalid-download-source)
+                       (log/warn "Deleted" (count invalid-download-source) "downloads from invalid sources"))
+                     (merge
+                       (->> old
+                            (remove (comp #{download-source-name} :download-source-name second))
+                            (filter (comp all-download-source-names :download-source-name second))
+                            (into {}))
+                       downloadables-by-url))))
           (update-cooldown *state [:download-source download-source-name])
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))

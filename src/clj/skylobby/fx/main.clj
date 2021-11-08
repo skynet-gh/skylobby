@@ -63,7 +63,7 @@
               :id "singleplayer"
               :closable true
               :graphic {:fx/type :label
-                        :text "singleplayer"
+                        :text "Singleplayer"
                         :style {:-fx-font-size 18}}
               :on-close-request {:event/type :spring-lobby/dissoc-in
                                  :path [:by-server :local :battle]}

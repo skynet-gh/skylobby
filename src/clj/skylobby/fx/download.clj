@@ -27,12 +27,12 @@
 (def springfiles-maps-download-source
   {:download-source-name "SpringFiles Maps"
    :url http/springfiles-maps-url
-   :resources-fn http/html-downloadables})
+   :resources-fn (partial http/html-downloadables http/maps-only)})
 
 (def hakora-maps-download-source
   {:download-source-name "Hakora Maps"
    :url "http://www.hakora.xyz/files/springrts/maps"
-   :resources-fn http/html-downloadables})
+   :resources-fn (partial http/html-downloadables http/maps-only)})
 
 (def download-sources
   [;springfiles-maps-download-source gone now
@@ -41,7 +41,7 @@
     :url http/ba-github-releases-url
     :browse-url "https://github.com/Balanced-Annihilation/Balanced-Annihilation/releases"
     :resources-fn http/get-github-release-downloadables
-    :resource-type-fn #(when (string/ends-with? % ".sdz") :spring-lobby/mod)}
+    :resource-type-fn http/mods-only}
    {:download-source-name "BAR GitHub spring"
     :url http/bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"
@@ -54,16 +54,13 @@
     :url http/evo-rts-github-releases-url
     :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
     :resources-fn http/get-evo-rts-github-release-downloadables
-    :resource-type-fn #(when (http/evo-rts-filename? %) :spring-lobby/mod)}
+    :resource-type-fn http/mods-only}
    {:download-source-name "SpringFightClub Maps"
     :url (str http/springfightclub-root "/maps")
-    :resources-fn http/html-downloadables}
+    :resources-fn (partial http/html-downloadables http/maps-only)}
    {:download-source-name "SpringFightClub Games"
     :url http/springfightclub-root
-    :resources-fn (partial http/html-downloadables
-                           (fn [url]
-                             (when (and url (string/ends-with? url ".sdz"))
-                               :spring-lobby/mod)))}
+    :resources-fn (partial http/html-downloadables http/mods-only)}
    {:download-source-name "SpringLauncher"
     :url http/springlauncher-root
     :resources-fn http/get-springlauncher-downloadables}
@@ -74,7 +71,7 @@
     :url http/tap-github-releases-url
     :browse-url "https://github.com/FluidPlay/TAPrime_v2/releases"
     :resources-fn http/get-github-release-downloadables
-    :resource-type-fn #(when (string/ends-with? % ".sdz") :spring-lobby/mod)}
+    :resource-type-fn http/mods-only}
    {:download-source-name "TAP GitHub maps"
     :url http/tap-maps-github-releases-url
     :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"

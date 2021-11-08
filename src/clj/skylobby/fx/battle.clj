@@ -96,7 +96,7 @@
        :style {:-fx-pref-height (+ 60 (* 40 (count items)))}
        :columns
        [{:fx/type :table-column
-         :text "Key"
+         :text "Name"
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
@@ -113,7 +113,7 @@
               :desc
               (merge
                 {:fx/type :label
-                 :text (or (some-> i :key name str)
+                 :text (or (some-> i :name name str)
                            "")}
                 (when-let [v (get-in scripttags ["game" "modoptions" (some-> i :key name str)])]
                   (when (not (spring-script/tag= i v))
@@ -204,7 +204,7 @@
                 {:text (str (:def i))})))}}]}]}))
 
 (defn modoptions-view
-  [{:keys [modoptions server-key]}]
+  [{:keys [modoptions server-key singleplayer]}]
   (let [sorted (sort-by (comp u/to-number first) modoptions)
         by-section (split-by (comp #{"section"} :type second) sorted)]
     {:fx/type :scroll-pane
@@ -218,7 +218,8 @@
         (fn [section]
           {:fx/type modoptions-table
            :modoptions section
-           :server-key server-key})
+           :server-key server-key
+           :singleplayer singleplayer})
         by-section)}}))
 
 
@@ -309,6 +310,7 @@
         indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         engine-bots (:engine-bots engine-details)
+        battle-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         bots (concat engine-bots
                      (->> battle-mod-details :luaai
@@ -675,6 +677,8 @@
                :username username}
               {:am-host am-host
                :am-spec am-spec
+               :battle-map-details battle-map-details
+               :battle-mod-details battle-mod-details
                :battle-status my-battle-status
                :channel-name channel-name
                :client-data client-data
@@ -1072,7 +1076,23 @@
         [{:fx/type :button
           :text "show window"
           :on-action {:event/type :spring-lobby/assoc
-                      :key :show-uikeys-window}}]}}]}))
+                      :key :show-uikeys-window}}]}}
+      #_
+      {:fx/type :tab
+       :graphic {:fx/type :label
+                 :text "script.txt"}
+       :closable false
+       :content
+       {:fx/type :v-box
+        :children
+        [{:fx/type :text-area
+          :v-box/vgrow :always
+          :style {:-fx-font-family "Monospace"}
+          :text (str (spring/battle-script-txt
+                       (assoc
+                         (fx/sub-val context get-in [:by-server server-key])
+                         :battle-map-details battle-map-details
+                         :battle-mod-details battle-mod-details)))}]}}]}))
 
 
 (defn battle-votes-impl

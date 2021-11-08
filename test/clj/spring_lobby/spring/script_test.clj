@@ -3,6 +3,7 @@
     [clojure.string :as string]
     [clojure.test :refer [deftest is]]
     clojure.walk
+    hashp.core
     [spring-lobby.spring.script :as spring-script]
     [spring-lobby.spring-test :refer [expected-script-data expected-script-txt]]))
 
@@ -103,7 +104,7 @@
          (spring-script/parse-number "0.00000 0.00000 0.98431"))))
 
 (deftest parse-script
-  (is (= expected-script-data
+  (is (= (clojure.walk/keywordize-keys expected-script-data)
          (assoc-in
            (spring-script/parse-script expected-script-txt)
            [:game :hostip] nil))))
