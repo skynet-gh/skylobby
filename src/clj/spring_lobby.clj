@@ -4344,16 +4344,21 @@
         (let [downloadables (resources-fn source)
               downloadables-by-url (->> downloadables
                                         (map (juxt :download-url identity))
-                                        (into {}))]
+                                        (into {}))
+              all-download-source-names (set (keys download-sources-by-name))]
           (log/info "Found downloadables from" download-source-name "at" url
                     (frequencies (map :resource-type downloadables)))
           (swap! *state update :downloadables-by-url
                  (fn [old]
-                   (merge
-                     (->> old
-                          (remove (comp #{download-source-name} :download-source-name second))
-                          (into {}))
-                     downloadables-by-url)))
+                   (let [invalid-download-source (remove (comp all-download-source-names :download-source-name second) old)]
+                     (when (seq invalid-download-source)
+                       (log/warn "Deleted" (count invalid-download-source) "downloads from invalid sources"))
+                     (merge
+                       (->> old
+                            (remove (comp #{download-source-name} :download-source-name second))
+                            (filter (comp all-download-source-names :download-source-name second))
+                            (into {}))
+                       downloadables-by-url))))
           (update-cooldown *state [:download-source download-source-name])
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
