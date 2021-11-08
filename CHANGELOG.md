@@ -23,6 +23,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.12]
+
+- Fix issues with singleplayer battle
+- Add setting to ring after game ends
+- Add basic search to settings
+- Add game refresh priority for downloaded sdp
+- Fix game refresh task being added multiple times
+- Remove downloads from invalid sources
+
 ### [0.7.11]
 
 - Add support for friends list
