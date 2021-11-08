@@ -30,18 +30,17 @@
 
 
 (deftest script-data-client
-  (is (= {:game
-          {:hostip "127.0.0.1"
-           :hostport 12345
-           :ishost 0
-           :mypasswd "secret-password"
-           :myplayername "skynet"}}
+  (is (= {"game"
+          {"hostip" "127.0.0.1"
+           "hostport" 12345
+           "ishost" 0
+           "mypasswd" "secret-password"
+           "myplayername" "skynet"}}
          (spring/script-data-client
            {:battle-ip "127.0.0.1"
             :battle-port 12345
             :script-password "secret-password"}
-           {:game
-            {:myplayername "skynet"}}))))
+           {:game {"myplayername" "skynet"}}))))
 
 
 (deftest script-data
@@ -50,25 +49,23 @@
            (assoc-in
              (spring/script-data battle
                {:is-host true
-                :game
-                {:myplayername "me"}})
-             [:game :hostip] nil))))
+                :game {"myplayername" "me"}})
+             ["game" "hostip"] nil))))
   (testing "player and bot"
     (is (= expected-script-data-players
            (spring/script-data
              battle-players
              {:is-host true
-              :game {:myplayername "me"}
+              :game {"myplayername" "me"}
               :sides {0 "ARM" 1 "CORE"}}))))
   (testing "fix git game name"
-    (is (= (assoc-in expected-script-data [:game :gametype] "Beyond All Reason $VERSION")
+    (is (= (assoc-in expected-script-data ["game" "gametype"] "Beyond All Reason $VERSION")
            (assoc-in
              (spring/script-data
                (assoc battle :battle-modname "Beyond All Reason git:f0cf2cb")
                {:is-host true
-                :game
-                {:myplayername "me"}})
-             [:game :hostip] nil)))))
+                :game {"myplayername" "me"}})
+             ["game" "hostip"] nil)))))
 
 (deftest script-test
   (is (= expected-script-txt
@@ -105,14 +102,14 @@
    :battle-ip "127.0.0.1"})
 
 (def expected-script-data
-  {:game
-   {:gametype "Balanced Annihilation V9.79.4"
-    :mapname "Dworld Acidic"
-    :hostport 8452
-    :hostip nil
-    :ishost 1
-    :modoptions {}
-    :myplayername "me"}})
+  {"game"
+   {"gametype" "Balanced Annihilation V9.79.4"
+    "mapname" "Dworld Acidic"
+    "hostport" 8452
+    "hostip" nil
+    "ishost" 1
+    "modoptions" {}
+    "myplayername" "me"}})
 
 (def battle-players
   {:battle-modhash -1
@@ -148,41 +145,41 @@
       :side 1}}}})
 
 (def expected-script-data-players
-  {:game
-   {:gametype "Balanced Annihilation V10.24"
-    :mapname "Dworld Duo"
-    :hostport 8452
-    :ishost 1
-    :myplayername "me"
-    :modoptions {}
-    :team0
-    {:teamleader 0
-     :handicap 0
-     :allyteam 0
-     :rgbcolor "0.0 0.0 0.0"
-     :side "ARM"}
-    :team1
-    {:teamleader 0
-     :handicap 1
-     :allyteam 1
-     :rgbcolor "0.00392156862745098 0.0 0.0"
-     :side "CORE"},
-    :allyteam1 {:numallies 0}
-    :allyteam0 {:numallies 0}
-    :ai1
-    {:name "kekbot1"
-     :shortname "KAIK"
-     :version "0.13"
-     :host 0
-     :team 1,
-     :isfromdemo 0
-     :options {}},
-    :player0
-    {:name "skynet9001",
-     :team 0,
-     :isfromdemo 0,
-     :countrycode nil
-     :spectator 0}}})
+  {"game"
+   {"gametype" "Balanced Annihilation V10.24"
+    "mapname" "Dworld Duo"
+    "hostport" 8452
+    "ishost" 1
+    "myplayername" "me"
+    "modoptions" {}
+    "team0"
+    {"teamleader" 0
+     "handicap" 0
+     "allyteam" 0
+     "rgbcolor" "0.0 0.0 0.0"
+     "side" "ARM"}
+    "team1"
+    {"teamleader" 0
+     "handicap" 1
+     "allyteam" 1
+     "rgbcolor" "0.00392156862745098 0.0 0.0"
+     "side" "CORE"},
+    "allyteam1" {"numallies" 0}
+    "allyteam0" {"numallies" 0}
+    "ai1"
+    {"name" "kekbot1"
+     "shortname" "KAIK"
+     "version" "0.13"
+     "host" 0
+     "team" 1,
+     "isfromdemo" 0
+     "options" {}},
+    "player0"
+    {"name" "skynet9001",
+     "team" 0,
+     "isfromdemo" 0,
+     "countrycode" nil
+     "spectator" 0}}})
 
 (def expected-script-txt
   "[game]

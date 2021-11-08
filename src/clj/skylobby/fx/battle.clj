@@ -96,7 +96,7 @@
        :style {:-fx-pref-height (+ 60 (* 40 (count items)))}
        :columns
        [{:fx/type :table-column
-         :text "Key"
+         :text "Name"
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
@@ -113,7 +113,7 @@
               :desc
               (merge
                 {:fx/type :label
-                 :text (or (some-> i :key name str)
+                 :text (or (some-> i :name name str)
                            "")}
                 (when-let [v (get-in scripttags ["game" "modoptions" (some-> i :key name str)])]
                   (when (not (spring-script/tag= i v))
@@ -204,7 +204,7 @@
                 {:text (str (:def i))})))}}]}]}))
 
 (defn modoptions-view
-  [{:keys [modoptions server-key]}]
+  [{:keys [modoptions server-key singleplayer]}]
   (let [sorted (sort-by (comp u/to-number first) modoptions)
         by-section (split-by (comp #{"section"} :type second) sorted)]
     {:fx/type :scroll-pane
@@ -218,7 +218,8 @@
         (fn [section]
           {:fx/type modoptions-table
            :modoptions section
-           :server-key server-key})
+           :server-key server-key
+           :singleplayer singleplayer})
         by-section)}}))
 
 
