@@ -12,6 +12,7 @@
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
+    [spring-lobby.sound :as sound]
     [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -465,7 +466,10 @@
                                  timeline (Timeline. keyframes)]
                              (.play timeline)))
                          (when (not media-player)
-                           (log/info "No media player to resume"))))
+                           (log/info "No media player to resume")))
+                       (let [{:keys [ring-when-game-ends] :as state} @state-atom]
+                         (when ring-when-game-ends
+                           (sound/play-ring state))))
         set-ingame (fn [ingame]
                      (client/send-message state-atom client-data
                        (str "MYSTATUS "
