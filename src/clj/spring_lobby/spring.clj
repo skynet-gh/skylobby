@@ -147,7 +147,7 @@
                                        :startposz (:z startpos)}]))
                                  (filter existing-team?)
                                  (into {}))}
-         startpostype (-> battle :scripttags :game :startpostype str)
+         startpostype (get-in battle [:scripttags "game" "startpostype" str])
          team-ids (->> battle
                        players-and-bots
                        (map (comp :id :battle-status second))
@@ -163,7 +163,7 @@
          default-map-teams)
        (update
          (:scripttags battle)
-         :game
+         "game"
          (fn [game]
            (let [all-modoptions (->> mod-details
                                      :modoptions
@@ -180,7 +180,7 @@
                                  (into {}))))
                   (filter existing-team?)
                   (into {})))))
-       {:game
+       {"game"
         (into
           (merge
             {:ishost (if is-host 1 0)}

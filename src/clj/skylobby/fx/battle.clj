@@ -309,6 +309,7 @@
         indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         engine-bots (:engine-bots engine-details)
+        battle-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         bots (concat engine-bots
                      (->> battle-mod-details :luaai
@@ -675,6 +676,8 @@
                :username username}
               {:am-host am-host
                :am-spec am-spec
+               :battle-map-details battle-map-details
+               :battle-mod-details battle-mod-details
                :battle-status my-battle-status
                :channel-name channel-name
                :client-data client-data
@@ -1072,7 +1075,23 @@
         [{:fx/type :button
           :text "show window"
           :on-action {:event/type :spring-lobby/assoc
-                      :key :show-uikeys-window}}]}}]}))
+                      :key :show-uikeys-window}}]}}
+      #_
+      {:fx/type :tab
+       :graphic {:fx/type :label
+                 :text "script.txt"}
+       :closable false
+       :content
+       {:fx/type :v-box
+        :children
+        [{:fx/type :text-area
+          :v-box/vgrow :always
+          :style {:-fx-font-family "Monospace"}
+          :text (str (spring/battle-script-txt
+                       (assoc
+                         (fx/sub-val context get-in [:by-server server-key])
+                         :battle-map-details battle-map-details
+                         :battle-mod-details battle-mod-details)))}]}}]}))
 
 
 (defn battle-votes-impl
