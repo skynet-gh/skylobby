@@ -23,6 +23,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.14]
+
+- Add engine select when multiple for a version
+- Fix state churn issue from tasks
+
 ### [0.7.13]
 
 - Add launcher for web ui
