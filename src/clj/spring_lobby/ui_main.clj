@@ -183,6 +183,17 @@
                   (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/standalone-replay-init spring-lobby/*state)
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))
+              (= "headless" (first arguments))
+              (do
+                (log/info "Starting headless")
+                (future
+                  (spring-lobby/auto-connect-servers spring-lobby/*state))
+                (future
+                  (log/info "Start 7Zip init, async")
+                  (fs/init-7z!)
+                  (log/info "Finished 7Zip init"))
+                (spring-lobby/init spring-lobby/*state)
+                (spring-lobby/browse-url "http://localhost:12345"))
               :else
               (do
                 (log/info "Creating renderer")

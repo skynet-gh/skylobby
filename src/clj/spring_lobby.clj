@@ -103,7 +103,7 @@
   {'spring-lobby/java.io.File #'spring-lobby/read-file-tag
    'spring-lobby/java.net.URL #'spring-lobby/read-url-tag})
 
-; https://stackoverflow.com/a/23592006/984393
+; https://stackoverflow.com/a/23592006
 (defmethod print-method File [f ^java.io.Writer w]
   (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
 (defmethod print-method URL [url ^java.io.Writer w]
@@ -3080,20 +3080,23 @@
       (catch Exception e
         (log/error e "Error browsing file" file)))))
 
+(defn browse-url [url]
+  (let [desktop (Desktop/getDesktop)]
+    (if (.isSupported desktop Desktop$Action/BROWSE)
+      (.browse desktop (java.net.URI. url))
+      (when (fs/linux?)
+        (when (fs/linux?)
+          (let [runtime (Runtime/getRuntime)
+                command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
+                ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+            (log/info "Running" (pr-str command))
+            (.exec runtime cmdarray nil nil)))))))
+
 (defmethod event-handler ::desktop-browse-url
   [{:keys [url]}]
   (future
     (try
-      (let [desktop (Desktop/getDesktop)]
-        (if (.isSupported desktop Desktop$Action/BROWSE)
-          (.browse desktop (java.net.URI. url))
-          (when (fs/linux?)
-            (when (fs/linux?)
-              (let [runtime (Runtime/getRuntime)
-                    command ["xdg-open" url] ; https://stackoverflow.com/a/5116553/984393
-                    ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-                (log/info "Running" (pr-str command))
-                (.exec runtime cmdarray nil nil))))))
+      (browse-url url)
       (catch Exception e
         (log/error e "Error browsing url" url)))))
 
@@ -4879,7 +4882,7 @@
     (log/warn "IPC port unavailable" u/ipc-port)))
 
 
-(defn- init
+(defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
