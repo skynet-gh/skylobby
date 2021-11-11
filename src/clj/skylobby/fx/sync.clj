@@ -3,6 +3,7 @@
     [cljfx.ext.node :as fx.ext.node]
     skylobby.fx
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]))
 
 
@@ -57,7 +58,7 @@
                       " status:"))
          :style {:-fx-font-size 16}}]
        (map
-         (fn [{:keys [action in-progress human-text severity text tooltip] :or {severity 2}}]
+         (fn [{:keys [action choice choices on-choice-changed in-progress human-text severity text tooltip] :or {severity 2}}]
            (let [font-style {:-fx-font-size 12}
                  display-text (or human-text
                                   (str text " " resource))
@@ -74,20 +75,28 @@
                   :text tooltip}})
               :desc
               (if (or (zero? severity) (not action))
-                {:fx/type :label
-                 :text display-text
-                 :style font-style
-                 :graphic
-                 {:fx/type font-icon/lifecycle
-                  :icon-literal
-                  (str "mdi-"
-                       (if (zero? severity)
-                         "check"
-                         (if (= -1 severity)
-                           "sync"
-                           "exclamation"))
-                       ":16:"
-                       "white")}}
+                (if (< 1 (count choices))
+                  {:fx/type :combo-box
+                   :value choice
+                   :items choices
+                   :on-value-changed on-choice-changed
+                   :button-cell
+                   (fn [file]
+                     {:text (str (fs/filename file))})}
+                  {:fx/type :label
+                   :text display-text
+                   :style font-style
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal
+                    (str "mdi-"
+                         (if (zero? severity)
+                           "check"
+                           (if (= -1 severity)
+                             "sync"
+                             "exclamation"))
+                         ":16:"
+                         "white")}})
                 (let [style (get severity-styles issue-severity)]
                   {:fx/type :v-box
                    :style (merge style font-style)

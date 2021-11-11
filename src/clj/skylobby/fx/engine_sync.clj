@@ -28,7 +28,11 @@
     :keys [engine-version spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
         downloadables-by-url (fx/sub-val context :downloadables-by-url)
-        engine-details (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version)
+        indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
+        engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
+                           (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version))
         engine-file (:file engine-details)
         extracting (fx/sub-val context :extracting)
         file-cache (fx/sub-val context :file-cache)
@@ -62,6 +66,10 @@
          [{:severity severity
            :text "info"
            :human-text (str "Spring " engine-version)
+           :choice engine-file
+           :choices (map :file indexed-engines)
+           :on-choice-changed {:event/type :spring-lobby/assoc-in
+                               :path [:engine-overrides spring-root-path engine-version]}
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file engine-details))
                       (str "Engine '" engine-version "' not found locally"))}])

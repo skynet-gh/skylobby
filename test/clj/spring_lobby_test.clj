@@ -32,7 +32,7 @@
         (spring-lobby/handle-task! state :spring-lobby/other-task)
         (is (= {:tasks-by-kind {}}
                @state))
-        (is (= [{:tasks-by-kind {}}] ; no update
+        (is (= [] ; no update
                @changes))
         (finally
           (remove-watch state :changes)))))
