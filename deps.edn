@@ -16,7 +16,7 @@
   clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-  com.taoensso/encore {:mvn/version "3.19.0"}
+  com.taoensso/encore {:mvn/version "3.20.0"}
   com.taoensso/nippy {:mvn/version "3.1.1"}
   com.taoensso/sente {:mvn/version "1.16.2"}
   com.taoensso/timbre {:mvn/version "5.1.2"}
@@ -71,7 +71,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1067"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
@@ -91,7 +91,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1067"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
@@ -104,18 +104,17 @@
   {:extra-paths ["src/cljs"]
    :extra-deps {
                 org.clojure/core.async {:mvn/version "1.4.627"}
-                com.taoensso/encore {:mvn/version "3.19.0"}
                 com.taoensso/sente {:mvn/version "1.16.2"}
                 com.taoensso/timbre {:mvn/version "5.1.2"}
                 metosin/reitit {:mvn/version "0.5.15"}
                 re-frame/re-frame {:mvn/version "1.2.0"}
-                thheller/shadow-cljs {:mvn/version "2.15.13"}}
+                thheller/shadow-cljs {:mvn/version "2.16.1"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1067"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -126,10 +125,10 @@
   {:extra-paths ["src/clj" "graal/clj"]
    :main-opts ["-m" "spring-lobby.main"]}
   :skylobby
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.2" :git/sha "226fb52"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.3" :git/sha "166b920"}}
    :ns-default skylobby}
   :skylobby-cli
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.2" :git/sha "226fb52"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.3" :git/sha "166b920"}}
    :ns-default skylobby-cli}
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
@@ -219,7 +218,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1067"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
