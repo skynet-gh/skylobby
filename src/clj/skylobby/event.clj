@@ -7,6 +7,7 @@
     [skylobby.util :as u]
     [spring-lobby.client :as client]
     [spring-lobby.client.message :as message]
+    [spring-lobby.client.util :as cu]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
@@ -83,6 +84,9 @@
                      (not no-focus)
                      (assoc :selected-server-tab server-key))))
     (do-connect state-atom (assoc state :client-data client-data))))
+
+(defn disconnect [state-atom server-key]
+  (update-disconnected! state-atom server-key))
 
 (defn leave-battle [state-atom {:keys [client-data server-key]}]
   (swap! state-atom assoc-in [:last-battle server-key :should-rejoin] false)
@@ -196,3 +200,37 @@
        :channel-name channel-name
        :client-data client-data
        :message (str "!cv start")})))
+
+(defn set-my-battle-status
+  [state-atom client-data battle-status team-color]
+  (message/send-message state-atom client-data
+    (str "MYBATTLESTATUS"
+         " "
+         (cu/encode-battle-status battle-status)
+         " "
+         (or team-color "0"))))
+
+(defn set-battle-mode
+  [state-atom {:keys [battle-status client-data mode ready-on-unspec team-color]}]
+  (let [
+        battle-status (assoc battle-status
+                             :mode mode
+                             :ready (boolean ready-on-unspec))]
+    (swap! state-atom assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
+    (set-my-battle-status state-atom client-data battle-status team-color)))
+
+(defn set-auto-unspec [state-atom {:keys [auto-unspec server-key] :as opts}]
+  (log/info "Setting auto-unspec to" auto-unspec)
+  (swap! state-atom assoc-in [:by-server server-key :auto-unspec] auto-unspec)
+  (when auto-unspec
+    (set-battle-mode state-atom (assoc opts :mode auto-unspec))))
+
+(defn set-battle-ready
+  [state-atom {:keys [battle-status client-data ready team-color]}]
+  (swap! state-atom assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready))
+  (set-my-battle-status state-atom client-data (assoc battle-status :ready ready) team-color))
+
+
+(defn set-client-status [state-atom {:keys [client-data client-status]}]
+  (log/info "Setting client status to" client-status)
+  (message/send-message state-atom client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
