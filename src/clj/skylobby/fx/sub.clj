@@ -60,6 +60,10 @@
   (let [{:keys [engines-by-version]} (fx/sub-ctx context spring-resources spring-root)]
     (get engines-by-version engine-version)))
 
+(defn indexed-engines [context spring-root engine-version]
+  (let [{:keys [engines-grouped-by-version]} (fx/sub-ctx context spring-resources spring-root)]
+    (get engines-grouped-by-version engine-version)))
+
 (defn indexed-map [context spring-root map-name]
   (let [{:keys [maps-by-name]} (fx/sub-ctx context spring-resources spring-root)]
     (get maps-by-name map-name)))

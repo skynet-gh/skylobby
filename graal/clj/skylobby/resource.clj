@@ -3,6 +3,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs :as fs]
+    [skylobby.http :as http]
     [skylobby.rapid :as rapid]))
 
 
@@ -110,22 +111,6 @@
             (first (string/split version #"\s"))
             "_" suffix ".7z")))))
 
-(def bar-platforms
-  {"linux64" "linux-64"
-   "win32" "windows-64"
-   "win64" "windows-64"})
-
-(defn bar-engine-filename
-  ([version]
-   (bar-engine-filename version (fs/platform)))
-  ([version platform]
-   (when version
-     (let [bar-platform (get bar-platforms platform)]
-       (if (string/includes? version "BAR105")
-         (str "spring_bar_.BAR105." (first (string/split version #"\s"))
-              "_" bar-platform "-minimal-portable.7z")
-         (str "spring_bar_.BAR." (first (string/split version #"\s"))
-              "_" bar-platform "-minimal-portable.7z"))))))
 
 (defn could-be-this-engine?
   "Returns true if this resource might be the engine with the given name, by magic, false otherwise."
@@ -141,7 +126,7 @@
                       resource-filename)
                    (= (engine-archive engine-version "master" (fs/platform64))
                       resource-filename)
-                   (= (bar-engine-filename engine-version) resource-filename)))))))
+                   (= (http/bar-engine-filename engine-version) resource-filename)))))))
 
 
 (defn normalize-mod [mod-name-or-filename]
@@ -295,6 +280,7 @@
     {:spring-isolation-dir spring-root
      :engines engines
      :engines-by-version (into {} (map (juxt :engine-version identity) engines))
+     :engines-grouped-by-version (group-by :engine-version engines)
      :maps maps
      :maps-by-name (into {} (map (juxt :map-name identity) maps))
      :mods mods

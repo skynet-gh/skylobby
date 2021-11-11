@@ -380,7 +380,7 @@
         now (u/curr-millis)
         server-key (u/server-key client-data)
         battle-id (-> state :battle :battle-id)
-        _ (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
+        {:keys [engine-overrides]} (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
@@ -485,10 +485,11 @@
       (log/info "Creating game script")
       (let [{:keys [battle-version]} (battle-details state)
             script-txt (battle-script-txt state)
-            engine-dir (some->> engines
-                                (filter (comp #{battle-version} :engine-version))
-                                first
-                                :file)
+            engine-dir (or (get-in engine-overrides [(fs/canonical-path spring-isolation-dir) battle-version])
+                           (some->> engines
+                                    (filter (comp #{battle-version} :engine-version))
+                                    first
+                                    :file))
             engine-file (io/file engine-dir (fs/spring-executable))
             _ (log/info "Engine executable" engine-file)
             _ (fs/set-executable engine-file)
