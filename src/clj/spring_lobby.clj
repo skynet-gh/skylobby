@@ -1404,32 +1404,33 @@
 
 (defn handle-task!
   ([state-atom task-kind]
-   (let [[_before after] (swap-vals! state-atom
-                           (fn [{:keys [tasks-by-kind] :as state}]
-                             (if (empty? (get tasks-by-kind task-kind))
-                               state ; don't update unnecessarily
-                               (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
-                                 (-> state
-                                     (update-in [:tasks-by-kind task-kind] (partial remove-task task))
-                                     (assoc-in [:current-tasks task-kind] task))))))
-         task (-> after :current-tasks (get task-kind))]
-     (try
-       (let [thread (Thread. (fn [] (handle-task task)))]
-         (swap! *state assoc-in [:task-threads task-kind] thread)
-         (.start thread)
-         (.join thread))
-       (catch Exception e
-         (log/error e "Error running task"))
-       (catch Throwable t
-         (log/error t "Critical error running task"))
-       (finally
-         (when task
-           (swap! state-atom
-             (fn [state]
-               (-> state
-                   (assoc-in [:current-tasks task-kind] nil)
-                   (update :task-threads dissoc task-kind)))))))
-     task)))
+   (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
+     (let [[_before after] (swap-vals! state-atom
+                             (fn [{:keys [tasks-by-kind] :as state}]
+                               (if (empty? (get tasks-by-kind task-kind))
+                                 state
+                                 (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
+                                   (-> state
+                                       (update-in [:tasks-by-kind task-kind] (partial remove-task task))
+                                       (assoc-in [:current-tasks task-kind] task))))))
+           task (-> after :current-tasks (get task-kind))]
+       (try
+         (let [thread (Thread. (fn [] (handle-task task)))]
+           (swap! *state assoc-in [:task-threads task-kind] thread)
+           (.start thread)
+           (.join thread))
+         (catch Exception e
+           (log/error e "Error running task"))
+         (catch Throwable t
+           (log/error t "Critical error running task"))
+         (finally
+           (when task
+             (swap! state-atom
+               (fn [state]
+                 (-> state
+                     (assoc-in [:current-tasks task-kind] nil)
+                     (update :task-threads dissoc task-kind)))))))
+       task))))
 
 
 (defn- my-client-status [{:keys [username users]}]
