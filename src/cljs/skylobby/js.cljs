@@ -535,7 +535,7 @@
                      "gray"))
           :href (href route-name {:server-url server-url} {:username username})}
          (or (get server-route-names route-name)
-             (str "Battle: " battle-title))]])]))
+             battle-title)]])]))
 
 (defn format-hours [moment]
   (.format moment "HH:mm:ss"))
