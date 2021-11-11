@@ -23,6 +23,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.13]
+
+- Add launcher for web ui
+- More work on web ui
+- Update .desktop file with better keywords
+- Add cljs compile to release action
+
 ### [0.7.12]
 
 - Fix issues with singleplayer battle
