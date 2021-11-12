@@ -86,7 +86,7 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (if indexed-mod
-                        (str "Loading mod details for '" mod-name "'")
+                        (str "Loading mod details for '" mod-name "' at " (:file indexed-mod))
                         (str "Game '" mod-name "' not found locally")))}])
        (when (and no-mod-details (not indexed-mod))
          (let [downloadable (->> downloadables-by-url
