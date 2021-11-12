@@ -170,7 +170,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-version :extra-import-sources
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
@@ -1630,6 +1630,8 @@
   ([state-atom]
    (refresh-engines state-atom nil))
   ([state-atom spring-root]
+   (refresh-engines state-atom spring-root nil))
+  ([state-atom spring-root _opts]
    (log/info "Refreshing engines in" spring-root)
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
@@ -1815,6 +1817,8 @@
   ([state-atom]
    (refresh-maps state-atom nil))
   ([state-atom spring-root]
+   (refresh-maps state-atom spring-root nil))
+  ([state-atom spring-root {:keys [priorities]}]
    (log/info "Refreshing maps in" spring-root)
    (let [before (u/curr-millis)
          {:keys [spring-isolation-dir] :as state} @state-atom
@@ -1846,7 +1850,8 @@
                                  #(resource/could-be-this-map? % resource)
                                  battle-maps))
                              (fn [f]
-                               {:resource-filename (fs/filename f)}))))
+                               {:resource-filename (fs/filename f)})))
+                         (concat priorities))
          _ (log/info "Prioritizing maps in battles" (pr-str priorities))
          this-round (concat priorities (take maps-batch-size todo))
          next-round (drop maps-batch-size todo)
@@ -2442,9 +2447,9 @@
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
 
-(defmethod task-handler ::refresh-engines [{:keys [spring-root]}]
+(defmethod task-handler ::refresh-engines [{:keys [spring-root] :as opts}]
   (if spring-root
-    (refresh-engines *state spring-root)
+    (refresh-engines *state spring-root opts)
     (refresh-engines-all-spring-roots)))
 
 
@@ -2465,9 +2470,9 @@
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
 
-(defmethod task-handler ::refresh-maps [{:keys [spring-root]}]
+(defmethod task-handler ::refresh-maps [{:keys [spring-root] :as opts}]
   (if spring-root
-    (refresh-maps *state spring-root)
+    (refresh-maps *state spring-root opts)
     (refresh-maps-all-spring-roots)))
 
 
@@ -4175,9 +4180,9 @@
             dest (or dest (resource/resource-dest spring-isolation-dir downloadable))]
         (http/download-file *state url dest))
       (case (:resource-type downloadable)
-        ::map (refresh-maps-all-spring-roots)
-        ::mod (refresh-mods-all-spring-roots)
-        ::engine (refresh-engines-all-spring-roots)
+        ::map (refresh-maps *state spring-isolation-dir {:priorities [dest]})
+        ::mod (refresh-mods *state spring-isolation-dir {:priorities [dest]})
+        ::engine (refresh-engines *state spring-isolation-dir {:priorities [dest]})
         nil)
       (catch Exception e
         (log/error e "Error downloading")))))
@@ -4386,9 +4391,11 @@
     (add-tasks! *state [{::task-type ::refresh-engines
                          :spring-root spring-root}
                         {::task-type ::refresh-mods
-                         :spring-root spring-root}
+                         :spring-root spring-root
+                         :priorities [(:file mod-resource)]}
                         {::task-type ::refresh-maps
-                         :spring-root spring-root}])))
+                         :spring-root spring-root
+                         :priorities [(:file map-resource)]}])))
 
 
 (defmethod event-handler ::import-source-change

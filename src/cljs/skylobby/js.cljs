@@ -109,6 +109,10 @@
   (let [{:keys [channel-name server-key channel-data]} ?data]
     (rf/dispatch [::assoc-in [:by-server server-key :chat channel-name] channel-data])))
 
+(defmethod -event-msg-handler :skylobby/logins
+  [{:keys [?data]}]
+  (rf/dispatch [::assoc :logins ?data]))
+
 (defmethod -event-msg-handler :skylobby/auto-launch
   [{:keys [?data]}]
   (rf/dispatch [::assoc :auto-launch ?data]))
@@ -286,9 +290,9 @@
     db))
 
 (rf/reg-event-db ::connect-server
-  (fn [db [_t server-url]]
+  (fn [db [_t opts]]
     (chsk-send!
-      [:skylobby/connect-server {:server-url server-url}]
+      [:skylobby/connect-server opts]
       5000)
     db))
 
@@ -316,6 +320,22 @@
       5000)
     (assoc-in db [:by-server server-key :chat-message] "")))
 
+
+(rf/reg-event-db ::set-server-username
+  (fn [db [_t server-url username]]
+    (log/info "Setting username for" server-url)
+    (chsk-send!
+      [:skylobby/assoc-in [[:logins server-url :username] username]]
+      5000)
+    (update db :username-drafts dissoc server-url)))
+
+(rf/reg-event-db ::set-server-password
+  (fn [db [_t server-url password]]
+    (log/info "Setting password for" server-url)
+    (chsk-send!
+      [:skylobby/assoc-in [[:logins server-url :password] password]]
+      5000)
+    (update db :password-drafts dissoc server-url)))
 
 
 (rf/reg-event-db ::set-away
@@ -372,14 +392,16 @@
 (rf/reg-event-db ::update-battle
   (fn [db [_t server-key battle]]
     (log/trace "Updating battle in" server-key battle)
-    (when-let [new-route (or (when (and battle (not (get-in db [:by-server server-key :battle])))
-                               ::room)
-                             (when (and (not battle) (get-in db [:by-server server-key :battle]))
-                               ::battles))]
-      (let [current-route (:current-route db)
-            {:keys [path-params query-params]} current-route]
-        (log/info "Replacing state" new-route path-params query-params)
-        (rfe/replace-state new-route path-params query-params)))
+    (let [current-route (:current-route db)
+          {:keys [path-params query-params]} current-route]
+      (when (= (get-server-key (:server-url path-params) (:username query-params))
+               server-key)
+        (when-let [new-route (or (when (and battle (not (get-in db [:by-server server-key :battle])))
+                                   ::room)
+                                 (when (and (not battle) (get-in db [:by-server server-key :battle]))
+                                   ::battles))]
+          (log/info "Replacing state" new-route path-params query-params)
+          (rfe/replace-state new-route path-params query-params))))
     (assoc-in db [:by-server server-key :battle] battle)))
 
 
@@ -396,6 +418,14 @@
 (rf/reg-sub ::battles
   (fn [db [_t server-key]]
     (get-in db [:by-server server-key :battles])))
+
+(rf/reg-sub ::username-drafts
+  (fn [db _t]
+    (get db :username-drafts)))
+
+(rf/reg-sub ::password-drafts
+  (fn [db _t]
+    (get db :password-drafts)))
 
 (rf/reg-sub ::users
   (fn [db [_t server-key]]
@@ -451,7 +481,9 @@
 
 (defn servers-page [_]
   (let [{:keys [active-servers logins servers]} (listen [::servers])
-        active-server-keys (set (map :server-key active-servers))]
+        active-server-keys (set (map :server-key active-servers))
+        username-drafts (listen [::username-drafts])
+        password-drafts (listen [::password-drafts])]
     [:div
      [nav]
      [:div {:class "flex justify-center"}
@@ -465,7 +497,10 @@
          [:th "Actions"]]]
        [:tbody
         (for [[server-url server-config] servers]
-          (let [username (get-in logins [server-url :username])
+          (let [username (or (get username-drafts server-url)
+                             (get-in logins [server-url :username]))
+                password (or (get password-drafts server-url)
+                             (get-in logins [server-url :password]))
                 server-key (get-server-key server-url username)]
             ^{:key server-url}
             [:tr
@@ -473,13 +508,17 @@
              [:td server-url]
              [:td
               [:input
-               {:read-only true
-                :value username}]]
+               {
+                :value username
+                :on-blur #(rf/dispatch [::set-server-username server-url (-> % .-target .-value)])
+                :on-change #(rf/dispatch [::assoc-in [:username-drafts server-url] (-> % .-target .-value)])}]]
              [:td
               [:input
-               {:read-only true
+               {
                 :type "password"
-                :value (get-in logins [server-url :password])}]]
+                :value password
+                :on-blur #(rf/dispatch [::set-server-password server-url (-> % .-target .-value)])
+                :on-change #(rf/dispatch [::assoc-in [:password-drafts server-url] (-> % .-target .-value)])}]]
              [:td
               (let [logged-in (contains? active-server-keys server-key)]
                 [:button
@@ -487,7 +526,7 @@
                   :on-click #(rf/dispatch
                                (if logged-in
                                  [::disconnect-server server-key]
-                                 [::connect-server server-url]))}
+                                 [::connect-server {:server-url server-url :username username :password password}]))}
                  (if logged-in
                    "Disconnect"
                    "Login")])]]))]]]]))
@@ -906,9 +945,7 @@
                    "bed"])]
                [:td (:ally battle-status)]
                [:td (:id battle-status)]
-               [:td
-                {:style {:background color}}]
-                ; color])
+               [:td {:style {:background color}}]
                [:td (str (not (:mode battle-status)))]
                [:td (str (:side battle-status))]
                [:td (str (:rank client-status))]
@@ -917,10 +954,13 @@
         [:div
          {:style {:min-width "300px"}}
          [:div
-          (str (:battle-version battle-details))]
+          {:class "ma1 ba br1 pa1"}
+          (str (:battle-engine battle-details) " " (:battle-version battle-details))]
          [:div
+          {:class "ma1 ba br1 pa1"}
           (str (:battle-modname battle-details))]
          [:div
+          {:class "ma1 ba br1 pa1"}
           (str (:battle-map battle-details))]]
         [:div
          {:class "flex justify-center"

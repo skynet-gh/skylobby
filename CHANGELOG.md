@@ -23,6 +23,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.15]
+
+- Add engine overrides to config
+- Improve sync speed after downloading or force check
+- Add changing usernames and passwords for servers in web ui
+
 ### [0.7.14]
 
 - Add engine select when multiple for a version
