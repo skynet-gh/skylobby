@@ -145,15 +145,18 @@
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
   (let [session (:session ring-req)
         uid     (:uid     session)
-        {:keys [server-url]} ?data
+        {:keys [server-url username password]} ?data
         {:keys [logins servers]} @*state
         login (get logins server-url)
-        username (:username login)
+        username (or username
+                     (:username login))
+        password (or password
+                     (:password login))
         server-key (u/server-key {:server-url server-url
                                   :username username})]
     (event/connect *state {:server [server-url (get servers server-url)]
                            :server-key server-key
-                           :password (:password login)
+                           :password password
                            :username username})))
 
 (defmethod -event-msg-handler
@@ -305,6 +308,10 @@
     (when (not= (:auto-launch old-state)
                 new-auto-launch)
       (broadcast [:skylobby/auto-launch new-auto-launch])))
+  (let [new-logins (:logins new-state)]
+    (when (not= (:logins old-state)
+                new-logins)
+      (broadcast [:skylobby/logins new-logins])))
   (doseq [[server-key server-data] (:by-server new-state)]
     (let [{:keys [auto-unspec battle battles channels users]} server-data]
       (when (not= auto-unspec
