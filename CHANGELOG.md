@@ -23,6 +23,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.16]
+
+- Fix default spring root for web ui
+- Add parameter to web ui js to attempt to force cache miss
+- Upload .msi again without version for direct linking
+
 ### [0.7.15]
 
 - Add engine overrides to config
