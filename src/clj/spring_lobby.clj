@@ -2041,7 +2041,8 @@
                         username (:username server-data)]
                     (when-let [me (-> server-data :battle :users (get username))]
                       (let [{:keys [battle-status team-color]} me]
-                        (when (not= (:ready battle-status) desired-ready)
+                        (when (and (:mode battle-status)
+                                   (not= (:ready battle-status) desired-ready))
                           (message/send-message *state (:client-data server-data)
                             (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0)))))))))))
           {:error-handler
