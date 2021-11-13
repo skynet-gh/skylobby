@@ -173,16 +173,18 @@
   (let [session (:session ring-req)
         uid     (:uid     session)
         {:keys [server-key]} ?data
-        {:keys [by-server by-spring-root servers spring-isolation-dir]} @*state
+        {:keys [by-server by-spring-root engine-overrides servers spring-isolation-dir]} @*state
         {:keys [battle client-data] :as server-data} (get by-server server-key)
         {:keys [server-url username]} client-data
-        spring-root (get-in servers [server-url :spring-isolation-dir] spring-isolation-dir)
+        spring-root (or (get-in servers [server-url :spring-isolation-dir])
+                        spring-isolation-dir)
         my-battle-status (get-in battle [:users username :battle-status])]
     (event/start-battle *state (merge server-data
                                  {:am-host false ; TODO
                                   :am-spec true ; TODO
                                   :battle-status my-battle-status
                                   :channel-name (u/battle-channel-name battle)
+                                  :engine-overrides engine-overrides
                                   :host-ingame true
                                   :spring-isolation-dir spring-root}
                                  (resource/spring-root-resources spring-root by-spring-root)))))
@@ -279,7 +281,7 @@
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
       [:link {:rel "stylesheet" :href "https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"}]
       [:link {:rel "stylesheet" :href "https://fonts.googleapis.com/icon?family=Material+Icons"}]
-      [:script {:src "/js/main.js"}]])
+      [:script {:src (str "/js/main.js?v=" (u/curr-millis))}]])
    :headers {"Content-Type" "text/html"}})
 
 (defn login-handler
