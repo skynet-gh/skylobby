@@ -971,7 +971,7 @@
                   :max-height minimap-px}}
          (when map-name
            [:img
-            {:src (str "http://localhost:12345/minimap-image?map-name=" map-name
+            {:src (str "/minimap-image?map-name=" map-name
                        (when minimap-type
                          (str "&minimap-type=" minimap-type)))
              :alt (str map-name)

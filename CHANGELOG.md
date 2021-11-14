@@ -23,6 +23,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.17]
+
+- Fix singleplayer when no username is set
+- Fix some issues with auto unspec and ready
+- Add report user for teiserver
+- Add cli option to set port for web ui
+
 ### [0.7.16]
 
 - Fix default spring root for web ui

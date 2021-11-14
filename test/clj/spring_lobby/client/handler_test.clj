@@ -285,6 +285,7 @@
                {:auto-unspec true
                 :battle
                 {:battle-id "0"
+                 :desired-ready false
                  :users
                  {"skynet"
                   {:battle-status
@@ -519,7 +520,9 @@
               {server-key
                {:auto-unspec true
                 :battle
-                {:users
+                {
+                 :desired-ready false
+                 :users
                  {"skynet"
                   {:battle-status
                    {:ally 0
@@ -585,6 +588,7 @@
                {:auto-unspec true
                 :battle
                 {:battle-id "0"
+                 :desired-ready false
                  :users
                  {"skynet"
                   {:battle-status
@@ -640,6 +644,7 @@
                {:auto-unspec true
                 :battle
                 {:channel-name "__battle__0"
+                 :desired-ready false
                  :users
                  {"skynet"
                   {:battle-status

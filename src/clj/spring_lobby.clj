@@ -2037,14 +2037,15 @@
             (let [state @state-atom]
               (doseq [[_server-key server-data] (u/valid-servers (:by-server state))]
                 (when-let [battle (:battle server-data)]
-                  (let [desired-ready (boolean (:desired-ready battle))
-                        username (:username server-data)]
-                    (when-let [me (-> server-data :battle :users (get username))]
-                      (let [{:keys [battle-status team-color]} me]
-                        (when (and (:mode battle-status)
-                                   (not= (:ready battle-status) desired-ready))
-                          (message/send-message *state (:client-data server-data)
-                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0)))))))))))
+                  (when (boolean? (:desired-ready battle))
+                    (let [desired-ready (boolean (:desired-ready battle))
+                          username (:username server-data)]
+                      (when-let [me (-> server-data :battle :users (get username))]
+                        (let [{:keys [battle-status team-color]} me]
+                          (when (and (:mode battle-status)
+                                     (not= (:ready battle-status) desired-ready))
+                            (message/send-message *state (:client-data server-data)
+                              (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0))))))))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating matchmaking")
@@ -3013,20 +3014,22 @@
     (try
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
-               (-> state
-                   (assoc :selected-server-tab "singleplayer")
-                   (assoc-in [:by-server :local :client-data] nil)
-                   (assoc-in [:by-server :local :server-key] :local)
-                   (assoc-in [:by-server :local :username] username)
-                   (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
-                                                                         :battle-map map-name
-                                                                         :battle-modname mod-name
-                                                                         :host-username username})
-                   (assoc-in [:by-server :local :battle]
-                             {:battle-id :singleplayer
-                              :scripttags {"game" {"startpostype" 0}}
-                              :users {username {:battle-status (assoc cu/default-battle-status :mode true)
-                                                :team-color (first color/ffa-colors-spring)}}}))))
+               (let [username (or (when-not (string/blank? username) username)
+                                  "You")]
+                 (-> state
+                     (assoc :selected-server-tab "singleplayer")
+                     (assoc-in [:by-server :local :client-data] nil)
+                     (assoc-in [:by-server :local :server-key] :local)
+                     (assoc-in [:by-server :local :username] username)
+                     (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
+                                                                           :battle-map map-name
+                                                                           :battle-modname mod-name
+                                                                           :host-username username})
+                     (assoc-in [:by-server :local :battle]
+                               {:battle-id :singleplayer
+                                :scripttags {"game" {"startpostype" 0}}
+                                :users {username {:battle-status (assoc cu/default-battle-status :mode true)
+                                                  :team-color (first color/ffa-colors-spring)}}})))))
       (catch Exception e
         (log/error e "Error starting singleplayer battle")))))
 
@@ -3772,6 +3775,33 @@
   (set-ignore server-key username false {:channel-name channel-name}))
 
 
+(defmethod event-handler ::show-report-user
+  [{:keys [server-key username]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :show-report-user-window true)
+          (assoc-in [:report-user server-key :message] "")
+          (assoc-in [:report-user server-key :username] username)))))
+
+(defmethod event-handler ::show-report-user
+  [{:keys [battle-id server-key username]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc-in [:report-user server-key :battle-id] battle-id)
+          (assoc-in [:report-user server-key :message] "")
+          (assoc-in [:report-user server-key :username] username))))
+  (event-handler {:event/type ::toggle :value true :key :show-report-user-window}))
+
+; https://github.com/beyond-all-reason/teiserver/blob/master/documents/spring/extensions.md#cmoderationreport_user
+(defmethod event-handler ::send-user-report
+  [{:keys [battle-id client-data message username]}]
+  (let [message (string/replace (str message) #"[\n\r]" "  ")]
+    (message/send-message *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
+  (swap! *state dissoc :show-report-user-window))
+
+
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event] :keys [am-host client-data singleplayer] :as e}]
   (let [startpostype (get spring/startpostypes-by-name event)]
@@ -3846,19 +3876,21 @@
   [{:keys [client-data id is-me is-bot ready-on-unspec] :fx/keys [event] :as data}]
   (let [mode (if (contains? data :value)
                (:value data)
-               (not event))]
+               (not event))
+        server-key (u/server-key client-data)]
     (when-not is-bot
-      (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :users (:username id) :battle-status :mode] mode))
+      (swap! *state assoc-in [:by-server server-key :battle :users (:username id) :battle-status :mode] mode))
     (future
       (try
         (if (or is-me is-bot)
           (let [
                 battle-status (assoc (:battle-status id) :mode mode)
-                battle-status (if (and (not is-bot) (:mode battle-status))
-                                (do
-                                  (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
-                                  (assoc battle-status :ready (boolean ready-on-unspec)))
+                desired-ready (boolean ready-on-unspec)
+                battle-status (if (and (not is-bot) mode)
+                                (assoc battle-status :ready desired-ready)
                                 battle-status)]
+            (when (and is-me mode)
+              (swap! *state assoc-in [:by-server server-key :battle :desired-ready] desired-ready))
             (update-battle-status client-data data battle-status (:team-color id)))
           (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
         (catch Exception e
