@@ -3014,20 +3014,22 @@
     (try
       (swap! *state
              (fn [{:keys [engine-version map-name mod-name username] :as state}]
-               (-> state
-                   (assoc :selected-server-tab "singleplayer")
-                   (assoc-in [:by-server :local :client-data] nil)
-                   (assoc-in [:by-server :local :server-key] :local)
-                   (assoc-in [:by-server :local :username] username)
-                   (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
-                                                                         :battle-map map-name
-                                                                         :battle-modname mod-name
-                                                                         :host-username username})
-                   (assoc-in [:by-server :local :battle]
-                             {:battle-id :singleplayer
-                              :scripttags {"game" {"startpostype" 0}}
-                              :users {username {:battle-status (assoc cu/default-battle-status :mode true)
-                                                :team-color (first color/ffa-colors-spring)}}}))))
+               (let [username (or (when-not (string/blank? username) username)
+                                  "You")]
+                 (-> state
+                     (assoc :selected-server-tab "singleplayer")
+                     (assoc-in [:by-server :local :client-data] nil)
+                     (assoc-in [:by-server :local :server-key] :local)
+                     (assoc-in [:by-server :local :username] username)
+                     (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
+                                                                           :battle-map map-name
+                                                                           :battle-modname mod-name
+                                                                           :host-username username})
+                     (assoc-in [:by-server :local :battle]
+                               {:battle-id :singleplayer
+                                :scripttags {"game" {"startpostype" 0}}
+                                :users {username {:battle-status (assoc cu/default-battle-status :mode true)
+                                                  :team-color (first color/ffa-colors-spring)}}})))))
       (catch Exception e
         (log/error e "Error starting singleplayer battle")))))
 
