@@ -12,6 +12,7 @@
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.main :as fx.main]
     [skylobby.fx.maps :as fx.maps]
+    [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.rapid :as fx.rapid]
     [skylobby.fx.register :as fx.register]
     [skylobby.fx.replay :as fx.replay]
@@ -185,7 +186,13 @@
        :key (boolean (fx/sub-val context :show-download-replays))
        :desc
        {:fx/type fx.replay/download-replays-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-report-user-window))
+       :desc
+       {:fx/type fx.players-table/report-user-window
         :screen-bounds screen-bounds}}]}))
+
 
 (defn root-view [state]
   (tufte/profile {:dynamic? true

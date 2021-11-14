@@ -3773,6 +3773,33 @@
   (set-ignore server-key username false {:channel-name channel-name}))
 
 
+(defmethod event-handler ::show-report-user
+  [{:keys [server-key username]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :show-report-user-window true)
+          (assoc-in [:report-user server-key :message] "")
+          (assoc-in [:report-user server-key :username] username)))))
+
+(defmethod event-handler ::show-report-user
+  [{:keys [battle-id server-key username]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc-in [:report-user server-key :battle-id] battle-id)
+          (assoc-in [:report-user server-key :message] "")
+          (assoc-in [:report-user server-key :username] username))))
+  (event-handler {:event/type ::toggle :value true :key :show-report-user-window}))
+
+; https://github.com/beyond-all-reason/teiserver/blob/master/documents/spring/extensions.md#cmoderationreport_user
+(defmethod event-handler ::send-user-report
+  [{:keys [battle-id client-data message username]}]
+  (let [message (string/replace (str message) #"[\n\r]" "  ")]
+    (message/send-message *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
+  (swap! *state dissoc :show-report-user-window))
+
+
 (defmethod event-handler ::battle-startpostype-change
   [{:fx/keys [event] :keys [am-host client-data singleplayer] :as e}]
   (let [startpostype (get spring/startpostypes-by-name event)]

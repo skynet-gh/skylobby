@@ -44,6 +44,75 @@
 (def sort-rank (comp (fnil - 0) u/to-number :rank :client-status :user))
 
 
+(defn report-user-window [{:fx/keys [context]}]
+  (let [
+        show (boolean (fx/sub-val context :show-report-user-window))
+        server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        battle-id (fx/sub-val context get-in [:report-user server-key :battle-id])
+        username (fx/sub-val context get-in [:report-user server-key :username])
+        message (fx/sub-val context get-in [:report-user server-key :message])]
+    {:fx/type :stage
+     :showing show
+     :title (str u/app-name " Report User")
+     :icons skylobby.fx/icons
+     :on-close-request {:event/type :spring-lobby/dissoc
+                        :key :show-report-user-window}
+     :height 480
+     :width 600
+     :scene
+     {:fx/type :scene
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root
+      {:fx/type :v-box
+       :style {:-fx-font-size 20}
+       :children
+       [
+        {:fx/type :h-box
+         :alignment :center
+         :children
+         [
+          {:fx/type :label
+           :style {:-fx-font-size 24}
+           :text " Report user: "}
+          {:fx/type :label
+           :style {:-fx-font-size 28}
+           :text (str username)}]}
+        {:fx/type :h-box
+         :alignment :center
+         :children
+         [
+          {:fx/type :label
+           :text (str " As " server-key)}]}
+        {:fx/type :h-box
+         :alignment :center
+         :children
+         [
+          {:fx/type :label
+           :text (str " In battle id " battle-id)}]}
+        {:fx/type :label
+         :text " Reason:"}
+        {:fx/type :text-area
+         :v-box/vgrow :always
+         :text (str message)
+         :on-text-changed {:event/type :spring-lobby/assoc-in
+                           :path [:report-user server-key :message]}}
+        {:fx/type :h-box
+         :children
+         [{:fx/type :button
+           :text "Report"
+           :on-action {:event/type :spring-lobby/send-user-report
+                       :battle-id battle-id
+                       :client-data client-data
+                       :message message
+                       :username username}}
+          {:fx/type :pane
+           :h-box/hgrow :always}
+          {:fx/type :button
+           :text "Cancel"
+           :on-action {:event/type :spring-lobby/dissoc
+                       :key :show-report-user-window}}]}]}}}))
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
@@ -197,7 +266,14 @@
                       :text "Ignore"
                       :on-action {:event/type :spring-lobby/ignore-user
                                   :server-key server-key
-                                  :username username}})])}})))}
+                                  :username username}})]
+                  (when (contains? (:compflags client-data) "teiserver")
+                    [{:fx/type :menu-item
+                      :text "Report"
+                      :on-action {:event/type :spring-lobby/show-report-user
+                                  :battle-id battle-id
+                                  :server-key server-key
+                                  :username username}}]))}})))}
        :columns
        (concat
          [{:fx/type :table-column
