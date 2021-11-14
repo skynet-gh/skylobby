@@ -2037,14 +2037,15 @@
             (let [state @state-atom]
               (doseq [[_server-key server-data] (u/valid-servers (:by-server state))]
                 (when-let [battle (:battle server-data)]
-                  (let [desired-ready (boolean (:desired-ready battle))
-                        username (:username server-data)]
-                    (when-let [me (-> server-data :battle :users (get username))]
-                      (let [{:keys [battle-status team-color]} me]
-                        (when (and (:mode battle-status)
-                                   (not= (:ready battle-status) desired-ready))
-                          (message/send-message *state (:client-data server-data)
-                            (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0)))))))))))
+                  (when (boolean? (:desired-ready battle))
+                    (let [desired-ready (boolean (:desired-ready battle))
+                          username (:username server-data)]
+                      (when-let [me (-> server-data :battle :users (get username))]
+                        (let [{:keys [battle-status team-color]} me]
+                          (when (and (:mode battle-status)
+                                     (not= (:ready battle-status) desired-ready))
+                            (message/send-message *state (:client-data server-data)
+                              (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0))))))))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating matchmaking")
@@ -3846,19 +3847,21 @@
   [{:keys [client-data id is-me is-bot ready-on-unspec] :fx/keys [event] :as data}]
   (let [mode (if (contains? data :value)
                (:value data)
-               (not event))]
+               (not event))
+        server-key (u/server-key client-data)]
     (when-not is-bot
-      (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :users (:username id) :battle-status :mode] mode))
+      (swap! *state assoc-in [:by-server server-key :battle :users (:username id) :battle-status :mode] mode))
     (future
       (try
         (if (or is-me is-bot)
           (let [
                 battle-status (assoc (:battle-status id) :mode mode)
-                battle-status (if (and (not is-bot) (:mode battle-status))
-                                (do
-                                  (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean ready-on-unspec))
-                                  (assoc battle-status :ready (boolean ready-on-unspec)))
+                desired-ready (boolean ready-on-unspec)
+                battle-status (if (and (not is-bot) mode)
+                                (assoc battle-status :ready desired-ready)
                                 battle-status)]
+            (when (and is-me mode)
+              (swap! *state assoc-in [:by-server server-key :battle :desired-ready] desired-ready))
             (update-battle-status client-data data battle-status (:team-color id)))
           (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
         (catch Exception e

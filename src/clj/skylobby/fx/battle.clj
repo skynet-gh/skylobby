@@ -563,16 +563,19 @@
                 :icon-literal (str "mdi-close:" font-icon-size ":white")}}]))}
         {:fx/type :pane
          :pref-width 16}]
-       (when (and (not (:mode my-battle-status))
+       (when (and am-spec
                   (not singleplayer))
          [{:fx/type :h-box
            :alignment :center-left
            :children
-           [{:fx/type :check-box
-             :selected (boolean auto-launch)
-             :style {:-fx-padding "10px"}
-             :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:auto-launch server-key]}}
+           [{:fx/type ext-recreate-on-key-changed
+             :key (str am-spec)
+             :desc
+             {:fx/type :check-box
+              :selected (boolean auto-launch)
+              :style {:-fx-padding "10px"}
+              :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                    :path [:auto-launch server-key]}}}
             {:fx/type :label
              :text "Auto Launch "}]}])
        (when-not singleplayer
@@ -611,28 +614,35 @@
          :style {:-fx-font-size 24}
          :children
          (if-not am-spec
-           [{:fx/type :check-box
-             :selected (-> my-battle-status :ready boolean)
-             :style {:-fx-padding "10px"}
-             :on-selected-changed {:event/type :spring-lobby/battle-ready-change
-                                   :client-data client-data
-                                   :username username
-                                   :battle-status my-battle-status
-                                   :team-color my-team-color}}
+           [(let [ready (:ready my-battle-status)]
+              {:fx/type ext-recreate-on-key-changed
+               :key (str am-spec)
+               :desc
+               {:fx/type :check-box
+                :selected (boolean ready)
+                :style {:-fx-padding "10px"}
+                :on-selected-changed {:event/type :spring-lobby/battle-ready-change
+                                      :client-data client-data
+                                      :username username
+                                      :battle-status my-battle-status
+                                      :team-color my-team-color}}})
             {:fx/type :label
              :text " Ready "}]
-           [{:fx/type :check-box
-             :selected (boolean auto-unspec)
-             :style {:-fx-padding "10px"
-                     :-fx-font-size 15}
-             :on-selected-changed
-             {:event/type :spring-lobby/auto-unspec
-              :client-data (when-not singleplayer client-data)
-              :is-me true
-              :is-bot false
-              :id my-player
-              :ready-on-unspec ready-on-unspec
-              :server-key server-key}}
+           [{:fx/type ext-recreate-on-key-changed
+             :key (str am-spec)
+             :desc
+             {:fx/type :check-box
+              :selected (boolean auto-unspec)
+              :style {:-fx-padding "10px"
+                      :-fx-font-size 15}
+              :on-selected-changed
+              {:event/type :spring-lobby/auto-unspec
+               :client-data (when-not singleplayer client-data)
+               :is-me true
+               :is-bot false
+               :id my-player
+               :ready-on-unspec ready-on-unspec
+               :server-key server-key}}}
             {:fx/type :label
              :style {:-fx-font-size 15}
              :text "Auto Unspec "}])}

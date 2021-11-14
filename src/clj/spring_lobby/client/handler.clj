@@ -162,15 +162,16 @@
             (start-game-if-synced state-atom prev-state server-data)))))))
 
 (defn do-auto-unspec
-  [state-atom client-data {:keys [battle-status ready-on-unspec team-color]}]
+  [state-atom client-data {:keys [battle-status ready-on-unspec server-key team-color]}]
   (try
     (if (auto-unspec-ready?)
-      (do
+      (let [desired-ready (boolean ready-on-unspec)]
         (log/info "Auto-unspeccing")
+        (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)
         (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
-                 (assoc battle-status :mode true :ready (boolean ready-on-unspec)))
+                 (assoc battle-status :mode true :ready desired-ready))
                " "
                (or team-color 0)))
         (reset! last-auto-unspec-atom (u/curr-millis)))
@@ -205,7 +206,7 @@
             (when (and (not= username my-username)
                        (not (get-in me [:battle-status :mode]))
                        (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
-              (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))))))
+              (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr) :server-key server-key)))))))))
 
 
 (defmethod handle "UPDATEBOT" [state-atom server-url m]
@@ -254,7 +255,7 @@
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr))))))
+        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr) :server-key server-key)))))
 
 
 (defmethod handle "JOIN" [state-atom server-key m]
@@ -353,7 +354,7 @@
                auto-unspec
                (teamsize-changed-message? message)
                (-> me :battle-status :mode not))
-      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))
 
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
@@ -393,7 +394,7 @@
                auto-unspec
                (-> me :battle-status :mode not)
                (teamsize-changed-message? message))
-      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state))))))
+      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
