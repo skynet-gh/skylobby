@@ -36,6 +36,7 @@
     :parse-fn #(Double/parseDouble %)
     :validate [#(<= 0 % 1) "Must be a number between 0.0 and 1.0"]]
    [nil "--no-update-check" "Diable skylobby self update check"]
+   [nil "--port PORT" "Port to use for web ui AND ipc for file associations like replays"]
    [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
     :assoc-fn (fn [m k v]
                 (update m k conj v))]
@@ -86,6 +87,8 @@
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
             (alter-var-root #'fs/app-root-override (constantly app-root-override)))
+          (when-let [port (:port options)]
+            (alter-var-root #'u/ipc-port (constantly port)))
           (when-let [replay-sources (seq (:replay-source options))]
             (let [replay-sources-override (map
                                             (fn [source]
@@ -193,7 +196,7 @@
                   (fs/init-7z!)
                   (log/info "Finished 7Zip init"))
                 (spring-lobby/init spring-lobby/*state)
-                (spring-lobby/browse-url "http://localhost:12345"))
+                (spring-lobby/browse-url (str "http://localhost:" u/ipc-port)))
               :else
               (do
                 (log/info "Creating renderer")

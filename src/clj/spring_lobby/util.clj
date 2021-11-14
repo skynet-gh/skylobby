@@ -470,7 +470,7 @@
     (agent-string)))
 
 
-(def ipc-port 12345)
+(def ^:dynamic ipc-port 12345)
 
 ; https://stackoverflow.com/a/4883851/984393
 (defn is-port-open? [port]
