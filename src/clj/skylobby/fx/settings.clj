@@ -118,6 +118,7 @@
               players-table-columns (fx/sub-val context :players-table-columns)
               prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
               ready-on-unspec (fx/sub-val context :ready-on-unspec)
+              ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
               ring-sound-file (fx/sub-val context :ring-sound-file)
               ring-volume (fx/sub-val context :ring-volume)
               ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
@@ -424,7 +425,16 @@
                       :on-selected-changed {:event/type :spring-lobby/assoc
                                             :key :ring-when-game-ends}}
                      {:fx/type :label
-                      :text " Ring when game ends"}]}]}
+                      :text " Ring when game ends"}]}
+                   {:fx/type :h-box
+                    :alignment :center-left
+                    :children
+                    [{:fx/type :check-box
+                      :selected (boolean ring-on-auto-unspec)
+                      :on-selected-changed {:event/type :spring-lobby/assoc
+                                            :key :ring-on-auto-unspec}}
+                     {:fx/type :label
+                      :text " Ring on auto unspec"}]}]}
                {:fx/type filterable-section
                 :search settings-search
                 :title " Performance"

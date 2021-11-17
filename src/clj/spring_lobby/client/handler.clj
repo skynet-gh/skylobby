@@ -167,7 +167,10 @@
     (if (auto-unspec-ready?)
       (let [desired-ready (boolean ready-on-unspec)]
         (log/info "Auto-unspeccing")
-        (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)
+        (let [{:keys [ring-on-auto-unspec] :as state} (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)]
+          (when ring-on-auto-unspec
+            (log/info "Playing ring for auto unspec")
+            (sound/play-ring state)))
         (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
