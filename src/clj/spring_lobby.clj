@@ -1688,10 +1688,11 @@
   ([state-atom spring-root {:keys [delete-invalid-sdp priorities]}]
    (log/info "Refreshing mods in" spring-root)
    (let [before (u/curr-millis)
-         {:keys [spring-isolation-dir use-git-mod-version] :as state} @state-atom
+         {:keys [rapid-by-spring-root spring-isolation-dir use-git-mod-version] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
          _ (log/info "Updating mods in" spring-root)
          spring-root-path (fs/canonical-path spring-root)
+         {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
          mods (-> state :by-spring-root (get spring-root-path) :mods)
          {:keys [rapid archive directory]} (group-by ::fs/source mods)
          known-file-paths (set (map (comp fs/canonical-path :file) (remove :error (concat archive directory))))
@@ -1709,19 +1710,32 @@
          ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
+                          (map second)
                           (map
                             (fn [{:keys [battle battles]}]
-                              (-> battles (get (:battle-id battle)) :battle-modname)))
+                              (let [{:keys [battle-id]} battle]
+                                (get-in battles [battle-id :battle-modname]))))
                           (filter some?))
+         battle-rapid-data (map rapid-data-by-version battle-mods)
+         battle-rapid-hashes (->> battle-rapid-data
+                                  (map :hash)
+                                  (filter some?)
+                                  set)
          priorities (->> todo
                          (filter
-                           (comp
-                             (fn [resource]
-                               (some
-                                 #(resource/could-be-this-mod? % resource)
-                                 battle-mods))
+                           (some-fn
+                             (comp
+                               (fn [resource]
+                                 (some
+                                   #(resource/could-be-this-mod? % resource)
+                                   battle-mods))
+                               (fn [f]
+                                 {:resource-filename (fs/filename f)}))
                              (fn [f]
-                               {:resource-filename (fs/filename f)})))
+                               (when-let [filename (fs/filename f)]
+                                 (when (string/ends-with? filename ".sdp")
+                                   (let [id (first (string/split filename #"\."))]
+                                     (contains? battle-rapid-hashes id)))))))
                          (concat priorities))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
          this-round (concat priorities (take mods-batch-size todo))
