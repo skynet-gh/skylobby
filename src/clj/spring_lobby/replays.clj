@@ -1,12 +1,12 @@
 (ns spring-lobby.replays
   (:require
     [cljfx.api :as fx]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.fs :as fs]
     [taoensso.timbre :as log])
   (:import
     (javafx.application Platform)

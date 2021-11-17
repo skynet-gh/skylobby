@@ -1,8 +1,8 @@
-(ns spring-lobby.fs-test
+(ns skylobby.fs-test
   (:require
     [clojure.string :as string]
     [clojure.test :refer [deftest is testing]]
-    [spring-lobby.fs :as fs]))
+    [skylobby.fs :as fs]))
 
 
 (declare mock-parsed-lua mock-map-data-txt)

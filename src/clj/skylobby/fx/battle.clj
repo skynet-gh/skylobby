@@ -14,6 +14,7 @@
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
+    [skylobby.fs :as fs]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.minimap :as fx.minimap]
@@ -27,7 +28,6 @@
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
     [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
   (:import

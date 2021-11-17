@@ -15,9 +15,9 @@
     [ring.middleware.content-type :as content-type]
     [skylobby.event :as event]
     [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fs.sdfz :as replay]
     [taoensso.sente :as sente]
     [taoensso.sente.server-adapters.aleph :refer (get-sch-adapter)]
     [taoensso.timbre :as log]))

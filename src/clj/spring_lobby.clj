@@ -23,6 +23,9 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
+    [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as replay]
+    [skylobby.fs.smf :as fs.smf]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.color :as fx.color]
@@ -34,16 +37,12 @@
     [skylobby.resource :as resource]
     [skylobby.server :as server]
     [skylobby.task :as task]
-    skylobby.fs
     [skylobby.util :as u]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.fs.sdfz :as replay]
-    [spring-lobby.fs.smf :as fs.smf]
     [spring-lobby.git :as git]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
@@ -268,7 +267,7 @@
                              :country true
                              :bonus true}
      :ready-on-unspec true
-     :spring-isolation-dir (fs/default-isolation-dir)
+     :spring-isolation-dir (fs/default-spring-root)
      :servers default-servers
      :use-default-ring-sound true}
     (apply
@@ -1060,7 +1059,7 @@
         (when-not (and spring-isolation-dir
                        (instance? File spring-isolation-dir))
           (let [fixed (or (fs/file spring-isolation-dir)
-                          (fs/default-isolation-dir))]
+                          (fs/default-spring-root))]
             (log/info "Fixed spring isolation dir, was" spring-isolation-dir "now" fixed)
             (swap! state-atom assoc :spring-isolation-dir fixed))))
       (catch Exception e
@@ -1654,7 +1653,7 @@
          missing-files (set
                          (concat
                            (->> known-canonical-paths
-                                (remove (comp fs/exists io/file)))
+                                (remove (comp fs/exists? io/file)))
                            (->> known-canonical-paths
                                 (remove (comp (partial fs/descendant? spring-root) io/file)))))
          to-remove (set
@@ -1730,7 +1729,7 @@
          missing-files (set
                          (concat
                            (->> all-paths
-                                (remove (comp fs/exists io/file)))
+                                (remove (comp fs/exists? io/file)))
                            (->> all-paths
                                 (remove (comp (partial fs/descendant? spring-root) io/file)))))
          next-round
@@ -1785,9 +1784,9 @@
                         metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
                         minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
                     (or (:force opts)
-                        (not (fs/exists heightmap-file))
-                        (not (fs/exists metalmap-file))
-                        (not (fs/exists minimap-file))))))
+                        (not (fs/exists? heightmap-file))
+                        (not (fs/exists? metalmap-file))
+                        (not (fs/exists? minimap-file))))))
               (sort-by :map-name))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
@@ -1866,7 +1865,7 @@
          missing-paths (set
                          (concat
                            (->> known-files
-                                (remove fs/exists)
+                                (remove fs/exists?)
                                 (map fs/canonical-path))
                            (->> known-files
                                 (remove (partial fs/descendant? spring-root))
@@ -2408,7 +2407,7 @@
 
 
 (defn refresh-engines-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
@@ -2420,7 +2419,7 @@
 
 
 (defn refresh-mods-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
@@ -2431,7 +2430,7 @@
     (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
@@ -2847,7 +2846,7 @@
           (let [f (io/file spring-isolation-dir-draft)
                 isolation-dir (if (fs/exists? f)
                                 f
-                                (fs/default-isolation-dir))]
+                                (fs/default-spring-root))]
             (-> state
                 (assoc :spring-isolation-dir isolation-dir)
                 (dissoc :spring-isolation-dir-draft)))))

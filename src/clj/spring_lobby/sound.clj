@@ -1,7 +1,7 @@
 (ns spring-lobby.sound
   (:require
     [clojure.java.io :as io]
-    [spring-lobby.fs :as fs]
+    [skylobby.fs :as fs]
     [taoensso.timbre :as log])
   (:import
     (javafx.scene.media Media MediaPlayer)))

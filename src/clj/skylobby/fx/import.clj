@@ -3,12 +3,12 @@
     [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 

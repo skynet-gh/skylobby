@@ -5,13 +5,13 @@
     clojure.set
     [clojure.string :as string]
     clojure.walk
+    [skylobby.fs :as fs]
+    [skylobby.fs.smf :as smf]
     skylobby.fx
     [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.fs.smf :as smf]
     [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
   (:import

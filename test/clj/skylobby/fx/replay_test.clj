@@ -2,8 +2,8 @@
   (:require
     [cljfx.api :as fx]
     [clojure.test :refer [deftest is]]
-    [skylobby.fx.replay :as fx.replay]
-    [spring-lobby.fs :as fs]))
+    [skylobby.fs :as fs]
+    [skylobby.fx.replay :as fx.replay]))
 
 
 (deftest replay-view

@@ -2,13 +2,13 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.sound :as sound]
     [taoensso.timbre :as log]
@@ -211,7 +211,7 @@
                      {:fx/type :button
                       :on-action {:event/type :spring-lobby/assoc
                                   :key :spring-isolation-dir
-                                  :value (fs/default-isolation-dir)}
+                                  :value (fs/default-spring-root)}
                       :text "Skylobby"}
                      {:fx/type :button
                       :on-action {:event/type :spring-lobby/assoc

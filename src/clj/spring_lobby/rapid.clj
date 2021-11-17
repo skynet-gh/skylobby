@@ -4,8 +4,8 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
+    [skylobby.fs :as fs]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.lua :as lua]
     [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log])

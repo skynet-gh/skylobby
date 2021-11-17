@@ -7,13 +7,13 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as sdfz]
     skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.fs :as fs]
-    [spring-lobby.fs.sdfz :as sdfz]
     [spring-lobby.git :as git]
     [spring-lobby.replays :as replays]
     [taoensso.timbre :as log])

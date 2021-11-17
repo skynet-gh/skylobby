@@ -4,13 +4,13 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
     [taoensso.tufte :as tufte]))
 
 

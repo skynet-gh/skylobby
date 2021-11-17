@@ -1,9 +1,9 @@
 (ns skylobby.fx.bottom-bar
   (:require
     [cljfx.api :as fx]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 

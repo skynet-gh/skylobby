@@ -1,4 +1,4 @@
-(ns spring-lobby.fs.smf
+(ns skylobby.fs.smf
   (:require
     [byte-streams]
     [clojure.java.io :as io]

@@ -1,13 +1,13 @@
 (ns skylobby.fx.map-sync
   (:require
     [cljfx.api :as fx]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [taoensso.tufte :as tufte]))
 
 

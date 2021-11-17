@@ -9,10 +9,10 @@
     clojure.walk
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
+    [skylobby.fs :as fs]
     [skylobby.util :as u]
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
-    [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
     [taoensso.timbre :as log])
   (:import
@@ -372,6 +372,8 @@
        (map (juxt identity (partial delete-spring-setting dir)))
        (into {})))
 
+(defn get-envp [] nil)
+
 (defn start-game
   [state-atom
    {:keys [client-data engines ^MediaPlayer media-player music-paused ^java.io.File spring-isolation-dir
@@ -507,7 +509,7 @@
               runtime (Runtime/getRuntime)]
           (log/info "Running '" command "'")
           (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-                ^"[Ljava.lang.String;" envp (fs/envp)
+                ^"[Ljava.lang.String;" envp (get-envp)
                 process (.exec runtime cmdarray envp spring-isolation-dir)]
             (async/thread
               (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
@@ -563,7 +565,7 @@
           runtime (Runtime/getRuntime)]
       (log/info "Running '" command "'")
       (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-            ^"[Ljava.lang.String;" envp (fs/envp)
+            ^"[Ljava.lang.String;" envp (get-envp)
             process (.exec runtime cmdarray envp spring-isolation-dir)]
         (async/thread
           (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]

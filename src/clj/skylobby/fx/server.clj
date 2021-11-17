@@ -2,11 +2,11 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
     [taoensso.tufte :as tufte]))
 
 

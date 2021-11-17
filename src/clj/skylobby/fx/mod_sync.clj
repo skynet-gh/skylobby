@@ -2,13 +2,13 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
     [taoensso.tufte :as tufte]))
 

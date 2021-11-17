@@ -7,6 +7,7 @@
     clojure.set
     [cljfx.api :as fx]
     java-time
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.battle :refer [minimap-types]]
     [skylobby.fx.color :as fx.color]
@@ -24,7 +25,6 @@
     [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
