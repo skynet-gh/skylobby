@@ -263,6 +263,7 @@
               {
                :context-menu
                {:fx/type :context-menu
+                :style {:-fx-font-size 16}
                 :items
                 (concat []
                   (when (not owner)
@@ -379,7 +380,7 @@
                      :tooltip
                      {:fx/type tooltip-nofocus/lifecycle
                       :show-delay skylobby.fx/tooltip-show-delay
-                      :style {:-fx-font-size "16"}
+                      :style {:-fx-font-size 18}
                       :text nickname}
                      :graphic
                      {:fx/type :h-box
@@ -425,7 +426,7 @@
                             :fill text-color-css
                             :style
                             (merge
-                              {:-fx-font-size "16"
+                              {:-fx-font-size 16
                                :-fx-font-smoothing-type :gray}
                               (when not-spec
                                 {:-fx-font-weight "bold"}))})])}}))))}}]
@@ -466,7 +467,7 @@
                        :tooltip
                        {:fx/type tooltip-nofocus/lifecycle
                         :show-delay skylobby.fx/tooltip-show-delay
-                        :style {:-fx-font-size "16"}
+                        :style {:-fx-font-size 16}
                         :text
                         (str
                           (case (int (or (:sync battle-status) 0))
