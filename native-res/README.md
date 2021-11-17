@@ -24,21 +24,35 @@ Build the jar
 clj -T:skylobby-cli uber
 ```
 
+### Linux
+
 You should delete the existing configs, otherwise you will have leftovers from previous runs that might not be needed:
 
 ```
-rm native-res/META-INF/native-image/skylobby/*
+rm native-res/linux/META-INF/native-image/skylobby/*
 ```
 
 Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example downloads and extracts a Spring engine, so it executes 7zip, which is required in order to build the native image properly:
-
-### Linux
 
 ```
 $GRAALVM_HOME/bin/java -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.cli,output-dir=native-res/linux/META-INF/native-image/skylobby -agentlib:native-image-agent=config-merge-dir=native-res/linux/META-INF/native-image/skylobby -jar target/skylobby-cli-0.0.1-standalone.jar get 105.0
 ```
 
+You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
+
+```
+clj -M:skylobby-cli-deps:skylobby-cli-native-linux
+```
+
 ### Windows
+
+You should delete the existing configs, otherwise you will have leftovers from previous runs that might not be needed:
+
+```
+rm native-res/windows/META-INF/native-image/skylobby/*
+```
+
+Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example downloads and extracts a Spring engine, so it executes 7zip, which is required in order to build the native image properly:
 
 ```
 & "$env:GRAALVM_HOME\bin\java" -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.cli,output-dir=native-res\windows\META-INF\native-image\skylobby -agentlib:native-image-agent=config-merge-dir=native-res\windows\META-INF\native-image\skylobby -jar target\skylobby-cli-0.0.1-standalone.jar get 105.0
@@ -47,5 +61,5 @@ $GRAALVM_HOME/bin/java -javaagent:clojure-native-image-agent.jar=initialize-clas
 You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
 
 ```
-clj -M:skylobby-cli-native
+clj -M:skylobby-cli-deps:skylobby-cli-native-windows
 ```

@@ -1,6 +1,5 @@
 (ns skylobby.fs
   (:require
-    byte-streams
     [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs.smf :as smf]
@@ -793,7 +792,7 @@
                 (log/trace "got" (count data) "bytes")
                 (.write baos data 0 (count data))
                 (count data))))
-      (byte-streams/convert (.toByteArray baos) String))))
+      (u/bytes->str (.toByteArray baos)))))
 
 (defn slurp-7z-item-bytes [^ISimpleInArchiveItem item]
   (with-open [baos (ByteArrayOutputStream.)]

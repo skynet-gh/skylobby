@@ -1,6 +1,5 @@
 (ns skylobby.fs.smf
   (:require
-    [byte-streams]
     [clojure.java.io :as io]
     [org.clojars.smee.binary.core :as b]
     [skylobby.util :as u])

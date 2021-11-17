@@ -94,6 +94,12 @@
   ([^String s, ^String encoding]
    (.getBytes s encoding)))
 
+(defn bytes->str
+  "Convert byte array to String."
+  [^bytes b]
+  (String. b StandardCharsets/UTF_8))
+
+
 (defn format-bytes
   "Returns a string of the given byte count in human readable format."
   [n]
