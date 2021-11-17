@@ -7,8 +7,8 @@
     [clojure.data.xml :as xml]
     [hf.depstar.uberjar]
     [me.raynes.fs :as raynes-fs]
-    [spring-lobby.git :as git]
-    [spring-lobby.util :as u])
+    [skylobby.util :as u]
+    [spring-lobby.git :as git])
   (:import
     (javafx.application Platform)))
 

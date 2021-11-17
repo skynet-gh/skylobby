@@ -4,9 +4,9 @@
     skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.settings :as fx.settings]
+    [skylobby.util :as u]
     spring-lobby
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (javafx.application Platform)

@@ -3,9 +3,9 @@
     [clj-http.client :as clj-http]
     clojure.core.async
     [clojure.tools.cli :as cli]
+    [skylobby.util :as u]
     [spring-lobby.ui-main :as ui-main]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:gen-class))
 

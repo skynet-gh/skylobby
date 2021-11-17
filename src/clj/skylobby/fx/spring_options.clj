@@ -7,8 +7,8 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]))
+    [skylobby.util :as u]
+    [spring-lobby.spring.script :as spring-script]))
 
 
 ; https://clojuredocs.org/clojure.core/split-with#example-5e48288ce4b0ca44402ef839

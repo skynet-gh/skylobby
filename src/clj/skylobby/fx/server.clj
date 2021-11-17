@@ -4,9 +4,9 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

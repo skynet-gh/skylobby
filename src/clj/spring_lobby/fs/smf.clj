@@ -3,7 +3,7 @@
     [byte-streams]
     [clojure.java.io :as io]
     [org.clojars.smee.binary.core :as b]
-    [spring-lobby.util :as u])
+    [skylobby.util :as u])
   (:import
     (gr.zdimensions.jsquish Squish Squish$CompressionType)
     (java.awt.image BufferedImage)

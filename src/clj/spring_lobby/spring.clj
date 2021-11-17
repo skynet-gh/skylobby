@@ -9,11 +9,11 @@
     clojure.walk
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
+    [skylobby.util :as u]
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
     [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (javafx.animation KeyFrame KeyValue Timeline)

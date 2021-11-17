@@ -1,10 +1,9 @@
-(ns spring-lobby.util-test
+(ns skylobby.util-test
   (:require
     [clojure.test :refer [deftest is]]
-    [spring-lobby.util :as u])
+    [skylobby.util :as u])
   (:import
-    (java.util TimeZone)
-    (javafx.scene.paint Color)))
+    (java.util TimeZone)))
 
 
 (deftest battle-channel-name?
@@ -90,22 +89,6 @@
            {:bot-name "bot1"
             :ai-name "BARb"
             :owner "skynet"}))))
-
-
-(deftest spring-color-to-javafx
-  (is (= "0x000000ff"
-         (str
-           (u/spring-color-to-javafx nil))))
-  (is (= "0x393000ff"
-         (str
-           (u/spring-color-to-javafx 12345)))))
-
-
-(deftest javafx-color-to-spring
-  (is (= 0
-         (u/javafx-color-to-spring nil)))
-  (is (= 12345
-         (u/javafx-color-to-spring (Color/web "0x393000ff")))))
 
 
 (deftest download-progress

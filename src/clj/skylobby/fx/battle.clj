@@ -25,10 +25,10 @@
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.stage Popup)

@@ -25,6 +25,7 @@
     [skylobby.discord :as discord]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.download :as fx.download :refer [download-sources-by-name]]
     [skylobby.fx.engine-sync :as fx.engine-sync]
     [skylobby.fx.import :as fx.import]
@@ -34,6 +35,7 @@
     [skylobby.server :as server]
     [skylobby.task :as task]
     skylobby.fs
+    [skylobby.util :as u]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
@@ -46,7 +48,6 @@
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
@@ -60,7 +61,7 @@
     (javafx.event Event)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
-    (javafx.scene.control Tab)
+    (javafx.scene.control ColorPicker ScrollBar Tab)
     (javafx.scene.input KeyCode KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
@@ -77,10 +78,6 @@
 
 
 (def wait-init-tasks-ms 20000)
-
-(def start-pos-r 10.0)
-
-(def minimap-size 512)
 
 
 (def map-browse-image-size 162)
@@ -356,18 +353,22 @@
       (let [old-data (select-fn old-state)
             new-data (select-fn new-state)]
         (when (not= old-data new-data)
-          (u/try-log (str "update " filename)
-            (spit-app-edn new-data filename opts))))
+          (try
+            (spit-app-edn new-data filename opts)
+            (catch Exception e
+              (log/error e "Exception writing" filename)))))
       (catch Exception e
         (log/error e "Error writing config edn" filename)))))
 
 
 (defn- read-map-details [{:keys [map-name map-file]}]
   (let [log-map-name (str "'" map-name "'")]
-    (u/try-log (str "reading map details for " log-map-name)
+    (try
       (if map-file
         (fs/read-map-data map-file)
-        (log/warn "No file found for map" log-map-name)))))
+        (log/warn "No file found for map" log-map-name))
+      (catch Exception e
+        (log/error e "Error reading map data from" map-file)))))
 
 
 (defn- read-mod-data
@@ -2224,44 +2225,6 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn truncate-messages!
-  ([state-atom]
-   (truncate-messages! state-atom u/max-messages))
-  ([state-atom max-messages]
-   (log/info "Truncating message logs")
-   (swap! state-atom update :by-server
-     (fn [by-server]
-       (reduce-kv
-         (fn [m k v]
-           (assoc m k
-             (-> v
-                 (update :console-log (partial take max-messages))
-                 (update :channels
-                   (fn [channels]
-                     (reduce-kv
-                       (fn [m k v]
-                         (assoc m k (update v :messages (partial take max-messages))))
-                       {}
-                       channels))))))
-         {}
-         by-server)))))
-
-(defn truncate-messages-chimer-fn [state-atom]
-  (log/info "Starting message truncate chimer")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
-            (java-time/duration 5 :minutes))
-          (fn [_chimestamp]
-            (if false
-              (truncate-messages! state-atom)
-              (log/info "Skipping message truncate")))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error truncating messages")
-             true)})]
-    (fn [] (.close chimer))))
 
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
@@ -2596,7 +2559,7 @@
 
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
+  [{:fx/keys [^MouseEvent event] :as e}]
   (future
     (when (= 2 (.getClickCount event))
       @(event-handler (merge e {:event/type ::join-battle})))))
@@ -2613,7 +2576,7 @@
             (assoc-in [:selected-tab-channel server-key] channel-name))))))
 
 (defmethod event-handler ::on-mouse-clicked-users-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [username] :as e}]
+  [{:fx/keys [^MouseEvent event] :keys [username] :as e}]
   (future
     (when (< 1 (.getClickCount event))
       (when username
@@ -3034,7 +2997,7 @@
       (catch Exception e
         (log/error e "Error starting singleplayer battle")))))
 
-(defn- update-filter-fn [^javafx.scene.input.KeyEvent event]
+(defn- update-filter-fn [^KeyEvent event]
   (fn [x]
     (if (= KeyCode/BACK_SPACE (.getCode event))
       (apply str (drop-last x))
@@ -3297,7 +3260,7 @@
 
 
 (defmethod event-handler ::minimap-mouse-pressed
-  [{:fx/keys [^javafx.scene.input.MouseEvent event]
+  [{:fx/keys [^MouseEvent event]
     :keys [start-boxes starting-points startpostype]}]
   (future
     (try
@@ -3308,13 +3271,13 @@
           (when-let [target (some
                               (fn [{:keys [x y] :as target}]
                                 (when (and
-                                        (< x ex (+ x (* 2 start-pos-r)))
-                                        (< y ey (+ y (* 2 start-pos-r))))
+                                        (< x ex (+ x (* 2 u/start-pos-r)))
+                                        (< y ey (+ y (* 2 u/start-pos-r))))
                                   target))
                               starting-points)]
             (swap! *state assoc :drag-team {:team (:team target)
-                                            :x (- ex start-pos-r)
-                                            :y (- ey start-pos-r)})))
+                                            :x (- ex u/start-pos-r)
+                                            :y (- ey u/start-pos-r)})))
         (= startpostype "Choose in game")
         (let [ex (.getX event)
               ey (.getY event)
@@ -3329,7 +3292,7 @@
                             (if (contains? allyteam-ids i)
                               (recur (inc i))
                               i))
-              close-size (* 2 start-pos-r)
+              close-size (* 2 u/start-pos-r)
               target (some
                        (fn [{:keys [allyteam x y width height]}]
                          (when (and allyteam x y width height)
@@ -3366,8 +3329,8 @@
                  (cond
                    (:drag-team state)
                    (update state :drag-team assoc
-                           :x (- x start-pos-r)
-                           :y (- y start-pos-r))
+                           :x (- x u/start-pos-r)
+                           :y (- y u/start-pos-r))
                    (:drag-allyteam state)
                    (update state :drag-allyteam assoc
                      :endx x
@@ -4005,12 +3968,12 @@
         (log/error e "Error updating battle handicap")))))
 
 (defmethod event-handler ::battle-color-action
-  [{:keys [client-data id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
+  [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]
   (future
     (try
-      (let [^javafx.scene.control.ColorPicker source (.getSource event)
+      (let [^ColorPicker source (.getSource event)
             javafx-color (.getValue source)
-            color-int (u/javafx-color-to-spring javafx-color)]
+            color-int (fx.color/javafx-color-to-spring javafx-color)]
         (when is-me
           (swap! *state assoc :preferred-color color-int))
         (update-color client-data id opts color-int))
@@ -4867,20 +4830,20 @@
 
 
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
-  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+  (when (= ScrollEvent/SCROLL (.getEventType event))
     (let [^ScrollEvent scroll-event event
           ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
                                 (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
-  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+  (when (= ScrollEvent/SCROLL (.getEventType event))
     (let [^ScrollEvent scroll-event event
           ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
                                 (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
 
@@ -4988,7 +4951,6 @@
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-         ;truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)

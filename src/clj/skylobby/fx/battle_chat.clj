@@ -3,7 +3,7 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.channel :as fx.channel]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

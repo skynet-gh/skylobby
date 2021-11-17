@@ -7,8 +7,8 @@
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -85,19 +85,19 @@
                                :text "!help"
                                :on-action {:event/type :spring-lobby/send-message
                                            :client-data client-data
-                                           :channel-name (u/user-channel username)
+                                           :channel-name (u/user-channel-name username)
                                            :message "!help"}}
                               {:fx/type :menu-item
                                :text "!ranking"
                                :on-action {:event/type :spring-lobby/send-message
                                            :client-data client-data
-                                           :channel-name (u/user-channel username)
+                                           :channel-name (u/user-channel-name username)
                                            :message "!ranking"}}
                               {:fx/type :menu-item
                                :text "!set privacyMode 0"
                                :on-action {:event/type :spring-lobby/send-message
                                            :client-data client-data
-                                           :channel-name (u/user-channel username)
+                                           :channel-name (u/user-channel-name username)
                                            :message "!set privacyMode 0"}}])
                            [(if (-> ignore-users (get server-key) (get username))
                               {:fx/type :menu-item

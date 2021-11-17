@@ -6,8 +6,8 @@
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

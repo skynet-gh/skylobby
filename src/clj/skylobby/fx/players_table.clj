@@ -5,14 +5,15 @@
     java-time
     [skylobby.color :as color]
     skylobby.fx
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
     [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -287,14 +288,14 @@
                         :text "!help"
                         :on-action {:event/type :spring-lobby/send-message
                                     :client-data client-data
-                                    :channel-name (u/user-channel host-username)
+                                    :channel-name (u/user-channel-name host-username)
                                     :message "!help"
                                     :server-key server-key}}
                        {:fx/type :menu-item
                         :text "!status battle"
                         :on-action {:event/type :spring-lobby/send-message
                                     :client-data client-data
-                                    :channel-name (u/user-channel host-username)
+                                    :channel-name (u/user-channel-name host-username)
                                     :message "!status battle"
                                     :server-key server-key}}]
                       (if host-ingame
@@ -302,14 +303,14 @@
                           :text "!status game"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
-                                      :channel-name (u/user-channel host-username)
+                                      :channel-name (u/user-channel-name host-username)
                                       :message "!status game"
                                       :server-key server-key}}]
                         [{:fx/type :menu-item
                           :text "!stats"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
-                                      :channel-name (u/user-channel host-username)
+                                      :channel-name (u/user-channel-name host-username)
                                       :message "!stats"
                                       :server-key server-key}}])))
                   (when (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
@@ -317,7 +318,7 @@
                       :text "!whois"
                       :on-action {:event/type :spring-lobby/send-message
                                   :client-data client-data
-                                  :channel-name (u/user-channel host-username)
+                                  :channel-name (u/user-channel-name host-username)
                                   :message (str "!whois " username)
                                   :server-key server-key}}])
                   [
@@ -328,7 +329,7 @@
                     :on-action (fn [_event]
                                  (let [clipboard (Clipboard/getSystemClipboard)
                                        content (ClipboardContent.)
-                                       color (u/spring-color-to-javafx team-color)]
+                                       color (fx.color/spring-color-to-javafx team-color)]
                                    (.putString content (str color))
                                    (.setContent clipboard content)))}
                    (if (-> ignore-users (get server-key) (get username))
@@ -371,7 +372,7 @@
                                             (when not-spec
                                               (case battle-players-color-type
                                                 "team" (get allyteam-javafx-colors (-> id :battle-status :ally))
-                                                "player" (-> id :team-color u/spring-color-to-javafx)
+                                                "player" (-> id :team-color fx.color/spring-color-to-javafx)
                                                 ; else
                                                 nil))
                                             Color/WHITE)
@@ -622,7 +623,7 @@
                       :key nickname
                       :desc
                       {:fx/type :color-picker
-                       :value (u/spring-color-to-javafx team-color)
+                       :value (fx.color/spring-color-to-javafx team-color)
                        :on-action {:event/type :spring-lobby/battle-color-action
                                    :client-data (when-not singleplayer client-data)
                                    :is-me (= (:username i) username)

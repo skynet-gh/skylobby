@@ -6,7 +6,7 @@
     [cljfx.mutator :as fx.mutator]
     [cljfx.prop :as fx.prop]
     [clojure.string :as string]
-    [spring-lobby.util :as u])
+    [skylobby.util :as u])
   (:import
     (javafx.beans.value ChangeListener)
     (javafx.scene Node)

@@ -7,9 +7,9 @@
     skylobby.fx
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]
     [version-clj.core :as version]))
 

@@ -12,8 +12,8 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.user :as fx.user]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -47,7 +47,7 @@
         ignore-channels-set (->> ignore-users
                                  (filter second)
                                  (map first)
-                                 (map u/user-channel)
+                                 (map u/user-channel-name)
                                  set)
         my-channel-names (->> my-channels
                               keys
@@ -148,7 +148,7 @@
         ignore-channels-set (->> ignore-users
                                  (filter second)
                                  (map first)
-                                 (map u/user-channel)
+                                 (map u/user-channel-name)
                                  set)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)

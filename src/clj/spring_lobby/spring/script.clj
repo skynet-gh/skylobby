@@ -3,7 +3,7 @@
     [clojail.core :as clojail]
     [clojure.string :as string]
     [instaparse.core :as instaparse]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 

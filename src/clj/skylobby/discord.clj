@@ -3,7 +3,7 @@
     [cheshire.core :as json]
     [clj-http.client :as http]
     [clojure.string :as string]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 

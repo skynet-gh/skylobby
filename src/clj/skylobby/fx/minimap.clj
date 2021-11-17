@@ -6,14 +6,16 @@
     [clojure.string :as string]
     clojure.walk
     skylobby.fx
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
+    [skylobby.util :as u]
     [spring-lobby.fs :as fs]
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.canvas Canvas)
     (javafx.scene.paint Color)
     (javafx.scene.text Font FontWeight)))
 
@@ -117,7 +119,7 @@
                            (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
                               (/ u/start-pos-r 2))))
                     :team team
-                    :color (or (some-> team-by-key (get normalized) :team-color u/spring-color-to-javafx)
+                    :color (or (some-> team-by-key (get normalized) :team-color fx.color/spring-color-to-javafx)
                                Color/WHITE)}))))
            (filter some?)
            doall))))
@@ -214,7 +216,7 @@
          :width (int (* minimap-scale minimap-width))
          :height (int (* minimap-scale minimap-height))
          :draw
-         (fn [^javafx.scene.canvas.Canvas canvas]
+         (fn [^Canvas canvas]
            (let [gc (.getGraphicsContext2D canvas)
                  border-color (if (not= "minimap" minimap-type)
                                 Color/WHITE Color/BLACK)

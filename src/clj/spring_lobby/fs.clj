@@ -3,11 +3,11 @@
     [byte-streams]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.util :as u]
     [spring-lobby.fs.smf :as smf]
     [spring-lobby.git :as git]
     [spring-lobby.lua :as lua]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.io ByteArrayOutputStream File FileOutputStream OutputStream RandomAccessFile)

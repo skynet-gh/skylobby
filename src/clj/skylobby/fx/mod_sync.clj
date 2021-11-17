@@ -7,9 +7,9 @@
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fs :as fs]
     [spring-lobby.rapid :as rapid]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

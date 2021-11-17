@@ -7,7 +7,7 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -83,7 +83,7 @@
                     ignore-channels-set (->> ignore-users
                                              (filter second)
                                              (map first)
-                                             (map u/user-channel)
+                                             (map u/user-channel-name)
                                              set)
                     classes (if (and (not= server-key selected-server-tab)
                                      (contains? needs-focus server-key)

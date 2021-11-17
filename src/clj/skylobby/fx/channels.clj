@@ -2,7 +2,7 @@
   (:require
     [cljfx.api :as fx]
     skylobby.fx
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

@@ -4,9 +4,9 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
+    [skylobby.util :as u]
     [spring-lobby.fs :as fs]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))

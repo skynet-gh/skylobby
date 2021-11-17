@@ -19,8 +19,8 @@
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
+    [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

@@ -2,7 +2,7 @@
   "Separate ns to avoid circular dependency for now."
   (:require
     [manifold.stream :as s]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 

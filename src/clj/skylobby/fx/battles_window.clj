@@ -3,7 +3,7 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.battles-table :as fx.battles-table]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

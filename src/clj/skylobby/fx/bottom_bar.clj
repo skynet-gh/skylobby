@@ -2,9 +2,9 @@
   (:require
     [cljfx.api :as fx]
     skylobby.fx
+    [skylobby.util :as u]
     [spring-lobby.fs :as fs]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
