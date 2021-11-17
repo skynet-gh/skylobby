@@ -1,6 +1,7 @@
 (ns spring-lobby
   (:require
     [aleph.http :as aleph-http]
+    [cheshire.core :as json]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.api :as fx]
@@ -1671,7 +1672,7 @@
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
-                   (filter #(contains? % :engine-bots))
+                   (filter fs/is-current-engine-data?)
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
      {:to-add-count (count to-add)
@@ -3844,23 +3845,60 @@
                    (update-in [:battle :scripttags "game"] dissoc allyteam-str)))))
     (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
+(defn modoption-value [modoption-type raw-value]
+  (if (or (= "list" modoption-type)
+          (= "string" modoption-type))
+    (str raw-value)
+    (u/to-number raw-value)))
+
 (defmethod event-handler ::modoption-change
-  [{:keys [am-host client-data modoption-key modoption-type singleplayer] :fx/keys [event] :as e}]
-  (let [value (if (= "list" modoption-type)
-                (str event)
-                (u/to-number event))]
+  [{:keys [am-host client-data modoption-key modoption-type option-key singleplayer] :fx/keys [event] :as e}]
+  (let [value (modoption-value modoption-type event)
+        option-key (or option-key "modoptions")]
     (if singleplayer
       (swap! *state
              (fn [state]
                (-> state
-                   (assoc-in [:by-server :local :scripttags "game" "modoptions" modoption-key] (str event))
-                   (assoc-in [:by-server :local :battle :scripttags "game" "modoptions" modoption-key] (str event)))))
+                   (assoc-in [:by-server :local :scripttags "game" option-key modoption-key] (str event))
+                   (assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key] (str event)))))
       (if am-host
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
+        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" (name modoption-key) "=" value))
         (event-handler
           (assoc e
                  :event/type ::send-message
                  :message (str "!bSet " (name modoption-key) " " value)))))))
+
+(defmethod event-handler ::show-ai-options-window
+  [{:keys [bot-name bot-username bot-version server-key]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :ai-options {:bot-name bot-name
+                              :bot-username bot-username
+                              :bot-version bot-version
+                              :server-key server-key}))))
+  (event-handler {:event/type ::toggle :value true :key :show-ai-options-window}))
+
+(defmethod event-handler ::aioption-change
+  [{:keys [bot-username modoption-key modoption-type server-key] :fx/keys [event]}]
+  (let [value (modoption-value modoption-type event)]
+    (swap! *state assoc-in [:by-server server-key :battle :scripttags "game" "bots" bot-username "options" (name modoption-key)] value)))
+
+(defmethod event-handler ::save-aioptions
+  [{:keys [am-host available-options bot-username channel-name client-data current-options]}]
+  (swap! *state assoc :show-ai-options-window false)
+  (when-not am-host
+    (let [available-option-keys (set (map (comp :key second) available-options))
+          options (->> current-options
+                       (filter (comp available-option-keys first))
+                       (into {}))
+          json-data (json/generate-string options)]
+      @(event-handler
+         {:event/type ::send-message
+          :channel-name channel-name
+          :client-data client-data
+          :message (str "!aiProfile " bot-username " " json-data)}))))
+
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status client-data team-color] :as id}]

@@ -541,23 +541,44 @@
                                 (filter is-directory?))]
            (mapcat
              (fn [^java.io.File ai-dir]
+               (log/info "Loading AI from" ai-dir)
                (->> (list-files ai-dir)
                     (filter is-directory?)
                     (map
                       (fn [^java.io.File version-dir]
-                        {:bot-name (filename ai-dir)
-                         :bot-version (filename version-dir)}))))
+                        (log/info "Loading AI version from" version-dir)
+                        (let [options-file (->> (list-files version-dir)
+                                                (filter is-file?)
+                                                (filter (comp #{"aioptions.lua"} string/lower-case filename))
+                                                first)]
+                          (log/info "Loading AI options from" options-file)
+                          {:bot-name (filename ai-dir)
+                           :bot-version (filename version-dir)
+                           :bot-options (try
+                                          (let [contents (slurp options-file)]
+                                            (lua/read-modinfo contents))
+                                          (catch Exception e
+                                            (log/trace e "Error loading AI options from" options-file)
+                                            (log/warn "Error loading AI options from" options-file)))})))))
              ai-dirs)))
        (catch Exception e
          (log/error e "Error loading bots")))
      [])))
+
+(def engine-data-version 1)
 
 (defn engine-data [^File engine-dir]
   (let [sync-version (sync-version engine-dir)]
     {:file engine-dir
      :sync-version sync-version
      :engine-version (sync-version-to-engine-version sync-version)
-     :engine-bots (engine-bots engine-dir)}))
+     :engine-bots (engine-bots engine-dir)
+     :engine-data-version engine-data-version}))
+
+(defn is-current-engine-data? [engine-data]
+  (boolean
+    (when-let [version (:engine-data-version engine-data)]
+      (= engine-data-version version))))
 
 
 (defn slurp-zip-entry [^ZipFile zip-file entries entry-filename-lowercase]
@@ -714,6 +735,12 @@
     (catch Exception e
       (log/error e "Failed to parse mapinfo.lua from" file))))
 
+(defn parse-mapoptions [^java.io.File file s path]
+  (try
+    {:mapoptions (lua/read-mapinfo s)}
+    (catch Exception e
+      (log/error e "Failed to parse mapoptions.lua from" file path))))
+
 (defn read-zip-smf
   ([^ZipFile zf ^ZipEntry smf-entry]
    (read-zip-smf zf smf-entry nil))
@@ -747,7 +774,12 @@
                          first)]
            (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
                        (spring-script/parse-script map-data))]
-             {:smd (assoc smd ::source (.getName smd-entry))})))))))
+             {:smd (assoc smd ::source (.getName smd-entry))}))
+         (when-let [^ZipEntry mapoptions-entry
+                    (->> entry-seq
+                         (filter (comp #{"mapoptions.lua"} string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (parse-mapoptions file (slurp (.getInputStream zf mapoptions-entry)) (.getName mapoptions-entry))))))))
 
 
 (defn slurp-7z-item [^ISimpleInArchiveItem item]
@@ -794,7 +826,8 @@
                      (or
                        (string/ends-with? path-lc ".smd")
                        (string/ends-with? path-lc ".smf")
-                       (string/ends-with? path-lc "mapinfo.lua"))))
+                       (string/ends-with? path-lc "mapinfo.lua")
+                       (string/ends-with? path-lc "mapoptions.lua"))))
                  (take n (iterate inc 0)))
            extracted-state (atom {})
            callback-state (atom {})]
@@ -852,6 +885,13 @@
                                          first))
                            first)]
              (parse-mapinfo file (slurp mapinfo-bytes) path))
+           (when-let [[path mapoptions-bytes]
+                      (->> extracted
+                           (filter (comp #{"mapoptions.lua"}
+                                         string/lower-case
+                                         first))
+                           first)]
+             (parse-mapoptions file (slurp mapoptions-bytes) path))
            (when-let [[path smd-bytes]
                       (->> extracted
                            (filter (comp #(string/ends-with? % ".smd") first))
@@ -888,6 +928,13 @@
          (let [content (slurp mapinfo-file)
                path (canonical-path mapinfo-file)]
            (parse-mapinfo file content path)))
+       (when-let [mapoptions-file (->> all-files
+                                       (filter (comp #{"mapoptions.lua"} string/lower-case filename))
+                                       (sort-by (comp not (partial child? file)))
+                                       first)]
+         (let [content (slurp mapoptions-file)
+               path (canonical-path mapoptions-file)]
+           (parse-mapoptions file content path)))
        (when-let [smd-file (->> all-files
                                 (filter (comp #(string/ends-with? % ".smd") string/lower-case filename))
                                 (sort-by (comp not (partial child? file)))

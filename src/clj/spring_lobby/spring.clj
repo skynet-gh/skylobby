@@ -149,6 +149,7 @@
                                  (filter existing-team?)
                                  (into {}))}
          startpostype (get-in battle [:scripttags "game" "startpostype" str])
+         bots-scripttags (get-in battle [:scripttags "game" "bots"])
          team-ids (->> battle
                        players-and-bots
                        (map (comp :id :battle-status second))
@@ -236,7 +237,7 @@
                     "host" host
                     "isfromdemo" 0  ; TODO replays
                     "team" team
-                    "options" {}}]))  ; TODO ai options
+                    "options" (get-in bots-scripttags [bot-name "options"] {})}]))
               (:bots battle))
             (map
               (fn [ally]

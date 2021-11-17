@@ -191,6 +191,11 @@
        :key (boolean (fx/sub-val context :show-report-user-window))
        :desc
        {:fx/type fx.players-table/report-user-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-ai-options-window))
+       :desc
+       {:fx/type fx.players-table/ai-options-window
         :screen-bounds screen-bounds}}]}))
 
 
