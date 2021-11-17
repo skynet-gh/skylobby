@@ -5,7 +5,7 @@
     skylobby.fx
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

@@ -8,7 +8,7 @@
 (def src-dir "graal/clj")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
-                            :aliases [:skylobby-cli-native]}))
+                            :aliases [:skylobby-cli-deps]}))
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
 
 

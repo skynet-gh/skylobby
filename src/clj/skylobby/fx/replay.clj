@@ -7,8 +7,10 @@
     clojure.set
     [cljfx.api :as fx]
     java-time
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.battle :refer [minimap-types]]
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.download :refer [springfiles-maps-download-source]]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
@@ -22,10 +24,9 @@
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
-    [spring-lobby.fs :as fs]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -96,7 +97,7 @@
             player (get player-num-to-name from)
             color (get player-name-to-color player)
             javafx-color (if color
-                           (u/spring-color-to-javafx color)
+                           (fx.color/spring-color-to-javafx color)
                            Color/YELLOW)
             css-color (some-> javafx-color str u/hex-color-to-css)
             is-spec (and (not (string/blank? player)) (not color))

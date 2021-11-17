@@ -7,8 +7,8 @@
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
@@ -278,34 +278,39 @@
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
   (let [users (fx/sub-val context get-in [:by-server server-key :channels channel-name :users])]
-    {:fx/type :table-view
-     :column-resize-policy :constrained
-     :items (->> users
-                 keys
-                 (sort String/CASE_INSENSITIVE_ORDER)
-                 vec)
-     :row-factory
-     {:fx/cell-type :table-row
-      :describe (fn [i]
-                  {
-                   :context-menu
-                   {:fx/type :context-menu
-                    :items
-                    [
-                     {:fx/type :menu-item
-                      :text "Message"
-                      :on-action {:event/type :spring-lobby/join-direct-message
-                                  :username i}}]}})}
-     :columns
-     [{:fx/type :table-column
-       :text "Username"
-       :cell-value-factory identity
-       :cell-factory
-       {:fx/cell-type :table-cell
-        :describe
-        (fn [i]
-          {:text (-> i str)
-           :style-class ["text" "skylobby-chat-user-list"]})}}]}))
+    {:fx/type :v-box
+     :children
+     [{:fx/type :label
+       :text (str (count users) " users in " channel-name)}
+      {:fx/type :table-view
+       :v-box/vgrow :always
+       :column-resize-policy :constrained
+       :items (->> users
+                   keys
+                   (sort String/CASE_INSENSITIVE_ORDER)
+                   vec)
+       :row-factory
+       {:fx/cell-type :table-row
+        :describe (fn [i]
+                    {
+                     :context-menu
+                     {:fx/type :context-menu
+                      :items
+                      [
+                       {:fx/type :menu-item
+                        :text "Message"
+                        :on-action {:event/type :spring-lobby/join-direct-message
+                                    :username i}}]}})}
+       :columns
+       [{:fx/type :table-column
+         :text "Username"
+         :cell-value-factory identity
+         :cell-factory
+         {:fx/cell-type :table-cell
+          :describe
+          (fn [i]
+            {:text (-> i str)
+             :style-class ["text" "skylobby-chat-user-list"]})}}]}]}))
 
 
 (defn channel-view-impl

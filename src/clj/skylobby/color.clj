@@ -1,6 +1,6 @@
 (ns skylobby.color
   (:require
-    [spring-lobby.util :as u])
+    [skylobby.fx.color :as fx.color])
   (:import
     (javafx.scene.paint Color)))
 
@@ -182,7 +182,7 @@
 
 (def ffa-colors-spring
   (mapv
-    (fn [c] (u/javafx-color-to-spring (Color/web c)))
+    (fn [c] (fx.color/javafx-color-to-spring (Color/web c)))
     ffa-colors-web))
 
 
@@ -207,14 +207,14 @@
                       player-index)
                     (get ffa-colors-web id))]
     (when web-color
-      (u/javafx-color-to-spring
+      (fx.color/javafx-color-to-spring
         (Color/web web-color)))))
 
 
 ; https://github.com/beyond-all-reason/Beyond-All-Reason/blob/5572edc/luaui/Widgets/gui_advplayerslist.lua#L1524
 (defn dark?
   "Returns true if the given color is considered dark, false otherwise."
-  [^javafx.scene.paint.Color color]
+  [^Color color]
   (< (+ (* 1.2 (+ (.getRed color)
                   (.getGreen color)))
         (* 0.4 (.getBlue color)))

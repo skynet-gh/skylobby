@@ -2,15 +2,15 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.spads :as spads]
-    [spring-lobby.fs :as fs]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.sound :as sound]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -118,6 +118,7 @@
               players-table-columns (fx/sub-val context :players-table-columns)
               prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
               ready-on-unspec (fx/sub-val context :ready-on-unspec)
+              ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
               ring-sound-file (fx/sub-val context :ring-sound-file)
               ring-volume (fx/sub-val context :ring-volume)
               ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
@@ -211,7 +212,7 @@
                      {:fx/type :button
                       :on-action {:event/type :spring-lobby/assoc
                                   :key :spring-isolation-dir
-                                  :value (fs/default-isolation-dir)}
+                                  :value (fs/default-spring-root)}
                       :text "Skylobby"}
                      {:fx/type :button
                       :on-action {:event/type :spring-lobby/assoc
@@ -424,7 +425,16 @@
                       :on-selected-changed {:event/type :spring-lobby/assoc
                                             :key :ring-when-game-ends}}
                      {:fx/type :label
-                      :text " Ring when game ends"}]}]}
+                      :text " Ring when game ends"}]}
+                   {:fx/type :h-box
+                    :alignment :center-left
+                    :children
+                    [{:fx/type :check-box
+                      :selected (boolean ring-on-auto-unspec)
+                      :on-selected-changed {:event/type :spring-lobby/assoc
+                                            :key :ring-on-auto-unspec}}
+                     {:fx/type :label
+                      :text " Ring on auto unspec"}]}]}
                {:fx/type filterable-section
                 :search settings-search
                 :title " Performance"

@@ -4,13 +4,13 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -19,9 +19,6 @@
 
 (def maps-window-width 1600)
 (def maps-window-height 800)
-
-
-(def minimap-size 512)
 
 
 (def map-browse-image-size 162)
@@ -260,10 +257,10 @@
                              :background-loading true}
                      :preserve-ratio true
                      :style
-                     {:-fx-min-width minimap-size
-                      :-fx-max-width minimap-size
-                      :-fx-min-height minimap-size
-                      :-fx-max-height minimap-size}}}
+                     {:-fx-min-width u/minimap-size
+                      :-fx-max-width u/minimap-size
+                      :-fx-min-height u/minimap-size
+                      :-fx-max-height u/minimap-size}}}
                    :graphic
                    {:fx/type :v-box
                     :alignment :center

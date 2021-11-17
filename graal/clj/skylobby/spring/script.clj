@@ -1,4 +1,4 @@
-(ns spring-lobby.spring.script
+(ns skylobby.spring.script
   (:require
     [clojail.core :as clojail]
     [clojure.string :as string]

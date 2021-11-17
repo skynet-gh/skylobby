@@ -169,11 +169,12 @@
      (hawk/watch! [{:paths ["src/clj" "graal/clj" "test/clj"]
                     :handler refresh-on-file-change}])
      (require 'spring-lobby)
-     (require 'spring-lobby.fs)
+     (require 'spring-lobby.ui-main)
+     (require 'skylobby.fs)
      (when-not @headless
        (require 'skylobby.fx.root)
        (require 'skylobby.fx))
-     (let [init-7z-fn (var-get (find-var 'spring-lobby.fs/init-7z!))]
+     (let [init-7z-fn (var-get (find-var 'skylobby.fs/init-7z!))]
        (future
          (try
            (println "Initializing 7zip")

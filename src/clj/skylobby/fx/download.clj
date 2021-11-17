@@ -4,14 +4,14 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.scene.input Clipboard ClipboardContent)))

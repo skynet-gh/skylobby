@@ -3,9 +3,9 @@
     [cljfx.api :as fx]
     [cljfx.css :as css]
     [clojure.java.io :as io]
+    [skylobby.fs :as fs]
     [skylobby.resource :as resource]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (javafx.stage Screen)))

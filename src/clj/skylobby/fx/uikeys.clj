@@ -6,8 +6,8 @@
     clojure.set
     [skylobby.fx :as skylobby.fx]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.spring.uikeys :as uikeys]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -69,7 +69,10 @@
   [{:fx/keys [context]
     :keys [filter-uikeys-action selected-uikeys-action uikeys]}]
   (let [show-uikeys-window (fx/sub-val context :show-uikeys-window)
-        default-uikeys (or (u/try-log "parse uikeys" (uikeys/parse-uikeys))
+        default-uikeys (or (try
+                             (uikeys/parse-uikeys)
+                             (catch Exception e
+                               (log/error e "Error parsing uikeys")))
                            [])
         filtered-uikeys (->>  default-uikeys
                               (filter

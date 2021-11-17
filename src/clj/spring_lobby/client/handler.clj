@@ -4,15 +4,15 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     crypto.random
+    [skylobby.fs :as fs]
     [skylobby.resource :as resource]
+    [skylobby.util :as u]
     [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
-    [spring-lobby.fs :as fs]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]))
 
 
@@ -56,7 +56,7 @@
                 :user-id user-id
                 :user-agent user-agent}
                 ;:client-status cu/default-client-status}
-          channel-name (u/user-channel username)]
+          channel-name (u/user-channel-name username)]
       (swap! state-atom update-in [:by-server server-key]
         (fn [server-data]
           (cond-> server-data
@@ -71,7 +71,7 @@
 
 (defmethod handle "REMOVEUSER" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        channel-name (u/user-channel username)]
+        channel-name (u/user-channel-name username)]
     (swap! state-atom update-in [:by-server server-key]
       (fn [server-data]
         (cond-> server-data
@@ -167,7 +167,10 @@
     (if (auto-unspec-ready?)
       (let [desired-ready (boolean ready-on-unspec)]
         (log/info "Auto-unspeccing")
-        (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)
+        (let [{:keys [ring-on-auto-unspec] :as state} (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)]
+          (when ring-on-auto-unspec
+            (log/info "Playing ring for auto unspec")
+            (sound/play-ring state)))
         (message/send-message state-atom client-data
           (str "MYBATTLESTATUS "
                (cu/encode-battle-status
@@ -402,13 +405,13 @@
     (swap! state-atom update-in [:by-server server-url]
       (fn [state]
         (-> state
-            (update-in [:channels (u/user-channel username) :messages]
+            (update-in [:channels (u/user-channel-name username) :messages]
               (u/update-chat-messages-fn (:username state) message)))))))
 
 
 (defmethod handle "SAIDPRIVATE" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        channel-name (u/user-channel username)]
+        channel-name (u/user-channel-name username)]
     (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message))))
 
 (defmethod handle "SAYPRIVATEEX" [state-atom server-url m]
@@ -416,12 +419,12 @@
     (swap! state-atom update-in [:by-server server-url]
       (fn [state]
         (-> state
-            (update-in [:channels (u/user-channel username) :messages]
+            (update-in [:channels (u/user-channel-name username) :messages]
               (u/update-chat-messages-fn (:username state) message true)))))))
 
 (defmethod handle "SAIDPRIVATEEX" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        channel-name (u/user-channel username)]
+        channel-name (u/user-channel-name username)]
     (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true))))
 
 (defmethod handle "JOINEDBATTLE" [state-atom server-url m]

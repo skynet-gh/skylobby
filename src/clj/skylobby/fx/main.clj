@@ -7,6 +7,7 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -77,14 +78,24 @@
                 {:fx/type fx.bottom-bar/bottom-bar}]}}])
           (mapv
             (fn [server-key]
-              (let [classes (if (and (not= server-key selected-server-tab)
+              (let [
+                    ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+                    ignore-channels-set (->> ignore-users
+                                             (filter second)
+                                             (map first)
+                                             (map u/user-channel-name)
+                                             set)
+                    classes (if (and (not= server-key selected-server-tab)
                                      (contains? needs-focus server-key)
                                      (or (and highlight-tabs-with-new-battle-messages
                                               (contains? (get needs-focus server-key) "battle")
                                               (not (get-in mute [server-key :battle])))
                                          (and highlight-tabs-with-new-chat-messages
                                               (contains? (get needs-focus server-key) "chat")
-                                              (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))
+                                              (some (fn [channel-name]
+                                                      (and
+                                                        (not (contains? (get mute server-key) channel-name))
+                                                        (not (contains? ignore-channels-set channel-name))))
                                                     (keys (get-in needs-focus [server-key "chat"]))))))
                                 ["tab" "skylobby-tab-focus"]
                                 ["tab"])]

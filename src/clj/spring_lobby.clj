@@ -1,6 +1,7 @@
 (ns spring-lobby
   (:require
     [aleph.http :as aleph-http]
+    [cheshire.core :as json]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
     [cljfx.api :as fx]
@@ -22,8 +23,12 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
+    [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as replay]
+    [skylobby.fs.smf :as fs.smf]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.download :as fx.download :refer [download-sources-by-name]]
     [skylobby.fx.engine-sync :as fx.engine-sync]
     [skylobby.fx.import :as fx.import]
@@ -32,20 +37,16 @@
     [skylobby.resource :as resource]
     [skylobby.server :as server]
     [skylobby.task :as task]
-    skylobby.fs
+    [skylobby.util :as u]
     [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.fs.sdfz :as replay]
-    [spring-lobby.fs.smf :as fs.smf]
     [spring-lobby.git :as git]
     [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
     [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
@@ -59,7 +60,7 @@
     (javafx.event Event)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
-    (javafx.scene.control Tab)
+    (javafx.scene.control ColorPicker ScrollBar Tab)
     (javafx.scene.input KeyCode KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
@@ -76,10 +77,6 @@
 
 
 (def wait-init-tasks-ms 20000)
-
-(def start-pos-r 10.0)
-
-(def minimap-size 512)
 
 
 (def map-browse-image-size 162)
@@ -175,7 +172,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
    :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec
-   :replays-window-dedupe :replays-window-details :ring-sound-file :ring-volume :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
+   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -270,7 +267,7 @@
                              :country true
                              :bonus true}
      :ready-on-unspec true
-     :spring-isolation-dir (fs/default-isolation-dir)
+     :spring-isolation-dir (fs/default-spring-root)
      :servers default-servers
      :use-default-ring-sound true}
     (apply
@@ -355,18 +352,22 @@
       (let [old-data (select-fn old-state)
             new-data (select-fn new-state)]
         (when (not= old-data new-data)
-          (u/try-log (str "update " filename)
-            (spit-app-edn new-data filename opts))))
+          (try
+            (spit-app-edn new-data filename opts)
+            (catch Exception e
+              (log/error e "Exception writing" filename)))))
       (catch Exception e
         (log/error e "Error writing config edn" filename)))))
 
 
 (defn- read-map-details [{:keys [map-name map-file]}]
   (let [log-map-name (str "'" map-name "'")]
-    (u/try-log (str "reading map details for " log-map-name)
+    (try
       (if map-file
         (fs/read-map-data map-file)
-        (log/warn "No file found for map" log-map-name)))))
+        (log/warn "No file found for map" log-map-name))
+      (catch Exception e
+        (log/error e "Error reading map data from" map-file)))))
 
 
 (defn- read-mod-data
@@ -1058,7 +1059,7 @@
         (when-not (and spring-isolation-dir
                        (instance? File spring-isolation-dir))
           (let [fixed (or (fs/file spring-isolation-dir)
-                          (fs/default-isolation-dir))]
+                          (fs/default-spring-root))]
             (log/info "Fixed spring isolation dir, was" spring-isolation-dir "now" fixed)
             (swap! state-atom assoc :spring-isolation-dir fixed))))
       (catch Exception e
@@ -1652,7 +1653,7 @@
          missing-files (set
                          (concat
                            (->> known-canonical-paths
-                                (remove (comp fs/exists io/file)))
+                                (remove (comp fs/exists? io/file)))
                            (->> known-canonical-paths
                                 (remove (comp (partial fs/descendant? spring-root) io/file)))))
          to-remove (set
@@ -1671,7 +1672,7 @@
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
-                   (filter #(contains? % :engine-bots))
+                   (filter fs/is-current-engine-data?)
                    (remove (comp to-remove fs/canonical-path :file))
                    set)))
      {:to-add-count (count to-add)
@@ -1687,10 +1688,11 @@
   ([state-atom spring-root {:keys [delete-invalid-sdp priorities]}]
    (log/info "Refreshing mods in" spring-root)
    (let [before (u/curr-millis)
-         {:keys [spring-isolation-dir use-git-mod-version] :as state} @state-atom
+         {:keys [rapid-by-spring-root spring-isolation-dir use-git-mod-version] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
          _ (log/info "Updating mods in" spring-root)
          spring-root-path (fs/canonical-path spring-root)
+         {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
          mods (-> state :by-spring-root (get spring-root-path) :mods)
          {:keys [rapid archive directory]} (group-by ::fs/source mods)
          known-file-paths (set (map (comp fs/canonical-path :file) (remove :error (concat archive directory))))
@@ -1708,19 +1710,32 @@
          ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
+                          (map second)
                           (map
                             (fn [{:keys [battle battles]}]
-                              (-> battles (get (:battle-id battle)) :battle-modname)))
+                              (let [{:keys [battle-id]} battle]
+                                (get-in battles [battle-id :battle-modname]))))
                           (filter some?))
+         battle-rapid-data (map rapid-data-by-version battle-mods)
+         battle-rapid-hashes (->> battle-rapid-data
+                                  (map :hash)
+                                  (filter some?)
+                                  set)
          priorities (->> todo
                          (filter
-                           (comp
-                             (fn [resource]
-                               (some
-                                 #(resource/could-be-this-mod? % resource)
-                                 battle-mods))
+                           (some-fn
+                             (comp
+                               (fn [resource]
+                                 (some
+                                   #(resource/could-be-this-mod? % resource)
+                                   battle-mods))
+                               (fn [f]
+                                 {:resource-filename (fs/filename f)}))
                              (fn [f]
-                               {:resource-filename (fs/filename f)})))
+                               (when-let [filename (fs/filename f)]
+                                 (when (string/ends-with? filename ".sdp")
+                                   (let [id (first (string/split filename #"\."))]
+                                     (contains? battle-rapid-hashes id)))))))
                          (concat priorities))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
          this-round (concat priorities (take mods-batch-size todo))
@@ -1728,7 +1743,7 @@
          missing-files (set
                          (concat
                            (->> all-paths
-                                (remove (comp fs/exists io/file)))
+                                (remove (comp fs/exists? io/file)))
                            (->> all-paths
                                 (remove (comp (partial fs/descendant? spring-root) io/file)))))
          next-round
@@ -1783,9 +1798,9 @@
                         metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
                         minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
                     (or (:force opts)
-                        (not (fs/exists heightmap-file))
-                        (not (fs/exists metalmap-file))
-                        (not (fs/exists minimap-file))))))
+                        (not (fs/exists? heightmap-file))
+                        (not (fs/exists? metalmap-file))
+                        (not (fs/exists? minimap-file))))))
               (sort-by :map-name))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
@@ -1864,7 +1879,7 @@
          missing-paths (set
                          (concat
                            (->> known-files
-                                (remove fs/exists)
+                                (remove fs/exists?)
                                 (map fs/canonical-path))
                            (->> known-files
                                 (remove (partial fs/descendant? spring-root))
@@ -2223,44 +2238,6 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn truncate-messages!
-  ([state-atom]
-   (truncate-messages! state-atom u/max-messages))
-  ([state-atom max-messages]
-   (log/info "Truncating message logs")
-   (swap! state-atom update :by-server
-     (fn [by-server]
-       (reduce-kv
-         (fn [m k v]
-           (assoc m k
-             (-> v
-                 (update :console-log (partial take max-messages))
-                 (update :channels
-                   (fn [channels]
-                     (reduce-kv
-                       (fn [m k v]
-                         (assoc m k (update v :messages (partial take max-messages))))
-                       {}
-                       channels))))))
-         {}
-         by-server)))))
-
-(defn truncate-messages-chimer-fn [state-atom]
-  (log/info "Starting message truncate chimer")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 5 :minutes))
-            (java-time/duration 5 :minutes))
-          (fn [_chimestamp]
-            (if false
-              (truncate-messages! state-atom)
-              (log/info "Skipping message truncate")))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error truncating messages")
-             true)})]
-    (fn [] (.close chimer))))
 
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
@@ -2444,7 +2421,7 @@
 
 
 (defn refresh-engines-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing engines in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-engines *state spring-root))))
@@ -2456,7 +2433,7 @@
 
 
 (defn refresh-mods-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing mods in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-mods *state spring-root))))
@@ -2467,7 +2444,7 @@
     (refresh-mods-all-spring-roots)))
 
 (defn refresh-maps-all-spring-roots []
-  (let [spring-roots (skylobby.fs/spring-roots @*state)]
+  (let [spring-roots (fs/spring-roots @*state)]
     (log/info "Refreshing maps in" (pr-str spring-roots))
     (doseq [spring-root spring-roots]
       (refresh-maps *state spring-root))))
@@ -2595,7 +2572,7 @@
 
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :as e}]
+  [{:fx/keys [^MouseEvent event] :as e}]
   (future
     (when (= 2 (.getClickCount event))
       @(event-handler (merge e {:event/type ::join-battle})))))
@@ -2612,7 +2589,7 @@
             (assoc-in [:selected-tab-channel server-key] channel-name))))))
 
 (defmethod event-handler ::on-mouse-clicked-users-row
-  [{:fx/keys [^javafx.scene.input.MouseEvent event] :keys [username] :as e}]
+  [{:fx/keys [^MouseEvent event] :keys [username] :as e}]
   (future
     (when (< 1 (.getClickCount event))
       (when username
@@ -2883,7 +2860,7 @@
           (let [f (io/file spring-isolation-dir-draft)
                 isolation-dir (if (fs/exists? f)
                                 f
-                                (fs/default-isolation-dir))]
+                                (fs/default-spring-root))]
             (-> state
                 (assoc :spring-isolation-dir isolation-dir)
                 (dissoc :spring-isolation-dir-draft)))))
@@ -3033,7 +3010,7 @@
       (catch Exception e
         (log/error e "Error starting singleplayer battle")))))
 
-(defn- update-filter-fn [^javafx.scene.input.KeyEvent event]
+(defn- update-filter-fn [^KeyEvent event]
   (fn [x]
     (if (= KeyCode/BACK_SPACE (.getCode event))
       (apply str (drop-last x))
@@ -3296,7 +3273,7 @@
 
 
 (defmethod event-handler ::minimap-mouse-pressed
-  [{:fx/keys [^javafx.scene.input.MouseEvent event]
+  [{:fx/keys [^MouseEvent event]
     :keys [start-boxes starting-points startpostype]}]
   (future
     (try
@@ -3307,13 +3284,13 @@
           (when-let [target (some
                               (fn [{:keys [x y] :as target}]
                                 (when (and
-                                        (< x ex (+ x (* 2 start-pos-r)))
-                                        (< y ey (+ y (* 2 start-pos-r))))
+                                        (< x ex (+ x (* 2 u/start-pos-r)))
+                                        (< y ey (+ y (* 2 u/start-pos-r))))
                                   target))
                               starting-points)]
             (swap! *state assoc :drag-team {:team (:team target)
-                                            :x (- ex start-pos-r)
-                                            :y (- ey start-pos-r)})))
+                                            :x (- ex u/start-pos-r)
+                                            :y (- ey u/start-pos-r)})))
         (= startpostype "Choose in game")
         (let [ex (.getX event)
               ey (.getY event)
@@ -3328,7 +3305,7 @@
                             (if (contains? allyteam-ids i)
                               (recur (inc i))
                               i))
-              close-size (* 2 start-pos-r)
+              close-size (* 2 u/start-pos-r)
               target (some
                        (fn [{:keys [allyteam x y width height]}]
                          (when (and allyteam x y width height)
@@ -3365,8 +3342,8 @@
                  (cond
                    (:drag-team state)
                    (update state :drag-team assoc
-                           :x (- x start-pos-r)
-                           :y (- y start-pos-r))
+                           :x (- x u/start-pos-r)
+                           :y (- y u/start-pos-r))
                    (:drag-allyteam state)
                    (update state :drag-allyteam assoc
                      :endx x
@@ -3844,23 +3821,60 @@
                    (update-in [:battle :scripttags "game"] dissoc allyteam-str)))))
     (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
+(defn modoption-value [modoption-type raw-value]
+  (if (or (= "list" modoption-type)
+          (= "string" modoption-type))
+    (str raw-value)
+    (u/to-number raw-value)))
+
 (defmethod event-handler ::modoption-change
-  [{:keys [am-host client-data modoption-key modoption-type singleplayer] :fx/keys [event] :as e}]
-  (let [value (if (= "list" modoption-type)
-                (str event)
-                (u/to-number event))]
+  [{:keys [am-host client-data modoption-key modoption-type option-key singleplayer] :fx/keys [event] :as e}]
+  (let [value (modoption-value modoption-type event)
+        option-key (or option-key "modoptions")]
     (if singleplayer
       (swap! *state
              (fn [state]
                (-> state
-                   (assoc-in [:by-server :local :scripttags "game" "modoptions" modoption-key] (str event))
-                   (assoc-in [:by-server :local :battle :scripttags "game" "modoptions" modoption-key] (str event)))))
+                   (assoc-in [:by-server :local :scripttags "game" option-key modoption-key] (str event))
+                   (assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key] (str event)))))
       (if am-host
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/modoptions/" (name modoption-key) "=" value))
+        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" (name modoption-key) "=" value))
         (event-handler
           (assoc e
                  :event/type ::send-message
                  :message (str "!bSet " (name modoption-key) " " value)))))))
+
+(defmethod event-handler ::show-ai-options-window
+  [{:keys [bot-name bot-username bot-version server-key]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :ai-options {:bot-name bot-name
+                              :bot-username bot-username
+                              :bot-version bot-version
+                              :server-key server-key}))))
+  (event-handler {:event/type ::toggle :value true :key :show-ai-options-window}))
+
+(defmethod event-handler ::aioption-change
+  [{:keys [bot-username modoption-key modoption-type server-key] :fx/keys [event]}]
+  (let [value (modoption-value modoption-type event)]
+    (swap! *state assoc-in [:by-server server-key :battle :scripttags "game" "bots" bot-username "options" (name modoption-key)] value)))
+
+(defmethod event-handler ::save-aioptions
+  [{:keys [am-host available-options bot-username channel-name client-data current-options]}]
+  (swap! *state assoc :show-ai-options-window false)
+  (when-not am-host
+    (let [available-option-keys (set (map (comp :key second) available-options))
+          options (->> current-options
+                       (filter (comp available-option-keys first))
+                       (into {}))
+          json-data (json/generate-string options)]
+      @(event-handler
+         {:event/type ::send-message
+          :channel-name channel-name
+          :client-data client-data
+          :message (str "!aiProfile " bot-username " " json-data)}))))
+
 
 (defmethod event-handler ::battle-ready-change
   [{:fx/keys [event] :keys [battle-status client-data team-color] :as id}]
@@ -3967,12 +3981,12 @@
         (log/error e "Error updating battle handicap")))))
 
 (defmethod event-handler ::battle-color-action
-  [{:keys [client-data id is-me] :fx/keys [^javafx.event.Event event] :as opts}]
+  [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]
   (future
     (try
-      (let [^javafx.scene.control.ColorPicker source (.getSource event)
+      (let [^ColorPicker source (.getSource event)
             javafx-color (.getValue source)
-            color-int (u/javafx-color-to-spring javafx-color)]
+            color-int (fx.color/javafx-color-to-spring javafx-color)]
         (when is-me
           (swap! *state assoc :preferred-color color-int))
         (update-color client-data id opts color-int))
@@ -4829,20 +4843,20 @@
 
 
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
-  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+  (when (= ScrollEvent/SCROLL (.getEventType event))
     (let [^ScrollEvent scroll-event event
           ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
                                 (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
-  (when (= javafx.scene.input.ScrollEvent/SCROLL (.getEventType event))
+  (when (= ScrollEvent/SCROLL (.getEventType event))
     (let [^ScrollEvent scroll-event event
           ^Parent source (.getSource scroll-event)
           needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^javafx.scene.control.ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
                                 (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
       (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
 
@@ -4950,7 +4964,6 @@
          check-app-update-chimer (check-app-update-chimer-fn state-atom)
          profile-print-chimer (profile-print-chimer-fn state-atom)
          spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
-         ;truncate-messages-chimer (truncate-messages-chimer-fn state-atom)
          fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)

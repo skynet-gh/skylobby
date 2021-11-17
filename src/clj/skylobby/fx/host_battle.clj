@@ -7,7 +7,7 @@
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.mods :refer [mods-view]]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

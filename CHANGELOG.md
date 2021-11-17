@@ -23,6 +23,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.18]
+
+- Add options for map and AI
+- Fix ignore not respected for tab highlighting
+- Add setting to ring on auto unspec
+- Fix prioritizing battle games, add rapid priority
+
 ### [0.7.17]
 
 - Fix singleplayer when no username is set

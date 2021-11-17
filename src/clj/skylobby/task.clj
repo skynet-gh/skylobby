@@ -20,7 +20,7 @@
     :spring-lobby/extract-7z
     :spring-lobby/import
     :spring-lobby/http-downloadable
-    :spring-lobby/rapid-downloadable
+    :spring-lobby/rapid-download
     :spring-lobby/update-rapid})
 
 (def task-kinds

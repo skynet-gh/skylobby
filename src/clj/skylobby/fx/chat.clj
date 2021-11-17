@@ -5,8 +5,8 @@
     [skylobby.fx.channels :as fx.channels]
     [skylobby.fx.main-tabs :as fx.main-tabs]
     [skylobby.fx.user :as fx.user]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

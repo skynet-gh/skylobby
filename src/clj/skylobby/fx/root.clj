@@ -19,8 +19,8 @@
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
+    [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -191,6 +191,11 @@
        :key (boolean (fx/sub-val context :show-report-user-window))
        :desc
        {:fx/type fx.players-table/report-user-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-ai-options-window))
+       :desc
+       {:fx/type fx.players-table/ai-options-window
         :screen-bounds screen-bounds}}]}))
 
 

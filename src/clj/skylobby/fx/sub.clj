@@ -2,8 +2,8 @@
   (:require
     [cljfx.api :as fx]
     [skylobby.resource :as resource]
-    [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]))
+    [skylobby.util :as u]
+    [spring-lobby.spring :as spring]))
 
 
 (set! *warn-on-reflection* true)

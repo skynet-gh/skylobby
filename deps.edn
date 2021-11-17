@@ -4,7 +4,6 @@
   "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
  {aleph/aleph {:mvn/version "0.4.6"}
-  byte-streams/byte-streams {:mvn/version "0.2.4"}
   cheshire/cheshire {:mvn/version  "5.10.1"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
@@ -38,6 +37,7 @@
   metosin/reitit {:mvn/version "0.5.15"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+  org.clj-commons/byte-streams {:mvn/version "0.2.10"}
   org.clojure/core.cache {:mvn/version "1.0.217"}
   org.clojure/clojure {:mvn/version "1.10.3"}
   org.clojure/core.async {:mvn/version "1.4.627"}
@@ -125,11 +125,48 @@
   {:extra-paths ["src/clj" "graal/clj"]
    :main-opts ["-m" "spring-lobby.main"]}
   :skylobby
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.3" :git/sha "166b920"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
    :ns-default skylobby}
   :skylobby-cli
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.3" :git/sha "166b920"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
    :ns-default skylobby-cli}
+  :skylobby-cli-deps
+  {:replace-deps
+   {
+    clj.native-image/clj.native-image
+    {:git/url "https://github.com/taylorwood/clj.native-image.git"
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
+    clj-http/clj-http {:mvn/version "3.12.3"}
+    clojail/clojail {:mvn/version "1.0.6"}
+    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    com.evocomputing/colors {:mvn/version "1.0.6"}
+    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
+    com.github.clj-easy/graal-config-clj-http
+    {:git/url "https://github.com/clj-easy/graal-config"
+     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
+     :deps/root "config/clj-http/clj-http"}
+    com.github.clj-easy/graal-config-nippy
+    {:git/url   "https://github.com/clj-easy/graal-config"
+     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
+     :deps/root "config/com.taoensso/nippy"}
+    com.taoensso/nippy {:mvn/version "3.1.1"}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    commons-io/commons-io {:mvn/version "2.11.0"}
+    crouton/crouton {:mvn/version "0.1.2"}
+    gr.zdimensions/jsquish {:mvn/version "1.0"}
+    instaparse/instaparse {:mvn/version "1.4.10"}
+    jarohen/chime {:mvn/version "0.3.3"}
+    me.raynes/fs {:mvn/version "1.4.6"}
+    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
+    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+    org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.clojure/core.async {:mvn/version "1.4.627"}
+    org.clojure/tools.cli {:mvn/version "1.0.206"}
+    org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}
+    smee/binary {:mvn/version "0.5.5"}}}
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
    :main-opts ["-m" "skylobby.cli"]}
@@ -140,36 +177,8 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
-   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
-   :replace-deps
-   {
-    clj.native-image/clj.native-image
-    {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    clj-http/clj-http {:mvn/version "3.12.3"}
-    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
-    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-    com.github.clj-easy/graal-config-clj-http
-    {:git/url "https://github.com/clj-easy/graal-config"
-     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
-     :deps/root "config/clj-http/clj-http"}
-    com.github.clj-easy/graal-config-nippy
-    {:git/url   "https://github.com/clj-easy/graal-config"
-     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
-     :deps/root "config/com.taoensso/nippy"}
-    com.taoensso/nippy {:mvn/version "3.1.1"}
-    com.taoensso/timbre {:mvn/version "5.1.2"}
-    commons-io/commons-io {:mvn/version "2.11.0"}
-    jarohen/chime {:mvn/version "0.3.3"}
-    me.raynes/fs {:mvn/version "1.4.6"}
-    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
-    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-    org.apache.commons/commons-compress {:mvn/version "1.21"}
-    org.clojure/core.async {:mvn/version "1.4.627"}
-    org.clojure/tools.cli {:mvn/version "1.0.206"}
-    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
-    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
-    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}}}
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+
   :skylobby-cli-native-windows ; TODO dedup
   {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/windows"]
    :main-opts ["-m" "native-image" "skylobby.cli" "--no-fallback" "--allow-incomplete-classpath"
@@ -177,36 +186,7 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
-   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
-   :replace-deps
-   {
-    clj.native-image/clj.native-image
-    {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    clj-http/clj-http {:mvn/version "3.12.3"}
-    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
-    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-    com.github.clj-easy/graal-config-clj-http
-    {:git/url "https://github.com/clj-easy/graal-config"
-     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
-     :deps/root "config/clj-http/clj-http"}
-    com.github.clj-easy/graal-config-nippy
-    {:git/url   "https://github.com/clj-easy/graal-config"
-     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
-     :deps/root "config/com.taoensso/nippy"}
-    com.taoensso/nippy {:mvn/version "3.1.1"}
-    com.taoensso/timbre {:mvn/version "5.1.2"}
-    commons-io/commons-io {:mvn/version "2.11.0"}
-    jarohen/chime {:mvn/version "0.3.3"}
-    me.raynes/fs {:mvn/version "1.4.6"}
-    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
-    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-    org.apache.commons/commons-compress {:mvn/version "1.21"}
-    org.clojure/core.async {:mvn/version "1.4.627"}
-    org.clojure/tools.cli {:mvn/version "1.0.206"}
-    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
-    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
-    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}}}
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :reveal
   {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps

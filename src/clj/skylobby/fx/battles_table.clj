@@ -9,8 +9,8 @@
     [skylobby.fx.flag-icon :as flag-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
@@ -195,7 +195,7 @@
                                   :text "!status battle"
                                   :on-action {:event/type :spring-lobby/send-message
                                               :client-data client-data
-                                              :channel-name (u/user-channel host-username)
+                                              :channel-name (u/user-channel-name host-username)
                                               :message "!status battle"
                                               :server-key server-key}}]
                                 (when (-> users (get host-username) :client-status :ingame)
@@ -203,7 +203,7 @@
                                     :text "!status game"
                                     :on-action {:event/type :spring-lobby/send-message
                                                 :client-data client-data
-                                                :channel-name (u/user-channel host-username)
+                                                :channel-name (u/user-channel-name host-username)
                                                 :message "!status game"
                                                 :server-key server-key}}]))))}}))}
          :columns

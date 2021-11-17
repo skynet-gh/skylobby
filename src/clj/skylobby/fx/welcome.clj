@@ -6,8 +6,8 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

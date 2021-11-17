@@ -5,7 +5,7 @@
     skylobby.fx
     [skylobby.fx.sync :refer [error-severity]]
     [skylobby.task :as task]
-    [spring-lobby.util :as u]
+    [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 

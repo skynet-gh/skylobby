@@ -4,16 +4,18 @@
     [cljfx.css :as css]
     clojure.core.async
     [clojure.core.cache :as cache]
+    [clojure.java.io :as io]
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as sdfz]
     skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
+    [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.fs :as fs]
-    [spring-lobby.fs.sdfz :as sdfz]
+    [spring-lobby.git :as git]
     [spring-lobby.replays :as replays]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (javafx.application Platform))
@@ -45,6 +47,22 @@
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]
    [nil "--update-copy-jar JAR_DEST" "Copy updated jar to the given location"]
    [nil "--window-maximized" "Start with the main window maximized"]])
+
+
+(defn get-app-version []
+  (or (u/manifest-version)
+      (try
+        (str "git:" (u/short-git-commit (git/tag-or-latest-id (io/file "."))))
+        (catch Exception e
+          (log/debug e "Error getting git version")))
+      (try
+        (slurp (io/resource (str u/app-name ".version")))
+        (catch Exception e
+          (log/debug e "Error getting version from file")))
+      "UNKNOWN"))
+
+; maybe not on init
+(alter-var-root #'skylobby.util/app-version (fn [& _] (get-app-version)))
 
 
 (defn parse-replay-file [args]

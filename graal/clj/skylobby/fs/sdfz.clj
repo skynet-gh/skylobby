@@ -1,12 +1,12 @@
-(ns spring-lobby.fs.sdfz
+(ns skylobby.fs.sdfz
   "Parsing of Spring demo files aka replays."
   (:require
     [clojure.java.io :as io]
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
-    [spring-lobby.fs :as fs]
-    [spring-lobby.spring.script :as spring-script]
-    [spring-lobby.util :as u]
+    [skylobby.fs :as fs]
+    [skylobby.spring.script :as spring-script]
+    [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))

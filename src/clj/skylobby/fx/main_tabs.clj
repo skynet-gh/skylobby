@@ -12,8 +12,8 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.user :as fx.user]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -43,9 +43,16 @@
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+        ignore-channels-set (->> ignore-users
+                                 (filter second)
+                                 (map first)
+                                 (map u/user-channel-name)
+                                 set)
         my-channel-names (->> my-channels
                               keys
                               (remove u/battle-channel-name?)
+                              (remove ignore-channels-set)
                               sort)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^java.util.List my-channel-names selected-tab-channel)
@@ -137,6 +144,12 @@
                     :v-box/vgrow :always
                     :server-key server-key}
         needs-focus (fx/sub-val context :needs-focus)
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+        ignore-channels-set (->> ignore-users
+                                 (filter second)
+                                 (map first)
+                                 (map u/user-channel-name)
+                                 set)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         mute (fx/sub-val context :mute)]
@@ -214,7 +227,10 @@
           :style-class (concat ["tab"] (when (and highlight-tabs-with-new-chat-messages
                                                   (not= selected-tab-main "chat")
                                                   (contains? (get needs-focus server-key) "chat")
-                                                  (some (fn [channel-name] (not (contains? (get mute server-key) channel-name)))
+                                                  (some (fn [channel-name]
+                                                          (and
+                                                            (not (contains? (get mute server-key) channel-name))
+                                                            (not (contains? ignore-channels-set channel-name))))
                                                         (keys (get-in needs-focus [server-key "chat"]))))
                                          ["skylobby-tab-focus"]))
           :content

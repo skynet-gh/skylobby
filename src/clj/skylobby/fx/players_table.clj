@@ -5,13 +5,15 @@
     java-time
     [skylobby.color :as color]
     skylobby.fx
+    [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.util :as u]
     [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
-    [spring-lobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -42,6 +44,79 @@
 (def sort-id (comp u/to-number :id :battle-status))
 (def sort-side (comp u/to-number :side :battle-status))
 (def sort-rank (comp (fnil - 0) u/to-number :rank :client-status :user))
+
+
+(defn ai-options-window [{:fx/keys [context]}]
+  (let [
+        show (boolean (fx/sub-val context :show-ai-options-window))
+        server-key (fx/sub-val context get-in [:ai-options :server-key])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        am-host (fx/sub-ctx context sub/am-host server-key)
+        bot-name (fx/sub-val context get-in [:ai-options :bot-name])
+        bot-version (fx/sub-val context get-in [:ai-options :bot-version])
+        bot-username (fx/sub-val context get-in [:ai-options :bot-username])
+        current-options (fx/sub-val context get-in [:by-server server-key :battle :scripttags "game" "bots" bot-username "options"])
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
+        engine-details (fx/sub-ctx context sub/indexed-engine spring-root engine-version)
+        engine-bots (:engine-bots engine-details)
+        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
+        battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        bots (concat engine-bots
+                     (->> battle-mod-details :luaai
+                          (map second)
+                          (map (fn [ai]
+                                 {:bot-name (:name ai)
+                                  :bot-version "<game>"}))))
+        bot-options-map (->> bots
+                             (map (juxt (juxt :bot-name :bot-version) :bot-options))
+                             (into {}))
+        available-options (get bot-options-map [bot-name bot-version])]
+    {:fx/type :stage
+     :showing show
+     :title (str u/app-name " AI Options")
+     :icons skylobby.fx/icons
+     :on-close-request {:event/type :spring-lobby/dissoc
+                        :key :show-ai-options-window}
+     :height 480
+     :width 600
+     :scene
+     {:fx/type :scene
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root
+      {:fx/type :v-box
+       :style {:-fx-font-size 16}
+       :children
+       [
+        {:fx/type :label
+         :style {:-fx-font-size 24}
+         :text (str bot-username)}
+        {:fx/type :label
+         :text "Options:"}
+        {:fx/type :v-box
+         :children
+         [
+          {:fx/type fx.spring-options/modoptions-view
+           :event-data {:event/type :spring-lobby/aioption-change
+                        :bot-username bot-username
+                        :server-key server-key}
+           :modoptions available-options
+           :current-options current-options
+           :server-key server-key
+           :singleplayer (= server-key :local)}]}
+        {:fx/type :button
+         :style {:-fx-font-size 24}
+         :text "Save"
+         :on-action {:event/type :spring-lobby/save-aioptions
+                     :am-host am-host
+                     :available-options available-options
+                     :bot-username bot-username
+                     :channel-name channel-name
+                     :client-data client-data
+                     :current-options current-options}}]}}}))
 
 
 (defn report-user-window [{:fx/keys [context]}]
@@ -189,6 +264,7 @@
               {
                :context-menu
                {:fx/type :context-menu
+                :style {:-fx-font-size 16}
                 :items
                 (concat []
                   (when (not owner)
@@ -212,14 +288,14 @@
                         :text "!help"
                         :on-action {:event/type :spring-lobby/send-message
                                     :client-data client-data
-                                    :channel-name (u/user-channel host-username)
+                                    :channel-name (u/user-channel-name host-username)
                                     :message "!help"
                                     :server-key server-key}}
                        {:fx/type :menu-item
                         :text "!status battle"
                         :on-action {:event/type :spring-lobby/send-message
                                     :client-data client-data
-                                    :channel-name (u/user-channel host-username)
+                                    :channel-name (u/user-channel-name host-username)
                                     :message "!status battle"
                                     :server-key server-key}}]
                       (if host-ingame
@@ -227,14 +303,14 @@
                           :text "!status game"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
-                                      :channel-name (u/user-channel host-username)
+                                      :channel-name (u/user-channel-name host-username)
                                       :message "!status game"
                                       :server-key server-key}}]
                         [{:fx/type :menu-item
                           :text "!stats"
                           :on-action {:event/type :spring-lobby/send-message
                                       :client-data client-data
-                                      :channel-name (u/user-channel host-username)
+                                      :channel-name (u/user-channel-name host-username)
                                       :message "!stats"
                                       :server-key server-key}}])))
                   (when (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
@@ -242,7 +318,7 @@
                       :text "!whois"
                       :on-action {:event/type :spring-lobby/send-message
                                   :client-data client-data
-                                  :channel-name (u/user-channel host-username)
+                                  :channel-name (u/user-channel-name host-username)
                                   :message (str "!whois " username)
                                   :server-key server-key}}])
                   [
@@ -253,7 +329,7 @@
                     :on-action (fn [_event]
                                  (let [clipboard (Clipboard/getSystemClipboard)
                                        content (ClipboardContent.)
-                                       color (u/spring-color-to-javafx team-color)]
+                                       color (fx.color/spring-color-to-javafx team-color)]
                                    (.putString content (str color))
                                    (.setContent clipboard content)))}
                    (if (-> ignore-users (get server-key) (get username))
@@ -287,7 +363,7 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [[_nickname-lc nickname {:keys [owner] :as id}]]
+            (fn [[_nickname-lc nickname {:keys [ai-name ai-version bot-name owner] :as id}]]
               (tufte/profile {:dynamic? true
                               :id :skylobby/player-table}
                 (tufte/p :nickname
@@ -296,7 +372,7 @@
                                             (when not-spec
                                               (case battle-players-color-type
                                                 "team" (get allyteam-javafx-colors (-> id :battle-status :ally))
-                                                "player" (-> id :team-color u/spring-color-to-javafx)
+                                                "player" (-> id :team-color fx.color/spring-color-to-javafx)
                                                 ; else
                                                 nil))
                                             Color/WHITE)
@@ -305,7 +381,7 @@
                      :tooltip
                      {:fx/type tooltip-nofocus/lifecycle
                       :show-delay skylobby.fx/tooltip-show-delay
-                      :style {:-fx-font-size "16"}
+                      :style {:-fx-font-size 18}
                       :text nickname}
                      :graphic
                      {:fx/type :h-box
@@ -326,7 +402,17 @@
                               (select-keys id [:bot-name :username]))
                             :graphic
                             {:fx/type font-icon/lifecycle
-                             :icon-literal "mdi-account-remove:16:white"}}])
+                             :icon-literal "mdi-account-remove:16:white"}}
+                           {:fx/type :button
+                            :on-action
+                            {:event/type :spring-lobby/show-ai-options-window
+                             :bot-name ai-name
+                             :bot-version ai-version
+                             :bot-username bot-name
+                             :server-key server-key}
+                            :graphic
+                            {:fx/type font-icon/lifecycle
+                             :icon-literal "mdi-settings:16:white"}}])
                         [{:fx/type :pane
                           :style {:-fx-pref-width 8}}
                          (merge
@@ -341,7 +427,7 @@
                             :fill text-color-css
                             :style
                             (merge
-                              {:-fx-font-size "16"
+                              {:-fx-font-size 16
                                :-fx-font-smoothing-type :gray}
                               (when not-spec
                                 {:-fx-font-weight "bold"}))})])}}))))}}]
@@ -382,7 +468,7 @@
                        :tooltip
                        {:fx/type tooltip-nofocus/lifecycle
                         :show-delay skylobby.fx/tooltip-show-delay
-                        :style {:-fx-font-size "16"}
+                        :style {:-fx-font-size 16}
                         :text
                         (str
                           (case (int (or (:sync battle-status) 0))
@@ -537,7 +623,7 @@
                       :key nickname
                       :desc
                       {:fx/type :color-picker
-                       :value (u/spring-color-to-javafx team-color)
+                       :value (fx.color/spring-color-to-javafx team-color)
                        :on-action {:event/type :spring-lobby/battle-color-action
                                    :client-data (when-not singleplayer client-data)
                                    :is-me (= (:username i) username)

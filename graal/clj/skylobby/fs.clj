@@ -2,16 +2,21 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.fs.smf :as smf]
+    [skylobby.lua :as lua]
+    [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.io File FileOutputStream OutputStream RandomAccessFile)
+    (java.io ByteArrayOutputStream File FileOutputStream OutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
     (java.nio.file.attribute FileAttribute)
+    (java.util.zip ZipEntry ZipFile)
     (javax.imageio ImageIO)
     (net.sf.sevenzipjbinding ArchiveFormat IArchiveExtractCallback IInArchive ISequentialOutStream
                              PropID SevenZip SevenZipException)
     (net.sf.sevenzipjbinding.impl RandomAccessFileInStream)
+    (net.sf.sevenzipjbinding.simple ISimpleInArchiveItem)
     (org.apache.commons.io FilenameUtils FileUtils)
     (org.apache.commons.compress.archivers.sevenz SevenZArchiveEntry SevenZFile SevenZFileOptions)))
 
@@ -561,35 +566,6 @@
         engines-folder)
       (filter spring-engine-dir? engines-folder))))
 
-(defn engine-bots
-  ([engine-file]
-   (or
-     (try
-       (when engine-file
-         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
-               ai-dirs (some->> (list-files ai-skirmish-dir)
-                                seq
-                                (filter is-directory?))]
-           (mapcat
-             (fn [^java.io.File ai-dir]
-               (->> (list-files ai-dir)
-                    (filter is-directory?)
-                    (map
-                      (fn [^java.io.File version-dir]
-                        {:bot-name (filename ai-dir)
-                         :bot-version (filename version-dir)}))))
-             ai-dirs)))
-       (catch Exception e
-         (log/error e "Error loading bots")))
-     [])))
-
-(defn engine-data [^File engine-dir]
-  (let [sync-version (sync-version engine-dir)]
-    {:file engine-dir
-     :sync-version sync-version
-     :engine-version (sync-version-to-engine-version sync-version)
-     :engine-bots (engine-bots engine-dir)}))
-
 
 (defn mods-dir
   [root]
@@ -746,3 +722,387 @@
         (map
           (comp file :spring-isolation-dir second)
           servers)))))
+
+
+; map
+
+(defn read-zip-smf
+  ([^ZipFile zf ^ZipEntry smf-entry]
+   (read-zip-smf zf smf-entry nil))
+  ([^ZipFile zf ^ZipEntry smf-entry opts]
+   (let [smf-path (.getName smf-entry)
+         smf-data (smf/decode-map (.getInputStream zf smf-entry) opts)]
+     {:map-name (map-name smf-path)
+      :smf (assoc smf-data ::source smf-path)})))
+
+(defn parse-mapinfo [^java.io.File file s path]
+  (try
+    (let [mapinfo (lua/read-mapinfo s)]
+      {:mapinfo (assoc mapinfo ::source path)
+       :map-name (string/trim
+                   (str (:name mapinfo)
+                        (when-let [version (:version mapinfo)]
+                          (when-not (string/ends-with? (:name mapinfo) (string/trim version))
+                            (str " " version)))))})
+    (catch Exception e
+      (log/error e "Failed to parse mapinfo.lua from" file))))
+
+(defn parse-mapoptions [^File file s path]
+  (try
+    {:mapoptions (lua/read-mapinfo s)}
+    (catch Exception e
+      (log/error e "Failed to parse mapoptions.lua from" file path))))
+
+(defn read-zip-map
+  ([^java.io.File file]
+   (read-zip-map file nil))
+  ([^java.io.File file opts]
+   (with-open [zf (new ZipFile file)]
+     (let [entry-seq (->> (.entries zf)
+                          enumeration-seq)]
+       (merge
+         (when-let [^ZipEntry smf-entry
+                    (->> entry-seq
+                         (filter (comp #(string/ends-with? % ".smf") string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (read-zip-smf zf smf-entry opts))
+         (when-let [^ZipEntry mapinfo-entry
+                    (->> entry-seq
+                         (filter (comp #{"mapinfo.lua"} string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (parse-mapinfo file (slurp (.getInputStream zf mapinfo-entry)) (.getName mapinfo-entry)))
+         (when-let [^ZipEntry smd-entry
+                    (->> entry-seq
+                         (filter (comp #(string/ends-with? % ".smd") string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (let [smd (when-let [map-data (slurp (.getInputStream zf smd-entry))]
+                       (spring-script/parse-script map-data))]
+             {:smd (assoc smd ::source (.getName smd-entry))}))
+         (when-let [^ZipEntry mapoptions-entry
+                    (->> entry-seq
+                         (filter (comp #{"mapoptions.lua"} string/lower-case #(.getName ^ZipEntry %)))
+                         first)]
+           (parse-mapoptions file (slurp (.getInputStream zf mapoptions-entry)) (.getName mapoptions-entry))))))))
+
+(defn slurp-7z-item [^ISimpleInArchiveItem item]
+  (with-open [baos (ByteArrayOutputStream.)]
+    (when (.extractSlow item
+            (reify ISequentialOutStream
+              (write [this data]
+                (log/trace "got" (count data) "bytes")
+                (.write baos data 0 (count data))
+                (count data))))
+      (u/bytes->str (.toByteArray baos)))))
+
+(defn slurp-7z-item-bytes [^ISimpleInArchiveItem item]
+  (with-open [baos (ByteArrayOutputStream.)]
+    (when (.extractSlow item
+            (reify ISequentialOutStream
+              (write [this data]
+                (log/trace "got" (count data) "bytes")
+                (.write baos data 0 (count data))
+                (count data))))
+      (.toByteArray baos))))
+
+(defn read-7z-smf-bytes
+  [smf-path smf-bytes opts]
+  (let [smf-data (smf/decode-map (io/input-stream smf-bytes) opts)]
+    {:map-name (map-name smf-path)
+     :smf (assoc smf-data ::source smf-path)}))
+
+(defn read-7z-map-fast
+  ([^java.io.File file]
+   (read-7z-map-fast file nil))
+  ([^java.io.File file opts]
+   (with-open [raf (new RandomAccessFile file "r")
+               rafis (new RandomAccessFileInStream raf)
+               archive (SevenZip/openInArchive nil rafis)]
+     (log/debug file "is of format" (.getArchiveFormat archive)
+                "and has" (.getNumberOfItems archive) "items")
+     (let [n (.getNumberOfItems archive)
+           ids (filter
+                 (fn [id]
+                   (let [path (.getProperty archive id PropID/PATH)
+                         path-lc (string/lower-case path)]
+                     (or
+                       (string/ends-with? path-lc ".smd")
+                       (string/ends-with? path-lc ".smf")
+                       (string/ends-with? path-lc "mapinfo.lua")
+                       (string/ends-with? path-lc "mapoptions.lua"))))
+                 (take n (iterate inc 0)))
+           extracted-state (atom {})
+           callback-state (atom {})]
+       (.extract archive
+                 (int-array ids)
+                 false
+                 (reify IArchiveExtractCallback
+                   (getStream [this index extract-ask-mode]
+                     (swap! callback-state assoc :index index)
+                     (try
+                       (let [path (.getProperty archive index PropID/PATH)
+                             is-folder (.getProperty archive index PropID/IS_FOLDER)]
+                         (when-not is-folder
+                           (log/debug "Stream for index" index "path" path)
+                           (let [baos (ByteArrayOutputStream.)] ; not with-open
+                             (swap! callback-state assoc :stream baos :path path)
+                             (reify ISequentialOutStream
+                               (write [this data]
+                                 (.write baos data 0 (count data))
+                                 (count data))))))
+                       (catch Throwable e
+                         (log/error e "Error getting stream for item" index))))
+                   (prepareOperation [this extract-ask-mode]
+                     (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+                     (log/trace "preparing" extract-ask-mode))
+                   (setOperationResult [this extract-operation-result]
+                     (let [cs @callback-state]
+                       (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
+                         (try
+                           (.close output-stream)
+                           (let [ba (.toByteArray output-stream)]
+                             (swap! extracted-state assoc (:path cs) ba))
+                           (catch Exception e
+                             (log/error e "Error closing output stream")
+                             (throw (SevenZipException. "Error closing output stream"))))))
+                     (swap! callback-state assoc :operation-result extract-operation-result)
+                     (log/trace "result" extract-operation-result))
+                   (setTotal [this total]
+                     (swap! callback-state assoc :total total)
+                     (log/trace "total" total))
+                   (setCompleted [this complete]
+                     (swap! callback-state assoc :complete complete)
+                     (log/trace "completed" complete))))
+       (let [extracted @extracted-state]
+         (merge
+           (when-let [[path smf-bytes]
+                      (->> extracted
+                           (filter (comp #(string/ends-with? % ".smf") first))
+                           first)]
+             (read-7z-smf-bytes path smf-bytes opts))
+           (when-let [[path mapinfo-bytes]
+                      (->> extracted
+                           (filter (comp #{"mapinfo.lua"}
+                                         string/lower-case
+                                         first))
+                           first)]
+             (parse-mapinfo file (slurp mapinfo-bytes) path))
+           (when-let [[path mapoptions-bytes]
+                      (->> extracted
+                           (filter (comp #{"mapoptions.lua"}
+                                         string/lower-case
+                                         first))
+                           first)]
+             (parse-mapoptions file (slurp mapoptions-bytes) path))
+           (when-let [[path smd-bytes]
+                      (->> extracted
+                           (filter (comp #(string/ends-with? % ".smd") first))
+                           first)]
+             (let [smd (spring-script/parse-script (slurp smd-bytes))]
+               {:smd (assoc smd ::source path)}))))))))
+
+(defn read-smf-file
+  ([smf-file]
+   (read-smf-file smf-file nil))
+  ([smf-file opts]
+   (let [smf-path (canonical-path smf-file)
+         smf-data (smf/decode-map (io/input-stream smf-file) opts)]
+     {:map-name (map-name smf-path)
+      :smf (assoc smf-data ::source smf-path)})))
+
+(defn read-map-directory
+  ([file]
+   (read-map-directory [file nil]))
+  ([file opts]
+   (let [all-files (file-seq file)]
+     (merge
+       (when-let [smf-file (->> all-files
+                                (filter (comp #(string/ends-with? % ".smf") string/lower-case filename))
+                                (sort-by (comp not (partial child? file)))
+                                first)]
+         (read-smf-file smf-file opts))
+       (when-let [mapinfo-file (->> all-files
+                                    (filter (comp #{"mapinfo.lua"} string/lower-case filename))
+                                    (sort-by (comp not (partial child? file)))
+                                    first)]
+         (let [content (slurp mapinfo-file)
+               path (canonical-path mapinfo-file)]
+           (parse-mapinfo file content path)))
+       (when-let [mapoptions-file (->> all-files
+                                       (filter (comp #{"mapoptions.lua"} string/lower-case filename))
+                                       (sort-by (comp not (partial child? file)))
+                                       first)]
+         (let [content (slurp mapoptions-file)
+               path (canonical-path mapoptions-file)]
+           (parse-mapoptions file content path)))
+       (when-let [smd-file (->> all-files
+                                (filter (comp #(string/ends-with? % ".smd") string/lower-case filename))
+                                (sort-by (comp not (partial child? file)))
+                                first)]
+         (let [smd (when-let [map-data (slurp (io/input-stream smd-file))]
+                     (spring-script/parse-script map-data))]
+           {:smd (assoc smd ::source (canonical-path smd-file))}))))))
+
+(defn read-map-data
+  ([^File file]
+   (read-map-data file nil))
+  ([^File file opts]
+   (let [filename (filename file)]
+     (log/info "Loading map" file)
+     (merge
+       {:file file}
+       (try
+         (cond
+           (and (is-file? file) (string/ends-with? filename ".sdz"))
+           (read-zip-map file opts)
+           (and (is-file? file) (string/ends-with? filename ".sd7"))
+           (read-7z-map-fast file opts)
+           (and (is-directory? file) (string/ends-with? filename ".sdd"))
+           (read-map-directory file opts)
+           :else
+           {:error true})
+         (catch Exception e
+           (log/warn e "Error reading map data for" filename)
+           {:error true}))))))
+
+
+; mod
+
+(defn mod-files
+  [root]
+  (spring-files-and-dirs (io/file root "games")))
+
+(defn slurp-zip-entry [^ZipFile zip-file entries entry-filename-lowercase]
+  (when-let [entry
+             (->> entries
+                  (filter (comp #{entry-filename-lowercase} string/lower-case #(.getName ^ZipEntry %)))
+                  first)]
+    (slurp (.getInputStream zip-file entry))))
+
+(defn read-mod-zip-file
+  ([^java.io.File file]
+   (read-mod-zip-file file nil))
+  ([^java.io.File file {:keys [modinfo-only]}]
+   (with-open [zf (new ZipFile file)]
+     (let [entries (enumeration-seq (.entries zf))
+           try-entry-lua (fn [filename]
+                           (try
+                             (when-let [slurped (slurp-zip-entry zf entries filename)]
+                               (lua/read-modinfo slurped))
+                             (catch Exception e
+                               (log/trace e "Error loading" filename "from" file)
+                               (log/warn "Error loading" filename "from" file))))
+           try-entry-script (fn [filename]
+                              (try
+                                (when-let [slurped (slurp-zip-entry zf entries filename)]
+                                  (spring-script/parse-script slurped))
+                                (catch Exception e
+                                  (log/trace e "Error loading" filename "from" file)
+                                  (log/warn "Error loading" filename "from" file))))]
+       (merge
+         {:file file
+          :modinfo (try-entry-lua "modinfo.lua")
+          ::source :archive}
+         (when-not modinfo-only
+           {:modoptions (try-entry-lua "modoptions.lua")
+            :engineoptions (try-entry-lua "engineoptions.lua")
+            :luaai (try-entry-lua "luaai.lua")
+            :sidedata (or (try-entry-lua "gamedata/sidedata.lua")
+                          (try-entry-script "gamedata/sidedata.tdf")
+                          (u/postprocess-byar-units-en
+                            (try-entry-lua "language/units_en.lua")))}))))))
+
+(defn read-mod-directory
+  ([^java.io.File file]
+   (read-mod-directory file nil))
+  ([^java.io.File file {:keys [modinfo-only]}]
+   (let [try-file-lua (fn [filename]
+                        (try
+                          (when-let [slurped (slurp (io/file file filename))]
+                            (lua/read-modinfo slurped))
+                          (catch java.io.FileNotFoundException _e
+                            (log/warn "Mod" file "is missing expected file" filename))
+                          (catch Exception e
+                            (log/trace e "Error loading" filename "from" file)
+                            (log/warn "Error loading" filename "from" file))))]
+     (merge
+       {:file file
+        :modinfo (try-file-lua "modinfo.lua")
+        :git-commit-id (try
+                         nil ; TODO (git/latest-id file)
+                         (catch java.io.FileNotFoundException _e
+                           (log/warn "Not a git repository at" file))
+                         (catch Exception e
+                           (log/error e "Error loading git commit id")))
+        ::source :directory}
+       (when-not modinfo-only
+         {:modoptions (try-file-lua "modoptions.lua")
+          :engineoptions (try-file-lua "engineoptions.lua")
+          :luaai (try-file-lua "luaai.lua")
+          :sidedata (or (try-file-lua "gamedata/sidedata.lua")
+                        (try-file-lua "gamedata/sidedata.tdf")
+                        (u/postprocess-byar-units-en
+                          (try-file-lua "language/units_en.lua")))})))))
+
+(defn read-mod-file
+  ([^java.io.File file]
+   (read-mod-file file nil))
+  ([^java.io.File file opts]
+   (cond
+     (is-directory? file)
+     (read-mod-directory file opts)
+     (string/ends-with? (filename file) ".sdz")
+     (read-mod-zip-file file opts)
+     :else
+     (log/warn "Unknown mod file type" file))))
+
+; engine
+
+(def engine-data-version 1)
+
+(defn is-current-engine-data? [engine-data]
+  (boolean
+    (when-let [version (:engine-data-version engine-data)]
+      (= engine-data-version version))))
+
+(defn engine-bots
+  ([engine-file]
+   (or
+     (try
+       (when engine-file
+         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
+               ai-dirs (some->> (list-files ai-skirmish-dir)
+                                seq
+                                (filter is-directory?))]
+           (mapcat
+             (fn [^java.io.File ai-dir]
+               (log/info "Loading AI from" ai-dir)
+               (->> (list-files ai-dir)
+                    (filter is-directory?)
+                    (map
+                      (fn [^java.io.File version-dir]
+                        (log/info "Loading AI version from" version-dir)
+                        (let [options-file (->> (list-files version-dir)
+                                                (filter is-file?)
+                                                (filter (comp #{"aioptions.lua"} string/lower-case filename))
+                                                first)]
+                          (log/info "Loading AI options from" options-file)
+                          {:bot-name (filename ai-dir)
+                           :bot-version (filename version-dir)
+                           :bot-options (try
+                                          (let [contents (slurp options-file)]
+                                            (lua/read-modinfo contents))
+                                          (catch Exception e
+                                            (log/trace e "Error loading AI options from" options-file)
+                                            (log/warn "Error loading AI options from" options-file)))})))))
+             ai-dirs)))
+       (catch Exception e
+         (log/error e "Error loading bots")))
+     [])))
+
+(defn engine-data [^File engine-dir]
+  (let [sync-version (sync-version engine-dir)]
+    {:file engine-dir
+     :sync-version sync-version
+     :engine-version (sync-version-to-engine-version sync-version)
+     :engine-bots (engine-bots engine-dir)
+     :engine-data-version engine-data-version}))
