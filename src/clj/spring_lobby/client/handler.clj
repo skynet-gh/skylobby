@@ -239,7 +239,7 @@
                                   is-my-battle
                                   (update-in [:battle :users] dissoc username)
                                   (and is-my-battle (not unified))
-                                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                                  (update-in [:channels (u/battle-id-channel-name battle-id) :messages]
                                     conj {:text ""
                                           :timestamp (u/curr-millis)
                                           :message-type :leave
@@ -441,7 +441,7 @@
                   script-password
                   (assoc-in [:battle :script-password] script-password)
                   (and (not unified) my-battle)
-                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                  (update-in [:channels (u/battle-id-channel-name battle-id) :messages]
                     conj {:text ""
                           :timestamp (u/curr-millis)
                           :message-type :join
