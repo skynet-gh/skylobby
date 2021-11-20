@@ -783,6 +783,10 @@
   (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
     (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
 
+(defmethod handle "FRIENDREQUEST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
+
 
 (defmethod handle "OK" [state-atom server-key m]
   (let [[_all command] (re-find #"[^\s]+ cmd=(.*)" m)]
