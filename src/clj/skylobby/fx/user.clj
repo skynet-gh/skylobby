@@ -43,7 +43,6 @@
      :desc
      {:fx/type :table-view
       :style {:-fx-font-size 15}
-      :column-resize-policy :constrained ; TODO auto resize
       :row-factory
       {:fx/cell-type :table-row
        :describe (fn [{:keys [client-status country away-start-time user-agent user-id username]}]
