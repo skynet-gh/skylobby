@@ -58,7 +58,7 @@
                       " status:"))
          :style {:-fx-font-size 16}}]
        (map
-         (fn [{:keys [action choice choices on-choice-changed in-progress human-text severity text tooltip] :or {severity 2}}]
+         (fn [{:keys [action choice choices force-action human-text in-progress on-choice-changed severity text tooltip] :or {severity 2}}]
            (let [font-style {:-fx-font-size 12}
                  display-text (or human-text
                                   (str text " " resource))
@@ -74,7 +74,9 @@
                   :style {:-fx-font-size 14}
                   :text tooltip}})
               :desc
-              (if (or (zero? severity) (not action))
+              (if (or (and (zero? severity)
+                           (not force-action))
+                      (not action))
                 (if (< 1 (count choices))
                   {:fx/type :combo-box
                    :value choice
