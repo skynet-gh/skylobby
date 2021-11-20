@@ -125,9 +125,12 @@
   (str username "@" server-url))
 
 
+(defn battle-id-channel-name [battle-id]
+  (str "__battle__" battle-id))
+
 (defn battle-channel-name [{:keys [battle-id channel-name]}]
   (or channel-name
-      (str "__battle__" battle-id)))
+      (battle-id-channel-name battle-id)))
 
 (defn battle-channel-name? [channel-name]
   (and channel-name

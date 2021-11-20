@@ -4,11 +4,11 @@
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word]]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte])
   (:import
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))

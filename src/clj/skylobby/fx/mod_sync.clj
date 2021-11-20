@@ -7,9 +7,9 @@
     [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
+    [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.rapid :as rapid]
     [taoensso.tufte :as tufte]))
 
 

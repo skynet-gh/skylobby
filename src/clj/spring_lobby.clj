@@ -21,6 +21,7 @@
     [me.raynes.fs :as raynes-fs]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.battle :as battle]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
     [skylobby.fs :as fs]
@@ -34,19 +35,18 @@
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.http :as http]
+    [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.server :as server]
+    [skylobby.spring.script :as spring-script]
     [skylobby.task :as task]
     [skylobby.util :as u]
-    [spring-lobby.battle :as battle]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
     [spring-lobby.git :as git]
-    [spring-lobby.rapid :as rapid]
     [spring-lobby.spring :as spring]
-    [spring-lobby.spring.script :as spring-script]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
@@ -1853,6 +1853,7 @@
                    shuffle)
          battle-maps (->> state
                           :by-server
+                          (map second)
                           (map
                             (fn [{:keys [battle battles]}]
                               (-> battles (get (:battle-id battle)) :battle-map)))

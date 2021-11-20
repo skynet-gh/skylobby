@@ -124,8 +124,11 @@
                    (= lce lcf)
                    (= (engine-archive engine-version)
                       resource-filename)
-                   (= (engine-archive engine-version "master" (fs/platform64))
-                      resource-filename)
+                   (some
+                     (fn [platform]
+                       (= (engine-archive "master" engine-version platform)
+                          resource-filename))
+                     (fs/platforms))
                    (= (http/bar-engine-filename engine-version) resource-filename)))))))
 
 

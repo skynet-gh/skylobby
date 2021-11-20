@@ -14,6 +14,7 @@
     [skylobby.fx.download :refer [springfiles-maps-download-source]]
     [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :refer [mod-sync-pane]]
@@ -25,7 +26,6 @@
     [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])

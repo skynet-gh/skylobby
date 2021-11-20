@@ -8,11 +8,11 @@
     [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])

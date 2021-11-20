@@ -3,8 +3,8 @@
     [cljfx.api :as fx]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
 

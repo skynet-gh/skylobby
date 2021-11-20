@@ -10,10 +10,10 @@
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.channels :as fx.channels]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.user :as fx.user]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import

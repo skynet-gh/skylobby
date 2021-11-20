@@ -4,15 +4,15 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     crypto.random
+    [skylobby.battle :as battle]
     [skylobby.fs :as fs]
     [skylobby.resource :as resource]
+    [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
-    [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
-    [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log]))
 
 
@@ -239,7 +239,7 @@
                                   is-my-battle
                                   (update-in [:battle :users] dissoc username)
                                   (and is-my-battle (not unified))
-                                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                                  (update-in [:channels (u/battle-id-channel-name battle-id) :messages]
                                     conj {:text ""
                                           :timestamp (u/curr-millis)
                                           :message-type :leave
@@ -441,7 +441,7 @@
                   script-password
                   (assoc-in [:battle :script-password] script-password)
                   (and (not unified) my-battle)
-                  (update-in [:channels (u/battle-channel-name battle-id) :messages]
+                  (update-in [:channels (u/battle-id-channel-name battle-id) :messages]
                     conj {:text ""
                           :timestamp (u/curr-millis)
                           :message-type :join
@@ -780,6 +780,10 @@
   (log/info "Ignoring unused FRIENDREQUESTLISTEND command"))
 
 (defmethod handle "FRIENDREQUESTLIST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
+
+(defmethod handle "FRIENDREQUEST" [state-atom server-key m]
   (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
     (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
 

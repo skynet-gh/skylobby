@@ -1,10 +1,10 @@
-(ns spring-lobby.spring.script-test
+(ns skylobby.spring.script-test
   (:require
     [clojure.string :as string]
     [clojure.test :refer [deftest is]]
     clojure.walk
     hashp.core
-    [spring-lobby.spring.script :as spring-script]
+    [skylobby.spring.script :as spring-script]
     [spring-lobby.spring-test :refer [expected-script-data expected-script-txt]]))
 
 

@@ -6,9 +6,9 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.flag-icon :as flag-icon]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
 
@@ -43,7 +43,6 @@
      :desc
      {:fx/type :table-view
       :style {:-fx-font-size 15}
-      :column-resize-policy :constrained ; TODO auto resize
       :row-factory
       {:fx/cell-type :table-row
        :describe (fn [{:keys [client-status country away-start-time user-agent user-id username]}]

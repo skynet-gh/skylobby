@@ -3,10 +3,10 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.channels :as fx.channels]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.main-tabs :as fx.main-tabs]
     [skylobby.fx.user :as fx.user]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
 
