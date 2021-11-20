@@ -23,6 +23,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.19]
+
+- Make it easier to download different engine arch
+- Add handler for FRIENDREQUEST
+- Set default engine download source as springrts
+- Fix battle channel name to fix join leave
+- Fix priorities for maps refresh
+
 ### [0.7.18]
 
 - Add options for map and AI
