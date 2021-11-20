@@ -5,8 +5,8 @@
     [clojure.string :as string]
     [org.clojars.smee.binary.core :as b]
     [skylobby.fs :as fs]
+    [skylobby.lua :as lua]
     [skylobby.util :as u]
-    [spring-lobby.lua :as lua]
     [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log])
   (:import
