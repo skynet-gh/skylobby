@@ -7,11 +7,11 @@
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.scene.input Clipboard ClipboardContent)))

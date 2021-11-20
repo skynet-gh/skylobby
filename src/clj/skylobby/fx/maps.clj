@@ -6,11 +6,11 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
 

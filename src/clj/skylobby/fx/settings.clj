@@ -5,11 +5,11 @@
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.channel :as fx.channel]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.sound :as sound]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])

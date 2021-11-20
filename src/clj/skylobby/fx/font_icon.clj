@@ -1,4 +1,4 @@
-(ns spring-lobby.fx.font-icon
+(ns skylobby.fx.font-icon
   (:require
     [cljfx.composite :as composite]
     [cljfx.lifecycle :as lifecycle])

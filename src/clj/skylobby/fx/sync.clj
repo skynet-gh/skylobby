@@ -2,9 +2,9 @@
   (:require
     [cljfx.ext.node :as fx.ext.node]
     skylobby.fx
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [skylobby.fs :as fs]
-    [spring-lobby.fx.font-icon :as font-icon]))
+    [skylobby.fs :as fs]))
 
 
 (set! *warn-on-reflection* true)

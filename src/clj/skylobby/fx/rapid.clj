@@ -6,10 +6,10 @@
     [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
+    [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fs :as fs]
     [skylobby.util :as u]
-    [spring-lobby.fx.font-icon :as font-icon]
     [spring-lobby.rapid :as rapid]
     [taoensso.tufte :as tufte]))
 

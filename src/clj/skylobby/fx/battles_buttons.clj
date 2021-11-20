@@ -4,7 +4,7 @@
     clojure.set
     [clojure.string :as string]
     skylobby.fx
-    [spring-lobby.fx.font-icon :as font-icon]
+    [skylobby.fx.font-icon :as font-icon]
     [taoensso.tufte :as tufte]))
 
 
