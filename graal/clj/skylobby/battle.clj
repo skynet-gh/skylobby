@@ -1,4 +1,4 @@
-(ns spring-lobby.battle
+(ns skylobby.battle
   "Utilities for processing battle data.")
 
 

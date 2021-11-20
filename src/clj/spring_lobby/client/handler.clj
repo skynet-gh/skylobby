@@ -4,10 +4,10 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     crypto.random
+    [skylobby.battle :as battle]
     [skylobby.fs :as fs]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.battle :as battle]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
     [spring-lobby.sound :as sound]
