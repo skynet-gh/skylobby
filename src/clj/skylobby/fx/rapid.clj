@@ -9,8 +9,8 @@
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fs :as fs]
+    [skylobby.rapid :as rapid]
     [skylobby.util :as u]
-    [spring-lobby.rapid :as rapid]
     [taoensso.tufte :as tufte]))
 
 
