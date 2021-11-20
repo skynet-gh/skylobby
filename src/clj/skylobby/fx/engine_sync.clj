@@ -20,7 +20,7 @@
   (cond
     (string/blank? engine-version) nil
     (string/includes? engine-version "BAR") "BAR GitHub spring"
-    :else nil))
+    :else "SpringRTS buildbot"))
 
 
 (defn engine-sync-pane-impl
