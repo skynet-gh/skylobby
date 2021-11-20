@@ -526,6 +526,10 @@
          :text (str " "
                     (when (< 1 (count team-counts))
                       (string/join "v" team-counts)))}]
+       (when (< 4 (count team-counts))
+         [{:fx/type :label
+           :style {:-fx-font-size 16}
+           :text (str " " (count team-counts) "-way ffa")}])
        (when show-team-skills
          [{:fx/type :label
            :style {:-fx-font-size 16}
