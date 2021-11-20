@@ -6,8 +6,8 @@
     [org.clojars.smee.binary.core :as b]
     [skylobby.fs :as fs]
     [skylobby.lua :as lua]
+    [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
-    [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log])
   (:import
     (java.util.zip GZIPInputStream)))

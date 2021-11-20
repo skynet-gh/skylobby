@@ -7,12 +7,12 @@
     [skylobby.battle :as battle]
     [skylobby.fs :as fs]
     [skylobby.resource :as resource]
+    [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
     [spring-lobby.sound :as sound]
     [spring-lobby.spring :as spring]
-    [spring-lobby.spring.script :as spring-script]
     [taoensso.timbre :as log]))
 
 
