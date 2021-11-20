@@ -1853,6 +1853,7 @@
                    shuffle)
          battle-maps (->> state
                           :by-server
+                          (map second)
                           (map
                             (fn [{:keys [battle battles]}]
                               (-> battles (get (:battle-id battle)) :battle-map)))
