@@ -4328,6 +4328,7 @@
         (catch Exception e
           (log/error e "Error extracting 7z" file))
         (finally
+          (fs/update-file-cache! *state file dest)
           (swap! *state assoc-in [:extracting path] false))))))
 
 (defmethod task-handler ::extract-7z
