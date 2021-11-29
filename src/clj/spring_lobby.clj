@@ -328,7 +328,11 @@
      (fs/make-parent-dirs file))
    (if nippy
      (let [file (fs/config-file (nippy-filename filename))]
-       (nippy/freeze-to-file file data))
+       (log/info "Saving nippy data to" file)
+       (try
+         (nippy/freeze-to-file file data)
+         (catch Exception e
+           (log/error e "Error saving nippy to" file))))
      (let [output (if pretty
                     (with-out-str (pprint (if (map? data)
                                             (into (sorted-map) data)
@@ -1546,11 +1550,10 @@
                                :todo (count todo)})
         (do
           (log/info "No valid replays left to parse")
-          (when (seq this-round)
-            (spit-app-edn
-              ((:select-fn parsed-replays-config) new-state)
-              (:filename parsed-replays-config)
-              parsed-replays-config))
+          (spit-app-edn
+            ((:select-fn parsed-replays-config) new-state)
+            (:filename parsed-replays-config)
+            parsed-replays-config)
           (add-task! state-atom {::task-type ::refresh-replay-resources}))))))
 
 (defn- refresh-replay-resources
