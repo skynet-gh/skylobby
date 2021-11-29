@@ -50,6 +50,10 @@
     {:file f
      :items (b/decode (b/repeated sdp-line) gz)}))
 
+(defn sdp-filename [rapid-hash]
+  (when rapid-hash
+    (str rapid-hash ".sdp")))
+
 (defn sdp-file
   [root sdp-filename]
   (when sdp-filename

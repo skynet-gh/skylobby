@@ -139,7 +139,7 @@
                                  :else nil))}])
                  (when dest-exists
                    (let [extracting (or (get extracting dest-path)
-                                       (contains? extract-tasks dest-path))]
+                                        (contains? extract-tasks dest-path))]
                      (when (or extracting (not extract-exists))
                        [{:severity (if engine-details
                                      0
