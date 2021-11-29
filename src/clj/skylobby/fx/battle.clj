@@ -267,6 +267,7 @@
                         :text " Interleave Player IDs "}]}]))]
     {:fx/type :flow-pane
      :style {:-fx-font-size 16}
+     :hgap 4
      :orientation :horizontal
      :children
      (concat
@@ -1384,7 +1385,8 @@
      [
       {:fx/type :h-box
        :alignment :center-left
-       :style {:-fx-font-size 16}
+       :style {:-fx-font-size 16
+               :-fx-padding 8}
        :children
        (concat
          (when battle-id
