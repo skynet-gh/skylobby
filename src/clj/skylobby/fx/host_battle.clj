@@ -74,6 +74,8 @@
          :children
          [
           {:fx/type :label
+           :text (str " Spring root for this server:  " spring-root)}
+          {:fx/type :label
            :text " Battle Name: "}
           {:fx/type :text-field
            :text (str battle-title)
