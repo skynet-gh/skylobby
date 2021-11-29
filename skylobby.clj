@@ -4,10 +4,11 @@
 
 
 (def lib 'skylobby/skylobby)
-(def version "0.6.18") ; TODO
-(def src-dirs ["src/clj" "graal/clj" "resources"])
+(def version "0.7.19") ; TODO
+(def src-dirs ["graal/clj" "resources"])
 (def class-dir "target/classes")
-(def basis (b/create-basis {:project "deps.edn"}))
+(def basis (b/create-basis {:project "deps.edn"
+                            :aliases [:skylobby-deps]}))
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
 
 
@@ -24,5 +25,5 @@
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis basis
-           :main 'spring_lobby.main
+           :main 'skylobby.main
            :manifest {"Build-Number" version}}))

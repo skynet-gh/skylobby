@@ -1,4 +1,4 @@
-(ns skylobby.server
+(ns skylobby.server-stub
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]
@@ -15,7 +15,7 @@
     [ring.middleware.anti-forgery :as anti-forgery]
     [ring.middleware.content-type :as content-type]
     ring.util.response
-    [skylobby.event :as event]
+    [skylobby.event-stub :as event]
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]

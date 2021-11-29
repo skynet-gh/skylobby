@@ -430,8 +430,8 @@
     (with-open [_server (ServerSocket. port)]
       true)
     (catch Exception e
-      (log/trace e "Port is not available" port)
-      (log/info "Port is not available" port)
+      (log/debug e "Port is not available" (pr-str port))
+      (log/info "Port is not available" (pr-str port))
       false)))
 
 (defn open-port []

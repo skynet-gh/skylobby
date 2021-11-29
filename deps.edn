@@ -3,7 +3,8 @@
  {"local" {:url "file:./repo"}
   "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
- {aleph/aleph {:mvn/version "0.4.6"}
+ {
+  aleph/aleph {:mvn/version "0.4.7-alpha10"}
   cheshire/cheshire {:mvn/version  "5.10.1"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
@@ -27,16 +28,25 @@
   expound/expound {:mvn/version "0.8.10"}
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
-  org.apache.commons/commons-compress {:mvn/version "1.21"}
-  org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
+  http-kit/http-kit {:mvn/version "2.5.3"}
+  io.netty/netty-codec {:mvn/version "4.1.70.Final"}
+  io.netty/netty-codec-http {:mvn/version "4.1.70.Final"}
+  io.netty/netty-handler {:mvn/version "4.1.70.Final"}
+  io.netty/netty-handler-proxy {:mvn/version "4.1.70.Final"}
+  io.netty/netty-resolver {:mvn/version "4.1.70.Final"}
+  io.netty/netty-resolver-dns {:mvn/version "4.1.70.Final"}
+  io.netty/netty-transport {:mvn/version "4.1.70.Final"}
+  io.netty/netty-transport-native-epoll {:mvn/version "4.1.70.Final"}
   hashp/hashp {:mvn/version "0.2.1"}
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   jarohen/chime {:mvn/version "0.3.3"}
+  manifold/manifold {:mvn/version "0.1.9"}
   me.raynes/fs {:mvn/version "1.4.6"}
   metosin/reitit {:mvn/version "0.5.15"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+  org.apache.commons/commons-compress {:mvn/version "1.21"}
   org.clj-commons/byte-streams {:mvn/version "0.2.10"}
   org.clojure/core.cache {:mvn/version "1.0.217"}
   org.clojure/clojure {:mvn/version "1.10.3"}
@@ -45,6 +55,7 @@
   org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
+  org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.0"}
   org.fxmisc.flowless/flowless {:mvn/version "0.6.7"}
   org.fxmisc.richtext/richtextfx {:mvn/version "0.10.7"}
@@ -121,12 +132,89 @@
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.60.945"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
-  :skylobby-main
-  {:extra-paths ["src/clj" "graal/clj"]
-   :main-opts ["-m" "spring-lobby.main"]}
   :skylobby
   {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
    :ns-default skylobby}
+  :skylobby-deps
+  {:replace-deps
+   {
+    aleph/aleph {:mvn/version "0.4.7-alpha10"}
+    clj.native-image/clj.native-image
+    {:git/url "https://github.com/taylorwood/clj.native-image.git"
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
+    clj-http/clj-http {:mvn/version "3.12.3"}
+    clojail/clojail {:mvn/version "1.0.6"}
+    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    com.evocomputing/colors {:mvn/version "1.0.6"}
+    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
+    com.github.clj-easy/graal-config-clj-http
+    {:git/url "https://github.com/clj-easy/graal-config"
+     :git/sha "42d4892cc581b12ccd71bca9f47964e31d1a308a"
+     :deps/root "config/clj-http/clj-http"}
+    com.github.clj-easy/graal-config-nippy
+    {:git/url   "https://github.com/clj-easy/graal-config"
+     :git/sha   "42d4892cc581b12ccd71bca9f47964e31d1a308a"
+     :deps/root "config/com.taoensso/nippy"}
+    com.taoensso/encore {:mvn/version "3.20.0"}
+    com.taoensso/nippy {:mvn/version "3.1.1"}
+    com.taoensso/sente {:mvn/version "1.16.2"}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    com.taoensso/tufte {:mvn/version "2.2.0"}
+    commons-io/commons-io {:mvn/version "2.11.0"}
+    crouton/crouton {:mvn/version "0.1.2"}
+    gr.zdimensions/jsquish {:mvn/version "1.0"}
+    http-kit/http-kit {:mvn/version "2.5.3"}
+    instaparse/instaparse {:mvn/version "1.4.10"}
+    io.netty/netty-codec {:mvn/version "4.1.70.Final"}
+    io.netty/netty-codec-http {:mvn/version "4.1.70.Final"}
+    io.netty/netty-handler {:mvn/version "4.1.70.Final"}
+    io.netty/netty-handler-proxy {:mvn/version "4.1.70.Final"}
+    io.netty/netty-resolver {:mvn/version "4.1.70.Final"}
+    io.netty/netty-resolver-dns {:mvn/version "4.1.70.Final"}
+    io.netty/netty-transport {:mvn/version "4.1.70.Final"}
+    io.netty/netty-transport-native-epoll {:mvn/version "4.1.70.Final"}
+    jarohen/chime {:mvn/version "0.3.3"}
+    manifold/manifold {:mvn/version "0.1.9"}
+    me.raynes/fs {:mvn/version "1.4.6"}
+    metosin/reitit {:mvn/version "0.5.15"}
+    net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
+    net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
+    org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.clojure/clojure {:mvn/version "1.10.3"}
+    org.clojure/core.async {:mvn/version "1.4.627"}
+    org.clojure/spec.alpha {:mvn/version "0.2.194"}
+    org.clojure/tools.cli {:mvn/version "1.0.206"}
+    org.clojure/tools.logging {:mvn/version "1.1.0"}
+    org.clojure/tools.namespace {:mvn/version "1.1.0"}
+    org.clojure/tools.reader {:mvn/version "1.3.6"}
+    org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}
+    ring/ring-anti-forgery {:mvn/version "1.3.0"}
+    ring/ring-core {:mvn/version "1.9.4"}
+    smee/binary {:mvn/version "0.5.5"}}}
+  :skylobby-main
+  {:replace-paths ["resources" "graal/clj"]
+   :main-opts ["-m" "skylobby.main"]}
+  :skylobby-native-linux
+  {:replace-paths ["resources" "dev/clj/graal" "graal/clj" "native-res/linux"]
+   :main-opts ["-m" "native-image" "skylobbymain" "--no-fallback" "--allow-incomplete-classpath"
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
+               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+               "--report-unsupported-elements-at-runtime"
+               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+  :skylobby-native-windows
+  {:replace-paths ["resources" "dev/clj/graal" "graal/clj" "native-res/windows"]
+   :main-opts ["-m" "native-image" "skylobby.main" "--no-fallback" "--allow-incomplete-classpath"
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
+               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+               "--report-unsupported-elements-at-runtime"
+               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
   {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
    :ns-default skylobby-cli}
@@ -170,7 +258,7 @@
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
    :main-opts ["-m" "skylobby.cli"]}
-  :skylobby-cli-native-linux ; TODO dedup
+  :skylobby-cli-native-linux
   {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/linux"]
    :main-opts ["-m" "native-image" "skylobby.cli" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
@@ -178,8 +266,7 @@
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
-
-  :skylobby-cli-native-windows ; TODO dedup
+  :skylobby-cli-native-windows
   {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/windows"]
    :main-opts ["-m" "native-image" "skylobby.cli" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
