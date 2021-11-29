@@ -8,7 +8,7 @@
   cheshire/cheshire {:mvn/version  "5.10.1"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
-  cljfx/cljfx {:mvn/version "1.7.16"
+  cljfx/cljfx {:mvn/version "1.7.17"
                :exclusions [org.openjfx/javafx-web]}
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
@@ -41,7 +41,7 @@
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   jarohen/chime {:mvn/version "0.3.3"}
-  manifold/manifold {:mvn/version "0.1.9"}
+  manifold/manifold {:mvn/version "0.2.0"}
   me.raynes/fs {:mvn/version "1.4.6"}
   metosin/reitit {:mvn/version "0.5.15"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
@@ -49,9 +49,9 @@
   org.apache.commons/commons-compress {:mvn/version "1.21"}
   org.clj-commons/byte-streams {:mvn/version "0.2.10"}
   org.clojure/core.cache {:mvn/version "1.0.217"}
-  org.clojure/clojure {:mvn/version "1.10.3"}
-  org.clojure/core.async {:mvn/version "1.4.627"}
-  org.clojure/spec.alpha {:mvn/version "0.2.194"}
+  org.clojure/clojure {:mvn/version "1.11.0-alpha3"}
+  org.clojure/core.async {:mvn/version "1.5.640"}
+  org.clojure/spec.alpha {:mvn/version "0.3.218"}
   org.clojure/test.check {:mvn/version "1.1.0"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
   org.clojure/tools.logging {:mvn/version "1.1.0"}
@@ -82,7 +82,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1076"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
@@ -102,7 +102,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1076"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
@@ -114,18 +114,18 @@
   :cljs
   {:extra-paths ["src/cljs"]
    :extra-deps {
-                org.clojure/core.async {:mvn/version "1.4.627"}
+                org.clojure/core.async {:mvn/version "1.5.640"}
                 com.taoensso/sente {:mvn/version "1.16.2"}
                 com.taoensso/timbre {:mvn/version "5.1.2"}
                 metosin/reitit {:mvn/version "0.5.15"}
                 re-frame/re-frame {:mvn/version "1.2.0"}
-                thheller/shadow-cljs {:mvn/version "2.16.4"}}
+                thheller/shadow-cljs {:mvn/version "2.16.6"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
    :extra-deps
    {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1076"}
     seancorfield/depstar {:mvn/version "1.1.136"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -133,7 +133,7 @@
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.60.945"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.8" :git/sha "4d41c26"}}
    :ns-default skylobby}
   :skylobby-deps
   {:replace-deps
@@ -174,15 +174,15 @@
     io.netty/netty-transport {:mvn/version "4.1.70.Final"}
     io.netty/netty-transport-native-epoll {:mvn/version "4.1.70.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
-    manifold/manifold {:mvn/version "0.1.9"}
+    manifold/manifold {:mvn/version "0.2.0"}
     me.raynes/fs {:mvn/version "1.4.6"}
     metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
     org.clojure/clojure {:mvn/version "1.10.3"}
-    org.clojure/core.async {:mvn/version "1.4.627"}
-    org.clojure/spec.alpha {:mvn/version "0.2.194"}
+    org.clojure/core.async {:mvn/version "1.5.640"}
+    org.clojure/spec.alpha {:mvn/version "0.3.218"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     org.clojure/tools.logging {:mvn/version "1.1.0"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
@@ -216,7 +216,7 @@
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.6" :git/sha "4d41c26"}}
+  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.8" :git/sha "4d41c26"}}
    :ns-default skylobby-cli}
   :skylobby-cli-deps
   {:replace-deps
@@ -248,7 +248,7 @@
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
-    org.clojure/core.async {:mvn/version "1.4.627"}
+    org.clojure/core.async {:mvn/version "1.5.640"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
     org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
@@ -285,7 +285,7 @@
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1071"}
+    org.clojure/tools.deps.alpha {:mvn/version "0.12.1076"}
     org.clojure/tools.namespace {:mvn/version "1.1.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
