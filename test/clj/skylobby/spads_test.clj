@@ -39,7 +39,13 @@
                          ""
                          "25s"],
           :text "* Vote in progress: \"set map Altored Divide Bar Remake 1.55\" [y:4/5, n:2/4(5)] (25s remaining)"}
-         (spads/parse-spads-message "* Vote in progress: \"set map Altored Divide Bar Remake 1.55\" [y:4/5, n:2/4(5)] (25s remaining)"))))
+         (spads/parse-spads-message "* Vote in progress: \"set map Altored Divide Bar Remake 1.55\" [y:4/5, n:2/4(5)] (25s remaining)")))
+  (is (= {:spads-message-type :cancelling-vote
+          :spads-parsed ["* Cancelling \"set autobalance on\" vote (command executed directly by user)"
+                         "set autobalance on"
+                         "command executed directly by user"]
+          :text "* [teh]cluster1[06] * Cancelling \"set autobalance on\" vote (command executed directly by user)"}
+         (spads/parse-spads-message "* [teh]cluster1[06] * Cancelling \"set autobalance on\" vote (command executed directly by user)"))))
 
 
 (deftest parse-command-message
