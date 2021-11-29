@@ -244,6 +244,7 @@
 (defn initial-state []
   (merge
     {:auto-get-resources true
+     :auto-rejoin-battle true
      :battle-as-tab true
      :battle-layout "horizontal"
      :battles-layout "horizontal"
