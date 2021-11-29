@@ -154,6 +154,7 @@
         am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
+        host-username (fx/sub-ctx context sub/host-username server-key)
         username (fx/sub-val context get-in [:by-server server-key :username])
         my-client-status (fx/sub-ctx context sub/my-client-status server-key)
         am-away (:away my-client-status)
@@ -267,6 +268,7 @@
                         :text " Interleave Player IDs "}]}]))]
     {:fx/type :flow-pane
      :style {:-fx-font-size 16}
+     :hgap 4
      :orientation :horizontal
      :children
      (concat
@@ -546,6 +548,7 @@
     :keys [server-key]}]
   (let [
         am-host (fx/sub-ctx context sub/am-host server-key)
+        host-username (fx/sub-ctx context sub/host-username server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         {:keys [battle-id] :as battle} (fx/sub-val context get-in [:by-server server-key :battle])
         mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
@@ -592,153 +595,163 @@
            :minimap-type-key :minimap-type}
           {:fx/type :v-box
            :children
-           [
-            {:fx/type :label
-             :text (str
-                     (when-let [description (-> battle-map-details :mapinfo :description)]
-                       description))}
-            {:fx/type :flow-pane
-             :children
+           (concat
              [
               {:fx/type :label
-               :text (str " Display (px): ")}
-              {:fx/type :combo-box
-               :value minimap-size
-               :items fx.minimap/minimap-sizes
-               :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :minimap-size}}
-              {:fx/type :combo-box
-               :value (fx/sub-val context :minimap-type)
-               :items minimap-types
-               :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :minimap-type}}
-              {:fx/type :label
-               :text (str " Map size: "
-                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
-                            (str
-                              (when map-width (quot map-width 64))
-                              " x "
-                              (when map-height (quot map-height 64)))))}]}
-            (let [{:keys [battle-status]} (-> battle :users (get username))]
-              {:fx/type maps-view
-               :action-disable-rotate {:event/type :spring-lobby/send-message
-                                       :channel-name channel-name
-                                       :client-data client-data
-                                       :message "!rotationEndGame off"
-                                       :server-key server-key}
-               :disable (and (not singleplayer) am-spec)
-               :flow true
-               :map-name map-name
-               :spring-isolation-dir spring-isolation-dir
-               :on-value-changed
-               (cond
-                 singleplayer
-                 {:event/type :spring-lobby/assoc-in
-                  :path [:by-server :local :battles :singleplayer :battle-map]}
-                 am-host
-                 {:event/type :spring-lobby/battle-map-change
-                  :client-data client-data}
-                 :else
-                 {:event/type :spring-lobby/suggest-battle-map
-                  :battle-status battle-status
-                  :channel-name channel-name
-                  :client-data client-data})})
-            {:fx/type :flow-pane
-             :children
-             (concat
-               [{:fx/type :label
-                 :alignment :center-left
-                 :text " Start Positions: "}
+               :text (str
+                       (when-let [description (-> battle-map-details :mapinfo :description)]
+                         description))}
+              {:fx/type :flow-pane
+               :children
+               [
+                {:fx/type :label
+                 :text (str " Display (px): ")}
                 {:fx/type :combo-box
-                 :value startpostype
-                 :items (map str (vals spring/startpostypes))
+                 :value minimap-size
+                 :items fx.minimap/minimap-sizes
+                 :on-value-changed {:event/type :spring-lobby/assoc
+                                    :key :minimap-size}}
+                {:fx/type :combo-box
+                 :value (fx/sub-val context :minimap-type)
+                 :items minimap-types
+                 :on-value-changed {:event/type :spring-lobby/assoc
+                                    :key :minimap-type}}
+                {:fx/type :label
+                 :text (str " Map size: "
+                            (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
+                              (str
+                                (when map-width (quot map-width 64))
+                                " x "
+                                (when map-height (quot map-height 64)))))}]}
+              (let [{:keys [battle-status]} (-> battle :users (get username))]
+                {:fx/type maps-view
+                 :action-disable-rotate {:event/type :spring-lobby/send-message
+                                         :channel-name channel-name
+                                         :client-data client-data
+                                         :message "!rotationEndGame off"
+                                         :server-key server-key}
                  :disable (and (not singleplayer) am-spec)
-                 :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
-                                    :am-host am-host
-                                    :channel-name channel-name
-                                    :client-data client-data
-                                    :singleplayer singleplayer}}]
-               (when (= "Choose before game" startpostype)
-                 [{:fx/type :button
-                   :text "Reset"
+                 :flow true
+                 :map-name map-name
+                 :spring-isolation-dir spring-isolation-dir
+                 :on-value-changed
+                 (cond
+                   singleplayer
+                   {:event/type :spring-lobby/assoc-in
+                    :path [:by-server :local :battles :singleplayer :battle-map]}
+                   am-host
+                   {:event/type :spring-lobby/battle-map-change
+                    :client-data client-data}
+                   :else
+                   {:event/type :spring-lobby/suggest-battle-map
+                    :battle-status battle-status
+                    :channel-name channel-name
+                    :client-data client-data})})
+              {:fx/type :flow-pane
+               :children
+               (concat
+                 [{:fx/type :label
+                   :alignment :center-left
+                   :text " Start Positions: "}
+                  {:fx/type :combo-box
+                   :value startpostype
+                   :items (map str (vals spring/startpostypes))
                    :disable (and (not singleplayer) am-spec)
-                   :on-action {:event/type :spring-lobby/reset-start-positions
-                               :client-data client-data
-                               :server-key server-key}}])
-               (when (= "Choose in game" startpostype)
-                 [{:fx/type :button
-                   :text "Clear boxes"
-                   :disable (and (not singleplayer) am-spec)
-                   :on-action {:event/type :spring-lobby/clear-start-boxes
-                               :allyteam-ids (->> (get scripttags "game")
-                                                  (filter (comp #(string/starts-with? % "allyteam") name first))
-                                                  (map
-                                                    (fn [[teamid _team]]
-                                                      (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
-                                                        id))))
-                               :client-data client-data
-                               :server-key server-key}}]))}
-            {:fx/type :label
-             :text (str "")}
-            {:fx/type :flow-pane
-             ;:alignment :center-left
-             :children
-             (concat
-               (when am-host
-                 [{:fx/type :button
-                   :text "FFA"
-                   :on-action {:event/type :spring-lobby/battle-teams-ffa
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}
-                  {:fx/type :button
-                   :text "2 teams"
-                   :on-action {:event/type :spring-lobby/battle-teams-2
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}
-                  {:fx/type :button
-                   :text "3 teams"
-                   :on-action {:event/type :spring-lobby/battle-teams-3
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}
-                  {:fx/type :button
-                   :text "4 teams"
-                   :on-action {:event/type :spring-lobby/battle-teams-4
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}
-                  {:fx/type :button
-                   :text "5 teams"
-                   :on-action {:event/type :spring-lobby/battle-teams-5
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}
-                  {:fx/type :button
-                   :text "Humans vs Bots"
-                   :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
-                               :am-host am-host
-                               :battle battle
-                               :client-data (when-not singleplayer client-data)
-                               :interleave-ally-player-ids interleave-ally-player-ids
-                               :users users
-                               :username username}}]))}]}]}}}
+                   :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
+                                      :am-host am-host
+                                      :channel-name channel-name
+                                      :client-data client-data
+                                      :singleplayer singleplayer}}]
+                 (when (= "Choose before game" startpostype)
+                   [{:fx/type :button
+                     :text "Reset"
+                     :disable (and (not singleplayer) am-spec)
+                     :on-action {:event/type :spring-lobby/reset-start-positions
+                                 :client-data client-data
+                                 :server-key server-key}}])
+                 (when (= "Choose in game" startpostype)
+                   [{:fx/type :button
+                     :text "Clear boxes"
+                     :disable (and (not singleplayer) am-spec)
+                     :on-action {:event/type :spring-lobby/clear-start-boxes
+                                 :allyteam-ids (->> (get scripttags "game")
+                                                    (filter (comp #(string/starts-with? % "allyteam") name first))
+                                                    (map
+                                                      (fn [[teamid _team]]
+                                                        (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
+                                                          id))))
+                                 :client-data client-data
+                                 :server-key server-key}}]))}
+              {:fx/type :label
+               :text (str "")}
+              {:fx/type :flow-pane
+               ;:alignment :center-left
+               :children
+               (concat
+                 (when am-host
+                   [{:fx/type :button
+                     :text "FFA"
+                     :on-action {:event/type :spring-lobby/battle-teams-ffa
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}
+                    {:fx/type :button
+                     :text "2 teams"
+                     :on-action {:event/type :spring-lobby/battle-teams-2
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}
+                    {:fx/type :button
+                     :text "3 teams"
+                     :on-action {:event/type :spring-lobby/battle-teams-3
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}
+                    {:fx/type :button
+                     :text "4 teams"
+                     :on-action {:event/type :spring-lobby/battle-teams-4
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}
+                    {:fx/type :button
+                     :text "5 teams"
+                     :on-action {:event/type :spring-lobby/battle-teams-5
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}
+                    {:fx/type :button
+                     :text "Humans vs Bots"
+                     :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
+                                 :am-host am-host
+                                 :battle battle
+                                 :client-data (when-not singleplayer client-data)
+                                 :interleave-ally-player-ids interleave-ally-player-ids
+                                 :users users
+                                 :username username}}]))}]
+             (when (and (not am-host)
+                        (-> users (get host-username) :client-status :bot))
+               [{:fx/type :button
+                 :text "List Maps"
+                 :on-action {:event/type :spring-lobby/send-message
+                             :channel-name channel-name
+                             :client-data client-data
+                             :message "!listmaps"
+                             :server-key server-key}}]))}]}}}
       {:fx/type :tab
        :graphic {:fx/type :label
                  :text "modoptions"}
@@ -1384,7 +1397,8 @@
      [
       {:fx/type :h-box
        :alignment :center-left
-       :style {:-fx-font-size 16}
+       :style {:-fx-font-size 16
+               :-fx-padding 8}
        :children
        (concat
          (when battle-id

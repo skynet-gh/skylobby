@@ -121,6 +121,7 @@
                                   (str "Downloaded to " dest-path)
                                   (str "Download " url)))
                      :in-progress in-progress
+                     :force-action true
                      :action (when-not dest-exists
                                (cond
                                  downloadable
@@ -139,16 +140,20 @@
                                  :else nil))}])
                  (when dest-exists
                    (let [extracting (or (get extracting dest-path)
-                                       (contains? extract-tasks dest-path))]
+                                        (contains? extract-tasks dest-path)
+                                        (contains? download-tasks url))]
                      (when (or extracting (not extract-exists))
                        [{:severity (if engine-details
                                      0
                                      (if extract-exists -1 2))
                          :text "extract"
-                         :in-progress (or (get extracting dest-path)
-                                          (contains? extract-tasks dest-path))
-                         :human-text (str "Extract " resource-filename)
-                         :tooltip (str "Click to extract to " extract-target)
+                         :in-progress extracting
+                         :human-text (if extracting
+                                       (str "Extracting " resource-filename)
+                                       (str "Extract " resource-filename))
+                         :tooltip (if extracting
+                                    (str "Extracting " dest " to " extract-target)
+                                    (str "Click to extract to " extract-target))
                          :force-action true
                          :action {:event/type :spring-lobby/extract-7z
                                   :file dest

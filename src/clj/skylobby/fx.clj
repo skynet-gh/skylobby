@@ -129,6 +129,8 @@
      {:-fx-fill "grey"}
      "-username"
      {:-fx-fill "royalblue"}
+     "-username-me"
+     {:-fx-fill "orange"}
      "-username-ex"
      {:-fx-fill "cyan"}
      "-username-join"

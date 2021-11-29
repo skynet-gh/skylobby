@@ -280,11 +280,21 @@
                     :children
                     [
                      {:fx/type :check-box
+                      :selected (boolean (fx/sub-val context :chat-color-username))
+                      :on-selected-changed {:event/type :spring-lobby/assoc
+                                            :key :chat-color-username}}
+                     {:fx/type :label
+                      :text " Color my username"}]}
+                   {:fx/type :h-box
+                    :style {:-fx-font-size 18}
+                    :children
+                    [
+                     {:fx/type :check-box
                       :selected (boolean (fx/sub-val context :chat-highlight-username))
                       :on-selected-changed {:event/type :spring-lobby/assoc
                                             :key :chat-highlight-username}}
                      {:fx/type :label
-                      :text " Highlight username"}]}
+                      :text " Highlight my username in messages"}]}
                    {:fx/type :label
                     :text "Highlight words (comma or space separated): "}
                    {:fx/type :text-field
@@ -530,6 +540,16 @@
                                             :key :auto-refresh-replays}}
                      {:fx/type :label
                       :text " Auto refresh replays"}]}
+                   {:fx/type :h-box
+                    :style {:-fx-font-size 18}
+                    :children
+                    [
+                     {:fx/type :check-box
+                      :selected (boolean (fx/sub-val context :refresh-replays-after-game))
+                      :on-selected-changed {:event/type :spring-lobby/assoc
+                                            :key :refresh-replays-after-game}}
+                     {:fx/type :label
+                      :text " Refresh replays after game"}]}
                    {:fx/type :v-box
                     :children
                     (map

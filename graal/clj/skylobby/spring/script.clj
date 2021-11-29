@@ -60,9 +60,9 @@
        (apply u/deep-merge)))
 
 
-(def script-grammar
- (instaparse/parser
-   "config = block*
+(defn script-grammar []
+  (instaparse/parser
+    "config = block*
      block = <comment*>
              tag <comment*>
              <'{'>
@@ -72,7 +72,7 @@
      tag = <'['> #'[\\w\\s]+' <']'>
      field = <#'\\s+'?> #'\\w+' <#'\\s+'?> <'='> <#'\\s*'> #'[^;]*' <';'> <#'.*'>?
      comment = '//' #'.*'"
-   :auto-whitespace :standard))
+    :auto-whitespace :standard))
 
 (declare parse-fields-or-blocks)
 
@@ -120,7 +120,7 @@
   [script-txt]
   (clojail/thunk-timeout
     #(let [cleaned (remove-nonprintable script-txt)
-           parsed (instaparse/parse script-grammar cleaned)]
+           parsed (instaparse/parse (script-grammar) cleaned)]
        (if (instaparse/failure? parsed)
          (do
            (log/debug parsed)

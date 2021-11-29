@@ -59,7 +59,7 @@
      :title (str u/app-name " Host Battle")
      :icons skylobby.fx/icons
      :on-close-request {:event/type :spring-lobby/dissoc
-                        :key :show-register-window}
+                        :key :show-host-battle-window}
      :x (skylobby.fx/fitx screen-bounds)
      :y (skylobby.fx/fity screen-bounds)
      :width (skylobby.fx/fitwidth screen-bounds host-battle-window-width)
@@ -73,6 +73,8 @@
          :style {:-fx-font-size 16}
          :children
          [
+          {:fx/type :label
+           :text (str " Spring root for this server:  " spring-root)}
           {:fx/type :label
            :text " Battle Name: "}
           {:fx/type :text-field
