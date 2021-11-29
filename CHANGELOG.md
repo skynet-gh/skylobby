@@ -23,6 +23,18 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.20]
+
+- Fix parsed replays not being saved to file
+- Add setting to color your username in chat
+- Make auto rejoin battle default
+- Add some spacing between buttons for battle
+- Add list maps button when host is a bot
+- Add setting to refresh replays after game
+- Fix cancelling vote message regex
+- Improve engine choice download
+- Fix host battle window close
+
 ### [0.7.19]
 
 - Make it easier to download different engine arch
