@@ -66,7 +66,7 @@
 (defn channel-document
   ([messages]
    (channel-document messages nil))
-  ([messages {:keys [highlight]}]
+  ([messages {:keys [color-my-username highlight my-username]}]
    (let [highlight (->> highlight
                         (filter some?)
                         (map string/trim)
@@ -93,7 +93,11 @@
                       (str username ": ")))
                   ["text" (if (= :info message-type)
                             "skylobby-chat-info"
-                            (str "skylobby-chat-username" (when message-type (str "-" (name message-type)))))])]
+                            (str "skylobby-chat-username" 
+                                 (if message-type 
+                                   (str "-" (name message-type))
+                                   (when (and color-my-username (= username my-username))
+                                     "-me"))))])]
                (when-not message-type
                  (map
                    (fn [[_all _ _irc-color-code text-segment]]
@@ -121,6 +125,7 @@
         username (fx/sub-val context get-in [:by-server server-key :username])
         chat-auto-scroll (fx/sub-val context :chat-auto-scroll)
         chat-font-size (fx/sub-val context :chat-font-size)
+        chat-color-username (fx/sub-val context :chat-color-username)
         chat-highlight-username (fx/sub-val context :chat-highlight-username)
         chat-highlight-words (fx/sub-val context :chat-highlight-words)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
@@ -168,12 +173,14 @@
          (fn [lines]
            (channel-document
              lines
-             {:highlight
+             {:color-my-username chat-color-username
+              :highlight
               (concat
                 (when chat-highlight-words
                   (string/split chat-highlight-words #"[\s,]+"))
                 (when chat-highlight-username
-                  [username]))}))
+                  [username]))
+              :my-username username}))
          chat-auto-scroll]}}}}))
 
 (defn channel-view-history
