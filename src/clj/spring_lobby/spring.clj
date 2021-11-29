@@ -10,6 +10,7 @@
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
     [skylobby.fs :as fs]
+    [skylobby.task :as task]
     [skylobby.util :as u]
     [spring-lobby.client.message :as client]
     [spring-lobby.client.util :as cu]
@@ -472,7 +473,9 @@
                            (log/info "No media player to resume")))
                        (let [{:keys [ring-when-game-ends] :as state} @state-atom]
                          (when ring-when-game-ends
-                           (sound/play-ring state))))
+                           (sound/play-ring state)))
+                       (when (:refresh-replays-after-game state)
+                         (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays})))
         set-ingame (fn [ingame]
                      (client/send-message state-atom client-data
                        (str "MYSTATUS "

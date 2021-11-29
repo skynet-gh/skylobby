@@ -171,7 +171,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
-   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec
+   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
@@ -269,6 +269,7 @@
                              :country true
                              :bonus true}
      :ready-on-unspec true
+     :refresh-replays-after-game true
      :spring-isolation-dir (fs/default-spring-root)
      :servers default-servers
      :use-default-ring-sound true}
@@ -426,30 +427,6 @@
 
 
 (defmulti event-handler :event/type)
-
-
-; tasks by kind
-
-(defn add-task! [state-atom task]
-  (if task
-    (let [task-kind (task/task-kind task)]
-      (log/info "Adding task" (pr-str task) "to" task-kind)
-      (swap! state-atom update-in [:tasks-by-kind task-kind]
-        (fn [tasks]
-          (set (conj tasks task)))))
-    (log/warn "Attempt to add nil task" task)))
-
-(defn add-multiple-tasks [tasks-by-kind new-tasks]
-  (reduce-kv
-    (fn [m k new-tasks]
-      (update m k (fn [existing]
-                    (set (concat new-tasks existing)))))
-    tasks-by-kind
-    (group-by task/task-kind new-tasks)))
-
-(defn- add-tasks! [state-atom new-tasks]
-  (log/info "Adding tasks" (pr-str new-tasks))
-  (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
 
 
 (defmethod event-handler ::stop-task [{:keys [task-kind ^java.lang.Thread task-thread]}]
@@ -876,7 +853,7 @@
                            (not (some (comp #{new-map} :map-name) old-maps))
                            map-exists)))
             (log/info "Mod details update for" server-key)
-            (add-task! state-atom
+            (task/add-task! state-atom
               {::task-type ::map-details
                :map-name new-map
                :map-file (:file map-exists)
@@ -927,7 +904,7 @@
                       (and (not (some filter-fn old-mods))
                            mod-exists))
               (log/info "Mod details update for" server-key)
-              (add-task! state-atom
+              (task/add-task! state-atom
                 {::task-type ::mod-details
                  :mod-name new-mod
                  :mod-file (:file mod-exists)
@@ -1018,7 +995,7 @@
                       :replay-file selected-replay-file})]]
         (when-let [tasks (->> tasks (filter some?) seq)]
           (log/info "Adding" (count tasks) "for replay resources")
-          (add-tasks! state-atom tasks)))
+          (task/add-tasks! state-atom tasks)))
       (catch Exception e
         (log/error e "Error in :replay-map-and-mod-details state watcher")))))
 
@@ -1086,7 +1063,7 @@
             (fn [{:keys [extra-import-sources] :as state}]
               (-> state
                   (update :tasks-by-kind
-                    add-multiple-tasks
+                    task/add-multiple-tasks
                     [{::task-type ::refresh-engines
                       :spring-root spring-isolation-dir}
                      {::task-type ::refresh-mods
@@ -1116,7 +1093,7 @@
                             (filter some?)
                             seq)]
         (log/info "Adding" (count tasks) "to auto get resources")
-        (add-tasks! state-atom tasks))
+        (task/add-tasks! state-atom tasks))
       (catch Exception e
         (log/error e "Error in :auto-get-resources state watcher")))))
 
@@ -1548,15 +1525,16 @@
                              (comp invalid-replay-paths fs/canonical-path second)
                              todo)]
       (if (seq valid-next-round)
-        (add-task! state-atom {::task-type ::refresh-replays
-                               :todo (count todo)})
+        (task/add-task! state-atom 
+          {::task-type ::refresh-replays
+           :todo (count todo)})
         (do
           (log/info "No valid replays left to parse")
           (spit-app-edn
             ((:select-fn parsed-replays-config) new-state)
             (:filename parsed-replays-config)
             parsed-replays-config)
-          (add-task! state-atom {::task-type ::refresh-replay-resources}))))))
+          (task/add-task! state-atom {::task-type ::refresh-replay-resources}))))))
 
 (defn- refresh-replay-resources
   [state-atom]
@@ -1782,9 +1760,10 @@
                   (dissoc :update-mods))))
      (when next-round
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-       (add-task! state-atom {::task-type ::refresh-mods
-                              :spring-root spring-root
-                              :todo (count next-round)}))
+       (task/add-task! state-atom 
+         {::task-type ::refresh-mods
+          :spring-root spring-root
+          :todo (count next-round)}))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
 
@@ -1828,8 +1807,9 @@
              (swap! *state assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
-       (add-task! *state {::task-type ::update-cached-minimaps
-                          :todo (count next-round)})))))
+       (task/add-task! *state 
+         {::task-type ::update-cached-minimaps
+          :todo (count next-round)})))))
 
 
 (defn- refresh-maps
@@ -1919,10 +1899,11 @@
      (if next-round
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-         (add-task! state-atom {::task-type ::refresh-maps
-                                :spring-root spring-root
-                                :todo next-round-count}))
-       (add-task! state-atom {::task-type ::update-cached-minimaps}))
+         (task/add-task! state-atom 
+           {::task-type ::refresh-maps
+            :spring-root spring-root
+            :todo next-round-count}))
+       (task/add-task! state-atom {::task-type ::update-cached-minimaps}))
      {:todo-count next-round-count})))
 
 
@@ -2153,7 +2134,7 @@
             (log/debug "Updating now")
             (let [{:keys [auto-refresh-replays]} @state-atom]
               (if auto-refresh-replays
-                (add-task! state-atom {::task-type ::refresh-replays})
+                (task/add-task! state-atom {::task-type ::refresh-replays})
                 (log/info "Auto replay refresh disabled"))))
           {:error-handler
            (fn [e]
@@ -3440,7 +3421,7 @@
     (log/warn "Attempt to update copying for nil file")))
 
 (defmethod event-handler ::add-task [{:keys [task]}]
-  (add-task! *state task))
+  (task/add-task! *state task))
 
 (defn- import-resource [{:keys [importable spring-isolation-dir]}]
   (let [{:keys [resource-file]} importable
@@ -4114,7 +4095,7 @@
               (update :file-cache merge new-files))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
     (update-cooldown *state [:update-rapid (fs/canonical-path spring-isolation-dir)])
-    (add-tasks! *state
+    (task/add-tasks! *state
       [
        (merge
          {::task-type ::update-rapid-packages
@@ -4148,8 +4129,9 @@
            :sdp-files sdp-files
            :rapid-packages packages
            :rapid-update false)
-    (add-task! *state {::task-type ::refresh-mods
-                       :spring-root spring-isolation-dir})))
+    (task/add-task! *state 
+      {::task-type ::refresh-mods
+       :spring-root spring-isolation-dir})))
 
 
 (defmethod event-handler ::rapid-repo-change
@@ -4212,10 +4194,11 @@
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
-        (add-tasks! *state [{::task-type ::update-rapid-packages
-                             :spring-isolation-dir spring-isolation-dir}
-                            {::task-type ::refresh-mods
-                             :spring-root spring-isolation-dir}])
+        (task/add-tasks! *state 
+          [{::task-type ::update-rapid-packages
+            :spring-isolation-dir spring-isolation-dir}
+           {::task-type ::refresh-mods
+            :spring-root spring-isolation-dir}])
         (swap! *state assoc-in [:rapid-download rapid-id :running] false)
         (update-cooldown *state [:rapid rapid-id])
         (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))))))
@@ -4267,7 +4250,7 @@
                        :resource-filename fileName
                        :resource-type ::replay}
         :spring-isolation-dir spring-isolation-dir})
-    (add-task! *state {::task-type ::refresh-replays})))
+    (task/add-task! *state {::task-type ::refresh-replays})))
 
 (defn search-springfiles
   "Search springfiles.com for the given resource name, returns a string mirror url for the resource,
@@ -4304,7 +4287,7 @@
                                                                    :springname springname}))]
     (let [url (or url
                   (springfiles-url search-result))]
-      (add-task! *state
+      (task/add-task! *state
         {::task-type ::http-downloadable
          :downloadable {:download-url url
                         :resource-filename filename
@@ -4442,14 +4425,15 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (add-tasks! *state [{::task-type ::refresh-engines
-                         :spring-root spring-root}
-                        {::task-type ::refresh-mods
-                         :spring-root spring-root
-                         :priorities [(:file mod-resource)]}
-                        {::task-type ::refresh-maps
-                         :spring-root spring-root
-                         :priorities [(:file map-resource)]}])))
+    (task/add-tasks! *state 
+      [{::task-type ::refresh-engines
+        :spring-root spring-root}
+       {::task-type ::refresh-mods
+        :spring-root spring-root
+        :priorities [(:file mod-resource)]}
+       {::task-type ::refresh-maps
+        :spring-root spring-root
+        :priorities [(:file map-resource)]}])))
 
 
 (defmethod event-handler ::import-source-change
@@ -4529,9 +4513,10 @@
 (defmethod event-handler ::scan-imports
   [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
   (doseq [import-source sources]
-    (add-task! *state (merge
-                        {::task-type ::scan-imports}
-                        import-source))))
+    (task/add-task! *state 
+      (merge
+        {::task-type ::scan-imports}
+         import-source))))
 
 (defmethod task-handler ::scan-all-imports [task]
   (event-handler (assoc task :event/type ::scan-imports)))
@@ -4545,10 +4530,11 @@
 (defmethod event-handler ::update-all-downloadables
   [opts]
   (doseq [download-source fx.download/download-sources]
-    (add-task! *state (merge
-                        {::task-type ::update-downloadables
-                         :force (:force opts)}
-                        download-source))))
+    (task/add-task! *state 
+      (merge
+        {::task-type ::update-downloadables
+         :force (:force opts)}
+        download-source))))
 
 
 (defmethod event-handler ::spring-settings-refresh
@@ -4984,13 +4970,13 @@
          (try
            (async/<!! (async/timeout wait-init-tasks-ms))
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-engines})
+           (task/add-task! state-atom {::task-type ::refresh-engines})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-mods})
+           (task/add-task! state-atom {::task-type ::refresh-mods})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-maps})
+           (task/add-task! state-atom {::task-type ::refresh-maps})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-replays})
+           (task/add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
            (event-handler {:event/type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
@@ -5027,9 +5013,9 @@
                                   (state-change-chimer-fn state-atom k watcher-fn)))
                            doall)]
     (add-watchers state-atom)
-    (add-task! state-atom {::task-type ::refresh-engines})
-    (add-task! state-atom {::task-type ::refresh-mods})
-    (add-task! state-atom {::task-type ::refresh-maps})
+    (task/add-task! state-atom {::task-type ::refresh-engines})
+    (task/add-task! state-atom {::task-type ::refresh-mods})
+    (task/add-task! state-atom {::task-type ::refresh-maps})
     (event-handler {:event/type ::update-all-downloadables})
     (event-handler {:event/type ::scan-imports})
     (log/info "Finished standalone replay init")

@@ -540,6 +540,16 @@
                                             :key :auto-refresh-replays}}
                      {:fx/type :label
                       :text " Auto refresh replays"}]}
+                   {:fx/type :h-box
+                    :style {:-fx-font-size 18}
+                    :children
+                    [
+                     {:fx/type :check-box
+                      :selected (boolean (fx/sub-val context :refresh-replays-after-game))
+                      :on-selected-changed {:event/type :spring-lobby/assoc
+                                            :key :refresh-replays-after-game}}
+                     {:fx/type :label
+                      :text " Refresh replays after game"}]}
                    {:fx/type :v-box
                     :children
                     (map
