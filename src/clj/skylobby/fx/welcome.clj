@@ -214,7 +214,11 @@
              [{:fx/type :button
                :text "Register"
                :on-action {:event/type :spring-lobby/toggle
-                           :key :show-register-window}}]))}]
+                           :key :show-register-window}}
+              {:fx/type :button
+               :text "Reset Password"
+               :on-action {:event/type :spring-lobby/toggle
+                           :key :show-reset-password-window}}]))}]
       (let [auto-servers (fx/sub-ctx context skylobby.fx/auto-servers-sub)
             auto-servers-not-connected (fx/sub-ctx context skylobby.fx/auto-servers-not-connected-sub)]
         (when (seq auto-servers)

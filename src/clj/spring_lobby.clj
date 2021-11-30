@@ -2783,6 +2783,52 @@
       (catch Exception e
         (log/error e "Error confirming agreement")))))
 
+
+(defmethod event-handler ::request-reset-password [{:keys [email server username]}]
+  (future
+    (try
+      (let [[server-url server-opts] server
+            {:keys [client-deferred]} (client/client server-url server-opts)
+            client @client-deferred
+            client-data {:client client
+                         :client-deferred client-deferred
+                         :server-url server-url}]
+        (message/send-message *state client-data
+          (str "RESETPASSWORDREQUEST " email))
+        (loop []
+          (when-let [d (s/take! client)]
+            (when-let [m @d]
+              (log/info (str "(request reset password " server-url ") <" "'" m "'"))
+              (swap! *state assoc :request-reset-password-response m)
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error resetting password with" server)))))
+
+(defmethod event-handler ::reset-password [{:keys [email server verification-code]}]
+  (future
+    (try
+      (let [[server-url server-opts] server
+            {:keys [client-deferred]} (client/client server-url server-opts)
+            client @client-deferred
+            client-data {:client client
+                         :client-deferred client-deferred
+                         :server-url server-url}]
+        (message/send-message *state client-data
+          (str "RESETPASSWORD " email " " verification-code))
+        (loop []
+          (when-let [d (s/take! client)]
+            (when-let [m @d]
+              (log/info (str "(reset password " server-url ") <" "'" m "'"))
+              (swap! *state assoc :reset-password-response m)
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error resetting password with" server)))))
+
+
 (defmethod event-handler ::edit-server
   [{:fx/keys [event]}]
   (let [[_server-url server-data] event]

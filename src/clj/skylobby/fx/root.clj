@@ -15,6 +15,7 @@
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.rapid :as fx.rapid]
     [skylobby.fx.register :as fx.register]
+    [skylobby.fx.reset-password :as fx.reset-password]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
@@ -156,6 +157,11 @@
        :key (boolean (fx/sub-val context :show-register-window))
        :desc
        {:fx/type fx.register/register-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-reset-password-window))
+       :desc
+       {:fx/type fx.reset-password/reset-password-window
         :screen-bounds screen-bounds}}
       {:fx/type ext-recreate-on-key-changed
        :key (boolean (fx/sub-val context :show-settings-window))
