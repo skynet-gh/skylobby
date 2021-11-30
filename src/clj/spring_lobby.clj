@@ -1543,14 +1543,14 @@
         {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
         parsed-replays (vals parsed-replays-by-path)
         engine-versions (->> parsed-replays
-                             (map (comp :engine-version :header))
+                             (map :replay-engine-version)
                              (filter some?)
                              set)
         mod-names (->> parsed-replays
-                       (map (comp :gametype :game :script-data :body))
+                       (map :replay-mod-name)
                        set)
         map-names (->> parsed-replays
-                       (map (comp :mapname :game :script-data :body))
+                       (map :replay-map-name)
                        set)
         downloads (vals downloadables-by-url)
         imports (vals importables-by-path)
