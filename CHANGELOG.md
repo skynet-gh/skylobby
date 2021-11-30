@@ -23,6 +23,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.21]
+
+- Add password reset button
+- Fix replay downloads from main table
+- Add support for replays in .sdf format
+
 ### [0.7.20]
 
 - Fix parsed replays not being saved to file

@@ -109,8 +109,10 @@
 
 (defn decode-replay-header [^java.io.File f]
   (with-open [is (io/input-stream f)
-              gz (GZIPInputStream. is)]
-    (->> gz
+              is (if (string/ends-with? (fs/filename f) ".sdf")
+                   is
+                   (GZIPInputStream. is))]
+    (->> is
          (b/decode sdfz-header)
          (into (sorted-map)))))
 
@@ -122,8 +124,10 @@
    (decode-replay f nil))
   ([^java.io.File f {:keys [parse-stream]}]
    (with-open [is (io/input-stream f)
-               gz (GZIPInputStream. is)]
-     (-> (->> (b/decode sdfz-protocol gz)
+               is (if (string/ends-with? (fs/filename f) ".sdf")
+                    is
+                    (GZIPInputStream. is))]
+     (-> (->> (b/decode sdfz-protocol is)
               (into (sorted-map)))
          (update :header
            (fn [header]

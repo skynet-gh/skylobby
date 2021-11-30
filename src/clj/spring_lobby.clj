@@ -1543,14 +1543,14 @@
         {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
         parsed-replays (vals parsed-replays-by-path)
         engine-versions (->> parsed-replays
-                             (map (comp :engine-version :header))
+                             (map :replay-engine-version)
                              (filter some?)
                              set)
         mod-names (->> parsed-replays
-                       (map (comp :gametype :game :script-data :body))
+                       (map :replay-mod-name)
                        set)
         map-names (->> parsed-replays
-                       (map (comp :mapname :game :script-data :body))
+                       (map :replay-map-name)
                        set)
         downloads (vals downloadables-by-url)
         imports (vals importables-by-path)
@@ -2782,6 +2782,52 @@
       (swap! *state update-in [:by-server server-key] dissoc :agreement :verification-code)
       (catch Exception e
         (log/error e "Error confirming agreement")))))
+
+
+(defmethod event-handler ::request-reset-password [{:keys [email server username]}]
+  (future
+    (try
+      (let [[server-url server-opts] server
+            {:keys [client-deferred]} (client/client server-url server-opts)
+            client @client-deferred
+            client-data {:client client
+                         :client-deferred client-deferred
+                         :server-url server-url}]
+        (message/send-message *state client-data
+          (str "RESETPASSWORDREQUEST " email))
+        (loop []
+          (when-let [d (s/take! client)]
+            (when-let [m @d]
+              (log/info (str "(request reset password " server-url ") <" "'" m "'"))
+              (swap! *state assoc :request-reset-password-response m)
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error resetting password with" server)))))
+
+(defmethod event-handler ::reset-password [{:keys [email server verification-code]}]
+  (future
+    (try
+      (let [[server-url server-opts] server
+            {:keys [client-deferred]} (client/client server-url server-opts)
+            client @client-deferred
+            client-data {:client client
+                         :client-deferred client-deferred
+                         :server-url server-url}]
+        (message/send-message *state client-data
+          (str "RESETPASSWORD " email " " verification-code))
+        (loop []
+          (when-let [d (s/take! client)]
+            (when-let [m @d]
+              (log/info (str "(reset password " server-url ") <" "'" m "'"))
+              (swap! *state assoc :reset-password-response m)
+              (when-not (Thread/interrupted)
+                (recur)))))
+        (s/close! client))
+      (catch Exception e
+        (log/error e "Error resetting password with" server)))))
+
 
 (defmethod event-handler ::edit-server
   [{:fx/keys [event]}]

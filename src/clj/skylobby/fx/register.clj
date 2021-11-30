@@ -16,10 +16,6 @@
 (def register-window-height 400)
 
 
-(def register-window-keys
-  [:css :email :password :password-confirm :register-response :server :servers :show-register-window
-   :username])
-
 (defn register-window-impl
   [{:fx/keys [context]
     :keys [screen-bounds]}]

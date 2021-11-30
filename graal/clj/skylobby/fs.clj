@@ -382,7 +382,10 @@
          (->> dir
               list-files
               (filter is-file?)
-              (filter (comp #(string/ends-with? % ".sdfz") filename)))]
+              (filter (comp (some-fn
+                              #(string/ends-with? % ".sdfz")
+                              #(string/ends-with? % ".sdf"))
+                            filename)))]
      (if recursive
        (let [subdirs (->> dir
                           list-files

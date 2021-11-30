@@ -41,7 +41,7 @@
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.10"}
   jarohen/chime {:mvn/version "0.3.3"}
-  manifold/manifold {:mvn/version "0.2.0"}
+  manifold/manifold {:mvn/version "0.2.2"}
   me.raynes/fs {:mvn/version "1.4.6"}
   metosin/reitit {:mvn/version "0.5.15"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
@@ -174,7 +174,7 @@
     io.netty/netty-transport {:mvn/version "4.1.70.Final"}
     io.netty/netty-transport-native-epoll {:mvn/version "4.1.70.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
-    manifold/manifold {:mvn/version "0.2.0"}
+    manifold/manifold {:mvn/version "0.2.2"}
     me.raynes/fs {:mvn/version "1.4.6"}
     metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
@@ -275,7 +275,7 @@
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :reveal
-  {:extra-paths ["dev/clj/jar" "dev/clj/user" "test/clj"]
+  {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
    {cider/cider-nrepl {:mvn/version "0.27.2"}
     cider/orchard {:mvn/version "0.7.3"}
@@ -290,7 +290,7 @@
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
     seancorfield/depstar {:mvn/version "1.1.136"}
-    vlaaad/reveal {:mvn/version "1.3.228"}}
+    vlaaad/reveal {:mvn/version "1.3.247"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-refresh
