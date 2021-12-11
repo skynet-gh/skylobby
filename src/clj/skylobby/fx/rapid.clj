@@ -11,7 +11,10 @@
     [skylobby.fs :as fs]
     [skylobby.rapid :as rapid]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (java.util Comparator)
+    (org.apache.commons.collections4 ComparatorUtils)))
 
 
 (set! *warn-on-reflection* true)
@@ -19,6 +22,11 @@
 
 (def rapid-download-window-width 1600)
 (def rapid-download-window-height 800)
+
+
+(def natural-comparator
+  ;(ComparatorUtils/naturalComparator)
+  (Comparator/naturalOrder))
 
 
 (defn rapid-download-window-impl
@@ -62,7 +70,7 @@
               sdp-hashes (set (map rapid/sdp-hash sdp-files))
               sorted-engine-versions (->> engines
                                           (map :engine-version)
-                                          sort)
+                                          (sort natural-comparator))
               filtered-rapid-versions (->> rapid-versions
                                            (filter
                                              (fn [{:keys [id]}]
@@ -85,12 +93,12 @@
               rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
               available-packages (or (->> filtered-rapid-versions
                                           seq
-                                          (sort-by :version String/CASE_INSENSITIVE_ORDER)
+                                          (sort-by :version ComparatorUtils/NATURAL_COMPARATOR)
                                           reverse)
                                      [])
               local-packages (or (->> rapid-packages
                                       seq
-                                      (sort-by :version String/CASE_INSENSITIVE_ORDER))
+                                      (sort-by :version ComparatorUtils/NATURAL_COMPARATOR))
                                  [])]
           {:fx/type :v-box
            :children
@@ -214,6 +222,7 @@
                    {:text (str (:hash i))})}}
                {:fx/type :table-column
                 :text "Version"
+                :comparator natural-comparator
                 :pref-width 100
                 :cell-value-factory :version
                 :cell-factory
@@ -302,6 +311,7 @@
                  (fn [i] {:text (:id i)})}}
                {:fx/type :table-column
                 :text "Version"
+                :comparator natural-comparator
                 :pref-width 100
                 :cell-value-factory :version
                 :cell-factory

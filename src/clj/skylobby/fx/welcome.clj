@@ -80,12 +80,16 @@
     {:fx/type :label
      :text "Offline:"}
     {:fx/type :button
-     :text "Singleplayer Battle"
+     :text "Singleplayer"
      :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
     {:fx/type :button
-     :text "Watch Replays"
+     :text "Replays"
      :on-action {:event/type :spring-lobby/toggle
                  :key :show-replays}}
+    {:fx/type :button
+     :text "Scenarios"
+     :on-action {:event/type :spring-lobby/toggle
+                 :key :show-scenarios-window}}
     {:fx/type :pane
      :v-box/vgrow :always}]})
 

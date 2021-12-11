@@ -27,9 +27,9 @@ jobs:
         with:
           graalvm-version: 'vm-21.3.0'
           java: 'java11'
-      - uses: DeLaGuardo/setup-clojure@3.5
+      - uses: DeLaGuardo/setup-clojure@3.6
         with:
-          cli: '1.10.3.1029'
+          cli: '1.10.3.1040'
 
       - run: clojure -M:test:headless:runner
 
@@ -45,9 +45,9 @@ jobs:
         with:
           graalvm-version: 'vm-21.3.0'
           java: 'java11'
-      - uses: DeLaGuardo/setup-clojure@3.5
+      - uses: DeLaGuardo/setup-clojure@3.6
         with:
-          cli: '1.10.3.1029'
+          cli: '1.10.3.1040'
 
       - run: clojure -M:coverage:headless
       - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json

@@ -10,7 +10,9 @@
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (java.util.zip GZIPInputStream)))
+    (java.io ByteArrayInputStream)
+    (java.util.zip GZIPInputStream)
+    (javax.imageio ImageIO)))
 
 
 (set! *warn-on-reflection* true)
@@ -194,6 +196,10 @@
     (catch Exception e
       (log/warn e "Error reading" filename "in" f))))
 
+
+(def scenario-prefix
+  "luamenu/configs/gameconfig/byar/scenarios/")
+
 (defn read-sdp-mod
   ([^java.io.File f]
    (read-sdp-mod f nil))
@@ -207,13 +213,52 @@
         :modinfo modinfo}
        (when-not modinfo-only
          (when modinfo
-           {:modoptions (try-inner-lua f "modoptions.lua" {:quiet false})
-            :engineoptions (try-inner-lua f "engineoptions.lua")
-            :luaai (try-inner-lua f "luaai.lua")
-            :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
-                          (try-inner-script f "gamedata/sidedata.tdf")
-                          (u/postprocess-byar-units-en
-                            (try-inner-lua f "language/units_en.lua")))}))))))
+           (merge
+             {:modoptions (try-inner-lua f "modoptions.lua" {:quiet false})
+              :engineoptions (try-inner-lua f "engineoptions.lua")
+              :luaai (try-inner-lua f "luaai.lua")
+              :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
+                            (try-inner-script f "gamedata/sidedata.tdf")
+                            (u/postprocess-byar-units-en
+                              (try-inner-lua f "language/units_en.lua")))}
+             (when (= "BYAR Chobby" (:name modinfo))
+               (log/info "Loading scenarios from chobby")
+               (let [{:keys [items] :as decoded} (decode-sdp f)
+                     root (root-from-sdp f)
+                     scenario-items (filter
+                                      #(string/starts-with? (:filename %) scenario-prefix)
+                                      items)
+                     scenario-lua (filter
+                                    #(string/ends-with? (:filename %) ".lua")
+                                    scenario-items)
+                     scenario-names (->> scenario-lua
+                                         (map
+                                          (fn [{:keys [filename]}]
+                                            (let [without-path (last (string/split filename #"/"))]
+                                              (subs without-path 0 (string/last-index-of without-path ".")))))
+                                         set)]
+                 (log/info "Found" (count scenario-lua) "scenarios")
+                 {:scenarios
+                  (mapv
+                    (fn [scenario]
+                      (let [lua-path (str scenario-prefix scenario ".lua")
+                            img-path (str scenario-prefix scenario ".jpg")]
+                        {:scenario scenario
+                         :lua (try-inner-lua f lua-path)
+                         :image-file
+                         (try
+                           (let [image-bytes (:content-bytes (inner root decoded img-path))
+                                 image (with-open [bais (ByteArrayInputStream. image-bytes)]
+                                         (ImageIO/read bais))
+                                 file (fs/file (fs/app-root) "scenarios" (str scenario ".png"))]
+                             (fs/make-parent-dirs file)
+                             (fs/write-image-png image file)
+                             file)
+                           (catch Exception e
+                             (log/error e "Error loading scenario image" img-path)
+                             nil))}))
+                    scenario-names)})))))))))
+
 
 (defn copy-package [source-sdp-file dest-spring-root]
   (log/info "Copying rapid package from" source-sdp-file "into" dest-spring-root)

@@ -172,7 +172,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
    :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :refresh-replays-after-game
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
+   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -234,11 +234,7 @@
    {:host "server2.beyondallreason.info"
     :port 8201
     :alias "Beyond All Reason (SSL)"
-    :ssl true}
-   "balancedannihilation.com:8200"
-   {:host "balancedannihilation.com"
-    :port 8200
-    :alias "Mandohost"}})
+    :ssl true}})
 
 
 (defn initial-state []
@@ -570,7 +566,7 @@
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
               rapid-data (get rapid-data-by-version battle-modname)
               rapid-id (:id rapid-data)
-              sdp-file (rapid/sdp-file spring-root (str (:hash rapid-data) ".sdp"))
+              sdp-file (rapid/sdp-file spring-root (rapid/sdp-filename (:hash rapid-data)))
               sdp-file-exists (fs/exists? sdp-file)
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
@@ -2557,6 +2553,9 @@
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (swap! *state assoc-in [:by-server server-key :selected-battle] (:battle-id event)))
 
+(defmethod event-handler ::select-scenario [{:fx/keys [event]}]
+  (swap! *state assoc :selected-scenario (:scenario event)))
+
 
 (defmethod event-handler ::on-mouse-clicked-battles-row
   [{:fx/keys [^MouseEvent event] :as e}]
@@ -3303,6 +3302,29 @@
             :message (str "!cv start")}))
       (catch Exception e
         (log/error e "Error starting battle")))))
+
+
+(defmethod event-handler ::play-scenario
+  [{:keys [difficulties mod-name scenario-options script-template script-params] :as state}]
+  (future
+    (try
+      (let [difficulties-by-name (into {} 
+                                   (map (juxt :name identity) difficulties))
+            {:keys [enemyhandicap playerhandicap]} (get difficulties-by-name (:difficulty script-params))
+            restrictions (get script-params :restricted-units {})
+            script-txt (-> script-template
+                           (string/replace #"__PLAYERSIDE__" (:side script-params))
+                           (string/replace #"__ENEMYHANDICAP__" (str enemyhandicap))
+                           (string/replace #"__PLAYERHANDICAP__" (str playerhandicap))
+                           (string/replace #"__SCENARIOOPTIONS__" (str (u/base64-encode (.getBytes (json/generate-string scenario-options)))))
+                           (string/replace #"__NUMRESTRICTIONS__" (str (count restrictions)))
+                           (string/replace #"__RESTRICTEDUNITS__" (str (string/join "," (keys restrictions))))
+                           (string/replace #"__MAPNAME__" (get script-params :map-name))
+                           (string/replace #"__BARVERSION__" mod-name)
+                           (string/replace #"__PLAYERNAME__" (get script-params :player-name)))]
+      (spring/start-game *state (assoc state :script-txt script-txt)))
+      (catch Exception e
+        (log/error e "Error starting scenario")))))
 
 
 (defmethod event-handler ::minimap-mouse-pressed

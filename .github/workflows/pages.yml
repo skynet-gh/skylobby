@@ -13,9 +13,9 @@ jobs:
         with:
           graalvm-version: 'vm-21.3.0'
           java: 'java11'
-      - uses: DeLaGuardo/setup-clojure@3.5
+      - uses: DeLaGuardo/setup-clojure@3.6
         with:
-          cli: '1.10.3.1029'
+          cli: '1.10.3.1040'
       - run: clojure -M:build
         working-directory: ./cryogen
       - uses: peaceiris/actions-gh-pages@v3

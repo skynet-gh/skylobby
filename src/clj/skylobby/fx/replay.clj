@@ -327,6 +327,18 @@
                  [watch-button
                   {:fx/type :pane
                    :h-box/hgrow :always}
+                  {:fx/type :button
+                   :style {:-fx-font-size 24}
+                   :on-action {:event/type :spring-lobby/dissoc
+                               :key (if (fx/sub-val context :selected-replay-file)
+                                      :selected-replay-file
+                                      :selected-replay-id)}
+                   :text "Close"
+                   :graphic
+                   {:fx/type font-icon/lifecycle
+                    :icon-literal "mdi-close:24:white"}}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
                   watch-button]}])))}
         {:fx/type :v-box
          :children
