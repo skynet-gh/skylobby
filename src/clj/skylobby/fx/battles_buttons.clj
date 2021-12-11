@@ -52,7 +52,8 @@
                    :text (str battle-password)
                    :prompt-text "Battle Password"
                    :on-action {:event/type :spring-lobby/host-battle}
-                   :on-text-changed {:event/type :spring-lobby/battle-password-change}}]))))
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :battle-password}}]))))
          [
           {:fx/type :button
            :text "Host Battle"

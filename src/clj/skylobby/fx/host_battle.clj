@@ -107,9 +107,9 @@
               :value (int (or (u/to-number battle-port) 8452))}}]}
           {:fx/type engines-view
            :engine-filter engine-filter
-           :engines engines
            :engine-version engine-version
-           :flow false}
+           :flow false
+           :spring-isolation-dir spring-root}
           {:fx/type mods-view
            :flow false
            :mod-filter mod-filter
