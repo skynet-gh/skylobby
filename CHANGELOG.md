@@ -23,6 +23,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.22]
+
+- Add very rudimentary support for BAR Chobby scenarios
+- Fix joining passworded battles
+- Fix engines list in host battle window
+- Add button to close replay details
+- Add discord promote button for techa hosts
+
 ### [0.7.21]
 
 - Add password reset button
