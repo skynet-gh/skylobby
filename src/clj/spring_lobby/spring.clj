@@ -377,7 +377,7 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data engines ^MediaPlayer media-player music-paused ^java.io.File spring-isolation-dir
+   {:keys [client-data engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
@@ -490,10 +490,12 @@
       (set-ingame true)
       (log/info "Creating game script")
       (let [{:keys [battle-version]} (battle-details state)
-            script-txt (battle-script-txt state)
-            engine-dir (or (get-in engine-overrides [(fs/canonical-path spring-isolation-dir) battle-version])
+            engine-version (or engine-version battle-version)
+            script-txt (or script-txt (battle-script-txt state))
+            engine-dir (or (get-in engine-overrides [(fs/canonical-path spring-isolation-dir) engine-version])
+                           (:file (get engines-by-version engine-version))
                            (some->> engines
-                                    (filter (comp #{battle-version} :engine-version))
+                                    (filter (comp #{engine-version} :engine-version))
                                     first
                                     :file))
             engine-file (io/file engine-dir (fs/spring-executable))

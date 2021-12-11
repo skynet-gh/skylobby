@@ -17,6 +17,7 @@
     [skylobby.fx.register :as fx.register]
     [skylobby.fx.reset-password :as fx.reset-password]
     [skylobby.fx.replay :as fx.replay]
+    [skylobby.fx.scenarios :as fx.scenarios]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.tasks :as fx.tasks]
@@ -202,6 +203,11 @@
        :key (boolean (fx/sub-val context :show-ai-options-window))
        :desc
        {:fx/type fx.players-table/ai-options-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-scenarios-window))
+       :desc
+       {:fx/type fx.scenarios/scenarios-window
         :screen-bounds screen-bounds}}]}))
 
 
