@@ -234,11 +234,7 @@
    {:host "server2.beyondallreason.info"
     :port 8201
     :alias "Beyond All Reason (SSL)"
-    :ssl true}
-   "balancedannihilation.com:8200"
-   {:host "balancedannihilation.com"
-    :port 8200
-    :alias "Mandohost"}})
+    :ssl true}})
 
 
 (defn initial-state []
