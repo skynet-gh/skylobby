@@ -14,9 +14,9 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.5
+      - uses: DeLaGuardo/setup-clojure@3.6
         with:
-          cli: '1.10.3.1029'
+          cli: '1.10.3.1040'
       - uses: actions/setup-node@v2
         with:
           node-version: '14'
@@ -49,9 +49,9 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.5
+      - uses: DeLaGuardo/setup-clojure@3.6
         with:
-          cli: '1.10.3.1029'
+          cli: '1.10.3.1040'
       - uses: actions/setup-node@v2
         with:
           node-version: '14'
@@ -84,7 +84,7 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - run: iwr -useb download.clojure.org/install/win-install-1.10.3.1029.ps1 | iex
+      - run: iwr -useb download.clojure.org/install/win-install-1.10.3.1040.ps1 | iex
       - uses: actions/setup-node@v2
         with:
           node-version: '14'
