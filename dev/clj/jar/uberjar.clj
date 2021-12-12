@@ -11,7 +11,8 @@
 (def version (spring-lobby.git/tag-or-latest-id (io/file ".")))
 (def src-dirs ["src/clj" "graal/clj" "resources"])
 (def class-dir "target/classes")
-(def basis (b/create-basis {:project "deps.edn"}))
+(def basis (b/create-basis {:project "deps.edn"
+                            :aliases [:headless]}))
 (def app-name (name lib))
 (def uber-file (format "target/%s.jar" app-name version))
 
@@ -31,7 +32,8 @@
   (println "\nCompiling clj\n")
   (b/compile-clj {:basis basis
                   :src-dirs src-dirs
-                  :class-dir class-dir})
+                  :class-dir class-dir
+                  :java-opts ["-Dtestfx.robot=glass" "-Dglass.platform=Monocle" "-Dmonocle.platform=Headless" "-Dprism.order=sw"]})
   (println "\nBuilding uberjar\n")
   (b/uber {:class-dir class-dir
            :uber-file uber-file
