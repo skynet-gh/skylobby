@@ -39,6 +39,7 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./target/${{ env.CI_REPOSITORY_NAME }}.jar
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-linux.jar
+          asset_content_type: application/java-archive
       - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
       - uses: actions/upload-release-asset@v1.0.2
         env:
