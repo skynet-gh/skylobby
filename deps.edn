@@ -75,19 +75,19 @@
  {:nrepl
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.27.3"}
+   {
+    cider/cider-nrepl {:mvn/version "0.27.3"}
     cider/orchard {:mvn/version "0.7.3"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1"}
+    io.github.clojure/tools.build {:git/tag "v0.7.0" :git/sha "16eddbf"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1090"}
+    nrepl/nrepl {:mvn/version "0.9.0"}
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
-    reply/reply {:mvn/version "0.5.1"}
-    seancorfield/depstar {:mvn/version "1.1.136"}}
+    reply/reply {:mvn/version "0.5.1"}}
    :jvm-opts ["-server" "-Xms128m" "-Xmx8g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
@@ -101,13 +101,12 @@
     com.jakemccrary/lein-test-refresh {:mvn/version "0.25.0"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1"}
+    io.github.clojure/tools.build {:git/tag "v0.7.0" :git/sha "16eddbf"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1090"}
+    nrepl/nrepl {:mvn/version "0.9.0"}
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
-    reply/reply {:mvn/version "0.5.1"}
-    seancorfield/depstar {:mvn/version "1.1.136"}}
+    reply/reply {:mvn/version "0.5.1"}}
    :jvm-opts ["-server" "-Xms128m" "-Xmx1g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
@@ -124,17 +123,22 @@
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
-   :extra-deps
-   {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1090"}
-    seancorfield/depstar {:mvn/version "1.1.136"}}
+   :replace-deps
+   {
+    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
+    cljfx/cljfx {:mvn/version "1.7.17"
+                 :exclusions [org.openjfx/javafx-web]}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    io.github.clojure/tools.build {:git/tag "v0.7.0" :git/sha "16eddbf"}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
    :extra-deps {lambdaisland/kaocha {:mvn/version "1.60.945"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.8" :git/sha "4d41c26"}}
+  {:deps 
+   {
+    io.github.clojure/tools.build {:git/tag "v0.7.0" :git/sha "16eddbf"}}
    :ns-default skylobby}
   :skylobby-deps
   {:replace-deps
@@ -217,7 +221,9 @@
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
-  {:deps {io.github.clojure/tools.build {:git/tag "v0.6.8" :git/sha "4d41c26"}}
+  {:deps 
+   {
+    io.github.clojure/tools.build {:git/tag "v0.7.0" :git/sha "16eddbf"}}
    :ns-default skylobby-cli}
   :skylobby-cli-deps
   {:replace-deps
@@ -285,12 +291,10 @@
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "0.8.3"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.12.1090"}
+    nrepl/nrepl {:mvn/version "0.9.0"}
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
-    seancorfield/depstar {:mvn/version "1.1.136"}
     vlaaad/reveal {:mvn/version "1.3.251"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
