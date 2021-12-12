@@ -23,6 +23,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.23]
+
+- Add linux jar without version in filename
+- Internal build changes
+
 ### [0.7.22]
 
 - Add very rudimentary support for BAR Chobby scenarios

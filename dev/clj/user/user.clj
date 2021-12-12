@@ -169,7 +169,7 @@
      (hawk/watch! [{:paths ["src/clj" "graal/clj" "test/clj"]
                     :handler refresh-on-file-change}])
      (require 'spring-lobby)
-     (require 'spring-lobby.ui-main)
+     (require 'spring-lobby.main)
      (require 'skylobby.fs)
      (when-not @headless
        (require 'skylobby.fx.root)

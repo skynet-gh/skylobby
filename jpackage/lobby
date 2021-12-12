@@ -1,11 +1,10 @@
 --verbose
---input dist
+--input target
 --main-jar "skylobby.jar"
 --name "skylobby"
 --main-class "spring_lobby.main"
 --vendor "skynet"
 --java-options "-server -Xmx2g -XX:+ExitOnOutOfMemoryError -XX:+DoEscapeAnalysis -XX:+UseCompressedOops"
---resource-dir "jpackage/resources"
 --file-associations "resources/FAsdfz.properties"
 --add-launcher skyreplays="resources/skyreplays.properties"
 --add-launcher skylobby-vhighmem="resources/skylobby-vhighmem.properties"
