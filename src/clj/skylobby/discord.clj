@@ -22,6 +22,7 @@
   (when (and mod-name
              (or
                (string/starts-with? mod-name "Balanced Annihilation")
+               (string/starts-with? mod-name "Metal Factions")
                (string/starts-with? mod-name "Tech Annihilation")))
     "898249621527220235"))
 

@@ -3,6 +3,7 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs.smf :as smf]
+    [skylobby.git :as git]
     [skylobby.lua :as lua]
     [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
@@ -1041,7 +1042,7 @@
        {:file file
         :modinfo (try-file-lua "modinfo.lua")
         :git-commit-id (try
-                         nil ; TODO (git/latest-id file)
+                         (git/latest-id file)
                          (catch java.io.FileNotFoundException _e
                            (log/warn "Not a git repository at" file))
                          (catch Exception e
