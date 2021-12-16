@@ -23,6 +23,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.24]
+
+- Fix engine sync not showing source update
+- Add discord promote button for metal factions
+- Fix mod git versioning
+
 ### [0.7.23]
 
 - Add linux jar without version in filename
