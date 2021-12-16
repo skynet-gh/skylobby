@@ -4979,7 +4979,7 @@
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
-  (when-let [{:keys [ipc-server]} @*state]
+  (when-let [{:keys [^java.io.Closeable ipc-server]} @*state]
     (when ipc-server
       (.close ipc-server)))
   (if (u/is-port-open? u/ipc-port)

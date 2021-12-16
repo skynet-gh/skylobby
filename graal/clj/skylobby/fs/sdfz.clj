@@ -108,7 +108,8 @@
 
 
 (defn decode-replay-header [^java.io.File f]
-  (with-open [is (io/input-stream f)
+  (with-open [^java.lang.AutoCloseable is (io/input-stream f)
+              ^java.lang.AutoCloseable 
               is (if (string/ends-with? (fs/filename f) ".sdf")
                    is
                    (GZIPInputStream. is))]
