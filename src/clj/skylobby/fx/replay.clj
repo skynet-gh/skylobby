@@ -1264,7 +1264,7 @@
                         :icon-literal "mdi-refresh:16:white"}})]
                   [{:fx/type :button
                     :text " Download"
-                    :on-action {:event/type :spring-lobby/assoc
+                    :on-action {:event/type :spring-lobby/toggle
                                 :key :show-download-replays}
                     :graphic
                     {:fx/type font-icon/lifecycle
