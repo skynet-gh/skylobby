@@ -137,7 +137,10 @@
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.60.945"}}
+   :extra-deps 
+   {
+    io.aviso/pretty {:mvn/version "1.1.1"}
+    lambdaisland/kaocha {:mvn/version "1.60.972"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
   {:deps 
@@ -307,7 +310,10 @@
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-once
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.60.945"}}
+   :extra-deps 
+   {
+    io.aviso/pretty {:mvn/version "1.1.1"}
+    lambdaisland/kaocha {:mvn/version "1.60.972"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]}
