@@ -38,10 +38,6 @@
 (def lock (Object.))
 
 
-(defn sevenz-lib-filename []
-  ; TODO windows, mac
-  "lib7-Zip-JBinding.so")
-
 (defn init-7z! []
   (locking lock
     (let [^"[Ljava.nio.file.attribute.FileAttribute;" attributes (into-array FileAttribute [])
@@ -166,6 +162,12 @@
   ([{:keys [os-name]}]
    (string/includes? os-name "Linux")))
 
+(defn mac?
+  ([]
+   (mac? (get-sys-data)))
+  ([{:keys [os-name]}]
+   (string/includes? os-name "Mac OS X")))
+
 (defn wsl?
   "Returns true if this system appears to be the Windows Subsystem for Linux."
   ([]
@@ -186,32 +188,44 @@
 (defn platform
   ([]
    (platform (get-sys-data)))
-  ([{:keys [os-name]}]
-   (if (and os-name
-            (string/includes? os-name "Linux")
+  ([{:keys [os-name] :as sys-data}]
+   (when os-name
+     (cond
+       (mac? sys-data)
+       "mac64"
+       (and (linux? sys-data)
             (not (wsl?)))
-     "linux64"
-     "win32")))
+       "linux64"
+       :else
+       "win32"))))
 
 (defn platform64
   ([]
    (platform64 (get-sys-data)))
-  ([{:keys [os-name]}]
-   (if (and os-name
-            (string/includes? os-name "Linux")
+  ([{:keys [os-name] :as sys-data}]
+   (when os-name
+     (cond
+       (mac? sys-data)
+       "mac64"
+       (and (linux? sys-data)
             (not (wsl?)))
-     "linux64"
-     "win64")))
+       "linux64"
+       :else
+       "win64"))))
 
 (defn platforms
   ([]
    (platforms (get-sys-data)))
-  ([{:keys [os-name]}]
-   (if (and os-name
-            (string/includes? os-name "Linux")
+  ([{:keys [os-name] :as sys-data}]
+   (when os-name
+     (cond
+       (mac? sys-data)
+       ["mac32" "mac64"]
+       (and (linux? sys-data)
             (not (wsl?)))
-     ["linux32" "linux64"]
-     ["win32" "win64"])))
+       ["linux32" "linux64"]
+       :else
+       ["win32" "win64"]))))
 
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."

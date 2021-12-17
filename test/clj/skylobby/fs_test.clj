@@ -35,6 +35,14 @@
                                          :user-home "/home/me2"})]
           (is (= (str "/home/me2/.spring")
                  (fs/canonical-path
+                   (fs/spring-root))))))
+      (testing "Mac"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Mac OS X 10.6 whatever"
+                                         :os-version "10.6"
+                                         :user-home "/home/me4"})]
+          (is (= (str "/home/me4/.spring")
+                 (fs/canonical-path
                    (fs/spring-root)))))))))
 
 (deftest springlobby-root
