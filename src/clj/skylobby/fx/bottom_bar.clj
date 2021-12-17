@@ -26,14 +26,22 @@
             version latest
             url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
                      "skylobby-" version "-"
-                     (if (fs/wsl-or-windows?) ; TODO mac
+                     (cond
+                       (fs/mac?)
+                       "mac"
+                       (fs/wsl-or-windows?)
                        "windows"
+                       :else
                        "linux")
                      ".jar")
             installer-url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
                                "skylobby-" version "_"
-                               (if (fs/wsl-or-windows?) ; TODO mac
+                               (cond 
+                                 (fs/mac?)
+                                 "mac.dmg"
+                                 (fs/wsl-or-windows?)
                                  "windows.msi"
+                                 :else
                                  "linux-amd64.deb"))
             download (get (fx/sub-val context :http-download) url)
             running (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-app-update-and-restart))]
