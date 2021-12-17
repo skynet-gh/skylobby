@@ -30,8 +30,8 @@
   (let [
         url (str base-url channel-id "/" (u/base64-decode (get tokens channel-id)))
         total-players (reduce (fnil + 0 0) 0 (flatten team-counts))
-        body {:content (str total-players " players in " battle-title "\n"
-                            mod-name " on " map-name)
+        body {:content (str "**" total-players " players** in " battle-title "\n"
+                            "**" mod-name "** on **" map-name "**")
               :username "skylobby"}
         _ (log/info "Posting Discord promotion to" url ":" body)
         response
