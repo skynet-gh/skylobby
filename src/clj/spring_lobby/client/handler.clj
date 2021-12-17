@@ -105,7 +105,7 @@
             (spring/start-game
               state-atom
               (merge
-                state
+                (dissoc state :engine-version)
                 server-data
                 {:spring-isolation-dir spring-root
                  :engines engines
