@@ -23,6 +23,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.25]
+
+- Fix issue with auto launch engine version
+- Fix some basic Mac OS X detection issues
+- Add bold to discord promote message
+
 ### [0.7.24]
 
 - Fix engine sync not showing source update
