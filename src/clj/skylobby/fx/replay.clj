@@ -911,15 +911,8 @@
                            {:fx/type font-icon/lifecycle
                             :icon-literal "mdi-refresh:16:white"}})
                         (not matching-map)
-                        {:fx/type :button
-                         :text " No map, update downloads"
-                         :on-action
-                         {:event/type :spring-lobby/add-task
-                          :task
-                          (merge
-                            {:spring-lobby/task-type :spring-lobby/update-downloadables
-                             :force true}
-                            springfiles-maps-download-source)}}))])}})}}])}}}}))
+                        {:fx/type :label
+                         :text " No map, select replay for more options"}))])}})}}])}}}}))
 
 
 (defn download-replays-window [{:fx/keys [context]}]
