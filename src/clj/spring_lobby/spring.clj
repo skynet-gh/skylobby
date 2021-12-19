@@ -430,10 +430,14 @@
         post-game-fn (fn []
                        (try
                          (let [infologs-dir (fs/file spring-isolation-dir "infologs")
+                               infolog-src (fs/file spring-isolation-dir "infolog.txt")
                                infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))]
-                           (fs/make-dirs infologs-dir)
-                           (log/info "Copying infolog to")
-                           (fs/copy (fs/file spring-isolation-dir "infolog.txt") infolog-dest))
+                           (if (fs/exists? infolog-src)
+                             (do
+                               (fs/make-dirs infologs-dir)
+                               (log/info "Copying infolog to")
+                               (fs/copy infolog-src infolog-dest))
+                             (log/warn "Infolog file does not exist:" infolog-src)))
                          (catch Exception e
                            (log/error e "Error backing up infolog")))
                        (when (:unready-after-game state)

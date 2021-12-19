@@ -67,6 +67,15 @@ jobs:
       - run: npm install
       - run: clojure -M:cljs compile frontend
       - run: clojure -M:uberjar:headless
+      # mac jar without version
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./target/${{ env.CI_REPOSITORY_NAME }}.jar
+          asset_name: ${{ env.CI_REPOSITORY_NAME }}-mac.jar
+          asset_content_type: application/java-archive
       - run: jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/mac
       - uses: actions/upload-release-asset@v1.0.2
         env:

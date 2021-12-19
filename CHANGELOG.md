@@ -23,6 +23,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.26]
+
+- Fix mac update buttons
+- Add upload of mac jar without version for releases
+- Fix noisy log when infolog does not exist
+- Improve replays no map download message
+
 ### [0.7.25]
 
 - Fix issue with auto launch engine version
