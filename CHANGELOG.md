@@ -23,6 +23,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.27]
+
+- Fix sync status not updated when battle map changes
+- Fix http server backend type for web ui
+
 ### [0.7.26]
 
 - Fix mac update buttons
