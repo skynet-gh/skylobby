@@ -625,8 +625,8 @@
 (defmethod handle "UPDATEBATTLEINFO" [state-atom server-url m]
   (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
     (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
-        (let [my-battle-id (-> state :battle :battle-id)
+      (fn [{:keys [battle username] :as state}]
+        (let [my-battle-id (:battle-id battle)
               old-battle-map (-> state (get :battles) (get battle-id) :battle-map)
               my-battle (= my-battle-id battle-id)
               map-changed (not= old-battle-map battle-map)]
@@ -639,7 +639,7 @@
                     :battle-maphash battle-maphash
                     :battle-map battle-map)
                   (and my-battle map-changed)
-                  (assoc :battle-map-details nil)))))))
+                  (assoc-in [:battle :users username :battle-status :sync] 0)))))))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
