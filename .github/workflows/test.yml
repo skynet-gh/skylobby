@@ -27,7 +27,7 @@ jobs:
         with:
           graalvm-version: 'vm-21.3.0'
           java: 'java11'
-      - uses: DeLaGuardo/setup-clojure@3.6
+      - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: '1.10.3.1040'
 
@@ -45,7 +45,7 @@ jobs:
         with:
           graalvm-version: 'vm-21.3.0'
           java: 'java11'
-      - uses: DeLaGuardo/setup-clojure@3.6
+      - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: '1.10.3.1040'
 

@@ -55,7 +55,7 @@
   org.clojure/spec.alpha {:mvn/version "0.3.218"}
   org.clojure/test.check {:mvn/version "1.1.1"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
-  org.clojure/tools.logging {:mvn/version "1.2.2"}
+  org.clojure/tools.logging {:mvn/version "1.2.3"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.1"}
   org.fxmisc.flowless/flowless {:mvn/version "0.6.7"}
@@ -115,13 +115,16 @@
    :main-opts ["--main" "repl" "headless"]}
   :cljs
   {:extra-paths ["src/cljs"]
-   :extra-deps {
-                org.clojure/core.async {:mvn/version "1.5.648"}
-                com.taoensso/sente {:mvn/version "1.16.2"}
-                com.taoensso/timbre {:mvn/version "5.1.2"}
-                metosin/reitit {:mvn/version "0.5.15"}
-                re-frame/re-frame {:mvn/version "1.2.0"}
-                thheller/shadow-cljs {:mvn/version "2.16.8"}}
+   :extra-deps
+   {
+    org.clojure/core.async {:mvn/version "1.5.648"}
+    com.taoensso/sente {:mvn/version "1.16.2"}
+    com.taoensso/timbre {:mvn/version "5.1.2"}
+    io.aviso/pretty {:mvn/version "1.1.1"}
+    metosin/reitit {:mvn/version "0.5.15"}
+    re-frame/re-frame {:mvn/version "1.2.0"}
+    reagent/reagent {:mvn/version "1.1.0"}
+    thheller/shadow-cljs {:mvn/version "2.16.9"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
@@ -137,13 +140,13 @@
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
-   :extra-deps 
+   :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
     lambdaisland/kaocha {:mvn/version "1.60.972"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
-  {:deps 
+  {:deps
    {
     io.github.clojure/tools.build {:git/tag "v0.7.2"
                                    :git/sha "0361dde"
@@ -198,7 +201,7 @@
     org.clojure/core.async {:mvn/version "1.5.648"}
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
-    org.clojure/tools.logging {:mvn/version "1.2.2"}
+    org.clojure/tools.logging {:mvn/version "1.2.3"}
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     org.clojure/tools.reader {:mvn/version "1.3.6"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
@@ -230,7 +233,7 @@
                "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
-  {:deps 
+  {:deps
    {
     io.github.clojure/tools.build {:git/tag "v0.7.2"
                                    :git/sha "0361dde"
@@ -310,7 +313,7 @@
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-once
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]
-   :extra-deps 
+   :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
     lambdaisland/kaocha {:mvn/version "1.60.972"}}

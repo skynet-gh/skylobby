@@ -1,6 +1,5 @@
 (ns spring-lobby
   (:require
-    [aleph.http :as aleph-http]
     [cheshire.core :as json]
     [chime.core :as chime]
     [clj-http.client :as clj-http]
@@ -19,6 +18,7 @@
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
     [me.raynes.fs :as raynes-fs]
+    [org.httpkit.server :as http-kit]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.battle :as battle]
@@ -55,7 +55,7 @@
     (java.awt Desktop Desktop$Action)
     (java.io File)
     (java.lang ProcessBuilder)
-    (java.net InetAddress InetSocketAddress URL)
+    (java.net URL)
     (java.util List)
     (javafx.event Event)
     (javafx.scene Parent)
@@ -1521,7 +1521,7 @@
                              (comp invalid-replay-paths fs/canonical-path second)
                              todo)]
       (if (seq valid-next-round)
-        (task/add-task! state-atom 
+        (task/add-task! state-atom
           {::task-type ::refresh-replays
            :todo (count todo)})
         (do
@@ -1756,7 +1756,7 @@
                   (dissoc :update-mods))))
      (when next-round
        (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-       (task/add-task! state-atom 
+       (task/add-task! state-atom
          {::task-type ::refresh-mods
           :spring-root spring-root
           :todo (count next-round)}))
@@ -1803,7 +1803,7 @@
              (swap! *state assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
-       (task/add-task! *state 
+       (task/add-task! *state
          {::task-type ::update-cached-minimaps
           :todo (count next-round)})))))
 
@@ -1895,7 +1895,7 @@
      (if next-round
        (do
          (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-         (task/add-task! state-atom 
+         (task/add-task! state-atom
            {::task-type ::refresh-maps
             :spring-root spring-root
             :todo next-round-count}))
@@ -2783,7 +2783,7 @@
         (log/error e "Error confirming agreement")))))
 
 
-(defmethod event-handler ::request-reset-password [{:keys [email server username]}]
+(defmethod event-handler ::request-reset-password [{:keys [email server]}]
   (future
     (try
       (let [[server-url server-opts] server
@@ -3308,7 +3308,7 @@
   [{:keys [difficulties mod-name scenario-options script-template script-params] :as state}]
   (future
     (try
-      (let [difficulties-by-name (into {} 
+      (let [difficulties-by-name (into {}
                                    (map (juxt :name identity) difficulties))
             {:keys [enemyhandicap playerhandicap]} (get difficulties-by-name (:difficulty script-params))
             restrictions (get script-params :restricted-units {})
@@ -3322,7 +3322,7 @@
                            (string/replace #"__MAPNAME__" (get script-params :map-name))
                            (string/replace #"__BARVERSION__" mod-name)
                            (string/replace #"__PLAYERNAME__" (get script-params :player-name)))]
-      (spring/start-game *state (assoc state :script-txt script-txt)))
+       (spring/start-game *state (assoc state :script-txt script-txt)))
       (catch Exception e
         (log/error e "Error starting scenario")))))
 
@@ -4197,7 +4197,7 @@
            :sdp-files sdp-files
            :rapid-packages packages
            :rapid-update false)
-    (task/add-task! *state 
+    (task/add-task! *state
       {::task-type ::refresh-mods
        :spring-root spring-isolation-dir})))
 
@@ -4262,7 +4262,7 @@
         (log/error e "Error downloading" rapid-id)
         (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
       (finally
-        (task/add-tasks! *state 
+        (task/add-tasks! *state
           [{::task-type ::update-rapid-packages
             :spring-isolation-dir spring-isolation-dir}
            {::task-type ::refresh-mods
@@ -4493,7 +4493,7 @@
                 (update :map-details cache/miss map-key nil)
                 mod-key
                 (update :mod-details cache/miss mod-key nil))))
-    (task/add-tasks! *state 
+    (task/add-tasks! *state
       [{::task-type ::refresh-engines
         :spring-root spring-root}
        {::task-type ::refresh-mods
@@ -4581,10 +4581,10 @@
 (defmethod event-handler ::scan-imports
   [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
   (doseq [import-source sources]
-    (task/add-task! *state 
+    (task/add-task! *state
       (merge
         {::task-type ::scan-imports}
-         import-source))))
+        import-source))))
 
 (defmethod task-handler ::scan-all-imports [task]
   (event-handler (assoc task :event/type ::scan-imports)))
@@ -4598,7 +4598,7 @@
 (defmethod event-handler ::update-all-downloadables
   [opts]
   (doseq [download-source fx.download/download-sources]
-    (task/add-task! *state 
+    (task/add-task! *state
       (merge
         {::task-type ::update-downloadables
          :force (:force opts)}
@@ -4979,17 +4979,19 @@
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
-  (when-let [{:keys [^java.io.Closeable ipc-server]} @*state]
+  (when-let [{:keys [ipc-server]} @*state]
     (when ipc-server
-      (.close ipc-server)))
+      (ipc-server)))
   (if (u/is-port-open? u/ipc-port)
     (do
       (log/info "Starting IPC server on port" u/ipc-port)
       (let [handler (server/handler *state)
-            server (aleph-http/start-server
+            server (http-kit/run-server
                      (-> handler
                          wrap-keyword-params
                          wrap-params)
+                     {:port u/ipc-port}
+                     #_
                      {:socket-address
                       (InetSocketAddress.
                         ^InetAddress (InetAddress/getByName nil)

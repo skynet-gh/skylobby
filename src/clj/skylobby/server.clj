@@ -383,6 +383,6 @@
                              muuntaja/format-response-middleware
                              rrc/coerce-response-middleware]}})
       (ring/create-default-handler
-        {:not-found index
-         :method-not-allowed index
-         :not-acceptable index}))))
+        {:not-found (fn [r] (assoc (index r) :status 404))
+         :method-not-allowed (fn [r] (assoc (index r) :status 405))
+         :not-acceptable (fn [r] (assoc (index r) :status 406))}))))
