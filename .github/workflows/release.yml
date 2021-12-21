@@ -14,7 +14,7 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.6
+      - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: '1.10.3.1040'
       - uses: actions/setup-node@v2
@@ -58,7 +58,7 @@ jobs:
         with:
           java-version: '14'
           distribution: 'zulu'
-      - uses: DeLaGuardo/setup-clojure@3.6
+      - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: '1.10.3.1040'
       - uses: actions/setup-node@v2
