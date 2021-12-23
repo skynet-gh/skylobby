@@ -81,8 +81,8 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.github.clojure/tools.build {:git/tag "v0.7.2"
-                                   :git/sha "0361dde"
+    io.github.clojure/tools.build {:git/tag "v0.7.4"
+                                   :git/sha "ac442da"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.9.0"}
@@ -101,8 +101,8 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.github.clojure/tools.build {:git/tag "v0.7.2"
-                                   :git/sha "0361dde"
+    io.github.clojure/tools.build {:git/tag "v0.7.4"
+                                   :git/sha "ac442da"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.9.0"}
@@ -133,9 +133,11 @@
     clj-jgit/clj-jgit {:mvn/version "0.8.10"}
     cljfx/cljfx {:mvn/version "1.7.17"
                  :exclusions [org.openjfx/javafx-web]}
+    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
-    io.github.clojure/tools.build {:git/tag "v0.7.2"
-                                   :git/sha "0361dde"
+    io.aviso/pretty {:mvn/version "1.1.1"}
+    io.github.clojure/tools.build {:git/tag "v0.7.4"
+                                   :git/sha "ac442da"
                                    :exclusions [org.slf4j/slf4j-nop]}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -148,9 +150,8 @@
   :skylobby
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.7.2"
-                                   :git/sha "0361dde"
-                                   :exclusions [org.slf4j/slf4j-nop]}}
+    io.github.clojure/tools.build {:git/tag "v0.7.4"
+                                   :git/sha "ac442da"}}
    :ns-default skylobby}
   :skylobby-deps
   {:replace-deps
@@ -160,6 +161,7 @@
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
+    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
     clojail/clojail {:mvn/version "1.0.6"}
     clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
     com.evocomputing/colors {:mvn/version "1.0.6"}
@@ -182,6 +184,7 @@
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
+    io.aviso/pretty {:mvn/version "1.1.1"}
     io.netty/netty-codec {:mvn/version "4.1.72.Final"}
     io.netty/netty-codec-http {:mvn/version "4.1.72.Final"}
     io.netty/netty-handler {:mvn/version "4.1.72.Final"}
@@ -216,12 +219,13 @@
    :main-opts ["-m" "skylobby.main"]}
   :skylobby-native-linux
   {:replace-paths ["resources" "dev/clj/graal" "graal/clj" "native-res/linux"]
-   :main-opts ["-m" "native-image" "skylobbymain" "--no-fallback" "--allow-incomplete-classpath"
+   :main-opts ["-m" "native-image" "skylobby.main" "--no-fallback" "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--report-unsupported-elements-at-runtime"
-               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
+               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-native-windows
   {:replace-paths ["resources" "dev/clj/graal" "graal/clj" "native-res/windows"]
@@ -230,14 +234,15 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--report-unsupported-elements-at-runtime"
-               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby"]
+               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=8"
+               ;"-H:+TraceNativeToolUsage"
+               "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.7.2"
-                                   :git/sha "0361dde"
-                                   :exclusions [org.slf4j/slf4j-nop]}}
+    io.github.clojure/tools.build {:git/tag "v0.7.4"
+                                   :git/sha "ac442da"}}
    :ns-default skylobby-cli}
   :skylobby-cli-deps
   {:replace-deps
@@ -246,6 +251,7 @@
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
+    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
     clojail/clojail {:mvn/version "1.0.6"}
     clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
     com.evocomputing/colors {:mvn/version "1.0.6"}
@@ -259,13 +265,16 @@
      :git/sha   "0dc2862e1b1c9871eef4c306ef77da3610a2bd93"
      :deps/root "config/com.taoensso/nippy"}
     com.taoensso/nippy {:mvn/version "3.1.1"}
+    com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
     commons-io/commons-io {:mvn/version "2.11.0"}
     crouton/crouton {:mvn/version "0.1.2"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
+    http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
     jarohen/chime {:mvn/version "0.3.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
+    metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
@@ -275,6 +284,8 @@
     org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"}
     org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
     org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"}
+    ring/ring-anti-forgery {:mvn/version "1.3.0"}
+    ring/ring-core {:mvn/version "1.9.4"}
     smee/binary {:mvn/version "0.5.5"}}}
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
@@ -285,7 +296,8 @@
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
-               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
+               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli-native-windows
   {:replace-paths ["dev/clj/graal" "graal/clj" "native-res/windows"]
@@ -293,7 +305,8 @@
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
-               "-H:+ReportExceptionStackTraces" "-H:NumberOfThreads=1" "-H:Name=skylobby-cli"]
+               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :reveal
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar" "dev/clj/user" "test/clj"]
@@ -308,7 +321,7 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
-    vlaaad/reveal {:mvn/version "1.3.251"}}
+    vlaaad/reveal {:mvn/version "1.3.258"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-once
