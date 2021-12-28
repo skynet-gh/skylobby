@@ -17,7 +17,7 @@
 /node_modules/
 /pom.xml
 /skylobby-*.msi
-/skyres
+/skylobby
 /target/
 /trace.edn
 /*.build_artifacts.txt
