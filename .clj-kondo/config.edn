@@ -1,0 +1,5 @@
+{:linters
+ {:unresolved-symbol
+  {:exclude [(diehard.core/defratelimiter)
+             (taoensso.nippy/extend-freeze)
+             (taoensso.nippy/extend-thaw)]}}}

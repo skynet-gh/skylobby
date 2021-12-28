@@ -15,7 +15,7 @@ jobs:
           java: 'java11'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
-          cli: '1.10.3.1040'
+          cli: '1.10.3.1053'
       - run: clojure -M:build
         working-directory: ./cryogen
       - uses: peaceiris/actions-gh-pages@v3
