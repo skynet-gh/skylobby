@@ -63,6 +63,9 @@
       (catch Exception e
         (log/warn e "Error creating file from" f "and" args)))))
 
+(defn ^String join [& args]
+  (string/join File/separator args))
+
 (defn filename ^String [^File f]
   (when f
     (.getName f)))
@@ -549,7 +552,10 @@
 (defn sync-version-to-engine-version
   "Returns the Spring engine version from a sync version. For some reason, engine '103.0' has sync
   version '103' whereas for engine 104.0.1-1553-gd3c0012 maintenance the sync version is the same,
-  '104.0.1-1553-gd3c0012 maintenance'."
+  '104.0.1-1553-gd3c0012 maintenance'.
+
+  Also for older versions, which print as 'Spring 0.79.1.2 (0.79.1.2-0-gbb45722{@}-cmake-tdm)' it
+  strips 'Spring' and the detailed version in parens, leaving '0.79.1.2'."
   [sync-version]
   (cond
     (string/blank? sync-version)
@@ -557,19 +563,34 @@
     (= sync-version (string/replace sync-version #"[^\d]" ""))
     (str sync-version ".0")
     :else
-    sync-version))
+    (if-let [[_all version] (re-find #"^Spring ([^\s]+) \(.*\)$" sync-version)]
+      version
+      sync-version)))
+
+(defn sync-version-exe
+  ([engine-exe]
+   (sync-version-exe engine-exe "--sync-version"))
+  ([engine-exe version-flag]
+   (let [
+         _ (set-executable engine-exe)
+         command [(canonical-path engine-exe) version-flag]
+         ^"[Ljava.lang.String;" cmdarray (into-array String command)
+         runtime (Runtime/getRuntime)
+         process (.exec runtime cmdarray)]
+     (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
+     (let [sync-version (string/trim (slurp (.getInputStream process)))]
+       (log/info "Discovered sync-version of" engine-exe "is" (str "'" sync-version "'"))
+       sync-version))))
 
 (defn sync-version [engine-dir]
-  (let [engine-exe (io/file engine-dir (spring-headless-executable))
-        _ (set-executable engine-exe)
-        command [(canonical-path engine-exe) "--sync-version"]
-        ^"[Ljava.lang.String;" cmdarray (into-array String command)
-        runtime (Runtime/getRuntime)
-        process (.exec runtime cmdarray)]
-    (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
-    (let [sync-version (string/trim (slurp (.getInputStream process)))]
-      (log/info "Discovered sync-version of" engine-exe "is" (str "'" sync-version "'"))
-      sync-version)))
+  (let [headless-exe (file engine-dir (spring-headless-executable))
+        spring-exe (file engine-dir (spring-executable))]
+    (try
+      (sync-version-exe headless-exe)
+      (catch Exception e
+        (log/error e "Error reading engine version from" headless-exe "falling back on" spring-exe)
+        (sync-version-exe spring-exe "--version")))))
+
 
 (defn engines-dir
   [root]
@@ -577,8 +598,8 @@
 
 (defn spring-engine-dir? [dir]
   (and (is-directory? dir)
-       (is-file? (io/file dir (spring-executable)))
-       (is-file? (io/file dir (spring-headless-executable)))))
+       (is-file? (io/file dir (spring-executable)))))
+       ;(is-file? (io/file dir (spring-headless-executable)))))
 
 (defn engine-dirs
   [root]
@@ -816,7 +837,7 @@
   (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
-              (write [this data]
+              (write [_this data]
                 (log/trace "got" (count data) "bytes")
                 (.write baos data 0 (count data))
                 (count data))))
@@ -826,7 +847,7 @@
   (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
             (reify ISequentialOutStream
-              (write [this data]
+              (write [_this data]
                 (log/trace "got" (count data) "bytes")
                 (.write baos data 0 (count data))
                 (count data))))
@@ -864,7 +885,7 @@
                  (int-array ids)
                  false
                  (reify IArchiveExtractCallback
-                   (getStream [this index extract-ask-mode]
+                   (getStream [_this index _extract-ask-mode]
                      (swap! callback-state assoc :index index)
                      (try
                        (let [path (.getProperty archive index PropID/PATH)
@@ -874,15 +895,15 @@
                            (let [baos (ByteArrayOutputStream.)] ; not with-open
                              (swap! callback-state assoc :stream baos :path path)
                              (reify ISequentialOutStream
-                               (write [this data]
+                               (write [_this data]
                                  (.write baos data 0 (count data))
                                  (count data))))))
                        (catch Throwable e
                          (log/error e "Error getting stream for item" index))))
-                   (prepareOperation [this extract-ask-mode]
+                   (prepareOperation [_this extract-ask-mode]
                      (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
                      (log/trace "preparing" extract-ask-mode))
-                   (setOperationResult [this extract-operation-result]
+                   (setOperationResult [_this extract-operation-result]
                      (let [cs @callback-state]
                        (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
                          (try
@@ -894,10 +915,10 @@
                              (throw (SevenZipException. "Error closing output stream"))))))
                      (swap! callback-state assoc :operation-result extract-operation-result)
                      (log/trace "result" extract-operation-result))
-                   (setTotal [this total]
+                   (setTotal [_this total]
                      (swap! callback-state assoc :total total)
                      (log/trace "total" total))
-                   (setCompleted [this complete]
+                   (setCompleted [_this complete]
                      (swap! callback-state assoc :complete complete)
                      (log/trace "completed" complete))))
        (let [extracted @extracted-state]
@@ -1034,10 +1055,112 @@
            {:modoptions (try-entry-lua "modoptions.lua")
             :engineoptions (try-entry-lua "engineoptions.lua")
             :luaai (try-entry-lua "luaai.lua")
+            ; https://stackoverflow.com/a/44387973
             :sidedata (or (try-entry-lua "gamedata/sidedata.lua")
                           (try-entry-script "gamedata/sidedata.tdf")
                           (u/postprocess-byar-units-en
                             (try-entry-lua "language/units_en.lua")))}))))))
+
+(defn read-7z-mod
+  ([^java.io.File file]
+   (read-7z-mod file nil))
+  ([^java.io.File file {:keys [modinfo-only]}]
+   (with-open [raf (new RandomAccessFile file "r")
+               rafis (new RandomAccessFileInStream raf)
+               archive (SevenZip/openInArchive nil rafis)]
+     (log/debug file "is of format" (.getArchiveFormat archive)
+                "and has" (.getNumberOfItems archive) "items")
+     (let [n (.getNumberOfItems archive)
+           ids (filter
+                 (fn [id]
+                   (let [path (.getProperty archive id PropID/PATH)
+                         path-lc (string/lower-case path)]
+                     (or
+                       (string/ends-with? path-lc "engineoptions.lua")
+                       (string/ends-with? path-lc "luaai.lua")
+                       (string/ends-with? path-lc "modinfo.lua")
+                       (string/ends-with? path-lc "modoptions.lua")
+                       (string/ends-with? path-lc "sidedata.lua")
+                       (string/ends-with? path-lc "sidedata.tdf")
+                       (string/ends-with? path-lc "units_en.lua"))))
+                 (take n (iterate inc 0)))
+           extracted-state (atom {})
+           callback-state (atom {})]
+       (.extract archive
+                 (int-array ids)
+                 false
+                 (reify IArchiveExtractCallback
+                   (getStream [_this index _extract-ask-mode]
+                     (swap! callback-state assoc :index index)
+                     (try
+                       (let [path (.getProperty archive index PropID/PATH)
+                             is-folder (.getProperty archive index PropID/IS_FOLDER)]
+                         (when-not is-folder
+                           (log/debug "Stream for index" index "path" path)
+                           (let [baos (ByteArrayOutputStream.)] ; not with-open
+                             (swap! callback-state assoc :stream baos :path path)
+                             (reify ISequentialOutStream
+                               (write [_this data]
+                                 (.write baos data 0 (count data))
+                                 (count data))))))
+                       (catch Throwable e
+                         (log/error e "Error getting stream for item" index))))
+                   (prepareOperation [_this extract-ask-mode]
+                     (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+                     (log/trace "preparing" extract-ask-mode))
+                   (setOperationResult [_this extract-operation-result]
+                     (let [cs @callback-state]
+                       (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
+                         (try
+                           (.close output-stream)
+                           (let [ba (.toByteArray output-stream)]
+                             (swap! extracted-state assoc (:path cs) ba))
+                           (catch Exception e
+                             (log/error e "Error closing output stream")
+                             (throw (SevenZipException. "Error closing output stream"))))))
+                     (swap! callback-state assoc :operation-result extract-operation-result)
+                     (log/trace "result" extract-operation-result))
+                   (setTotal [_this total]
+                     (swap! callback-state assoc :total total)
+                     (log/trace "total" total))
+                   (setCompleted [_this complete]
+                     (swap! callback-state assoc :complete complete)
+                     (log/trace "completed" complete))))
+       (let [extracted @extracted-state
+             try-entry-lua (fn [filename]
+                             (try
+                               (if-let [[_path file-bytes]
+                                        (->> extracted
+                                             (filter (comp #(string/ends-with? % filename) string/lower-case first))
+                                             first)]
+                                 (lua/read-modinfo (u/bytes->str file-bytes))
+                                 (log/warn "Mod file" filename "not found in" file))
+                               (catch Exception e
+                                 (log/trace e "Error loading" filename "from" file)
+                                 (log/warn "Error loading" filename "from" file))))
+             try-entry-script (fn [filename]
+                                (try
+                                  (if-let [[_path file-bytes]
+                                           (->> extracted
+                                                (filter (comp #(string/ends-with? % filename) string/lower-case first))
+                                                first)]
+                                    (spring-script/parse-script (u/bytes->str file-bytes))
+                                    (log/warn "Mod file" filename "not found in" file))
+                                  (catch Exception e
+                                    (log/trace e "Error loading" filename "from" file)
+                                    (log/warn "Error loading" filename "from" file))))]
+         (merge
+           {:file file
+            :modinfo (try-entry-lua "modinfo.lua")
+            ::source :archive}
+           (when-not modinfo-only
+             {:modoptions (try-entry-lua "modoptions.lua")
+              :engineoptions (try-entry-lua "engineoptions.lua")
+              :luaai (try-entry-lua "luaai.lua")
+              :sidedata (or (try-entry-lua (join "gamedata" "sidedata.lua"))
+                            (try-entry-script (join "gamedata" "sidedata.tdf"))
+                            (u/postprocess-byar-units-en
+                              (try-entry-lua (join "language" "units_en.lua"))))})))))))
 
 (defn read-mod-directory
   ([^java.io.File file]
@@ -1075,13 +1198,16 @@
   ([^java.io.File file]
    (read-mod-file file nil))
   ([^java.io.File file opts]
-   (cond
-     (is-directory? file)
-     (read-mod-directory file opts)
-     (string/ends-with? (filename file) ".sdz")
-     (read-mod-zip-file file opts)
-     :else
-     (log/warn "Unknown mod file type" file))))
+   (let [filename (filename file)]
+     (cond
+       (and (is-directory? file) (string/ends-with? filename ".sdd"))
+       (read-mod-directory file opts)
+       (string/ends-with? filename ".sdz")
+       (read-mod-zip-file file opts)
+       (string/ends-with? filename ".sd7")
+       (read-7z-mod file opts)
+       :else
+       (log/warn "Unknown mod file type" file)))))
 
 ; engine
 

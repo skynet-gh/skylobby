@@ -7,6 +7,7 @@
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.font-icon :as font-icon]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
@@ -38,7 +39,7 @@
         http-download (fx/sub-val context :http-download)
         rapid-download (fx/sub-val context :rapid-download)
         mod-filter (fx/sub-val context :mod-filter)
-        mods (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :mods])
+        {:keys [mods mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
         games (filter :is-game mods)
@@ -154,9 +155,13 @@
              :text "Reload games"}}
            :desc
            {:fx/type :button
+            :disable (boolean
+                       (seq
+                         (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)))
             :on-action {:event/type :spring-lobby/add-task
                         :task {:spring-lobby/task-type :spring-lobby/refresh-mods
-                               :spring-root spring-isolation-dir}}
+                               :spring-root spring-isolation-dir
+                               :priorities [(:file (get mods-by-name mod-name))]}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])})))

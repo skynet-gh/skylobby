@@ -300,7 +300,7 @@
 (defn mod-name-and-version
   ([mod-data]
    (mod-name-and-version mod-data nil))
-  ([{:keys [git-commit-id modinfo]} {:keys [use-git-mod-version] :as opts}]
+  ([{:keys [git-commit-id modinfo]} {:keys [use-git-mod-version]}]
    (let [mod-name-only (:name modinfo)
          mod-version (or (when (and use-git-mod-version git-commit-id)
                            (str "git:" (short-git-commit git-commit-id)))
@@ -436,11 +436,11 @@
 
 (defn open-port []
   (try
-    (with-open [_server (ServerSocket. 0)]
-      true)
+    (with-open [server (ServerSocket. 0)]
+      (.getLocalPort server))
     (catch Exception e
       (log/error e "Error getting open port")
-      false)))
+      nil)))
 
 
 (defn- parse-mod-name-git [mod-name]

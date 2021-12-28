@@ -8,6 +8,14 @@
 (declare mock-parsed-lua mock-map-data-txt)
 
 
+(deftest join
+  (if (fs/windows?)
+    (is (= "test\\join"
+           (fs/join "test" "join")))
+    (is (= "test/join"
+           (fs/join "test" "join")))))
+
+
 (deftest spring-root
   (if (fs/windows?)
     (testing "Windows paths"
@@ -140,7 +148,9 @@
   (is (= "104.0.1-1553-gd3c0012 maintenance"
          (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance")))
   (is (= "104.0.1-1553-gd3c0012 maintenance"
-         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance"))))
+         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance")))
+  (is (= "0.79.1.2"
+         (fs/sync-version-to-engine-version "Spring 0.79.1.2 (0.79.1.2-0-gbb45722{@}-cmake-tdm)"))))
 
 
 (deftest spring-config-line

@@ -413,6 +413,7 @@
                             (boolean
                               (or (:engineoptions mod-data)
                                   (:modoptions mod-data))))]
+     (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
      (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
             (fn [mods]
               (set
@@ -1611,7 +1612,7 @@
    (refresh-engines state-atom nil))
   ([state-atom spring-root]
    (refresh-engines state-atom spring-root nil))
-  ([state-atom spring-root _opts]
+  ([state-atom spring-root opts]
    (log/info "Refreshing engines in" spring-root)
    (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
    (let [before (u/curr-millis)
@@ -1627,7 +1628,9 @@
                                     (map (comp fs/canonical-path :file))
                                     (filter some?)
                                     set)
-         to-add (remove (comp known-canonical-paths fs/canonical-path) engine-dirs)
+         to-add (if (:force opts) ; refresh existing engines too
+                  engine-dirs
+                  (remove (comp known-canonical-paths fs/canonical-path) engine-dirs))
          canonical-path-set (set (map fs/canonical-path engine-dirs))
          missing-files (set
                          (concat
@@ -1645,7 +1648,10 @@
        (let [engine-data (fs/engine-data engine-dir)]
          (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
                 (fn [engines]
-                  (set (conj engines engine-data))))))
+                  (set
+                    (conj
+                      (remove (comp #{(fs/canonical-path engine-dir)} fs/canonical-path :file) engines)
+                      engine-data))))))
      (log/debug "Removing" (count to-remove) "engines")
      (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
             (fn [engines]
