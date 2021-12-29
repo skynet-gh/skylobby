@@ -1,0 +1,61 @@
+# https://gist.github.com/linux-china/8745394fbc308168b20068386771ea1b
+
+name: GraalVM Native Image Build
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/msvc-dev-cmd@v1.10.0
+      - uses: microsoft/setup-msbuild@v1
+      - uses: ayltai/setup-graalvm@v1
+        with:
+          java-version: 11
+          graalvm-version: 21.3.0
+          native-image: true
+      - uses: DeLaGuardo/setup-clojure@3.7
+        with:
+          cli: latest
+      - run: clojure -M:skylobby-deps:skylobby-native-windows
+        shell: powershell
+      - uses: actions/upload-artifact@v2
+        with:
+          path: skylobby.exe
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ayltai/setup-graalvm@v1
+        with:
+          java-version: 11
+          graalvm-version: 21.3.0
+          native-image: true
+      - uses: DeLaGuardo/setup-clojure@3.7
+        with:
+          cli: latest
+      - run: clojure -M:skylobby-deps:skylobby-native-linux
+      # ^ TODO different resources for mac
+      - uses: actions/upload-artifact@v2
+        with:
+          path: skylobby
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ayltai/setup-graalvm@v1
+        with:
+          java-version: 11
+          graalvm-version: 21.3.0
+          native-image: true
+      - uses: DeLaGuardo/setup-clojure@3.7
+        with:
+          cli: latest
+      - run: clojure -M:skylobby-deps:skylobby-native-linux
+      - uses: actions/upload-artifact@v2
+        with:
+          path: skylobby

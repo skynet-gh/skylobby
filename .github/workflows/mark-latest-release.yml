@@ -1,0 +1,17 @@
+name: Mark Release As Latest (non-prerelease)
+
+on:
+  workflow_run:
+    workflows: ["Build Release Artifacts"]
+    types:
+      - completed
+
+jobs:
+  latest:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          allowUpdates: true

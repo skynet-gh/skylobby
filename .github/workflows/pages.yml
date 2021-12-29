@@ -9,13 +9,19 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@5.0
+      - uses: actions/setup-java@v2
         with:
-          graalvm-version: 'vm-21.3.0'
-          java: 'java11'
+          java-version: '14'
+          distribution: 'zulu'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
-          cli: '1.10.3.1053'
+          cli: latest
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('cryogen/project.clj') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - run: clojure -M:build
         working-directory: ./cryogen
       - uses: peaceiris/actions-gh-pages@v3
