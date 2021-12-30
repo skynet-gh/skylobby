@@ -28,10 +28,11 @@
         spring-root (or (fx/sub-val context :scenarios-spring-root)
                         spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-root)
-        rapid-data-by-id (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-id])
-        rapid-id "byar-chobby:test"
-        rapid-data (get rapid-data-by-id rapid-id)
+        {:keys [rapid-data-by-hash rapid-data-by-id]} (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path])
+        latest-rapid-id "byar-chobby:test"
+        rapid-data (get rapid-data-by-id latest-rapid-id)
         rapid-hash (:hash rapid-data)
+        rapid-id (:id (get rapid-data-by-hash rapid-hash))
         rapid-version (:version rapid-data)
         {:keys [engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         some-bar-name (->> mods-by-name

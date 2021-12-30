@@ -4165,12 +4165,16 @@
                               reverse)
           _ (log/info "Found" (count rapid-versions) "rapid versions")
           rapid-data-by-hash (->> rapid-versions
+                                  (remove (comp #(string/ends-with? % ":test") :id))
+                                  ; prevents duplicates, uses specific version
                                   (map (juxt :hash identity))
                                   (into {}))
           rapid-data-by-id (->> rapid-versions
                                 (map (juxt :id identity))
                                 (into {}))
           rapid-data-by-version (->> rapid-versions
+                                     (remove (comp #(string/ends-with? % ":test") :id))
+                                     ; prevents duplicates, uses specific version
                                      (map (juxt :version identity))
                                      (into {}))]
       (swap! *state
