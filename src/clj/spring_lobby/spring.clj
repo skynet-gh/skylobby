@@ -177,7 +177,7 @@
                             (->> all-modoptions
                                  (map
                                    (fn [modoption]
-                                     (let [k (-> modoption :key string/lower-case keyword)
+                                     (let [k (some-> modoption :key string/lower-case keyword)
                                            v (:def modoption)]
                                        [k (get modoptions k v)])))
                                  (into {}))))
@@ -262,7 +262,8 @@
           (str "[" (name k ) "]\n" tabs "{\n"
                (apply str (map (partial script-txt-inner (str tabs "\t")) (sort-by first v)))
                tabs "}\n")
-          (str (name k) " = " v ";"))
+          (when k
+            (str (name k) " = " v ";")))
         "\n")))
 
 ; https://springrts.com/wiki/Script.txt

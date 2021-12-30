@@ -23,6 +23,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.28]
+
+- Fix some issues with detecting engine version
+- Add support for 7z mod archives
+- Fix port in singleplayer start script
+- Fix some assumptions about old engine versions
+- Attempt to improve some GitHub actions
+
 ### [0.7.27]
 
 - Fix sync status not updated when battle map changes

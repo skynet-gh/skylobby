@@ -1,53 +1,50 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Unit test
-
-# Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   test:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-20.04
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        java: ['11', '17']
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
     steps:
-      # https://github.com/marketplace/actions/setup-clojure
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@5.0
+      - uses: actions/setup-java@v2
         with:
-          graalvm-version: 'vm-21.3.0'
-          java: 'java11'
+          java-version: ${{ matrix.java }}
+          distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
-          cli: '1.10.3.1053'
-
-      - run: clojure -M:test:headless:runner
-
+          cli: latest
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      - if: ${{ matrix.os != 'windows-latest' }}
+        run: clojure -M:test:headless:runner
+        shell: bash
+      - if: ${{ matrix.os == 'windows-latest' }}
+        run: clojure -M:test:headless:runner
+        shell: powershell
   coverage:
-    # The type of runner that the job will run on
+    if: ${{ false }}  # disable for now
     runs-on: ubuntu-20.04
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # https://github.com/marketplace/actions/setup-clojure
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@5.0
+      - uses: actions/setup-java@v2
         with:
-          graalvm-version: 'vm-21.3.0'
-          java: 'java11'
+          java-version: '17'
+          distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
-          cli: '1.10.3.1053'
-
+          cli: latest
       - run: clojure -M:coverage:headless
       - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json

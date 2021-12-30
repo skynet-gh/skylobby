@@ -107,8 +107,12 @@
              :text "Reload engines"}}
            :desc
            {:fx/type :button
+            :disable (boolean
+                       (seq
+                         (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)))
             :on-action {:event/type :spring-lobby/add-task
                         :task {:spring-lobby/task-type :spring-lobby/refresh-engines
+                               :force true
                                :spring-root spring-isolation-dir}}
             :graphic
             {:fx/type font-icon/lifecycle

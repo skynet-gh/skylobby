@@ -8,8 +8,17 @@
 (declare mock-parsed-lua mock-map-data-txt)
 
 
-(deftest spring-root
+(deftest join
   (if (fs/windows?)
+    (is (= "test\\join"
+           (fs/join "test" "join")))
+    (is (= "test/join"
+           (fs/join "test" "join")))))
+
+
+(deftest spring-root
+  (cond
+    (fs/windows?)
     (testing "Windows paths"
       (testing "Windows"
         (with-redefs [fs/get-sys-data (constantly
@@ -19,7 +28,8 @@
           (is (= (str "C:\\Users\\me3\\Documents\\My Games\\Spring")
                  (fs/canonical-path
                    (fs/spring-root)))))))
-    (testing "Unix paths"
+    (fs/linux?)
+    (testing "Linux paths"
       (testing "Windows Subsystem for Linux"
         (with-redefs [fs/get-sys-data (constantly
                                         {:os-name "Linux"
@@ -35,18 +45,22 @@
                                          :user-home "/home/me2"})]
           (is (= (str "/home/me2/.spring")
                  (fs/canonical-path
-                   (fs/spring-root))))))
+                   (fs/spring-root)))))))
+    (fs/mac?)
+    (testing "Mac paths"
       (testing "Mac"
         (with-redefs [fs/get-sys-data (constantly
                                         {:os-name "Mac OS X 10.6 whatever"
                                          :os-version "10.6"
                                          :user-home "/home/me4"})]
-          (is (= (str "/home/me4/.spring")
+          (is (= (str "/System/Volumes/Data/home/me4/.spring")
                  (fs/canonical-path
                    (fs/spring-root)))))))))
 
+
 (deftest springlobby-root
-  (if (fs/windows?)
+  (cond
+    (fs/windows?)
     (testing "Windows paths"
       (testing "Windows"
         (with-redefs [fs/get-sys-data (constantly
@@ -56,7 +70,8 @@
           (is (= (str "C:\\Users\\me3\\AppData\\Roaming\\springlobby")
                  (fs/canonical-path
                    (fs/springlobby-root)))))))
-    (testing "Unix paths"
+    (fs/linux?)
+    (testing "Linux paths"
       (testing "Windows Subsystem for Linux"
         (with-redefs [fs/get-sys-data (constantly
                                         {:os-name "Linux"
@@ -72,10 +87,21 @@
                                          :user-home "/home/me2"})]
           (is (= (str "/home/me2/snap/springlobby-nsg/common/.springlobby")
                  (fs/canonical-path
+                   (fs/springlobby-root)))))))
+    (fs/mac?)
+    (testing "Mac paths"
+      (testing "Mac"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Mac OS X"
+                                         :os-version ""
+                                         :user-home "/System/Volumes/Data/home/me2"})]
+          (is (= (str "/System/Volumes/Data/home/me2/.springlobby")
+                 (fs/canonical-path
                    (fs/springlobby-root)))))))))
 
 (deftest app-root
-  (if (fs/windows?)
+  (cond
+    (fs/windows?)
     (testing "Windows paths"
       (testing "Windows"
         (with-redefs [fs/get-sys-data (constantly
@@ -85,7 +111,8 @@
           (is (= (str "C:\\Users\\me3\\.skylobby")
                  (fs/canonical-path
                    (fs/app-root)))))))
-    (testing "Unix paths"
+    (fs/linux?)
+    (testing "Linux paths"
       (testing "Windows Subsystem for Linux"
         (with-redefs [fs/get-sys-data (constantly
                                         {:os-name "Linux"
@@ -101,10 +128,21 @@
                                          :user-home "/home/me2"})]
           (is (= (str "/home/me2/.skylobby")
                  (fs/canonical-path
+                   (fs/app-root)))))))
+    (fs/mac?)
+    (testing "Mac paths"
+      (testing "Mac"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Mac"
+                                         :os-version ""
+                                         :user-home "/System/Volumes/Data/home/me2"})]
+          (is (= (str "/System/Volumes/Data/home/me2/.skylobby")
+                 (fs/canonical-path
                    (fs/app-root)))))))))
 
 (deftest config-root
-  (if (fs/windows?)
+  (cond
+    (fs/windows?)
     (testing "Windows paths"
       (testing "Windows"
         (with-redefs [fs/get-sys-data (constantly
@@ -114,7 +152,8 @@
           (is (= (str "C:\\Users\\me3\\.skylobby")
                  (fs/canonical-path
                    (fs/config-root)))))))
-    (testing "Windows paths"
+    (fs/linux?)
+    (testing "Linux paths"
       (testing "Windows Subsystem for Linux"
         (with-redefs [fs/get-sys-data (constantly
                                         {:os-name "Linux"
@@ -130,6 +169,16 @@
                                          :user-home "/home/me2"})]
           (is (= (str "/home/me2/.skylobby")
                  (fs/canonical-path
+                   (fs/config-root)))))))
+    (fs/mac?)
+    (testing "Mac paths"
+      (testing "Linux"
+        (with-redefs [fs/get-sys-data (constantly
+                                        {:os-name "Linux"
+                                         :os-version ""
+                                         :user-home "/System/Volumes/Data/home/me2"})]
+          (is (= (str "/System/Volumes/Data/home/me2/.skylobby")
+                 (fs/canonical-path
                    (fs/config-root)))))))))
 
 (deftest sync-version-to-engine-version
@@ -140,7 +189,9 @@
   (is (= "104.0.1-1553-gd3c0012 maintenance"
          (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance")))
   (is (= "104.0.1-1553-gd3c0012 maintenance"
-         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance"))))
+         (fs/sync-version-to-engine-version "104.0.1-1553-gd3c0012 maintenance")))
+  (is (= "0.79.1.2"
+         (fs/sync-version-to-engine-version "Spring 0.79.1.2 (0.79.1.2-0-gbb45722{@}-cmake-tdm)"))))
 
 
 (deftest spring-config-line

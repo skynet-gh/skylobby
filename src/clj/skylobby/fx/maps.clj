@@ -41,7 +41,7 @@
         http-download (fx/sub-val context :http-download)
         map-input-prefix (fx/sub-val context :map-input-prefix)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
-        maps (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :maps])]
+        {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -146,9 +146,13 @@
              :text "Reload maps"}}
            :desc
            {:fx/type :button
+            :disable (boolean
+                       (seq
+                         (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-maps)))
             :on-action {:event/type :spring-lobby/add-task
                         :task {:spring-lobby/task-type :spring-lobby/refresh-maps
-                               :spring-root spring-isolation-dir}}
+                               :spring-root spring-isolation-dir
+                               :priorities [(:file (get maps-by-name map-name))]}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}]
