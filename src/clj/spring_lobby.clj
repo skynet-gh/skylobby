@@ -172,7 +172,7 @@
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
    :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :refresh-replays-after-game
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-team-skills :show-vote-log :spring-isolation-dir
+   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
 
 
@@ -266,6 +266,7 @@
                              :bonus true}
      :ready-on-unspec true
      :refresh-replays-after-game true
+     :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
      :servers default-servers
      :use-default-ring-sound true}
@@ -2742,6 +2743,11 @@
     (future
       (async/<!! (async/timeout 10))
       (swap! *state assoc (:key e) v))))
+
+
+(defmethod event-handler ::nav-spring-picker [_e]
+  (swap! *state assoc :show-spring-picker true :selected-server-tab "spring"))
+
 
 (defmethod event-handler ::on-change-server
   [{:fx/keys [event] :as e}]

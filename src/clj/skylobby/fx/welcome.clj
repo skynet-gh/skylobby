@@ -90,6 +90,9 @@
      :text "Scenarios"
      :on-action {:event/type :spring-lobby/toggle
                  :key :show-scenarios-window}}
+    {:fx/type :button
+     :text "Spring"
+     :on-action {:event/type :spring-lobby/nav-spring-picker}}
     {:fx/type :pane
      :v-box/vgrow :always}]})
 
