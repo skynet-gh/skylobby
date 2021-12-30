@@ -37,6 +37,7 @@ jobs:
           cache: 'npm'
       - run: npm install
       - run: clojure -M:cljs compile frontend
+        shell: powershell
       - run: clojure -M:skylobby-deps:skylobby-native-windows
         shell: powershell
       - uses: actions/upload-artifact@v2

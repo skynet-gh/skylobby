@@ -21,28 +21,20 @@ Future Features:
 
 ## Actual changelog
 
-### [0.7.34]
-
-- Add cache and js build to native action
-
-### [0.7.33]
-
-- Fix native action Windows version
-
-### [0.7.32]
+### [0.7.32 - 0.7.35]
 
 - Fix Spring picker always shown on start
+- Fix shell for native Windows js build
+- Add cache and js build to native action
+- Fix native action Windows version
 
 ### [0.7.31]
 
 - Add tab to help users pick Spring directory
 
-### [0.7.30]
+### [0.7.29 - 0.7.30]
 
 - Fix mac release and native actions
-
-### [0.7.29]
-
 - Fix releases action
 
 ### [0.7.28]
