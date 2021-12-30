@@ -173,7 +173,7 @@
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
    :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :window-states])
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
 
 
 (defn- select-config [state]
@@ -269,7 +269,8 @@
      :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
      :servers default-servers
-     :use-default-ring-sound true}
+     :use-default-ring-sound true
+     :windows-as-tabs true}
     (apply
       merge
       (doall
@@ -2745,8 +2746,27 @@
       (swap! *state assoc (:key e) v))))
 
 
-(defmethod event-handler ::nav-spring-picker [_e]
-  (swap! *state assoc :show-spring-picker true :selected-server-tab "spring"))
+(def window-to-tab
+  {
+   :show-replays "replays"
+   :show-scenarios-window "scenarios"
+   :show-settings-window "settings"
+   :show-spring-picker "spring"})
+
+(defmethod event-handler ::toggle-window
+  [{:fx/keys [event] :as e}]
+  (let [k (:key e)
+        v (boolean (or (:value e) event))
+        inv (not v)]
+    (swap! *state assoc k inv)
+    (future
+      (async/<!! (async/timeout 10))
+      (swap! *state
+        (fn [state]
+          (let [tab (get window-to-tab k)]
+            (cond-> (assoc state k v)
+              tab
+              (assoc :selected-server-tab tab))))))))
 
 
 (defmethod event-handler ::on-change-server

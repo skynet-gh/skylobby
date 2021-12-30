@@ -36,7 +36,7 @@
                      ".jar")
             installer-url (str "https://github.com/skynet-gh/skylobby/releases/download/" version "/"
                                "skylobby-" version "_"
-                               (cond 
+                               (cond
                                  (fs/mac?)
                                  "mac.dmg"
                                  (fs/wsl-or-windows?)
@@ -198,7 +198,7 @@
          :style-class ["button" "skylobby-normal"]
          :text "Replays"
          :style {:-fx-font-size 14}
-         :on-action {:event/type :spring-lobby/toggle
+         :on-action {:event/type :spring-lobby/toggle-window
                      :key :show-replays}
          :graphic
          {:fx/type font-icon/lifecycle
@@ -209,7 +209,7 @@
          :text "Settings"
          :graphic {:fx/type font-icon/lifecycle
                    :icon-literal (str "mdi-settings:" icon-size)}
-         :on-action {:event/type :spring-lobby/toggle
+         :on-action {:event/type :spring-lobby/toggle-window
                      :key :show-settings-window}}
         {:fx/type :button
          :style-class ["button" "skylobby-normal"]

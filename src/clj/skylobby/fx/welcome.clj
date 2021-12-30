@@ -84,15 +84,20 @@
      :on-action {:event/type :spring-lobby/start-singleplayer-battle}}
     {:fx/type :button
      :text "Replays"
-     :on-action {:event/type :spring-lobby/toggle
+     :on-action {:event/type :spring-lobby/toggle-window
                  :key :show-replays}}
     {:fx/type :button
      :text "Scenarios"
-     :on-action {:event/type :spring-lobby/toggle
+     :on-action {:event/type :spring-lobby/toggle-window
                  :key :show-scenarios-window}}
     {:fx/type :button
      :text "Spring"
-     :on-action {:event/type :spring-lobby/nav-spring-picker}}
+     :on-action {:event/type :spring-lobby/toggle-window
+                 :key :show-spring-picker}}
+    {:fx/type :button
+     :text "Settings"
+     :on-action {:event/type :spring-lobby/toggle-window
+                 :key :show-settings-window}}
     {:fx/type :pane
      :v-box/vgrow :always}]})
 
