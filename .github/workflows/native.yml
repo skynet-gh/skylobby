@@ -31,6 +31,12 @@ jobs:
         with:
           cli: latest
       - run: git config --system core.longpaths true
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'npm'
+      - run: npm install
+      - run: clojure -M:cljs compile frontend
       - run: clojure -M:skylobby-deps:skylobby-native-windows
         shell: powershell
       - uses: actions/upload-artifact@v2
@@ -55,6 +61,12 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'npm'
+      - run: npm install
+      - run: clojure -M:cljs compile frontend
       - run: clojure -M:skylobby-deps:skylobby-native-linux
       # ^ TODO different resources for mac
       - uses: actions/upload-artifact@v2
@@ -79,6 +91,12 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'npm'
+      - run: npm install
+      - run: clojure -M:cljs compile frontend
       - run: clojure -M:skylobby-deps:skylobby-native-linux
       - uses: actions/upload-artifact@v2
         with:
