@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.32]
+
+- Fix Spring picker always shown on start
+
 ### [0.7.31]
 
 - Add tab to help users pick Spring directory

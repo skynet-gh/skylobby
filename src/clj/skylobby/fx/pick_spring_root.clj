@@ -64,8 +64,9 @@
               :children
               [
                {:fx/type :button
-                :on-action {:event/type :spring-lobby/dissoc
-                            :key :show-spring-picker}
+                :on-action {:event/type :spring-lobby/assoc
+                            :key :show-spring-picker
+                            :value false}
                 :style (dissoc ok-severity :-fx-background-color)
                 :text "Use this Spring directory"}
                {:fx/type :pane

@@ -60,8 +60,9 @@
               :graphic {:fx/type :label
                         :text "Spring"
                         :style {:-fx-font-size 18}}
-              :on-close-request {:event/type :spring-lobby/dissoc
-                                 :key :show-spring-picker}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-spring-picker
+                                 :value false}
               :content
               {:fx/type fx.pick-spring-root/pick-spring-root-view}}])
           [{:fx/type :tab
