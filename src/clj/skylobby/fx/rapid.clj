@@ -24,7 +24,9 @@
 
 
 (def case-insensitive-natural-comparator
-  (.thenComparing String/CASE_INSENSITIVE_ORDER ComparatorUtils/NATURAL_COMPARATOR))
+  (.thenComparing
+    String/CASE_INSENSITIVE_ORDER
+    ComparatorUtils/NATURAL_COMPARATOR))
 
 
 (defn rapid-download-root
@@ -71,6 +73,9 @@
         engines-by-version (into {} (map (juxt :engine-version identity) engines))
         engine-file (:file (get engines-by-version engine-version))
         rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
+        rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+                               (map (juxt :rapid-id identity))
+                               (into {}))
         available-packages (or (->> filtered-rapid-versions
                                     seq
                                     (sort-by :version case-insensitive-natural-comparator)
@@ -184,7 +189,8 @@
         [{:fx/type :table-column
           :sortable false
           :text "ID"
-          :pref-width 100
+          :pref-width 480
+          :resizable false
           :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
@@ -194,7 +200,8 @@
          {:fx/type :table-column
           :sortable false
           :text "Hash"
-          :pref-width 100
+          :pref-width 320
+          :resizable false
           :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
@@ -205,6 +212,7 @@
           :text "Version"
           :comparator case-insensitive-natural-comparator
           :pref-width 100
+          :min-width 320
           :cell-value-factory :version
           :cell-factory
           {:fx/cell-type :table-cell
@@ -214,7 +222,7 @@
          {:fx/type :table-column
           :text "Download"
           :sortable false
-          :pref-width 20
+          :pref-width 800
           :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
@@ -236,6 +244,7 @@
                    :else
                    {:graphic
                     {:fx/type :button
+                     :disable (boolean (contains? rapid-tasks-by-id (:id i)))
                      :on-action {:event/type :spring-lobby/add-task
                                  :task
                                  {:spring-lobby/task-type :spring-lobby/rapid-download
