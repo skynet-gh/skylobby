@@ -12,7 +12,7 @@ jobs:
       - uses: FranzDiebold/github-env-vars-action@v2.3.0
       - uses: actions/setup-java@v2
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
@@ -63,7 +63,7 @@ jobs:
       - uses: FranzDiebold/github-env-vars-action@v2.3.0
       - uses: actions/setup-java@v2
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
@@ -106,7 +106,7 @@ jobs:
       - uses: FranzDiebold/github-env-vars-action@v2.3.0
       - uses: actions/setup-java@v2
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
