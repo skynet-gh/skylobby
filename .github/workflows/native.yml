@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/msvc-dev-cmd@v1.10.0
-      - uses: microsoft/setup-msbuild@v1.1.1
+      - uses: microsoft/setup-msbuild@v1.1
         with:
           vs-version: '16.11.8'
           msbuild-architecture: x64
