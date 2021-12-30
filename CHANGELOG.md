@@ -23,6 +23,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.30]
+
+- Fix mac release and native actions
+
 ### [0.7.29]
 
 - Fix releases action
