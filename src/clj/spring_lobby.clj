@@ -2748,6 +2748,9 @@
 
 (def window-to-tab
   {
+   :show-downloader "http"
+   :show-importer "import"
+   :show-rapid-downloader "rapid"
    :show-replays "replays"
    :show-scenarios-window "scenarios"
    :show-settings-window "settings"
