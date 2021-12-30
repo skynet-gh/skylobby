@@ -13,7 +13,6 @@
     [skylobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
-    (java.util Comparator)
     (org.apache.commons.collections4 ComparatorUtils)))
 
 
@@ -24,9 +23,8 @@
 (def rapid-download-window-height 800)
 
 
-(def natural-comparator
-  ;(ComparatorUtils/naturalComparator)
-  (Comparator/naturalOrder))
+(def case-insensitive-natural-comparator
+  (.thenComparing String/CASE_INSENSITIVE_ORDER ComparatorUtils/NATURAL_COMPARATOR))
 
 
 (defn rapid-download-window-impl
@@ -70,7 +68,7 @@
               sdp-hashes (set (map rapid/sdp-hash sdp-files))
               sorted-engine-versions (->> engines
                                           (map :engine-version)
-                                          (sort natural-comparator))
+                                          (sort case-insensitive-natural-comparator))
               filtered-rapid-versions (->> rapid-versions
                                            (filter
                                              (fn [{:keys [id]}]
@@ -93,12 +91,12 @@
               rapid-updating (seq (get tasks-by-type :spring-lobby/update-rapid))
               available-packages (or (->> filtered-rapid-versions
                                           seq
-                                          (sort-by :version ComparatorUtils/NATURAL_COMPARATOR)
+                                          (sort-by :version case-insensitive-natural-comparator)
                                           reverse)
                                      [])
               local-packages (or (->> rapid-packages
                                       seq
-                                      (sort-by :version ComparatorUtils/NATURAL_COMPARATOR))
+                                      (sort-by :version case-insensitive-natural-comparator))
                                  [])]
           {:fx/type :v-box
            :children
@@ -222,7 +220,7 @@
                    {:text (str (:hash i))})}}
                {:fx/type :table-column
                 :text "Version"
-                :comparator natural-comparator
+                :comparator case-insensitive-natural-comparator
                 :pref-width 100
                 :cell-value-factory :version
                 :cell-factory
@@ -311,7 +309,7 @@
                  (fn [i] {:text (:id i)})}}
                {:fx/type :table-column
                 :text "Version"
-                :comparator natural-comparator
+                :comparator case-insensitive-natural-comparator
                 :pref-width 100
                 :cell-value-factory :version
                 :cell-factory
