@@ -23,6 +23,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.29]
+
+- Fix releases action
+
 ### [0.7.28]
 
 - Fix some issues with detecting engine version
