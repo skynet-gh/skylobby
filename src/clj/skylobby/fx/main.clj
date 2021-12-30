@@ -5,6 +5,7 @@
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
+    [skylobby.fx.pick-spring-root :as fx.pick-spring-root]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
@@ -18,7 +19,9 @@
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
         show-singleplayer (fx/sub-val context get-in [:by-server :local :battle :battle-id])
+        show-spring-picker (fx/sub-val context :show-spring-picker)
         tab-ids (concat
+                  (when show-spring-picker ["spring"])
                   ["welcome"]
                   (when show-singleplayer ["singleplayer"])
                   valid-server-keys)
@@ -50,6 +53,17 @@
        {:fx/type :tab-pane
         :tabs
         (concat
+          (when show-spring-picker
+            [{:fx/type :tab
+              :id "spring"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Spring"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/dissoc
+                                 :key :show-spring-picker}
+              :content
+              {:fx/type fx.pick-spring-root/pick-spring-root-view}}])
           [{:fx/type :tab
             :id "welcome"
             :closable false

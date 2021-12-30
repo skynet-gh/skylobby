@@ -12,7 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/msvc-dev-cmd@v1.10.0
-      - uses: microsoft/setup-msbuild@v1
+      - uses: microsoft/setup-msbuild@v1.1.1
+        vs-version: '16.11.8'
+        msbuild-architecture: x64
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
@@ -26,6 +28,7 @@ jobs:
         shell: powershell
       - uses: actions/upload-artifact@v2
         with:
+          name: skylobby.exe
           path: skylobby.exe
   mac:
     runs-on: macos-latest
@@ -43,6 +46,7 @@ jobs:
       # ^ TODO different resources for mac
       - uses: actions/upload-artifact@v2
         with:
+          name: skylobby-mac
           path: skylobby
   linux:
     runs-on: ubuntu-latest
@@ -59,4 +63,5 @@ jobs:
       - run: clojure -M:skylobby-deps:skylobby-native-linux
       - uses: actions/upload-artifact@v2
         with:
+          name: skylobby-linux
           path: skylobby

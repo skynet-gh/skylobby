@@ -10,7 +10,6 @@ Future Features:
 - Visually group teams in players table
 - Arbitrary engine directories
 - Open battle links
-- First run intro window
 - Highlight window when rang or new direct message
 - Add new butler downloader system
 - Chat URL highlighting and clicking
@@ -18,10 +17,13 @@ Future Features:
 - Merged view of multiple servers
 - Auto switch spring settings per server or per game
 - Improve map filter window
-- Call Spring unitsync to get resource hashes
 
 
 ## Actual changelog
+
+### [0.7.31]
+
+- Add tab to help users pick Spring directory
 
 ### [0.7.30]
 
