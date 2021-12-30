@@ -84,7 +84,7 @@
             :id "welcome"
             :closable false
             :graphic {:fx/type :label
-                      :text "Welcome"
+                      :text "Main"
                       :style {:-fx-font-size 18}}
             :content
             {:fx/type fx.welcome/welcome-view
