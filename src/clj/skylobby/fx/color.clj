@@ -6,6 +6,9 @@
     (javafx.scene.paint Color)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn spring-color-to-javafx
   "Returns the rgb int color represention for the given Spring bgr int color."
   [spring-color]

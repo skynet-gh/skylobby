@@ -1,6 +1,9 @@
 (ns skylobby.event-stub)
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn connect [state-atom {:keys [no-focus server server-key password username] :as state}]
   nil)
 

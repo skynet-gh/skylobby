@@ -4,6 +4,9 @@
     [spring-lobby.client :as client]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest decode-client-status
   (is (= {:bot false,
           :access false,

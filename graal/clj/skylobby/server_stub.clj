@@ -26,6 +26,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; sente  https://github.com/ptaoussanis/sente/blob/master/example-project/src/example/server.clj
 
 (defmulti -event-msg-handler :id)

@@ -7,6 +7,9 @@
     [spring-lobby.client.util :as cu]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest parse-addbot
   (is (= ["12" "kekbot1" "skynet9001" "0" "0" "KAIK|0.13"]
          (rest (handler/parse-addbot "ADDBOT 12 kekbot1 skynet9001 0 0 KAIK|0.13"))))

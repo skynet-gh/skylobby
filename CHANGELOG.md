@@ -21,6 +21,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.36]
+
+- Add setting to view windows as tabs
+- Fix an issue with downloading rapid latest versions
+- Rename Welcome tab to Main
+
 ### [0.7.32 - 0.7.35]
 
 - Fix Spring picker always shown on start

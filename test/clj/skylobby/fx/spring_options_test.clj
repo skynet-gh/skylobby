@@ -5,6 +5,9 @@
     [skylobby.fx.spring-options :as fx.spring-options]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest split-by
   (is (= []
          (fx.spring-options/split-by (constantly false) [])))

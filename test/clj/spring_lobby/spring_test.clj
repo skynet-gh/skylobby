@@ -7,6 +7,9 @@
     [spring-lobby.spring :as spring]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (declare battle battle-players expected-script-data expected-script-data-players
          expected-script-txt expected-script-txt-players)
 

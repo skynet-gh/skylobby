@@ -4,6 +4,9 @@
     skylobby.fx))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def screen-bounds
   {:min-x -2560.0
    :min-y 0.0

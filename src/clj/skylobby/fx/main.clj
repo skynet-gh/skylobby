@@ -5,8 +5,14 @@
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
+    [skylobby.fx.download :as fx.download]
+    [skylobby.fx.import :as fx.import]
     [skylobby.fx.pick-spring-root :as fx.pick-spring-root]
+    [skylobby.fx.rapid :as fx.rapid]
+    [skylobby.fx.replay :as fx.replay]
+    [skylobby.fx.scenarios :as fx.scenarios]
     [skylobby.fx.server-tab :as fx.server-tab]
+    [skylobby.fx.settings :as fx.settings]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -18,11 +24,32 @@
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
+        show-http (fx/sub-val context :show-downloader)
+        show-import (fx/sub-val context :show-importer)
+        show-rapid (fx/sub-val context :show-rapid-downloader)
+        show-replays (fx/sub-val context :show-replays)
+        show-scenarios (fx/sub-val context :show-scenarios-window)
+        show-settings (fx/sub-val context :show-settings-window)
         show-singleplayer (fx/sub-val context get-in [:by-server :local :battle :battle-id])
         show-spring-picker (fx/sub-val context :show-spring-picker)
+        windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
                   (when show-spring-picker ["spring"])
                   ["welcome"]
+                  (when windows-as-tabs
+                    (concat
+                      (when show-settings
+                        ["settings"])
+                      (when show-replays
+                        ["replays"])
+                      (when show-scenarios
+                        ["scenarios"])
+                      (when show-http
+                        ["http"])
+                      (when show-rapid
+                        ["rapid"])
+                      (when show-import
+                        ["import"])))
                   (when show-singleplayer ["singleplayer"])
                   valid-server-keys)
                   ;#_(when (seq valid-server-keys) ["multi"]))
@@ -69,11 +96,83 @@
             :id "welcome"
             :closable false
             :graphic {:fx/type :label
-                      :text "Welcome"
+                      :text "Main"
                       :style {:-fx-font-size 18}}
             :content
             {:fx/type fx.welcome/welcome-view
              :v-box/vgrow :always}}]
+          (when (and windows-as-tabs show-settings)
+            [{:fx/type :tab
+              :id "settings"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Settings"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-settings-window
+                                 :value false}
+              :content
+              {:fx/type fx.settings/settings-root}}])
+          (when (and windows-as-tabs show-replays)
+            [{:fx/type :tab
+              :id "replays"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Replays"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-replays
+                                 :value false}
+              :content
+              {:fx/type fx.replay/replays-root}}])
+          (when (and windows-as-tabs show-scenarios)
+            [{:fx/type :tab
+              :id "scenarios"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Scenarios"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-scenarios-window
+                                 :value false}
+              :content
+              {:fx/type fx.scenarios/scenarios-root}}])
+          (when (and windows-as-tabs show-http)
+            [{:fx/type :tab
+              :id "http"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "HTTP Download"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-downloader
+                                 :value false}
+              :content
+              {:fx/type fx.download/downloader-root}}])
+          (when (and windows-as-tabs show-rapid)
+            [{:fx/type :tab
+              :id "rapid"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Rapid"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-rapid-downloader
+                                 :value false}
+              :content
+              {:fx/type fx.rapid/rapid-download-root}}])
+          (when (and windows-as-tabs show-import)
+            [{:fx/type :tab
+              :id "import"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Importer"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-downloader
+                                 :value false}
+              :content
+              {:fx/type fx.import/importer-root}}])
           (when show-singleplayer
             [{:fx/type :tab
               :id "singleplayer"

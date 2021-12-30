@@ -7,6 +7,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn script-txt-inner
   ([kv]
    (script-txt-inner "" kv))

@@ -10,6 +10,9 @@
     (java.net URL)))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
 (defn- read-file-tag [cs]
   (io/file cs))

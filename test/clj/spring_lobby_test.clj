@@ -6,6 +6,9 @@
     [spring-lobby]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest handle-task!
   (testing "empty"
     (let [state (atom {:tasks-by-kind {}})

@@ -5,6 +5,9 @@
     [skylobby.http :as http]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest detect-engine-branch
   (is (= "master"
          (http/detect-engine-branch "103")))

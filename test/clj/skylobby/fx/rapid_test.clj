@@ -5,8 +5,15 @@
     [skylobby.fx.rapid :as fx.rapid]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest rapid-download-window
   (is (map?
-        (fx.rapid/rapid-download-window {:fx/context (fx/create-context nil)})))
+        (fx.rapid/rapid-download-window
+          {:fx/context (fx/create-context nil)
+           :screen-bounds {}})))
   (is (map?
-        (fx.rapid/rapid-download-window {:fx/context (fx/create-context {:show-rapid-downloader true})}))))
+        (fx.rapid/rapid-download-window
+          {:fx/context (fx/create-context {:show-rapid-downloader true})
+           :screen-bounds {}}))))

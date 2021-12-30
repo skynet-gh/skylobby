@@ -4,6 +4,9 @@
     [skylobby.spads :as spads]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest parse-spads-message
   (is (= nil
          (spads/parse-spads-message "")))

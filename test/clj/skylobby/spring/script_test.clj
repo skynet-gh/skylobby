@@ -8,6 +8,9 @@
     [spring-lobby.spring-test :refer [expected-script-data expected-script-txt]]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest tag=
   (is (true? (spring-script/tag= {:def "true" :type "bool"} "1")))
   (is (false? (spring-script/tag= {:def "true" :type "bool"} "0")))

@@ -154,7 +154,6 @@
         am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
-        host-username (fx/sub-ctx context sub/host-username server-key)
         username (fx/sub-val context get-in [:by-server server-key :username])
         my-client-status (fx/sub-ctx context sub/my-client-status server-key)
         am-away (:away my-client-status)
@@ -1276,21 +1275,21 @@
                              :text " Resources: "}
                             {:fx/type :button
                              :text "Import"
-                             :on-action {:event/type :spring-lobby/toggle
+                             :on-action {:event/type :spring-lobby/toggle-window
                                          :key :show-importer}
                              :graphic
                              {:fx/type font-icon/lifecycle
                               :icon-literal (str "mdi-file-import:16:white")}}
                             {:fx/type :button
                              :text "HTTP"
-                             :on-action {:event/type :spring-lobby/toggle
+                             :on-action {:event/type :spring-lobby/toggle-window
                                          :key :show-downloader}
                              :graphic
                              {:fx/type font-icon/lifecycle
                               :icon-literal (str "mdi-download:16:white")}}
                             {:fx/type :button
                              :text "Rapid"
-                             :on-action {:event/type :spring-lobby/toggle
+                             :on-action {:event/type :spring-lobby/toggle-window
                                          :key :show-rapid-downloader}
                              :graphic
                              {:fx/type font-icon/lifecycle
@@ -1470,7 +1469,7 @@
                                  position-property (.positionProperty divider)]
                              (.addListener position-property
                                (reify javafx.beans.value.ChangeListener
-                                 (changed [this _observable _old-value new-value]
+                                 (changed [_this _observable _old-value new-value]
                                    (swap! skylobby.fx/divider-positions assoc :battle-vertical new-value))))))
              :h-box/hgrow :always
              :desc
@@ -1498,7 +1497,7 @@
                                (let [position-property (.positionProperty divider)]
                                  (.addListener position-property
                                    (reify javafx.beans.value.ChangeListener
-                                     (changed [this _observable _old-value new-value]
+                                     (changed [_this _observable _old-value new-value]
                                        (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))))
              :h-box/hgrow :always
              :desc

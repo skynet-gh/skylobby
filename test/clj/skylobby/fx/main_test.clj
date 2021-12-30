@@ -5,6 +5,10 @@
     [skylobby.fx.main :as fx.main]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest main-window
   (is (map?
-        (fx.main/main-window {:fx/context (fx/create-context nil)}))))
+        (fx.main/main-window
+          {:fx/context (fx/create-context nil)}))))

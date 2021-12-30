@@ -5,6 +5,9 @@
     [skylobby.fx.welcome :as fx.welcome]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest connect-button
   (is (map?
         (fx.welcome/connect-button {:fx/context (fx/create-context nil)}))))

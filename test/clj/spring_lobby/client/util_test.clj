@@ -4,6 +4,9 @@
     [spring-lobby.client.util :as cu]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest decode-battle-status
   (is (= {:ready false,
           :ally 0,

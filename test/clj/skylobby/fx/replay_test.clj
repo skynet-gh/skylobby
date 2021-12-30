@@ -6,6 +6,9 @@
     [skylobby.fx.replay :as fx.replay]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest replay-view
   (is (map?
         (fx.replay/replay-view {:fx/context (fx/create-context nil)})))
@@ -45,9 +48,13 @@
 
 (deftest replays-window-impl
   (is (map?
-        (fx.replay/replays-window-impl {:fx/context (fx/create-context nil)})))
+        (fx.replay/replays-window-impl
+          {:fx/context (fx/create-context nil)
+           :screen-bounds {}})))
   (is (map?
-        (fx.replay/replays-window-impl {:fx/context (fx/create-context {:show-replays true})})))
+        (fx.replay/replays-window-impl
+          {:fx/context (fx/create-context {:show-replays true})
+           :screen-bounds {}})))
   (is (map?
         (fx.replay/replays-window-impl
           {:fx/context
@@ -55,7 +62,8 @@
              {:show-replays true
               :parsed-replays-by-path
               {"."
-               {:filename ".sdfz"}}})})))
+               {:filename ".sdfz"}}})
+           :screen-bounds {}})))
   (is (map?
         (let [f (fs/file ".")]
           (fx.replay/replays-window-impl
@@ -65,7 +73,8 @@
                 :parsed-replays-by-path
                 {(fs/canonical-path f)
                  {:filename ".sdfz"}}
-                :selected-replay-file f})}))))
+                :selected-replay-file f})
+             :screen-bounds {}}))))
   (is (map?
         (let [f (fs/file ".")]
           (fx.replay/replays-window-impl
@@ -80,9 +89,12 @@
                 :filter-replay-type "."
                 :filter-replay-min-players 1
                 :filter-replay-max-players 2
-                :filter-replay ". ."})})))))
+                :filter-replay ". ."})
+             :screen-bounds {}})))))
 
 
 (deftest standalone-replay-window
   (is (map?
-        (fx.replay/standalone-replay-window {:fx/context (fx/create-context nil)}))))
+        (fx.replay/standalone-replay-window
+          {:fx/context (fx/create-context nil)
+           :screen-bounds {}}))))

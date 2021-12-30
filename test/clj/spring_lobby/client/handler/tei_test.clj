@@ -5,6 +5,9 @@
     spring-lobby.client.handler.tei))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest handle-full-queue-list
   (testing "update all matchmaking queues"
     (let [state-atom (atom
