@@ -63,7 +63,8 @@ jobs:
       - uses: FranzDiebold/github-env-vars-action@v2.3.0
       - uses: actions/setup-java@v2
         with:
-          java-version: '17'
+          java-version: '14'
+          # ^ mac jpackage hates versions starting with 0 in later versions
           distribution: 'adopt'
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
