@@ -21,6 +21,7 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
+      - run: git config --system core.longpaths true
       - run: clojure -M:skylobby-deps:skylobby-native-windows
         shell: powershell
       - uses: actions/upload-artifact@v2
