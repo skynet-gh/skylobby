@@ -163,3 +163,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
           allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
