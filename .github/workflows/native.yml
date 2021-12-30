@@ -21,6 +21,12 @@ jobs:
           java-version: 11
           graalvm-version: 21.3.0
           native-image: true
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
@@ -40,6 +46,12 @@ jobs:
           java-version: 11
           graalvm-version: 21.3.0
           native-image: true
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
@@ -58,6 +70,12 @@ jobs:
           java-version: 11
           graalvm-version: 21.3.0
           native-image: true
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - uses: DeLaGuardo/setup-clojure@3.7
         with:
           cli: latest
