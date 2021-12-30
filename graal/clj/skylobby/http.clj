@@ -13,6 +13,9 @@
     (org.apache.commons.io.input CountingInputStream)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def progress-update-frequency-millis 1000)
 (def last-progress-update
   (atom {}))

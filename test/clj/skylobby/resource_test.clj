@@ -6,6 +6,9 @@
     [skylobby.fs :as fs]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest resource-dest
   (let [root (fs/default-spring-root)]
     (is (= nil

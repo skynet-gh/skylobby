@@ -11,6 +11,9 @@
     [skylobby.util :as u]))
 
 
+(set! *warn-on-reflection* true)
+
+
 ; https://clojuredocs.org/clojure.core/split-with#example-5e48288ce4b0ca44402ef839
 (defn split-by [pred coll]
   (lazy-seq

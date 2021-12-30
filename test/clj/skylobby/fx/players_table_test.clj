@@ -4,6 +4,9 @@
     [skylobby.fx.players-table :as fx]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest players-table
   (is (map?
         (fx/players-table nil))))

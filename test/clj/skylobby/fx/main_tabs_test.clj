@@ -5,6 +5,10 @@
     [skylobby.fx.main-tabs :as fx.main-tabs]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest main-tab-view
   (is (map?
-        (fx.main-tabs/main-tab-view {:fx/context (fx/create-context nil)}))))
+        (fx.main-tabs/main-tab-view
+          {:fx/context (fx/create-context nil)}))))

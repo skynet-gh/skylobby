@@ -6,6 +6,9 @@
     (javafx.scene.paint Color)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest spring-color-to-javafx
   (is (= "0x000000ff"
          (str

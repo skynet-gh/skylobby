@@ -20,6 +20,9 @@
     (org.apache.commons.io FileUtils)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def app-name "skylobby")
 (def ^:dynamic app-version nil)
 

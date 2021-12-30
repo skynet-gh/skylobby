@@ -17,6 +17,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-infer* true)
+
+
 (declare nav)
 
 

@@ -5,6 +5,10 @@
     [skylobby.fx.channels :as fx.channels]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest channels-table
   (is (map?
-        (fx.channels/channels-table {:fx/context (fx/create-context nil)}))))
+        (fx.channels/channels-table
+          {:fx/context (fx/create-context nil)}))))

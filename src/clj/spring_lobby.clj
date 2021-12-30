@@ -5019,7 +5019,7 @@
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
   (when-let [{:keys [ipc-server]} @*state]
-    (when ipc-server
+    (when (fn? ipc-server)
       (ipc-server)))
   (if (u/is-port-open? u/ipc-port)
     (do
@@ -5029,12 +5029,7 @@
                      (-> handler
                          wrap-keyword-params
                          wrap-params)
-                     {:port u/ipc-port}
-                     #_
-                     {:socket-address
-                      (InetSocketAddress.
-                        ^InetAddress (InetAddress/getByName nil)
-                        ^int u/ipc-port)})]
+                     {:port u/ipc-port})]
         (swap! *state assoc :ipc-server server)))
     (log/warn "IPC port unavailable" u/ipc-port)))
 

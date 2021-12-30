@@ -7,6 +7,9 @@
   (:gen-class))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def cli-options
   [
    [nil "--port PORT" "Port to use for web ui AND ipc for file associations like replays"

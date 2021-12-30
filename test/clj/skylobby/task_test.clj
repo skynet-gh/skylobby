@@ -4,6 +4,9 @@
     [skylobby.task :as task]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest add-task!
   (testing "kind and dedupe in queue"
     (let [state (atom {})]

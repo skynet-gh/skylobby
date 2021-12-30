@@ -14,6 +14,9 @@
     (manifold.stream SplicedStream)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn- update-disconnected!
   [state-atom server-key]
   (log/info "Disconnecting from" (pr-str server-key))

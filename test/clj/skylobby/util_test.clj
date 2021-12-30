@@ -6,6 +6,9 @@
     (java.util TimeZone)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (deftest battle-channel-name?
   (is (true? (u/battle-channel-name? "__battle__12345")))
   (is (false? (u/battle-channel-name? "@skynet")))

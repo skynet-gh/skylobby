@@ -5,6 +5,9 @@
     [skylobby.fs :as fs]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (declare mock-parsed-lua mock-map-data-txt)
 
 
