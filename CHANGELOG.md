@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.34]
+
+- Add cache and js build to native action
+
 ### [0.7.33]
 
 - Fix native action Windows version
