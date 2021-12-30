@@ -153,3 +153,12 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-windows.msi
           asset_content_type: application/x-msi
+  mark-latest-release:
+    needs: [build-deb, build-exe, build-dmg]
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          allowUpdates: true
