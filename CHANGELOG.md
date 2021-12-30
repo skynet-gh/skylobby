@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.33]
+
+- Fix native action Windows version
+
 ### [0.7.32]
 
 - Fix Spring picker always shown on start
