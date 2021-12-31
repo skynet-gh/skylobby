@@ -240,6 +240,17 @@
                ;"-H:+TraceNativeToolUsage"
                "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+  :skylobby-native-mac
+  {:replace-paths ["resources" "dev/clj/graal" "graal/clj" "native-res/linux"]
+   :main-opts ["-m" "native-image" "skylobby.main" "--no-fallback" "--allow-incomplete-classpath"
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
+               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+               "--report-unsupported-elements-at-runtime"
+               "-J-Xmx6g" ;"-H:+StaticExecutableWithDynamicLibC"
+               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:Name=skylobby"]
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli
   {:deps
    {
