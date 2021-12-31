@@ -3187,15 +3187,24 @@
 
 (defmethod event-handler ::update-css
   [{:keys [css]}]
+  (log/info "Registering CSS with" (count css) "keys")
   (let [registered (css/register :skylobby.fx/current css)]
     (swap! *state assoc :css registered)))
+
+(defmethod event-handler ::load-custom-css-edn
+  [{:keys [file]}]
+  (if (fs/exists? file)
+    (do
+      (log/info "Loading CSS as EDN from" file)
+      (let [css (edn/read-string (slurp file))]
+        (event-handler {:css css
+                        :event/type ::update-css})))
+    (log/warn "Custom CSS file does not exist" file)))
 
 (defmethod event-handler ::load-custom-css
   [{:keys [file]}]
   (if (fs/exists? file)
-    (let [css (edn/read-string (slurp file))]
-      (event-handler {:css css
-                      :event/type ::update-css}))
+    (swap! *state assoc :css (slurp file))
     (log/warn "Custom CSS file does not exist" file)))
 
 
