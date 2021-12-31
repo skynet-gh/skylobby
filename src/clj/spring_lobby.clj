@@ -5071,6 +5071,11 @@
      (add-watchers state-atom)
      (if-not skip-tasks
        (future
+         (.addShutdownHook
+           (Runtime/getRuntime)
+           (Thread.
+             (fn []
+               (spit-state-config-to-edn nil @state-atom))))
          (try
            (async/<!! (async/timeout wait-init-tasks-ms))
            (async/<!! (async/timeout wait-init-tasks-ms))
