@@ -15,9 +15,6 @@
     (java.time Duration)))
 
 
-(set! *warn-on-reflection* true)
-
-
 (def ^:dynamic *state (atom {}))
 
 

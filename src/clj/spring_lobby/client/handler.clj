@@ -343,6 +343,10 @@
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
     (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message))))
 
+(defn spec-because-unready-message? [message]
+  (boolean
+    (re-find #"^You have been spec'd as you are unready" message)))
+
 (defn teamsize-changed-message? [message]
   (boolean
     (re-find #"Global setting changed by (.+) \(teamSize=(.+)\)" message)))
@@ -392,12 +396,17 @@
         state (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message true))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
-        me (-> battle :users (get my-username))]
-    (when (and battle
-               auto-unspec
-               (-> me :battle-status :mode not)
-               (teamsize-changed-message? message))
-      (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))
+        me (-> battle :users (get my-username))
+        auto-unspeccing (and battle auto-unspec)]
+    (when auto-unspeccing
+      (if (and (= "Coordinator" username)
+               (spec-because-unready-message? message))
+        (do
+          (log/info "Disabling auto unspec because specced for being unready")
+          (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false))
+        (when (and (-> me :battle-status :mode not)
+                   (teamsize-changed-message? message))
+          (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))))
 
 
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]

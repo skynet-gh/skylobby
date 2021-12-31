@@ -303,6 +303,10 @@
   []
   (io/file (app-root) "download"))
 
+(defn download-file ^File
+  [filename]
+  (file (download-dir) filename))
+
 (defn default-spring-root
   "Returns the default isolation dir for spring in this app."
   ^File
@@ -705,6 +709,11 @@
   (if (is-directory? source)
     (copy-dir source dest)
     (java-nio-copy source dest)))
+
+(defn move
+  "Move a file from source to dest."
+  [source dest]
+  (FileUtils/moveFile source dest))
 
 (defn copy-missing [source-dir dest-dir]
   (let [source-path (to-path source-dir)]

@@ -618,47 +618,47 @@
           :title " Appearance"
           :children
           [
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [
-               {:fx/type :label
-                :text " Preset: "}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/update-css
-                            :css skylobby.fx/black-style-data}
-                :text "Black (default)"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/update-css
-                            :css skylobby.fx/grey-style-data}
-                :text "Grey"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/update-css
-                            :css skylobby.fx/javafx-style-data}
-                :text "JavaFX"}]}
-             (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/load-custom-css
-                            :file custom-file}
-                :text (str "Custom from " custom-file)})
-             (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :css
-                            :value {:cljfx.css/url (-> custom-css-file .toURI .toURL)}}
-                :text (str "Custom from " custom-css-file)})
-             {:fx/type :h-box
-              :children
-              [{:fx/type :label
-                :text " Chat font size: "}
-               {:fx/type :text-field
-                :text-formatter
-                {:fx/type :text-formatter
-                 :value-converter :integer
-                 :value (int (or (when (number? chat-font-size) chat-font-size)
-                                 fx.channel/default-font-size))
-                 :on-value-changed {:event/type :spring-lobby/assoc
-                                    :key :chat-font-size}}}]}]}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :label
+              :text " Preset: "}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/black-style-data}
+              :text "Black (default)"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/grey-style-data}
+              :text "Grey"}
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/update-css
+                          :css skylobby.fx/javafx-style-data}
+              :text "JavaFX"}]}
+           (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/load-custom-css-edn
+                          :file custom-file}
+              :text (str "Custom CSS as EDN from " custom-file)})
+           #_
+           (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
+             {:fx/type :button
+              :on-action {:event/type :spring-lobby/load-custom-css
+                          :file custom-css-file}
+              :text (str "Custom from " custom-css-file)})
+           {:fx/type :h-box
+            :children
+            [{:fx/type :label
+              :text " Chat font size: "}
+             {:fx/type :text-field
+              :text-formatter
+              {:fx/type :text-formatter
+               :value-converter :integer
+               :value (int (or (when (number? chat-font-size) chat-font-size)
+                               fx.channel/default-font-size))
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :chat-font-size}}}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title " Battle Players Columns"

@@ -171,7 +171,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
-   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :ready-on-unspec :refresh-replays-after-game
+   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
 
@@ -3187,15 +3187,24 @@
 
 (defmethod event-handler ::update-css
   [{:keys [css]}]
+  (log/info "Registering CSS with" (count css) "keys")
   (let [registered (css/register :skylobby.fx/current css)]
     (swap! *state assoc :css registered)))
+
+(defmethod event-handler ::load-custom-css-edn
+  [{:keys [file]}]
+  (if (fs/exists? file)
+    (do
+      (log/info "Loading CSS as EDN from" file)
+      (let [css (edn/read-string (slurp file))]
+        (event-handler {:css css
+                        :event/type ::update-css})))
+    (log/warn "Custom CSS file does not exist" file)))
 
 (defmethod event-handler ::load-custom-css
   [{:keys [file]}]
   (if (fs/exists? file)
-    (let [css (edn/read-string (slurp file))]
-      (event-handler {:css css
-                      :event/type ::update-css}))
+    (swap! *state assoc :css (slurp file))
     (log/warn "Custom CSS file does not exist" file)))
 
 
@@ -4320,8 +4329,12 @@
   (future
     (try
       (let [url (:download-url downloadable)
-            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))]
-        (http/download-file *state url dest))
+            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))
+            temp-dest (fs/download-file (str (hash (str url)) "-" (fs/filename dest)))]
+        (log/info "Downloading to temp file" temp-dest "then moving to" dest)
+        (http/download-file *state url temp-dest)
+        (log/info "Moving temp download file" temp-dest "into place at" dest)
+        (fs/move temp-dest dest))
       (case (:resource-type downloadable)
         ::map (refresh-maps *state spring-isolation-dir {:priorities [dest]})
         ::mod (refresh-mods *state spring-isolation-dir {:priorities [dest]})
@@ -5043,7 +5056,7 @@
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)
          (log/info "Creating initial custom CSS file" custom-css-file)
-         (spit custom-css-file skylobby.fx/default-style-data)))
+         (spit custom-css-file (with-out-str (pprint skylobby.fx/default-style-data)))))
      (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
        (when-not (fs/exists? custom-css-file)
          (log/info "Creating initial custom CSS file" custom-css-file)
@@ -5071,6 +5084,11 @@
      (add-watchers state-atom)
      (if-not skip-tasks
        (future
+         (.addShutdownHook
+           (Runtime/getRuntime)
+           (Thread.
+             (fn []
+               (spit-state-config-to-edn nil @state-atom))))
          (try
            (async/<!! (async/timeout wait-init-tasks-ms))
            (async/<!! (async/timeout wait-init-tasks-ms))
