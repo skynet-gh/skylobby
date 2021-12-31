@@ -2,4 +2,7 @@
  {:unresolved-symbol
   {:exclude [(diehard.core/defratelimiter)
              (taoensso.nippy/extend-freeze)
-             (taoensso.nippy/extend-thaw)]}}}
+             (taoensso.nippy/extend-thaw)]}}
+ :output
+ {
+  :exclude-files ["event_stub.clj"]}}

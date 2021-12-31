@@ -34,6 +34,7 @@
     [skylobby.fx.engine-sync :as fx.engine-sync]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
+    [skylobby.git :as git]
     [skylobby.http :as http]
     [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
@@ -45,7 +46,6 @@
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
     [spring-lobby.client.util :as cu]
-    [spring-lobby.git :as git]
     [spring-lobby.spring :as spring]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
@@ -2757,19 +2757,22 @@
    :show-spring-picker "spring"})
 
 (defmethod event-handler ::toggle-window
-  [{:fx/keys [event] :as e}]
+  [{:fx/keys [event] :keys [windows-as-tabs] :as e}]
   (let [k (:key e)
         v (boolean (or (:value e) event))
         inv (not v)]
-    (swap! *state assoc k inv)
-    (future
-      (async/<!! (async/timeout 10))
+    (if windows-as-tabs
       (swap! *state
         (fn [state]
           (let [tab (get window-to-tab k)]
             (cond-> (assoc state k v)
               tab
-              (assoc :selected-server-tab tab))))))))
+              (assoc :selected-server-tab tab)))))
+      (do
+        (swap! *state assoc k inv)
+        (future
+          (async/<!! (async/timeout 10))
+          (swap! *state assoc k v))))))
 
 
 (defmethod event-handler ::on-change-server
@@ -3194,12 +3197,18 @@
 (defmethod event-handler ::load-custom-css-edn
   [{:keys [file]}]
   (if (fs/exists? file)
-    (do
+    (try
       (log/info "Loading CSS as EDN from" file)
       (let [css (edn/read-string (slurp file))]
         (event-handler {:css css
-                        :event/type ::update-css})))
-    (log/warn "Custom CSS file does not exist" file)))
+                        :event/type ::update-css})
+        (swap! *state assoc :load-custom-css-edn-message "Success"))
+      (catch Exception e
+        (log/error e "Error loading custom css from edn at" file)
+        (swap! *state assoc :load-custom-css-edn-message (str "Error: " (.getMessage e)))))
+    (do
+      (log/warn "Custom CSS file does not exist" file)
+      (swap! *state assoc :load-custom-css-edn-message "Error: file does not exist"))))
 
 (defmethod event-handler ::load-custom-css
   [{:keys [file]}]
@@ -5164,7 +5173,7 @@
                       :server server
                       :server-key server-key}
                      login))
-                (async/<!! (async/timeout 1000))))))))))
+                (async/<!! (async/timeout 500))))))))))
 
 
 (defmethod task-handler ::auto-connect-servers [_]

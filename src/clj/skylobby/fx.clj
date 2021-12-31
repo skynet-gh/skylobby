@@ -29,7 +29,7 @@
   (let [maximized-property (.maximizedProperty node)]
     (.addListener maximized-property
       (reify javafx.beans.value.ChangeListener
-        (changed [this _observable _old-value new-value]
+        (changed [_this _observable _old-value new-value]
           (window-changed window-key :maximized new-value))))))
 
 

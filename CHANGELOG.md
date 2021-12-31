@@ -21,6 +21,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.38]
+
+- Make main menu buttons the same size and add icons
+- Improve performance when using windows as tabs
+- Add css classes skylobby-chat and skylobby-chat-input
+- Improve feedback when loading custom css
+
 ### [0.7.37]
 
 - Disable auto unspec when specced for being unready

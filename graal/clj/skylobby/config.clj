@@ -43,7 +43,6 @@
         (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
           (if (map? data)
             (do
-              #_ ; skip backup for now
               (try
                 (log/info "Backing up config file that we could parse")
                 (fs/copy config-file (fs/config-file (str edn-filename ".known-good")))

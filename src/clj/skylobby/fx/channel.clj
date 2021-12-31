@@ -93,8 +93,8 @@
                       (str username ": ")))
                   ["text" (if (= :info message-type)
                             "skylobby-chat-info"
-                            (str "skylobby-chat-username" 
-                                 (if message-type 
+                            (str "skylobby-chat-username"
+                                 (if message-type
                                    (str "-" (name message-type))
                                    (when (and color-my-username (= username my-username))
                                      "-me"))))])]
@@ -222,6 +222,7 @@
         mute (fx/sub-val context get-in mute-path)
         mute-ring (fx/sub-val context get-in [:mute-ring server-key])]
     {:fx/type :h-box
+     :style-class ["skylobby-chat-input"]
      :children
      (concat
        [{:fx/type :button
@@ -329,7 +330,7 @@
        (concat
          [{:fx/type :v-box
            :h-box/hgrow :always
-           :style {:-fx-font-size 16}
+           :style-class ["skylobby-chat"]
            :children
            [{:fx/type channel-view-history
              :v-box/vgrow :always

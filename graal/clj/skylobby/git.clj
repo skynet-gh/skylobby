@@ -35,21 +35,21 @@
                              :dir dest
                              :monitor
                              (reify ProgressMonitor
-                               (beginTask [this title total-work]
+                               (beginTask [_this title total-work]
                                  (log/info "beginTask" title total-work)
                                  (when (fn? on-begin-task)
                                    (on-begin-task title total-work)))
-                               (endTask [this]
+                               (endTask [_this]
                                  (log/info "endTask")
                                  (when (fn? on-begin-task)
                                    (on-end-task)))
-                               (isCancelled [this]
+                               (isCancelled [_this]
                                  false)
-                               (start [this total-tasks]
+                               (start [_this total-tasks]
                                  (log/info "start" total-tasks)
                                  (when (fn? on-start)
                                    (on-start total-tasks)))
-                               (update [this completed]
+                               (update [_this completed]
                                  (log/trace "update" completed))))]
      (log/info "Cloned" repo-url
                (pr-str (latest-id repo)))

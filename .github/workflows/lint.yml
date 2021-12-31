@@ -1,0 +1,16 @@
+name: Lint
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: DeLaGuardo/clojure-lint-action@master
+        with:
+          clj-kondo-args: --lint src/clj graal/clj src/cljs dev/clj
+          github_token: ${{ secrets.GITHUB_TOKEN }}

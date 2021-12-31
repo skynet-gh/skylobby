@@ -199,6 +199,7 @@
          :text "Replays"
          :style {:-fx-font-size 14}
          :on-action {:event/type :spring-lobby/toggle-window
+                     :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                      :key :show-replays}
          :graphic
          {:fx/type font-icon/lifecycle
@@ -210,6 +211,7 @@
          :graphic {:fx/type font-icon/lifecycle
                    :icon-literal (str "mdi-settings:" icon-size)}
          :on-action {:event/type :spring-lobby/toggle-window
+                     :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                      :key :show-settings-window}}
         {:fx/type :button
          :style-class ["button" "skylobby-normal"]
