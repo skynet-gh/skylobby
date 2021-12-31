@@ -5043,7 +5043,7 @@
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)
          (log/info "Creating initial custom CSS file" custom-css-file)
-         (spit custom-css-file skylobby.fx/default-style-data)))
+         (spit custom-css-file (with-out-str (pprint skylobby.fx/default-style-data)))))
      (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
        (when-not (fs/exists? custom-css-file)
          (log/info "Creating initial custom CSS file" custom-css-file)
