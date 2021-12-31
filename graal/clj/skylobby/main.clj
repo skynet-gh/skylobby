@@ -18,7 +18,7 @@
 
 
 (defn -main [& args]
-  (let [{:keys [arguments errors options]} (cli/parse-opts args cli-options)]
+  (let [{:keys [errors options]} (cli/parse-opts args cli-options)]
     (if errors
       (do
         (println "Error parsing arguments:\n\n"

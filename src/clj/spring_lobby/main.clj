@@ -13,9 +13,9 @@
     skylobby.fx
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
+    [skylobby.git :as git]
     [skylobby.util :as u]
     spring-lobby
-    [spring-lobby.git :as git]
     [spring-lobby.replays :as replays]
     [taoensso.timbre :as log])
   (:import

@@ -2,18 +2,16 @@
   (:require
     [cljs.reader :as reader]
     [clojure.string :as string]
-    [goog.string :as gstring]
     goog.string.format
     ["moment" :as moment]
     [reagent.dom :as rdom]
     [reitit.coercion.spec :as rss]
-    [reitit.core :as r]
     [reitit.frontend :as reitit]
     [reitit.frontend.controllers :as rfc]
     [reitit.frontend.easy :as rfe]
     [re-frame.core :as rf]
     [taoensso.encore :as encore :refer-macros [have]]
-    [taoensso.sente :as sente :refer [cb-success?]]
+    [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
 
 
@@ -52,34 +50,34 @@
 (defmulti -event-msg-handler :id)
 
 (defn event-msg-handler
-  [{:as ev-msg :keys [id ?data event]}]
+  [{:as ev-msg}]
   (log/trace ev-msg)
   (-event-msg-handler ev-msg))
 
 (defmethod -event-msg-handler
   :default ; Default/fallback case (no other matching handler)
-  [{:as ev-msg :keys [event]}]
+  [{:keys [event]}]
   (log/warnf "Unhandled event: %s" event))
 
 (defmethod -event-msg-handler
   :chsk/ws-ping
-  [{:as ev-msg :keys [event]}]
+  [{:keys [event]}]
   (log/debugf "WebSocket ping: %s" event))
 
 (defmethod -event-msg-handler :chsk/state
-  [{:as ev-msg :keys [?data]}]
-  (let [[old-state-map new-state-map] (have vector? ?data)]
+  [{:keys [?data]}]
+  (let [[_old-state-map new-state-map] (have vector? ?data)]
     (if (:first-open? new-state-map)
       (log/info "Channel socket successfully established!: %s" new-state-map)
       (log/info "Channel socket state change: %s"              new-state-map))))
 
 (defmethod -event-msg-handler :chsk/recv
-  [{:as ev-msg :keys [?data]}]
+  [{:keys [?data]}]
   (log/info "Push event from server: %s" ?data))
 
 (defmethod -event-msg-handler :chsk/handshake
-  [{:as ev-msg :keys [?data]}]
-  (let [[?uid ?csrf-token ?handshake-data] ?data]
+  [{:keys [?data]}]
+  (let [[_?uid _?csrf-token _?handshake-data] ?data]
     (log/info "Handshake: %s" ?data)))
 
 
@@ -216,9 +214,7 @@
       (fn [reply]
         (log/trace "Battle reply for" server-key reply)
         (if (sente/cb-success? reply)
-          (do
-            (rf/dispatch [::update-battle server-key reply]))
-            ;(rf/dispatch [::poll :poll-chat [::get-chat server-key (battle-channel-name reply)]]))
+          (rf/dispatch [::update-battle server-key reply])
           (log/error reply))))
     db))
 

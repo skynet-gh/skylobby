@@ -40,7 +40,7 @@
         scripttags (fx/sub-val context get-in [:by-server server-key :scripttags])
         show-host-battle-window (fx/sub-val context :show-host-battle-window)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
-        {:keys [engines maps mods]} (fx/sub-ctx context sub/spring-resources spring-root)
+        {:keys [maps mods]} (fx/sub-ctx context sub/spring-resources spring-root)
         host-battle-action {:event/type :spring-lobby/host-battle
                             :host-battle-state
                             {:host-port battle-port

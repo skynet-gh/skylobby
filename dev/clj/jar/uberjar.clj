@@ -2,19 +2,19 @@
   (:require
     [clojure.java.io :as io]
     [clojure.tools.build.api :as b]
-    [spring-lobby.git :as git])
+    [skylobby.git :as git])
   (:import
     (javafx.application Platform)))
 
 
 (def lib 'skylobby/skylobby)
-(def version (spring-lobby.git/tag-or-latest-id (io/file ".")))
+(def version (git/tag-or-latest-id (io/file ".")))
 (def src-dirs ["src/clj" "graal/clj" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
                             :aliases [:headless]}))
 (def app-name (name lib))
-(def uber-file (format "target/%s.jar" app-name version))
+(def uber-file (format "target/%s.jar" app-name))
 
 
 
@@ -23,7 +23,7 @@
   (spit (io/file "resources" (str app-name ".version")) version))
 
 
-(defn -main [& args]
+(defn -main [& _args]
   (println "\nDeleting target\n")
   (b/delete {:path "target"})
   (spit-version-resource)

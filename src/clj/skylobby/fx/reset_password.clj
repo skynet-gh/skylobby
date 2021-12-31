@@ -1,7 +1,6 @@
 (ns skylobby.fx.reset-password
   (:require
     [cljfx.api :as fx]
-    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]

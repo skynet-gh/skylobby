@@ -59,7 +59,7 @@
                                 (TextFields/bindAutoCompletion
                                   text-field
                                   (reify Callback
-                                    (call [this request]
+                                    (call [_this request]
                                       (let [^AutoCompletionBinding$ISuggestionRequest request request
                                             user-text (.getUserText request)
                                             split (string/split user-text #"\s+" -1)
@@ -121,7 +121,7 @@
                  (.scrollYBy scroll-pane ##Inf)
                  (let [
                        scroll-on-change (reify javafx.beans.value.ChangeListener
-                                          (changed [this _observable _old-value _new-value]
+                                          (changed [_this _observable _old-value _new-value]
                                             (.layout scroll-pane)
                                             (.scrollYBy scroll-pane ##Inf)))
                        width-property (.widthProperty scroll-pane)
