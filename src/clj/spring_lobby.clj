@@ -4329,8 +4329,12 @@
   (future
     (try
       (let [url (:download-url downloadable)
-            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))]
-        (http/download-file *state url dest))
+            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))
+            temp-dest (fs/download-file (str (hash (str url)) "-" (fs/filename dest)))]
+        (log/info "Downloading to temp file" temp-dest "then moving to" dest)
+        (http/download-file *state url temp-dest)
+        (log/info "Moving temp download file" temp-dest "into place at" dest)
+        (fs/move temp-dest dest))
       (case (:resource-type downloadable)
         ::map (refresh-maps *state spring-isolation-dir {:priorities [dest]})
         ::mod (refresh-mods *state spring-isolation-dir {:priorities [dest]})
