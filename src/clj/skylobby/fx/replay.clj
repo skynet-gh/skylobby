@@ -369,7 +369,7 @@
          [
           {:fx/type fx.minimap/minimap-pane
            :map-name map-name
-           :server-key :local
+           :server-key nil
            :minimap-type-key :replay-minimap-type
            :players players-and-bots
            :scripttags script-data}
