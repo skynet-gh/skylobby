@@ -37,10 +37,11 @@
                            (max worst severity))
                          -1
                          issues)
-        overall-severity (if in-progress
+        overall-in-progress (or in-progress
+                                (some :in-progress issues))
+        overall-severity (if overall-in-progress
                            (min 1 worst-severity)
-                           worst-severity)
-        overall-in-progress in-progress]
+                           worst-severity)]
     {:fx/type :v-box
      :style (merge
               (get severity-styles overall-severity)
