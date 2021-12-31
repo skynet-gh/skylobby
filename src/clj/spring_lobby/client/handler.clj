@@ -461,11 +461,13 @@
    (left state-atom server-key channel-name username nil))
   ([state-atom server-key channel-name username {:keys [bridge]}]
    (swap! state-atom update-in [:by-server server-key]
-          (fn [state]
-            (let [next-state (cond-> state
+          (fn [{:keys [battle] :as state}]
+            (let [is-channel-for-my-battle (= channel-name
+                                              (u/battle-id-channel-name (:battle-id battle)))
+                  next-state (cond-> state
                                      true
                                      (update-in [:channels channel-name :users] dissoc username)
-                                     (not bridge)
+                                     (and (not bridge) is-channel-for-my-battle)
                                      (update-in [:channels channel-name :messages] conj
                                        {:text ""
                                         :timestamp (u/curr-millis)
@@ -616,7 +618,7 @@
           {:keys [last-battle] :as state} (swap! state-atom assoc-in [:by-server server-key :battles battle-id] battle)
           last-battle (get last-battle server-key)
           {:keys [client-data username]} (-> state :by-server (get server-key))]
-      (when (and (:auto-rejoin-battle state)
+      (when (and (:auto-reoin-battle state)
                  (not= host-username username)
                  (= host-username (:host-username last-battle))
                  (:should-rejoin last-battle))
