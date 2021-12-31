@@ -1276,6 +1276,7 @@
                             {:fx/type :button
                              :text "Import"
                              :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                                          :key :show-importer}
                              :graphic
                              {:fx/type font-icon/lifecycle
@@ -1283,6 +1284,7 @@
                             {:fx/type :button
                              :text "HTTP"
                              :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                                          :key :show-downloader}
                              :graphic
                              {:fx/type font-icon/lifecycle
@@ -1290,6 +1292,7 @@
                             {:fx/type :button
                              :text "Rapid"
                              :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                                          :key :show-rapid-downloader}
                              :graphic
                              {:fx/type font-icon/lifecycle

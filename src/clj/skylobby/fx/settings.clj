@@ -636,21 +636,35 @@
               :on-action {:event/type :spring-lobby/update-css
                           :css skylobby.fx/javafx-style-data}
               :text "JavaFX"}]}
+           {:fx/type :pane
+            :pref-height 8}
            (let [custom-file (fs/file (fs/app-root) "custom-css.edn")]
              {:fx/type :button
               :on-action {:event/type :spring-lobby/load-custom-css-edn
                           :file custom-file}
-              :text (str "Custom CSS as EDN from " custom-file)})
+              :text ""
+              :graphic
+              {:fx/type :v-box
+               :children
+               [{:fx/type :label
+                 :text (str "Load custom CSS as EDN from:")}
+                {:fx/type :label
+                 :text (str custom-file)}]}})
+           {:fx/type :label
+            :text (str (fx/sub-val context :load-custom-css-edn-message))}
            #_
            (let [custom-css-file (fs/file (fs/app-root) "custom.css")]
              {:fx/type :button
               :on-action {:event/type :spring-lobby/load-custom-css
                           :file custom-css-file}
               :text (str "Custom from " custom-css-file)})
+           {:fx/type :pane
+            :pref-height 8}
            {:fx/type :h-box
+            :alignment :center-left
             :children
             [{:fx/type :label
-              :text " Chat font size: "}
+              :text " Chat history font size: "}
              {:fx/type :text-field
               :text-formatter
               {:fx/type :text-formatter

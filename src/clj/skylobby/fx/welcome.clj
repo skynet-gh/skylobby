@@ -75,7 +75,7 @@
 (def local-buttons-text-gap 16)
 
 (defn singleplayer-buttons
-  [{:fx/keys [_context]}]
+  [{:fx/keys [context]}]
   {:fx/type :v-box
    :spacing 10
    :children
@@ -95,6 +95,7 @@
      :pref-width local-buttons-width
      :text "Replays"
      :on-action {:event/type :spring-lobby/toggle-window
+                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                  :key :show-replays}
      :alignment :center-left
      :graphic-text-gap local-buttons-text-gap
@@ -106,6 +107,7 @@
      :pref-width local-buttons-width
      :text "Scenarios"
      :on-action {:event/type :spring-lobby/toggle-window
+                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                  :key :show-scenarios-window}
      :alignment :center-left
      :graphic-text-gap local-buttons-text-gap
@@ -117,6 +119,7 @@
      :pref-width local-buttons-width
      :text "Spring"
      :on-action {:event/type :spring-lobby/toggle-window
+                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                  :key :show-spring-picker}
      :alignment :center-left
      :graphic-text-gap local-buttons-text-gap
@@ -128,6 +131,7 @@
      :pref-width local-buttons-width
      :text "Settings"
      :on-action {:event/type :spring-lobby/toggle-window
+                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                  :key :show-settings-window}
      :alignment :center-left
      :graphic-text-gap local-buttons-text-gap
