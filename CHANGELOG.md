@@ -21,6 +21,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.37]
+
+- Disable auto unspec when specced for being unready
+- Download files to temp folder then move into place
+- Improve in-progress indication for resources
+- Remove broken custom CSS button until solution found
+- Fix native image build
+
 ### [0.7.36]
 
 - Add setting to view windows as tabs
