@@ -57,11 +57,12 @@
     (java.lang ProcessBuilder)
     (java.net URL)
     (java.util List)
+    (javafx.application Platform)
     (javafx.event Event)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
     (javafx.scene.control ColorPicker ScrollBar Tab)
-    (javafx.scene.input KeyCode KeyEvent MouseEvent ScrollEvent)
+    (javafx.scene.input KeyCode KeyCodeCombination KeyCombination KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
     (javafx.stage DirectoryChooser FileChooser)
@@ -2757,6 +2758,9 @@
    :show-spring-picker "spring"
    :show-tasks-window "tasks"})
 
+(def tab-to-window-key
+  (clojure.set/map-invert window-to-tab))
+
 (defmethod event-handler ::toggle-window
   [{:fx/keys [event] :keys [windows-as-tabs] :as e}]
   (let [k (:key e)
@@ -4794,10 +4798,71 @@
       (swap! *state assoc :new-online-replays-count new-count))))
 
 
+(def
+  ^KeyCodeCombination
+  quit-win-keys
+  (KeyCodeCombination. KeyCode/Q (into-array [KeyCombination/CONTROL_DOWN])))
+(def
+  ^KeyCodeCombination
+  quit-mac-keys
+  (KeyCodeCombination. KeyCode/Q (into-array [KeyCombination/SHORTCUT_DOWN])))
+
+(def
+  ^KeyCodeCombination
+  close-tab-win-keys
+  (KeyCodeCombination. KeyCode/W (into-array [KeyCombination/SHORTCUT_DOWN])))
+(def
+  ^KeyCodeCombination
+  close-tab-mac-keys
+  (KeyCodeCombination. KeyCode/W (into-array [KeyCombination/CONTROL_DOWN])))
+
+(defmethod event-handler ::main-window-key-pressed
+  [{:fx/keys [^KeyEvent event] :as e}]
+  (if (or (.match quit-win-keys event)
+          (.match quit-mac-keys event))
+    (event-handler (assoc e :event/type ::main-window-on-close-request))
+    (when (or (.match close-tab-win-keys event)
+              (.match close-tab-mac-keys event))
+      (log/info "Closing current tab")
+      (let [{:keys [by-server selected-server-tab selected-tab-channel selected-tab-main]} @*state
+            {:keys [battle client-data] :as server-data} (get by-server selected-server-tab)]
+        (if server-data
+          (let [tab-in-server (get selected-tab-main selected-server-tab)]
+            (cond
+              (and (= "battle" tab-in-server)
+                   battle)
+              (do
+                (log/info "Closing battle tab")
+                (event-handler (assoc e
+                                      :event/type ::leave-battle
+                                      :client-data client-data
+                                      :server-key selected-server-tab)))
+              (= "chat" tab-in-server)
+              (let [channel-in-battle (get selected-tab-channel selected-server-tab)]
+                (log/info "Closing chat tab")
+                (event-handler (assoc e
+                                      :event/type ::leave-channel
+                                      :channel-name channel-in-battle
+                                      :client-data client-data)))
+              :else
+              (do
+                (log/info "Closing server tab for" selected-server-tab)
+                (event-handler (assoc e
+                                      :event/type ::disconnect
+                                      :server-key selected-server-tab)))))
+          (if-let [k (get tab-to-window-key selected-server-tab)]
+            (do
+              (log/info "Closing tab" (pr-str selected-server-tab) "by setting" k)
+              (swap! *state assoc k false))
+            (log/warn "Unknown tab to close")))))))
+
 (defmethod event-handler ::main-window-on-close-request [{:keys [standalone] :as e}]
   (log/debug "Main window close request" e)
-  (when standalone
-    (System/exit 0)))
+  (if standalone
+    (do
+      (Platform/exit)
+      (System/exit 0))
+    (log/info "Ignoring main window close since in dev mode")))
 
 (defmethod event-handler ::my-channels-tab-action [e]
   (log/info e))

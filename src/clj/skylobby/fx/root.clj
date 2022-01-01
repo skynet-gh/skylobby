@@ -114,7 +114,9 @@
         :scene
         {:fx/type :scene
          :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
-         :root {:fx/type fx.main/main-window}}}}
+         :root {:fx/type fx.main/main-window}
+         :on-key-pressed {:event/type :spring-lobby/main-window-key-pressed
+                          :standalone (fx/sub-val context :standalone)}}}}
       {:fx/type ext-recreate-on-key-changed
        :key (boolean (fx/sub-val context :pop-out-battle))
        :desc
