@@ -123,6 +123,9 @@
              [])})
         {:fx/type :pane
          :h-box/hgrow :always}]
+       (when-let [rtt (fx/sub-val context get-in [:by-server server-key :rtt])]
+         [{:fx/type :label
+           :text (str "Ping: " rtt "ms")}])
        (when (fx/sub-val context :music-dir)
          (if music-now-playing
            [{:fx/type :h-box
