@@ -183,7 +183,6 @@
                              (log/info "ping loop thread started")
                              (loop []
                                (async/<!! (async/timeout 30000))
-                               (u/append-console-log state-atom server-key :client "PING")
                                (when (message/send-message state-atom client-data "PING")
                                  (when-not (Thread/interrupted)
                                    (recur))))
