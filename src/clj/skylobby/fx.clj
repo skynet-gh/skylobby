@@ -61,9 +61,15 @@
    {:-fx-base "rgb(20, 20, 20)"
     :-fx-accent "rgb(50, 50, 50)"
     :-fx-background "rgb(0, 0, 0)"
-    ;:-fx-background-color "rgb(0, 0, 0, 255)" ; tooltips
     :-fx-control-inner-background "rgb(30, 30, 30)"
     :-fx-selection-bar-non-focused "rgb(40, 40, 40)"}
+   ".tab"
+   {:-fx-base "rgb(35, 35, 35)"
+    :-fx-background "rgb(40, 40, 40)"
+    :-fx-accent "rgb(0, 0, 0)"}
+   ".tab:selected"
+   {:-fx-background "rgb(0, 0, 0)"
+    :-fx-accent "rgb(160, 160, 160)"}
    ".styled-text-area"
    {:-fx-background-color "rgb(0, 0, 0)"}
    ".text-field"
