@@ -21,6 +21,15 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.39]
+
+- Fix leave messages in battle chat
+- Add keyboard shortcuts to close tabs or quit
+- Add server ping tracking and display
+- Make selected tab more visible in black theme
+- Add delete of old skylobby update jars on start
+- Make tasks window a tab
+
 ### [0.7.38]
 
 - Make main menu buttons the same size and add icons
