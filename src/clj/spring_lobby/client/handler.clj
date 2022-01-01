@@ -456,18 +456,19 @@
                           :message-type :join
                           :username username})))))))
 
-(defn- left
+(defn left
   ([state-atom server-key channel-name username]
    (left state-atom server-key channel-name username nil))
   ([state-atom server-key channel-name username {:keys [bridge]}]
    (swap! state-atom update-in [:by-server server-key]
           (fn [{:keys [battle] :as state}]
             (let [is-channel-for-my-battle (= channel-name
-                                              (u/battle-id-channel-name (:battle-id battle)))
-                  next-state (cond-> state
-                                     true
-                                     (update-in [:channels channel-name :users] dissoc username)
-                                     (and (not bridge) is-channel-for-my-battle)
+                                              (:channel-name battle))
+                  next-state (cond-> (update-in state [:channels channel-name :users] dissoc username)
+                                     (and (not bridge)
+                                          (or
+                                            (not (u/battle-channel-name? channel-name))
+                                            is-channel-for-my-battle))
                                      (update-in [:channels channel-name :messages] conj
                                        {:text ""
                                         :timestamp (u/curr-millis)

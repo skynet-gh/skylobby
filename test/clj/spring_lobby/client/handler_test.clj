@@ -369,6 +369,49 @@
                  "user4:discord" {:bridge "appservice"}}}}}}}
            @state-atom))))
 
+(deftest left
+  (let [state-atom (atom
+                     {:by-server
+                      {:server1
+                       {:battle
+                        {:channel-name "__battle__1"}}}})
+        server-key :server1
+        now 12345]
+    (with-redefs [
+                  u/curr-millis (constantly now)]
+      (handler/left state-atom server-key "__battle__1" "user1"))
+    (is (= {
+            :by-server {:server1 {:battle {
+                                           :channel-name "__battle__1"}
+                                  :channels {"__battle__1" {:messages [{:message-type :leave
+                                                                        :text ""
+                                                                        :timestamp now
+                                                                        :username "user1"}]
+                                                            :users nil}}}}}
+           @state-atom))))
+
+(deftest handle-LEFT
+  (let [state-atom (atom
+                     {:by-server
+                      {:server1
+                       {:battle
+                        {:channel-name "__battle__1234"}}}})
+        server-key :server1
+        now 12345]
+    (with-redefs [
+                  u/curr-millis (constantly now)]
+      (handler/handle state-atom server-key "LEFT __battle__1234 someone"))
+    (is (= {:by-server
+            {:server1
+             {:battle
+              {:channel-name "__battle__1234"}
+              :channels {"__battle__1234" {:messages [{:message-type :leave
+                                                       :text ""
+                                                       :timestamp now
+                                                       :username "someone"}]
+                                           :users nil}}}}}
+           @state-atom))))
+
 (deftest handle-LEFTFROM
   (let [state-atom (atom
                      {:by-server
