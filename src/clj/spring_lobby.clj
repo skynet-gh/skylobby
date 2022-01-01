@@ -2754,7 +2754,8 @@
    :show-replays "replays"
    :show-scenarios-window "scenarios"
    :show-settings-window "settings"
-   :show-spring-picker "spring"})
+   :show-spring-picker "spring"
+   :show-tasks-window "tasks"})
 
 (defmethod event-handler ::toggle-window
   [{:fx/keys [event] :keys [windows-as-tabs] :as e}]

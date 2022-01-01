@@ -216,7 +216,8 @@
         {:fx/type :button
          :style-class ["button" "skylobby-normal"]
          :text (str (count tasks-by-type) " tasks")
-         :on-action {:event/type :spring-lobby/toggle
+         :on-action {:event/type :spring-lobby/toggle-window
+                     :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                      :key :show-tasks-window}
          :graphic {:fx/type font-icon/lifecycle
                    :icon-literal (str "mdi-chip:" icon-size)}}])}))
