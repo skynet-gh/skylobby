@@ -2,6 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [me.raynes.fs :as raynes-fs]
     [skylobby.fs.smf :as smf]
     [skylobby.git :as git]
     [skylobby.lua :as lua]
@@ -1269,3 +1270,14 @@
      :engine-version (sync-version-to-engine-version sync-version)
      :engine-bots (engine-bots engine-dir)
      :engine-data-version engine-data-version}))
+
+
+(defn delete-skylobby-update-jars []
+  (let [skylobby-jars (->> (download-dir)
+                           list-files
+                           (filter is-file?)
+                           (filter (comp (partial re-find #"skylobby.*\.jar$") filename)))]
+    (log/info "Deleting skylobby update jars:" (pr-str skylobby-jars))
+    (doseq [jar skylobby-jars]
+      (raynes-fs/delete jar))
+    skylobby-jars))

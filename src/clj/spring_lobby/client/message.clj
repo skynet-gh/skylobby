@@ -1,6 +1,7 @@
 (ns spring-lobby.client.message
   "Separate ns to avoid circular dependency for now."
   (:require
+    [clojure.string :as string]
     [manifold.stream :as s]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
@@ -24,5 +25,7 @@
      (let [server-key (u/server-key client-data)]
        (log/info (str "[" server-key "] > '" log-message "'"))
        @(s/put! client (str message "\n"))
-       (u/append-console-log state-atom server-key :client log-message))
+       (u/append-console-log state-atom server-key :client log-message)
+       (when (= "PING" (string/trim message))
+         (swap! state-atom assoc-in [:by-server server-key :last-ping] (u/curr-millis))))
      (log/error (ex-info "No client to send message" {:message log-message})))))

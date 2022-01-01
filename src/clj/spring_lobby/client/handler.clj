@@ -278,16 +278,29 @@
   (let [[_all channel-name] (re-find #"\w+ ([^\s]+)" m)]
     (swap! state-atom update-in [:by-server server-key :my-channels] dissoc channel-name)))
 
-(defmethod handle "JOINED" [state-atom server-url m]
+(defmethod handle "JOINED" [state-atom server-key m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]
-    (swap! state-atom update-in [:by-server server-url :channels channel-name]
-      (fn [channel]
-        (-> channel
-            (assoc-in [:users username] {})
-            (update :messages conj {:text ""
-                                    :timestamp (u/curr-millis)
-                                    :message-type :join
-                                    :username username}))))))
+    (swap! state-atom
+      (fn [{:keys [by-server selected-tab-channel] :as state}]
+        (let [is-me (= username
+                       (get-in by-server [server-key :username]))
+              needs-selected-tab-channel-fix (and is-me
+                                                  (not (get selected-tab-channel server-key)))
+              fix-to (or (->> (get-in by-server [server-key :my-channels])
+                              keys
+                              (remove u/battle-channel-name?)
+                              first)
+                         channel-name)]
+          (cond-> (update-in state [:by-server server-key :channels channel-name]
+                    (fn [channel]
+                      (-> channel
+                          (assoc-in [:users username] {})
+                          (update :messages conj {:text ""
+                                                  :timestamp (u/curr-millis)
+                                                  :message-type :join
+                                                  :username username}))))
+                  needs-selected-tab-channel-fix
+                  (assoc-in [:selected-tab-channel server-key] fix-to)))))))
 
 (defmethod handle "JOINEDFROM" [state-atom server-url m]
   (let [[_all channel-name bridge username] (re-find #"\w+\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)" m)]
@@ -456,26 +469,41 @@
                           :message-type :join
                           :username username})))))))
 
-(defn- left
+(defn left
   ([state-atom server-key channel-name username]
    (left state-atom server-key channel-name username nil))
   ([state-atom server-key channel-name username {:keys [bridge]}]
-   (swap! state-atom update-in [:by-server server-key]
-          (fn [{:keys [battle] :as state}]
-            (let [is-channel-for-my-battle (= channel-name
-                                              (u/battle-id-channel-name (:battle-id battle)))
-                  next-state (cond-> state
-                                     true
-                                     (update-in [:channels channel-name :users] dissoc username)
-                                     (and (not bridge) is-channel-for-my-battle)
-                                     (update-in [:channels channel-name :messages] conj
-                                       {:text ""
-                                        :timestamp (u/curr-millis)
-                                        :message-type :leave
-                                        :username username}))]
-              (if (= (:username state) username) ; me
-                (update next-state :my-channels dissoc channel-name)
-                next-state))))))
+   (swap! state-atom
+     (fn [{:keys [by-server selected-tab-channel] :as state}]
+       (let [is-me (= username
+                      (get-in by-server [server-key :username]))
+             needs-selected-tab-channel-fix (and is-me
+                                                 (= channel-name
+                                                    (get selected-tab-channel server-key)))
+             fix-to (->> (get-in by-server [server-key :my-channels])
+                         keys
+                         (remove u/battle-channel-name?)
+                         first)]
+         (cond->
+           (update-in state [:by-server server-key]
+             (fn [{:keys [battle] :as state}]
+               (let [is-channel-for-my-battle (= channel-name
+                                                 (:channel-name battle))
+                     next-state (cond-> (update-in state [:channels channel-name :users] dissoc username)
+                                        (and (not bridge)
+                                             (or
+                                               (not (u/battle-channel-name? channel-name))
+                                               is-channel-for-my-battle))
+                                        (update-in [:channels channel-name :messages] conj
+                                          {:text ""
+                                           :timestamp (u/curr-millis)
+                                           :message-type :leave
+                                           :username username}))]
+                 (if (= (:username state) username) ; me
+                   (update next-state :my-channels dissoc channel-name)
+                   next-state))))
+           needs-selected-tab-channel-fix
+           (assoc-in [:selected-tab-channel server-key] fix-to)))))))
 
 (defmethod handle "LEFT" [state-atom server-key m]
   (let [[_all channel-name username] (re-find #"\w+ ([^\s]+) ([^\s]+)" m)]

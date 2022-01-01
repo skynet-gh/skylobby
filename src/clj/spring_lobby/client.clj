@@ -122,7 +122,12 @@
   (swap! state-atom assoc-in [:by-server server-url :last-failed-message] m))
 
 (defmethod handler/handle "PONG" [state-atom server-url _m]
-  (swap! state-atom assoc-in [:by-server server-url :last-pong] (u/curr-millis)))
+  (swap! state-atom update-in [:by-server server-url]
+    (fn [{:keys [last-ping] :as state}]
+      (let [now (u/curr-millis)]
+        (cond-> (assoc state :last-pong now)
+                (number? last-ping)
+                (assoc :rtt (- now last-ping)))))))
 
 (defmethod handler/handle "SETSCRIPTTAGS" [state-atom server-url m]
   (let [[_all script-tags-raw] (re-find #"\w+ (.*)" m)
@@ -157,6 +162,7 @@
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
+    (message/send-message state-atom client-data "PING")
     (message/send-message state-atom client-data "CHANNELS")
     (message/send-message state-atom client-data "FRIENDLIST")
     (message/send-message state-atom client-data "FRIENDREQUESTLIST")
@@ -183,7 +189,6 @@
                              (log/info "ping loop thread started")
                              (loop []
                                (async/<!! (async/timeout 30000))
-                               (u/append-console-log state-atom server-key :client "PING")
                                (when (message/send-message state-atom client-data "PING")
                                  (when-not (Thread/interrupted)
                                    (recur))))

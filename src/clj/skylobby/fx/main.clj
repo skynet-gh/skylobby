@@ -13,6 +13,7 @@
     [skylobby.fx.scenarios :as fx.scenarios]
     [skylobby.fx.server-tab :as fx.server-tab]
     [skylobby.fx.settings :as fx.settings]
+    [skylobby.fx.tasks :as fx.tasks]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -32,6 +33,7 @@
         show-settings (fx/sub-val context :show-settings-window)
         show-singleplayer (fx/sub-val context get-in [:by-server :local :battle :battle-id])
         show-spring-picker (fx/sub-val context :show-spring-picker)
+        show-tasks (fx/sub-val context :show-tasks-window)
         windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
                   (when show-spring-picker ["spring"])
@@ -49,7 +51,9 @@
                       (when show-rapid
                         ["rapid"])
                       (when show-import
-                        ["import"])))
+                        ["import"])
+                      (when show-tasks
+                        ["tasks"])))
                   (when show-singleplayer ["singleplayer"])
                   valid-server-keys)
                   ;#_(when (seq valid-server-keys) ["multi"]))
@@ -173,6 +177,18 @@
                                  :value false}
               :content
               {:fx/type fx.import/importer-root}}])
+          (when (and windows-as-tabs show-tasks)
+            [{:fx/type :tab
+              :id "tasks"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "Tasks"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/assoc
+                                 :key :show-tasks-window
+                                 :value false}
+              :content
+              {:fx/type fx.tasks/tasks-root}}])
           (when show-singleplayer
             [{:fx/type :tab
               :id "singleplayer"

@@ -230,6 +230,8 @@
                   (fx/mount-renderer spring-lobby/*ui-state r))
                 (spring-lobby/init-async spring-lobby/*state)
                 (future
+                  (fs/delete-skylobby-update-jars))
+                (future
                   (spring-lobby/auto-connect-servers spring-lobby/*state))
                 (future
                   (log/info "Start 7Zip init, async")

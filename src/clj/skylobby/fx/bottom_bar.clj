@@ -123,6 +123,9 @@
              [])})
         {:fx/type :pane
          :h-box/hgrow :always}]
+       (when-let [rtt (fx/sub-val context get-in [:by-server server-key :rtt])]
+         [{:fx/type :label
+           :text (str "Ping: " rtt "ms")}])
        (when (fx/sub-val context :music-dir)
          (if music-now-playing
            [{:fx/type :h-box
@@ -216,7 +219,8 @@
         {:fx/type :button
          :style-class ["button" "skylobby-normal"]
          :text (str (count tasks-by-type) " tasks")
-         :on-action {:event/type :spring-lobby/toggle
+         :on-action {:event/type :spring-lobby/toggle-window
+                     :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                      :key :show-tasks-window}
          :graphic {:fx/type font-icon/lifecycle
                    :icon-literal (str "mdi-chip:" icon-size)}}])}))
