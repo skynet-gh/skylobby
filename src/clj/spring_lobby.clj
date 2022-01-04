@@ -4057,11 +4057,12 @@
   (future
     (try
       (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
-        (if (not= player-id (-> id :battle-status :id))
-          (do
-            (log/info "Updating team for" id "from" (-> id :battle-status :side) "to" player-id)
-            (update-team client-data id data player-id))
-          (log/debug "No change for team")))
+        (let [old-id (-> id :battle-status :id u/to-number)]
+          (if (not= player-id old-id)
+            (do
+              (log/info "Updating team for" id "from" (pr-str old-id) "to" (pr-str player-id))
+              (update-team client-data id data player-id))
+            (log/debug "No change for team"))))
       (catch Exception e
         (log/error e "Error updating battle team")))))
 
@@ -4070,11 +4071,12 @@
   (future
     (try
       (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
-        (if (not= ally (-> id :battle-status :ally))
-          (do
-            (log/info "Updating ally for" id "from" (-> id :battle-status :ally) "to" ally)
-            (update-ally client-data id data ally))
-          (log/debug "No change for ally")))
+        (let [old-ally (-> id :battle-status :ally u/to-number)]
+          (if (not= ally old-ally)
+            (do
+              (log/info "Updating ally for" id "from" (pr-str old-ally) "to" (pr-str ally))
+              (update-ally client-data id data ally))
+            (log/debug "No change for ally"))))
       (catch Exception e
         (log/error e "Error updating battle ally")))))
 
