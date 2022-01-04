@@ -25,6 +25,7 @@ Future Features:
 
 - Fix an issue with sending extra battle status changes
 - Fix Windows file browse when spaces in path
+- Add `--open-url` CLI arg to open a page in browser on start
 - Add natType to host battle window
 - Fix host battle not leaving current battle first
 - Filter prereleases from update check
