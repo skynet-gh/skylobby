@@ -21,6 +21,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.40]
+
+- Fix an issue with sending extra battle status changes
+- Fix Windows file browse when spaces in path
+- Add natType to host battle window
+- Fix host battle not leaving current battle first
+- Filter prereleases from update check
+
 ### [0.7.39]
 
 - Fix leave messages in battle chat
