@@ -2999,9 +2999,14 @@
 
 
 (defmethod event-handler ::host-battle
-  [{:keys [client-data scripttags host-battle-state use-git-mod-version]}]
-  (swap! *state assoc :show-host-battle-window false)
-  (let [{:keys [engine-version map-name mod-name]} host-battle-state]
+  [{:keys [client-data scripttags host-battle-state use-git-mod-version] :as e}]
+  (let [{:keys [by-server]} (swap! *state assoc :show-host-battle-window false)
+        server-key (u/server-key client-data)
+        {:keys [battle]} (get by-server server-key)
+        {:keys [engine-version map-name mod-name]} host-battle-state]
+    (when battle
+      @(event-handler (merge e {:event/type ::leave-battle}))
+      (async/<!! (async/timeout 500)))
     (if-not (or (string/blank? engine-version)
                 (string/blank? mod-name)
                 (string/blank? map-name))

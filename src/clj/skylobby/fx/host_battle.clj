@@ -22,12 +22,20 @@
    :map-input-prefix :map-name :mod-filter :mod-name :selected-server-tab :servers
    :show-host-battle-window :spring-isolation-dir])
 
+(defn nat-cell [nat-type]
+  {:text (str nat-type ": " (case (int nat-type)
+                              0 "none"
+                              1 "Hole punching"
+                              2 "Fixed source ports"
+                              nil))})
+
 (defn host-battle-window-impl
   [{:fx/keys [context]
     :keys [screen-bounds]}]
   (let [
         battle-password (fx/sub-val context :battle-password)
         battle-port (fx/sub-val context :battle-port)
+        battle-nat-type (or (fx/sub-val context :battle-nat-type) 0)
         battle-title (fx/sub-val context :battle-title)
         engine-filter (fx/sub-val context :engine-filter)
         engine-version (fx/sub-val context :engine-version)
@@ -45,6 +53,7 @@
                             :host-battle-state
                             {:host-port battle-port
                              :title battle-title
+                             :nat-type battle-nat-type
                              :battle-password battle-password
                              :engine-version engine-version
                              :map-name map-name
@@ -92,6 +101,7 @@
            :on-text-changed {:event/type :spring-lobby/assoc
                              :key :battle-password}}
           {:fx/type :h-box
+           :alignment :center-left
            :children
            [
             {:fx/type :label
@@ -105,6 +115,21 @@
              {:fx/type :text-formatter
               :value-converter :integer
               :value (int (or (u/to-number battle-port) 8452))}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :label
+             :text " NAT Type: "}
+            {:fx/type :combo-box
+             :value battle-nat-type
+             :items [0 1 2]
+             :on-value-changed {:event/type :spring-lobby/assoc
+                                :key :battle-nat-type}
+             :button-cell nat-cell
+             :cell-factory
+             {:fx/cell-type :list-cell
+              :describe nat-cell}}]}
           {:fx/type engines-view
            :engine-filter engine-filter
            :engine-version engine-version
