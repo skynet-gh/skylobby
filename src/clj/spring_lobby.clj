@@ -2309,6 +2309,7 @@
   (let [versions
         (->> (clj-http/get app-update-url {:as :auto})
              :body
+             (remove :prerelease)
              (map :tag_name)
              (sort version/version-compare)
              reverse)

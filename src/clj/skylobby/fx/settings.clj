@@ -4,6 +4,7 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.bottom-bar :refer [app-update-button]]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.import :as fx.import]
@@ -967,7 +968,8 @@
             :text "Check for skylobby update"
             :graphic
             {:fx/type font-icon/lifecycle
-             :icon-literal "mdi-refresh"}}]}]}]}}))
+             :icon-literal "mdi-refresh"}}
+           {:fx/type app-update-button}]}]}]}}))
 
 
 
