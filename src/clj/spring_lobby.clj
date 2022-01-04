@@ -3132,9 +3132,12 @@
             (.browseFileDirectory desktop file))
           (if (fs/wsl-or-windows?)
             (let [runtime (Runtime/getRuntime)
-                  command ["explorer.exe" (if (fs/is-directory? file)
-                                            (fs/wslpath file)
-                                            (str "/select," (fs/wslpath file)))]
+                  command (concat
+                            ["explorer.exe"]
+                            (if (fs/is-directory? file)
+                              [(fs/wslpath file)]
+                              ["/select," ; https://superuser.com/a/809644
+                               (str "\"" (fs/wslpath file) "\"")]))
                   ^"[Ljava.lang.String;" cmdarray (into-array String command)]
               (log/info "Running" (pr-str command))
               (.exec runtime cmdarray nil nil))
