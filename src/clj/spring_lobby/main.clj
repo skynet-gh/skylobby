@@ -39,6 +39,7 @@
     :parse-fn #(Double/parseDouble %)
     :validate [#(<= 0 % 1) "Must be a number between 0.0 and 1.0"]]
    [nil "--no-update-check" "Diable skylobby self update check"]
+   [nil "--open-url URL" "Open a URL in the default system browser on start"]
    [nil "--port PORT" "Port to use for web ui AND ipc for file associations like replays"]
    [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
     :assoc-fn (fn [m k v]
@@ -102,6 +103,8 @@
             (log/error e "Error copying update jar")))
         (try
           (alter-var-root #'spring-lobby/main-args (constantly args))
+          (when-let [url (:open-url options)]
+            (spring-lobby/browse-url (str url)))
           (when (:no-update-check options)
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
