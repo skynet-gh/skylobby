@@ -325,36 +325,43 @@
              (apply assoc users
                     (mapcat (fn [client] [client {:bridge bridge}]) clients))))))
 
-(defn- update-incoming-chat [state-atom server-key channel-name update-messages-fn]
-  (swap! state-atom
-    (fn [state]
-      (let [focus-chat (:focus-chat-on-message state)
-            selected-tab-channel (get-in state [:selected-tab-channel server-key])
-            battle-channel? (u/battle-channel-name? channel-name)
-            main-tab (if battle-channel? "battle" "chat")
-            channel-tab (if battle-channel? :battle channel-name)]
-        (cond-> state
-                true
-                (update-in [:by-server server-key]
-                  (fn [state]
-                    (-> state
-                        (update-in [:channels channel-name :messages] update-messages-fn)
-                        (assoc-in [:my-channels channel-name] {}))))
-                (and (not focus-chat)
-                     (not (and (= server-key (:selected-server-tab state))
-                               (= main-tab (get-in state [:selected-tab-main server-key]))
-                               (if-not battle-channel?
-                                 (= channel-tab selected-tab-channel)
-                                 true))))
-                (assoc-in [:needs-focus server-key main-tab channel-tab] true)
-                (and (not battle-channel?) focus-chat)
-                (assoc-in [:selected-tab-main server-key] main-tab)
-                (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
-                (assoc-in [:selected-tab-channel server-key] channel-name))))))
+(defn- update-incoming-chat
+  ([state-atom server-key channel-name update-messages-fn]
+   (update-incoming-chat state-atom server-key channel-name update-messages-fn nil))
+  ([state-atom server-key channel-name update-messages-fn {:keys [message]}]
+   (swap! state-atom
+     (fn [state]
+       (let [focus-chat (:focus-chat-on-message state)
+             selected-tab-channel (get-in state [:selected-tab-channel server-key])
+             battle-channel? (u/battle-channel-name? channel-name)
+             main-tab (if battle-channel? "battle" "chat")
+             channel-tab (if battle-channel? :battle channel-name)
+             now (u/curr-millis)]
+         (cond-> (update-in state [:by-server server-key]
+                   (fn [state]
+                     (let [capture (<= now (or (get-in state [:channels channel-name :capture-until]) 0))]
+                       (cond-> state
+                               (not capture)
+                               (assoc-in [:my-channels channel-name] {})
+                               (not capture)
+                               (update-in [:channels channel-name :messages] update-messages-fn)
+                               capture
+                               (update-in [:channels channel-name :capture] #(str % "\n" message))))))
+                 (and (not focus-chat)
+                      (not (and (= server-key (:selected-server-tab state))
+                                (= main-tab (get-in state [:selected-tab-main server-key]))
+                                (if-not battle-channel?
+                                  (= channel-tab selected-tab-channel)
+                                  true))))
+                 (assoc-in [:needs-focus server-key main-tab channel-tab] true)
+                 (and (not battle-channel?) focus-chat)
+                 (assoc-in [:selected-tab-main server-key] main-tab)
+                 (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
+                 (assoc-in [:selected-tab-channel server-key] channel-name)))))))
 
 (defmethod handle "SAID" [state-atom server-key m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message))))
+    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message) {:message message})))
 
 (defn spec-because-unready-message? [message]
   (boolean
@@ -366,7 +373,7 @@
 
 (defmethod handle "SAIDEX" [state-atom server-key m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
-        state (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true))
+        state (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true) {:message message})
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
         me (-> battle :users (get my-username))]
@@ -434,7 +441,7 @@
 (defmethod handle "SAIDPRIVATE" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel-name username)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message))))
+    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message) {:message message})))
 
 (defmethod handle "SAYPRIVATEEX" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
@@ -447,7 +454,7 @@
 (defmethod handle "SAIDPRIVATEEX" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel-name username)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true))))
+    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true) {:message message})))
 
 (defmethod handle "JOINEDBATTLE" [state-atom server-url m]
   (let [[_all battle-id username _ script-password] (re-find #"\w+ (\w+) ([^\s]+)( (.+))?" m)]

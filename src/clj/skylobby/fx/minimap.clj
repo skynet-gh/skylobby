@@ -126,7 +126,8 @@
 
 (defn minimap-pane-impl
   [{:fx/keys [context]
-    :keys [players map-name minimap-type-key scripttags server-key]}]
+    :keys [players map-name minimap-type-key scripttags server-key]
+    :or {minimap-type-key :minimap-type}}]
   (let [
         am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
