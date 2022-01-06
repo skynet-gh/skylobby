@@ -3962,19 +3962,20 @@
 (defmethod event-handler ::modoption-change
   [{:keys [am-host client-data modoption-key modoption-type option-key singleplayer] :fx/keys [event] :as e}]
   (let [value (modoption-value modoption-type event)
-        option-key (or option-key "modoptions")]
+        option-key (or option-key "modoptions")
+        modoption-key-str (name modoption-key)]
     (if singleplayer
       (swap! *state
              (fn [state]
                (-> state
-                   (assoc-in [:by-server :local :scripttags "game" option-key modoption-key] (str event))
-                   (assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key] (str event)))))
+                   (assoc-in [:by-server :local :scripttags "game" option-key modoption-key-str] (str event))
+                   (assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key-str] (str event)))))
       (if am-host
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" (name modoption-key) "=" value))
+        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
         (event-handler
           (assoc e
                  :event/type ::send-message
-                 :message (str "!bSet " (name modoption-key) " " value)))))))
+                 :message (str "!bSet " modoption-key-str " " value)))))))
 
 (defmethod event-handler ::show-ai-options-window
   [{:keys [bot-name bot-username bot-version server-key]}]
