@@ -723,7 +723,9 @@
                          (do
                            (log/info "Adding task to search springfiles for map" battle-map)
                            {::task-type ::search-springfiles
-                            :springname battle-map})
+                            :springname battle-map
+                            :resource-type ::map
+                            :spring-isolation-dir spring-root})
                          (and battle-map
                               (not map-importable)
                               (not map-downloadable)
@@ -4417,11 +4419,16 @@
        :mirrors mirrors})))
 
 (defmethod task-handler ::search-springfiles
-  [{:keys [springname] :as e}]
+  [{:keys [download-if-found springname] :or {download-if-found true} :as e}]
   (if-not (string/blank? springname)
     (let [search-result (search-springfiles e)]
       (log/info "Found details for" springname "on springfiles" search-result)
       (swap! *state assoc-in [:springfiles-search-results springname] search-result)
+      (when download-if-found
+        (task/add-task! *state
+          (assoc e
+                 ::task-type ::download-springfiles
+                 :search-result search-result)))
       search-result)
     (log/warn "No springname to search springfiles" e)))
 

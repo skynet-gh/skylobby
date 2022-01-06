@@ -152,7 +152,7 @@
                                      "Not found on springfiles")
                                    (if springfiles-search-in-progress
                                      "Searching springfiles..."
-                                     "Search springfiles")))
+                                     "Search springfiles and download")))
                    :tooltip (when dest-exists
                               (str "Downloaded to " (fs/canonical-path dest-exists)))
                    :in-progress (or springfiles-in-progress springfiles-search-in-progress)
@@ -168,7 +168,9 @@
                          :springname springname
                          :spring-isolation-dir spring-isolation-dir}
                         {:spring-lobby/task-type :spring-lobby/search-springfiles
-                         :springname springname})})}]))
+                         :springname springname
+                         :resource-type :spring-lobby/map
+                         :spring-isolation-dir spring-isolation-dir})})}]))
              (let [importable (some->> importables-by-path
                                        vals
                                        (filter (comp #{:spring-lobby/map} :resource-type))
