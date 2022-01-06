@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.42]
+
+- Fix bool modoptions in start script
+
 ### [0.7.41]
 
 - Fix modoption for singleplayer
