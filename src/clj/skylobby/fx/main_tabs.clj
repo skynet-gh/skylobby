@@ -9,9 +9,14 @@
     [skylobby.fx.console :as fx.console]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.channels :as fx.channels]
+    [skylobby.fx.engine-sync :refer [engine-sync-pane]]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.font-icon :as font-icon]
+    [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.matchmaking :as fx.matchmaking]
+    [skylobby.fx.minimap :as fx.minimap]
+    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
+    [skylobby.fx.players-table :refer [players-table]]
     [skylobby.fx.user :as fx.user]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
@@ -110,6 +115,49 @@
 (defn old-battle-tab-id [battle-id]
   (str "old-battle-" battle-id))
 
+(defn battle-details [{:fx/keys [context] :keys [server-key]}]
+  (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
+        users (fx/sub-val context get-in [:by-server server-key :users])
+        server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
+        spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
+        engine-version (:battle-version selected-battle-details)
+        map-name (:battle-map selected-battle-details)
+        mod-name (:battle-modname selected-battle-details)]
+    {:fx/type :h-box
+     :children
+     [
+      {:fx/type :v-box
+       :h-box/hgrow :always
+       :children
+       [{:fx/type :label
+         :style {:-fx-font-size 20}
+         :text (str (:battle-title selected-battle-details))}
+        {:fx/type players-table
+         :server-key server-key
+         :players (fx.battle/battle-players-and-bots
+                    {:battle selected-battle-details
+                     :users users})}]}
+      {:fx/type :flow-pane
+       :vgap 5
+       :hgap 5
+       :padding 5
+       :children
+       [
+        {:fx/type engine-sync-pane
+         :engine-version engine-version
+         :spring-isolation-dir spring-root}
+        {:fx/type mod-sync-pane
+         :engine-version engine-version
+         :mod-name mod-name
+         :spring-isolation-dir spring-root}
+        {:fx/type map-sync-pane
+         :map-name map-name
+         :spring-isolation-dir spring-root}]}
+      {:fx/type fx.minimap/minimap-pane
+       :map-name map-name
+       :server-key server-key}]}))
+
 (defn- main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-as-tab (fx/sub-val context :battle-as-tab)
@@ -152,7 +200,11 @@
                                  set)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
-        mute (fx/sub-val context :mute)]
+        mute (fx/sub-val context :mute)
+        vertical (= "vertical" (fx/sub-val context :battles-layout))
+        selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
+        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
                                         :server-key server-key
@@ -202,8 +254,8 @@
           :content
           {:fx/type :v-box
            :children
-           [
-            (let [vertical (= "vertical" (fx/sub-val context :battles-layout))]
+           (concat
+             [
               {:fx/type :split-pane
                :orientation (if vertical
                               :vertical
@@ -215,9 +267,20 @@
                 {:fx/type fx.battles-table/battles-table
                  :v-box/vgrow :always
                  :server-key server-key}
-                users-view]})
-            {:fx/type fx.battles-buttons/battles-buttons-view
-             :server-key server-key}]}}]
+                {:fx/type :h-box
+                 :children
+                 (concat
+                   (when (and vertical selected-battle-details)
+                     [{:fx/type battle-details
+                       :server-key server-key
+                       :h-box/hgrow :always}])
+                   [(assoc users-view :h-box/hgrow :always)])}]}
+              {:fx/type fx.battles-buttons/battles-buttons-view
+               :server-key server-key}]
+             (when (and (not vertical) selected-battle-details)
+               [{:fx/type battle-details
+                 :server-key server-key
+                 :h-box/hgrow :always}]))}}]
         [{:fx/type :tab
           :graphic {:fx/type :label
                     :text "Chat"}
@@ -229,6 +292,7 @@
                                                   (contains? (get needs-focus server-key) "chat")
                                                   (some (fn [channel-name]
                                                           (and
+                                                            (contains? my-channels channel-name)
                                                             (not (contains? (get mute server-key) channel-name))
                                                             (not (contains? ignore-channels-set channel-name))))
                                                         (keys (get-in needs-focus [server-key "chat"]))))

@@ -210,6 +210,7 @@
             (fn [server-key]
               (let [
                     ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+                    my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
                     ignore-channels-set (->> ignore-users
                                              (filter second)
                                              (map first)
@@ -224,6 +225,7 @@
                                               (contains? (get needs-focus server-key) "chat")
                                               (some (fn [channel-name]
                                                       (and
+                                                        (contains? my-channels channel-name)
                                                         (not (contains? (get mute server-key) channel-name))
                                                         (not (contains? ignore-channels-set channel-name))))
                                                     (keys (get-in needs-focus [server-key "chat"]))))))

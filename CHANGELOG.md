@@ -21,6 +21,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.41]
+
+- Fix modoption for singleplayer
+- Make springfiles search download if found
+- Add basic battle preview on click in battles table
+- Fix tab highlighting by adding to themes
+
 ### [0.7.40]
 
 - Fix an issue with sending extra battle status changes

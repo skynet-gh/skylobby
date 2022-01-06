@@ -169,7 +169,7 @@
                                      (if springfiles-search-result
                                        "Download from springfiles"
                                        "Not found on springfiles")
-                                     "Search springfiles"))
+                                     "Search springfiles and download"))
                      :in-progress springfiles-in-progress
                      :action
                      (when (or (not springfiles-searched) springfiles-search-result)
@@ -182,7 +182,9 @@
                            :springname springname
                            :spring-isolation-dir spring-isolation-dir}
                           {:spring-lobby/task-type :spring-lobby/search-springfiles
-                           :springname springname})})}])))
+                           :springname springname
+                           :resource-type :spring-lobby/mod
+                           :spring-isolation-dir spring-isolation-dir})})}])))
              (when (and mod-name (not (some #(re-find % mod-name) no-rapid)))
                (let [rapid-data (get rapid-data-by-version mod-name)
                      rapid-id (:id rapid-data)
