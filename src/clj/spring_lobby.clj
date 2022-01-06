@@ -2564,13 +2564,14 @@
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
+        wait-time 1000
         state (swap! *state update-in [:by-server server-key]
                 (fn [{:keys [users] :as server-data}]
                   (let [battle-id (:battle-id event)
                         {:keys [host-username]} (get-in server-data [:battles battle-id])]
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
-                            (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) 500))))))
+                            (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
         {:keys [client-data users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
@@ -2583,7 +2584,7 @@
             :channel-name channel-name
             :client-data client-data
             :message (str "!status battle")})
-        (async/<!! (async/timeout 500))
+        (async/<!! (async/timeout wait-time))
         (let [path [:by-server server-key :channels channel-name :capture]
               [old-state _new-state] (swap-vals! *state assoc-in path nil)
               captured (get-in old-state path)
