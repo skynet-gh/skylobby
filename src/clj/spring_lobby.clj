@@ -3775,7 +3775,15 @@
                    (apply-battle-status-changes client-data (assoc id :is-me is-me) opts status-changes))))
              doall))
       (catch Exception e
-        (log/error e "Error updating to" n "teams")))))
+        (log/error e "Error updating to" n "teams")))
+    (when-not client-data
+      (let [{:keys [battle users username]} (get-in @*state [:by-server :local])]
+        (event-handler
+          (assoc e
+                 :event/type ::battle-fix-colors
+                 :battle battle
+                 :users users
+                 :username username))))))
 
 (defmethod event-handler ::battle-teams-ffa
   [e]

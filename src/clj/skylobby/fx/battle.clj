@@ -195,7 +195,7 @@
                                        :value (not (boolean battle-resource-details))}
                            :style sync-button-style}]}]
                        [{:fx/type :button
-                         :text "reload"
+                         :text "Reload"
                          :on-action {:event/type :spring-lobby/clear-map-and-mod-details
                                      :map-resource indexed-map
                                      :mod-resource indexed-mod}}])
@@ -283,6 +283,7 @@
              :refs {::add-bot-button
                     {:fx/type :button
                      :text "Add AI"
+                     :disable (boolean (fx/sub-val context :show-add-bot))
                      :on-action {:event/type :spring-lobby/toggle
                                  :key :show-add-bot}}}
              :desc {:fx/type fx/ext-let-refs
