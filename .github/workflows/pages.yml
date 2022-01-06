@@ -2,7 +2,8 @@ name: Build GitHub Pages Cryogen
 on:
   push:
     branches: [ master ]
-
+    paths:
+      - 'cryogen'
   workflow_dispatch:
 jobs:
   pages:
