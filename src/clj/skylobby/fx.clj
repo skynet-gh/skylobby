@@ -55,7 +55,11 @@
    ".skylobby"
    {"-normal"
     {"> .ikonli-font-icon"
-     {:-fx-icon-color "white"}}}})
+     {:-fx-icon-color "white"}}
+    "-tab"
+    {"-focus"
+     {:-fx-background "#ffd700"
+      :-fx-base "#ffd700"}}}})
 (def black-style-data
   {".root"
    {:-fx-base "rgb(20, 20, 20)"
@@ -80,7 +84,11 @@
      {:-fx-icon-color "white"}}
     "-chat"
     {"-user-list"
-     {:-fx-text-fill "lightgrey"}}}})
+     {:-fx-text-fill "lightgrey"}}
+    "-tab"
+    {"-focus"
+     {:-fx-background "#ffd700"
+      :-fx-base "#ffd700"}}}})
 (def javafx-style-data
   {
    ".styled-text-area"
@@ -98,7 +106,11 @@
     "-console"
     {
      "-message"
-     {:-fx-fill "black"}}}})
+     {:-fx-fill "black"}}
+    "-tab"
+    {"-focus"
+     {:-fx-background "#ffd700"
+      :-fx-base "#ffd700"}}}})
 (def default-style-data black-style-data)
 
 
