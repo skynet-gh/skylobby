@@ -178,8 +178,13 @@
                                  (map
                                    (fn [modoption]
                                      (let [k (some-> modoption :key string/lower-case keyword)
-                                           v (:def modoption)]
-                                       [k (get modoptions k v)])))
+                                           default (:def modoption)
+                                           v (get modoptions k default)]
+                                       [k
+                                        (str
+                                          (if (= "bool" (:type modoption))
+                                            (u/to-number (u/to-bool v))
+                                            v))])))
                                  (into {}))))
                   (filter existing-team?)
                   (into {})))))
