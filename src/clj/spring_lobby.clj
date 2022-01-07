@@ -4952,53 +4952,54 @@
 (defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
   (future
     (try
-      (swap! *state update-in [:by-server server-key]
-        (fn [server-data]
-          (-> server-data
-              (update :message-drafts dissoc channel-name)
-              (update-in [:channels channel-name :sent-messages] conj message)
-              (assoc-in [:channels channel-name :history-index] default-history-index))))
-      (cond
-        (string/blank? channel-name)
-        (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
-        (string/blank? message)
-        (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
-        :else
+      (let [server-key (or server-key (u/server-key client-data))]
+        (swap! *state update-in [:by-server server-key]
+          (fn [server-data]
+            (-> server-data
+                (update :message-drafts dissoc channel-name)
+                (update-in [:channels channel-name :sent-messages] conj message)
+                (assoc-in [:channels channel-name :history-index] default-history-index))))
         (cond
-          (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
-          (re-find #"^/ignore" message)
-          (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
-            (set-ignore server-key username true {:channel-name channel-name}))
-          (re-find #"^/unignore" message)
-          (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
-            (set-ignore server-key username false {:channel-name channel-name}))
-          (or (re-find #"^/msg" message) (re-find #"^/message" message))
-          (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
-            @(event-handler
-               (merge e
-                 {:event/type ::send-message
-                  :channel-name (str "@" user)
-                  :message message})))
-          (re-find #"^/rename" message)
-          (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
-           (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
-                                                                                                  :timestamp (u/curr-millis)
-                                                                                                  :message-type :info}
-            (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
+          (string/blank? channel-name)
+          (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
+          (string/blank? message)
+          (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
           :else
-          (let [[private-message username] (re-find #"^@(.*)$" channel-name)
-                unified (-> client-data :compflags (contains? "u"))]
-            (if-let [[_all message] (re-find #"^/me (.*)$" message)]
-              (if private-message
-                (message/send-message *state client-data (str "SAYPRIVATEEX " username " " message))
-                (if (and (not unified) (u/battle-channel-name? channel-name))
-                  (message/send-message *state client-data (str "SAYBATTLEEX " message))
-                  (message/send-message *state client-data (str "SAYEX " channel-name " " message))))
-              (if private-message
-                (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
-                (if (and (not unified) (u/battle-channel-name? channel-name))
-                  (message/send-message *state client-data (str "SAYBATTLE " message))
-                  (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
+          (cond
+            (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
+            (re-find #"^/ignore" message)
+            (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
+              (set-ignore server-key username true {:channel-name channel-name}))
+            (re-find #"^/unignore" message)
+            (let [[_all username] (re-find #"^/unignore\s+([^\s]+)\s*" message)]
+              (set-ignore server-key username false {:channel-name channel-name}))
+            (or (re-find #"^/msg" message) (re-find #"^/message" message))
+            (let [[_all user message] (re-find #"^/msg\s+([^\s]+)\s+(.+)" message)]
+              @(event-handler
+                 (merge e
+                   {:event/type ::send-message
+                    :channel-name (str "@" user)
+                    :message message})))
+            (re-find #"^/rename" message)
+            (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
+             (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
+                                                                                                    :timestamp (u/curr-millis)
+                                                                                                    :message-type :info}
+              (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
+            :else
+            (let [[private-message username] (re-find #"^@(.*)$" channel-name)
+                  unified (-> client-data :compflags (contains? "u"))]
+              (if-let [[_all message] (re-find #"^/me (.*)$" message)]
+                (if private-message
+                  (message/send-message *state client-data (str "SAYPRIVATEEX " username " " message))
+                  (if (and (not unified) (u/battle-channel-name? channel-name))
+                    (message/send-message *state client-data (str "SAYBATTLEEX " message))
+                    (message/send-message *state client-data (str "SAYEX " channel-name " " message))))
+                (if private-message
+                  (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
+                  (if (and (not unified) (u/battle-channel-name? channel-name))
+                    (message/send-message *state client-data (str "SAYBATTLE " message))
+                    (message/send-message *state client-data (str "SAY " channel-name " " message)))))))))
       (catch Exception e
         (log/error e "Error sending message" message "to channel" channel-name)))))
 
