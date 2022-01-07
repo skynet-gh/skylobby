@@ -21,6 +21,11 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.43]
+
+- Fix some sent messages not recorded to correct server
+- Clean up spectate change code
+
 ### [0.7.42]
 
 - Fix bool modoptions in start script
