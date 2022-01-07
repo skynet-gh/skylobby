@@ -4077,22 +4077,22 @@
   (let [mode (if (contains? data :value)
                (:value data)
                (not event))
-        server-key (u/server-key client-data)]
-    (when-not is-bot
-      (swap! *state assoc-in [:by-server server-key :battle :users (:username id) :battle-status :mode] mode))
+        server-key (u/server-key client-data)
+        battle-status (assoc (:battle-status id) :mode mode)
+        desired-ready (boolean ready-on-unspec)
+        battle-status (if (and (not is-bot) mode)
+                        (assoc battle-status :ready desired-ready)
+                        battle-status)]
+    (swap! *state assoc-in [:by-server server-key :battle (if is-bot :bots :users) (:username id) :battle-status :mode] mode)
+    (when (and is-me mode)
+      (swap! *state assoc-in [:by-server server-key :battle :desired-ready] desired-ready))
     (future
       (try
         (if (or is-me is-bot)
-          (let [
-                battle-status (assoc (:battle-status id) :mode mode)
-                desired-ready (boolean ready-on-unspec)
-                battle-status (if (and (not is-bot) mode)
-                                (assoc battle-status :ready desired-ready)
-                                battle-status)]
-            (when (and is-me mode)
-              (swap! *state assoc-in [:by-server server-key :battle :desired-ready] desired-ready))
-            (update-battle-status client-data data battle-status (:team-color id)))
-          (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id))))
+          (update-battle-status client-data data battle-status (:team-color id))
+          (if mode
+            (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id)))
+            (log/error "No method to force unspec for" (:username id))))
         (catch Exception e
           (log/error e "Error updating battle spectate"))))))
 
