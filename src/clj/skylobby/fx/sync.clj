@@ -99,7 +99,9 @@
                              "sync"
                              "exclamation"))
                          ":16:"
-                         "white")}})
+                         (if (= 1 overall-severity)
+                           "black"
+                           "white"))}})
                 (let [style (get severity-styles issue-severity)]
                   {:fx/type :v-box
                    :style (merge style font-style)
