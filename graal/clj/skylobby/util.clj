@@ -125,7 +125,9 @@
 
 
 (defn server-key [{:keys [server-url username]}]
-  (str username "@" server-url))
+  (if (and server-url username)
+    (str username "@" server-url)
+    :local))
 
 
 (defn battle-id-channel-name [battle-id]

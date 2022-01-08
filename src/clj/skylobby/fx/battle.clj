@@ -478,51 +478,73 @@
          :alignment :center-left
          :style {:-fx-font-size 24}
          :children
-         [
-          {:fx/type fx.ext.node/with-tooltip-props
-           :props
-           {:tooltip
-            {:fx/type tooltip-nofocus/lifecycle
-             :show-delay skylobby.fx/tooltip-show-delay
-             :style {:-fx-font-size 12}
-             :text (cond
-                     am-host "You are the host, start the game"
-                     host-ingame "Join game in progress"
-                     :else (str "Call vote to start the game"))}}
-           :desc
-           {:fx/type :button
-            :text (cond
-                    (and spring-running (not singleplayer))
-                    "Game running"
-                    (and am-spec (not host-ingame) (not singleplayer))
-                    "Game not running"
-                    :else
-                    (str (if (and (not singleplayer) (or host-ingame am-spec))
-                           "Join" "Start")
-                         " Game"))
-            :disable (boolean
-                       (or spring-running
-                           (and (not singleplayer)
-                                (or (and (not host-ingame) am-spec)
-                                    (not in-sync)))))
-            :on-action
-            (merge
-              {:event/type :spring-lobby/start-battle}
-              (fx/sub-ctx context sub/spring-resources spring-root)
-              {:battle battle
-               :battles battles
-               :users users
-               :username username}
-              {:am-host am-host
-               :am-spec am-spec
-               :battle-map-details battle-map-details
-               :battle-mod-details battle-mod-details
-               :battle-status my-battle-status
-               :channel-name channel-name
-               :client-data client-data
-               :host-ingame host-ingame
-               :singleplayer singleplayer
-               :spring-isolation-dir spring-root})}}]}
+         (concat
+           [
+            {:fx/type fx.ext.node/with-tooltip-props
+             :props
+             {:tooltip
+              {:fx/type tooltip-nofocus/lifecycle
+               :show-delay skylobby.fx/tooltip-show-delay
+               :style {:-fx-font-size 16}
+               :text (cond
+                       am-host (if singleplayer
+                                 "Start the game"
+                                 "You are the host, start the game")
+                       host-ingame "Join game in progress"
+                       :else (str "Call vote to start the game"))}}
+             :desc
+             {:fx/type :button
+              :text (cond
+                      spring-running
+                      "Game running"
+                      (and am-spec (not host-ingame) (not singleplayer))
+                      "Game not running"
+                      :else
+                      (str (if (and (not singleplayer) (or host-ingame am-spec))
+                             "Join" "Start")
+                           " Game"))
+              :disable (boolean
+                         (or spring-running
+                             (and (not singleplayer)
+                                  (or (and (not host-ingame) am-spec)
+                                      (not in-sync)))))
+              :on-action
+              (merge
+                {:event/type :spring-lobby/start-battle}
+                (fx/sub-ctx context sub/spring-resources spring-root)
+                {:battle battle
+                 :battles battles
+                 :users users
+                 :username username}
+                {:am-host am-host
+                 :am-spec am-spec
+                 :battle-map-details battle-map-details
+                 :battle-mod-details battle-mod-details
+                 :battle-status my-battle-status
+                 :channel-name channel-name
+                 :client-data client-data
+                 :host-ingame host-ingame
+                 :singleplayer singleplayer
+                 :spring-isolation-dir spring-root})}}]
+           (when (and spring-running singleplayer)
+             [{:fx/type fx.ext.node/with-tooltip-props
+               :props
+               {:tooltip
+                {:fx/type tooltip-nofocus/lifecycle
+                 :show-delay skylobby.fx/tooltip-show-delay
+                 :style {:-fx-font-size 16}
+                 :text "Allow another copy of spring to run"}}
+               :desc
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :text ""
+                :on-action
+                {:event/type :spring-lobby/assoc-in
+                 :path [:spring-running :local battle-id]
+                 :value false}
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-content-copy:20"}}}]))}
         {:fx/type :label
          :style {:-fx-font-size 24}
          :text (str " "
