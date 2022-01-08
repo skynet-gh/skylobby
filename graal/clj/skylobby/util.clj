@@ -305,11 +305,9 @@
 (defn mod-name-and-version
   ([mod-data]
    (mod-name-and-version mod-data nil))
-  ([{:keys [git-commit-id modinfo]} {:keys [use-git-mod-version]}]
+  ([{:keys [modinfo]} _opts]
    (let [mod-name-only (:name modinfo)
-         mod-version (or (when (and use-git-mod-version git-commit-id)
-                           (str "git:" (short-git-commit git-commit-id)))
-                         (:version modinfo))]
+         mod-version (:version modinfo)]
      {:mod-name (str mod-name-only " " mod-version)
       :mod-version mod-version
       :mod-name-only (:name modinfo)})))

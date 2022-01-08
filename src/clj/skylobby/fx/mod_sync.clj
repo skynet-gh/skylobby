@@ -312,14 +312,17 @@
                                  (if in-progress
                                    (str "Resetting " (fs/filename (:file mod-details))
                                         " git to ref " battle-mod-git-ref)
-                                   (str "Reset " (fs/filename (:file mod-details))
-                                        " git to ref " battle-mod-git-ref)))
+                                   (if (seq mod-update-tasks)
+                                     "Refreshing mods..."
+                                     (str "Reset " (fs/filename (:file mod-details))
+                                          " git to ref " battle-mod-git-ref))))
                    :action
                    {:event/type :spring-lobby/add-task
                     :task
                     {:spring-lobby/task-type :spring-lobby/git-mod
                      :file mod-file
-                     :battle-mod-git-ref battle-mod-git-ref}}}))]
+                     :battle-mod-git-ref battle-mod-git-ref
+                     :spring-root spring-isolation-dir}}}))]
              (when (and (not (zero? severity))
                         (not= battle-mod-git-ref "$VERSION"))
                [(merge

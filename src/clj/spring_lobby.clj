@@ -399,10 +399,29 @@
           :error true})))))
 
 
+(defn fix-sdd-git-version [modinfo-str git-version]
+  (string/replace modinfo-str #"version = '[^']+'" (str "version = '" git-version "'")))
+
 (defn- update-mod
   ([state-atom spring-root-path file]
    (update-mod state-atom spring-root-path file nil))
   ([state-atom spring-root-path file opts]
+   (when (fs/is-directory? file)
+     (when-let [git-commit-id (try
+                                (git/latest-id file)
+                                (catch java.io.FileNotFoundException _e
+                                  (log/warn "Not a git repository at" file))
+                                (catch Exception e
+                                  (log/error e "Error loading git commit id")))]
+       (try
+         (let [git-version (str "git:" (u/short-git-commit git-commit-id))]
+           (log/info "Setting git version in modinfo.lua to" git-version)
+           (let [
+                 modinfo-file (fs/file file "modinfo.lua")
+                 contents (slurp modinfo-file)]
+             (spit modinfo-file (fix-sdd-git-version contents git-version))))
+         (catch Exception e
+           (log/error e "Error setting modinfo version for git")))))
    (let [path (fs/canonical-path file)
          mod-data (try
                     (read-mod-data file (assoc opts :modinfo-only false))
@@ -3649,24 +3668,21 @@
 (defmethod task-handler ::import [e]
   (import-resource e))
 
-(defmethod event-handler ::git-mod
-  [{:keys [battle-mod-git-ref file]}]
+(defmethod task-handler ::git-mod
+  [{:keys [battle-mod-git-ref file spring-root]}]
   (when (and file battle-mod-git-ref)
     (log/info "Resetting mod at" file "to ref" battle-mod-git-ref)
     (let [canonical-path (fs/canonical-path file)]
       (swap! *state assoc-in [:gitting canonical-path] {:status true})
-      (future
-        (try
-          (git/fetch file)
-          (git/reset-hard file battle-mod-git-ref)
-          (refresh-mods-all-spring-roots)
-          (catch Exception e
-            (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
-          (finally
-            (swap! *state assoc-in [:gitting canonical-path] {:status false})))))))
-
-(defmethod task-handler ::git-mod [task]
-  (event-handler (assoc task :event/type ::git-mod)))
+      (try
+        (git/fetch file)
+        (git/reset-hard file battle-mod-git-ref)
+        (task/add-task! *state {::task-type ::refresh-mods
+                                :spring-root spring-root})
+        (catch Exception e
+          (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
+        (finally
+          (swap! *state assoc-in [:gitting canonical-path] {:status false}))))))
 
 (defmethod event-handler ::minimap-scroll
   [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]

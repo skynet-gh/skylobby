@@ -62,7 +62,7 @@
               :game {"myplayername" "me"}
               :sides {0 "ARM" 1 "CORE"}}))))
   (testing "fix git game name"
-    (is (= (assoc-in expected-script-data ["game" "gametype"] "Beyond All Reason $VERSION")
+    (is (= (assoc-in expected-script-data ["game" "gametype"] "Beyond All Reason git:f0cf2cb")
            (assoc-in
              (spring/script-data
                (assoc battle :battle-modname "Beyond All Reason git:f0cf2cb")
