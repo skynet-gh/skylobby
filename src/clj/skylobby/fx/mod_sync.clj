@@ -22,7 +22,8 @@
    #"Tech Annihilation"])
 
 (def no-rapid
-  [#"Total Atomization Prime"])
+  [#"Total Atomization Prime"
+   #"Evolution RTS Music Addon"])
 
 
 (defn mod-download-source [mod-name]
@@ -49,7 +50,7 @@
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
-        no-mod-details (and (not dependency) (not (resource/details? mod-details)))
+        no-mod-details (not (resource/details? mod-details))
         refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
         mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
         update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
@@ -77,10 +78,10 @@
      (concat
        (let [severity (if no-mod-details
                         (if indexed-mod
-                          (if index-only 0 -1)
+                          (if (or dependency index-only)
+                            0 -1)
                           2)
-                        (if (or dependency (= mod-name (:mod-name indexed-mod)))
-                          0 1))]
+                        0)]
          [{:severity severity
            :text "info"
            :human-text mod-name
