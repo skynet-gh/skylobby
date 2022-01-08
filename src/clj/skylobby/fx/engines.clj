@@ -6,6 +6,7 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
@@ -69,23 +70,24 @@
                                       (filter some?)
                                       (filter #(string/includes? (string/lower-case %) filter-lc))
                                       sort)]
-            [{:fx/type :combo-box
-              :prompt-text " < pick an engine > "
-              :value engine-version
-              :items filtered-engines
-              :on-value-changed (or on-value-changed
-                                    {:event/type :spring-lobby/assoc
-                                     :key :engine-version})
-              :cell-factory
-              {:fx/cell-type :list-cell
-               :describe
-               (fn [engine]
-                 {:text (if (string/blank? engine)
-                          "< choose an engine >"
-                          engine)})}
-              :on-key-pressed {:event/type :spring-lobby/engines-key-pressed}
-              :on-hidden {:event/type :spring-lobby/dissoc
-                          :key :engine-filter}}]))
+            [{:fx/type ext-recreate-on-key-changed
+              :key (str engine-version)
+              :desc
+              {:fx/type :combo-box
+               :prompt-text " < pick an engine > "
+               :value engine-version
+               :items filtered-engines
+               :on-value-changed on-value-changed
+               :cell-factory
+               {:fx/cell-type :list-cell
+                :describe
+                (fn [engine]
+                  {:text (if (string/blank? engine)
+                           "< choose an engine >"
+                           engine)})}
+               :on-key-pressed {:event/type :spring-lobby/engines-key-pressed}
+               :on-hidden {:event/type :spring-lobby/dissoc
+                           :key :engine-filter}}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip

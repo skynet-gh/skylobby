@@ -42,6 +42,15 @@
           (remove-watch state :changes))))))
 
 
+(deftest set-sdd-modinfo-version
+  (is (= ""
+         (spring-lobby/set-sdd-modinfo-version "" "$VERSION")))
+  (is (= "version = '$VERSION'"
+         (spring-lobby/set-sdd-modinfo-version "version = 'xxxx'" "$VERSION")))
+  (is (= "version = 'git:xxxxxxx'"
+         (spring-lobby/set-sdd-modinfo-version "version = '$VERSION'" "git:xxxxxxx"))))
+
+
 (deftest available-name
   (is (= "bot"
          (spring-lobby/available-name [] "bot")))
@@ -49,6 +58,44 @@
          (spring-lobby/available-name ["bot"] "bot")))
   (is (= "bot2"
          (spring-lobby/available-name ["bot" "bot0" "bot1"] "bot"))))
+
+
+(deftest parse-battle-status-message
+  (is (= []
+         (spring-lobby/parse-battle-status-message "")))
+  (is (= [{:ally "1"
+           :clan ""
+           :id "1"
+           :rank "3"
+           :ready ""
+           :skill "(20)"
+           :user-id "MFAI : normal (nebula3)"
+           :username "bot1 (bot)"}
+          {:ally "2"
+           :clan ""
+           :id "2"
+           :rank "3"
+           :ready ""
+           :skill "(20)"
+           :user-id "MFAI : normal (nebula3)"
+           :username "bot2 (bot)"}
+          {:ally ""
+           :clan ""
+           :id ""
+           :rank "6"
+           :ready ""
+           :skill ""
+           :user-id "968127"
+           :username "nebula3"}]
+         (spring-lobby/parse-battle-status-message
+           (str
+             "\n"
+             "Name        Team  Id  Clan  Ready  Rank  Skill  ID\n"
+             "----------  ----  --  ----  -----  ----  -----  -----------------------\n"
+             "bot1 (bot)  1     1                3     (20)   MFAI : normal (nebula3)\n"
+             "bot2 (bot)  2     2                3     (20)   MFAI : normal (nebula3)\n"
+             "nebula3                            6            968127\n"
+             "=======================================================================")))))
 
 
 (deftest parse-rapid-progress

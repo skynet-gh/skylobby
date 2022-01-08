@@ -215,11 +215,11 @@
                                (if engine-file
                                  (if rapid-update-tasks
                                    (if rapid-update-download
-                                     (str (u/download-progress rapid-update-download))
+                                     (str "Downloading " (u/download-progress rapid-update-download))
                                      "Updating rapid packages...")
                                    (if rapid-id
                                      (if in-progress
-                                       (str (u/download-progress rapid-download))
+                                       (str "Downloading " (u/download-progress rapid-download))
                                        (str "Download rapid " rapid-id))
                                      "No rapid download found, update packages"))
                                  "Needs engine first to download with rapid")

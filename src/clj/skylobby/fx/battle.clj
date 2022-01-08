@@ -1291,6 +1291,7 @@
                :battle-layout battle-layout
                :server-key server-key}]}))
         resources-buttons {:fx/type :h-box
+                           :style {:-fx-font-size 16}
                            :alignment :center-left
                            :children
                            [
@@ -1323,24 +1324,30 @@
         singleplayer (= :local server-key)
         resources-pane (if singleplayer
                          {:fx/type :v-box
+                          :style {:-fx-font-size 20}
                           :children
                           [
                            {:fx/type engines-view
                             :engine-version engine-version
-                            :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed}
+                            :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed
+                                               :spring-root spring-root}
                             :spring-isolation-dir spring-root}
                            (if (seq engine-details)
                              {:fx/type mods-view
                               :engine-file engine-file
                               :mod-name mod-name
-                              :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed}
+                              :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed
+                                                 :spring-root spring-root}
                               :spring-isolation-dir spring-root}
                              {:fx/type :label
                               :text " Game: Get an engine first"})
                            {:fx/type maps-view
                             :map-name map-name
-                            :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed}
+                            :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed
+                                               :spring-root spring-root}
                             :spring-isolation-dir spring-root}
+                           {:fx/type :pane
+                            :style {:-fx-pref-height 8}}
                            resources-buttons]}
                          {:fx/type :flow-pane
                           :vgap 5
@@ -1358,21 +1365,17 @@
                                   :suggest true
                                   :on-value-changed {:event/type :spring-lobby/assoc-in
                                                      :path [:by-server :local :battles :singleplayer :battle-version]}}]}]
-                              (if (seq engine-details)
-                                [{:fx/type mods-view
-                                  :spring-isolation-dir spring-root
-                                  :suggest true
-                                  :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                     :path [:by-server :local :battles :singleplayer :battle-modname]}}]
-                                [{:fx/type :h-box
-                                  :alignment :center-left
-                                  :children
-                                  [{:fx/type :label
-                                    :text " Game: Get an engine first"}]}])
+                              [{:fx/type mods-view
+                                :mod-name mod-name
+                                :spring-isolation-dir spring-root
+                                :suggest true
+                                :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                   :path [:by-server :local :battles :singleplayer :battle-modname]}}]
                               [{:fx/type :h-box
                                 :alignment :center-left
                                 :children
                                 [{:fx/type maps-view
+                                  :map-name map-name
                                   :spring-isolation-dir spring-root
                                   :suggest true
                                   :on-value-changed {:event/type :spring-lobby/assoc-in

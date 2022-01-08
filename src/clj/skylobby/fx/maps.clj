@@ -6,6 +6,7 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
@@ -86,22 +87,25 @@
                       (filter string?)
                       (filter #(string/includes? (string/lower-case %) filter-lc))
                       (sort String/CASE_INSENSITIVE_ORDER))]
-             [{:fx/type :combo-box
-               :prompt-text " < pick a map > "
-               :value map-name
-               :items filtered-map-names
-               :disable (boolean disable)
-               :on-value-changed on-value-changed
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [map-name]
-                  {:text (if (string/blank? map-name)
-                           "< choose a map >"
-                           map-name)})}
-               :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
-               :on-hidden {:event/type :spring-lobby/dissoc
-                           :key :map-input-prefix}}]))
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str map-name)
+               :desc
+               {:fx/type :combo-box
+                :prompt-text " < pick a map > "
+                :value map-name
+                :items filtered-map-names
+                :disable (boolean disable)
+                :on-value-changed on-value-changed
+                :cell-factory
+                {:fx/cell-type :list-cell
+                 :describe
+                 (fn [map-name]
+                   {:text (if (string/blank? map-name)
+                            "< choose a map >"
+                            map-name)})}
+                :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
+                :on-hidden {:event/type :spring-lobby/dissoc
+                            :key :map-input-prefix}}}]))
          [{:fx/type :button
            :text ""
            :on-action {:event/type :spring-lobby/show-maps-window
