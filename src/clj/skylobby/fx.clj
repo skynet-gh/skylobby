@@ -8,13 +8,20 @@
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
-    (javafx.stage Screen)))
+    (javafx.stage Screen)
+    (org.apache.commons.collections4 ComparatorUtils)))
 
 
 (set! *warn-on-reflection* true)
 
 
-(def tooltip-show-delay [50 :ms])
+(def tooltip-show-delay [100 :ms])
+
+
+(def case-insensitive-natural-comparator
+  (.thenComparing
+    String/CASE_INSENSITIVE_ORDER
+    ComparatorUtils/NATURAL_COMPARATOR))
 
 
 (def divider-positions

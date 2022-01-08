@@ -72,6 +72,7 @@
 (defn settings-root
   [{:fx/keys [context]}]
   (let [
+        battles-table-images (fx/sub-val context :battles-table-images)
         chat-auto-complete (fx/sub-val context :chat-auto-complete)
         chat-font-size (fx/sub-val context :chat-font-size)
         extra-import-name (fx/sub-val context :extra-import-name)
@@ -148,7 +149,17 @@
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :windows-as-tabs}}
              {:fx/type :label
-              :text " Use tabs instead of some windows"}]}]}
+              :text " Use tabs instead of some windows"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean battles-table-images)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :battles-table-images}}
+             {:fx/type :label
+              :text " Images view of battles"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Default Spring Dir"

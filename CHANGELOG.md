@@ -21,6 +21,18 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.44]
+
+- Add task to delete `rapid` dir if a `versions.gz` is corrupt
+- Improve git mod versioning, update `modinfo.lua` so replays work
+- Add experimental setting to show battles table with map images
+- Fix springfiles search download if not found
+- Fix some incoming chat focus issues
+- Show singleplayer game as running but still allow multiple copies if needed
+- Fix game and map sync showing unknown for battle details preview
+- Fix game dependencies sync
+- Increase tooltip delays to reduce jarring popups
+
 ### [0.7.43]
 
 - Fix some sent messages not recorded to correct server

@@ -167,7 +167,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-players-color-type :battle-port :battle-resource-details :battle-title :battle-password :battles-layout :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :engine-version :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -399,10 +399,29 @@
           :error true})))))
 
 
+(defn fix-sdd-git-version [modinfo-str git-version]
+  (string/replace modinfo-str #"version = '[^']+'" (str "version = '" git-version "'")))
+
 (defn- update-mod
   ([state-atom spring-root-path file]
    (update-mod state-atom spring-root-path file nil))
   ([state-atom spring-root-path file opts]
+   (when (fs/is-directory? file)
+     (when-let [git-commit-id (try
+                                (git/latest-id file)
+                                (catch java.io.FileNotFoundException _e
+                                  (log/warn "Not a git repository at" file))
+                                (catch Exception e
+                                  (log/error e "Error loading git commit id")))]
+       (try
+         (let [git-version (str "git:" (u/short-git-commit git-commit-id))]
+           (log/info "Setting git version in modinfo.lua to" git-version)
+           (let [
+                 modinfo-file (fs/file file "modinfo.lua")
+                 contents (slurp modinfo-file)]
+             (spit modinfo-file (fix-sdd-git-version contents git-version))))
+         (catch Exception e
+           (log/error e "Error setting modinfo version for git")))))
    (let [path (fs/canonical-path file)
          mod-data (try
                     (read-mod-data file (assoc opts :modinfo-only false))
@@ -417,12 +436,22 @@
                               (or (:engineoptions mod-data)
                                   (:modoptions mod-data))))]
      (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
-     (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
-            (fn [mods]
-              (set
-                (cond->
-                  (remove (comp #{path} fs/canonical-path :file) mods)
-                  mod-details (conj mod-details)))))
+     (let [{:keys [mod-details use-git-mod-version]}
+           (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
+                  (fn [mods]
+                    (set
+                      (cond->
+                        (remove (comp #{path} fs/canonical-path :file) mods)
+                        mod-details (conj mod-details)))))
+           cached (get mod-details path)]
+       (when (and cached
+                  (not= (:mod-version cached)
+                        (:mod-version mod-data)))
+         (task/add-task! *state
+           {::task-type ::mod-details
+            :mod-name (:mod-name mod-data)
+            :mod-file file
+            :use-git-mod-version use-git-mod-version})))
      mod-data)))
 
 
@@ -3639,24 +3668,21 @@
 (defmethod task-handler ::import [e]
   (import-resource e))
 
-(defmethod event-handler ::git-mod
-  [{:keys [battle-mod-git-ref file]}]
+(defmethod task-handler ::git-mod
+  [{:keys [battle-mod-git-ref file spring-root]}]
   (when (and file battle-mod-git-ref)
     (log/info "Resetting mod at" file "to ref" battle-mod-git-ref)
     (let [canonical-path (fs/canonical-path file)]
       (swap! *state assoc-in [:gitting canonical-path] {:status true})
-      (future
-        (try
-          (git/fetch file)
-          (git/reset-hard file battle-mod-git-ref)
-          (refresh-mods-all-spring-roots)
-          (catch Exception e
-            (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
-          (finally
-            (swap! *state assoc-in [:gitting canonical-path] {:status false})))))))
-
-(defmethod task-handler ::git-mod [task]
-  (event-handler (assoc task :event/type ::git-mod)))
+      (try
+        (git/fetch file)
+        (git/reset-hard file battle-mod-git-ref)
+        (task/add-task! *state {::task-type ::refresh-mods
+                                :spring-root spring-root})
+        (catch Exception e
+          (log/error e "Error during git reset" canonical-path "to ref" battle-mod-git-ref))
+        (finally
+          (swap! *state assoc-in [:gitting canonical-path] {:status false}))))))
 
 (defmethod event-handler ::minimap-scroll
   [{:fx/keys [^ScrollEvent event] :keys [minimap-type-key]}]
@@ -4216,8 +4242,14 @@
         :message (str "!fixcolors")})))
 
 
+(defmethod task-handler ::delete-corrupt-rapid
+  [{:keys [update-rapid-task spring-root]}]
+  (log/info "Attempting to delete corrupt rapid dir after error, then updating rapid again")
+  (fs/delete-rapid-dir spring-root)
+  (task/add-task! *state update-rapid-task))
+
 (defmethod task-handler ::update-rapid
-  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as e}]
+  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
@@ -4259,8 +4291,18 @@
                                         curr-time (or (-> new-files (get path) :last-modified) Long/MAX_VALUE)]
                                     (or
                                       (< prev-time curr-time)
-                                      (:force e)))))
-                              (mapcat rapid/rapid-versions)
+                                      (:force task)))))
+                              (mapcat
+                                (fn [f]
+                                  (try
+                                    (rapid/rapid-versions f)
+                                    (catch Exception e
+                                      (log/error e "Error reading rapid versions in" f
+                                                 "scheduling delete of rapid folder and another rapid update")
+                                      (task/add-task! *state
+                                        {::task-type ::delete-corrupt-rapid
+                                         :spring-root spring-isolation-dir
+                                         :update-rapid-task task})))))
                               (filter :version)
                               (sort-by :version version/version-compare)
                               reverse)
@@ -4486,7 +4528,7 @@
     (let [search-result (search-springfiles e)]
       (log/info "Found details for" springname "on springfiles" search-result)
       (swap! *state assoc-in [:springfiles-search-results springname] search-result)
-      (when download-if-found
+      (when (and search-result download-if-found)
         (task/add-task! *state
           (assoc e
                  ::task-type ::download-springfiles

@@ -195,8 +195,7 @@
             (when-let [gametype (if-let [modinfo (:modinfo mod-details)]
                                   (str (:name modinfo) " " (:version modinfo))
                                   (:battle-modname battle))]
-              (let [gametype (u/mod-name-fix-git gametype)]
-                {"gametype" gametype}))
+              {"gametype" gametype})
             (when-let [hostip (:battle-ip battle)]
               (when-not is-host
                 {"hostip" hostip}))
@@ -390,7 +389,7 @@
         now (u/curr-millis)
         server-key (u/server-key client-data)
         battle-id (-> state :battle :battle-id)
-        {:keys [engine-overrides]} (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
+        {:keys [engine-overrides refresh-replays-after-game ring-when-game-ends]} (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
@@ -481,10 +480,9 @@
                              (.play timeline)))
                          (when (not media-player)
                            (log/info "No media player to resume")))
-                       (let [{:keys [ring-when-game-ends] :as state} @state-atom]
-                         (when ring-when-game-ends
-                           (sound/play-ring state)))
-                       (when (:refresh-replays-after-game state)
+                       (when ring-when-game-ends
+                         (sound/play-ring state))
+                       (when refresh-replays-after-game
                          (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays})))
         set-ingame (fn [ingame]
                      (client/send-message state-atom client-data

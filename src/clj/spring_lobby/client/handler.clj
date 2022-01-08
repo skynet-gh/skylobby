@@ -267,11 +267,12 @@
     (swap! state-atom
       (fn [state]
         (let [focus-chat (:focus-chat-on-message state)
-              selected-tab-channel (get-in state [:selected-tab-channel server-key])]
-          (cond-> state
-                  true
-                  (assoc-in [:by-server server-key :my-channels channel-name] {})
-                  (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
+              my-channels (get-in state [:by-server server-key :my-channels])
+              selected-tab-channel (get-in state [:selected-tab-channel server-key])
+              needs-selected-tab-channel-fix (or (not selected-tab-channel)
+                                                 (not (contains? my-channels selected-tab-channel)))]
+          (cond-> (assoc-in state [:by-server server-key :my-channels channel-name] {})
+                  (and (not battle-channel?) (or focus-chat needs-selected-tab-channel-fix))
                   (assoc-in [:selected-tab-channel server-key] channel-name)))))))
 
 (defmethod handle "JOINFAILED" [state-atom server-key m]
@@ -333,6 +334,9 @@
      (fn [state]
        (let [focus-chat (:focus-chat-on-message state)
              selected-tab-channel (get-in state [:selected-tab-channel server-key])
+             my-channels (get-in state [:by-server server-key :my-channels])
+             needs-selected-tab-channel-fix (or (not selected-tab-channel)
+                                                (not (contains? my-channels selected-tab-channel)))
              battle-channel? (u/battle-channel-name? channel-name)
              main-tab (if battle-channel? "battle" "chat")
              channel-tab (if battle-channel? :battle channel-name)
@@ -356,7 +360,7 @@
                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)
                  (and (not battle-channel?) focus-chat)
                  (assoc-in [:selected-tab-main server-key] main-tab)
-                 (and (not battle-channel?) (or focus-chat (not selected-tab-channel)))
+                 (and (not battle-channel?) (or focus-chat needs-selected-tab-channel-fix))
                  (assoc-in [:selected-tab-channel server-key] channel-name)))))))
 
 (defmethod handle "SAID" [state-atom server-key m]

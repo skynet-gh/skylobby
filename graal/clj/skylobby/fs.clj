@@ -1281,3 +1281,11 @@
     (doseq [jar skylobby-jars]
       (raynes-fs/delete jar))
     skylobby-jars))
+
+(defn delete-rapid-dir [spring-root]
+  (let [rapid-dir (io/file spring-root "rapid")]
+    (if (and (is-directory? rapid-dir) (exists? rapid-dir))
+      (do
+        (log/info "Deleting corrupt rapid dir:" rapid-dir)
+        (FileUtils/deleteDirectory rapid-dir))
+      (log/error "Not a valid directory:" rapid-dir))))

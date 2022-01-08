@@ -149,9 +149,11 @@
          :spring-isolation-dir spring-root}
         {:fx/type mod-sync-pane
          :engine-version engine-version
+         :index-only true
          :mod-name mod-name
          :spring-isolation-dir spring-root}
         {:fx/type map-sync-pane
+         :index-only true
          :map-name map-name
          :spring-isolation-dir spring-root}]}
       {:fx/type fx.minimap/minimap-pane

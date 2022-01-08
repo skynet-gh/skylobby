@@ -675,6 +675,7 @@
                {:text ""
                 :graphic
                 {:fx/type :h-box
+                 :alignment :center-left
                  :children
                  (concat
                    (when-let [file (:file i)]
@@ -892,9 +893,14 @@
                         {:fx/type :label
                          :text " No engine"}
                         (not matching-mod)
-                        (if (string/ends-with? mod-version "$VERSION")
+                        (cond
+                          (string/ends-with? mod-version "$VERSION")
                           {:fx/type :label
                            :text " Unknown game version "}
+                          (string/includes? mod-version " git:")
+                          {:fx/type :label
+                           :text " Different git version, select for options"}
+                          :else
                           {:fx/type :button
                            :text (if rapid-update-tasks
                                    " Updating rapid..."

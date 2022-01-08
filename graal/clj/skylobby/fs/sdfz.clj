@@ -109,7 +109,7 @@
 
 (defn decode-replay-header [^java.io.File f]
   (with-open [^java.lang.AutoCloseable is (io/input-stream f)
-              ^java.lang.AutoCloseable 
+              ^java.lang.AutoCloseable
               is (if (string/ends-with? (fs/filename f) ".sdf")
                    is
                    (GZIPInputStream. is))]
@@ -125,7 +125,7 @@
    (decode-replay f nil))
   ([^java.io.File f {:keys [parse-stream]}]
    (with-open [^java.lang.AutoCloseable is (io/input-stream f)
-              ^java.lang.AutoCloseable 
+               ^java.lang.AutoCloseable
                is (if (string/ends-with? (fs/filename f) ".sdf")
                     is
                     (GZIPInputStream. is))]

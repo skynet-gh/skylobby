@@ -23,7 +23,9 @@
     :spring-lobby/import
     :spring-lobby/http-downloadable
     :spring-lobby/rapid-download
-    :spring-lobby/update-rapid})
+    :spring-lobby/update-rapid
+    :spring-lobby/update-rapid-packages
+    :spring-lobby/delete-corrupt-rapid})
 
 (def task-kinds
   [:spring-lobby/index-task :spring-lobby/resource-task :spring-lobby/download-task
