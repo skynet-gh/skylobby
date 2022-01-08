@@ -235,7 +235,7 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--report-unsupported-elements-at-runtime"
-               "-J-Xmx6g" "-H:+StaticExecutableWithDynamicLibC"
+               "-J-Xmx8g" "-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=8"
                ;"-H:+TraceNativeToolUsage"
                "-H:Name=skylobby"]
