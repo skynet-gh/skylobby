@@ -11,9 +11,7 @@
     [skylobby.fs :as fs]
     [skylobby.rapid :as rapid]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte])
-  (:import
-    (org.apache.commons.collections4 ComparatorUtils)))
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -21,12 +19,6 @@
 
 (def rapid-download-window-width 1600)
 (def rapid-download-window-height 800)
-
-
-(def case-insensitive-natural-comparator
-  (.thenComparing
-    String/CASE_INSENSITIVE_ORDER
-    ComparatorUtils/NATURAL_COMPARATOR))
 
 
 (defn rapid-download-root
@@ -52,7 +44,7 @@
         sdp-hashes (set (map rapid/sdp-hash sdp-files))
         sorted-engine-versions (->> engines
                                     (map :engine-version)
-                                    (sort case-insensitive-natural-comparator))
+                                    (sort skylobby.fx/case-insensitive-natural-comparator))
         filtered-rapid-versions (->> rapid-versions
                                      (filter
                                        (fn [{:keys [id]}]
@@ -78,12 +70,12 @@
                                (into {}))
         available-packages (or (->> filtered-rapid-versions
                                     seq
-                                    (sort-by :version case-insensitive-natural-comparator)
+                                    (sort-by :version skylobby.fx/case-insensitive-natural-comparator)
                                     reverse)
                                [])
         local-packages (or (->> rapid-packages
                                 seq
-                                (sort-by :version case-insensitive-natural-comparator))
+                                (sort-by :version skylobby.fx/case-insensitive-natural-comparator))
                            [])]
     {:fx/type :v-box
      :children
@@ -210,7 +202,7 @@
              {:text (str (:hash i))})}}
          {:fx/type :table-column
           :text "Version"
-          :comparator case-insensitive-natural-comparator
+          :comparator skylobby.fx/case-insensitive-natural-comparator
           :pref-width 100
           :min-width 320
           :cell-value-factory :version
@@ -302,7 +294,7 @@
            (fn [i] {:text (:id i)})}}
          {:fx/type :table-column
           :text "Version"
-          :comparator case-insensitive-natural-comparator
+          :comparator skylobby.fx/case-insensitive-natural-comparator
           :pref-width 100
           :cell-value-factory :version
           :cell-factory

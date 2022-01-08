@@ -34,12 +34,15 @@
         rapid-hash (:hash rapid-data)
         rapid-id (:id (get rapid-data-by-hash rapid-hash))
         rapid-version (:version rapid-data)
-        {:keys [engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
+        {:keys [engines engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         some-bar-name (->> mods-by-name
                            keys
                            (filter #(string/starts-with? % "Beyond All Reason"))
                            first)
         indexed-mod (get mods-by-name rapid-version)
+        sorted-engine-versions (->> engines
+                                    (map :engine-version)
+                                    (sort skylobby.fx/case-insensitive-natural-comparator))
         engine-version (fx/sub-val context :engine-version)
         engine-file (:file (get engines-by-version engine-version))
         servers (fx/sub-val context :servers)
@@ -49,6 +52,11 @@
         selected-scenario-name (fx/sub-val context :selected-scenario)
         scenario-difficulty (fx/sub-val context :scenario-difficulty)
         scenario-side (fx/sub-val context :scenario-side)
+        mod-details-chobby-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
+                                      (filter :mod-name)
+                                      (filter (comp #(string/includes? % "chobby") string/lower-case :mod-name))
+                                      seq)
+        loading-scenarios (boolean mod-details-chobby-tasks)
         rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
                                (map (juxt :rapid-id identity))
                                (into {}))]
@@ -74,6 +82,18 @@
              :describe (fn [f] {:text (str f)})}
             :on-value-changed {:event/type :spring-lobby/assoc
                                :key :scenarios-spring-root}}}]}
+        {:fx/type :h-box
+         :alignment :center
+         :children
+         [
+          {:fx/type :label
+           :text " Spring engine version: "}
+          {:fx/type :combo-box
+           :value (str engine-version)
+           :items (or (seq sorted-engine-versions)
+                      [])
+           :on-value-changed {:event/type :spring-lobby/assoc
+                              :key :engine-version}}]}
         {:fx/type :label
          :text (str " Scenarios for " rapid-id)}]
        (if indexed-mod
@@ -84,7 +104,12 @@
           {:fx/type :label
            :text (str rapid-version)}
           {:fx/type :button
-           :text " Load scenarios "
+           :disable loading-scenarios
+           :text (if loading-scenarios
+                   " Loading scenarios... "
+                   (if (resource/details? mod-details)
+                     " Reload scenarios "
+                     " Load scenarios "))
            :on-action
            {:event/type :spring-lobby/add-task
             :task
