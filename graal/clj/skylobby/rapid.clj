@@ -145,7 +145,8 @@
                   :detail detail
                   :version version})))))
     (catch Exception e
-      (log/error e "Error reading rapid versions from" f))))
+      (log/error e "Error reading rapid versions from" f)
+      (throw e))))
 
 
 (defn package-versions

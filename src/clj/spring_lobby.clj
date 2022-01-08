@@ -4216,8 +4216,14 @@
         :message (str "!fixcolors")})))
 
 
+(defmethod task-handler ::delete-corrupt-rapid
+  [{:keys [update-rapid-task spring-root]}]
+  (log/info "Attempting to delete corrupt rapid dir after error, then updating rapid again")
+  (fs/delete-rapid-dir spring-root)
+  (task/add-task! *state update-rapid-task))
+
 (defmethod task-handler ::update-rapid
-  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as e}]
+  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
   (swap! *state assoc :rapid-update true)
   (let [before (u/curr-millis)
         {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
@@ -4259,8 +4265,18 @@
                                         curr-time (or (-> new-files (get path) :last-modified) Long/MAX_VALUE)]
                                     (or
                                       (< prev-time curr-time)
-                                      (:force e)))))
-                              (mapcat rapid/rapid-versions)
+                                      (:force task)))))
+                              (mapcat
+                                (fn [f]
+                                  (try
+                                    (rapid/rapid-versions f)
+                                    (catch Exception e
+                                      (log/error e "Error reading rapid versions in" f
+                                                 "scheduling delete of rapid folder and another rapid update")
+                                      (task/add-task! *state
+                                        {::task-type ::delete-corrupt-rapid
+                                         :spring-root spring-isolation-dir
+                                         :update-rapid-task task})))))
                               (filter :version)
                               (sort-by :version version/version-compare)
                               reverse)
