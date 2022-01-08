@@ -4486,7 +4486,7 @@
     (let [search-result (search-springfiles e)]
       (log/info "Found details for" springname "on springfiles" search-result)
       (swap! *state assoc-in [:springfiles-search-results springname] search-result)
-      (when download-if-found
+      (when (and search-result download-if-found)
         (task/add-task! *state
           (assoc e
                  ::task-type ::download-springfiles
