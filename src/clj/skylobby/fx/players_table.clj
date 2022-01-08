@@ -235,7 +235,8 @@
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
                                (str id))})
-        now (or (fx/sub-val context :now) (u/curr-millis))]
+        now (or (fx/sub-val context :now) (u/curr-millis))
+        sorm (if singleplayer "singleplayer" "multiplayer")]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -251,9 +252,9 @@
         players-with-skill)
       :desc
       {:fx/type :table-view
+       :style-class ["table-view" "skylobby-players-" sorm]
        :column-resize-policy :unconstrained
-       :style {:-fx-font-size 14
-               :-fx-min-height 200}
+       :style {:-fx-min-height 200}
        :row-factory
        {:fx/cell-type :table-row
         :describe
@@ -417,6 +418,7 @@
                           :style {:-fx-pref-width 8}}
                          (merge
                            {:fx/type :text
+                            :style-class ["text" (str "skylobby-players-" sorm "-nickname")]
                             :effect {:fx/type :drop-shadow
                                      :color (if (color/dark? text-color-javafx)
                                               "#d5d5d5"
@@ -427,8 +429,7 @@
                             :fill text-color-css
                             :style
                             (merge
-                              {:-fx-font-size 16
-                               :-fx-font-smoothing-type :gray}
+                              {:-fx-font-smoothing-type :gray}
                               (when not-spec
                                 {:-fx-font-weight "bold"}))})])}}))))}}]
          (when (:skill players-table-columns)
@@ -444,7 +445,8 @@
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :skill
-                    {:text
+                    {:alignment :center-left
+                     :text
                      (str skill
                           " "
                           (when (number? skilluncertainty)
@@ -652,6 +654,7 @@
                   (tufte/p :spectator
                     (let [is-spec (-> i :battle-status :mode u/to-bool not boolean)]
                       {:text ""
+                       :alignment :center
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
                         :key (u/nickname i)

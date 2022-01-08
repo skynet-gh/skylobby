@@ -38,15 +38,17 @@
     (contains? download-tasks task-type) :spring-lobby/download-task
     :else :spring-lobby/other-task))
 
-
-(defn add-task! [state-atom task]
+(defn add-task-state [state task]
   (if task
     (let [task-kind (task-kind task)]
       (log/info "Adding task" (pr-str task) "to" task-kind)
-      (swap! state-atom update-in [:tasks-by-kind task-kind]
+      (update-in state [:tasks-by-kind task-kind]
         (fn [tasks]
           (set (conj tasks task)))))
     (log/warn "Attempt to add nil task" task)))
+
+(defn add-task! [state-atom task]
+  (swap! state-atom add-task-state task))
 
 (defn add-multiple-tasks [tasks-by-kind new-tasks]
   (reduce-kv

@@ -235,8 +235,7 @@
               [
                {:fx/type :check-box
                 :selected (boolean use-git-mod-version)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :use-git-mod-version}}
+                :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}
                {:fx/type :label
                 :text " Use git to version .sdd games"}]}])}
          {:fx/type filterable-section

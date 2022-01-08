@@ -38,17 +38,14 @@
         battle-nat-type (or (fx/sub-val context :battle-nat-type) 0)
         battle-title (fx/sub-val context :battle-title)
         engine-filter (fx/sub-val context :engine-filter)
-        engine-version (fx/sub-val context :engine-version)
         map-input-prefix (fx/sub-val context :map-input-prefix)
-        map-name (fx/sub-val context :map-name)
         mod-filter (fx/sub-val context :mod-filter)
-        mod-name (fx/sub-val context :mod-name)
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         scripttags (fx/sub-val context get-in [:by-server server-key :scripttags])
         show-host-battle-window (fx/sub-val context :show-host-battle-window)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
-        {:keys [maps mods]} (fx/sub-ctx context sub/spring-resources spring-root)
+        {:keys [engine-version map-name maps mod-name mods]} (fx/sub-ctx context sub/spring-resources spring-root)
         host-battle-action {:event/type :spring-lobby/host-battle
                             :host-battle-state
                             {:host-port battle-port

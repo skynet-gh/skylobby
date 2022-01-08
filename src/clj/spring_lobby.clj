@@ -57,6 +57,7 @@
     (java.lang ProcessBuilder)
     (java.net URL)
     (java.util List)
+    (java.util.regex Matcher)
     (javafx.application Platform)
     (javafx.event Event)
     (javafx.scene Parent)
@@ -168,11 +169,11 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :engine-version :extra-import-sources
+   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :map-name :minimap-size
-   :mod-name :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
+   :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
+   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-spring-root :server :servers :show-closed-battles :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
 
@@ -399,29 +400,36 @@
           :error true})))))
 
 
-(defn fix-sdd-git-version [modinfo-str git-version]
-  (string/replace modinfo-str #"version = '[^']+'" (str "version = '" git-version "'")))
+(defn set-sdd-modinfo-version [modinfo-str mod-version]
+  (string/replace
+    modinfo-str
+    #"version = '[^']+'"
+    (Matcher/quoteReplacement
+      (str "version = '" mod-version "'"))))
 
 (defn- update-mod
   ([state-atom spring-root-path file]
    (update-mod state-atom spring-root-path file nil))
-  ([state-atom spring-root-path file opts]
+  ([state-atom spring-root-path file {:keys [use-git-mod-version] :as opts}]
    (when (fs/is-directory? file)
-     (when-let [git-commit-id (try
-                                (git/latest-id file)
-                                (catch java.io.FileNotFoundException _e
-                                  (log/warn "Not a git repository at" file))
-                                (catch Exception e
-                                  (log/error e "Error loading git commit id")))]
-       (try
-         (let [git-version (str "git:" (u/short-git-commit git-commit-id))]
-           (log/info "Setting git version in modinfo.lua to" git-version)
-           (let [
-                 modinfo-file (fs/file file "modinfo.lua")
-                 contents (slurp modinfo-file)]
-             (spit modinfo-file (fix-sdd-git-version contents git-version))))
-         (catch Exception e
-           (log/error e "Error setting modinfo version for git")))))
+     (try
+       (let [
+             git-commit-id (try
+                             (git/latest-id file)
+                             (catch java.io.FileNotFoundException _e
+                               (log/warn "Not a git repository at" file))
+                             (catch Exception e
+                               (log/error e "Error loading git commit id")))
+             mod-version (if use-git-mod-version
+                           (str "git:" (u/short-git-commit git-commit-id))
+                           "$VERSION")]
+         (log/info "Setting version in modinfo.lua to" mod-version)
+         (let [
+               modinfo-file (fs/file file "modinfo.lua")
+               contents (slurp modinfo-file)]
+           (spit modinfo-file (set-sdd-modinfo-version contents mod-version))))
+       (catch Exception e
+         (log/error e "Error setting modinfo version for git"))))
    (let [path (fs/canonical-path file)
          mod-data (try
                     (read-mod-data file (assoc opts :modinfo-only false))
@@ -511,11 +519,6 @@
     state
     [:by-spring-root :map-details :mod-details :online-bar-replays :parsed-replays-by-path
      :selected-replay-file :selected-replay-id :servers :spring-isolation-dir]))
-
-(defn- fix-resource-relevant-keys [state]
-  (select-keys
-    state
-    [:engine-version :engines :map-name :maps :mod-name :mods]))
 
 
 (defn update-cooldown [state-atom k]
@@ -1031,6 +1034,15 @@
         (log/error e "Error in :replay-map-and-mod-details state watcher")))))
 
 
+(defn- fix-resource-relevant-keys [state]
+  (-> state
+      (select-keys [:by-server :by-spring-root :spring-isolation-dir])
+      (update :by-server
+        (fn [by-server]
+          (-> by-server
+              (select-keys [:local])
+              (update :local select-keys [:battles]))))))
+
 (defn fix-missing-resource-watcher [_k state-atom old-state new-state]
   (tufte/profile {:dynamic? true
                   :id ::state-watcher}
@@ -1038,30 +1050,42 @@
       (when (not= (fix-resource-relevant-keys old-state)
                   (fix-resource-relevant-keys new-state))
         (try
-          (let [{:keys [engine-version engines map-name maps mod-name mods]} new-state
-                engine-fix (when engine-version
-                             (when-not (->> engines
-                                            (filter (comp #{engine-version} :engine-version))
-                                            first)
-                               (-> engines first :engine-version)))
-                games (filter :is-game mods)
-                mod-fix (when mod-name
-                          (when-not (->> games
-                                         (filter (comp #{mod-name} :mod-name))
-                                         first)
-                            (-> games first :mod-name)))
-                map-fix (when map-name
-                          (when-not (->> maps
-                                         (filter (comp #{map-name} :map-name))
-                                         first)
-                            (-> maps first :map-name)))]
-            (when (or engine-fix mod-fix map-fix)
-              (swap! state-atom
-                     (fn [state]
-                       (cond-> state
-                         engine-fix (assoc :engine-version engine-fix)
-                         mod-fix (assoc :mod-name mod-fix)
-                         map-fix (assoc :map-name map-fix))))))
+          (let [old-spring-root (:spring-isolation-dir old-state)
+                spring-root (:spring-isolation-dir new-state)
+                spring-root-path (fs/canonical-path spring-root)
+                old-spring-data (get-in old-state [:by-spring-root (fs/canonical-path old-spring-root)])
+                {:keys [engines maps mods]} (get-in new-state [:by-spring-root spring-root-path])
+                {:keys [battle-version battle-map battle-modname]} (get-in new-state [:by-server :local :battles :singleplayer])]
+            (when (not (some (comp #{battle-map} :map-name) maps))
+              (when-let [old-file (->> old-spring-data
+                                       :maps
+                                       (filter (comp #{battle-map} :map-name))
+                                       first
+                                       :file)]
+                (when-let [new-map (->> maps
+                                        (filter (comp #{(fs/canonical-path old-file)} fs/canonical-path :file))
+                                        first)]
+                  (swap! state-atom assoc-in [:by-server :local :battles :singleplayer :battle-map] (:map-name new-map)))))
+            (when (not (some (comp #{battle-modname} :mod-name) mods))
+              (when-let [old-file (->> old-spring-data
+                                       :mods
+                                       (filter (comp #{battle-modname} :mod-name))
+                                       first
+                                       :file)]
+                (when-let [new-mod (->> mods
+                                        (filter (comp #{(fs/canonical-path old-file)} fs/canonical-path :file))
+                                        first)]
+                  (swap! state-atom assoc-in [:by-server :local :battles :singleplayer :battle-modname] (:mod-name new-mod)))))
+            (when (not (some (comp #{battle-version} :engine-version) engines))
+              (when-let [old-file (->> old-spring-data
+                                       :engines
+                                       (filter (comp #{battle-version} :engine-version))
+                                       first
+                                       :file)]
+                (when-let [new-engine (->> mods
+                                           (filter (comp #{(fs/canonical-path old-file)} fs/canonical-path :file))
+                                           first)]
+                  (swap! state-atom assoc-in [:by-server :local :battles :singleplayer :battle-version] (:engine-version new-engine))))))
           (catch Exception e
             (log/error e "Error in :battle-map-details state watcher")))))))
 
@@ -1339,72 +1363,14 @@
 (defn- add-watchers
   "Adds all *state watchers."
   [state-atom]
-  (remove-watch state-atom :state-to-edn)
-  (remove-watch state-atom :debug)
-  (remove-watch state-atom :battle-map-details)
-  (remove-watch state-atom :battle-mod-details)
-  (remove-watch state-atom :replay-map-and-mod-details)
   (remove-watch state-atom :fix-missing-resource)
-  (remove-watch state-atom :fix-spring-isolation-dir)
-  (remove-watch state-atom :spring-isolation-dir-changed)
-  (remove-watch state-atom :auto-get-resources)
+  (remove-watch state-atom :filter-replays)
   (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
-  (remove-watch state-atom :filter-replays)
-  (remove-watch state-atom :update-battle-status-sync)
-  #_
-  (add-watch state-atom :battle-map-details
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :battle-map-details-watcher
-          (battle-map-details-watcher _k state-atom old-state new-state)))))
-  #_
-  (add-watch state-atom :battle-mod-details
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :battle-mod-details-watcher
-          (battle-mod-details-watcher _k state-atom old-state new-state)))))
-  #_
-  (add-watch state-atom :replay-map-and-mod-details
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :replay-map-and-mod-details-watcher
-          (replay-map-and-mod-details-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
-  #_
-  (add-watch state-atom :fix-spring-isolation-dir fix-spring-isolation-dir-watcher
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :fix-spring-isolation-dir-watcher
-          (fix-spring-isolation-dir-watcher _k state-atom old-state new-state)))))
-  #_
-  (add-watch state-atom :spring-isolation-dir-changed
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :spring-isolation-dir-changed-watcher
-          (spring-isolation-dir-changed-watcher _k state-atom old-state new-state)))))
-  #_
-  (add-watch state-atom :auto-get-resources
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :auto-get-resources-watcher
-          (auto-get-resources-watcher _k state-atom old-state new-state)))))
   (add-watch state-atom :filter-replays filter-replays-watcher)
   (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
-  (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
-  #_
-  (add-watch state-atom :update-battle-status-sync
-    (fn [_k state-atom old-state new-state]
-      (tufte/profile {:dynamic? true
-                      :id ::state-watcher}
-        (tufte/p :update-battle-status-sync-watcher
-          (update-battle-status-sync-watcher))))))
+  (add-watch state-atom :fix-selected-server fix-selected-server-watcher))
 
 
 (defmulti task-handler ::task-type)
@@ -1785,8 +1751,6 @@
                   (update-in [:by-spring-root spring-root-path :mods]
                     (fn [mods]
                       (->> mods
-                           ;(filter #(contains? % :is-game))
-                           ;(filter #(contains? % :mod-name-only))
                            (remove
                              (fn [{:keys [error mod-name]}]
                                (and (not error)
@@ -2061,6 +2025,14 @@
     (when media-player
       (.setVolume media-player volume))
     (swap! *state assoc :music-volume volume)))
+
+(defmethod event-handler ::on-change-git-version
+  [{:fx/keys [event]}]
+  (swap! *state
+    (fn [state]
+      (-> state
+          (assoc :use-git-mod-version (boolean event))
+          (task/add-task-state {::task-type ::refresh-mods})))))
 
 
 (defn- fix-battle-ready-chimer-fn [state-atom]
@@ -2591,6 +2563,29 @@
   (refresh-replay-resources *state))
 
 
+(defn parse-battle-status-message [battle-status-message]
+  (if (string/starts-with? battle-status-message "\nBattle lobby is empty")
+    []
+    (let [lines (string/split battle-status-message #"\n")
+          [_blank _titles counts & rem-lines] lines
+          table-lines (take-while #(not (string/starts-with? % "=====================")) rem-lines)
+          counts (when counts
+                   (map count (string/split counts #"\s+")))]
+      (map
+        (fn [line]
+          (->> counts
+               (reduce
+                 (fn [{:keys [line parts]} n]
+                   (let [n (min (+ 2 n) (count line))]
+                     {:line (subs line n)
+                      :parts (conj parts (subs line 0 n))}))
+                 {:line line
+                  :parts []})
+               :parts
+               (map string/trim)
+               (zipmap [:username :ally :id :clan :ready :rank :skill :user-id])))
+        table-lines))))
+
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
         wait-time 1000
@@ -2617,34 +2612,21 @@
         (let [path [:by-server server-key :channels channel-name :capture]
               [old-state _new-state] (swap-vals! *state assoc-in path nil)
               captured (get-in old-state path)
-              parsed
-              (if (string/starts-with? captured "\nBattle lobby is empty")
-                []
-                (->> (string/split captured #"\n")
-                     rest
-                     rest
-                     rest
-                     (take-while #(not (string/starts-with? % "=====================")))
-                     (map #(string/split % #"\s+(?![\?\(])"))
-                     (remove #(< (count %) 7))
-                     (map (fn [vs]
-                            (if (= 8 (count vs))
-                              vs
-                              (concat (take 3 vs) [""] (drop 3 vs)))))
-                     (map (partial zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))
-                     (map
-                       (fn [{:keys [ally id] :as u}]
-                         (let [id (some-> id u/to-number int dec)
-                               ally (some-> ally u/to-number int dec)]
-                           (assoc u :battle-status {:ally ally :id id}))))))]
+              parsed (parse-battle-status-message captured)
+              parsed-user-set (set (map :username parsed))]
           (log/info "Captured chat from" channel-name ":" captured)
-          (swap! *state update-in [:by-server server-key :battles battle-id :users]
-            (fn [users]
-              (reduce
-                (fn [m u]
-                  (update m (:username u) merge u))
-                users
-                parsed))))))))
+          (if (seq parsed)
+            (swap! *state update-in [:by-server server-key :battles battle-id :users]
+              (fn [users]
+                (reduce
+                  (fn [m u]
+                    (update m (:username u) merge u))
+                  (into {}
+                    (filter
+                      (comp parsed-user-set first)
+                      users))
+                  parsed)))
+            (log/info "Ignoring empty battle status")))))))
 
 
 (defmethod event-handler ::select-scenario [{:fx/keys [event]}]
@@ -3155,23 +3137,24 @@
   (future
     (try
       (swap! *state
-             (fn [{:keys [engine-version map-name mod-name username] :as state}]
-               (let [username (or (when-not (string/blank? username) username)
-                                  "You")]
-                 (-> state
-                     (assoc :selected-server-tab "singleplayer")
-                     (assoc-in [:by-server :local :client-data] nil)
-                     (assoc-in [:by-server :local :server-key] :local)
-                     (assoc-in [:by-server :local :username] username)
-                     (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
-                                                                           :battle-map map-name
-                                                                           :battle-modname mod-name
-                                                                           :host-username username})
-                     (assoc-in [:by-server :local :battle]
-                               {:battle-id :singleplayer
-                                :scripttags {"game" {"startpostype" 0}}
-                                :users {username {:battle-status (assoc cu/default-battle-status :mode true)
-                                                  :team-color (first color/ffa-colors-spring)}}})))))
+        (fn [{:keys [by-spring-root spring-isolation-dir username] :as state}]
+          (let [{:keys [engine-version map-name mod-name]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+                username (or (when-not (string/blank? username) username)
+                             "You")]
+            (-> state
+                (assoc :selected-server-tab "singleplayer")
+                (assoc-in [:by-server :local :client-data] nil)
+                (assoc-in [:by-server :local :server-key] :local)
+                (assoc-in [:by-server :local :username] username)
+                (assoc-in [:by-server :local :battles :singleplayer] {:battle-version engine-version
+                                                                      :battle-map map-name
+                                                                      :battle-modname mod-name
+                                                                      :host-username username})
+                (assoc-in [:by-server :local :battle]
+                          {:battle-id :singleplayer
+                           :scripttags {"game" {"startpostype" 0}}
+                           :users {username {:battle-status (assoc cu/default-battle-status :mode true)
+                                             :team-color (first color/ffa-colors-spring)}}})))))
       (catch Exception e
         (log/error e "Error starting singleplayer battle")))))
 
@@ -4741,29 +4724,35 @@
   (swap! *state assoc :chat-auto-scroll false))
 
 
-(defmethod event-handler ::singleplayer-engine-changed [{:fx/keys [event] :keys [engine-version]}]
+(defmethod event-handler ::singleplayer-engine-changed
+  [{:fx/keys [event] :keys [engine-version spring-root]}]
   (let [engine-version (or engine-version event)]
     (swap! *state
-           (fn [server]
-             (-> server
-                 (assoc :engine-version engine-version)
-                 (assoc-in [:by-server :local :battles :singleplayer :battle-version] engine-version))))))
+      (fn [server]
+        (-> server
+            (assoc :engine-filter "")
+            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :engine-version] engine-version)
+            (assoc-in [:by-server :local :battles :singleplayer :battle-version] engine-version))))))
 
-(defmethod event-handler ::singleplayer-mod-changed [{:fx/keys [event] :keys [mod-name]}]
+(defmethod event-handler ::singleplayer-mod-changed
+  [{:fx/keys [event] :keys [mod-name spring-root]}]
   (let [mod-name (or mod-name event)]
     (swap! *state
-           (fn [server]
-             (-> server
-                 (assoc :mod-name mod-name)
-                 (assoc-in [:by-server :local :battles :singleplayer :battle-modname] mod-name))))))
+      (fn [server]
+        (-> server
+            (assoc :mod-filter "")
+            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :mod-name] mod-name)
+            (assoc-in [:by-server :local :battles :singleplayer :battle-modname] mod-name))))))
 
-(defmethod event-handler ::singleplayer-map-changed [{:fx/keys [event] :keys [map-name]}]
+(defmethod event-handler ::singleplayer-map-changed
+  [{:fx/keys [event] :keys [map-name spring-root]}]
   (let [map-name (or map-name event)]
     (swap! *state
-           (fn [server]
-             (-> server
-                 (assoc :map-name map-name)
-                 (assoc-in [:by-server :local :battles :singleplayer :battle-map] map-name))))))
+      (fn [server]
+        (-> server
+            (assoc :map-input-prefix "")
+            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :map-name] map-name)
+            (assoc-in [:by-server :local :battles :singleplayer :battle-map] map-name))))))
 
 
 (defmethod event-handler ::scan-imports

@@ -6,6 +6,7 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
@@ -117,23 +118,24 @@
                                      (filter string?)
                                      (filter #(string/includes? (string/lower-case %) filter-lc))
                                      (sort version/version-compare))]
-             [{:fx/type :combo-box
-               :prompt-text " < pick a game > "
-               :value mod-name
-               :items filtered-games
-               :on-value-changed (or on-value-changed
-                                     {:event/type :spring-lobby/assoc
-                                      :key :mod-name})
-               :cell-factory
-               {:fx/cell-type :list-cell
-                :describe
-                (fn [mod-name]
-                  {:text (if (string/blank? mod-name)
-                           "< choose a game >"
-                           mod-name)})}
-               :on-key-pressed {:event/type :spring-lobby/mods-key-pressed}
-               :on-hidden {:event/type :spring-lobby/dissoc
-                           :key :mod-filter}}]))
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str mod-name)
+               :desc
+               {:fx/type :combo-box
+                :prompt-text " < pick a game > "
+                :value mod-name
+                :items filtered-games
+                :on-value-changed on-value-changed
+                :cell-factory
+                {:fx/cell-type :list-cell
+                 :describe
+                 (fn [mod-name]
+                   {:text (if (string/blank? mod-name)
+                            "< choose a game >"
+                            mod-name)})}
+                :on-key-pressed {:event/type :spring-lobby/mods-key-pressed}
+                :on-hidden {:event/type :spring-lobby/dissoc
+                            :key :mod-filter}}}]))
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip

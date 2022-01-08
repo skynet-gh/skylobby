@@ -142,6 +142,15 @@
    {"-normal"
     {"> .ikonli-font-icon"
      {:-fx-icon-color "dimgrey"}}
+    "-players"
+    {"-multiplayer"
+     {:-fx-font-size 14
+      "-nickname"
+      {:-fx-font-size 16}}
+     "-singleplayer"
+     {:-fx-font-size 20
+      "-nickname"
+      {:-fx-font-size 22}}}
     "-tab"
     {"-focus"
      {:-fx-background "#ffd700"
@@ -177,11 +186,11 @@
      "-message"
      {:-fx-fill "white"}}}})
 (def default-classes-css
-  (css/register ::default default-classes))
-
+  (css/register ::default-classes default-classes))
 
 (defn stylesheet-urls [css]
-  [(str (::css/url default-classes-css))
+  [
+   (str (::css/url default-classes-css))
    (str (::css/url (or css default-style)))])
 
 (defn stylesheet-urls-sub [context]
