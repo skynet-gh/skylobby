@@ -16,7 +16,7 @@
 
 (defn- map-sync-pane-impl
   [{:fx/keys [context]
-    :keys [battle-map map-name spring-isolation-dir]}]
+    :keys [battle-map index-only map-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
         downloadables-by-url (fx/sub-val context :downloadables-by-url)
         file-cache (fx/sub-val context :file-cache)
@@ -49,7 +49,8 @@
        (let [severity (cond
                         no-map-details
                         (if indexed-map
-                          -1 2)
+                          (if index-only 0 -1)
+                          2)
                         :else 0)]
          [{:severity severity
            :text "info"

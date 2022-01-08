@@ -36,7 +36,7 @@
 
 (defn- mod-sync-pane-impl
   [{:fx/keys [context]
-    :keys [dependency engine-version mod-name spring-isolation-dir]}]
+    :keys [dependency engine-version index-only mod-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
         downloadables-by-url (fx/sub-val context :downloadables-by-url)
         file-cache (fx/sub-val context :file-cache)
@@ -77,7 +77,8 @@
      (concat
        (let [severity (if no-mod-details
                         (if indexed-mod
-                          -1 2)
+                          (if index-only 0 -1)
+                          2)
                         (if (or dependency (= mod-name (:mod-name indexed-mod)))
                           0 1))]
          [{:severity severity

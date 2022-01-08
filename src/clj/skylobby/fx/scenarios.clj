@@ -242,6 +242,7 @@
                              :on-value-changed {:event/type :spring-lobby/assoc
                                                 :key :scenario-side}}
                             {:fx/type map-sync-pane
+                             :index-only true
                              :map-name map-name
                              :spring-isolation-dir spring-root}]}]))}
                     {:fx/type :button
