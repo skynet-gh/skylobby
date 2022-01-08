@@ -18,6 +18,10 @@
 (def replay-filename-re
   #"^(\d+)_(\d+)_(.*)_(.+).sdfz$")
 
+(defn header-and-body
+  [{:keys [header body]}]
+  (merge header body))
+
 
 ; https://github.com/springlobby/springlobby/blob/master/src/replaylist.h
 ; https://github.com/spring/spring/blob/master/rts/System/LoadSave/demofile.h
@@ -149,13 +153,15 @@
                                player-num-to-name (->> parsed
                                                        (map (comp :demo-stream-chunk :body))
                                                        (filter (comp #{6} :command :header))
-                                                       (map :body)
+                                                       (map header-and-body)
                                                        (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
                                                        (into {}))
                                chat-log (->> parsed
-                                             (map (comp :demo-stream-chunk :body))
+                                             (map (fn [{:keys [header body]}]
+                                                    (assoc (:demo-stream-chunk body) :mod-game-time (:mod-game-time header))))
                                              (filter (comp #{7} :command :header))
-                                             (map :body)
+                                             (map (fn [{:keys [body mod-game-time]}]
+                                                    (assoc body :mod-game-time mod-game-time)))
                                              (remove (comp #(string/starts-with? % "My player ID is") :message))
                                              doall)]
                            {:chat-log chat-log

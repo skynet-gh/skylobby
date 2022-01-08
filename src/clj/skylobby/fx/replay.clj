@@ -92,7 +92,7 @@
                    (comp #(string/starts-with? % "SPRINGIE:") :message)
                    chat-log)]
     (doseq [chat chat-log]
-      (let [{:keys [from dest message]} chat
+      (let [{:keys [from dest message mod-game-time]} chat
             player (get player-num-to-name from)
             color (get player-name-to-color player)
             javafx-color (if color
@@ -111,6 +111,13 @@
           (vec
             (concat
               [
+               (segment
+                 (when mod-game-time
+                   (str
+                     "["
+                     (u/format-duration (java-time/duration mod-game-time :seconds))
+                     "] "))
+                 (str "-fx-fill: grey;"))
                (segment
                  (str
                    (when is-spec
