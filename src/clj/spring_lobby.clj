@@ -417,12 +417,22 @@
                               (or (:engineoptions mod-data)
                                   (:modoptions mod-data))))]
      (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
-     (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
-            (fn [mods]
-              (set
-                (cond->
-                  (remove (comp #{path} fs/canonical-path :file) mods)
-                  mod-details (conj mod-details)))))
+     (let [{:keys [mod-details use-git-mod-version]}
+           (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
+                  (fn [mods]
+                    (set
+                      (cond->
+                        (remove (comp #{path} fs/canonical-path :file) mods)
+                        mod-details (conj mod-details)))))
+           cached (get mod-details path)]
+       (when (and cached
+                  (not= (:mod-version cached)
+                        (:mod-version mod-data)))
+         (task/add-task! *state
+           {::task-type ::mod-details
+            :mod-name (:mod-name mod-data)
+            :mod-file file
+            :use-git-mod-version use-git-mod-version})))
      mod-data)))
 
 
