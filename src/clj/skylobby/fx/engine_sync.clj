@@ -95,7 +95,10 @@
                                   (io/file spring-isolation-dir "engine" resource-filename))
                  extract-exists (fs/file-exists? file-cache extract-target)]
              (concat
-               (when (or (not engine-details) (not dest-exists))
+               (when (or (not engine-details)
+                         (and
+                           (fs/file-status file-cache dest)
+                           (not dest-exists)))
                  [{:severity severity
                    :text "download"
                    :human-text (if in-progress
@@ -138,7 +141,10 @@
                  (let [extracting (or (get extracting dest-path)
                                       (contains? extract-tasks dest-path)
                                       (contains? download-tasks url))]
-                   (when (or extracting (not extract-exists))
+                   (when (or extracting
+                             (and
+                               (fs/file-status file-cache extract-target)
+                               (not extract-exists)))
                      [{:severity (if engine-details
                                    0
                                    (if extract-exists -1 2))
