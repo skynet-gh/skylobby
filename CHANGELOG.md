@@ -21,6 +21,13 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.45]
+
+- Add timestamps to replay chat
+- Fix git versioning singleplayer issues
+- Fix battle status parsing
+- Increase size of controls in singleplayer
+
 ### [0.7.44]
 
 - Add task to delete `rapid` dir if a `versions.gz` is corrupt
