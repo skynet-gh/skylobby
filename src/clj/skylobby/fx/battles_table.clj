@@ -174,6 +174,7 @@
                                :text (str "Players:\n\n")}]
                              (->> battle-users
                                   keys
+                                  (filter string?)
                                   (sort String/CASE_INSENSITIVE_ORDER)
                                   (map
                                     (fn [player]

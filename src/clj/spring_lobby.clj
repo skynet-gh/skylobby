@@ -2564,27 +2564,31 @@
 
 
 (defn parse-battle-status-message [battle-status-message]
-  (if (string/starts-with? battle-status-message "\nBattle lobby is empty")
+  (if (string/includes? battle-status-message "Battle lobby is empty")
     []
     (let [lines (string/split battle-status-message #"\n")
           [_blank _titles counts & rem-lines] lines
           table-lines (take-while #(not (string/starts-with? % "=====================")) rem-lines)
           counts (when counts
                    (map count (string/split counts #"\s+")))]
-      (map
-        (fn [line]
-          (->> counts
-               (reduce
-                 (fn [{:keys [line parts]} n]
-                   (let [n (min (+ 2 n) (count line))]
-                     {:line (subs line n)
-                      :parts (conj parts (subs line 0 n))}))
-                 {:line line
-                  :parts []})
-               :parts
-               (map string/trim)
-               (zipmap [:username :ally :id :clan :ready :rank :skill :user-id])))
-        table-lines))))
+      (->> table-lines
+           (map
+             (fn [line]
+               (->> counts
+                    (reduce
+                      (fn [{:keys [line parts]} n]
+                        (let [n (min (+ 2 n) (count line))]
+                          {:line (subs line n)
+                           :parts (conj parts (subs line 0 n))}))
+                      {:line line
+                       :parts []})
+                    :parts
+                    (map string/trim)
+                    (zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))))
+           (map
+             (fn [{:keys [ally id] :as user}]
+               (assoc user :battle-status {:id (u/to-number id)
+                                           :ally (u/to-number ally)})))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
@@ -2601,32 +2605,35 @@
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
     (future
-      (when is-bot
-        (log/info "Capturing chat from" channel-name)
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!status battle")})
-        (async/<!! (async/timeout wait-time))
-        (let [path [:by-server server-key :channels channel-name :capture]
-              [old-state _new-state] (swap-vals! *state assoc-in path nil)
-              captured (get-in old-state path)
-              parsed (parse-battle-status-message captured)
-              parsed-user-set (set (map :username parsed))]
-          (log/info "Captured chat from" channel-name ":" captured)
-          (if (seq parsed)
-            (swap! *state update-in [:by-server server-key :battles battle-id :users]
-              (fn [users]
-                (reduce
-                  (fn [m u]
-                    (update m (:username u) merge u))
-                  (into {}
-                    (filter
-                      (comp parsed-user-set first)
-                      users))
-                  parsed)))
-            (log/info "Ignoring empty battle status")))))))
+      (try
+        (when is-bot
+          (log/info "Capturing chat from" channel-name)
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!status battle")})
+          (async/<!! (async/timeout wait-time))
+          (let [path [:by-server server-key :channels channel-name :capture]
+                [old-state _new-state] (swap-vals! *state assoc-in path nil)
+                captured (get-in old-state path)
+                parsed (parse-battle-status-message captured)
+                parsed-user-set (set (map :username parsed))]
+            (log/info "Captured chat from" channel-name ":" captured)
+            (if (seq parsed)
+              (swap! *state update-in [:by-server server-key :battles battle-id :users]
+                (fn [users]
+                  (reduce
+                    (fn [m u]
+                      (update m (:username u) merge u))
+                    (into {}
+                      (filter
+                        (comp parsed-user-set first)
+                        users))
+                    parsed)))
+              (log/info "Ignoring empty battle status"))))
+        (catch Exception e
+          (log/error e "Error parsing battle status response"))))))
 
 
 (defmethod event-handler ::select-scenario [{:fx/keys [event]}]
