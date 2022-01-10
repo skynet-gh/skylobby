@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.46]
+
+- Fix battle status parsing for id and ally
+
 ### [0.7.45]
 
 - Add timestamps to replay chat
