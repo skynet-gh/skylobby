@@ -51,7 +51,7 @@
          [
           {:fx/type :button
            :text (if running
-                   (u/download-progress download)
+                   (str "Downloading update: " (u/download-progress download))
                    (str "Update to " latest))
            :disable (boolean running)
            :on-action
