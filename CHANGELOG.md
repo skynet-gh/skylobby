@@ -21,6 +21,10 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.47]
+
+- Add setting to show hidden modoptions, default off
+
 ### [0.7.46]
 
 - Fix battle status parsing for id and ally

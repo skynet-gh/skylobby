@@ -49,6 +49,9 @@
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)
+        exact-version-match (= mod-name (:mod-name indexed-mod))
+        is-unversioned (and mod-name
+                            (string/ends-with? mod-name "$VERSION"))
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         no-mod-details (not (resource/details? mod-details))
         refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
@@ -57,7 +60,9 @@
                                      (map :download-source-name)
                                      set)
         mod-update-tasks (concat refresh-mods-tasks mod-details-tasks)
-        rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+        rapid-tasks-by-id (->> (concat
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid)
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download))
                                (map (juxt :rapid-id identity))
                                (into {}))
         mod-file (or (:file mod-details) (:file indexed-mod))
@@ -79,7 +84,10 @@
        (let [severity (if no-mod-details
                         (if indexed-mod
                           (if (or dependency index-only)
-                            0 -1)
+                            0
+                            (if (not= mod-name (:mod-name indexed-mod))
+                              1
+                              -1))
                           2)
                         0)]
          [{:severity severity
@@ -88,8 +96,14 @@
            :tooltip (if (zero? severity)
                       canonical-path
                       (if indexed-mod
-                        (str "Loading mod details for '" mod-name "' at " (:file indexed-mod))
+                        (if exact-version-match
+                          (str "Loading mod details for '" mod-name "' at " (:file indexed-mod))
+                          "Cannot determine exact version match")
                         (str "Game '" mod-name "' not found locally")))}])
+       (when (and indexed-mod (not exact-version-match))
+         [{:severity 1
+           :text "mismatch"
+           :human-text (str "Cannot match version, using " (:mod-name indexed-mod))}])
        (when (and no-mod-details (not indexed-mod))
          (let [downloadable (->> downloadables-by-url
                                  vals
@@ -187,7 +201,9 @@
                            :springname springname
                            :resource-type :spring-lobby/mod
                            :spring-isolation-dir spring-isolation-dir})})}])))
-             (when (and mod-name (not (some #(re-find % mod-name) no-rapid)))
+             (when (and mod-name
+                        (not is-unversioned)
+                        (not (some #(re-find % mod-name) no-rapid)))
                (let [rapid-data (get rapid-data-by-version mod-name)
                      rapid-id (:id rapid-data)
                      rapid-download (get rapid-downloads-by-id rapid-id)
@@ -287,7 +303,8 @@
                 :in-progress true}]))))
        (when (= :directory
                 (::fs/source indexed-mod))
-         (let [battle-mod-git-ref (u/mod-git-ref mod-name)
+         (let [
+               battle-mod-git-ref (u/mod-git-ref mod-name)
                severity (if (= mod-name
                                (:mod-name indexed-mod))
                           0 1)

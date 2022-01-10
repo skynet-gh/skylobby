@@ -903,7 +903,7 @@
                         (cond
                           (string/ends-with? mod-version "$VERSION")
                           {:fx/type :label
-                           :text " Unknown game version "}
+                           :text " Game version not specified"}
                           (string/includes? mod-version " git:")
                           {:fx/type :label
                            :text " Different git version, select for options"}

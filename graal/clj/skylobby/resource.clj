@@ -279,7 +279,8 @@
         mods-by-name (->> mods
                           (map (juxt :mod-name identity))
                           (into {})
-                          (merge git-mods))]
+                          (merge git-mods))
+        mods-by-name-only (group-by :mod-name-only mods)]
     {:spring-isolation-dir spring-root
      :engine-version engine-version
      :engines engines
@@ -290,4 +291,5 @@
      :maps-by-name (into {} (map (juxt :map-name identity) maps))
      :mod-name mod-name
      :mods mods
-     :mods-by-name mods-by-name}))
+     :mods-by-name mods-by-name
+     :mods-by-name-only mods-by-name-only}))
