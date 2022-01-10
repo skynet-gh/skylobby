@@ -117,7 +117,7 @@
       (str (format-bytes current)
            " / "
            (format-bytes total))
-      "Downloading...")))
+      "...")))
 
 
 (defn decode [^String s]
