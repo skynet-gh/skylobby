@@ -93,7 +93,7 @@
                    {:severity severity
                     :text "download"
                     :human-text (if in-progress
-                                  (u/download-progress download)
+                                  (str "Downloading " (u/download-progress download))
                                   (if downloadable
                                     (if dest-exists
                                       (str "Downloaded " (fs/filename dest))
@@ -144,7 +144,7 @@
                  [{:severity severity
                    :text "springfiles"
                    :human-text (if springfiles-in-progress
-                                 (u/download-progress springfiles-download)
+                                 (str "Downloading " (u/download-progress springfiles-download))
                                  (if springfiles-searched
                                    (if springfiles-search-result
                                      (if dest-exists
