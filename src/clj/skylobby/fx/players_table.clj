@@ -531,7 +531,7 @@
            [{:fx/type :table-column
              :text "Ally"
              :resizable false
-             :pref-width 80
+             :pref-width 86
              :cell-value-factory (juxt
                                    sort-playing
                                    sort-ally
@@ -570,7 +570,7 @@
            [{:fx/type :table-column
              :text "Team"
              :resizable false
-             :pref-width 80
+             :pref-width 86
              :cell-value-factory (juxt
                                    sort-playing
                                    sort-id

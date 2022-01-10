@@ -57,7 +57,9 @@
                                       (filter (comp #(string/includes? % "chobby") string/lower-case :mod-name))
                                       seq)
         loading-scenarios (boolean mod-details-chobby-tasks)
-        rapid-tasks-by-id (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+        rapid-tasks-by-id (->> (concat
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-update))
                                (map (juxt :rapid-id identity))
                                (into {}))]
     {:fx/type :v-box
@@ -95,14 +97,9 @@
            :on-value-changed {:event/type :spring-lobby/assoc
                               :key :engine-version}}]}
         {:fx/type :label
-         :text (str " Scenarios for " rapid-id)}]
+         :text (str " Latest version is " (get-in rapid-data-by-id [latest-rapid-id :version]))}]
        (if indexed-mod
-         [{:fx/type :label
-           :text (str rapid-id)}
-          {:fx/type :label
-           :text (str rapid-hash)}
-          {:fx/type :label
-           :text (str rapid-version)}
+         [
           {:fx/type :button
            :disable loading-scenarios
            :text (if loading-scenarios
@@ -116,9 +113,17 @@
             {:spring-lobby/task-type :spring-lobby/mod-details
              :mod-name rapid-version
              :mod-file (:file indexed-mod)}}}]
-         [{:fx/type :button
-           :text " Get latest "
-           :disable (contains? rapid-tasks-by-id rapid-id)
+         [
+          {:fx/type :button
+           :text (cond
+                   (not engine-version) "Pick an engine"
+                   (contains? rapid-tasks-by-id rapid-id)
+                   (str "Getting latest " rapid-id "...")
+                   :else
+                   " Get latest ")
+           :disable (or
+                      (contains? rapid-tasks-by-id rapid-id)
+                      (not engine-version))
            :on-action
            {:event/type :spring-lobby/add-task
             :task

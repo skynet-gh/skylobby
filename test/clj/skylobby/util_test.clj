@@ -95,7 +95,7 @@
 
 
 (deftest download-progress
-  (is (= "Downloading..."
+  (is (= "..."
          (u/download-progress nil)))
   (is (= "0 bytes / 0 bytes"
          (u/download-progress
