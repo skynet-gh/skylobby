@@ -36,9 +36,14 @@
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+        show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
         option-key (or option-key "modoptions")
         current-options (or current-options
                             (get-in scripttags ["game" option-key]))
+        modoptions (if show-hidden-modoptions
+                     modoptions
+                     (->> modoptions
+                          (remove (comp :hidden second))))
         first-option (-> modoptions first second)
         is-section (-> first-option :type (= "section"))
         header (when is-section first-option)
