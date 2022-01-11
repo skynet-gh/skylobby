@@ -32,10 +32,11 @@
                                       "other" {}}})
         now 12345]
     (with-redefs [u/curr-millis (constantly now)]
-      (u/append-console-log state-atom "skynet@localhost" :server "message"))
+      (u/append-console-log state-atom "skynet@localhost" :server "message test"))
     (is (= {:by-server
             {"skynet@localhost"
-             {:console-log [{:message "message"
+             {:console-log [{:message "message test"
+                             :message-type "message"
                              :timestamp now
                              :source :server}]}
              "other" {}}}

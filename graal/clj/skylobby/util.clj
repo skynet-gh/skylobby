@@ -362,7 +362,8 @@
           (fn [console-log]
             (conj console-log {:timestamp (curr-millis)
                                :source source
-                               :message message})))
+                               :message message
+                               :message-type (first (string/split message #"\s+"))})))
         state))))
 
 
