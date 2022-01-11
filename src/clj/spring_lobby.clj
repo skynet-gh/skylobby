@@ -2587,8 +2587,8 @@
                     (zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))))
            (map
              (fn [{:keys [ally id] :as user}]
-               (assoc user :battle-status {:id (u/to-number id)
-                                           :ally (u/to-number ally)})))))))
+               (assoc user :battle-status {:id (some-> id u/to-number int dec)
+                                           :ally (some-> ally u/to-number int dec)})))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
