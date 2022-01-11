@@ -21,6 +21,12 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.49]
+
+- Fix file browsing for some resource files, or if path does not exist
+- Add ability to filter console messages
+- Fix off by one in battle status parse
+
 ### [0.7.48]
 
 - Fix spring root picker showing when cli arg is set
