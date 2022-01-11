@@ -29,6 +29,7 @@
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   http-kit/http-kit {:mvn/version "2.5.3"}
+  io.aviso/pretty {:mvn/version "1.1.1"}
   io.netty/netty-codec {:mvn/version "4.1.72.Final"}
   io.netty/netty-codec-http {:mvn/version "4.1.72.Final"}
   io.netty/netty-handler {:mvn/version "4.1.72.Final"}

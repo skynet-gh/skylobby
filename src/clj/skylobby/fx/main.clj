@@ -32,7 +32,8 @@
         show-scenarios (fx/sub-val context :show-scenarios-window)
         show-settings (fx/sub-val context :show-settings-window)
         show-singleplayer (fx/sub-val context get-in [:by-server :local :battle :battle-id])
-        show-spring-picker (fx/sub-val context :show-spring-picker)
+        show-spring-picker (and (fx/sub-val context :show-spring-picker)
+                                (not (fx/sub-val context :spring-lobby.main/spring-root-arg)))
         show-tasks (fx/sub-val context :show-tasks-window)
         windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
