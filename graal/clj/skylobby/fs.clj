@@ -108,6 +108,13 @@
           (when-let [parent (parent-file f)]
             (canonical-path parent)))))
 
+(defn first-existing-parent [f]
+  (when f
+    (let [parent (parent-file f)]
+      (if (exists? parent)
+        parent
+        (first-existing-parent parent)))))
+
 (defn list-files [^File f]
   (when f
     (.listFiles f)))

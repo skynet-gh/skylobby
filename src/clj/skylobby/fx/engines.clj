@@ -2,12 +2,12 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
-    [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.font-icon :as font-icon]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
@@ -27,9 +27,10 @@
     :or {flow true}}]
   (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
         engine-filter (fx/sub-val context :engine-filter)
-        engines (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :engines])
+        {:keys [engines engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         http-download (fx/sub-val context :http-download)
-        http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)]
+        http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
+        selected-engine-file (:file (get engines-by-version engine-version))]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -93,11 +94,12 @@
            {:tooltip
             {:fx/type tooltip-nofocus/lifecycle
              :show-delay skylobby.fx/tooltip-show-delay
-             :text "Open engine directory"}}
+             :text "View engine directory"}}
            :desc
            {:fx/type :button
             :on-action {:event/type :spring-lobby/desktop-browse-dir
-                        :file (io/file spring-isolation-dir "engine")}
+                        :file (or selected-engine-file
+                                  (fs/file spring-isolation-dir "engine"))}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-folder:16:white"}}}

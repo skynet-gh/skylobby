@@ -169,7 +169,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :console-auto-scroll :console-ignore-message-types :css :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
@@ -2587,8 +2587,8 @@
                     (zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))))
            (map
              (fn [{:keys [ally id] :as user}]
-               (assoc user :battle-status {:id (u/to-number id)
-                                           :ally (u/to-number ally)})))))))
+               (assoc user :battle-status {:id (some-> id u/to-number int dec)
+                                           :ally (some-> ally u/to-number int dec)})))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
@@ -3205,7 +3205,10 @@
   [{:keys [file]}]
   (future
     (try
-      (let [desktop (Desktop/getDesktop)]
+      (let [desktop (Desktop/getDesktop)
+            file (if (fs/exists? file)
+                   file
+                   (fs/first-existing-parent file))]
         (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
           (if (fs/is-directory? file)
             (.browseFileDirectory desktop (fs/file file "dne"))

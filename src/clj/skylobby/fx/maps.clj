@@ -42,7 +42,8 @@
         http-download (fx/sub-val context :http-download)
         map-input-prefix (fx/sub-val context :map-input-prefix)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
-        {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)]
+        {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        selected-map-file (:file (get maps-by-name map-name))]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -118,11 +119,12 @@
            {:tooltip
             {:fx/type tooltip-nofocus/lifecycle
              :show-delay skylobby.fx/tooltip-show-delay
-             :text "Open maps directory"}}
+             :text "View map file"}}
            :desc
            {:fx/type :button
             :on-action {:event/type :spring-lobby/desktop-browse-dir
-                        :file (io/file spring-isolation-dir "maps")}
+                        :file (or selected-map-file
+                                  (fs/file spring-isolation-dir "maps"))}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-folder:16:white"}}}]
@@ -156,7 +158,7 @@
             :on-action {:event/type :spring-lobby/add-task
                         :task {:spring-lobby/task-type :spring-lobby/refresh-maps
                                :spring-root spring-isolation-dir
-                               :priorities [(:file (get maps-by-name map-name))]}}
+                               :priorities [selected-map-file]}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}]
