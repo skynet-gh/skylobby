@@ -3205,7 +3205,10 @@
   [{:keys [file]}]
   (future
     (try
-      (let [desktop (Desktop/getDesktop)]
+      (let [desktop (Desktop/getDesktop)
+            file (if (fs/exists? file)
+                   file
+                   (fs/first-existing-parent file))]
         (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
           (if (fs/is-directory? file)
             (.browseFileDirectory desktop (fs/file file "dne"))

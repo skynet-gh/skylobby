@@ -2,7 +2,6 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
-    [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
@@ -44,7 +43,8 @@
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
         games (filter :is-game mods)
-        spring-root-path (fs/canonical-path spring-isolation-dir)]
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        selected-mod-file (:file (get mods-by-name mod-name))]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -141,11 +141,12 @@
            {:tooltip
             {:fx/type tooltip-nofocus/lifecycle
              :show-delay skylobby.fx/tooltip-show-delay
-             :text "Open games directory"}}
+             :text "View game file"}}
            :desc
            {:fx/type :button
             :on-action {:event/type :spring-lobby/desktop-browse-dir
-                        :file (io/file spring-isolation-dir "games")}
+                        :file (or selected-mod-file
+                                  (fs/file spring-isolation-dir "games"))}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-folder:16:white"}}}
@@ -163,7 +164,7 @@
             :on-action {:event/type :spring-lobby/add-task
                         :task {:spring-lobby/task-type :spring-lobby/refresh-mods
                                :spring-root spring-isolation-dir
-                               :priorities [(:file (get mods-by-name mod-name))]}}
+                               :priorities [selected-mod-file]}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])})))
