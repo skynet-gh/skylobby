@@ -131,7 +131,9 @@
                           initial-state
                           {:standalone true}
                           (when (contains? options :spring-root)
-                            {:spring-isolation-dir (fs/file (:spring-root options))})
+                            (let [f (fs/file (:spring-root options))]
+                              {:spring-isolation-dir f
+                               ::spring-root-arg f}))
                           (when (contains? options :music-dir)
                             {:music-dir (fs/file (:music-dir options))})
                           (when (contains? options :music-volume)

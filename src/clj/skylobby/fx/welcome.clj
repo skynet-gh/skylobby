@@ -79,67 +79,69 @@
   {:fx/type :v-box
    :spacing 10
    :children
-   [
-    {:fx/type :button
-     :style-class ["button" "skylobby-normal"]
-     :pref-width local-buttons-width
-     :text "Singleplayer"
-     :on-action {:event/type :spring-lobby/start-singleplayer-battle}
-     :alignment :center-left
-     :graphic-text-gap local-buttons-text-gap
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-account:30"}}
-    {:fx/type :button
-     :style-class ["button" "skylobby-normal"]
-     :pref-width local-buttons-width
-     :text "Replays"
-     :on-action {:event/type :spring-lobby/toggle-window
-                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                 :key :show-replays}
-     :alignment :center-left
-     :graphic-text-gap local-buttons-text-gap
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-movie:30"}}
-    {:fx/type :button
-     :style-class ["button" "skylobby-normal"]
-     :pref-width local-buttons-width
-     :text "Scenarios"
-     :on-action {:event/type :spring-lobby/toggle-window
-                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                 :key :show-scenarios-window}
-     :alignment :center-left
-     :graphic-text-gap local-buttons-text-gap
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-checkerboard:30"}}
-    {:fx/type :button
-     :style-class ["button" "skylobby-normal"]
-     :pref-width local-buttons-width
-     :text "Spring"
-     :on-action {:event/type :spring-lobby/toggle-window
-                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                 :key :show-spring-picker}
-     :alignment :center-left
-     :graphic-text-gap local-buttons-text-gap
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-white-balance-sunny:30"}}
-    {:fx/type :button
-     :style-class ["button" "skylobby-normal"]
-     :pref-width local-buttons-width
-     :text "Settings"
-     :on-action {:event/type :spring-lobby/toggle-window
-                 :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                 :key :show-settings-window}
-     :alignment :center-left
-     :graphic-text-gap local-buttons-text-gap
-     :graphic
-     {:fx/type font-icon/lifecycle
-      :icon-literal "mdi-settings:30"}}
-    {:fx/type :pane
-     :v-box/vgrow :always}]})
+   (concat
+     [
+      {:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
+       :text "Singleplayer"
+       :on-action {:event/type :spring-lobby/start-singleplayer-battle}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-account:30"}}
+      {:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
+       :text "Replays"
+       :on-action {:event/type :spring-lobby/toggle-window
+                   :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                   :key :show-replays}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-movie:30"}}
+      {:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
+       :text "Scenarios"
+       :on-action {:event/type :spring-lobby/toggle-window
+                   :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                   :key :show-scenarios-window}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-checkerboard:30"}}]
+     (when (not (fx/sub-val context :spring-lobby.main/spring-root-arg))
+       [{:fx/type :button
+         :style-class ["button" "skylobby-normal"]
+         :pref-width local-buttons-width
+         :text "Spring"
+         :on-action {:event/type :spring-lobby/toggle-window
+                     :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                     :key :show-spring-picker}
+         :alignment :center-left
+         :graphic-text-gap local-buttons-text-gap
+         :graphic
+         {:fx/type font-icon/lifecycle
+          :icon-literal "mdi-white-balance-sunny:30"}}])
+     [{:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
+       :text "Settings"
+       :on-action {:event/type :spring-lobby/toggle-window
+                   :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                   :key :show-settings-window}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-settings:30"}}
+      {:fx/type :pane
+       :v-box/vgrow :always}])})
 
 
 (defn multiplayer-buttons
