@@ -104,7 +104,7 @@
                    :human-text (if in-progress
                                  (if (and (not downloadable) download-source-name)
                                    (str "Updating download source " download-source-name)
-                                   (u/download-progress download))
+                                   (str "Downloading " (u/download-progress download)))
                                  (if downloadable
                                    (if dest-exists
                                      (str "Downloaded " (fs/filename dest))
@@ -185,7 +185,7 @@
            [{:severity 2
              :text "springfiles"
              :human-text (if springfiles-in-progress
-                           (u/download-progress springfiles-download)
+                           (str "Downloading " (u/download-progress springfiles-download))
                            (if springfiles-searched
                              (if springfiles-search-result
                                "Download from springfiles"

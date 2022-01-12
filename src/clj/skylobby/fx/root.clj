@@ -20,6 +20,7 @@
     [skylobby.fx.scenarios :as fx.scenarios]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.settings :as fx.settings]
+    [skylobby.fx.spring-info :as fx.spring-info]
     [skylobby.fx.tasks :as fx.tasks]
     [skylobby.util :as u]
     spring-lobby
@@ -122,6 +123,11 @@
        :desc
        {:fx/type battle-window}}
       {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-spring-debug))
+       :desc
+       {:fx/type fx.battle/spring-debug-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
        :key (boolean (fx/sub-val context :show-downloader))
        :desc
        {:fx/type fx.download/download-window
@@ -210,6 +216,11 @@
        :key (boolean (fx/sub-val context :show-scenarios-window))
        :desc
        {:fx/type fx.scenarios/scenarios-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-spring-info-window))
+       :desc
+       {:fx/type fx.spring-info/spring-info-window
         :screen-bounds screen-bounds}}]}))
 
 

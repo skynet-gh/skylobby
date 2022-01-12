@@ -75,6 +75,7 @@
         battles-table-images (fx/sub-val context :battles-table-images)
         chat-auto-complete (fx/sub-val context :chat-auto-complete)
         chat-font-size (fx/sub-val context :chat-font-size)
+        debug-spring (fx/sub-val context :debug-spring)
         extra-import-name (fx/sub-val context :extra-import-name)
         extra-import-path (fx/sub-val context :extra-import-path)
         extra-import-sources (fx/sub-val context :extra-import-sources)
@@ -458,7 +459,16 @@
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :show-hidden-modoptions}}
              {:fx/type :label
-              :text " Show hidden modoptions"}]}]}
+              :text " Show hidden modoptions"}]}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [{:fx/type :check-box
+              :selected (boolean debug-spring)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :debug-spring}}
+             {:fx/type :label
+              :text " Debug spring mode (write script and show command)"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title " Performance"

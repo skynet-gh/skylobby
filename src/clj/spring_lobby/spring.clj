@@ -177,7 +177,7 @@
                             (->> all-modoptions
                                  (map
                                    (fn [modoption]
-                                     (let [k (some-> modoption :key string/lower-case keyword)
+                                     (let [k (some-> modoption :key string/lower-case)
                                            default (:def modoption)
                                            v (get modoptions k default)]
                                        [k
@@ -382,7 +382,8 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt ^java.io.File spring-isolation-dir
+   {:keys [client-data debug-spring engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt
+           ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
@@ -432,15 +433,16 @@
                                     (log/info "Copied Spring settings" res)))
                                 (log/info "Game specific settings do not exist, skipping"))))
                           (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state)))))))
+        infologs-dir (fs/file spring-isolation-dir "infologs")
+        infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))
         post-game-fn (fn []
                        (try
-                         (let [infologs-dir (fs/file spring-isolation-dir "infologs")
-                               infolog-src (fs/file spring-isolation-dir "infolog.txt")
-                               infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))]
+                         (let [
+                               infolog-src (fs/file spring-isolation-dir "infolog.txt")]
                            (if (fs/exists? infolog-src)
                              (do
                                (fs/make-dirs infologs-dir)
-                               (log/info "Copying infolog to")
+                               (log/info "Copying infolog to" infolog-dest)
                                (fs/copy infolog-src infolog-dest))
                              (log/warn "Infolog file does not exist:" infolog-src)))
                          (catch Exception e
@@ -488,7 +490,8 @@
                      (client/send-message state-atom client-data
                        (str "MYSTATUS "
                             (cu/encode-client-status
-                              (assoc my-client-status :ingame ingame)))))]
+                              (assoc my-client-status :ingame ingame)))))
+        spring-log-state (atom [])]
     (try
       (log/info "Preparing to start game")
       (try
@@ -518,39 +521,52 @@
         (let [command [(fs/canonical-path engine-file)
                        "--isolation-dir" isolation-dir-param
                        "--write-dir" write-dir-param
-                       script-file-param]
-              runtime (Runtime/getRuntime)]
-          (log/info "Running '" command "'")
-          (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-                ^"[Ljava.lang.String;" envp (get-envp)
-                process (.exec runtime cmdarray envp spring-isolation-dir)]
-            (async/thread
-              (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (do
-                      (log/info "(spring out)" line)
-                      (recur))
-                    (log/info "Spring stdout stream closed")))))
-            (async/thread
-              (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (do
-                      (log/info "(spring err)" line)
-                      (recur))
-                    (log/info "Spring stderr stream closed")))))
-            (try
-              (.waitFor process)
+                       script-file-param]]
+          (if debug-spring
+            (do
+              (log/info "Setting spring command for debug mode")
+              (swap! state-atom assoc :show-spring-debug true :spring-debug-command command))
+            (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+                  ^"[Ljava.lang.String;" envp (get-envp)
+                  runtime (Runtime/getRuntime)
+                  process (.exec runtime cmdarray envp spring-isolation-dir)]
+              (log/info "Running '" command "'")
+              (async/thread
+                (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+                  (loop []
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (log/info "(spring out)" line)
+                        (swap! spring-log-state conj {:stream :out :line line})
+                        (recur))
+                      (log/info "Spring stdout stream closed")))))
+              (async/thread
+                (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+                  (loop []
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (log/info "(spring err)" line)
+                        (swap! spring-log-state conj {:stream :err :line line})
+                        (recur))
+                      (log/info "Spring stderr stream closed")))))
               (try
-                (post-game-fn)
+                (let [exit-code (.waitFor process)]
+                  (log/info "Spring exited with code" exit-code)
+                  (when (not= 0 exit-code)
+                    (log/info "Non-zero spring exit, showing info window")
+                    (swap! state-atom assoc
+                           :show-spring-info-window true
+                           :spring-log @spring-log-state
+                           :spring-crash-infolog-file infolog-dest)))
+                (try
+                  (post-game-fn)
+                  (catch Exception e
+                    (log/error e "Error in post-game-fn")))
                 (catch Exception e
-                  (log/error e "Error in post-game-fn")))
-              (catch Exception e
-                (log/error e "Error waiting for Spring to close"))
-              (catch Throwable t
-                (log/error t "Fatal error waiting for Spring to close")
-                (throw t))))))
+                  (log/error e "Error waiting for Spring to close"))
+                (catch Throwable t
+                  (log/error t "Fatal error waiting for Spring to close")
+                  (throw t)))))))
       (catch Exception e
         (log/error e "Error starting game"))
       (finally

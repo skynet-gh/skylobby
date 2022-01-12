@@ -30,14 +30,14 @@
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   http-kit/http-kit {:mvn/version "2.5.3"}
   io.aviso/pretty {:mvn/version "1.1.1"}
-  io.netty/netty-codec {:mvn/version "4.1.72.Final"}
-  io.netty/netty-codec-http {:mvn/version "4.1.72.Final"}
-  io.netty/netty-handler {:mvn/version "4.1.72.Final"}
-  io.netty/netty-handler-proxy {:mvn/version "4.1.72.Final"}
-  io.netty/netty-resolver {:mvn/version "4.1.72.Final"}
-  io.netty/netty-resolver-dns {:mvn/version "4.1.72.Final"}
-  io.netty/netty-transport {:mvn/version "4.1.72.Final"}
-  io.netty/netty-transport-native-epoll {:mvn/version "4.1.72.Final"}
+  io.netty/netty-codec {:mvn/version "4.1.73.Final"}
+  io.netty/netty-codec-http {:mvn/version "4.1.73.Final"}
+  io.netty/netty-handler {:mvn/version "4.1.73.Final"}
+  io.netty/netty-handler-proxy {:mvn/version "4.1.73.Final"}
+  io.netty/netty-resolver {:mvn/version "4.1.73.Final"}
+  io.netty/netty-resolver-dns {:mvn/version "4.1.73.Final"}
+  io.netty/netty-transport {:mvn/version "4.1.73.Final"}
+  io.netty/netty-transport-native-epoll {:mvn/version "4.1.73.Final"}
   hashp/hashp {:mvn/version "0.2.1"}
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.10"}
@@ -186,14 +186,14 @@
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.netty/netty-codec {:mvn/version "4.1.72.Final"}
-    io.netty/netty-codec-http {:mvn/version "4.1.72.Final"}
-    io.netty/netty-handler {:mvn/version "4.1.72.Final"}
-    io.netty/netty-handler-proxy {:mvn/version "4.1.72.Final"}
-    io.netty/netty-resolver {:mvn/version "4.1.72.Final"}
-    io.netty/netty-resolver-dns {:mvn/version "4.1.72.Final"}
-    io.netty/netty-transport {:mvn/version "4.1.72.Final"}
-    io.netty/netty-transport-native-epoll {:mvn/version "4.1.72.Final"}
+    io.netty/netty-codec {:mvn/version "4.1.73.Final"}
+    io.netty/netty-codec-http {:mvn/version "4.1.73.Final"}
+    io.netty/netty-handler {:mvn/version "4.1.73.Final"}
+    io.netty/netty-handler-proxy {:mvn/version "4.1.73.Final"}
+    io.netty/netty-resolver {:mvn/version "4.1.73.Final"}
+    io.netty/netty-resolver-dns {:mvn/version "4.1.73.Final"}
+    io.netty/netty-transport {:mvn/version "4.1.73.Final"}
+    io.netty/netty-transport-native-epoll {:mvn/version "4.1.73.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.2.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
