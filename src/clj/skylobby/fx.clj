@@ -184,7 +184,14 @@
      "-source-client"
      {:-fx-fill "royalblue"}
      "-message"
+     {:-fx-fill "white"}}
+    "-spring-log"
+    {
+     "-err"
+     {:-fx-fill "red"}
+     "-out"
      {:-fx-fill "white"}}}})
+
 (def default-classes-css
   (css/register ::default-classes default-classes))
 

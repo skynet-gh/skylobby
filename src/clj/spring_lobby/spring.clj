@@ -432,15 +432,16 @@
                                     (log/info "Copied Spring settings" res)))
                                 (log/info "Game specific settings do not exist, skipping"))))
                           (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state)))))))
+        infologs-dir (fs/file spring-isolation-dir "infologs")
+        infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))
         post-game-fn (fn []
                        (try
-                         (let [infologs-dir (fs/file spring-isolation-dir "infologs")
-                               infolog-src (fs/file spring-isolation-dir "infolog.txt")
-                               infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))]
+                         (let [
+                               infolog-src (fs/file spring-isolation-dir "infolog.txt")]
                            (if (fs/exists? infolog-src)
                              (do
                                (fs/make-dirs infologs-dir)
-                               (log/info "Copying infolog to")
+                               (log/info "Copying infolog to" infolog-dest)
                                (fs/copy infolog-src infolog-dest))
                              (log/warn "Infolog file does not exist:" infolog-src)))
                          (catch Exception e
@@ -488,7 +489,8 @@
                      (client/send-message state-atom client-data
                        (str "MYSTATUS "
                             (cu/encode-client-status
-                              (assoc my-client-status :ingame ingame)))))]
+                              (assoc my-client-status :ingame ingame)))))
+        spring-log-state (atom [])]
     (try
       (log/info "Preparing to start game")
       (try
@@ -530,6 +532,7 @@
                   (if-let [line (.readLine reader)]
                     (do
                       (log/info "(spring out)" line)
+                      (swap! spring-log-state conj {:stream :out :line line})
                       (recur))
                     (log/info "Spring stdout stream closed")))))
             (async/thread
@@ -538,10 +541,18 @@
                   (if-let [line (.readLine reader)]
                     (do
                       (log/info "(spring err)" line)
+                      (swap! spring-log-state conj {:stream :err :line line})
                       (recur))
                     (log/info "Spring stderr stream closed")))))
             (try
-              (.waitFor process)
+              (let [exit-code (.waitFor process)]
+                (log/info "Spring exited with code" exit-code)
+                (when (not= 0 exit-code)
+                  (log/info "Non-zero spring exit, showing info window")
+                  (swap! state-atom assoc
+                         :show-spring-info-window true
+                         :spring-log @spring-log-state
+                         :spring-crash-infolog-file infolog-dest)))
               (try
                 (post-game-fn)
                 (catch Exception e
