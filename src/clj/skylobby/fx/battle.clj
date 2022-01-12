@@ -550,7 +550,10 @@
               :on-action
               (merge
                 {:event/type :spring-lobby/start-battle}
-                (fx/sub-ctx context sub/spring-resources spring-root)
+                (let [resources (fx/sub-ctx context sub/spring-resources spring-root)]
+                  (if singleplayer
+                    resources
+                    (dissoc resources :engine-version :map-name :mod-name)))
                 {:battle battle
                  :battles battles
                  :users users
