@@ -59,6 +59,42 @@
     :keep-header? true))
 
 
+(defn map-draw-protocol [length]
+  (case (inc length)
+    ; erase
+    8
+    (do
+      (assert (= 7 length))
+      (b/ordered-map
+        :pad :ubyte
+        :player-num :ubyte
+        :map-draw-action :ubyte
+        :x :short-le
+        :z :short-le))
+    ; line
+    12
+    (do
+      (assert (= 11 length))
+      (b/ordered-map
+        :pad :ubyte
+        :player-num :ubyte
+        :map-draw-action :ubyte
+        :x1 :short-le
+        :z1 :short-le
+        :x2 :short-le
+        :z2 :short-le))
+    ; point
+    (do
+      (assert (<= 7 length))
+      (b/ordered-map
+        :pad :ubyte
+        :player-num :ubyte
+        :map-draw-action :ubyte
+        :x :short-le
+        :z :short-le
+        :label (b/string "ISO-8859-1" :length (- length 7))))))
+
+
 ; https://github.com/spring/spring/blob/develop/rts/Net/Protocol/NetMessageTypes.h
 (def net-message-header
   (b/ordered-map
@@ -70,26 +106,71 @@
     (fn [{:keys [command]}]
       (let [l (dec length)]
         (case (int command)
-          6 (b/ordered-map
+          ; quit
+          3
+          (b/ordered-map
+            :reason (b/string "ISO-8859-1" :length l))
+          ; playername
+          6
+          (do
+            (assert (<= 3 length))
+            (b/ordered-map
               :pad :byte
               :player-num :ubyte
-              :player-name (b/string "ISO-8859-1" :length (- length 3)))
-          7 (b/ordered-map
+              :player-name (b/string "ISO-8859-1" :length (- length 3))))
+          ; chat
+          7
+          (do
+            (assert (<= 4 length))
+            (b/ordered-map
               :pad :byte
               :from :ubyte
               :dest :ubyte
-              :message (b/string "ISO-8859-1" :length (- length 4)))
-          30 (b/ordered-map
-               :pad :byte
-               :player-num :ubyte
-               :winning-ally-teams (b/repeated :ubyte :length (- length 3)))
-          36 (b/ordered-map
-               :player-num :ubyte
-               :my-team :ubyte
-               :ready :ubyte
-               :x :float-le
-               :y :float-le
-               :z :float-le)
+              :message (b/string "ISO-8859-1" :length (- length 4))))
+          ; pause
+          13
+          (do
+            (assert (= 3 length))
+            (b/ordered-map
+              :player-num :ubyte
+              :paused :ubyte))
+          ; gameover
+          30
+          (do
+            (assert (<= 3 length))
+            (b/ordered-map
+              :pad :byte
+              :player-num :ubyte
+              :winning-ally-teams (b/repeated :ubyte :length (- length 3))))
+          ; mapdraw
+          31 (map-draw-protocol l)
+          ; startpos
+          36
+          (do
+            (assert (= 16 length))
+            (b/ordered-map
+              :player-num :ubyte
+              :my-team :ubyte
+              :ready :ubyte
+              :x :float-le
+              :y :float-le
+              :z :float-le))
+          ; playerleft
+          37
+          (do
+            (assert (= 3 length))
+            (b/ordered-map
+              :player-num :ubyte
+              :intended :ubyte))
+          ; team
+          51
+          (do
+            (assert (= 5 length) (str length))
+            (b/ordered-map
+              :player-num :ubyte
+              :team-action :ubyte
+              :parameter1 :ubyte
+              :parameter2 :ubyte))
           (b/blob :length l))))
     (constantly nil) ; TODO writing replays
     :keep-header? true))
@@ -156,16 +237,24 @@
                                                        (map header-and-body)
                                                        (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
                                                        (into {}))
+                               start-positions (->> parsed
+                                                    (filter (comp #{36} :command :header)))
                                chat-log (->> parsed
                                              (map (fn [{:keys [header body]}]
-                                                    (assoc (:demo-stream-chunk body) :mod-game-time (:mod-game-time header))))
-                                             (filter (comp #{7} :command :header))
-                                             (map (fn [{:keys [body mod-game-time]}]
-                                                    (assoc body :mod-game-time mod-game-time)))
-                                             (remove (comp #(string/starts-with? % "My player ID is") :message))
+                                                    (merge
+                                                      header
+                                                      (:demo-stream-chunk body))))
+                                             (filter (comp #{3 7 13 30 31 37 51} :command :header))
+                                             (map (fn [{:keys [body header] :as m}]
+                                                    (merge
+                                                      (dissoc m :body :header)
+                                                      header
+                                                      body)))
+                                             (remove (comp #(and % (string/starts-with? % "My player ID is")) :message))
                                              doall)]
                            {:chat-log chat-log
-                            :player-num-to-name player-num-to-name})
+                            :player-num-to-name player-num-to-name
+                            :start-positions start-positions})
                          (catch Exception e
                            (log/warn e "Exception parsing demo stream")))
                        nil))))))))))

@@ -85,31 +85,131 @@
     (or text "")
     (or style "")))
 
-(defn chat-log-document [chat-log {:keys [player-name-to-color player-num-to-name]}]
+(defn add-text-chat [builder chat {:keys [player-name-to-color player-num-to-name]}]
+  (let [{:keys [from dest message mod-game-time]} chat
+        player (get player-num-to-name from)
+        color (get player-name-to-color player)
+        javafx-color (if color
+                       (fx.color/spring-color-to-javafx color)
+                       Color/YELLOW)
+        css-color (some-> javafx-color str u/hex-color-to-css)
+        is-spec (and (not (string/blank? player)) (not color))
+        dest-type (case (int dest)
+                    252 :ally
+                    253 :spec
+                    254 :global
+                    :self)
+        dest-type (if (and is-spec (= :ally dest-type)) :spec dest-type)]
+    (.addParagraph builder
+      ^java.util.List
+      (vec
+        (concat
+          [
+           (segment
+             (when mod-game-time
+               (str
+                 "["
+                 (u/format-duration (java-time/duration mod-game-time :seconds))
+                 "] "))
+             (str "-fx-fill: grey;"))
+           (segment
+             (str
+               (when is-spec
+                 "(s) ")
+               player)
+             (str "-fx-fill: " css-color ";"))
+           (segment
+             (format-chat-dest dest-type)
+             (str "-fx-fill: " (chat-dest-color dest-type) ";"))
+           (segment
+             (str
+               (if (string/blank? player) "*" ":")
+               " "
+               message)
+             (str "-fx-fill: "
+                  (if (string/blank? player)
+                    "cyan"
+                    (if (= :spec dest-type)
+                      "yellow"
+                      "white"))
+                  ";"))]))
+      "")))
+
+(defn add-map-draw [builder chat {:keys [player-name-to-color player-num-to-name]}]
+  (let [{:keys [mod-game-time map-draw-action player-num x z label]} chat
+        player (get player-num-to-name player-num)
+        color (get player-name-to-color player)
+        javafx-color (if color
+                       (fx.color/spring-color-to-javafx color)
+                       Color/YELLOW)
+        css-color (some-> javafx-color str u/hex-color-to-css)
+        is-spec (and (not (string/blank? player)) (not color))
+        printable-label (u/remove-nonprintable label)]
+    (when (= 0 map-draw-action) ; pings only
+      (.addParagraph builder
+        ^java.util.List
+        (vec
+          (concat
+            [
+             (segment
+               (when mod-game-time
+                 (str
+                   "["
+                   (u/format-duration (java-time/duration mod-game-time :seconds))
+                   "] "))
+               (str "-fx-fill: grey;"))
+             (segment
+               (str "* " player)
+               (str "-fx-fill: " css-color ";"))
+             (segment
+               (str " (" x "," z ") ")
+               (str "-fx-fill: grey;"))
+             (segment
+               (str ": " (if (string/blank? printable-label)
+                           "<look here>"
+                           printable-label))
+               (str "-fx-fill: "
+                    (if is-spec "yellow" "white")
+                    ";"))]))
+        ""))))
+
+(defn chat-log-document [chat-log {:keys [player-num-to-name] :as opts}]
   (let [
         builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")
-        chat-log (remove
-                   (comp #(string/starts-with? % "SPRINGIE:") :message)
-                   chat-log)]
-    (doseq [chat chat-log]
-      (let [{:keys [from dest message mod-game-time]} chat
-            player (get player-num-to-name from)
-            color (get player-name-to-color player)
-            javafx-color (if color
-                           (fx.color/spring-color-to-javafx color)
-                           Color/YELLOW)
-            css-color (some-> javafx-color str u/hex-color-to-css)
-            is-spec (and (not (string/blank? player)) (not color))
-            dest-type (case (int dest)
-                        252 :ally
-                        253 :spec
-                        254 :global
-                        :self)
-            dest-type (if (and is-spec (= :ally dest-type)) :spec dest-type)]
-        (.addParagraph builder
-          ^java.util.List
-          (vec
-            (concat
+        known-commands #{3 7 31 51}
+        known-messages (->> chat-log
+                            (remove (comp #(and % (string/starts-with? % "SPRINGIE:")) :message))
+                            (filter (comp known-commands :command)))]
+    (doseq [chat known-messages]
+      (let [{:keys [command mod-game-time]} chat]
+        (case command
+          7 (add-text-chat builder chat opts)
+          31 (add-map-draw builder chat opts)
+          51 ; team
+          (when (#{2 3} (:team-action chat))
+            (.addParagraph builder
+              ^java.util.List
+              (vec
+                [
+                 (segment
+                   (when mod-game-time
+                     (str
+                       "["
+                       (u/format-duration (java-time/duration mod-game-time :seconds))
+                       "] "))
+                   (str "-fx-fill: grey;"))
+                 (segment
+                   (str (get player-num-to-name (:player-num chat)) " "
+                        (case (:team-action chat)
+                          2 "resigned"
+                          3 "joined"
+                          "unknown"))
+                   (str "-fx-fill: grey;"))])
+              ""))
+          3 ; quit
+          (.addParagraph builder
+            ^java.util.List
+            (vec
               [
                (segment
                  (when mod-game-time
@@ -119,28 +219,11 @@
                      "] "))
                  (str "-fx-fill: grey;"))
                (segment
-                 (str
-                   (when is-spec
-                     "(s) ")
-                   player)
-                 (str "-fx-fill: " css-color ";"))
-               (segment
-                 (format-chat-dest dest-type)
-                 (str "-fx-fill: " (chat-dest-color dest-type) ";"))
-               (segment
-                 (str
-                   (if (string/blank? player) "*" ":")
-                   " "
-                   message)
-                 (str "-fx-fill: "
-                      (if (string/blank? player)
-                        "cyan"
-                        (if (= :spec dest-type)
-                          "yellow"
-                          "white"))
-                      ";"))]))
-          "")))
-    (when (seq chat-log)
+                 (str "Quit - " (u/remove-nonprintable (:reason chat)))
+                 (str "-fx-fill: grey;"))])
+            "")
+          (log/warn "No replay chat handler for message of type" command))))
+    (when (seq known-messages)
       (.build builder))))
 
 
@@ -274,7 +357,7 @@
              :map-name map-name
              :spring-isolation-dir spring-isolation-dir}]}
           {:fx/type :button
-           :text " Refresh "
+           :text " Refresh resources "
            :on-action {:event/type :spring-lobby/clear-map-and-mod-details
                        :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
                        :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}]}]
