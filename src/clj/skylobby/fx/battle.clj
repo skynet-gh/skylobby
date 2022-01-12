@@ -1243,6 +1243,8 @@
         battle-layout (if (contains? (set battle-layouts) battle-layout)
                         battle-layout
                         (first battle-layouts))
+        battle-layout-key (if (= "vertical" battle-layout) :battle-vertical :battle-horizontal)
+        battle-layout-default-split (if (= "vertical" battle-layout) 0.35 0.6)
         show-vote-log (fx/sub-val context :show-vote-log)
         battle-buttons (if-not old-battle
                          {:fx/type battle-buttons
@@ -1488,70 +1490,57 @@
             resources-pane
             battle-buttons]}
           battle-tabs]
-         (case battle-layout
-           "vertical"
-           [
-            {:fx/type fx/ext-on-instance-lifecycle
-             :on-created (fn [^javafx.scene.control.SplitPane node]
-                           (let [dividers (.getDividers node)
-                                 ^javafx.scene.control.SplitPane$Divider divider (first dividers)
-                                 position-property (.positionProperty divider)]
-                             (.addListener position-property
-                               (reify javafx.beans.value.ChangeListener
-                                 (changed [_this _observable _old-value new-value]
-                                   (swap! skylobby.fx/divider-positions assoc :battle-vertical new-value))))))
+         (concat
+           [{:fx/type ext-recreate-on-key-changed
              :h-box/hgrow :always
+             :key (str battle-layout)
              :desc
-             {:fx/type :split-pane
-              :divider-positions [(or (:battle-vertical divider-positions) 0.35)]
-              :items
-              (concat
-                [
-                 {:fx/type :v-box
-                  :children
-                  (concat
-                    [(assoc players-table :v-box/vgrow :always)]
-                    (when (fx/sub-val context :battle-resource-details)
-                      [resources-pane])
-                    [battle-buttons])}]
-                (when-not pop-out-chat
-                  [battle-chat]))}}
-            battle-tabs]
-           ; else
-           [
-            {:fx/type fx/ext-on-instance-lifecycle
-             :on-created (fn [^javafx.scene.control.SplitPane node]
-                           (let [dividers (.getDividers node)]
-                             (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
-                               (let [position-property (.positionProperty divider)]
-                                 (.addListener position-property
-                                   (reify javafx.beans.value.ChangeListener
-                                     (changed [_this _observable _old-value new-value]
-                                       (swap! skylobby.fx/divider-positions assoc :battle-horizontal new-value))))))))
-             :h-box/hgrow :always
-             :desc
-             {:fx/type :split-pane
-              :orientation :vertical
-              :divider-positions [(or (:battle-horizontal divider-positions) 0.6)]
-              :items
-              (concat
-                [{:fx/type :h-box
-                  :children
-                  [
-                   {:fx/type :v-box
-                    :h-box/hgrow :always
-                    :children
-                    [{:fx/type :h-box
-                      :v-box/vgrow :always
-                      :children
-                      (concat
-                        [(assoc players-table :h-box/hgrow :always)]
-                        (when (fx/sub-val context :battle-resource-details)
-                          [resources-pane]))}
-                     battle-buttons]}
-                   battle-tabs]}]
-                (when-not pop-out-chat
-                  [battle-chat]))}}]))}]}))
+             {:fx/type fx/ext-on-instance-lifecycle
+              :on-created (fn [^javafx.scene.control.SplitPane node]
+                            (let [dividers (.getDividers node)
+                                  ^javafx.scene.control.SplitPane$Divider divider (first dividers)
+                                  position-property (.positionProperty divider)]
+                              (.addListener position-property
+                                (reify javafx.beans.value.ChangeListener
+                                  (changed [_this _observable _old-value new-value]
+                                    (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value))))))
+              :desc
+              {:fx/type :split-pane
+               :orientation (if (= "vertical" battle-layout) :horizontal :vertical)
+               :divider-positions [(or (get divider-positions battle-layout-key) battle-layout-default-split)]
+               :items
+               (if (= "vertical" battle-layout)
+                 (concat
+                   [
+                    {:fx/type :v-box
+                     :children
+                     (concat
+                       [(assoc players-table :v-box/vgrow :always)]
+                       (when (fx/sub-val context :battle-resource-details)
+                         [resources-pane])
+                       [battle-buttons])}]
+                   (when-not pop-out-chat
+                     [battle-chat]))
+                 (concat
+                   [{:fx/type :h-box
+                     :children
+                     [
+                      {:fx/type :v-box
+                       :h-box/hgrow :always
+                       :children
+                       [{:fx/type :h-box
+                         :v-box/vgrow :always
+                         :children
+                         (concat
+                           [(assoc players-table :h-box/hgrow :always)]
+                           (when (fx/sub-val context :battle-resource-details)
+                             [resources-pane]))}
+                        battle-buttons]}
+                      battle-tabs]}]
+                   (when-not pop-out-chat
+                     [battle-chat])))}}}]
+           (when (= "vertical" battle-layout)
+             [battle-tabs])))}]}))
 
 (defn battle-view
   [state]
