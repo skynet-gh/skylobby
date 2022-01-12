@@ -21,6 +21,14 @@ Future Features:
 
 ## Actual changelog
 
+### [0.7.50]
+
+- Add parsing and display of more replay messages
+- Fix issue with modoptions in singleplayer
+- Fix issue with battle split pane position saving
+- Add display of infolog when Spring crashes
+- Add setting to show Spring command for debug
+
 ### [0.7.49]
 
 - Fix file browsing for some resource files, or if path does not exist
