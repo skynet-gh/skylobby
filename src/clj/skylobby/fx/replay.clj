@@ -727,7 +727,7 @@
                           {:fx/type :button
                            :text
                            (if in-progress
-                             (str (u/download-progress download))
+                             (str "Downloading " (str (u/download-progress download)))
                              " Download replay")
                            :disable (boolean in-progress)
                            :on-action {:event/type :spring-lobby/add-task
@@ -783,7 +783,7 @@
                                                   (contains? http-download-tasks download-url))]
                               {:fx/type :button
                                :text (if in-progress
-                                       (str (u/download-progress download))
+                                       (str "Downloading " (str (u/download-progress download)))
                                        " Download engine")
                                :disable (boolean in-progress)
                                :on-action {:event/type :spring-lobby/add-task
@@ -820,7 +820,7 @@
                         (let [in-progress (contains? rapid-tasks (:id mod-rapid))]
                           {:fx/type :button
                            :text (if in-progress
-                                   (u/download-progress mod-rapid-download)
+                                   (str "Downloading " (u/download-progress mod-rapid-download))
                                    (str " Download game"))
                            :disable in-progress
                            :on-action {:event/type :spring-lobby/add-task
@@ -839,7 +839,7 @@
                                               (contains? http-download-tasks download-url))]
                           {:fx/type :button
                            :text (if in-progress
-                                   (str (u/download-progress download))
+                                   (str "Downloading " (u/download-progress download))
                                    " Download game")
                            :disable (boolean in-progress)
                            :on-action {:event/type :spring-lobby/add-task
@@ -884,7 +884,7 @@
                                               (contains? http-download-tasks download-url))]
                           {:fx/type :button
                            :text (if in-progress
-                                   (str (u/download-progress download))
+                                   (str "Downloading " (u/download-progress download))
                                    " Download map")
                            :disable (boolean in-progress)
                            :on-action

@@ -82,6 +82,40 @@
                  :spring-root spring-root}
      :style sync-button-style}))
 
+
+(defn spring-debug-window
+  [{:fx/keys [context]
+    :keys [screen-bounds]}]
+  (let [
+        show (boolean (fx/sub-val context :show-spring-debug))]
+    {:fx/type :stage
+     :showing (boolean show)
+     :title (str u/app-name " Spring Debug")
+     :icons skylobby.fx/icons
+     :modality :application-modal
+     :on-close-request {:event/type :spring-lobby/dissoc
+                        :key :show-spring-debug}
+     :width (skylobby.fx/fitwidth screen-bounds nil 800)
+     :height (skylobby.fx/fitheight screen-bounds nil 200)
+     :scene
+     {:fx/type :scene
+      :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
+      :root
+      {:fx/type :v-box
+       :style {:-fx-font-size 16}
+       :children
+       [{:fx/type :label
+         :text "Spring command array"}
+        {:fx/type :text-area
+         :editable false
+         :text (pr-str (fx/sub-val context :spring-debug-command))}
+        {:fx/type :label
+         :text "Spring command"}
+        {:fx/type :text-area
+         :editable false
+         :text (str (string/join " " (fx/sub-val context :spring-debug-command)))}]}}}))
+
+
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e35_popup.clj
 (def popup-width 300)
 (def ext-with-shown-on
@@ -264,7 +298,8 @@
                         :on-selected-changed {:event/type :spring-lobby/assoc
                                               :key :interleave-ally-player-ids}}
                        {:fx/type :label
-                        :text " Interleave Player IDs "}]}]))]
+                        :text " Interleave Player IDs "}]}]))
+        debug-spring (boolean (fx/sub-val context :debug-spring))]
     {:fx/type :flow-pane
      :style {:-fx-font-size 16}
      :hgap 4
@@ -487,6 +522,7 @@
                :show-delay skylobby.fx/tooltip-show-delay
                :style {:-fx-font-size 16}
                :text (cond
+                       debug-spring "Write script.txt and show Spring command"
                        am-host (if singleplayer
                                  "Start the game"
                                  "You are the host, start the game")
@@ -500,11 +536,14 @@
                       (and am-spec (not host-ingame) (not singleplayer))
                       "Game not running"
                       :else
-                      (str (if (and (not singleplayer) (or host-ingame am-spec))
-                             "Join" "Start")
-                           " Game"))
+                      (if debug-spring
+                        "Debug Spring"
+                        (str (if (and (not singleplayer) (or host-ingame am-spec))
+                               "Join" "Start")
+                             " Game")))
               :disable (boolean
                          (or spring-running
+                             (and debug-spring (fx/sub-val context :show-spring-debug))
                              (and (not singleplayer)
                                   (or (and (not host-ingame) am-spec)
                                       (not in-sync)))))
@@ -523,6 +562,7 @@
                  :battle-status my-battle-status
                  :channel-name channel-name
                  :client-data client-data
+                 :debug-spring debug-spring
                  :host-ingame host-ingame
                  :singleplayer singleplayer
                  :spring-isolation-dir spring-root})}}]

@@ -123,6 +123,11 @@
        :desc
        {:fx/type battle-window}}
       {:fx/type ext-recreate-on-key-changed
+       :key (boolean (fx/sub-val context :show-spring-debug))
+       :desc
+       {:fx/type fx.battle/spring-debug-window
+        :screen-bounds screen-bounds}}
+      {:fx/type ext-recreate-on-key-changed
        :key (boolean (fx/sub-val context :show-downloader))
        :desc
        {:fx/type fx.download/download-window

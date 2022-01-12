@@ -382,7 +382,8 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt ^java.io.File spring-isolation-dir
+   {:keys [client-data debug-spring engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt
+           ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
@@ -520,48 +521,52 @@
         (let [command [(fs/canonical-path engine-file)
                        "--isolation-dir" isolation-dir-param
                        "--write-dir" write-dir-param
-                       script-file-param]
-              runtime (Runtime/getRuntime)]
-          (log/info "Running '" command "'")
-          (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-                ^"[Ljava.lang.String;" envp (get-envp)
-                process (.exec runtime cmdarray envp spring-isolation-dir)]
-            (async/thread
-              (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (do
-                      (log/info "(spring out)" line)
-                      (swap! spring-log-state conj {:stream :out :line line})
-                      (recur))
-                    (log/info "Spring stdout stream closed")))))
-            (async/thread
-              (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (do
-                      (log/info "(spring err)" line)
-                      (swap! spring-log-state conj {:stream :err :line line})
-                      (recur))
-                    (log/info "Spring stderr stream closed")))))
-            (try
-              (let [exit-code (.waitFor process)]
-                (log/info "Spring exited with code" exit-code)
-                (when (not= 0 exit-code)
-                  (log/info "Non-zero spring exit, showing info window")
-                  (swap! state-atom assoc
-                         :show-spring-info-window true
-                         :spring-log @spring-log-state
-                         :spring-crash-infolog-file infolog-dest)))
+                       script-file-param]]
+          (if debug-spring
+            (do
+              (log/info "Setting spring command for debug mode")
+              (swap! state-atom assoc :show-spring-debug true :spring-debug-command command))
+            (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+                  ^"[Ljava.lang.String;" envp (get-envp)
+                  runtime (Runtime/getRuntime)
+                  process (.exec runtime cmdarray envp spring-isolation-dir)]
+              (log/info "Running '" command "'")
+              (async/thread
+                (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+                  (loop []
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (log/info "(spring out)" line)
+                        (swap! spring-log-state conj {:stream :out :line line})
+                        (recur))
+                      (log/info "Spring stdout stream closed")))))
+              (async/thread
+                (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+                  (loop []
+                    (if-let [line (.readLine reader)]
+                      (do
+                        (log/info "(spring err)" line)
+                        (swap! spring-log-state conj {:stream :err :line line})
+                        (recur))
+                      (log/info "Spring stderr stream closed")))))
               (try
-                (post-game-fn)
+                (let [exit-code (.waitFor process)]
+                  (log/info "Spring exited with code" exit-code)
+                  (when (not= 0 exit-code)
+                    (log/info "Non-zero spring exit, showing info window")
+                    (swap! state-atom assoc
+                           :show-spring-info-window true
+                           :spring-log @spring-log-state
+                           :spring-crash-infolog-file infolog-dest)))
+                (try
+                  (post-game-fn)
+                  (catch Exception e
+                    (log/error e "Error in post-game-fn")))
                 (catch Exception e
-                  (log/error e "Error in post-game-fn")))
-              (catch Exception e
-                (log/error e "Error waiting for Spring to close"))
-              (catch Throwable t
-                (log/error t "Fatal error waiting for Spring to close")
-                (throw t))))))
+                  (log/error e "Error waiting for Spring to close"))
+                (catch Throwable t
+                  (log/error t "Fatal error waiting for Spring to close")
+                  (throw t)))))))
       (catch Exception e
         (log/error e "Error starting game"))
       (finally
