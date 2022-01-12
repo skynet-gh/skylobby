@@ -177,7 +177,7 @@
                             (->> all-modoptions
                                  (map
                                    (fn [modoption]
-                                     (let [k (some-> modoption :key string/lower-case keyword)
+                                     (let [k (some-> modoption :key string/lower-case)
                                            default (:def modoption)
                                            v (get modoptions k default)]
                                        [k

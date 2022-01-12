@@ -3988,11 +3988,7 @@
   (let [startpostype (get spring/startpostypes-by-name event)]
     (if am-host
       (if singleplayer
-        (swap! *state
-               (fn [state]
-                 (-> state
-                     (assoc-in [:by-server :local :scripttags "game" "startpostype"] startpostype)
-                     (assoc-in [:by-server :local :battle :scripttags "game" "startpostype"] startpostype))))
+        (swap! *state assoc-in [:by-server :local :battle :scripttags "game" "startpostype"] startpostype)
         (message/send-message *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
@@ -4005,11 +4001,7 @@
         scripttag-keys (map (fn [i] (str "game/team" i)) team-ids)
         team-kws (map #(str "team" %) team-ids)
         dissoc-fn #(apply dissoc % team-kws)]
-    (swap! *state update-in [:by-server server-key]
-           (fn [state]
-             (-> state
-                 (update-in [:scripttags "game"] dissoc-fn)
-                 (update-in [:battle :scripttags "game"] dissoc-fn))))
+    (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc-fn)
     (message/send-message *state
       client-data
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
@@ -4018,11 +4010,7 @@
   [{:keys [allyteam-ids client-data server-key]}]
   (doseq [allyteam-id allyteam-ids]
     (let [allyteam-str (str "allyteam" allyteam-id)]
-      (swap! *state update-in [:by-server server-key]
-             (fn [state]
-               (-> state
-                   (update-in [:scripttags "game"] dissoc allyteam-str)
-                   (update-in [:battle :scripttags "game"] dissoc allyteam-str)))))
+      (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc allyteam-str))
     (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
 (defn modoption-value [modoption-type raw-value]
@@ -4037,11 +4025,7 @@
         option-key (or option-key "modoptions")
         modoption-key-str (name modoption-key)]
     (if singleplayer
-      (swap! *state
-             (fn [state]
-               (-> state
-                   (assoc-in [:by-server :local :scripttags "game" option-key modoption-key-str] (str event))
-                   (assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key-str] (str event)))))
+      (swap! *state assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key-str] (str event))
       (if am-host
         (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
         (event-handler
