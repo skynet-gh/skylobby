@@ -10,12 +10,12 @@ makedepends+=('git' 'clojure')
 depends+=('java-runtime>=14')
 license=('MIT')
 url="https://github.com/skynet-gh/skylobby"
-source+=("${_gitname:=${pkgname%-git}}::${_giturl:-git+$url}")
-for integ in $(get_integlist)
-do
-  typeset -n array="${integ}sums"
-  array+=('SKIP')
-done
+source+=(
+  "${_gitname:=${pkgname%-git}}::${_giturl:-git+$url}"
+  "local://skylobby.sh"
+)
+sha256sums=('SKIP'
+            '7675e1020c41d4e53005c82a4944696e6d4a2030785c4069485ecf1f90d1ea19')
 provides+=("$_gitname=$pkgver")
 conflicts+=("$_gitname")
 
@@ -34,23 +34,11 @@ printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 build() {
   cd ${_gitname:-$pkgname}
   clojure -M:uberjar
-  cat <<-'EOF' > ./target/skylobby
-#!/bin/sh
-exec /usr/bin/java -Dglass.gtk.uiScale=1.1 \
-  -server \
-  -Xmx2g \
-  -XX:+ExitOnOutOfMemoryError \
-  -XX:+DoEscapeAnalysis \
-  -XX:+UseCompressedOops \
-  -jar '/usr/share/java/skylobby/skylobby.jar' \
-  "$@"
-	EOF
-  chmod a+x target/skylobby 
 }
 
 package() {
+  install -Dm0755 skylobby.sh "$pkgdir/usr/bin/skylobby"
   cd ${_gitname:-$pkgname}
-  install -Dm0755 target/skylobby "$pkgdir/usr/bin/skylobby"
   install -Dm0644 target/skylobby.jar "$pkgdir/usr/share/java/$_gitname/skylobby.jar"
   install -Dm0644 resources/icon256.png "$pkgdir/usr/share/pixmaps/skylobby.png"
   install -Dm0644 resources/skylobby.desktop "$pkgdir/usr/share/applications/skylobby.desktop"
@@ -58,4 +46,3 @@ package() {
 # vim: filetype=sh
 # template end;
 # template end;
-
