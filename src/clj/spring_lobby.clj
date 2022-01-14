@@ -4650,23 +4650,34 @@
 (defmethod event-handler ::clear-map-and-mod-details
   [{:keys [map-resource mod-resource spring-root]}]
   (let [map-key (resource/details-cache-key map-resource)
-        mod-key (resource/details-cache-key mod-resource)]
-    (swap! *state
-      (fn [state]
-        (cond-> state
-                map-key
-                (update :map-details cache/miss map-key nil)
-                mod-key
-                (update :mod-details cache/miss mod-key nil))))
+        mod-key (resource/details-cache-key mod-resource)
+        {:keys [use-git-mod-version]}
+        (swap! *state
+          (fn [state]
+            (cond-> state
+                    map-key
+                    (update :map-details cache/miss map-key nil)
+                    mod-key
+                    (update :mod-details cache/miss mod-key nil))))]
     (task/add-tasks! *state
-      [{::task-type ::refresh-engines
-        :spring-root spring-root}
-       {::task-type ::refresh-mods
-        :spring-root spring-root
-        :priorities [(:file mod-resource)]}
-       {::task-type ::refresh-maps
-        :spring-root spring-root
-        :priorities [(:file map-resource)]}])))
+      (concat
+        [{::task-type ::refresh-engines
+          :spring-root spring-root}
+         {::task-type ::refresh-mods
+          :spring-root spring-root
+          :priorities [(:file mod-resource)]}
+         {::task-type ::refresh-maps
+          :spring-root spring-root
+          :priorities [(:file map-resource)]}]
+        (when-let [mod-file (:file mod-resource)]
+          [{::task-type ::mod-details
+            :mod-name (:mod-name mod-resource)
+            :mod-file mod-file
+            :use-git-mod-version use-git-mod-version}])
+        (when-let [map-file (:file map-resource)]
+          [{::task-type ::map-details
+            :map-name (:map-name map-resource)
+            :map-file map-file}])))))
 
 
 (defmethod event-handler ::import-source-change
