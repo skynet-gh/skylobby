@@ -1321,6 +1321,7 @@
                                      (every?
                                        (some-fn
                                          (partial includes-term? (:replay-id replay))
+                                         (partial includes-term? (some-> replay :file fs/filename))
                                          (partial includes-term? (get replays-tags (:replay-id replay)))
                                          (partial includes-term? (:replay-engine-version replay))
                                          (partial includes-term? (:replay-mod-name replay))
