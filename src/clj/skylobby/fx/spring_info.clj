@@ -1,9 +1,12 @@
 (ns skylobby.fx.spring-info
   (:require
     [cljfx.api :as fx]
+    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.sub :as sub]
+    [skylobby.fx.sync :refer [error-severity]]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.util :as u])
   (:import
@@ -69,21 +72,51 @@
                      :file (fx/sub-val context :spring-crash-infolog-file)}
          :graphic
          {:fx/type font-icon/lifecycle
-          :icon-literal "mdi-folder:16:white"}}
-        #_
-        {:fx/type :scroll-pane
-         :fit-to-width true
-         :content
-         {:fx/type :v-box
-          :children
-          (mapv
-            (fn [{:keys [line stream]}]
-              (merge
-                {:fx/type :label
-                 :text (str line)}
-                (when (= :err stream)
-                  {:style {:-fx-text-fill "red"}})))
-            spring-log)}}])}))
+          :icon-literal "mdi-folder:16:white"}}]
+       (when-let [{:keys [archive-name resolved-archive-name]} (fx/sub-val context :spring-crash-archive-not-found)]
+         (let [spring-root (fx/sub-val context :spring-isolation-dir)
+               {:keys [maps maps-by-name mods mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
+               matching-map (or (get maps-by-name resolved-archive-name)
+                                (->> maps (filter :map-name) (filter (comp #{archive-name} string/lower-case :map-name)) first))
+               matching-mod (or (get mods-by-name resolved-archive-name)
+                                (->> mods (filter :mod-name) (filter (comp #{archive-name} string/lower-case :mod-name)) first))
+               map-tasks (seq
+                           (concat
+                             (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/delete-corrupt-map-file)
+                             (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-maps)))
+               mod-tasks (seq
+                           (concat
+                             (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/delete-corrupt-mod-file)
+                             (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)))
+               deleting (cond
+                          matching-map (boolean map-tasks)
+                          matching-mod (boolean mod-tasks)
+                          :else false)]
+           (when (or matching-map matching-mod)
+             [{:fx/type :h-box
+               :alignment :center-left
+               :children
+               [{:fx/type :label
+                 :text " Suggested action: "}
+                {:fx/type :button
+                 :style (dissoc error-severity :-fx-background-color)
+                 :text (str (if deleting "Deleting" "Delete")
+                            " corrupt "
+                            (if matching-map "map " "game ")
+                            (or resolved-archive-name archive-name)
+                            (when deleting "..."))
+                 :disable deleting
+                 :on-action
+                 {
+                  :event/type :spring-lobby/add-task
+                  :task
+                  (if matching-map
+                    {:spring-lobby/task-type :spring-lobby/delete-corrupt-map-file
+                     :indexed-map matching-map
+                     :spring-root spring-root}
+                    {:spring-lobby/task-type :spring-lobby/delete-corrupt-mod-file
+                     :indexed-mod matching-mod
+                     :spring-root spring-root})}}]}]))))}))
 
 
 (defn spring-info-window

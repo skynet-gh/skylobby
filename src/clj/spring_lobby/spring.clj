@@ -380,6 +380,22 @@
 
 (defn get-envp [] nil)
 
+(defn wait-for-spring [process state-atom spring-log-state {:keys [infolog-dest]}]
+  (let [exit-code (.waitFor process)]
+    (log/info "Spring exited with code" exit-code)
+    (when (not= 0 exit-code)
+      (log/info "Non-zero spring exit, showing info window")
+      (let [spring-log @spring-log-state
+            archive-not-found (when-let [[_all archive-name _ resolved] (some #(re-find #"errorMsg=\"Dependent archive \"([^\"]*)\" (\(resolved to \"([^\"]*)\"\))? not found\"" %)
+                                                                              (map :line spring-log))]
+                                {:archive-name archive-name
+                                 :resolved-archive-name resolved})]
+        (swap! state-atom assoc
+               :show-spring-info-window true
+               :spring-log spring-log
+               :spring-crash-infolog-file infolog-dest
+               :spring-crash-archive-not-found archive-not-found)))))
+
 (defn start-game
   [state-atom
    {:keys [client-data debug-spring engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt
@@ -550,14 +566,7 @@
                         (recur))
                       (log/info "Spring stderr stream closed")))))
               (try
-                (let [exit-code (.waitFor process)]
-                  (log/info "Spring exited with code" exit-code)
-                  (when (not= 0 exit-code)
-                    (log/info "Non-zero spring exit, showing info window")
-                    (swap! state-atom assoc
-                           :show-spring-info-window true
-                           :spring-log @spring-log-state
-                           :spring-crash-infolog-file infolog-dest)))
+                (wait-for-spring process state-atom spring-log-state {:infolog-des infolog-dest})
                 (try
                   (post-game-fn)
                   (catch Exception e
@@ -574,7 +583,8 @@
         (set-ingame false)))))
 
 
-(defn watch-replay [{:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
+(defn watch-replay
+  [state-atom {:keys [engine-version engines replay-file ^java.io.File spring-isolation-dir]}]
   (try
     (log/info "Watching replay" replay-file)
     (let [engine-dir (some->> engines
@@ -591,7 +601,8 @@
                    "--isolation-dir" isolation-dir-param
                    "--write-dir" write-dir-param
                    replay-file-param]
-          runtime (Runtime/getRuntime)]
+          runtime (Runtime/getRuntime)
+          spring-log-state (atom [])]
       (log/info "Running '" command "'")
       (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
             ^"[Ljava.lang.String;" envp (get-envp)
@@ -602,6 +613,7 @@
               (if-let [line (.readLine reader)]
                 (do
                   (log/info "(spring out)" line)
+                  (swap! spring-log-state conj {:stream :out :line line})
                   (recur))
                 (log/info "Spring stdout stream closed")))))
         (async/thread
@@ -610,8 +622,9 @@
               (if-let [line (.readLine reader)]
                 (do
                   (log/info "(spring err)" line)
+                  (swap! spring-log-state conj {:stream :err :line line})
                   (recur))
                 (log/info "Spring stderr stream closed")))))
-        (.waitFor process)))
+        (wait-for-spring process state-atom spring-log-state nil)))
     (catch Exception e
       (log/error e "Error starting replay" replay-file))))

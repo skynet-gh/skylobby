@@ -2238,25 +2238,6 @@
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
-(defn restart-command [_old-jar new-jar]
-  (when-let [java-or-exe (u/process-command)]
-    (let [^List vm-args (vec (u/vm-args))
-          i (.indexOf vm-args "-jar")
-          new-jar-path (fs/canonical-path new-jar)
-          with-new-jar (if (not= -1 i)
-                         (concat
-                           (subvec vm-args 0 (inc i))
-                           [new-jar-path]
-                           (subvec vm-args 0 (+ i 2)))
-                         (concat vm-args ["-jar" new-jar-path]))
-          is-java (u/is-java? java-or-exe)]
-          ; java vs jpackage installer executable
-      (concat
-        [java-or-exe]
-        (when is-java with-new-jar)
-        (when is-java [u/main-class-name])
-        main-args))))
-        ;(when old-jar ["--update-copy-jar" (fs/canonical-path old-jar)])))))
 
 (defn restart-process [old-jar new-jar]
   (when new-jar
@@ -4226,6 +4207,27 @@
   (fs/delete-rapid-dir spring-root)
   (task/add-task! *state update-rapid-task))
 
+(defmethod task-handler ::delete-corrupt-map-file
+  [{:keys [indexed-map spring-root]}]
+  (let [{:keys [file map-name]} indexed-map]
+    (log/info "Attempting to delete corrupt map" map-name "at" file)
+    (raynes-fs/delete file)
+    (fs/update-file-cache! *state file)
+    (task/add-task! *state
+      {::task-type ::refresh-maps
+       :spring-root spring-root})))
+
+(defmethod task-handler ::delete-corrupt-mod-file
+  [{:keys [indexed-mod spring-root]}]
+  (let [{:keys [file mod-name]} indexed-mod]
+    (log/info "Attempting to delete corrupt mod" mod-name "at" file)
+    (raynes-fs/delete file)
+    (fs/update-file-cache! *state file)
+    (task/add-task! *state
+      {::task-type ::refresh-mods
+       :spring-root spring-root})))
+
+
 (defmethod task-handler ::update-rapid
   [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
   (swap! *state assoc :rapid-update true)
@@ -4830,6 +4832,7 @@
                 (assoc-in [:replays-watched (fs/canonical-path replay-file)] true)
                 (assoc-in [:spring-running :replay :replay] true))))
         (spring/watch-replay
+          *state
           {:engine-version engine-version
            :engines engines
            :replay-file replay-file
