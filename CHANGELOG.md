@@ -6,7 +6,7 @@
 - Filter replays by filename
 - Fix resource refresh in replays
 - Fix host disappearing when getting battle status (caused -1 player counts)
-- Attempt to add more fancy GitHub actions
+- Add GitHub actions to publish release and notify Discord
 
 ## [0.7.50](https://github.com/skynet-gh/skylobby/releases/tag/0.7.50)
 
