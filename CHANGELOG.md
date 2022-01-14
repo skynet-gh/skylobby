@@ -1223,7 +1223,7 @@
 
 - Add ability to register on server
 
-## [0.1.0] - 2020-12-18 to 2020-12-27
+## [0.1.0] - 2020-12-27
 
 Initial public release.
 - GitHub Actions to publish releases and build jars and installers
@@ -1233,7 +1233,7 @@ Initial public release.
 - Map detail browser with minimap images
 - Download BAR engine from GitHub
 
-## [pre-0.1.0 part 3] - 2020-11-15 to 2020-12-17
+## [0.0.3] - 2020-12-17
 
 Fairly usable now.
 - Manage resources (engines, mods/games, maps).
@@ -1245,7 +1245,7 @@ Fairly usable now.
   - Add minimap, start positions
   - Support all battle status changes in protocol
 
-## [pre-0.1.0 part 2] - 2020-09-06 to 2020-09-07
+## [0.0.2] - 2020-09-07
 
 Start basic games.
 - Run Spring in isolation mode
@@ -1253,7 +1253,7 @@ Start basic games.
 - Add bots to battles
 - Add basic battle status
 
-## [pre-0.1.0 part 1] - 2020-07-14 to 2020-07-26
+## [0.0.1] - 2020-07-26
 
 Basic UI and client.
 - Initial UI
