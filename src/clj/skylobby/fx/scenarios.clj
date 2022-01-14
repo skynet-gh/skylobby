@@ -57,11 +57,14 @@
                                       (filter (comp #(string/includes? % "chobby") string/lower-case :mod-name))
                                       seq)
         loading-scenarios (boolean mod-details-chobby-tasks)
+        rapid-packages-tasks (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid))
         rapid-tasks-by-id (->> (concat
                                  (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
-                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-update))
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid))
                                (map (juxt :rapid-id identity))
-                               (into {}))]
+                               (into {}))
+        some-task (or (contains? rapid-tasks-by-id rapid-id)
+                      rapid-packages-tasks)]
     {:fx/type :v-box
      :alignment :top-center
      :style {:-fx-font-size 16}
@@ -117,13 +120,12 @@
           {:fx/type :button
            :text (cond
                    (not engine-version) "Pick an engine"
-                   (contains? rapid-tasks-by-id rapid-id)
+                   some-task
                    (str "Getting latest " rapid-id "...")
                    :else
                    " Get latest ")
-           :disable (or
-                      (contains? rapid-tasks-by-id rapid-id)
-                      (not engine-version))
+           :disable (or some-task
+                        (not engine-version))
            :on-action
            {:event/type :spring-lobby/add-task
             :task
