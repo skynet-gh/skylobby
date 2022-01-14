@@ -141,7 +141,7 @@
                    :text "download"
                    :human-text (if in-progress
                                  (if downloadable
-                                   (u/download-progress download)
+                                   (str "Downloading " (u/download-progress download))
                                    (str "Refreshing " possible-source-name))
                                  (if no-mod-details
                                    (if downloadable
@@ -180,7 +180,7 @@
                    [{:severity 2
                      :text "springfiles"
                      :human-text (if springfiles-in-progress
-                                   (u/download-progress springfiles-download)
+                                   (str "Downloading " (u/download-progress springfiles-download))
                                    (if springfiles-searched
                                      (if springfiles-search-result
                                        "Download from springfiles"
