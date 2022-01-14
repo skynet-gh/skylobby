@@ -85,7 +85,7 @@
     (or text "")
     (or style "")))
 
-(defn add-text-chat [builder chat {:keys [player-name-to-color player-num-to-name]}]
+(defn add-text-chat [^ReadOnlyStyledDocumentBuilder builder chat {:keys [player-name-to-color player-num-to-name]}]
   (let [{:keys [from dest message mod-game-time]} chat
         player (get player-num-to-name from)
         color (get player-name-to-color player)
@@ -135,7 +135,7 @@
                   ";"))]))
       "")))
 
-(defn add-map-draw [builder chat {:keys [player-name-to-color player-num-to-name]}]
+(defn add-map-draw [^ReadOnlyStyledDocumentBuilder builder chat {:keys [player-name-to-color player-num-to-name]}]
   (let [{:keys [mod-game-time map-draw-action player-num x z label]} chat
         player (get player-num-to-name player-num)
         color (get player-name-to-color player)
@@ -182,7 +182,7 @@
                             (filter (comp known-commands :command)))]
     (doseq [chat known-messages]
       (let [{:keys [command mod-game-time]} chat]
-        (case command
+        (case (int (or command -1))
           7 (add-text-chat builder chat opts)
           31 (add-map-draw builder chat opts)
           51 ; team
@@ -200,7 +200,7 @@
                    (str "-fx-fill: grey;"))
                  (segment
                    (str (get player-num-to-name (:player-num chat)) " "
-                        (case (:team-action chat)
+                        (case (int (or (:team-action chat) -1))
                           2 "resigned"
                           3 "joined"
                           "unknown"))
