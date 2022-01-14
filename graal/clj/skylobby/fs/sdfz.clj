@@ -60,7 +60,7 @@
 
 
 (defn map-draw-protocol [length]
-  (case (inc length)
+  (case (inc (int length))
     ; erase
     8
     (do
