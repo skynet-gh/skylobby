@@ -17,10 +17,9 @@ jobs:
       - uses: coditory/changelog-parser@v1
         id: changelog
       - if: ${{ steps.changelog.outputs.version != steps.lasttag.outputs.version }}
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
           body: ${{ steps.changelog.outputs.description }}
-          tag_name: ${{ steps.changelog.outputs.version }}
-          release-name: ${{ steps.changelog.outputs.version }}
+          prerelease: true
+          tag: ${{ steps.changelog.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
