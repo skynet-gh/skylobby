@@ -2627,10 +2627,10 @@
                   (reduce
                     (fn [m u]
                       (update m (:username u) merge u))
-                    (into {}
-                      (filter
-                        (comp parsed-user-set first)
-                        users))
+                    (->> users
+                         (filter (comp parsed-user-set first))
+                         (into {})
+                         (merge {host-username {}}))
                     parsed)))
               (log/info "Ignoring empty battle status"))))
         (catch Exception e
