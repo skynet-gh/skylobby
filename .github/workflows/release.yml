@@ -169,4 +169,4 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         with:
-          args: ' {{ github.event.release.url }}'
+          args: ${{ github.event.release.url }}

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.52](https://github.com/skynet-gh/skylobby/releases/tag/0.7.52)
+
+- Fix Discord notify release action
+
 ## [0.7.51](https://github.com/skynet-gh/skylobby/releases/tag/0.7.51)
 
 - Add button to delete corrupt archives after Spring crash
