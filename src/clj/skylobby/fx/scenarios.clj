@@ -8,6 +8,7 @@
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
+    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
     [skylobby.fx.sub :as sub]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
@@ -19,6 +20,11 @@
 
 (def scenarios-window-width 1600)
 (def scenarios-window-height 1200)
+
+
+(def table-height 300)
+
+(def mod-name-prefix "Beyond All Reason test-")
 
 
 (defn scenarios-root
@@ -35,15 +41,22 @@
         rapid-id (:id (get rapid-data-by-hash rapid-hash))
         rapid-version (:version rapid-data)
         {:keys [engines engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
-        some-bar-name (->> mods-by-name
-                           keys
-                           (filter #(string/starts-with? % "Beyond All Reason"))
-                           first)
+        latest-local-bar (->> mods-by-name
+                              keys
+                              (filter #(string/starts-with? % mod-name-prefix))
+                              sort
+                              last)
         indexed-mod (get mods-by-name rapid-version)
         sorted-engine-versions (->> engines
                                     (map :engine-version)
                                     (sort skylobby.fx/case-insensitive-natural-comparator))
-        engine-version (fx/sub-val context :engine-version)
+        engine-version (or (fx/sub-val context :scenarios-engine-version)
+                           (->> engines
+                                (map :engine-version)
+                                (filter some?)
+                                (filter #(string/includes? % "BAR"))
+                                sort
+                                last))
         engine-file (:file (get engines-by-version engine-version))
         servers (fx/sub-val context :servers)
         spring-roots (fs/spring-roots {:servers servers :spring-isolation-dir spring-isolation-dir})
@@ -57,14 +70,14 @@
                                       (filter (comp #(string/includes? % "chobby") string/lower-case :mod-name))
                                       seq)
         loading-scenarios (boolean mod-details-chobby-tasks)
-        rapid-packages-tasks (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid))
+        rapid-packages-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid-packages)
         rapid-tasks-by-id (->> (concat
                                  (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
                                  (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid))
                                (map (juxt :rapid-id identity))
                                (into {}))
         some-task (or (contains? rapid-tasks-by-id rapid-id)
-                      rapid-packages-tasks)]
+                      (seq rapid-packages-tasks))]
     {:fx/type :v-box
      :alignment :top-center
      :style {:-fx-font-size 16}
@@ -97,14 +110,14 @@
            :value (str engine-version)
            :items (or (seq sorted-engine-versions)
                       [])
-           :on-value-changed {:event/type :spring-lobby/assoc
-                              :key :engine-version}}]}
+           :on-value-changed {:event/type :spring-lobby/assoc-in
+                              :key :scenarios-engine-version}}]}
         {:fx/type :label
          :text (str " Latest version is " (get-in rapid-data-by-id [latest-rapid-id :version]))}]
        (if indexed-mod
          [
           {:fx/type :button
-           :disable loading-scenarios
+           :disable (boolean loading-scenarios)
            :text (if loading-scenarios
                    " Loading scenarios... "
                    (if (resource/details? mod-details)
@@ -121,17 +134,17 @@
            :text (cond
                    (not engine-version) "Pick an engine"
                    some-task
-                   (str "Getting latest " rapid-id "...")
+                   (str "Getting latest scenarios: " rapid-id "...")
                    :else
-                   " Get latest ")
-           :disable (or some-task
-                        (not engine-version))
+                   "Get latest scenarios")
+           :disable (boolean (or some-task
+                                 (not engine-version)))
            :on-action
            {:event/type :spring-lobby/add-task
             :task
             {:spring-lobby/task-type :spring-lobby/rapid-download
              :engine-file engine-file
-             :rapid-id rapid-id
+             :rapid-id (or rapid-id latest-rapid-id)
              :spring-isolation-dir spring-root}}}])
        (when (resource/details? mod-details)
          (let [scenarios (->> mod-details
@@ -142,7 +155,8 @@
                                       (filter (comp #{selected-scenario-name} :scenario))
                                       first)]
            [{:fx/type :v-box
-             :alignment :center
+             :v-box/vgrow :always
+             :alignment :top-center
              :children
              (concat
                [
@@ -155,9 +169,13 @@
                   :items scenarios
                   :desc
                   {:fx/type :table-view
+                   :style {:-fx-min-height table-height
+                           :-fx-pref-height table-height
+                           :-fx-max-height table-height}
                    :items scenarios
                    :columns
                    [
+                    #_
                     {:fx/type :table-column
                      :text "Scenario"
                      :sortable false
@@ -170,6 +188,7 @@
                     {:fx/type :table-column
                      :text "Title"
                      :sortable false
+                     :pref-width 200
                      :cell-value-factory (comp :title :lua)
                      :cell-factory
                      {:fx/cell-type :table-cell
@@ -178,6 +197,8 @@
                         {:text (str title)})}}
                     {:fx/type :table-column
                      :text "Difficulty"
+                     :resizable false
+                     :pref-width 80
                      :cell-value-factory (comp u/to-number :difficulty :lua)
                      :cell-factory
                      {:fx/cell-type :table-cell
@@ -200,6 +221,7 @@
                        sides (or (vals (:allowedsides lua)) [])
                        side (or scenario-side (last sides))]
                    [{:fx/type :h-box
+                     :v-box/vgrow :always
                      :children
                      (concat
                        [{:fx/type :v-box
@@ -225,11 +247,16 @@
                            {:fx/type :label
                             :text (str (:briefing lua))
                             :wrap-text true}}
+                          {:fx/type :pane
+                           :style {:-fx-pref-height 16}}
                           {:fx/type :label
+                           :style {:-fx-font-size 18}
                            :text (str " Map: " (:mapfilename lua))}
                           {:fx/type :label
+                           :style {:-fx-font-size 18}
                            :text (str " Victory: " (:victorycondition lua))}
                           {:fx/type :label
+                           :style {:-fx-font-size 18}
                            :text (str " Loss: " (:losscondition lua))}
                           #_
                           {:fx/type :label
@@ -251,32 +278,51 @@
                              :text (str " Par resources: " (:parresources lua))}
                             {:fx/type :label
                              :text " Difficulty: "}
-                            {:fx/type :combo-box
-                             :value difficulty
-                             :items (or (vals (:difficulties lua)) [])
-                             :cell-factory
-                             {:fx/cell-type :list-cell
-                              :describe
-                              (fn [difficulty]
-                                {:text (str (:name difficulty))})}
-                             :on-value-changed {:event/type :spring-lobby/assoc
-                                                :key :scenario-difficulty}}
+                            {:fx/type ext-recreate-on-key-changed
+                             :key (str difficulty)
+                             :desc
+                             {:fx/type :combo-box
+                              :value difficulty
+                              :items (or (vals (:difficulties lua)) [])
+                              :cell-factory
+                              {:fx/cell-type :list-cell
+                               :describe
+                               (fn [difficulty]
+                                 {:text (str (:name difficulty))})}
+                              :on-value-changed {:event/type :spring-lobby/assoc
+                                                 :key :scenario-difficulty}}}
                             {:fx/type :label
                              :text " Side: "}
-                            {:fx/type :combo-box
-                             :value side
-                             :items sides
-                             :cell-factory
-                             {:fx/cell-type :list-cell
-                              :describe
-                              (fn [side]
-                                {:text (str side)})}
-                             :on-value-changed {:event/type :spring-lobby/assoc
-                                                :key :scenario-side}}
-                            {:fx/type map-sync-pane
-                             :index-only true
-                             :map-name map-name
-                             :spring-isolation-dir spring-root}]}]))}
+                            {:fx/type ext-recreate-on-key-changed
+                             :key (str side)
+                             :desc
+                             {:fx/type :combo-box
+                              :value side
+                              :items sides
+                              :cell-factory
+                              {:fx/cell-type :list-cell
+                               :describe
+                               (fn [side]
+                                 {:text (str side)})}
+                              :on-value-changed {:event/type :spring-lobby/assoc
+                                                 :key :scenario-side}}}
+                            {:fx/type :pane
+                             :style {:-fx-pref-height 8}}
+                            {:fx/type :v-box
+                             :children
+                             [
+                              {:fx/type map-sync-pane
+                               :v-box/margin 8
+                               :index-only true
+                               :map-name map-name
+                               :spring-isolation-dir spring-root}
+                              {:fx/type mod-sync-pane
+                               :v-box/margin 8
+                               :engine-version engine-version
+                               :index-only true
+                               :mod-name (or latest-local-bar
+                                             mod-name-prefix) ; to show rapid update button
+                               :spring-isolation-dir spring-root}]}]}]))}
                     {:fx/type :button
                      :style {:-fx-font-size 24
                              :-fx-margin-bottom 8}
@@ -286,7 +332,7 @@
                       :difficulties (or (vals (:difficulties lua)) [])
                       :engine-version engine-version
                       :engines-by-version engines-by-version
-                      :mod-name some-bar-name
+                      :mod-name latest-local-bar
                       :scenario-options (:scenariooptions lua)
                       :script-template (:startscript lua)
                       :script-params

@@ -8,7 +8,7 @@
   cheshire/cheshire {:mvn/version  "5.10.1"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
-  cljfx/cljfx {:mvn/version "1.7.17"
+  cljfx/cljfx {:mvn/version "1.7.18"
                :exclusions [org.openjfx/javafx-web]}
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
@@ -68,7 +68,7 @@
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
   ring/ring-anti-forgery {:mvn/version "1.3.0"}
-  ring/ring-core {:mvn/version "1.9.4"}
+  ring/ring-core {:mvn/version "1.9.5"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
   version-clj/version-clj {:mvn/version "2.0.2"}}
@@ -132,7 +132,7 @@
    :replace-deps
    {
     clj-jgit/clj-jgit {:mvn/version "0.8.10"}
-    cljfx/cljfx {:mvn/version "1.7.17"
+    cljfx/cljfx {:mvn/version "1.7.18"
                  :exclusions [org.openjfx/javafx-web]}
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
@@ -213,7 +213,7 @@
     org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
     org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
     ring/ring-anti-forgery {:mvn/version "1.3.0"}
-    ring/ring-core {:mvn/version "1.9.4"}
+    ring/ring-core {:mvn/version "1.9.5"}
     smee/binary {:mvn/version "0.5.5"}}}
   :skylobby-main
   {:replace-paths ["resources" "graal/clj"]
@@ -300,7 +300,7 @@
     org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
     org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
     ring/ring-anti-forgery {:mvn/version "1.3.0"}
-    ring/ring-core {:mvn/version "1.9.4"}
+    ring/ring-core {:mvn/version "1.9.5"}
     smee/binary {:mvn/version "0.5.5"}}}
   :skylobby-cli-main
   {:replace-paths ["graal/clj"]
@@ -329,7 +329,7 @@
    {cider/cider-nrepl {:mvn/version "0.28.0"}
     cider/orchard {:mvn/version "0.9.0"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
-    cljfx/cljfx {:mvn/version "1.7.17"}
+    cljfx/cljfx {:mvn/version "1.7.18"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}

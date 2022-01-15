@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.56](https://github.com/skynet-gh/skylobby/releases/tag/0.7.56)
+
+- Add default engine for scenarios, and ability to get latest game
+- Fix scenarios table changing size
+- Add indication on chat tab when there are friend requests
+- Add button to close battle preview
+- Fix skill uncertainty in battle preview
+
 ## [0.7.55](https://github.com/skynet-gh/skylobby/releases/tag/0.7.55)
 
 - Fix Discord release notify

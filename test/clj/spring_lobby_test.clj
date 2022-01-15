@@ -70,6 +70,7 @@
            :rank "3"
            :ready ""
            :skill "(20)"
+           :skilluncertainty 0
            :user-id "MFAI : normal (nebula3)"
            :username "bot1 (bot)"}
           {:ally "2"
@@ -79,6 +80,7 @@
            :rank "3"
            :ready ""
            :skill "(20)"
+           :skilluncertainty 0
            :user-id "MFAI : normal (nebula3)"
            :username "bot2 (bot)"}
           {:ally ""
@@ -88,6 +90,7 @@
            :rank "6"
            :ready ""
            :skill ""
+           :skilluncertainty 0
            :user-id "968127"
            :username "nebula3"}]
          (spring-lobby/parse-battle-status-message

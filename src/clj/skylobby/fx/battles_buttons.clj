@@ -31,6 +31,7 @@
      :children
      [{:fx/type :flow-pane
        :alignment :center-left
+       :hgap 4
        :style {:-fx-font-size 16}
        :children
        (concat
@@ -79,7 +80,11 @@
            :value (fx/sub-val context :battles-layout)
            :items battles-layouts
            :on-value-changed {:event/type :spring-lobby/assoc
-                              :key :battles-layout}}]
+                              :key :battles-layout}}
+          {:fx/type :button
+           :text "Close Battle Preview"
+           :on-action {:event/type :spring-lobby/dissoc-in
+                       :path [:by-server server-key :selected-battle]}}]
          #_
          [{:fx/type :label
            :text " Resources: "}
