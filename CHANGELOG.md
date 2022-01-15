@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.52](https://github.com/skynet-gh/skylobby/releases/tag/0.7.53)
+
+- Move Discord notify to when release is created
+
 ## [0.7.52](https://github.com/skynet-gh/skylobby/releases/tag/0.7.52)
 
 - Fix Discord notify release action

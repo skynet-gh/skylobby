@@ -23,3 +23,8 @@ jobs:
           prerelease: true
           tag: ${{ steps.changelog.outputs.version }}
           token: ${{ secrets.CREATE_RELEASE }}
+      - uses: Ilshidur/action-discord@0.3.2
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: "https://github.com/skynet-gh/skylobby/releases/tag/${{ steps.changelog.outputs.version }}\n\n${{ steps.changelog.outputs.description }}"
