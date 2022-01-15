@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.55](https://github.com/skynet-gh/skylobby/releases/tag/0.7.55)
+
+- Fix Discord release notify
+
 ## [0.7.54](https://github.com/skynet-gh/skylobby/releases/tag/0.7.54)
 
 - Move Discord notify to release publish
