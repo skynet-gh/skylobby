@@ -380,7 +380,7 @@
 
 (defn get-envp [] nil)
 
-(defn wait-for-spring [process state-atom spring-log-state {:keys [infolog-dest]}]
+(defn wait-for-spring [^java.lang.Process process state-atom spring-log-state {:keys [infolog-dest]}]
   (let [exit-code (.waitFor process)]
     (log/info "Spring exited with code" exit-code)
     (when (not= 0 exit-code)
