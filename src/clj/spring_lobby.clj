@@ -2570,7 +2570,8 @@
            (map
              (fn [{:keys [ally id] :as user}]
                (assoc user :battle-status {:id (some-> id u/to-number int dec)
-                                           :ally (some-> ally u/to-number int dec)})))))))
+                                           :ally (some-> ally u/to-number int dec)}
+                      :skilluncertainty 0)))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
