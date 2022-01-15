@@ -22,4 +22,4 @@ jobs:
           body: ${{ steps.changelog.outputs.description }}
           prerelease: true
           tag: ${{ steps.changelog.outputs.version }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CREATE_RELEASE }}
