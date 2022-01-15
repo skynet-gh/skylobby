@@ -285,7 +285,7 @@
                  :h-box/hgrow :always}]))}}]
         [{:fx/type :tab
           :graphic {:fx/type :label
-                    :text "Chat"}
+                    :text (str "Chat" (when friend-requests (str " (" (count friend-requests) " friend requests)")))}
           :closable false
           :id "chat"
           :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
