@@ -89,21 +89,22 @@
                       (filter #(string/includes? (string/lower-case %) filter-lc))
                       (sort String/CASE_INSENSITIVE_ORDER))]
              [{:fx/type ext-recreate-on-key-changed
-               :key (str map-name)
+               :key map-name
                :desc
                {:fx/type :combo-box
-                :prompt-text " < pick a map > "
+                :prompt-text (or map-name " < pick a map > ")
                 :value map-name
                 :items filtered-map-names
                 :disable (boolean disable)
                 :on-value-changed on-value-changed
+                :button-cell
+                (fn [map-name]
+                  {:text (str map-name)})
                 :cell-factory
                 {:fx/cell-type :list-cell
                  :describe
                  (fn [map-name]
-                   {:text (if (string/blank? map-name)
-                            "< choose a map >"
-                            map-name)})}
+                   {:text (str map-name)})}
                 :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
                 :on-hidden {:event/type :spring-lobby/dissoc
                             :key :map-input-prefix}}}]))
