@@ -209,6 +209,7 @@
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
         sides (spring/mod-sides battle-mod-details)
         side-items (->> sides seq (sort-by first) (map second))
         singleplayer (or (not server-key) (= :local server-key))
@@ -691,7 +692,8 @@
                   (tufte/p :faction
                     {:text ""
                      :graphic
-                     (if (seq side-items)
+                     (cond
+                       (seq side-items)
                        {:fx/type ext-recreate-on-key-changed
                         :key (u/nickname i)
                         :desc
@@ -709,8 +711,12 @@
                                       (not (or am-host
                                                (= (:username i) username)
                                                (= (:owner i) username))))}}
+                       (seq mod-details-tasks)
                        {:fx/type :label
-                        :text "loading..."})})))}}])
+                        :text "loading..."}
+                       :else
+                       {:fx/type :label
+                        :text (-> i :battle-status :side str)})})))}}])
          (when (:rank players-table-columns)
            [{:fx/type :table-column
              :editable false
@@ -722,12 +728,15 @@
                                    (comp u/to-number :rank :client-status :user))
              :cell-factory
              {:fx/cell-type :table-cell
-              :describe (fn [[_ rank]] {:text (str rank)})}}])
+              :describe
+              (fn [[_ rank]]
+                {:text (str rank)
+                 :alignment :center})}}])
          (when (:country players-table-columns)
            [{:fx/type :table-column
              :text "Country"
              :resizable false
-             :pref-width 64
+             :pref-width 70
              :cell-value-factory (comp :country :user)
              :cell-factory
              {:fx/cell-type :table-cell
@@ -737,6 +746,7 @@
                                 :id :skylobby/player-table}
                   (tufte/p :flag
                     {:text ""
+                     :alignment :center
                      :graphic
                      {:fx/type flag-icon/flag-icon
                       :country-code country}})))}}])
