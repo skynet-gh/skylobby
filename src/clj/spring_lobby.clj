@@ -168,7 +168,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :console-ignore-message-types :css :debug-spring :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -2572,9 +2572,12 @@
                     (zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))))
            (map
              (fn [{:keys [ally id] :as user}]
-               (assoc user :battle-status {:id (some-> id u/to-number int dec)
-                                           :ally (some-> ally u/to-number int dec)}
-                      :skilluncertainty 0)))))))
+               (let [id (some-> id u/to-number int dec)
+                     ally (some-> ally u/to-number int dec)]
+                 (assoc user :battle-status {:id id
+                                             :ally ally
+                                             :mode (boolean (and id ally))}
+                        :skilluncertainty 0))))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)

@@ -188,6 +188,21 @@
            :on-action {:event/type :spring-lobby/dissoc
                        :key :show-report-user-window}}]}]}}}))
 
+(defn add-parsed-skill
+  [scripttags {:keys [skill skilluncertainty username] :as player}]
+  (let [username-lc (when username (string/lower-case username))
+        tags (get-in scripttags ["game" "players" username-lc])
+        uncertainty (or (try (u/to-number skilluncertainty)
+                             (catch Exception e
+                               (log/debug e "Error parsing skill uncertainty")))
+                        (try (u/to-number (get tags "skilluncertainty"))
+                             (catch Exception e
+                               (log/debug e "Error parsing skill uncertainty")))
+                        3)]
+    (assoc player
+           :skill (or skill (get tags "skill"))
+           :skilluncertainty uncertainty)))
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
@@ -214,22 +229,7 @@
         side-items (->> sides seq (sort-by first) (map second))
         singleplayer (or (not server-key) (= :local server-key))
         username (fx/sub-val context get-in [:by-server server-key :username])
-
-        players-with-skill (map
-                             (fn [{:keys [skill skilluncertainty username] :as player}]
-                               (let [username-lc (when username (string/lower-case username))
-                                     tags (get-in scripttags ["game" "players" username-lc])
-                                     uncertainty (or (try (u/to-number skilluncertainty)
-                                                          (catch Exception e
-                                                            (log/debug e "Error parsing skill uncertainty")))
-                                                     (try (u/to-number (get tags "skilluncertainty"))
-                                                          (catch Exception e
-                                                            (log/debug e "Error parsing skill uncertainty")))
-                                                     3)]
-                                 (assoc player
-                                        :skill (or skill (get tags "skill"))
-                                        :skilluncertainty uncertainty)))
-                             players)
+        players-with-skill (map (partial add-parsed-skill scripttags) players)
         incrementing-cell (fn [id]
                             {:text
                              (if increment-ids
@@ -237,7 +237,10 @@
                                  (str (inc n)))
                                (str id))})
         now (or (fx/sub-val context :now) (u/curr-millis))
-        sorm (if singleplayer "singleplayer" "multiplayer")]
+        css-class-suffix (cond
+                           (not server-key) "replay"
+                           singleplayer "singleplayer"
+                           :else "multiplayer")]
     {:fx/type ext-recreate-on-key-changed
      :key players-table-columns
      :desc
@@ -253,7 +256,7 @@
         players-with-skill)
       :desc
       {:fx/type :table-view
-       :style-class ["table-view" "skylobby-players-" sorm]
+       :style-class ["table-view" "skylobby-players-" css-class-suffix]
        :column-resize-policy :unconstrained
        :style {:-fx-min-height 200}
        :row-factory
@@ -419,7 +422,7 @@
                           :style {:-fx-pref-width 8}}
                          (merge
                            {:fx/type :text
-                            :style-class ["text" (str "skylobby-players-" sorm "-nickname")]
+                            :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
                             :effect {:fx/type :drop-shadow
                                      :color (if (color/dark? text-color-javafx)
                                               "#d5d5d5"
@@ -784,9 +787,97 @@
                                            :is-bot (-> i :user :client-status :bot)
                                            :id i}}}}})))}}]))}}}))
 
+(defn players-not-a-table
+  [{:fx/keys [context]
+    :keys [players server-key]}]
+  (let [
+        singleplayer (or (not server-key) (= :local server-key))
+        css-class-suffix (cond
+                           (not server-key) "replay"
+                           singleplayer "singleplayer"
+                           :else "multiplayer")
+        scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+        players-with-skill (map (partial add-parsed-skill scripttags) players)
+        playing-by-ally (->> players-with-skill
+                             (filter (comp :mode :battle-status))
+                             (group-by (comp :ally :battle-status)))
+        increment-ids (fx/sub-val context :increment-ids)
+        spectators (->> players-with-skill
+                        (filter (comp not :mode :battle-status)))]
+    {:fx/type :flow-pane
+     :hgap 16
+     :children
+     (concat
+       (map
+         (fn [[ally players]]
+           (let [ally-n (u/to-number ally)
+                 players (->> players (sort-by (comp u/to-number :id :battle-status)))]
+             {:fx/type :v-box
+              :pref-width 200
+              :flow-pane/margin {:left 16}
+              :children
+              [{:fx/type :label
+                :text (str " Team " (if increment-ids
+                                      (when ally-n
+                                        (str (inc ally-n)))
+                                      (str ally)))
+                :pref-width 200
+                :style {:-fx-font-size 24
+                        :-fx-font-weight "bold"
+                        :-fx-text-fill (get allyteam-colors ally-n "#ffffff")
+                        :-fx-border-color "#aaaaaa"
+                        :-fx-border-radius 1
+                        :-fx-border-style "solid"}}
+               {:fx/type :v-box
+                :style {
+                        :-fx-border-color "#666666"
+                        :-fx-border-radius 1
+                        :-fx-border-style "solid"}
+                :children
+                (mapv
+                  (fn [player]
+                    (let [text-color-javafx (or
+                                              (-> player :team-color fx.color/spring-color-to-javafx)
+                                              Color/WHITE)
+                          text-color-css (-> text-color-javafx str u/hex-color-to-css)]
+                      {:fx/type :text
+                       :text (str " " (u/nickname player))
+                       :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
+                       :fill text-color-css
+                       :style {:-fx-font-smoothing :gray
+                               :-fx-font-weight "bold"}
+                       :effect {:fx/type :drop-shadow
+                                :color (if (color/dark? text-color-javafx)
+                                         "#d5d5d5"
+                                         "black")
+                                :radius 2
+                                :spread 1}}))
+                  players)}]}))
+         playing-by-ally)
+       [{:fx/type :v-box
+         :flow-pane/margin {:left 16}
+         :children
+         [{:fx/type :label
+           :text "Spectators"
+           :style {:-fx-font-size 24}}
+          {:fx/type :flow-pane
+           :hgap 16
+           :children
+           (mapv
+             (fn [player]
+               {:fx/type :text
+                :text (str (u/nickname player))
+                :fill "#ffffff"
+                :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]})
+             spectators)}]}])}))
+
 (defn players-table
-  [state]
+  [{:fx/keys [context] :as state}]
   (tufte/profile {:dynamic? true
                   :id :skylobby/ui}
     (tufte/p :players-table
-      (players-table-impl state))))
+      (let [display-type (fx/sub-val context :battle-players-display-type)]
+        (case display-type
+          "group" (players-not-a-table state)
+          ; else
+          (players-table-impl state))))))

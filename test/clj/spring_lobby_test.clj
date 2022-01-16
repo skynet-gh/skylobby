@@ -64,7 +64,9 @@
   (is (= []
          (spring-lobby/parse-battle-status-message "")))
   (is (= [{:ally "1"
-           :battle-status {:ally 0, :id 0}
+           :battle-status {:ally 0
+                           :id 0
+                           :mode true}
            :clan ""
            :id "1"
            :rank "3"
@@ -74,7 +76,9 @@
            :user-id "MFAI : normal (nebula3)"
            :username "bot1 (bot)"}
           {:ally "2"
-           :battle-status {:ally 1, :id 1}
+           :battle-status {:ally 1
+                           :id 1
+                           :mode true}
            :clan ""
            :id "2"
            :rank "3"
@@ -84,7 +88,9 @@
            :user-id "MFAI : normal (nebula3)"
            :username "bot2 (bot)"}
           {:ally ""
-           :battle-status {:ally nil, :id nil}
+           :battle-status {:ally nil
+                           :id nil
+                           :mode false}
            :clan ""
            :id ""
            :rank "6"
