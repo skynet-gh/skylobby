@@ -379,6 +379,18 @@
             :children
             [
              {:fx/type :label
+              :text " Players display type: "}
+             {:fx/type :combo-box
+              :value (or (fx/sub-val context :battle-players-display-type)
+                         "group")
+              :items ["group" "table"]
+              :on-value-changed {:event/type :spring-lobby/assoc
+                                 :key :battle-players-display-type}}]}
+           {:fx/type :h-box
+            :alignment :center-left
+            :children
+            [
+             {:fx/type :label
               :text " Color player name: "}
              {:fx/type :combo-box
               :value (or (fx/sub-val context :battle-players-color-type)

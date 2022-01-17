@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.battles-buttons :as fx.battles-buttons]
@@ -119,6 +120,19 @@
   (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
         users (fx/sub-val context get-in [:by-server server-key :users])
+        user-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id :user-details])
+        bot-details (->> user-details
+                         (filter (comp #(string/includes? % "(bot)") :username second))
+                         (into {}))
+        selected-battle-details (-> selected-battle-details
+                                    (update :users
+                                      (fn [users]
+                                        (reduce-kv
+                                          (fn [m k v]
+                                            (update m k merge v (get user-details k)))
+                                          {}
+                                          users)))
+                                    (update :users merge bot-details))
         server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
         engine-version (:battle-version selected-battle-details)
@@ -285,7 +299,8 @@
                  :h-box/hgrow :always}]))}}]
         [{:fx/type :tab
           :graphic {:fx/type :label
-                    :text (str "Chat" (when friend-requests (str " (" (count friend-requests) " friend requests)")))}
+                    :text (str "Chat" (when (seq friend-requests)
+                                        (str " (" (count friend-requests) " friend requests)")))}
           :closable false
           :id "chat"
           :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))

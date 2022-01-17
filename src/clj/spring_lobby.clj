@@ -168,7 +168,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :console-ignore-message-types :css :debug-spring :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -2572,9 +2572,12 @@
                     (zipmap [:username :ally :id :clan :ready :rank :skill :user-id]))))
            (map
              (fn [{:keys [ally id] :as user}]
-               (assoc user :battle-status {:id (some-> id u/to-number int dec)
-                                           :ally (some-> ally u/to-number int dec)}
-                      :skilluncertainty 0)))))))
+               (let [id (some-> id u/to-number int dec)
+                     ally (some-> ally u/to-number int dec)]
+                 (assoc user :battle-status {:id id
+                                             :ally ally
+                                             :mode (boolean (and id ally))}
+                        :skilluncertainty 0))))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
@@ -2586,13 +2589,13 @@
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
                             (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
-        {:keys [client-data users] :as server-data} (get-in state [:by-server server-key])
+        {:keys [client-data battle users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
     (future
       (try
-        (when is-bot
+        (when (and (not= battle-id (:battle-id battle)) is-bot)
           (log/info "Capturing chat from" channel-name)
           @(event-handler
              {:event/type ::send-message
@@ -2603,21 +2606,10 @@
           (let [path [:by-server server-key :channels channel-name :capture]
                 [old-state _new-state] (swap-vals! *state assoc-in path nil)
                 captured (get-in old-state path)
-                parsed (parse-battle-status-message captured)
-                parsed-user-set (set (map :username parsed))]
+                parsed (when captured (parse-battle-status-message captured))]
             (log/info "Captured chat from" channel-name ":" captured)
-            (if (seq parsed)
-              (swap! *state update-in [:by-server server-key :battles battle-id :users]
-                (fn [users]
-                  (reduce
-                    (fn [m u]
-                      (update m (:username u) merge u))
-                    (->> users
-                         (filter (comp parsed-user-set first))
-                         (into {})
-                         (merge {host-username {}}))
-                    parsed)))
-              (log/info "Ignoring empty battle status"))))
+            (swap! *state assoc-in [:by-server server-key :battles battle-id :user-details]
+              (into {} (map (juxt :username identity) parsed)))))
         (catch Exception e
           (log/error e "Error parsing battle status response"))))))
 

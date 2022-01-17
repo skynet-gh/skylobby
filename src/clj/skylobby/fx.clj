@@ -147,6 +147,10 @@
      {:-fx-font-size 14
       "-nickname"
       {:-fx-font-size 16}}
+     "-replay"
+     {:-fx-font-size 14
+      "-nickname"
+      {:-fx-font-size 16}}
      "-singleplayer"
      {:-fx-font-size 20
       "-nickname"
