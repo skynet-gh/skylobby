@@ -6,7 +6,7 @@
     [skylobby.color :as color]
     skylobby.fx
     [skylobby.fx.color :as fx.color]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size ext-with-context-menu]]
     [skylobby.fx.flag-icon :as flag-icon]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.spring-options :as fx.spring-options]
@@ -203,17 +203,112 @@
            :skill (or skill (get tags "skill"))
            :skilluncertainty uncertainty)))
 
+(defn player-context-menu
+  [{:fx/keys [context]
+    :keys [battle-id host-is-bot host-ingame player server-key]}]
+  (let [{:keys [owner team-color username user]} player
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        ignore-users (fx/sub-val context :ignore-users)
+        host-username (fx/sub-ctx context sub/host-username server-key)]
+    {:fx/type :context-menu
+     :style {:-fx-font-size 16}
+     :items
+     (concat []
+       (when (not owner)
+         [
+          {:fx/type :menu-item
+           :text "Message"
+           :on-action {:event/type :spring-lobby/join-direct-message
+                       :server-key server-key
+                       :username username}}])
+       [{:fx/type :menu-item
+         :text "Ring"
+         :on-action {:event/type :spring-lobby/ring
+                     :client-data client-data
+                     :channel-name channel-name
+                     :username username}}]
+       (when (and host-username
+                  (= host-username username)
+                  (-> user :client-status :bot))
+         (concat
+           [{:fx/type :menu-item
+             :text "!help"
+             :on-action {:event/type :spring-lobby/send-message
+                         :client-data client-data
+                         :channel-name (u/user-channel-name host-username)
+                         :message "!help"
+                         :server-key server-key}}
+            {:fx/type :menu-item
+             :text "!status battle"
+             :on-action {:event/type :spring-lobby/send-message
+                         :client-data client-data
+                         :channel-name (u/user-channel-name host-username)
+                         :message "!status battle"
+                         :server-key server-key}}]
+           (if host-ingame
+             [{:fx/type :menu-item
+               :text "!status game"
+               :on-action {:event/type :spring-lobby/send-message
+                           :client-data client-data
+                           :channel-name (u/user-channel-name host-username)
+                           :message "!status game"
+                           :server-key server-key}}]
+             [{:fx/type :menu-item
+               :text "!stats"
+               :on-action {:event/type :spring-lobby/send-message
+                           :client-data client-data
+                           :channel-name (u/user-channel-name host-username)
+                           :message "!stats"
+                           :server-key server-key}}])))
+       (when host-is-bot
+         [{:fx/type :menu-item
+           :text "!whois"
+           :on-action {:event/type :spring-lobby/send-message
+                       :client-data client-data
+                       :channel-name (u/user-channel-name host-username)
+                       :message (str "!whois " username)
+                       :server-key server-key}}])
+       [
+        {:fx/type :menu-item
+         :text (str "User ID: " (-> user :user-id))}
+        {:fx/type :menu-item
+         :text (str "Copy color")
+         :on-action (fn [_event]
+                      (let [clipboard (Clipboard/getSystemClipboard)
+                            content (ClipboardContent.)
+                            color (fx.color/spring-color-to-javafx team-color)]
+                        (.putString content (str color))
+                        (.setContent clipboard content)))}
+        (if (-> ignore-users (get server-key) (get username))
+          {:fx/type :menu-item
+           :text "Unignore"
+           :on-action {:event/type :spring-lobby/unignore-user
+                       :server-key server-key
+                       :username username}}
+          {:fx/type :menu-item
+           :text "Ignore"
+           :on-action {:event/type :spring-lobby/ignore-user
+                       :server-key server-key
+                       :username username}})]
+       (when (contains? (:compflags client-data) "teiserver")
+         [{:fx/type :menu-item
+           :text "Report"
+           :on-action {:event/type :spring-lobby/show-report-user
+                       :battle-id battle-id
+                       :server-key server-key
+                       :username username}}]))}))
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
-        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         host-username (fx/sub-ctx context sub/host-username server-key)
-        ignore-users (fx/sub-val context :ignore-users)
+        host-is-bot (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
         increment-ids (fx/sub-val context :increment-ids)
         players-table-columns (fx/sub-val context :players-table-columns)
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
@@ -262,99 +357,18 @@
        :row-factory
        {:fx/cell-type :table-row
         :describe
-        (fn [{:keys [owner team-color username user]}]
+        (fn [{:as player}]
           (tufte/profile {:dynamic? true
                           :id :skylobby/player-table}
             (tufte/p :row
               {
                :context-menu
-               {:fx/type :context-menu
-                :style {:-fx-font-size 16}
-                :items
-                (concat []
-                  (when (not owner)
-                    [
-                     {:fx/type :menu-item
-                      :text "Message"
-                      :on-action {:event/type :spring-lobby/join-direct-message
-                                  :server-key server-key
-                                  :username username}}])
-                  [{:fx/type :menu-item
-                    :text "Ring"
-                    :on-action {:event/type :spring-lobby/ring
-                                :client-data client-data
-                                :channel-name channel-name
-                                :username username}}]
-                  (when (and host-username
-                             (= host-username username)
-                             (-> user :client-status :bot))
-                    (concat
-                      [{:fx/type :menu-item
-                        :text "!help"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel-name host-username)
-                                    :message "!help"
-                                    :server-key server-key}}
-                       {:fx/type :menu-item
-                        :text "!status battle"
-                        :on-action {:event/type :spring-lobby/send-message
-                                    :client-data client-data
-                                    :channel-name (u/user-channel-name host-username)
-                                    :message "!status battle"
-                                    :server-key server-key}}]
-                      (if host-ingame
-                        [{:fx/type :menu-item
-                          :text "!status game"
-                          :on-action {:event/type :spring-lobby/send-message
-                                      :client-data client-data
-                                      :channel-name (u/user-channel-name host-username)
-                                      :message "!status game"
-                                      :server-key server-key}}]
-                        [{:fx/type :menu-item
-                          :text "!stats"
-                          :on-action {:event/type :spring-lobby/send-message
-                                      :client-data client-data
-                                      :channel-name (u/user-channel-name host-username)
-                                      :message "!stats"
-                                      :server-key server-key}}])))
-                  (when (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
-                    [{:fx/type :menu-item
-                      :text "!whois"
-                      :on-action {:event/type :spring-lobby/send-message
-                                  :client-data client-data
-                                  :channel-name (u/user-channel-name host-username)
-                                  :message (str "!whois " username)
-                                  :server-key server-key}}])
-                  [
-                   {:fx/type :menu-item
-                    :text (str "User ID: " (-> user :user-id))}
-                   {:fx/type :menu-item
-                    :text (str "Copy color")
-                    :on-action (fn [_event]
-                                 (let [clipboard (Clipboard/getSystemClipboard)
-                                       content (ClipboardContent.)
-                                       color (fx.color/spring-color-to-javafx team-color)]
-                                   (.putString content (str color))
-                                   (.setContent clipboard content)))}
-                   (if (-> ignore-users (get server-key) (get username))
-                     {:fx/type :menu-item
-                      :text "Unignore"
-                      :on-action {:event/type :spring-lobby/unignore-user
-                                  :server-key server-key
-                                  :username username}}
-                     {:fx/type :menu-item
-                      :text "Ignore"
-                      :on-action {:event/type :spring-lobby/ignore-user
-                                  :server-key server-key
-                                  :username username}})]
-                  (when (contains? (:compflags client-data) "teiserver")
-                    [{:fx/type :menu-item
-                      :text "Report"
-                      :on-action {:event/type :spring-lobby/show-report-user
-                                  :battle-id battle-id
-                                  :server-key server-key
-                                  :username username}}]))}})))}
+               {:fx/type player-context-menu
+                :player player
+                :battle-id battle-id
+                :host-is-bot host-is-bot
+                :host-ingame host-ingame
+                :server-key server-key}})))}
        :columns
        (concat
          [{:fx/type :table-column
@@ -803,7 +817,11 @@
                              (group-by (comp :ally :battle-status)))
         increment-ids (fx/sub-val context :increment-ids)
         spectators (->> players-with-skill
-                        (filter (comp not :mode :battle-status)))]
+                        (filter (comp not :mode :battle-status)))
+        host-username (fx/sub-ctx context sub/host-username server-key)
+        host-is-bot (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
+        host-ingame (fx/sub-ctx context sub/host-ingame server-key)
+        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])]
     {:fx/type :flow-pane
      :hgap 16
      :children
@@ -840,20 +858,29 @@
                                               (-> player :team-color fx.color/spring-color-to-javafx)
                                               Color/WHITE)
                           text-color-css (-> text-color-javafx str u/hex-color-to-css)]
-                      {:fx/type :text
-                       :text (str " " (u/nickname player))
-                       :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
-                       :fill text-color-css
-                       :style {:-fx-font-smoothing :gray
-                               :-fx-font-weight "bold"}
-                       :effect {:fx/type :drop-shadow
-                                :color (if (color/dark? text-color-javafx)
-                                         "#d5d5d5"
-                                         "black")
-                                :radius 2
-                                :spread 1}}))
+                      {:fx/type ext-with-context-menu
+                       :props {:context-menu
+                               {:fx/type player-context-menu
+                                :player player
+                                :battle-id battle-id
+                                :host-is-bot host-is-bot
+                                :host-ingame host-ingame
+                                :server-key server-key}}
+                       :desc
+                       {:fx/type :text
+                        :text (str " " (u/nickname player))
+                        :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
+                        :fill text-color-css
+                        :style {:-fx-font-smoothing :gray
+                                :-fx-font-weight "bold"}
+                        :effect {:fx/type :drop-shadow
+                                 :color (if (color/dark? text-color-javafx)
+                                          "#d5d5d5"
+                                          "black")
+                                 :radius 2
+                                 :spread 1}}}))
                   players)}]}))
-         playing-by-ally)
+         (sort-by first playing-by-ally))
        [{:fx/type :v-box
          :flow-pane/margin {:left 16}
          :children
@@ -865,10 +892,19 @@
            :children
            (mapv
              (fn [player]
-               {:fx/type :text
-                :text (str (u/nickname player))
-                :fill "#ffffff"
-                :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]})
+               {:fx/type ext-with-context-menu
+                :props {:context-menu
+                        {:fx/type player-context-menu
+                         :player player
+                         :battle-id battle-id
+                         :host-is-bot host-is-bot
+                         :host-ingame host-ingame
+                         :server-key server-key}}
+                :desc
+                {:fx/type :text
+                 :text (str (u/nickname player))
+                 :fill "#ffffff"
+                 :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}})
              spectators)}]}])}))
 
 (defn players-table

@@ -9,8 +9,10 @@
     [skylobby.util :as u])
   (:import
     (javafx.beans.value ChangeListener)
+    (javafx.event EventHandler)
     (javafx.scene Node)
-    (javafx.scene.control ScrollPane TableView TextArea TextField)
+    (javafx.scene.control ContextMenu ScrollPane TableView TextArea TextField)
+    (javafx.scene.input ContextMenuEvent)
     (javafx.util Callback)
     (org.controlsfx.control.textfield AutoCompletionBinding$ISuggestionRequest TextFields)
     (org.fxmisc.flowless VirtualizedScrollPane)))
@@ -174,3 +176,17 @@
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created focus-when-on-scene!
    :desc desc})
+
+
+; https://github.com/cljfx/cljfx/issues/71#issuecomment-631663519
+(defn- context-menu->listener [^ContextMenu menu]
+  (reify EventHandler
+    (handle [_ e]
+      (let [^ContextMenuEvent e e]
+        (.show menu ^Node (.getTarget e) (.getScreenX e) (.getScreenY e))))))
+
+(def ext-with-context-menu
+  (fx/make-ext-with-props
+    {:context-menu (fx.prop/make
+                     (fx.mutator/setter #(.setOnContextMenuRequested ^Node %1 %2))
+                     (fx.lifecycle/wrap-coerce fx.lifecycle/dynamic context-menu->listener))}))
