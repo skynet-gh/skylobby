@@ -119,6 +119,14 @@
   (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
         users (fx/sub-val context get-in [:by-server server-key :users])
+        user-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id :user-details])
+        selected-battle-details (update selected-battle-details :users
+                                  (fn [users]
+                                    (reduce-kv
+                                      (fn [m k v]
+                                        (update m k merge v (get user-details k)))
+                                      {}
+                                      users)))
         server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
         engine-version (:battle-version selected-battle-details)

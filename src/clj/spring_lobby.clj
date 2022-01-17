@@ -2606,21 +2606,10 @@
           (let [path [:by-server server-key :channels channel-name :capture]
                 [old-state _new-state] (swap-vals! *state assoc-in path nil)
                 captured (get-in old-state path)
-                parsed (when captured (parse-battle-status-message captured))
-                parsed-user-set (set (map :username parsed))]
+                parsed (when captured (parse-battle-status-message captured))]
             (log/info "Captured chat from" channel-name ":" captured)
-            (if (seq parsed)
-              (swap! *state update-in [:by-server server-key :battles battle-id :users]
-                (fn [users]
-                  (reduce
-                    (fn [m u]
-                      (update m (:username u) merge u))
-                    (->> users
-                         (filter (comp parsed-user-set first))
-                         (into {})
-                         (merge {host-username {}}))
-                    parsed)))
-              (log/info "Ignoring empty battle status"))))
+            (swap! *state assoc-in [:by-server server-key :battles battle-id :user-details]
+              (into {} (map (juxt :username identity) parsed)))))
         (catch Exception e
           (log/error e "Error parsing battle status response"))))))
 
