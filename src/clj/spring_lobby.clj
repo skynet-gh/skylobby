@@ -2589,13 +2589,13 @@
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
                             (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
-        {:keys [client-data users] :as server-data} (get-in state [:by-server server-key])
+        {:keys [client-data battle users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
     (future
       (try
-        (when is-bot
+        (when (and (not= battle-id (:battle-id battle)) is-bot)
           (log/info "Capturing chat from" channel-name)
           @(event-handler
              {:event/type ::send-message
@@ -2606,7 +2606,7 @@
           (let [path [:by-server server-key :channels channel-name :capture]
                 [old-state _new-state] (swap-vals! *state assoc-in path nil)
                 captured (get-in old-state path)
-                parsed (parse-battle-status-message captured)
+                parsed (when captured (parse-battle-status-message captured))
                 parsed-user-set (set (map :username parsed))]
             (log/info "Captured chat from" channel-name ":" captured)
             (if (seq parsed)
