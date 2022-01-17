@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.58](https://github.com/skynet-gh/skylobby/releases/tag/0.7.58) - 2022-01-17
+
+- Add skill and status players grouped by team, wrap in scroll pane
+- Bundle CSS and font icons for web view to prevent remote fetches
+
 ## [0.7.57](https://github.com/skynet-gh/skylobby/releases/tag/0.7.57) - 2022-01-17
 
 - Add setting to show players grouped by team

@@ -212,7 +212,8 @@
         ignore-users (fx/sub-val context :ignore-users)
         host-username (fx/sub-ctx context sub/host-username server-key)]
     {:fx/type :context-menu
-     :style {:-fx-font-size 16}
+     :style {:-fx-font-size 16
+             :-fx-font-weight "normal"}
      :items
      (concat []
        (when (not owner)
@@ -298,6 +299,78 @@
                        :battle-id battle-id
                        :server-key server-key
                        :username username}}]))}))
+
+(defn player-status
+  [{:fx/keys [context]
+    :keys [player server-key]}]
+  (let [{:keys [battle-status user username]} player
+        client-status (:client-status user)
+        host-username (fx/sub-ctx context sub/host-username server-key)
+        am-host (= username host-username)
+        now (or (fx/sub-val context :now) (u/curr-millis))
+        singleplayer (or (not server-key) (= :local server-key))]
+    {:fx/type :label
+     :text ""
+     :tooltip
+     {:fx/type tooltip-nofocus/lifecycle
+      :show-delay skylobby.fx/tooltip-show-delay
+      :style {:-fx-font-size 16}
+      :text
+      (str
+        (case (int (or (:sync battle-status) 0))
+          1 "Synced"
+          2 "Unsynced"
+          "Unknown sync")
+        "\n"
+        (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
+        (when (u/to-bool (:mode battle-status))
+          (str "\n" (if (:ready battle-status) "Ready" "Unready")))
+        (when (:ingame client-status)
+          "\nIn game")
+        (when-let [away-start-time (:away-start-time user)]
+          (when (and (:away client-status) away-start-time)
+            (str "\nAway: "
+                 (let [diff (- now away-start-time)]
+                   (if (< diff 30000)
+                     " just now"
+                     (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
+     :graphic
+     {:fx/type :h-box
+      :alignment :center-left
+      :children
+      (concat
+        (when-not singleplayer
+          [
+           {:fx/type font-icon/lifecycle
+            :icon-literal
+            (let [sync-status (int (or (:sync battle-status) 0))]
+              (case sync-status
+                1 "mdi-sync:16:green"
+                2 "mdi-sync-off:16:red"
+                ; else
+                "mdi-sync-alert:16:yellow"))}])
+        [(cond
+           (:bot client-status)
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-robot:16:grey"}
+           (not (u/to-bool (:mode battle-status)))
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-magnify:16:white"}
+           (:ready battle-status)
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-account-check:16:green"}
+           am-host
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-account-key:16:orange"}
+           :else
+           {:fx/type font-icon/lifecycle
+            :icon-literal "mdi-account:16:white"})]
+        (when (:ingame client-status)
+          [{:fx/type font-icon/lifecycle
+            :icon-literal "mdi-sword:16:red"}])
+        (when (:away client-status)
+          [{:fx/type font-icon/lifecycle
+            :icon-literal "mdi-sleep:16:grey"}]))}}))
 
 (defn players-table-impl
   [{:fx/keys [context]
@@ -801,6 +874,8 @@
                                            :is-bot (-> i :user :client-status :bot)
                                            :id i}}}}})))}}]))}}}))
 
+(def player-width 320)
+
 (defn players-not-a-table
   [{:fx/keys [context]
     :keys [players server-key]}]
@@ -822,90 +897,111 @@
         host-is-bot (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])]
-    {:fx/type :flow-pane
-     :hgap 16
-     :children
-     (concat
-       (map
-         (fn [[ally players]]
-           (let [ally-n (u/to-number ally)
-                 players (->> players (sort-by (comp u/to-number :id :battle-status)))]
-             {:fx/type :v-box
-              :pref-width 200
-              :flow-pane/margin {:left 16}
-              :children
-              [{:fx/type :label
-                :text (str " Team " (if increment-ids
-                                      (when ally-n
-                                        (str (inc ally-n)))
-                                      (str ally)))
-                :pref-width 200
-                :style {:-fx-font-size 24
-                        :-fx-font-weight "bold"
-                        :-fx-text-fill (get allyteam-colors ally-n "#ffffff")
-                        :-fx-border-color "#aaaaaa"
-                        :-fx-border-radius 1
-                        :-fx-border-style "solid"}}
-               {:fx/type :v-box
-                :style {
-                        :-fx-border-color "#666666"
-                        :-fx-border-radius 1
-                        :-fx-border-style "solid"}
-                :children
-                (mapv
-                  (fn [player]
-                    (let [text-color-javafx (or
-                                              (-> player :team-color fx.color/spring-color-to-javafx)
-                                              Color/WHITE)
-                          text-color-css (-> text-color-javafx str u/hex-color-to-css)]
-                      {:fx/type ext-with-context-menu
-                       :props {:context-menu
-                               {:fx/type player-context-menu
-                                :player player
-                                :battle-id battle-id
-                                :host-is-bot host-is-bot
-                                :host-ingame host-ingame
-                                :server-key server-key}}
-                       :desc
-                       {:fx/type :text
-                        :text (str " " (u/nickname player))
-                        :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
-                        :fill text-color-css
-                        :style {:-fx-font-smoothing :gray
-                                :-fx-font-weight "bold"}
-                        :effect {:fx/type :drop-shadow
-                                 :color (if (color/dark? text-color-javafx)
-                                          "#d5d5d5"
-                                          "black")
-                                 :radius 2
-                                 :spread 1}}}))
-                  players)}]}))
-         (sort-by first playing-by-ally))
-       [{:fx/type :v-box
-         :flow-pane/margin {:left 16}
-         :children
-         [{:fx/type :label
-           :text "Spectators"
-           :style {:-fx-font-size 24}}
-          {:fx/type :flow-pane
-           :hgap 16
-           :children
-           (mapv
-             (fn [player]
-               {:fx/type ext-with-context-menu
-                :props {:context-menu
-                        {:fx/type player-context-menu
-                         :player player
-                         :battle-id battle-id
-                         :host-is-bot host-is-bot
-                         :host-ingame host-ingame
-                         :server-key server-key}}
-                :desc
-                {:fx/type :text
-                 :text (str (u/nickname player))
-                 :fill "#ffffff"
-                 :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}})
-             spectators)}]}])}))
+    {:fx/type :scroll-pane
+     :min-height 160
+     :fit-to-width true
+     :hbar-policy :never
+     :content
+     {:fx/type :flow-pane
+      :hgap 16
+      :vgap 16
+      :children
+      (concat
+        (map
+          (fn [[ally players]]
+            (let [ally-n (u/to-number ally)
+                  players (->> players (sort-by (comp u/to-number :id :battle-status)))]
+              {:fx/type :v-box
+               :pref-width player-width
+               :flow-pane/margin {:left 16}
+               :children
+               [{:fx/type :label
+                 :text (str " Team " (if increment-ids
+                                       (when ally-n
+                                         (str (inc ally-n)))
+                                       (str ally)))
+                 :pref-width player-width
+                 :style {:-fx-font-size 24
+                         :-fx-font-weight "bold"
+                         :-fx-text-fill (get allyteam-colors ally-n "#ffffff")
+                         :-fx-border-color "#aaaaaa"
+                         :-fx-border-radius 1
+                         :-fx-border-style "solid"}}
+                {:fx/type :v-box
+                 :style {
+                         :-fx-border-color "#666666"
+                         :-fx-border-radius 1
+                         :-fx-border-style "solid"}
+                 :children
+                 (mapv
+                   (fn [player]
+                     (let [text-color-javafx (or
+                                               (-> player :team-color fx.color/spring-color-to-javafx)
+                                               Color/WHITE)
+                           text-color-css (-> text-color-javafx str u/hex-color-to-css)]
+                       {:fx/type ext-with-context-menu
+                        :props {:context-menu
+                                {:fx/type player-context-menu
+                                 :player player
+                                 :battle-id battle-id
+                                 :host-is-bot host-is-bot
+                                 :host-ingame host-ingame
+                                 :server-key server-key}}
+                        :desc
+                        {:fx/type :h-box
+                         :children
+                         [
+                          {:fx/type :text
+                           :text (str " " (u/nickname player))
+                           :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
+                           :fill text-color-css
+                           :style {:-fx-font-smoothing :gray
+                                   :-fx-font-weight "bold"}
+                           :effect {:fx/type :drop-shadow
+                                    :color (if (color/dark? text-color-javafx)
+                                             "#d5d5d5"
+                                             "black")
+                                    :radius 2
+                                    :spread 1}}
+                          {:fx/type :pane
+                           :h-box/hgrow :always}
+                          {:fx/type :label
+                           :text
+                           (str (:skill player)
+                                " "
+                                (let [uncertainty (:skilluncertainty player)]
+                                  (when (number? uncertainty)
+                                    (apply str (repeat uncertainty "?")))))}
+                          {:fx/type player-status
+                           :player player
+                           :server-key server-key}]}}))
+                   players)}]}))
+          (sort-by first playing-by-ally))
+        [{:fx/type :v-box
+          :flow-pane/margin {:left 16}
+          :children
+          [{:fx/type :label
+            :text "Spectators"
+            :style {:-fx-font-size 24}}
+           {:fx/type :flow-pane
+            :hgap 16
+            :children
+            (mapv
+              (fn [player]
+                {:fx/type ext-with-context-menu
+                 :props {:context-menu
+                         {:fx/type player-context-menu
+                          :player player
+                          :battle-id battle-id
+                          :host-is-bot host-is-bot
+                          :host-ingame host-ingame
+                          :server-key server-key}}
+                 :desc
+                 {:fx/type :text
+                  :text (str (u/nickname player))
+                  :fill "#ffffff"
+                  :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}})
+              spectators)}]}])}}))
 
 (defn players-table
   [{:fx/keys [context] :as state}]

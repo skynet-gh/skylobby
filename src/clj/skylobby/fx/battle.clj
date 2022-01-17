@@ -1029,7 +1029,7 @@
 
 (defn battle-votes-impl
   [{:fx/keys [context]
-    :keys [battle-layout server-key]}]
+    :keys [server-key]}]
   (let [show-vote-log (fx/sub-val context :show-vote-log)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
@@ -1144,17 +1144,14 @@
              :h-box/hgrow :always}
             {:fx/type :button
              :text ""
+             :style-class ["button" "skylobby-normal"]
              :on-action {:event/type (if show-vote-log :spring-lobby/dissoc :spring-lobby/assoc)
                          :key :show-vote-log}
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal (if show-vote-log
-                              (if (= "vertical" battle-layout)
-                                "mdi-arrow-down:16:white"
-                                "mdi-arrow-right:16:white")
-                              (if (= "vertical" battle-layout)
-                                "mdi-arrow-up:16:white"
-                                "mdi-arrow-left:16:white"))}}])}]
+                              "mdi-arrow-down:16"
+                              "mdi-arrow-up:16")}}])}]
        (when show-vote-log
          [{:fx/type :scroll-pane
            :pref-width 400
@@ -1298,33 +1295,27 @@
                          {:fx/type :pane})
         battle-chat {:fx/type :h-box
                      :children
-                     (concat
-                       [
-                        {:fx/type fx.channel/channel-view
-                         :h-box/hgrow :always
-                         :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key battle-id)
-                         :disable old-battle
-                         :hide-users true
-                         :server-key server-key
-                         :usernames (keys (or battle-users {}))}]
-                       (when (not= "vertical" battle-layout)
-                         [{:fx/type battle-votes
-                           :battle-layout battle-layout
-                           :server-key server-key}]))}
+                     [
+                      {:fx/type fx.channel/channel-view
+                       :h-box/hgrow :always
+                       :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key battle-id)
+                       :disable old-battle
+                       :hide-users true
+                       :server-key server-key
+                       :usernames (keys (or battle-users {}))}]}
         battle-tabs
-        (if (and (not= "vertical" battle-layout) (not pop-out-chat))
+        (if pop-out-chat
           {:fx/type battle-tabs
            :server-key server-key}
           (if show-vote-log
             {:fx/type :split-pane
              :orientation :vertical
-             :divider-positions [0.5]
+             :divider-positions [0.3]
              :items
              [
               {:fx/type battle-tabs
                :server-key server-key}
               {:fx/type battle-votes
-               :battle-layout battle-layout
                :server-key server-key}]}
             {:fx/type :v-box
              :children
@@ -1333,7 +1324,6 @@
                :v-box/vgrow :always
                :server-key server-key}
               {:fx/type battle-votes
-               :battle-layout battle-layout
                :server-key server-key}]}))
         resources-buttons {:fx/type :h-box
                            :style {:-fx-font-size 16}
@@ -1552,38 +1542,27 @@
                :orientation (if (= "vertical" battle-layout) :horizontal :vertical)
                :divider-positions [(or (get divider-positions battle-layout-key) battle-layout-default-split)]
                :items
-               (if (= "vertical" battle-layout)
-                 (concat
-                   [
-                    {:fx/type :v-box
-                     :children
+               (concat
+                 [
+                  {:fx/type :v-box
+                   :children
+                   (if (= "vertical" battle-layout)
                      (concat
                        [(assoc players-table :v-box/vgrow :always)]
                        (when (fx/sub-val context :battle-resource-details)
                          [resources-pane])
-                       [battle-buttons])}]
-                   (when-not pop-out-chat
-                     [battle-chat]))
-                 (concat
-                   [{:fx/type :h-box
-                     :children
-                     [
-                      {:fx/type :v-box
-                       :h-box/hgrow :always
+                       [battle-buttons])
+                     [{:fx/type :h-box
+                       :v-box/vgrow :always
                        :children
-                       [{:fx/type :h-box
-                         :v-box/vgrow :always
-                         :children
-                         (concat
-                           [(assoc players-table :h-box/hgrow :always)]
-                           (when (fx/sub-val context :battle-resource-details)
-                             [resources-pane]))}
-                        battle-buttons]}
-                      battle-tabs]}]
-                   (when-not pop-out-chat
-                     [battle-chat])))}}}]
-           (when (= "vertical" battle-layout)
-             [battle-tabs])))}]}))
+                       (concat
+                         [(assoc players-table :h-box/hgrow :always)]
+                         (when (fx/sub-val context :battle-resource-details)
+                           [resources-pane]))}
+                      battle-buttons])}]
+                 (when-not pop-out-chat
+                   [battle-chat]))}}}]
+           [battle-tabs]))}]}))
 
 (defn battle-view
   [state]
