@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.57](https://github.com/skynet-gh/skylobby/releases/tag/0.7.57) - 2022-01-17
+
+- Add setting to show players grouped by team
+- Fix issues with battle preview
+
 ## [0.7.56](https://github.com/skynet-gh/skylobby/releases/tag/0.7.56) - 2022-01-15
 
 - Add default engine for scenarios, and ability to get latest game
