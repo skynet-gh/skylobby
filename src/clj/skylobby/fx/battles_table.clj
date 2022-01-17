@@ -118,7 +118,8 @@
        :v-box/vgrow :always
        :props {:selection-mode :single
                :on-selected-item-changed {:event/type :spring-lobby/select-battle
-                                          :server-key server-key}}
+                                          :server-key server-key}
+               :selected-item (get filter-battles (filter (comp)))}
        :desc
        {:fx/type ext-table-column-auto-size
         :items filtered-battles

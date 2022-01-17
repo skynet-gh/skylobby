@@ -233,9 +233,7 @@
                                              (= battle-id (:battle-id battle)))
                               is-me (= username (:username server-data))
                               unified (-> client-data :compflags (contains? "u"))]
-                          (cond-> server-data
-                                  true
-                                  (update-in [:battles battle-id :users] dissoc username)
+                          (cond-> (update-in server-data [:battles battle-id :users] dissoc username)
                                   is-my-battle
                                   (update-in [:battle :users] dissoc username)
                                   (and is-my-battle (not unified))
@@ -247,7 +245,9 @@
                                   (and is-me is-my-battle)
                                   (assoc-in [:old-battles battle-id] battle)
                                   is-me
-                                  (dissoc :battle :auto-unspec)))))
+                                  (dissoc :battle :auto-unspec)
+                                  is-me
+                                  (update-in [:battles battle-id] dissoc :bots)))))
           {:keys [battle client-data] :as server-data} (-> prev :by-server (get server-key))
           my-username (:username server-data)
           me (-> battle :users (get my-username))
