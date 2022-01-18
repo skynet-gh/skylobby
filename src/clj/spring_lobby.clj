@@ -488,28 +488,28 @@
 
 (defn- battle-map-details-relevant-keys [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks-by-kind])
+      (select-keys [:by-server :by-spring-root :map-details :servers :spring-isolation-dir])
       (update :by-server
         (fn [by-server]
           (reduce-kv
             (fn [m k v]
               (assoc m k
                 (-> v
-                    (select-keys [:client-data :battle :battles])
+                    (select-keys [:battle :battles])
                     (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
 
 (defn- battle-mod-details-relevant-data [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks-by-kind])
+      (select-keys [:by-server :by-spring-root :mod-details :servers :spring-isolation-dir])
       (update :by-server
         (fn [by-server]
           (reduce-kv
             (fn [m k v]
               (assoc m k
                 (-> v
-                    (select-keys [:client-data :battle :battles])
+                    (select-keys [:battle :battles])
                     (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
@@ -541,21 +541,6 @@
       true)
     true))
 
-
-(defn- auto-get-resources-relevant-keys [state]
-  (select-keys
-    state
-    [:auto-get-resources
-     :by-server :by-spring-root
-     :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path
-     :rapid-data-by-version :servers :spring-isolation-dir :tasks-by-kind]))
-
-(defn- auto-get-resources-server-relevant-keys [state]
-  (update
-    (select-keys state [:battle :battles])
-    :battles
-    select-keys [(:battle-id (:battle state))]))
-
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
     state
@@ -582,12 +567,12 @@
 (defn server-auto-resources [_old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
-      (when (or (not= (auto-get-resources-server-relevant-keys old-server)
-                      (auto-get-resources-server-relevant-keys new-server))
-                (and (-> new-server :battle :battle-id)
-                     (let [username (:username new-server)
-                           sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
-                       (not= 1 sync-status))))
+      (when #_(or (not= (auto-get-resources-server-relevant-keys old-server)
+                        (auto-get-resources-server-relevant-keys new-server)))
+            (and (-> new-server :battle :battle-id)
+                 (let [username (:username new-server)
+                       sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
+                   (not= 1 sync-status)))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
                       rapid-by-spring-root servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
@@ -900,8 +885,8 @@
 (defn server-needs-battle-status-sync-check [server-data]
   (and (-> server-data :battle :battle-id)
        (let [username (:username server-data)
-             sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
-         (not= 1 sync-status))))
+             sync-status (some-> server-data :battle :users (get username) :battle-status :sync u/to-number int)]
+         (not= sync-status 1))))
 
 (defn battle-mod-details-watcher [_k state-atom old-state new-state]
   (when (not= (battle-mod-details-relevant-data old-state)
@@ -1135,8 +1120,8 @@
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
-  (when (not= (auto-get-resources-relevant-keys old-state)
-              (auto-get-resources-relevant-keys new-state))
+  (when (and (:auto-get-resources new-state)
+             (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
     (try
       (when-let [tasks (->> new-state
                             :by-server
@@ -1196,8 +1181,9 @@
 
 
 (defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (not= (update-battle-status-sync-relevant-data old-state)
-              (update-battle-status-sync-relevant-data new-state))
+  (when (or (not= (update-battle-status-sync-relevant-data old-state)
+                  (update-battle-status-sync-relevant-data new-state))
+            (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
     (log/info "Checking servers for battle sync status updates")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
