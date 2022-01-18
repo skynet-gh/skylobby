@@ -161,6 +161,7 @@
         show-team-skills (fx/sub-val context :show-team-skills)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        spring-starting (fx/sub-val context get-in [:spring-starting server-key battle-id])
         spring-running (fx/sub-val context get-in [:spring-running server-key battle-id])
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
@@ -531,6 +532,8 @@
              :desc
              {:fx/type :button
               :text (cond
+                      spring-starting
+                      "Game starting"
                       spring-running
                       "Game running"
                       (and am-spec (not host-ingame) (not singleplayer))
@@ -542,7 +545,8 @@
                                "Join" "Start")
                              " Game")))
               :disable (boolean
-                         (or spring-running
+                         (or spring-starting
+                             spring-running
                              (and debug-spring (fx/sub-val context :show-spring-debug))
                              (and (not singleplayer)
                                   (or (and (not host-ingame) am-spec)

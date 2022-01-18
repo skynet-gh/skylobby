@@ -3405,6 +3405,7 @@
 
 (defmethod event-handler ::start-battle
   [{:keys [am-host am-spec battle-status channel-name client-data host-ingame] :as state}]
+  (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] true)
   (future
     (try
       (when-not (:mode battle-status)
