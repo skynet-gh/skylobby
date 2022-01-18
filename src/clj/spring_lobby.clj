@@ -2127,6 +2127,30 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn- resend-no-response-messages-chimer-fn [state-atom]
+  (log/info "Starting chimer to resend messages that did not receive the expected response in time")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (log/info "Resending messages that did not receive the expected response in time")
+            (let [{:keys [by-server]} @state-atom]
+              (doseq [[_server-key server-data] by-server]
+                (doseq [[expected-response sent] (:expecting-responses server-data)]
+                  (let [{:keys [sent-message sent-millis]} sent]
+                    (if (and sent-message sent-millis)
+                      (when (< (+ sent-millis 3000) (u/curr-millis))
+                        (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
+                        (message/send-message state-atom (:client-data server-data) sent-message))
+                      (log/warn "Issue with expecting response:" expected-response sent)))))))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
 (defn- update-replays-chimer-fn [state-atom]
   (log/info "Starting update replays chimer")
   (let [chimer
@@ -5291,6 +5315,7 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
+         resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
          update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
@@ -5334,6 +5359,7 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
+         resend-no-response-messages-chimer
          update-replays-chimer
          update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))
