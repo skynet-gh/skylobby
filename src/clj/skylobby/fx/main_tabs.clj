@@ -123,6 +123,9 @@
         user-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id :user-details])
         bot-details (->> user-details
                          (filter (comp #(string/includes? % "(bot)") :username second))
+                         (map (fn [[k v]]
+                                (let [[_all bot-name] (re-find #"(.*)\s+\(bot\)" k)]
+                                  [bot-name v])))
                          (into {}))
         selected-battle-details (-> selected-battle-details
                                     (update :users
@@ -131,8 +134,8 @@
                                           (fn [m k v]
                                             (update m k merge v (get user-details k)))
                                           {}
-                                          users)))
-                                    (update :users merge bot-details))
+                                          users))))
+        selected-battle-details (update selected-battle-details :bots merge bot-details)
         server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
         engine-version (:battle-version selected-battle-details)
