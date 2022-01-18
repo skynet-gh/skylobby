@@ -2589,7 +2589,7 @@
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
                             (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
-        {:keys [client-data battle users] :as server-data} (get-in state [:by-server server-key])
+        {:keys [battle users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
@@ -2600,8 +2600,10 @@
           @(event-handler
              {:event/type ::send-message
               :channel-name channel-name
-              :client-data client-data
-              :message (str "!status battle")})
+              :message (str "!status battle")
+              :no-clear-draft true
+              :no-history true
+              :server-key server-key})
           (async/<!! (async/timeout wait-time))
           (let [path [:by-server server-key :channels channel-name :capture]
                 [old-state _new-state] (swap-vals! *state assoc-in path nil)
@@ -3318,7 +3320,8 @@
              {:event/type ::send-message
               :channel-name channel-name
               :client-data client-data
-              :message (str "!map " map-name)})))
+              :message (str "!map " map-name)
+              :no-clear-draft true})))
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
@@ -3412,7 +3415,8 @@
              {:event/type ::send-message
               :channel-name channel-name
               :client-data client-data
-              :message (str "!joinas spec")})
+              :message (str "!joinas spec")
+              :no-clear-draft true})
           (log/info "Skipping !joinas spec for this server"))
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
@@ -3421,7 +3425,8 @@
            {:event/type ::send-message
             :channel-name channel-name
             :client-data client-data
-            :message (str "!cv start")}))
+            :message (str "!cv start")
+            :no-clear-draft true}))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
@@ -3582,6 +3587,7 @@
                   (event-handler
                     (assoc e
                            :event/type ::send-message
+                           :no-clear-draft true
                            :message
                            (str "!addBox "
                                 (int (* 200 left)) " "
@@ -3599,6 +3605,7 @@
                       (event-handler
                         (assoc e
                                :event/type ::send-message
+                               :no-clear-draft true
                                :message (str "!clearBox " (inc (int (u/to-number target)))))))))
                 (log/info "Start box too small, ignoring" left top right bottom))))))
       (catch Exception e
@@ -3887,7 +3894,8 @@
        {:event/type ::send-message
         :channel-name channel-name
         :client-data client-data
-        :message (str "!ring " username)})))
+        :message (str "!ring " username)
+        :no-clear-draft true})))
 
 (defmethod event-handler ::ring-specs
   [{:keys [battle-users channel-name client-data users]}]
@@ -3901,7 +3909,8 @@
                {:event/type ::send-message
                 :channel-name channel-name
                 :client-data client-data
-                :message (str "!ring " username)})
+                :message (str "!ring " username)
+                :no-clear-draft true})
             (async/<!! (async/timeout 1000))))
         (catch Exception e
           (log/error e "Error ringing specs"))))))
@@ -3971,6 +3980,7 @@
       (event-handler
         (assoc e
                :event/type ::send-message
+               :no-clear-draft true
                :message (str "!bSet startpostype " startpostype))))))
 
 (defmethod event-handler ::reset-start-positions
@@ -4009,6 +4019,7 @@
         (event-handler
           (assoc e
                  :event/type ::send-message
+                 :no-clear-draft true
                  :message (str "!bSet " modoption-key-str " " value)))))))
 
 (defmethod event-handler ::show-ai-options-window
@@ -4040,6 +4051,7 @@
          {:event/type ::send-message
           :channel-name channel-name
           :client-data client-data
+          :no-clear-draft true
           :message (str "!aiProfile " bot-username " " json-data)}))))
 
 
@@ -4167,6 +4179,7 @@
      {:event/type ::send-message
       :channel-name channel-name
       :client-data client-data
+      :no-clear-draft true
       :message (str "!balance")}))
 
 (defmethod event-handler ::battle-fix-colors
@@ -4194,6 +4207,7 @@
        {:event/type ::send-message
         :channel-name channel-name
         :client-data client-data
+        :no-clear-draft true
         :message (str "!fixcolors")})))
 
 
@@ -4985,16 +4999,21 @@
 
 (def default-history-index -1)
 
-(defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
-  (future
-    (try
-      (let [server-key (or server-key (u/server-key client-data))]
-        (swap! *state update-in [:by-server server-key]
-          (fn [server-data]
-            (-> server-data
-                (update :message-drafts dissoc channel-name)
-                (update-in [:channels channel-name :sent-messages] conj message)
-                (assoc-in [:channels channel-name :history-index] default-history-index))))
+(defmethod event-handler ::send-message [{:keys [channel-name client-data message no-clear-draft no-history server-key] :as e}]
+  (let [server-key (or server-key (u/server-key client-data))
+        {:keys [by-server]} (swap! *state update-in [:by-server server-key]
+                              (fn [server-data]
+                                (cond-> server-data
+                                        (not no-clear-draft)
+                                        (update :message-drafts dissoc channel-name)
+                                        (not no-history)
+                                        (update-in [:channels channel-name :sent-messages] conj message)
+                                        (not no-history)
+                                        (assoc-in [:channels channel-name :history-index] default-history-index))))
+        client-data (or (get-in by-server [server-key :client-data])
+                        client-data)]
+    (future
+      (try
         (cond
           (string/blank? channel-name)
           (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
@@ -5015,7 +5034,8 @@
                  (merge e
                    {:event/type ::send-message
                     :channel-name (str "@" user)
-                    :message message})))
+                    :message message
+                    :no-clear-draft true})))
             (re-find #"^/rename" message)
             (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
              (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
@@ -5035,9 +5055,9 @@
                   (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
                     (message/send-message *state client-data (str "SAYBATTLE " message))
-                    (message/send-message *state client-data (str "SAY " channel-name " " message)))))))))
-      (catch Exception e
-        (log/error e "Error sending message" message "to channel" channel-name)))))
+                    (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
+        (catch Exception e
+          (log/error e "Error sending message" message "to channel" channel-name))))))
 
 
 (defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted server-key]}]

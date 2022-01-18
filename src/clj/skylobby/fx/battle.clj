@@ -662,10 +662,43 @@
            :children
            (concat
              [
-              {:fx/type :label
-               :text (str
-                       (when-let [description (-> battle-map-details :mapinfo :description)]
-                         description))}
+              (let [{:keys [battle-status]} (-> battle :users (get username))
+                    disable (boolean (and (not singleplayer) am-spec))]
+                {:fx/type maps-view
+                 :action-disable-rotate {:event/type :spring-lobby/send-message
+                                         :channel-name channel-name
+                                         :client-data client-data
+                                         :message "!rotationEndGame off"
+                                         :server-key server-key}
+                 :disable disable
+                 :flow true
+                 :map-name map-name
+                 :spring-isolation-dir spring-isolation-dir
+                 :text-only disable
+                 :on-value-changed
+                 (cond
+                   singleplayer
+                   {:event/type :spring-lobby/assoc-in
+                    :path [:by-server :local :battles :singleplayer :battle-map]}
+                   am-host
+                   {:event/type :spring-lobby/battle-map-change
+                    :client-data client-data}
+                   :else
+                   {:event/type :spring-lobby/suggest-battle-map
+                    :battle-status battle-status
+                    :channel-name channel-name
+                    :client-data client-data})})
+              (let [map-description (str (-> battle-map-details :mapinfo :description))]
+                {:fx/type fx.ext.node/with-tooltip-props
+                 :props
+                 {:tooltip
+                  {:fx/type tooltip-nofocus/lifecycle
+                   :show-delay skylobby.fx/tooltip-show-delay
+                   :style {:-fx-font-size 16}
+                   :text map-description}}
+                 :desc
+                 {:fx/type :label
+                  :text map-description}})
               {:fx/type :flow-pane
                :children
                [
@@ -688,30 +721,6 @@
                                 (when map-width (quot map-width 64))
                                 " x "
                                 (when map-height (quot map-height 64)))))}]}
-              (let [{:keys [battle-status]} (-> battle :users (get username))]
-                {:fx/type maps-view
-                 :action-disable-rotate {:event/type :spring-lobby/send-message
-                                         :channel-name channel-name
-                                         :client-data client-data
-                                         :message "!rotationEndGame off"
-                                         :server-key server-key}
-                 :disable (and (not singleplayer) am-spec)
-                 :flow true
-                 :map-name map-name
-                 :spring-isolation-dir spring-isolation-dir
-                 :on-value-changed
-                 (cond
-                   singleplayer
-                   {:event/type :spring-lobby/assoc-in
-                    :path [:by-server :local :battles :singleplayer :battle-map]}
-                   am-host
-                   {:event/type :spring-lobby/battle-map-change
-                    :client-data client-data}
-                   :else
-                   {:event/type :spring-lobby/suggest-battle-map
-                    :battle-status battle-status
-                    :channel-name channel-name
-                    :client-data client-data})})
               {:fx/type :flow-pane
                :children
                (concat
@@ -1071,7 +1080,10 @@
                                spads-message-type) nil
                              :else prev)))
                        nil
-                       (reverse vote-messages))]
+                       (reverse vote-messages))
+        minimap-size (fx/sub-val context :minimap-size)
+        minimap-size (or (u/to-number minimap-size)
+                         fx.minimap/default-minimap-size)]
     {:fx/type :v-box
      :children
      (concat
@@ -1154,7 +1166,7 @@
                               "mdi-arrow-up:16")}}])}]
        (when show-vote-log
          [{:fx/type :scroll-pane
-           :pref-width 400
+           :pref-width (+ minimap-size 20)
            :v-box/vgrow :always
            :content
            {:fx/type :v-box

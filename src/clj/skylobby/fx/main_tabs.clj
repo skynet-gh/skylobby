@@ -137,7 +137,10 @@
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
         engine-version (:battle-version selected-battle-details)
         map-name (:battle-map selected-battle-details)
-        mod-name (:battle-modname selected-battle-details)]
+        mod-name (:battle-modname selected-battle-details)
+        minimap-size (fx/sub-val context :minimap-size)
+        minimap-size (or (u/to-number minimap-size)
+                         fx.minimap/default-minimap-size)]
     {:fx/type :h-box
      :children
      [
@@ -170,9 +173,22 @@
          :index-only true
          :map-name map-name
          :spring-isolation-dir spring-root}]}
-      {:fx/type fx.minimap/minimap-pane
-       :map-name map-name
-       :server-key server-key}]}))
+      {:fx/type :v-box
+       :children
+       [
+        {:fx/type fx.minimap/minimap-pane
+         :map-name map-name
+         :server-key server-key}
+        {:fx/type :h-box
+         :children
+         [
+          {:fx/type :label
+           :text (str " Display (px): ")}
+          {:fx/type :combo-box
+           :value minimap-size
+           :items fx.minimap/minimap-sizes
+           :on-value-changed {:event/type :spring-lobby/assoc
+                              :key :minimap-size}}]}]}]}))
 
 (defn- main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]

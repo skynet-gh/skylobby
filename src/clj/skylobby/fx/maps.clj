@@ -36,7 +36,7 @@
 
 (defn maps-view-impl
   [{:fx/keys [context]
-    :keys [action-disable-rotate disable flow map-name on-value-changed spring-isolation-dir suggest]
+    :keys [action-disable-rotate disable flow map-name on-value-changed spring-isolation-dir suggest text-only]
     :or {flow true}}]
   (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
         http-download (fx/sub-val context :http-download)
@@ -88,26 +88,29 @@
                       (filter string?)
                       (filter #(string/includes? (string/lower-case %) filter-lc))
                       (sort String/CASE_INSENSITIVE_ORDER))]
-             [{:fx/type ext-recreate-on-key-changed
-               :key map-name
-               :desc
-               {:fx/type :combo-box
-                :prompt-text (or map-name " < pick a map > ")
-                :value map-name
-                :items filtered-map-names
-                :disable (boolean disable)
-                :on-value-changed on-value-changed
-                :button-cell
-                (fn [map-name]
-                  {:text (str map-name)})
-                :cell-factory
-                {:fx/cell-type :list-cell
-                 :describe
-                 (fn [map-name]
-                   {:text (str map-name)})}
-                :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
-                :on-hidden {:event/type :spring-lobby/dissoc
-                            :key :map-input-prefix}}}]))
+             [(if text-only
+                {:fx/type :label
+                 :text map-name}
+                {:fx/type ext-recreate-on-key-changed
+                 :key map-name
+                 :desc
+                 {:fx/type :combo-box
+                  :prompt-text (or map-name " < pick a map > ")
+                  :value map-name
+                  :items filtered-map-names
+                  :disable (boolean disable)
+                  :on-value-changed on-value-changed
+                  :button-cell
+                  (fn [map-name]
+                    {:text (str map-name)})
+                  :cell-factory
+                  {:fx/cell-type :list-cell
+                   :describe
+                   (fn [map-name]
+                     {:text (str map-name)})}
+                  :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
+                  :on-hidden {:event/type :spring-lobby/dissoc
+                              :key :map-input-prefix}}})]))
          [{:fx/type :button
            :text ""
            :on-action {:event/type :spring-lobby/show-maps-window

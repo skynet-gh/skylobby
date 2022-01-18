@@ -193,7 +193,6 @@
 
 (defn channel-view-text [{:fx/keys [context] :keys [channel-name disable server-key]}]
   (let [
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])]
     {:fx/type :text-field
      :disable (boolean disable)
@@ -203,7 +202,6 @@
                        :path [:by-server server-key :message-drafts channel-name]}
      :on-action {:event/type :spring-lobby/send-message
                  :channel-name channel-name
-                 :client-data client-data
                  :message message-draft
                  :server-key server-key}
      :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
