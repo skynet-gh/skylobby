@@ -5202,11 +5202,11 @@
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
   (message/send-message *state client-data (str "c.matchmaking.ready"))
-  (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 (defmethod event-handler ::matchmaking-decline [{:keys [client-data queue-id]}]
   (message/send-message *state client-data (str "c.matchmaking.decline"))
-  (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 
 (def state-watch-chimers
