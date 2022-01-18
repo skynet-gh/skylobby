@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.59](https://github.com/skynet-gh/skylobby/releases/tag/0.7.59) - 2022-01-18
+
+- Fix error with battle popout causing UI to be unresponsive
+- Fix possible source of chat input cursor position reset
+- Move join battle after LEFTBATTLE handler if in battle
+- Prioritize minimaps for battles
+- Track and display status while preparing to executing spring
+- Add resend of messages that server has not responded to in time
+- Reduce load from checking for resources
+
 ## [0.7.58](https://github.com/skynet-gh/skylobby/releases/tag/0.7.58) - 2022-01-17
 
 - Add skill and status players grouped by team, wrap in scroll pane
