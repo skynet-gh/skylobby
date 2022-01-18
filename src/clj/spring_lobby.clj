@@ -1758,7 +1758,7 @@
 (defn- update-cached-minimaps
   ([maps]
    (update-cached-minimaps maps nil))
-  ([maps opts]
+  ([maps {:keys [priorities] :as opts}]
    (let [to-update
          (->> maps
               (filter :map-name)
@@ -1772,7 +1772,8 @@
                         (not (fs/exists? heightmap-file))
                         (not (fs/exists? metalmap-file))
                         (not (fs/exists? minimap-file))))))
-              (sort-by :map-name))
+              (sort-by :map-name)
+              (concat priorities))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
      (log/info (count to-update) "maps do not have cached minimap image files")
@@ -1796,6 +1797,7 @@
      (when (seq next-round)
        (task/add-task! *state
          {::task-type ::update-cached-minimaps
+          :priorites priorities
           :todo (count next-round)})))))
 
 
@@ -1862,36 +1864,43 @@
      (fs/make-dirs fs/maps-cache-root)
      (when (seq this-round)
        (log/info "Adding" (count this-round) "maps this iteration"))
-     (doseq [map-file this-round]
-       (log/info "Reading" map-file)
-       (let [map-data (fs/read-map-data map-file)
-             relevant-map-data (select-keys map-data [:error :file :map-name])]
-         (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-                (fn [maps]
-                  (set
-                    (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
-                      map-data
-                      (conj relevant-map-data)))))))
-     (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
-     (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-            (fn [maps]
-              (->> maps
-                   (filter (comp fs/canonical-path :file))
-                   (remove
-                     (fn [{:keys [error map-name]}]
-                       (and (not error)
-                            (string/blank? map-name))))
-                   (remove (comp missing-paths fs/canonical-path :file))
-                   set)))
-     (if next-round
-       (do
-         (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-         (task/add-task! state-atom
-           {::task-type ::refresh-maps
-            :spring-root spring-root
-            :todo next-round-count}))
-       (task/add-task! state-atom {::task-type ::update-cached-minimaps}))
-     {:todo-count next-round-count})))
+     (let [map-file-to-name (into {}
+                              (for [map-file this-round]
+                                (do
+                                  (log/info "Reading" map-file)
+                                  (let [map-data (fs/read-map-data map-file)
+                                        relevant-map-data (select-keys map-data [:error :file :map-name])]
+                                    (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+                                           (fn [maps]
+                                             (set
+                                               (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
+                                                 map-data
+                                                 (conj relevant-map-data)))))
+                                    [map-file (:map-name map-data)]))))]
+       (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
+       (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+              (fn [maps]
+                (->> maps
+                     (filter (comp fs/canonical-path :file))
+                     (remove
+                       (fn [{:keys [error map-name]}]
+                         (and (not error)
+                              (string/blank? map-name))))
+                     (remove (comp missing-paths fs/canonical-path :file))
+                     set)))
+       (if next-round
+         (do
+           (log/info "Scheduling map load since there are" next-round-count "maps left to load")
+           (task/add-task! state-atom
+             {::task-type ::refresh-maps
+              :spring-root spring-root
+              :todo next-round-count}))
+         (task/add-task! state-atom {::task-type ::update-cached-minimaps
+                                     :priorities (map (fn [map-file]
+                                                        {:map-name (get map-file-to-name map-file)
+                                                         :file map-file})
+                                                      priorities)}))
+       {:todo-count next-round-count}))))
 
 
 (defmethod event-handler ::randomize-client-id
@@ -2521,11 +2530,12 @@
         (throw t)))))
 
 
-(defmethod task-handler ::update-cached-minimaps [_]
+(defmethod task-handler ::update-cached-minimaps
+  [{:keys [priorities]}]
   (let [{:keys [by-spring-root]} @*state
         all-maps (mapcat :maps (vals by-spring-root))]
     (log/info "Found" (count all-maps) "maps to update cached minimaps for")
-    (update-cached-minimaps all-maps)))
+    (update-cached-minimaps all-maps {:priorities priorities})))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
