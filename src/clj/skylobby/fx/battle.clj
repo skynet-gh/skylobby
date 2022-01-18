@@ -1310,7 +1310,7 @@
           (if show-vote-log
             {:fx/type :split-pane
              :orientation :vertical
-             :divider-positions [0.3]
+             :divider-positions [0.9]
              :items
              [
               {:fx/type battle-tabs
@@ -1530,17 +1530,17 @@
              :desc
              {:fx/type fx/ext-on-instance-lifecycle
               :on-created (fn [^javafx.scene.control.SplitPane node]
-                            (let [dividers (.getDividers node)
-                                  ^javafx.scene.control.SplitPane$Divider divider (first dividers)
-                                  position-property (.positionProperty divider)]
-                              (.addListener position-property
-                                (reify javafx.beans.value.ChangeListener
-                                  (changed [_this _observable _old-value new-value]
-                                    (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value))))))
+                            (let [dividers (.getDividers node)]
+                              (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
+                                (.addListener (.positionProperty divider)
+                                  (reify javafx.beans.value.ChangeListener
+                                    (changed [_this _observable _old-value new-value]
+                                      (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value)))))))
               :desc
               {:fx/type :split-pane
                :orientation (if (= "vertical" battle-layout) :horizontal :vertical)
-               :divider-positions [(or (get divider-positions battle-layout-key) battle-layout-default-split)]
+               :divider-positions [(or (get divider-positions battle-layout-key)
+                                       battle-layout-default-split)]
                :items
                (concat
                  [

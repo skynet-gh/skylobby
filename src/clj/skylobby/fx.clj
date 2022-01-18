@@ -178,7 +178,9 @@
      "-message"
      {:-fx-fill "white"}
      "-message-highlight"
-     {:-fx-fill "red"}}
+     {:-fx-fill "red"}
+     "-input"
+     {:-fx-font-size 15}}
     "-console"
     {
      "-time"
