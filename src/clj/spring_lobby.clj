@@ -12,7 +12,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.set]
     [clojure.string :as string]
-    [crypto.random]
+    crypto.random
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -3098,23 +3098,27 @@
   [{:keys [battle battle-password battle-passworded client-data selected-battle] :as e}]
   (future
     (try
-      (when battle
-        @(event-handler (merge e {:event/type ::leave-battle}))
-        (async/<!! (async/timeout 500)))
       (if selected-battle
         (let [server-key (u/server-key client-data)]
-          (swap! *state
-            (fn [state]
-              (-> state
-                  (assoc-in [:by-server server-key :battle] {})
-                  (update-in [:by-server server-key] dissoc :selected-battle)
-                  (assoc-in [:selected-tab-main server-key] "battle"))))
-          (message/send-message *state client-data
-            (str "JOINBATTLE " selected-battle
-                 (if battle-passworded
-                   (str " " battle-password)
-                   (str " *"))
-                 " " (crypto.random/hex 6))))
+          (if battle
+            (do
+              (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
+                                                                                :battle-password battle-password
+                                                                                :battle-passworded battle-passworded})
+              (event-handler (merge e {:event/type ::leave-battle})))
+            (do
+              (swap! *state
+                (fn [state]
+                  (-> state
+                      (assoc-in [:by-server server-key :battle] {})
+                      (update-in [:by-server server-key] dissoc :selected-battle)
+                      (assoc-in [:selected-tab-main server-key] "battle"))))
+              (message/send-message *state client-data
+                (str "JOINBATTLE " selected-battle
+                     (if battle-passworded
+                       (str " " battle-password)
+                       (str " *"))
+                     " " (crypto.random/hex 6))))))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
