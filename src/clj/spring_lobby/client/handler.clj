@@ -234,6 +234,8 @@
                               is-me (= username (:username server-data))
                               unified (-> client-data :compflags (contains? "u"))]
                           (cond-> (update-in server-data [:battles battle-id :users] dissoc username)
+                                  true
+                                  (dissoc :join-after-leave)
                                   is-my-battle
                                   (update-in [:battle :users] dissoc username)
                                   (and is-my-battle (not unified))
@@ -248,17 +250,28 @@
                                   (dissoc :battle :auto-unspec)
                                   is-me
                                   (update-in [:battles battle-id] dissoc :bots)))))
-          {:keys [battle client-data] :as server-data} (-> prev :by-server (get server-key))
+          {:keys [battle client-data join-after-leave] :as server-data} (-> prev :by-server (get server-key))
           my-username (:username server-data)
           me (-> battle :users (get my-username))
           curr-server-data (-> curr :by-server (get server-key))]
+
+    (if (and (= username my-username)
+             join-after-leave)
+      (let [{:keys [battle-id battle-passworded battle-password]} join-after-leave]
+        (log/info "Joining battle after leaving" battle-id)
+        (message/send-message state-atom client-data
+          (str "JOINBATTLE " join-after-leave
+               (if battle-passworded
+                 (str " " battle-password)
+                 (str " *"))
+               " " (crypto.random/hex 6))))
       (when (and (:auto-unspec curr-server-data)
                  (:battle curr-server-data)
                  (= battle-id (:battle-id battle))
                  (-> me :battle-status :mode not)
                  (not= username my-username)
                  (-> battle :users (get username) :battle-status :mode))
-        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr) :server-key server-key)))))
+        (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec curr) :server-key server-key))))))
 
 
 (defmethod handle "JOIN" [state-atom server-key m]

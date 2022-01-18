@@ -1,6 +1,7 @@
 (ns skylobby.fx.players-table
   (:require
     [cljfx.api :as fx]
+    [cljfx.ext.node :as fx.ext.node]
     [clojure.string :as string]
     java-time
     [skylobby.color :as color]
@@ -997,10 +998,24 @@
                           :host-ingame host-ingame
                           :server-key server-key}}
                  :desc
-                 {:fx/type :text
-                  :text (str (u/nickname player))
-                  :fill "#ffffff"
-                  :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}})
+                 {:fx/type fx.ext.node/with-tooltip-props
+                  :props
+                  {:tooltip
+                   {:fx/type tooltip-nofocus/lifecycle
+                    :show-delay skylobby.fx/tooltip-show-delay
+                    :style {:-fx-font-size 16}
+                    :text (str (u/nickname player) "\n\n"
+                               "Skill: "
+                               (str (:skill player)
+                                    " "
+                                    (let [uncertainty (:skilluncertainty player)]
+                                      (when (number? uncertainty)
+                                        (apply str (repeat uncertainty "?"))))))}}
+                  :desc
+                  {:fx/type :text
+                   :text (str (u/nickname player))
+                   :fill "#ffffff"
+                   :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}}})
               spectators)}]}])}}))
 
 (defn players-table

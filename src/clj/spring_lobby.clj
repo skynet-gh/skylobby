@@ -12,7 +12,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.set]
     [clojure.string :as string]
-    [crypto.random]
+    crypto.random
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -488,28 +488,28 @@
 
 (defn- battle-map-details-relevant-keys [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :map-details :servers :spring-isolation-dir :tasks-by-kind])
+      (select-keys [:by-server :by-spring-root :map-details :servers :spring-isolation-dir])
       (update :by-server
         (fn [by-server]
           (reduce-kv
             (fn [m k v]
               (assoc m k
                 (-> v
-                    (select-keys [:client-data :battle :battles])
+                    (select-keys [:battle :battles])
                     (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
 
 (defn- battle-mod-details-relevant-data [state]
   (-> state
-      (select-keys [:by-server :by-spring-root :current-tasks :mod-details :servers :spring-isolation-dir :tasks-by-kind])
+      (select-keys [:by-server :by-spring-root :mod-details :servers :spring-isolation-dir])
       (update :by-server
         (fn [by-server]
           (reduce-kv
             (fn [m k v]
               (assoc m k
                 (-> v
-                    (select-keys [:client-data :battle :battles])
+                    (select-keys [:battle :battles])
                     (update :battles select-keys [(:battle-id (:battle v))]))))
             {}
             by-server)))))
@@ -541,21 +541,6 @@
       true)
     true))
 
-
-(defn- auto-get-resources-relevant-keys [state]
-  (select-keys
-    state
-    [:auto-get-resources
-     :by-server :by-spring-root
-     :current-tasks :downloadables-by-url :engines :file-cache :importables-by-path
-     :rapid-data-by-version :servers :spring-isolation-dir :tasks-by-kind]))
-
-(defn- auto-get-resources-server-relevant-keys [state]
-  (update
-    (select-keys state [:battle :battles])
-    :battles
-    select-keys [(:battle-id (:battle state))]))
-
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
     state
@@ -582,12 +567,12 @@
 (defn server-auto-resources [_old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
-      (when (or (not= (auto-get-resources-server-relevant-keys old-server)
-                      (auto-get-resources-server-relevant-keys new-server))
-                (and (-> new-server :battle :battle-id)
-                     (let [username (:username new-server)
-                           sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
-                       (not= 1 sync-status))))
+      (when #_(or (not= (auto-get-resources-server-relevant-keys old-server)
+                        (auto-get-resources-server-relevant-keys new-server)))
+            (and (-> new-server :battle :battle-id)
+                 (let [username (:username new-server)
+                       sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
+                   (not= 1 sync-status)))
         (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
         (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
                       rapid-by-spring-root servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
@@ -900,8 +885,8 @@
 (defn server-needs-battle-status-sync-check [server-data]
   (and (-> server-data :battle :battle-id)
        (let [username (:username server-data)
-             sync-status (-> server-data :battle :users (get username) :battle-status :sync)]
-         (not= 1 sync-status))))
+             sync-status (some-> server-data :battle :users (get username) :battle-status :sync u/to-number int)]
+         (not= sync-status 1))))
 
 (defn battle-mod-details-watcher [_k state-atom old-state new-state]
   (when (not= (battle-mod-details-relevant-data old-state)
@@ -1135,8 +1120,8 @@
 
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
-  (when (not= (auto-get-resources-relevant-keys old-state)
-              (auto-get-resources-relevant-keys new-state))
+  (when (and (:auto-get-resources new-state)
+             (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
     (try
       (when-let [tasks (->> new-state
                             :by-server
@@ -1196,8 +1181,9 @@
 
 
 (defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (not= (update-battle-status-sync-relevant-data old-state)
-              (update-battle-status-sync-relevant-data new-state))
+  (when (or (not= (update-battle-status-sync-relevant-data old-state)
+                  (update-battle-status-sync-relevant-data new-state))
+            (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
     (log/info "Checking servers for battle sync status updates")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
@@ -1772,7 +1758,7 @@
 (defn- update-cached-minimaps
   ([maps]
    (update-cached-minimaps maps nil))
-  ([maps opts]
+  ([maps {:keys [priorities] :as opts}]
    (let [to-update
          (->> maps
               (filter :map-name)
@@ -1786,7 +1772,8 @@
                         (not (fs/exists? heightmap-file))
                         (not (fs/exists? metalmap-file))
                         (not (fs/exists? minimap-file))))))
-              (sort-by :map-name))
+              (sort-by :map-name)
+              (concat priorities))
          this-round (take minimap-batch-size to-update)
          next-round (drop minimap-batch-size to-update)]
      (log/info (count to-update) "maps do not have cached minimap image files")
@@ -1810,6 +1797,7 @@
      (when (seq next-round)
        (task/add-task! *state
          {::task-type ::update-cached-minimaps
+          :priorites priorities
           :todo (count next-round)})))))
 
 
@@ -1876,36 +1864,43 @@
      (fs/make-dirs fs/maps-cache-root)
      (when (seq this-round)
        (log/info "Adding" (count this-round) "maps this iteration"))
-     (doseq [map-file this-round]
-       (log/info "Reading" map-file)
-       (let [map-data (fs/read-map-data map-file)
-             relevant-map-data (select-keys map-data [:error :file :map-name])]
-         (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-                (fn [maps]
-                  (set
-                    (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
-                      map-data
-                      (conj relevant-map-data)))))))
-     (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
-     (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-            (fn [maps]
-              (->> maps
-                   (filter (comp fs/canonical-path :file))
-                   (remove
-                     (fn [{:keys [error map-name]}]
-                       (and (not error)
-                            (string/blank? map-name))))
-                   (remove (comp missing-paths fs/canonical-path :file))
-                   set)))
-     (if next-round
-       (do
-         (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-         (task/add-task! state-atom
-           {::task-type ::refresh-maps
-            :spring-root spring-root
-            :todo next-round-count}))
-       (task/add-task! state-atom {::task-type ::update-cached-minimaps}))
-     {:todo-count next-round-count})))
+     (let [map-file-to-name (into {}
+                              (for [map-file this-round]
+                                (do
+                                  (log/info "Reading" map-file)
+                                  (let [map-data (fs/read-map-data map-file)
+                                        relevant-map-data (select-keys map-data [:error :file :map-name])]
+                                    (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+                                           (fn [maps]
+                                             (set
+                                               (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
+                                                 map-data
+                                                 (conj relevant-map-data)))))
+                                    [map-file (:map-name map-data)]))))]
+       (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
+       (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+              (fn [maps]
+                (->> maps
+                     (filter (comp fs/canonical-path :file))
+                     (remove
+                       (fn [{:keys [error map-name]}]
+                         (and (not error)
+                              (string/blank? map-name))))
+                     (remove (comp missing-paths fs/canonical-path :file))
+                     set)))
+       (if next-round
+         (do
+           (log/info "Scheduling map load since there are" next-round-count "maps left to load")
+           (task/add-task! state-atom
+             {::task-type ::refresh-maps
+              :spring-root spring-root
+              :todo next-round-count}))
+         (task/add-task! state-atom {::task-type ::update-cached-minimaps
+                                     :priorities (map (fn [map-file]
+                                                        {:map-name (get map-file-to-name map-file)
+                                                         :file map-file})
+                                                      priorities)}))
+       {:todo-count next-round-count}))))
 
 
 (defmethod event-handler ::randomize-client-id
@@ -2126,6 +2121,30 @@
           (fn [_chimestamp]
             (log/debug "Updating now")
             (swap! state-atom assoc :now (u/curr-millis)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error updating now")
+             true)})]
+    (fn [] (.close chimer))))
+
+(defn- resend-no-response-messages-chimer-fn [state-atom]
+  (log/info "Starting chimer to resend messages that did not receive the expected response in time")
+  (let [chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (log/info "Resending messages that did not receive the expected response in time")
+            (let [{:keys [by-server]} @state-atom]
+              (doseq [[_server-key server-data] by-server]
+                (doseq [[expected-response sent] (:expecting-responses server-data)]
+                  (let [{:keys [sent-message sent-millis]} sent]
+                    (if (and sent-message sent-millis)
+                      (when (< (+ sent-millis 3000) (u/curr-millis))
+                        (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
+                        (message/send-message state-atom (:client-data server-data) sent-message))
+                      (log/warn "Issue with expecting response:" expected-response sent)))))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating now")
@@ -2535,11 +2554,12 @@
         (throw t)))))
 
 
-(defmethod task-handler ::update-cached-minimaps [_]
+(defmethod task-handler ::update-cached-minimaps
+  [{:keys [priorities]}]
   (let [{:keys [by-spring-root]} @*state
         all-maps (mapcat :maps (vals by-spring-root))]
     (log/info "Found" (count all-maps) "maps to update cached minimaps for")
-    (update-cached-minimaps all-maps)))
+    (update-cached-minimaps all-maps {:priorities priorities})))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
@@ -2589,7 +2609,7 @@
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
                             (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
-        {:keys [client-data battle users] :as server-data} (get-in state [:by-server server-key])
+        {:keys [battle users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
@@ -2600,8 +2620,10 @@
           @(event-handler
              {:event/type ::send-message
               :channel-name channel-name
-              :client-data client-data
-              :message (str "!status battle")})
+              :message (str "!status battle")
+              :no-clear-draft true
+              :no-history true
+              :server-key server-key})
           (async/<!! (async/timeout wait-time))
           (let [path [:by-server server-key :channels channel-name :capture]
                 [old-state _new-state] (swap-vals! *state assoc-in path nil)
@@ -3096,23 +3118,27 @@
   [{:keys [battle battle-password battle-passworded client-data selected-battle] :as e}]
   (future
     (try
-      (when battle
-        @(event-handler (merge e {:event/type ::leave-battle}))
-        (async/<!! (async/timeout 500)))
       (if selected-battle
         (let [server-key (u/server-key client-data)]
-          (swap! *state
-            (fn [state]
-              (-> state
-                  (assoc-in [:by-server server-key :battle] {})
-                  (update-in [:by-server server-key] dissoc :selected-battle)
-                  (assoc-in [:selected-tab-main server-key] "battle"))))
-          (message/send-message *state client-data
-            (str "JOINBATTLE " selected-battle
-                 (if battle-passworded
-                   (str " " battle-password)
-                   (str " *"))
-                 " " (crypto.random/hex 6))))
+          (if battle
+            (do
+              (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
+                                                                                :battle-password battle-password
+                                                                                :battle-passworded battle-passworded})
+              (event-handler (merge e {:event/type ::leave-battle})))
+            (do
+              (swap! *state
+                (fn [state]
+                  (-> state
+                      (assoc-in [:by-server server-key :battle] {})
+                      (update-in [:by-server server-key] dissoc :selected-battle)
+                      (assoc-in [:selected-tab-main server-key] "battle"))))
+              (message/send-message *state client-data
+                (str "JOINBATTLE " selected-battle
+                     (if battle-passworded
+                       (str " " battle-password)
+                       (str " *"))
+                     " " (crypto.random/hex 6))))))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
@@ -3318,7 +3344,8 @@
              {:event/type ::send-message
               :channel-name channel-name
               :client-data client-data
-              :message (str "!map " map-name)})))
+              :message (str "!map " map-name)
+              :no-clear-draft true})))
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
@@ -3402,6 +3429,7 @@
 
 (defmethod event-handler ::start-battle
   [{:keys [am-host am-spec battle-status channel-name client-data host-ingame] :as state}]
+  (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] true)
   (future
     (try
       (when-not (:mode battle-status)
@@ -3412,7 +3440,8 @@
              {:event/type ::send-message
               :channel-name channel-name
               :client-data client-data
-              :message (str "!joinas spec")})
+              :message (str "!joinas spec")
+              :no-clear-draft true})
           (log/info "Skipping !joinas spec for this server"))
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
@@ -3421,7 +3450,8 @@
            {:event/type ::send-message
             :channel-name channel-name
             :client-data client-data
-            :message (str "!cv start")}))
+            :message (str "!cv start")
+            :no-clear-draft true}))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
@@ -3582,6 +3612,7 @@
                   (event-handler
                     (assoc e
                            :event/type ::send-message
+                           :no-clear-draft true
                            :message
                            (str "!addBox "
                                 (int (* 200 left)) " "
@@ -3599,6 +3630,7 @@
                       (event-handler
                         (assoc e
                                :event/type ::send-message
+                               :no-clear-draft true
                                :message (str "!clearBox " (inc (int (u/to-number target)))))))))
                 (log/info "Start box too small, ignoring" left top right bottom))))))
       (catch Exception e
@@ -3887,7 +3919,8 @@
        {:event/type ::send-message
         :channel-name channel-name
         :client-data client-data
-        :message (str "!ring " username)})))
+        :message (str "!ring " username)
+        :no-clear-draft true})))
 
 (defmethod event-handler ::ring-specs
   [{:keys [battle-users channel-name client-data users]}]
@@ -3901,7 +3934,8 @@
                {:event/type ::send-message
                 :channel-name channel-name
                 :client-data client-data
-                :message (str "!ring " username)})
+                :message (str "!ring " username)
+                :no-clear-draft true})
             (async/<!! (async/timeout 1000))))
         (catch Exception e
           (log/error e "Error ringing specs"))))))
@@ -3971,6 +4005,7 @@
       (event-handler
         (assoc e
                :event/type ::send-message
+               :no-clear-draft true
                :message (str "!bSet startpostype " startpostype))))))
 
 (defmethod event-handler ::reset-start-positions
@@ -4009,6 +4044,7 @@
         (event-handler
           (assoc e
                  :event/type ::send-message
+                 :no-clear-draft true
                  :message (str "!bSet " modoption-key-str " " value)))))))
 
 (defmethod event-handler ::show-ai-options-window
@@ -4040,6 +4076,7 @@
          {:event/type ::send-message
           :channel-name channel-name
           :client-data client-data
+          :no-clear-draft true
           :message (str "!aiProfile " bot-username " " json-data)}))))
 
 
@@ -4167,6 +4204,7 @@
      {:event/type ::send-message
       :channel-name channel-name
       :client-data client-data
+      :no-clear-draft true
       :message (str "!balance")}))
 
 (defmethod event-handler ::battle-fix-colors
@@ -4194,6 +4232,7 @@
        {:event/type ::send-message
         :channel-name channel-name
         :client-data client-data
+        :no-clear-draft true
         :message (str "!fixcolors")})))
 
 
@@ -4985,16 +5024,21 @@
 
 (def default-history-index -1)
 
-(defmethod event-handler ::send-message [{:keys [channel-name client-data message server-key] :as e}]
-  (future
-    (try
-      (let [server-key (or server-key (u/server-key client-data))]
-        (swap! *state update-in [:by-server server-key]
-          (fn [server-data]
-            (-> server-data
-                (update :message-drafts dissoc channel-name)
-                (update-in [:channels channel-name :sent-messages] conj message)
-                (assoc-in [:channels channel-name :history-index] default-history-index))))
+(defmethod event-handler ::send-message [{:keys [channel-name client-data message no-clear-draft no-history server-key] :as e}]
+  (let [server-key (or server-key (u/server-key client-data))
+        {:keys [by-server]} (swap! *state update-in [:by-server server-key]
+                              (fn [server-data]
+                                (cond-> server-data
+                                        (not no-clear-draft)
+                                        (update :message-drafts dissoc channel-name)
+                                        (not no-history)
+                                        (update-in [:channels channel-name :sent-messages] conj message)
+                                        (not no-history)
+                                        (assoc-in [:channels channel-name :history-index] default-history-index))))
+        client-data (or (get-in by-server [server-key :client-data])
+                        client-data)]
+    (future
+      (try
         (cond
           (string/blank? channel-name)
           (log/info "Skipping message" (pr-str message) "to empty channel" (pr-str channel-name))
@@ -5015,7 +5059,8 @@
                  (merge e
                    {:event/type ::send-message
                     :channel-name (str "@" user)
-                    :message message})))
+                    :message message
+                    :no-clear-draft true})))
             (re-find #"^/rename" message)
             (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
              (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
@@ -5035,9 +5080,9 @@
                   (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
                     (message/send-message *state client-data (str "SAYBATTLE " message))
-                    (message/send-message *state client-data (str "SAY " channel-name " " message)))))))))
-      (catch Exception e
-        (log/error e "Error sending message" message "to channel" channel-name)))))
+                    (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
+        (catch Exception e
+          (log/error e "Error sending message" message "to channel" channel-name))))))
 
 
 (defmethod event-handler ::promote-discord [{:keys [data discord-channel discord-promoted server-key]}]
@@ -5202,11 +5247,11 @@
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
   (message/send-message *state client-data (str "c.matchmaking.ready"))
-  (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 (defmethod event-handler ::matchmaking-decline [{:keys [client-data queue-id]}]
   (message/send-message *state client-data (str "c.matchmaking.decline"))
-  (swap! *state assoc-in [:matchmaking-queues queue-id :ready-check] false))
+  (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 
 (def state-watch-chimers
@@ -5270,6 +5315,7 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
+         resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
          update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
@@ -5313,6 +5359,7 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
+         resend-no-response-messages-chimer
          update-replays-chimer
          update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))

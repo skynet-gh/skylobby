@@ -406,7 +406,11 @@
         now (u/curr-millis)
         server-key (u/server-key client-data)
         battle-id (-> state :battle :battle-id)
-        {:keys [engine-overrides refresh-replays-after-game ring-when-game-ends]} (swap! state-atom assoc-in [:spring-running server-key battle-id] true)
+        {:keys [engine-overrides refresh-replays-after-game ring-when-game-ends]} (swap! state-atom
+                                                                                    (fn [state]
+                                                                                      (-> state
+                                                                                          (assoc-in [:spring-starting server-key battle-id] false)
+                                                                                          (assoc-in [:spring-running server-key battle-id] true))))
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
@@ -579,7 +583,11 @@
       (catch Exception e
         (log/error e "Error starting game"))
       (finally
-        (swap! state-atom assoc-in [:spring-running server-key battle-id] false)
+        (swap! state-atom
+          (fn [state]
+            (-> state
+                (assoc-in [:spring-starting server-key battle-id] false)
+                (assoc-in [:spring-running server-key battle-id] false))))
         (set-ingame false)))))
 
 

@@ -83,7 +83,7 @@
         {:keys [ch-recv send-fn connected-uids]} chsk-server
         broadcast (fn [message]
                     (let [uids (:any @connected-uids)]
-                      (log/info "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
+                      (log/debug "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
                       (doseq [uid uids]
                         (send-fn uid message))))
         push-watcher (fn [_ref _k old-state new-state]

@@ -11,13 +11,6 @@
 
 
 (defn send-message
-  ([c m]
-   (log/error (ex-info "Old client message fn" {}))
-   (if c
-     (do
-       (log/info ">" (str "'" m "'"))
-       @(s/put! c (str m "\n")))
-     (log/error (ex-info "No client to send message" {}))))
   ([state-atom client-data message]
    (send-message state-atom client-data message nil))
   ([state-atom client-data message {:keys [log-message] :or {log-message message}}]
@@ -25,7 +18,15 @@
      (let [server-key (u/server-key client-data)]
        (log/info (str "[" server-key "] > '" log-message "'"))
        @(s/put! client (str message "\n"))
-       (u/append-console-log state-atom server-key :client log-message)
-       (when (= "PING" (string/trim message))
-         (swap! state-atom assoc-in [:by-server server-key :last-ping] (u/curr-millis))))
+       (let [k (-> message
+                   (string/split #"\s")
+                   first)]
+         (swap! state-atom
+           (fn [state]
+             (cond-> ((u/append-console-log-fn server-key :client log-message) state)
+                     (= "PING" k)
+                     (assoc-in [:by-server server-key :last-ping] (u/curr-millis))
+                     (= "MYBATTLESTATUS" k)
+                     (assoc-in [:by-server server-key :expecting-responses] {:sent-message message
+                                                                             :sent-millis (u/curr-millis)}))))))
      (log/error (ex-info "No client to send message" {:message log-message})))))

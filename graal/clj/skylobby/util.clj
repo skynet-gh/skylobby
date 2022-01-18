@@ -354,17 +354,20 @@
   []
   (long (rand (* 255 255 255))))
 
+(defn append-console-log-fn [server-key source message]
+  (fn [state]
+    (if (contains? (:by-server state) server-key)
+      (update-in state [:by-server server-key :console-log]
+        (fn [console-log]
+          (conj console-log {:timestamp (curr-millis)
+                             :source source
+                             :message message
+                             :message-type (first (string/split message #"\s+"))})))
+      state)))
+
 (defn append-console-log [state-atom server-key source message]
   (swap! state-atom
-    (fn [state]
-      (if (contains? (:by-server state) server-key)
-        (update-in state [:by-server server-key :console-log]
-          (fn [console-log]
-            (conj console-log {:timestamp (curr-millis)
-                               :source source
-                               :message message
-                               :message-type (first (string/split message #"\s+"))})))
-        state))))
+    (append-console-log-fn server-key source message)))
 
 
 (defn remove-nonprintable [s]

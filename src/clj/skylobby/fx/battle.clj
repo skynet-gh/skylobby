@@ -161,6 +161,7 @@
         show-team-skills (fx/sub-val context :show-team-skills)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        spring-starting (fx/sub-val context get-in [:spring-starting server-key battle-id])
         spring-running (fx/sub-val context get-in [:spring-running server-key battle-id])
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
@@ -531,6 +532,8 @@
              :desc
              {:fx/type :button
               :text (cond
+                      spring-starting
+                      "Game starting"
                       spring-running
                       "Game running"
                       (and am-spec (not host-ingame) (not singleplayer))
@@ -542,7 +545,8 @@
                                "Join" "Start")
                              " Game")))
               :disable (boolean
-                         (or spring-running
+                         (or spring-starting
+                             spring-running
                              (and debug-spring (fx/sub-val context :show-spring-debug))
                              (and (not singleplayer)
                                   (or (and (not host-ingame) am-spec)
@@ -662,10 +666,43 @@
            :children
            (concat
              [
-              {:fx/type :label
-               :text (str
-                       (when-let [description (-> battle-map-details :mapinfo :description)]
-                         description))}
+              (let [{:keys [battle-status]} (-> battle :users (get username))
+                    disable (boolean (and (not singleplayer) am-spec))]
+                {:fx/type maps-view
+                 :action-disable-rotate {:event/type :spring-lobby/send-message
+                                         :channel-name channel-name
+                                         :client-data client-data
+                                         :message "!rotationEndGame off"
+                                         :server-key server-key}
+                 :disable disable
+                 :flow true
+                 :map-name map-name
+                 :spring-isolation-dir spring-isolation-dir
+                 :text-only disable
+                 :on-value-changed
+                 (cond
+                   singleplayer
+                   {:event/type :spring-lobby/assoc-in
+                    :path [:by-server :local :battles :singleplayer :battle-map]}
+                   am-host
+                   {:event/type :spring-lobby/battle-map-change
+                    :client-data client-data}
+                   :else
+                   {:event/type :spring-lobby/suggest-battle-map
+                    :battle-status battle-status
+                    :channel-name channel-name
+                    :client-data client-data})})
+              (let [map-description (str (-> battle-map-details :mapinfo :description))]
+                {:fx/type fx.ext.node/with-tooltip-props
+                 :props
+                 {:tooltip
+                  {:fx/type tooltip-nofocus/lifecycle
+                   :show-delay skylobby.fx/tooltip-show-delay
+                   :style {:-fx-font-size 16}
+                   :text map-description}}
+                 :desc
+                 {:fx/type :label
+                  :text map-description}})
               {:fx/type :flow-pane
                :children
                [
@@ -688,30 +725,6 @@
                                 (when map-width (quot map-width 64))
                                 " x "
                                 (when map-height (quot map-height 64)))))}]}
-              (let [{:keys [battle-status]} (-> battle :users (get username))]
-                {:fx/type maps-view
-                 :action-disable-rotate {:event/type :spring-lobby/send-message
-                                         :channel-name channel-name
-                                         :client-data client-data
-                                         :message "!rotationEndGame off"
-                                         :server-key server-key}
-                 :disable (and (not singleplayer) am-spec)
-                 :flow true
-                 :map-name map-name
-                 :spring-isolation-dir spring-isolation-dir
-                 :on-value-changed
-                 (cond
-                   singleplayer
-                   {:event/type :spring-lobby/assoc-in
-                    :path [:by-server :local :battles :singleplayer :battle-map]}
-                   am-host
-                   {:event/type :spring-lobby/battle-map-change
-                    :client-data client-data}
-                   :else
-                   {:event/type :spring-lobby/suggest-battle-map
-                    :battle-status battle-status
-                    :channel-name channel-name
-                    :client-data client-data})})
               {:fx/type :flow-pane
                :children
                (concat
@@ -1071,7 +1084,10 @@
                                spads-message-type) nil
                              :else prev)))
                        nil
-                       (reverse vote-messages))]
+                       (reverse vote-messages))
+        minimap-size (fx/sub-val context :minimap-size)
+        minimap-size (or (u/to-number minimap-size)
+                         fx.minimap/default-minimap-size)]
     {:fx/type :v-box
      :children
      (concat
@@ -1154,7 +1170,7 @@
                               "mdi-arrow-up:16")}}])}]
        (when show-vote-log
          [{:fx/type :scroll-pane
-           :pref-width 400
+           :pref-width (+ minimap-size 20)
            :v-box/vgrow :always
            :content
            {:fx/type :v-box
@@ -1310,7 +1326,7 @@
           (if show-vote-log
             {:fx/type :split-pane
              :orientation :vertical
-             :divider-positions [0.3]
+             :divider-positions [0.9]
              :items
              [
               {:fx/type battle-tabs
@@ -1530,17 +1546,17 @@
              :desc
              {:fx/type fx/ext-on-instance-lifecycle
               :on-created (fn [^javafx.scene.control.SplitPane node]
-                            (let [dividers (.getDividers node)
-                                  ^javafx.scene.control.SplitPane$Divider divider (first dividers)
-                                  position-property (.positionProperty divider)]
-                              (.addListener position-property
-                                (reify javafx.beans.value.ChangeListener
-                                  (changed [_this _observable _old-value new-value]
-                                    (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value))))))
+                            (let [dividers (.getDividers node)]
+                              (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
+                                (.addListener (.positionProperty divider)
+                                  (reify javafx.beans.value.ChangeListener
+                                    (changed [_this _observable _old-value new-value]
+                                      (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value)))))))
               :desc
               {:fx/type :split-pane
                :orientation (if (= "vertical" battle-layout) :horizontal :vertical)
-               :divider-positions [(or (get divider-positions battle-layout-key) battle-layout-default-split)]
+               :divider-positions [(or (get divider-positions battle-layout-key)
+                                       battle-layout-default-split)]
                :items
                (concat
                  [
