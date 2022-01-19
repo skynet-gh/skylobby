@@ -3472,7 +3472,15 @@
                            (string/replace #"__PLAYERHANDICAP__" (str playerhandicap))
                            (string/replace #"__SCENARIOOPTIONS__" (str (u/base64-encode (.getBytes (json/generate-string scenario-options)))))
                            (string/replace #"__NUMRESTRICTIONS__" (str (count restrictions)))
-                           (string/replace #"__RESTRICTEDUNITS__" (str (string/join "," (keys restrictions))))
+                           ; https://github.com/beyond-all-reason/spring/blob/7f308f9/doc/StartScriptFormat.txt#L127-L128
+                           (string/replace #"__RESTRICTEDUNITS__" (->> restrictions
+                                                                       (map-indexed vector)
+                                                                       (mapcat
+                                                                         (fn [[i [k v]]]
+                                                                           [{(str "Unit" i) (name k)}
+                                                                            {(str "Limit" i) v}]))
+                                                                       (into {})
+                                                                       spring/script-txt))
                            (string/replace #"__MAPNAME__" (get script-params :map-name))
                            (string/replace #"__BARVERSION__" mod-name)
                            (string/replace #"__PLAYERNAME__" (get script-params :player-name)))]

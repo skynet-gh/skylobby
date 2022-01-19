@@ -289,6 +289,9 @@
                                :describe
                                (fn [difficulty]
                                  {:text (str (:name difficulty))})}
+                              :button-cell
+                              (fn [difficulty]
+                                {:text (str (:name difficulty))})
                               :on-value-changed {:event/type :spring-lobby/assoc
                                                  :key :scenario-difficulty}}}
                             {:fx/type :label
@@ -326,7 +329,7 @@
                     {:fx/type :button
                      :style {:-fx-font-size 24
                              :-fx-margin-bottom 8}
-                     :text "Play"
+                     :text "Play Scenario"
                      :on-action
                      {:event/type :spring-lobby/play-scenario
                       :difficulties (or (vals (:difficulties lua)) [])
@@ -341,7 +344,9 @@
                        :player-name "Me"
                        :map-name map-name
                        :restricted-units (:unitlimits lua)}
-                      :spring-isolation-dir spring-root}}])))}])))}))
+                      :spring-isolation-dir spring-root}}
+                    {:fx/type :pane
+                     :style {:-fx-pref-height 8}}])))}])))}))
 
 
 (defn scenarios-window-impl
