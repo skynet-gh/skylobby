@@ -373,6 +373,34 @@
           [{:fx/type font-icon/lifecycle
             :icon-literal "mdi-sleep:16:grey"}]))}}))
 
+(defn player-name-tooltip [{:keys [player]}]
+  {:fx/type tooltip-nofocus/lifecycle
+   :show-delay skylobby.fx/tooltip-show-delay
+   :style {:-fx-font-size 16
+           :-fx-font-weight "normal"}
+   :text ""
+   :graphic
+   {:fx/type :v-box
+    :children
+    [
+     {:fx/type :label
+      :style {:-fx-font-size 18}
+      :text (str (u/nickname player))}
+     {:fx/type :label
+      :text
+      (str "Skill: "
+           (str (:skill player)
+                " "
+                (let [uncertainty (:skilluncertainty player)]
+                  (when (number? uncertainty)
+                    (apply str (repeat uncertainty "?"))))))}
+     {:fx/type :h-box
+      :children
+      [{:fx/type :label
+        :text "Country: "}
+       {:fx/type flag-icon/flag-icon
+        :country-code (-> player :user :country)}]}]}})
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [mod-name players server-key]}]
@@ -952,18 +980,24 @@
                         {:fx/type :h-box
                          :children
                          [
-                          {:fx/type :text
-                           :text (str " " (u/nickname player))
-                           :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
-                           :fill text-color-css
-                           :style {:-fx-font-smoothing :gray
-                                   :-fx-font-weight "bold"}
-                           :effect {:fx/type :drop-shadow
-                                    :color (if (color/dark? text-color-javafx)
-                                             "#d5d5d5"
-                                             "black")
-                                    :radius 2
-                                    :spread 1}}
+                          {:fx/type fx.ext.node/with-tooltip-props
+                           :props
+                           {:tooltip
+                            {:fx/type player-name-tooltip
+                             :player player}}
+                           :desc
+                           {:fx/type :text
+                            :text (str " " (u/nickname player))
+                            :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]
+                            :fill text-color-css
+                            :style {:-fx-font-smoothing :gray
+                                    :-fx-font-weight "bold"}
+                            :effect {:fx/type :drop-shadow
+                                     :color (if (color/dark? text-color-javafx)
+                                              "#d5d5d5"
+                                              "black")
+                                     :radius 2
+                                     :spread 1}}}
                           {:fx/type :pane
                            :h-box/hgrow :always}
                           {:fx/type :label
@@ -1001,16 +1035,8 @@
                  {:fx/type fx.ext.node/with-tooltip-props
                   :props
                   {:tooltip
-                   {:fx/type tooltip-nofocus/lifecycle
-                    :show-delay skylobby.fx/tooltip-show-delay
-                    :style {:-fx-font-size 16}
-                    :text (str (u/nickname player) "\n\n"
-                               "Skill: "
-                               (str (:skill player)
-                                    " "
-                                    (let [uncertainty (:skilluncertainty player)]
-                                      (when (number? uncertainty)
-                                        (apply str (repeat uncertainty "?"))))))}}
+                   {:fx/type player-name-tooltip
+                    :player player}}
                   :desc
                   {:fx/type :text
                    :text (str (u/nickname player))
