@@ -180,6 +180,17 @@
             (if server
               "mdi-wrench:30:white"
               "mdi-plus:30:white")}}]}]
+       (when (= "server2.beyondallreason.info:8201" (first server))
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "You must first login once at "}
+            (let [url "https://server2.beyondallreason.info"]
+              {:fx/type :hyperlink
+               :text url
+               :on-action {:event/type :spring-lobby/desktop-browse-url
+                           :url url}})]}])
        (when-let [login-error (str " " (get login-error (first server)))]
          [{:fx/type :label
            :text (str " " login-error)

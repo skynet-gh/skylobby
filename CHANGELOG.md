@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.62](https://github.com/skynet-gh/skylobby/releases/tag/0.7.62) - 2022-01-19
+
+- Fix host battle
+- Fix scenarios difficulty picker and restricted units
+
 ## [0.7.61](https://github.com/skynet-gh/skylobby/releases/tag/0.7.61) - 2022-01-18
 
 - Fix issue with login
