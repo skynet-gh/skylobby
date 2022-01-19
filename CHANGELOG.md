@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.61](https://github.com/skynet-gh/skylobby/releases/tag/0.7.61) - 2022-01-18
+
+- Fix issue with login
+
 ## [0.7.60](https://github.com/skynet-gh/skylobby/releases/tag/0.7.60) - 2022-01-18
 
 - Fix issue with join battle after leave
