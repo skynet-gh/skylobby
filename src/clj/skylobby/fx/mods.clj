@@ -44,6 +44,9 @@
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
         games (filter :is-game mods)
         spring-root-path (fs/canonical-path spring-isolation-dir)
+        on-value-changed (or on-value-changed 
+                             {:event/type :spring-lobby/assoc-in
+                              :path [:by-spring-root spring-root-path :mod-name]})
         selected-mod-file (:file (get mods-by-name mod-name))]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}

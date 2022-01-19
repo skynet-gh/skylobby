@@ -143,8 +143,6 @@
            :map-name map-name
            :maps maps
            :map-input-prefix map-input-prefix
-           :on-value-changed {:event/type :spring-lobby/assoc
-                              :key :map-name}
            :spring-isolation-dir spring-root}
           {:fx/type :pane
            :v-box/vgrow :always}

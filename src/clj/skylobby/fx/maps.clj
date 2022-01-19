@@ -43,7 +43,10 @@
         map-input-prefix (fx/sub-val context :map-input-prefix)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
-        selected-map-file (:file (get maps-by-name map-name))]
+        selected-map-file (:file (get maps-by-name map-name))
+        on-value-changed (or on-value-changed
+                             {:event/type :spring-lobby/assoc-in
+                              :path [:by-spring-root (fs/canonical-path spring-isolation-dir) :map-name]})]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -88,12 +91,13 @@
                       (filter string?)
                       (filter #(string/includes? (string/lower-case %) filter-lc))
                       (sort String/CASE_INSENSITIVE_ORDER))]
-             [(if text-only
-                {:fx/type :label
-                 :text map-name}
-                {:fx/type ext-recreate-on-key-changed
-                 :key map-name
-                 :desc
+             [
+              {:fx/type ext-recreate-on-key-changed
+               :key (str [map-name text-only])
+               :desc
+               (if text-only
+                 {:fx/type :label
+                  :text map-name}
                  {:fx/type :combo-box
                   :prompt-text (or map-name " < pick a map > ")
                   :value map-name
@@ -110,7 +114,7 @@
                      {:text (str map-name)})}
                   :on-key-pressed {:event/type :spring-lobby/maps-key-pressed}
                   :on-hidden {:event/type :spring-lobby/dissoc
-                              :key :map-input-prefix}}})]))
+                              :key :map-input-prefix}})}]))
          [{:fx/type :button
            :text ""
            :on-action {:event/type :spring-lobby/show-maps-window

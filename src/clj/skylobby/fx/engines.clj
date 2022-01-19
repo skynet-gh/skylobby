@@ -29,6 +29,9 @@
         engine-filter (fx/sub-val context :engine-filter)
         {:keys [engines engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-isolation-dir)
+        on-value-changed (or on-value-changed
+                             {:event/type :spring-lobby/assoc-in
+                              :path [:by-spring-root spring-root-path :engine-version]})
         engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
         indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
         engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
