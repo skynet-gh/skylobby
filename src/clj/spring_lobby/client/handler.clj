@@ -225,6 +225,20 @@
             (update-in state [:battle :bots username] merge bot-data)
             state))))))
 
+(defn join-battle [state-atom server-key client-data battle-id {:keys [battle-password battle-passworded]}]
+  (swap! state-atom
+    (fn [state]
+      (-> state
+          (assoc-in [:by-server server-key :battle] {})
+          (update-in [:by-server server-key] dissoc :selected-battle)
+          (assoc-in [:selected-tab-main server-key] "battle"))))
+  (message/send-message state-atom client-data
+    (str "JOINBATTLE " battle-id
+         (if battle-passworded
+           (str " " battle-password)
+           (str " *"))
+         " " (crypto.random/hex 6))))
+
 (defmethod handle "LEFTBATTLE" [state-atom server-key m]
   (let [[_all battle-id username] (re-find #"\w+ (\w+) ([^\s]+)" m)
         [prev curr] (swap-vals! state-atom update-in [:by-server server-key]
@@ -258,14 +272,9 @@
 
     (if (and (= username my-username)
              join-after-leave)
-      (let [{:keys [battle-id battle-passworded battle-password]} join-after-leave]
+      (let [{:keys [battle-id]} join-after-leave]
         (log/info "Joining battle after leaving" battle-id)
-        (message/send-message state-atom client-data
-          (str "JOINBATTLE " join-after-leave
-               (if battle-passworded
-                 (str " " battle-password)
-                 (str " *"))
-               " " (crypto.random/hex 6))))
+        (join-battle state-atom server-key client-data battle-id join-after-leave))
       (when (and (:auto-unspec curr-server-data)
                  (:battle curr-server-data)
                  (= battle-id (:battle-id battle))

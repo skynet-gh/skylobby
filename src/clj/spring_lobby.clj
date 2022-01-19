@@ -3144,19 +3144,7 @@
                                                                                 :battle-password battle-password
                                                                                 :battle-passworded battle-passworded})
               (event-handler (merge e {:event/type ::leave-battle})))
-            (do
-              (swap! *state
-                (fn [state]
-                  (-> state
-                      (assoc-in [:by-server server-key :battle] {})
-                      (update-in [:by-server server-key] dissoc :selected-battle)
-                      (assoc-in [:selected-tab-main server-key] "battle"))))
-              (message/send-message *state client-data
-                (str "JOINBATTLE " selected-battle
-                     (if battle-passworded
-                       (str " " battle-password)
-                       (str " *"))
-                     " " (crypto.random/hex 6))))))
+            (handler/join-battle *state server-key client-data selected-battle e)))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))
