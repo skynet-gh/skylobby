@@ -226,7 +226,7 @@
                                        k (-> m
                                              (string/split #"\s")
                                              first)]
-                                   (swap! state-atom ((u/append-console-log-fn server-key :server m)))
+                                   (swap! state-atom (u/append-console-log-fn server-key :server m))
                                    (tufte/with-profiling pd {:dynamic? true
                                                              :id :skylobby/client}
                                      (handler state-atom server-key m)

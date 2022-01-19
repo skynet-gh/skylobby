@@ -1005,7 +1005,10 @@
           :children
           [
            {:fx/type :button
-            :on-action {:event/type :spring-lobby/check-app-update}
+            :on-action 
+            {:event/type :spring-lobby/add-task
+             :task {:spring-lobby/task-type :spring-lobby/check-app-update}}
+            :disable (boolean (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/check-app-update)))
             :style-class ["button" "skylobby-normal"]
             :text "Check for skylobby update"
             :graphic
