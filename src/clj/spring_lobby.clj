@@ -2127,7 +2127,7 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn- resend-no-response-messages-chimer-fn [state-atom]
+(defn resend-no-response-messages-chimer-fn [state-atom]
   (log/info "Starting chimer to resend messages that did not receive the expected response in time")
   (let [chimer
         (chime/chime-at
@@ -5325,7 +5325,7 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
-         resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
+         ;resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
          update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
@@ -5364,12 +5364,11 @@
          check-app-update-chimer
          profile-print-chimer
          spit-app-config-chimer
-         ;truncate-messages-chimer
          fix-battle-ready-chimer
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
-         resend-no-response-messages-chimer
+         ;resend-no-response-messages-chimer
          update-replays-chimer
          update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))
