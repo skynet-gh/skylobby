@@ -226,10 +226,7 @@
                                        k (-> m
                                              (string/split #"\s")
                                              first)]
-                                   (swap! state-atom
-                                     (fn [state]
-                                       (let [next-state ((u/append-console-log-fn server-key :server m) state)]
-                                         (update-in next-state [:by-server server-key :expecting-responses] dissoc k))))
+                                   (swap! state-atom ((u/append-console-log-fn server-key :server m)))
                                    (tufte/with-profiling pd {:dynamic? true
                                                              :id :skylobby/client}
                                      (handler state-atom server-key m)

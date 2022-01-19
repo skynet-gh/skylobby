@@ -191,11 +191,12 @@
           (swap-vals! state-atom update-in [:by-server server-key]
             (fn [server]
               (if (:battle server)
-                (-> server
-                    (update-in [:battle :users username]
-                      assoc
-                      :battle-status decoded
-                      :team-color team-color))
+                (cond-> (update-in server [:battle :users username]
+                          assoc
+                          :battle-status decoded
+                          :team-color team-color)
+                        (= username (:username server))
+                        (update :expecting-responses dissoc "MYBATTLESTATUS"))
                 (do
                   (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
                   server))))
