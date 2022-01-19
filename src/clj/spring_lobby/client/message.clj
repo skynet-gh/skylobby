@@ -27,6 +27,8 @@
                      (= "PING" k)
                      (assoc-in [:by-server server-key :last-ping] (u/curr-millis))
                      (= "MYBATTLESTATUS" k)
-                     (assoc-in [:by-server server-key :expecting-responses] {:sent-message message
-                                                                             :sent-millis (u/curr-millis)}))))))
+                     (assoc-in
+                       [:by-server server-key :expecting-responses k]
+                       {:sent-message message
+                        :sent-millis (u/curr-millis)}))))))
      (log/error (ex-info "No client to send message" {:message log-message})))))

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.60](https://github.com/skynet-gh/skylobby/releases/tag/0.7.60) - 2022-01-18
+
+- Fix issue with join battle after leave
+- Fix issue with battles table items deselected
+- Fix issue with resending messages with no response
+
 ## [0.7.59](https://github.com/skynet-gh/skylobby/releases/tag/0.7.59) - 2022-01-18
 
 - Fix error with battle popout causing UI to be unresponsive

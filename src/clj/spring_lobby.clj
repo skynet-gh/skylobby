@@ -894,7 +894,7 @@
     (try
       (doseq [[server-key new-server] (-> new-state :by-server seq)]
         (if-not (server-needs-battle-status-sync-check new-server)
-          (log/info "Server" server-key "does not need battle mod details check")
+          (log/debug "Server" server-key "does not need battle mod details check")
           (let [old-server (-> old-state :by-server (get server-key))
                 server-url (-> new-server :client-data :server-url)
                 {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
@@ -1188,7 +1188,7 @@
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
         (if-not (server-needs-battle-status-sync-check new-server)
-          (log/info "Server" server-key "does not need battle sync status check")
+          (log/debug "Server" server-key "does not need battle sync status check")
           (let [
                 _ (log/info "Checking battle sync status for" server-key)
                 old-server (-> old-state :by-server (get server-key))
@@ -2089,7 +2089,7 @@
             (java-time/plus (java-time/instant))
             (java-time/duration 30 :seconds))
           (fn [_chimestamp]
-            (log/info "Updating music queue")
+            (log/debug "Updating music queue")
             (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
               (if music-dir
                 (let [music-files (music-files music-dir)]
@@ -2104,7 +2104,7 @@
                              :media-player media-player
                              :music-now-playing music-file
                              :music-queue music-files))))
-                (log/info "No music dir" music-dir))))
+                (log/debug "No music dir" music-dir))))
           {:error-handler
            (fn [e]
              (log/error e "Error updating music queue")
@@ -2135,13 +2135,31 @@
             (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
-            (log/info "Resending messages that did not receive the expected response in time")
-            (let [{:keys [by-server]} @state-atom]
+            (log/debug "Resending messages that did not receive the expected response in time")
+            (let [now (u/curr-millis)
+                  [{:keys [by-server]} _new-state]
+                  (swap-vals! state-atom update :by-server
+                    (fn [by-server]
+                      (reduce-kv
+                        (fn [m k v]
+                          (assoc m k
+                            (update v :expecting-responses
+                              (fn [expecting-responses]
+                                (reduce-kv
+                                  (fn [m k v]
+                                    (if (and (:sent-millis v)
+                                             (< now (+ (:sent-millis v) 3000)))
+                                      (assoc m k v)
+                                      m))
+                                  {}
+                                  expecting-responses)))))
+                        {}
+                        by-server)))]
               (doseq [[_server-key server-data] by-server]
                 (doseq [[expected-response sent] (:expecting-responses server-data)]
                   (let [{:keys [sent-message sent-millis]} sent]
                     (if (and sent-message sent-millis)
-                      (when (< (+ sent-millis 3000) (u/curr-millis))
+                      (when (< (+ sent-millis 3000) now)
                         (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
                         (message/send-message state-atom (:client-data server-data) sent-message))
                       (log/warn "Issue with expecting response:" expected-response sent)))))))
@@ -2600,11 +2618,11 @@
                         :skilluncertainty 0))))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
-  (let [battle-id (:battle-id event)
+  (let [battle-id event
         wait-time 1000
         state (swap! *state update-in [:by-server server-key]
                 (fn [{:keys [users] :as server-data}]
-                  (let [battle-id (:battle-id event)
+                  (let [
                         {:keys [host-username]} (get-in server-data [:battles battle-id])]
                     (cond-> (assoc server-data :selected-battle battle-id)
                             (get-in users [host-username :client-status :bot])
@@ -3126,19 +3144,7 @@
                                                                                 :battle-password battle-password
                                                                                 :battle-passworded battle-passworded})
               (event-handler (merge e {:event/type ::leave-battle})))
-            (do
-              (swap! *state
-                (fn [state]
-                  (-> state
-                      (assoc-in [:by-server server-key :battle] {})
-                      (update-in [:by-server server-key] dissoc :selected-battle)
-                      (assoc-in [:selected-tab-main server-key] "battle"))))
-              (message/send-message *state client-data
-                (str "JOINBATTLE " selected-battle
-                     (if battle-passworded
-                       (str " " battle-password)
-                       (str " *"))
-                     " " (crypto.random/hex 6))))))
+            (handler/join-battle *state server-key client-data selected-battle e)))
         (log/warn "No battle to join" e))
       (catch Exception e
         (log/error e "Error joining battle")))))

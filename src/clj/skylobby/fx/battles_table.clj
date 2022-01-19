@@ -67,7 +67,8 @@
                                     false)))
                               (sort-by (juxt (comp count :users) :battle-spectators))
                               reverse
-                              doall)]
+                              doall)
+        battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
     {:fx/type :v-box
      :style {:-fx-font-size 16
              :-fx-min-height 128}
@@ -119,18 +120,20 @@
        :props {:selection-mode :single
                :on-selected-item-changed {:event/type :spring-lobby/select-battle
                                           :server-key server-key}
-               :selected-item (get filter-battles (filter (comp)))}
+               :selected-item selected-battle}
        :desc
        {:fx/type ext-table-column-auto-size
-        :items filtered-battles
+        :items (mapv :battle-id filtered-battles)
         :desc
         {:fx/type :table-view
          :style {:-fx-font-size 15}
          :column-resize-policy :constrained
          :row-factory
          {:fx/cell-type :table-row
-          :describe (fn [{:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data}]
-                      (let [battle-users (:users battle-data)]
+          :describe (fn [battle-id]
+                      (let [
+                            {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data} (get battles-by-id battle-id)
+                            battle-users (:users battle-data)]
                         {:on-mouse-clicked
                          {:event/type :spring-lobby/on-mouse-clicked-battles-row
                           :battle battle
@@ -218,7 +221,7 @@
           {:fx/type :table-column
            :text "Game"
            :pref-width 240
-           :cell-value-factory :battle-modname
+           :cell-value-factory (comp :battle-modname battles-by-id)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -233,7 +236,7 @@
            :text "Status"
            :resizable false
            :pref-width 112
-           :cell-value-factory identity
+           :cell-value-factory battles-by-id
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -270,7 +273,7 @@
           {:fx/type :table-column
            :text "Map"
            :pref-width 200
-           :cell-value-factory :battle-map
+           :cell-value-factory (comp :battle-map battles-by-id)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -285,7 +288,9 @@
            :text "Play (Spec)"
            :resizable false
            :pref-width 100
-           :cell-value-factory (juxt (comp count :users) #(or (u/to-number (:battle-spectators %)) 0))
+           :cell-value-factory (juxt
+                                 (comp count :users battles-by-id)
+                                 #(or (u/to-number (:battle-spectators (get battles-by-id %))) 0))
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -297,7 +302,7 @@
           {:fx/type :table-column
            :text "Battle Name"
            :pref-width 200
-           :cell-value-factory :battle-title
+           :cell-value-factory (comp :battle-title battles-by-id)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe (fn [battle-title] {:text (str battle-title)})}}
@@ -305,7 +310,7 @@
            :text "Country"
            :resizable false
            :pref-width 64
-           :cell-value-factory #(:country (get users (:host-username %)))
+           :cell-value-factory #(:country (get users (:host-username (get battles-by-id %))))
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -317,7 +322,7 @@
           {:fx/type :table-column
            :text "Host"
            :pref-width 100
-           :cell-value-factory :host-username
+           :cell-value-factory (comp :host-username battles-by-id)
            :cell-factory
            {:fx/cell-type :table-cell
             :describe (fn [host-username] {:text (str host-username)})}}]}}}]}))
@@ -368,7 +373,8 @@
                                     false)))
                               (sort-by (juxt (comp count :users) :battle-spectators))
                               reverse
-                              doall)]
+                              doall)
+        battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
     {:fx/type :v-box
      :style {:-fx-font-size 16
              :-fx-min-height 128}
@@ -419,15 +425,18 @@
        :v-box/vgrow :always
        :props {:selection-mode :single
                :on-selected-item-changed {:event/type :spring-lobby/select-battle
-                                          :server-key server-key}}
+                                          :server-key server-key}
+               :selected-item selected-battle}
        :desc
        {:fx/type :table-view
         :style {:-fx-font-size 15}
-        :items filtered-battles
+        :items (mapv :battle-id filtered-battles)
         :row-factory
         {:fx/cell-type :table-row
-         :describe (fn [{:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data}]
-                     (let [battle-users (:users battle-data)]
+         :describe (fn [battle-id]
+                     (let [
+                           {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data} (get battles-by-id battle-id)
+                           battle-users (:users battle-data)]
                        {:on-mouse-clicked
                         {:event/type :spring-lobby/on-mouse-clicked-battles-row
                          :battle battle
@@ -515,7 +524,7 @@
           :pref-width (+ 8 battles-map-size)
           :resizable false
           :sortable false
-          :cell-value-factory :battle-map
+          :cell-value-factory (comp :battle-map battles-by-id)
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -549,7 +558,7 @@
           :text "Details"
           :sortable false
           :pref-width 480
-          :cell-value-factory identity
+          :cell-value-factory battles-by-id
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -584,7 +593,7 @@
           :text "Resources"
           :sortable false
           :pref-width 480
-          :cell-value-factory identity
+          :cell-value-factory battles-by-id
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -619,7 +628,7 @@
           :text "Status"
           :resizable false
           :pref-width 112
-          :cell-value-factory identity
+          :cell-value-factory battles-by-id
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
