@@ -269,7 +269,6 @@
           my-username (:username server-data)
           me (-> battle :users (get my-username))
           curr-server-data (-> curr :by-server (get server-key))]
-
     (if (and (= username my-username)
              join-after-leave)
       (let [{:keys [battle-id]} join-after-leave]
@@ -491,7 +490,7 @@
               unified (-> client-data :compflags (contains? "u"))
               next-state (assoc-in state [:battles battle-id :users username] initial-status)
               my-battle (= battle-id (-> next-state :battle :battle-id))]
-          (cond-> next-state
+          (cond-> (dissoc next-state :join-after-leave)
                   my-battle
                   (assoc-in [:battle :users username] initial-status)
                   script-password
