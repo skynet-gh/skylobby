@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.63](https://github.com/skynet-gh/skylobby/releases/tag/0.7.63) - 2022-01-20
+
+- Fix team balance buttons in singleplayer
+- Fix scenarios layout on smaller resolutions
+- Fix issue with joining battle after leaving
+- Improve labels on welcome tab
+
 ## [0.7.62](https://github.com/skynet-gh/skylobby/releases/tag/0.7.62) - 2022-01-19
 
 - Fix host battle
