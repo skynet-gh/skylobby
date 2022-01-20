@@ -591,8 +591,74 @@
                  :value false}
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-content-copy:20"}}}]))}
-        {:fx/type :label
+                 :icon-literal "mdi-content-copy:20"}}}]))}]
+       (when am-host
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text " Balance: "}
+            {:fx/type :button
+             :text "FFA"
+             :on-action {:event/type :spring-lobby/battle-teams-ffa
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "2 teams"
+             :on-action {:event/type :spring-lobby/battle-teams-2
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "3 teams"
+             :on-action {:event/type :spring-lobby/battle-teams-3
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "4 teams"
+             :on-action {:event/type :spring-lobby/battle-teams-4
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "5 teams"
+             :on-action {:event/type :spring-lobby/battle-teams-5
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}
+            {:fx/type :button
+             :text "Humans vs Bots"
+             :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
+                         :am-host am-host
+                         :battle battle
+                         :client-data (when-not singleplayer client-data)
+                         :interleave-ally-player-ids interleave-ally-player-ids
+                         :server-key server-key
+                         :users users
+                         :username username}}]}])
+       [{:fx/type :label
          :style {:-fx-font-size 24}
          :text (str " "
                     (when (< 1 (count team-counts))
@@ -630,7 +696,6 @@
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         file-cache (fx/sub-val context :file-cache)
-        interleave-ally-player-ids (fx/sub-val context :interleave-ally-player-ids)
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         singleplayer (= :local server-key)
         spring-settings (fx/sub-val context :spring-settings)
@@ -759,68 +824,7 @@
                                                         (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
                                                           id))))
                                  :client-data client-data
-                                 :server-key server-key}}]))}
-              {:fx/type :label
-               :text (str "")}
-              {:fx/type :flow-pane
-               ;:alignment :center-left
-               :children
-               (concat
-                 (when am-host
-                   [{:fx/type :button
-                     :text "FFA"
-                     :on-action {:event/type :spring-lobby/battle-teams-ffa
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}
-                    {:fx/type :button
-                     :text "2 teams"
-                     :on-action {:event/type :spring-lobby/battle-teams-2
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}
-                    {:fx/type :button
-                     :text "3 teams"
-                     :on-action {:event/type :spring-lobby/battle-teams-3
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}
-                    {:fx/type :button
-                     :text "4 teams"
-                     :on-action {:event/type :spring-lobby/battle-teams-4
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}
-                    {:fx/type :button
-                     :text "5 teams"
-                     :on-action {:event/type :spring-lobby/battle-teams-5
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}
-                    {:fx/type :button
-                     :text "Humans vs Bots"
-                     :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
-                                 :am-host am-host
-                                 :battle battle
-                                 :client-data (when-not singleplayer client-data)
-                                 :interleave-ally-player-ids interleave-ally-player-ids
-                                 :users users
-                                 :username username}}]))}]
+                                 :server-key server-key}}]))}]
              (when (and (not am-host)
                         (-> users (get host-username) :client-status :bot))
                [{:fx/type :button

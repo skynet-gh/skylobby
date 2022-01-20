@@ -172,7 +172,7 @@
    :console-auto-scroll :console-ignore-message-types :css :debug-spring :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
+   :friend-users :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
    :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
@@ -255,6 +255,7 @@
      :highlight-tabs-with-new-battle-messages true
      :highlight-tabs-with-new-chat-messages true
      :increment-ids true
+     :interleave-ally-player-ids true
      :is-java (u/is-java? (u/process-command))
      :leave-battle-on-close-window true
      :players-table-columns {:skill true
@@ -3857,26 +3858,61 @@
                 (assoc-in data [:status-changes :id] i))))))))
 
 
-(defn- n-teams [{:keys [client-data interleave-ally-player-ids] :as e} n]
-  (future
-    (try
-      (let [new-teams (balance-teams (battle-players-and-bots e) n {:interleave interleave-ally-player-ids})]
-        (->> new-teams
-             (map
-               (fn [{:keys [id opts status-changes]}]
-                 (let [is-me (= (:username e) (:username id))]
-                   (apply-battle-status-changes client-data (assoc id :is-me is-me) opts status-changes))))
-             doall))
-      (catch Exception e
-        (log/error e "Error updating to" n "teams")))
-    (when-not client-data
-      (let [{:keys [battle users username]} (get-in @*state [:by-server :local])]
-        (event-handler
-          (assoc e
-                 :event/type ::battle-fix-colors
-                 :battle battle
-                 :users users
-                 :username username))))))
+(defn- n-teams [{:keys [am-host client-data interleave-ally-player-ids server-key] :as e} n]
+  (let [new-teams (balance-teams (battle-players-and-bots e) n {:interleave interleave-ally-player-ids})]
+    (if (= :local server-key)
+      (let [user-changes-by-name (->> new-teams
+                                      (remove (comp :is-bot :opts))
+                                      (map (juxt (comp :username :id) :status-changes))
+                                      (into {}))
+            bot-changes-by-name (->> new-teams
+                                     (filter (comp :is-bot :opts))
+                                     (map (juxt (comp :bot-name :id) :status-changes))
+                                     (into {}))]
+        (log/info "Updating singleplayer battle")
+        (swap! *state update-in [:by-server :local :battle]
+          (fn [singleplayer-battle]
+            (-> singleplayer-battle
+                (update :users
+                  (fn [users]
+                    (reduce-kv
+                      (fn [m k v]
+                        (assoc m k (update v :battle-status merge (get user-changes-by-name k))))
+                      {}
+                      users)))
+                (update :bots
+                  (fn [bots]
+                    (reduce-kv
+                      (fn [m k v]
+                        (assoc m k (update v :battle-status merge (get bot-changes-by-name k))))
+                      {}
+                      bots))))))
+        (let [{:keys [battle users username]} (get-in @*state [:by-server :local])]
+          (event-handler
+            (assoc e
+                   :event/type ::battle-fix-colors
+                   :battle battle
+                   :users users
+                   :username username))))
+      (future
+        (try
+          (->> new-teams
+               (map
+                 (fn [{:keys [id opts status-changes]}]
+                   (let [is-me (= (:username e) (:username id))]
+                     (apply-battle-status-changes client-data (assoc id :is-me is-me) opts status-changes))))
+               doall)
+          (when am-host
+            (async/<!! (async/timeout 500))
+            (let [{:keys [battle users username]} (get-in @*state [:by-server server-key])]
+              (event-handler
+                (assoc e
+                       :event/type ::battle-fix-colors
+                       :battle battle
+                       :users users
+                       :username username))))
+          (catch Exception e
+            (log/error e "Error updating to" n "teams")))))))
 
 (defmethod event-handler ::battle-teams-ffa
   [e]
