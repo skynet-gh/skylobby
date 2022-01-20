@@ -1187,7 +1187,8 @@
     (log/info "Checking servers for battle sync status updates")
     (try
       (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
-        (if-not (server-needs-battle-status-sync-check new-server)
+        (if (and (= (:servers old-state) (:servers new-state))
+                 (not (server-needs-battle-status-sync-check new-server)))
           (log/debug "Server" server-key "does not need battle sync status check")
           (let [
                 _ (log/info "Checking battle sync status for" server-key)
