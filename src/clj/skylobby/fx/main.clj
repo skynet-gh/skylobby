@@ -198,7 +198,7 @@
                         :text "Singleplayer"
                         :style {:-fx-font-size 18}}
               :on-close-request {:event/type :spring-lobby/dissoc-in
-                                 :path [:by-server :local :battle]}
+                                 :path [:by-server :local]}
               :content
               {:fx/type :v-box
                :children

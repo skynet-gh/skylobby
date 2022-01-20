@@ -56,6 +56,7 @@
        (when (or (and client-deferred (or (not client) (not accepted)))
                  (and client (not client-deferred)))
          [{:fx/type :button
+           :style-class ["button" "skylobby-normal"]
            :text ""
            :tooltip
            {:fx/type tooltip-nofocus/lifecycle
@@ -68,7 +69,7 @@
                        :server-key server-key}
            :graphic
            {:fx/type font-icon/lifecycle
-            :icon-literal "mdi-close-octagon:16:white"}}]))}))
+            :icon-literal "mdi-close-octagon:16"}}]))}))
 
 
 (def local-buttons-width 180)
@@ -156,7 +157,8 @@
         username (fx/sub-val context :username)
         verification-code (fx/sub-val context :verification-code)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
-        auto-connect-running (seq (get tasks-by-type :spring-lobby/auto-connect-servers))]
+        auto-connect-running (seq (get tasks-by-type :spring-lobby/auto-connect-servers))
+        spring-root (fx/sub-val context :spring-isolation-dir)]
     {:fx/type :v-box
      :spacing 10
      :children
@@ -171,15 +173,16 @@
            :servers servers
            :on-value-changed {:event/type :spring-lobby/on-change-server}}
           {:fx/type :button
-           :text ""
+           :style-class ["button" "skylobby-normal"]
+           :text (if server "Edit" "Add")
            :on-action {:event/type :spring-lobby/toggle
                        :key :show-servers-window}
            :graphic
            {:fx/type font-icon/lifecycle
             :icon-literal
             (if server
-              "mdi-wrench:30:white"
-              "mdi-plus:30:white")}}]}]
+              "mdi-wrench:30"
+              "mdi-plus:30")}}]}]
        (when (= "server2.beyondallreason.info:8201" (first server))
          [{:fx/type :h-box
            :alignment :center-left
@@ -236,13 +239,16 @@
          :style {:-fx-min-height 20
                  :-fx-pref-height 20}}
         (let [[server-url server-details] server
-              spring-isolation-dir (:spring-isolation-dir server-details)]
+              server-spring-root (:spring-isolation-dir server-details)]
           {:fx/type :v-box
            :style {:-fx-font-size 16}
            :children
            [
             {:fx/type :label
-             :text " Server-specific Spring Dir"
+             :text (if (or (not server-spring-root)
+                           (= server-spring-root spring-root))
+                     "Using default Spring dir"
+                     "Using server-specific Spring dir")
              :style {:-fx-font-size 20}}
             {:fx/type :h-box
              :alignment :center-left
@@ -250,24 +256,27 @@
              (concat
                [{:fx/type :text-field
                  :disable true
-                 :text (str (or spring-isolation-dir
-                                " < use default >"))
-                 :style {:-fx-min-width 400}}]
-               (when spring-isolation-dir
+                 :text (str (or server-spring-root spring-root))
+                 :style {:-fx-min-width 400
+                         :-fx-font-size 16}}]
+               (when server-spring-root
                  [{:fx/type :button
-                   :text ""
+                   :style-class ["button" "skylobby-normal"]
+                   :text "Reset"
                    :on-action {:event/type :spring-lobby/dissoc-in
                                :path [:servers server-url :spring-isolation-dir]}
                    :graphic
                    {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-close:16:white"}}])
+                    :icon-literal "mdi-close:20"}}])
                [{:fx/type :button
+                 :style-class ["button" "skylobby-normal"]
+                 :text "Change"
                  :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                             :spring-isolation-dir (or server-spring-root spring-root)
                              :target [:servers server-url :spring-isolation-dir]}
-                 :text ""
                  :graphic
                  {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-file-find:16:white"}}])}]})
+                  :icon-literal "mdi-file-find:20"}}])}]})
         {:fx/type :h-box
          :spacing 10
          :children
