@@ -169,7 +169,7 @@
                   :items scenarios
                   :desc
                   {:fx/type :table-view
-                   :style {:-fx-min-height table-height
+                   :style {:-fx-min-height 200
                            :-fx-pref-height table-height
                            :-fx-max-height table-height}
                    :items scenarios
@@ -220,115 +220,129 @@
                        map-name (:mapfilename lua)
                        sides (or (vals (:allowedsides lua)) [])
                        side (or scenario-side (last sides))]
-                   [{:fx/type :h-box
-                     :v-box/vgrow :always
-                     :children
-                     (concat
-                       [{:fx/type :v-box
-                         :children
-                         [
-                          {:fx/type :label
-                           :style {:-fx-font-size 20}
-                           :text (str (:title lua))}
-                          {:fx/type :label
-                           :text (str " Author: " (:author lua))}
-                          {:fx/type :label
-                           :text " Summary: "
-                           :style {:-fx-font-size 18}}
-                          {:fx/type :label
-                           :text (str (:summary lua))
-                           :style {:-fx-font-size 18}
-                           :wrap-text true}
-                          {:fx/type :label
-                           :text " Briefing: "}
-                          {:fx/type :scroll-pane
-                           :fit-to-width true
-                           :content
+                   [{:fx/type :scroll-pane
+                     :fit-to-width true
+                     :content
+                     {:fx/type :h-box
+                      :children
+                      (concat
+                        [{:fx/type :v-box
+                          :children
+                          [
+                           {:fx/type :label
+                            :style {:-fx-font-size 20}
+                            :text (str (:title lua))}
+                           {:fx/type :label
+                            :text (str " Author: " (:author lua))}
+                           {:fx/type :label
+                            :text " Summary: "
+                            :style {:-fx-font-size 18}}
+                           {:fx/type :label
+                            :text (str (:summary lua))
+                            :style {:-fx-font-size 18}
+                            :wrap-text true}
+                           {:fx/type :label
+                            :text " Briefing: "}
                            {:fx/type :label
                             :text (str (:briefing lua))
-                            :wrap-text true}}
-                          {:fx/type :pane
-                           :style {:-fx-pref-height 16}}
-                          {:fx/type :label
-                           :style {:-fx-font-size 18}
-                           :text (str " Map: " (:mapfilename lua))}
-                          {:fx/type :label
-                           :style {:-fx-font-size 18}
-                           :text (str " Victory: " (:victorycondition lua))}
-                          {:fx/type :label
-                           :style {:-fx-font-size 18}
-                           :text (str " Loss: " (:losscondition lua))}
-                          #_
-                          {:fx/type :label
-                           :text " Start script: "}
-                          #_
-                          {:fx/type :text-area
-                           :text (str (:startscript lua))}]}]
-                       (when image-file
-                         [{:fx/type :v-box
-                           :children
-                           [{:fx/type :image-view
-                             :image {:url (-> image-file io/as-url str)
-                                     :background-loading true}
-                             :fit-width 800
-                             :preserve-ratio true}
-                            {:fx/type :label
-                             :text (str " Par time: " (:partime lua))}
-                            {:fx/type :label
-                             :text (str " Par resources: " (:parresources lua))}
-                            {:fx/type :label
-                             :text " Difficulty: "}
-                            {:fx/type ext-recreate-on-key-changed
-                             :key (str difficulty)
-                             :desc
-                             {:fx/type :combo-box
-                              :value difficulty
-                              :items (or (vals (:difficulties lua)) [])
-                              :cell-factory
-                              {:fx/cell-type :list-cell
-                               :describe
-                               (fn [difficulty]
-                                 {:text (str (:name difficulty))})}
-                              :button-cell
-                              (fn [difficulty]
-                                {:text (str (:name difficulty))})
-                              :on-value-changed {:event/type :spring-lobby/assoc
-                                                 :key :scenario-difficulty}}}
-                            {:fx/type :label
-                             :text " Side: "}
-                            {:fx/type ext-recreate-on-key-changed
-                             :key (str side)
-                             :desc
-                             {:fx/type :combo-box
-                              :value side
-                              :items sides
-                              :cell-factory
-                              {:fx/cell-type :list-cell
-                               :describe
-                               (fn [side]
-                                 {:text (str side)})}
-                              :on-value-changed {:event/type :spring-lobby/assoc
-                                                 :key :scenario-side}}}
-                            {:fx/type :pane
-                             :style {:-fx-pref-height 8}}
-                            {:fx/type :v-box
-                             :children
-                             [
-                              {:fx/type map-sync-pane
-                               :v-box/margin 8
-                               :index-only true
-                               :map-name map-name
-                               :spring-isolation-dir spring-root}
-                              {:fx/type mod-sync-pane
-                               :v-box/margin 8
-                               :engine-version engine-version
-                               :index-only true
-                               :mod-name (or latest-local-bar
-                                             mod-name-prefix) ; to show rapid update button
-                               :spring-isolation-dir spring-root}]}]}]))}
+                            :wrap-text true}
+                           {:fx/type :pane
+                            :style {:-fx-pref-height 16}}
+                           {:fx/type :label
+                            :style {:-fx-font-size 18}
+                            :text (str " Map: " (:mapfilename lua))}
+                           {:fx/type :label
+                            :style {:-fx-font-size 18}
+                            :text (str " Victory: " (:victorycondition lua))}
+                           {:fx/type :label
+                            :style {:-fx-font-size 18}
+                            :text (str " Loss: " (:losscondition lua))}
+                           #_
+                           {:fx/type :label
+                            :text " Start script: "}
+                           #_
+                           {:fx/type :text-area
+                            :text (str (:startscript lua))}]}]
+                        (when image-file
+                          [{:fx/type :v-box
+                            :children
+                            [{:fx/type :image-view
+                              :image {:url (-> image-file io/as-url str)
+                                      :background-loading true}
+                              :fit-width 800
+                              :preserve-ratio true}
+                             {:fx/type :h-box
+                              :children
+                              [{:fx/type :v-box
+                                :h-box/margin 8
+                                :children
+                                [
+                                 {:fx/type :label
+                                  :text (str " Par time: " (:partime lua))}
+                                 {:fx/type :label
+                                  :text (str " Par resources: " (:parresources lua))}]}
+                               {:fx/type :v-box
+                                :h-box/margin 8
+                                :children
+                                [
+                                 {:fx/type :label
+                                  :text " Difficulty: "}
+                                 {:fx/type ext-recreate-on-key-changed
+                                  :key (str difficulty)
+                                  :desc
+                                  {:fx/type :combo-box
+                                   :value difficulty
+                                   :items (or (vals (:difficulties lua)) [])
+                                   :cell-factory
+                                   {:fx/cell-type :list-cell
+                                    :describe
+                                    (fn [difficulty]
+                                      {:text (str (:name difficulty))})}
+                                   :button-cell
+                                   (fn [difficulty]
+                                     {:text (str (:name difficulty))})
+                                   :on-value-changed {:event/type :spring-lobby/assoc
+                                                      :key :scenario-difficulty}}}]}
+                               {:fx/type :v-box
+                                :h-box/margin 8
+                                :children
+                                [
+                                 {:fx/type :label
+                                  :text " Side: "}
+                                 {:fx/type ext-recreate-on-key-changed
+                                  :key (str side)
+                                  :desc
+                                  {:fx/type :combo-box
+                                   :value side
+                                   :items sides
+                                   :cell-factory
+                                   {:fx/cell-type :list-cell
+                                    :describe
+                                    (fn [side]
+                                      {:text (str side)})}
+                                   :on-value-changed {:event/type :spring-lobby/assoc
+                                                      :key :scenario-side}}}]}]}
+                             {:fx/type :pane
+                              :style {:-fx-pref-height 8}}
+                             {:fx/type :h-box
+                              :children
+                              [
+                               {:fx/type map-sync-pane
+                                :h-box/margin 8
+                                :index-only true
+                                :map-name map-name
+                                :spring-isolation-dir spring-root}
+                               {:fx/type mod-sync-pane
+                                :h-box/margin 8
+                                :engine-version engine-version
+                                :index-only true
+                                :mod-name (or latest-local-bar
+                                              mod-name-prefix) ; to show rapid update button
+                                :spring-isolation-dir spring-root}]}]}]))}}
                     {:fx/type :button
                      :style {:-fx-font-size 24
                              :-fx-margin-bottom 8}
+                     :v-box/vgrow :always
                      :text "Play Scenario"
                      :on-action
                      {:event/type :spring-lobby/play-scenario
