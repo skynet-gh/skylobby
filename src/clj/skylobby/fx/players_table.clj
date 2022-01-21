@@ -302,6 +302,8 @@
                        :server-key server-key
                        :username username}}]))}))
 
+(def player-status-width 72)
+
 (defn player-status
   [{:fx/keys [context]
     :keys [player server-key]}]
@@ -312,6 +314,9 @@
         now (or (fx/sub-val context :now) (u/curr-millis))
         singleplayer (or (not server-key) (= :local server-key))]
     {:fx/type :label
+     :style {:-fx-min-width player-status-width
+             :-fx-pref-width player-status-width
+             :-fx-max-width player-status-width}
      :text ""
      :tooltip
      {:fx/type tooltip-nofocus/lifecycle
@@ -442,7 +447,6 @@
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
                                (str id))})
-        now (or (fx/sub-val context :now) (u/curr-millis))
         css-class-suffix (cond
                            (not server-key) "replay"
                            singleplayer "singleplayer"
@@ -591,73 +595,15 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ _ _ {:keys [battle-status user username]}]]
+              (fn [[_ _ _ player]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :status
-                    (let [client-status (:client-status user)
-                          am-host (= username host-username)]
-                      {:text ""
-                       :tooltip
-                       {:fx/type tooltip-nofocus/lifecycle
-                        :show-delay skylobby.fx/tooltip-show-delay
-                        :style {:-fx-font-size 16}
-                        :text
-                        (str
-                          (case (int (or (:sync battle-status) 0))
-                            1 "Synced"
-                            2 "Unsynced"
-                            "Unknown sync")
-                          "\n"
-                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
-                          (when (u/to-bool (:mode battle-status))
-                            (str "\n" (if (:ready battle-status) "Ready" "Unready")))
-                          (when (:ingame client-status)
-                            "\nIn game")
-                          (when-let [away-start-time (:away-start-time user)]
-                            (when (and (:away client-status) away-start-time)
-                              (str "\nAway: "
-                                   (let [diff (- now away-start-time)]
-                                     (if (< diff 30000)
-                                       " just now"
-                                       (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
-                       :graphic
-                       {:fx/type :h-box
-                        :alignment :center-left
-                        :children
-                        (concat
-                          (when-not singleplayer
-                            [
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal
-                              (let [sync-status (int (or (:sync battle-status) 0))]
-                                (case sync-status
-                                  1 "mdi-sync:16:green"
-                                  2 "mdi-sync-off:16:red"
-                                  ; else
-                                  "mdi-sync-alert:16:yellow"))}])
-                          [(cond
-                             (:bot client-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-robot:16:grey"}
-                             (not (u/to-bool (:mode battle-status)))
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-magnify:16:white"}
-                             (:ready battle-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-check:16:green"}
-                             am-host
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-key:16:orange"}
-                             :else
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account:16:white"})]
-                          (when (:ingame client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sword:16:red"}])
-                          (when (:away client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sleep:16:grey"}]))}}))))}}])
+                    {:text ""
+                     :graphic
+                     {:fx/type player-status
+                      :player player
+                      :server-key server-key}})))}}])
          (when (:ally players-table-columns)
            [{:fx/type :table-column
              :text "Ally"
@@ -1025,6 +971,10 @@
                           {:fx/type :pane
                            :h-box/hgrow :always}
                           {:fx/type :label
+                           :alignment :center-left
+                           :style {:-fx-min-width 64
+                                   :-fx-pref-width 64
+                                   :-fx-max-width 64}
                            :text
                            (str (:skill player)
                                 " "
