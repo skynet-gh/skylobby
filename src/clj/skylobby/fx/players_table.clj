@@ -383,24 +383,32 @@
    :graphic
    {:fx/type :v-box
     :children
-    [
-     {:fx/type :label
-      :style {:-fx-font-size 18}
-      :text (str (u/nickname player))}
-     {:fx/type :label
-      :text
-      (str "Skill: "
-           (str (:skill player)
-                " "
-                (let [uncertainty (:skilluncertainty player)]
-                  (when (number? uncertainty)
-                    (apply str (repeat uncertainty "?"))))))}
-     {:fx/type :h-box
-      :children
-      [{:fx/type :label
-        :text "Country: "}
-       {:fx/type flag-icon/flag-icon
-        :country-code (-> player :user :country)}]}]}})
+    (concat
+      [
+       {:fx/type :label
+        :style {:-fx-font-size 18}
+        :text (str (u/nickname player))}
+       {:fx/type :label
+        :text ""}]
+      (when-let [bonus (-> player :battle-status :handicap u/to-number)]
+        (when (not= 0 bonus)
+          [{:fx/type :label
+            :text (str "Bonus: +" bonus "%")}]))
+      (when-not (-> player :user :client-status :bot)
+        [{:fx/type :label
+          :text
+          (str "Skill: "
+               (str (:skill player)
+                    " "
+                    (let [uncertainty (:skilluncertainty player)]
+                      (when (number? uncertainty)
+                        (apply str (repeat uncertainty "?"))))))}])
+      [{:fx/type :h-box
+        :children
+        [{:fx/type :label
+          :text "Country: "}
+         {:fx/type flag-icon/flag-icon
+          :country-code (-> player :user :country)}]}])}})
 
 (defn players-table-impl
   [{:fx/keys [context]
@@ -988,6 +996,7 @@
                                  :server-key server-key}}
                         :desc
                         {:fx/type :h-box
+                         :alignment :center-left
                          :children
                          [
                           {:fx/type fx.ext.node/with-tooltip-props
@@ -1008,6 +1017,11 @@
                                               "black")
                                      :radius 2
                                      :spread 1}}}
+                          (let [bonus (-> player :battle-status :handicap u/to-number)]
+                            {:fx/type :label
+                             :text (str
+                                     (when (and bonus (not= 0 bonus))
+                                       (str "+" (int bonus) "%")))})
                           {:fx/type :pane
                            :h-box/hgrow :always}
                           {:fx/type :label
