@@ -20,6 +20,7 @@
     [skylobby.fx.players-table :refer [players-table]]
     [skylobby.fx.user :as fx.user]
     [skylobby.util :as u]
+    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -143,7 +144,11 @@
         mod-name (:battle-modname selected-battle-details)
         minimap-size (fx/sub-val context :minimap-size)
         minimap-size (or (u/to-number minimap-size)
-                         fx.minimap/default-minimap-size)]
+                         fx.minimap/default-minimap-size)
+        {:keys [mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-root)
+        indexed-mod (get mods-by-name mod-name)
+        mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        sides (spring/mod-sides mod-details)]
     {:fx/type :h-box
      :children
      [
@@ -154,10 +159,12 @@
          :style {:-fx-font-size 20}
          :text (str (:battle-title selected-battle-details))}
         {:fx/type players-table
-         :server-key server-key
          :players (fx.battle/battle-players-and-bots
                     {:battle selected-battle-details
-                     :users users})}]}
+                     :users users})
+         :read-only true
+         :server-key server-key
+         :sides sides}]}
       {:fx/type :flow-pane
        :vgap 5
        :hgap 5

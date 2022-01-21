@@ -378,11 +378,10 @@
              :key (str (not= selected-replay selected-replay-details))
              :desc
              {:fx/type fx.players-table/players-table
-              :am-host false
               :mod-name mod-name
               :players players-and-bots
-              :sides sides
-              :singleplayer true}}
+              :read-only true
+              :sides sides}}
             {:fx/type :h-box
              :alignment :center-left
              :children
