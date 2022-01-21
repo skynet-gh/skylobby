@@ -362,18 +362,17 @@
              battle-channel? (u/battle-channel-name? channel-name)
              main-tab (if battle-channel? "battle" "chat")
              channel-tab (if battle-channel? :battle channel-name)
-             now (u/curr-millis)]
+             now (u/curr-millis)
+             capture (<= now (or (get-in state [:by-server server-key :channels channel-name :capture-until]) 0))]
          (cond-> (update-in state [:by-server server-key]
                    (fn [state]
-                     (let [capture (<= now (or (get-in state [:channels channel-name :capture-until]) 0))]
-                       (cond-> state
-                               (not capture)
-                               (assoc-in [:my-channels channel-name] {})
-                               (not capture)
-                               (update-in [:channels channel-name :messages] update-messages-fn)
-                               capture
-                               (update-in [:channels channel-name :capture] #(str % "\n" message))))))
+                     (cond-> (update-in state [:channels channel-name :messages] update-messages-fn)
+                             (not capture)
+                             (assoc-in [:my-channels channel-name] {})
+                             capture
+                             (update-in [:channels channel-name :capture] #(str % "\n" message)))))
                  (and (not focus-chat)
+                      (not capture)
                       (not (and (= server-key (:selected-server-tab state))
                                 (= main-tab (get-in state [:selected-tab-main server-key]))
                                 (if-not battle-channel?
