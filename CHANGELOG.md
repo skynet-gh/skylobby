@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.64](https://github.com/skynet-gh/skylobby/releases/tag/0.7.64) - 2022-01-21
+
+- Fix players table sending updates when it should be read-only
+- Fix chat highlighting messages from automated chat commands
+- Align skill and status in players by team view
+
 ## [0.7.63](https://github.com/skynet-gh/skylobby/releases/tag/0.7.63) - 2022-01-20
 
 - Fix team balance buttons in singleplayer

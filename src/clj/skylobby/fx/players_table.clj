@@ -206,7 +206,7 @@
 
 (defn player-context-menu
   [{:fx/keys [context]
-    :keys [battle-id host-is-bot host-ingame player server-key]}]
+    :keys [battle-id host-is-bot host-ingame player read-only server-key]}]
   (let [{:keys [owner team-color username user]} player
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
@@ -224,12 +224,13 @@
            :on-action {:event/type :spring-lobby/join-direct-message
                        :server-key server-key
                        :username username}}])
-       [{:fx/type :menu-item
-         :text "Ring"
-         :on-action {:event/type :spring-lobby/ring
-                     :client-data client-data
-                     :channel-name channel-name
-                     :username username}}]
+       (when-not read-only
+         [{:fx/type :menu-item
+           :text "Ring"
+           :on-action {:event/type :spring-lobby/ring
+                       :client-data client-data
+                       :channel-name channel-name
+                       :username username}}])
        (when (and host-username
                   (= host-username username)
                   (-> user :client-status :bot))
@@ -301,6 +302,8 @@
                        :server-key server-key
                        :username username}}]))}))
 
+(def player-status-width 72)
+
 (defn player-status
   [{:fx/keys [context]
     :keys [player server-key]}]
@@ -311,6 +314,9 @@
         now (or (fx/sub-val context :now) (u/curr-millis))
         singleplayer (or (not server-key) (= :local server-key))]
     {:fx/type :label
+     :style {:-fx-min-width player-status-width
+             :-fx-pref-width player-status-width
+             :-fx-max-width player-status-width}
      :text ""
      :tooltip
      {:fx/type tooltip-nofocus/lifecycle
@@ -382,28 +388,36 @@
    :graphic
    {:fx/type :v-box
     :children
-    [
-     {:fx/type :label
-      :style {:-fx-font-size 18}
-      :text (str (u/nickname player))}
-     {:fx/type :label
-      :text
-      (str "Skill: "
-           (str (:skill player)
-                " "
-                (let [uncertainty (:skilluncertainty player)]
-                  (when (number? uncertainty)
-                    (apply str (repeat uncertainty "?"))))))}
-     {:fx/type :h-box
-      :children
-      [{:fx/type :label
-        :text "Country: "}
-       {:fx/type flag-icon/flag-icon
-        :country-code (-> player :user :country)}]}]}})
+    (concat
+      [
+       {:fx/type :label
+        :style {:-fx-font-size 18}
+        :text (str (u/nickname player))}
+       {:fx/type :label
+        :text ""}]
+      (when-let [bonus (-> player :battle-status :handicap u/to-number)]
+        (when (not= 0 bonus)
+          [{:fx/type :label
+            :text (str "Bonus: +" bonus "%")}]))
+      (when-not (-> player :user :client-status :bot)
+        [{:fx/type :label
+          :text
+          (str "Skill: "
+               (str (:skill player)
+                    " "
+                    (let [uncertainty (:skilluncertainty player)]
+                      (when (number? uncertainty)
+                        (apply str (repeat uncertainty "?"))))))}])
+      [{:fx/type :h-box
+        :children
+        [{:fx/type :label
+          :text "Country: "}
+         {:fx/type flag-icon/flag-icon
+          :country-code (-> player :user :country)}]}])}})
 
 (defn players-table-impl
   [{:fx/keys [context]
-    :keys [mod-name players server-key]}]
+    :keys [mod-name players read-only server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
@@ -433,7 +447,6 @@
                                (when-let [n (u/to-number id)]
                                  (str (inc n)))
                                (str id))})
-        now (or (fx/sub-val context :now) (u/curr-millis))
         css-class-suffix (cond
                            (not server-key) "replay"
                            singleplayer "singleplayer"
@@ -470,6 +483,7 @@
                 :battle-id battle-id
                 :host-is-bot host-is-bot
                 :host-ingame host-ingame
+                :read-only read-only
                 :server-key server-key}})))}
        :columns
        (concat
@@ -509,7 +523,8 @@
                       :alignment :center
                       :children
                       (concat
-                        (when (and username
+                        (when (and (not read-only)
+                                   username
                                    (not= username (:username id))
                                    (or am-host
                                        (= owner username)))
@@ -580,73 +595,15 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ _ _ {:keys [battle-status user username]}]]
+              (fn [[_ _ _ player]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :status
-                    (let [client-status (:client-status user)
-                          am-host (= username host-username)]
-                      {:text ""
-                       :tooltip
-                       {:fx/type tooltip-nofocus/lifecycle
-                        :show-delay skylobby.fx/tooltip-show-delay
-                        :style {:-fx-font-size 16}
-                        :text
-                        (str
-                          (case (int (or (:sync battle-status) 0))
-                            1 "Synced"
-                            2 "Unsynced"
-                            "Unknown sync")
-                          "\n"
-                          (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
-                          (when (u/to-bool (:mode battle-status))
-                            (str "\n" (if (:ready battle-status) "Ready" "Unready")))
-                          (when (:ingame client-status)
-                            "\nIn game")
-                          (when-let [away-start-time (:away-start-time user)]
-                            (when (and (:away client-status) away-start-time)
-                              (str "\nAway: "
-                                   (let [diff (- now away-start-time)]
-                                     (if (< diff 30000)
-                                       " just now"
-                                       (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
-                       :graphic
-                       {:fx/type :h-box
-                        :alignment :center-left
-                        :children
-                        (concat
-                          (when-not singleplayer
-                            [
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal
-                              (let [sync-status (int (or (:sync battle-status) 0))]
-                                (case sync-status
-                                  1 "mdi-sync:16:green"
-                                  2 "mdi-sync-off:16:red"
-                                  ; else
-                                  "mdi-sync-alert:16:yellow"))}])
-                          [(cond
-                             (:bot client-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-robot:16:grey"}
-                             (not (u/to-bool (:mode battle-status)))
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-magnify:16:white"}
-                             (:ready battle-status)
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-check:16:green"}
-                             am-host
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account-key:16:orange"}
-                             :else
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-account:16:white"})]
-                          (when (:ingame client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sword:16:red"}])
-                          (when (:away client-status)
-                            [{:fx/type font-icon/lifecycle
-                              :icon-literal "mdi-sleep:16:grey"}]))}}))))}}])
+                    {:text ""
+                     :graphic
+                     {:fx/type player-status
+                      :player player
+                      :server-key server-key}})))}}])
          (when (:ally players-table-columns)
            [{:fx/type :table-column
              :text "Ally"
@@ -669,7 +626,7 @@
                     {:text ""
                      :graphic
                      {:fx/type ext-recreate-on-key-changed
-                      :key [(u/nickname i) increment-ids]
+                      :key [battle-id (u/nickname i) increment-ids]
                       :desc
                       {:fx/type :combo-box
                        :value (-> i :battle-status :ally str)
@@ -682,7 +639,8 @@
                        :button-cell incrementing-cell
                        :cell-factory {:fx/cell-type :list-cell
                                       :describe incrementing-cell}
-                       :disable (or (not username)
+                       :disable (or read-only
+                                    (not username)
                                     (not (or am-host
                                              (= (:username i) username)
                                              (= (:owner i) username))))}}})))}}])
@@ -709,7 +667,7 @@
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
-                        :key [(u/nickname i) increment-ids]
+                        :key [battle-id (u/nickname i) increment-ids]
                         :desc
                         {:fx/type :combo-box
                          :value value
@@ -722,7 +680,8 @@
                          :button-cell incrementing-cell
                          :cell-factory {:fx/cell-type :list-cell
                                         :describe incrementing-cell}
-                         :disable (or (not username)
+                         :disable (or read-only
+                                      (not username)
                                       (not (or am-host
                                                (= (:username i) username)
                                                (= (:owner i) username))))}}}))))}}])
@@ -742,7 +701,7 @@
                     {:text ""
                      :graphic
                      {:fx/type ext-recreate-on-key-changed
-                      :key nickname
+                      :key [battle-id nickname]
                       :desc
                       {:fx/type :color-picker
                        :value (fx.color/spring-color-to-javafx team-color)
@@ -751,7 +710,8 @@
                                    :is-me (= (:username i) username)
                                    :is-bot (-> i :user :client-status :bot)
                                    :id i}
-                       :disable (or (not username)
+                       :disable (or read-only
+                                    (not username)
                                     (not (or am-host
                                              (= (:username i) username)
                                              (= (:owner i) username))))}}})))}}])
@@ -777,7 +737,7 @@
                        :alignment :center
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
-                        :key (u/nickname i)
+                        :key [battle-id (u/nickname i)]
                         :desc
                         {:fx/type :check-box
                          :selected (boolean is-spec)
@@ -787,7 +747,8 @@
                                                :is-bot (-> i :user :client-status :bot)
                                                :id i
                                                :ready-on-unspec ready-on-unspec}
-                         :disable (or (not username)
+                         :disable (or read-only
+                                      (not username)
                                       (not (or (and am-host (not is-spec))
                                                (= (:username i) username)
                                                (= (:owner i) username))))}}}))))}}])
@@ -814,7 +775,7 @@
                      (cond
                        (seq side-items)
                        {:fx/type ext-recreate-on-key-changed
-                        :key (u/nickname i)
+                        :key [battle-id (u/nickname i)]
                         :desc
                         {:fx/type :combo-box
                          :value (->> i :battle-status :side (get sides) str)
@@ -826,7 +787,8 @@
                                             :indexed-mod indexed-mod
                                             :sides sides}
                          :items side-items
-                         :disable (or (not username)
+                         :disable (or read-only
+                                      (not username)
                                       (not (or am-host
                                                (= (:username i) username)
                                                (= (:owner i) username))))}}
@@ -890,10 +852,11 @@
                     {:text ""
                      :graphic
                      {:fx/type ext-recreate-on-key-changed
-                      :key (u/nickname i)
+                      :key [battle-id (u/nickname i)]
                       :desc
                       {:fx/type :text-field
-                       :disable (boolean am-spec)
+                       :disable (boolean (or read-only
+                                             am-spec))
                        :text-formatter
                        {:fx/type :text-formatter
                         :value-converter :integer
@@ -907,7 +870,7 @@
 
 (defn players-not-a-table
   [{:fx/keys [context]
-    :keys [players server-key]}]
+    :keys [players read-only server-key]}]
   (let [
         singleplayer (or (not server-key) (= :local server-key))
         css-class-suffix (cond
@@ -975,9 +938,11 @@
                                  :battle-id battle-id
                                  :host-is-bot host-is-bot
                                  :host-ingame host-ingame
+                                 :read-only read-only
                                  :server-key server-key}}
                         :desc
                         {:fx/type :h-box
+                         :alignment :center-left
                          :children
                          [
                           {:fx/type fx.ext.node/with-tooltip-props
@@ -998,9 +963,18 @@
                                               "black")
                                      :radius 2
                                      :spread 1}}}
+                          (let [bonus (-> player :battle-status :handicap u/to-number)]
+                            {:fx/type :label
+                             :text (str
+                                     (when (and bonus (not= 0 bonus))
+                                       (str "+" (int bonus) "%")))})
                           {:fx/type :pane
                            :h-box/hgrow :always}
                           {:fx/type :label
+                           :alignment :center-left
+                           :style {:-fx-min-width 64
+                                   :-fx-pref-width 64
+                                   :-fx-max-width 64}
                            :text
                            (str (:skill player)
                                 " "
@@ -1030,6 +1004,7 @@
                           :battle-id battle-id
                           :host-is-bot host-is-bot
                           :host-ingame host-ingame
+                          :read-only read-only
                           :server-key server-key}}
                  :desc
                  {:fx/type fx.ext.node/with-tooltip-props
