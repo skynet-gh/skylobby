@@ -72,7 +72,7 @@
        (into {})))
 
 (defn minimap-starting-points
-  [teams map-details scripttags scale minimap-width minimap-height]
+  [{:keys [teams map-details scripttags minimap-scale minimap-width minimap-height start-positions]}]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         team-by-key (->> teams
                          (map second)
@@ -87,9 +87,10 @@
         midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
         choose-before-game (= "3" (str (get-in scripttags ["game" "startpostype"])))
-        all-teams (if choose-before-game
-                    (concat map-teams (map (fn [team] [team {}]) missing-teams))
-                    map-teams)]
+        all-teams (or start-positions
+                      (if choose-before-game
+                        (concat map-teams (map (fn [team] [team {}]) missing-teams))
+                        map-teams))]
     (when (and (number? map-width)
                (number? map-height)
                (number? minimap-width)
@@ -111,11 +112,11 @@
                      z (or scriptz scripty z midz)]
                  (when (and (number? x) (number? z))
                    {:x (int
-                         (* scale
+                         (* minimap-scale
                            (- (* (/ x (* spring/map-multiplier map-width)) minimap-width)
                              (/ u/start-pos-r 2))))
                     :y (int
-                         (* scale
+                         (* minimap-scale
                            (- (* (/ z (* spring/map-multiplier map-height)) minimap-height)
                               (/ u/start-pos-r 2))))
                     :team team
@@ -126,7 +127,7 @@
 
 (defn minimap-pane-impl
   [{:fx/keys [context]
-    :keys [players map-name minimap-type-key scripttags server-key]
+    :keys [is-replay map-name minimap-type-key players scripttags server-key start-positions]
     :or {minimap-type-key :minimap-type}}]
   (let [
         am-host (fx/sub-ctx context sub/am-host server-key)
@@ -160,7 +161,14 @@
                 (when server-key
                   (spring/teams
                     (spring/battle-details {:battle (fx/sub-val context get-in [:by-server server-key :battle])}))))
-        starting-points (minimap-starting-points teams map-details scripttags minimap-scale minimap-width minimap-height)
+        starting-points (minimap-starting-points
+                          {:teams teams
+                           :map-details map-details
+                           :scripttags scripttags
+                           :minimap-scale minimap-scale
+                           :minimap-width minimap-width
+                           :minimap-height minimap-height
+                           :start-positions start-positions})
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         startpostype (spring/startpostype-name (get-in scripttags ["game" "startpostype"]))
         singleplayer (= server-key :local)
@@ -230,7 +238,8 @@
              (.clearRect gc 0 0 minimap-width minimap-height)
              (.setFill gc Color/RED)
              (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
-             (if (#{"Fixed" "Random" "Choose before game"} startpostype)
+             (when (or (#{"Fixed" "Random" "Choose before game"} startpostype)
+                       is-replay)
                (doseq [{:keys [x y team color]} starting-points]
                  (let [drag (when (and drag-team
                                        (= team (:team drag-team)))
@@ -261,7 +270,9 @@
                    (.setLineWidth gc 3.0)
                    (.strokeText gc (str text) xc yc)
                    (.setFill gc Color/WHITE)
-                   (.fillText gc (str text) xc yc)))
+                   (.fillText gc (str text) xc yc))))
+             (when (or (#{"Choose in game"} startpostype)
+                       is-replay)
                (doseq [{:keys [allyteam x y width height]} start-boxes]
                  (when (and x y width height (not= 0 width) (not= 0 height))
                    (let [color (Color/color 0.5 0.5 0.5 0.5)

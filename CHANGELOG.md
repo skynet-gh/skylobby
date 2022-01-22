@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.65](https://github.com/skynet-gh/skylobby/releases/tag/0.7.65) - 2022-01-22
+
+- Add minimap start points for replays with box starts
+
 ## [0.7.64](https://github.com/skynet-gh/skylobby/releases/tag/0.7.64) - 2022-01-21
 
 - Fix players table sending updates when it should be read-only

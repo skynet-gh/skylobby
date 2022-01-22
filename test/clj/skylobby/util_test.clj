@@ -88,7 +88,7 @@
   (is (= "skynet"
          (u/nickname
            {:username "skynet"})))
-  (is (= "bot1 (BARb, skynet)"
+  (is (= "bot1"
          (u/nickname
            {:bot-name "bot1"
             :ai-name "BARb"

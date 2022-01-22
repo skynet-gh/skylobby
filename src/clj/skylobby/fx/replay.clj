@@ -456,12 +456,20 @@
        :children
        (concat
          [
-          {:fx/type fx.minimap/minimap-pane
-           :map-name map-name
-           :server-key nil
-           :minimap-type-key :replay-minimap-type
-           :players players-and-bots
-           :scripttags script-data}
+          (let [{:keys [start-positions]} (-> full-replay-details :body :demo-stream)
+                start-positions (reduce
+                                  (fn [m {:keys [my-team x z]}]
+                                    (assoc m (str "team" my-team) {"startpos" {"x" x "z" z}}))
+                                  {}
+                                  (map :body start-positions))]
+            {:fx/type fx.minimap/minimap-pane
+             :is-replay true
+             :map-name map-name
+             :minimap-type-key :replay-minimap-type
+             :players players-and-bots
+             :scripttags script-data
+             :server-key nil
+             :start-positions start-positions})
           {:fx/type :h-box
            :alignment :center-left
            :children

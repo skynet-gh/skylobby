@@ -238,6 +238,7 @@
                                                        (map (juxt :player-num (comp u/remove-nonprintable :player-name)))
                                                        (into {}))
                                start-positions (->> parsed
+                                                    (map (comp :demo-stream-chunk :body))
                                                     (filter (comp #{36} :command :header)))
                                chat-log (->> parsed
                                              (map (fn [{:keys [header body]}]

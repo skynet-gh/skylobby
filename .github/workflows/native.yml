@@ -16,6 +16,11 @@ jobs:
         with:
           vs-version: '16.11.8'
           msbuild-architecture: x64
+      # https://github.com/clojure-lsp/clojure-lsp/blob/419f58c/.github/workflows/release.yml#L300-L304
+      - uses: al-cheb/configure-pagefile-action@v1.2
+        with:
+          minimum-size: 8GB
+          maximum-size: 16GB
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
