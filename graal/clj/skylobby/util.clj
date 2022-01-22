@@ -283,9 +283,9 @@
   (string/replace color #"0x" "#"))
 
 
-(defn nickname [{:keys [ai-name bot-name owner username]}]
+(defn nickname [{:keys [bot-name username]}]
   (if bot-name
-    (str bot-name " (" ai-name ", " owner ")")
+    (str bot-name)
     (str username)))
 
 (defn spring-script-color-to-int [rgbcolor]

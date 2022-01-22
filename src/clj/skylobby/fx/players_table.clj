@@ -395,6 +395,12 @@
         :text (str (u/nickname player))}
        {:fx/type :label
         :text ""}]
+      (when-let [ai-name (:ai-name player)]
+        [{:fx/type :label
+          :text (str "AI Type: " ai-name)}])
+      (when-let [owner (:owner player)]
+        [{:fx/type :label
+          :text (str "Owner: " owner)}])
       (when-let [bonus (-> player :battle-status :handicap u/to-number)]
         (when (not= 0 bonus)
           [{:fx/type :label
@@ -408,12 +414,13 @@
                     (let [uncertainty (:skilluncertainty player)]
                       (when (number? uncertainty)
                         (apply str (repeat uncertainty "?"))))))}])
-      [{:fx/type :h-box
-        :children
-        [{:fx/type :label
-          :text "Country: "}
-         {:fx/type flag-icon/flag-icon
-          :country-code (-> player :user :country)}]}])}})
+      (when-let [country (-> player :user :country)]
+        [{:fx/type :h-box
+          :children
+          [{:fx/type :label
+            :text "Country: "}
+           {:fx/type flag-icon/flag-icon
+            :country-code country}]}]))}})
 
 (defn players-table-impl
   [{:fx/keys [context]
@@ -990,7 +997,7 @@
           :flow-pane/margin {:left 16}
           :children
           [{:fx/type :label
-            :text "Spectators"
+            :text (str "Spectators (" (count spectators) ")")
             :style {:-fx-font-size 24}}
            {:fx/type :flow-pane
             :hgap 16
