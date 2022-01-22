@@ -148,57 +148,68 @@
         {:keys [mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-root)
         indexed-mod (get mods-by-name mod-name)
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
-        sides (spring/mod-sides mod-details)]
-    {:fx/type :h-box
-     :children
-     [
-      {:fx/type :v-box
-       :h-box/hgrow :always
-       :children
-       [{:fx/type :label
-         :style {:-fx-font-size 20}
-         :text (str (:battle-title selected-battle-details))}
-        {:fx/type players-table
-         :players (fx.battle/battle-players-and-bots
-                    {:battle selected-battle-details
-                     :users users})
-         :read-only true
-         :server-key server-key
-         :sides sides}]}
-      {:fx/type :flow-pane
-       :vgap 5
-       :hgap 5
-       :padding 5
-       :children
-       [
-        {:fx/type engine-sync-pane
-         :engine-version engine-version
-         :spring-isolation-dir spring-root}
-        {:fx/type mod-sync-pane
-         :engine-version engine-version
-         :index-only true
-         :mod-name mod-name
-         :spring-isolation-dir spring-root}
-        {:fx/type map-sync-pane
-         :index-only true
-         :map-name map-name
-         :spring-isolation-dir spring-root}]}
-      {:fx/type :v-box
-       :children
-       [
-        {:fx/type fx.minimap/minimap-pane
-         :map-name map-name
-         :server-key server-key}
-        {:fx/type :h-box
-         :children
-         [
-          {:fx/type :label
-           :text (str " Display (px): ")}
-          {:fx/type :combo-box
-           :value minimap-size
-           :items fx.minimap/minimap-sizes
-           :on-value-changed {:event/type :spring-lobby/assoc
-                              :key :minimap-size}}]}]}]}))
+        sides (spring/mod-sides mod-details)
+        minimap-type (fx/sub-val context :minimap-type)]
+    {:fx/type ext-recreate-on-key-changed
+     :key (str minimap-size)
+     :desc
+     {:fx/type :h-box
+      :children
+      [
+       {:fx/type :v-box
+        :h-box/hgrow :always
+        :children
+        [{:fx/type :label
+          :style {:-fx-font-size 20}
+          :text (str (:battle-title selected-battle-details))}
+         {:fx/type players-table
+          :players (fx.battle/battle-players-and-bots
+                     {:battle selected-battle-details
+                      :users users})
+          :read-only true
+          :server-key server-key
+          :sides sides}]}
+       {:fx/type :flow-pane
+        :vgap 5
+        :hgap 5
+        :padding 5
+        :children
+        [
+         {:fx/type engine-sync-pane
+          :engine-version engine-version
+          :spring-isolation-dir spring-root}
+         {:fx/type mod-sync-pane
+          :engine-version engine-version
+          :index-only true
+          :mod-name mod-name
+          :spring-isolation-dir spring-root}
+         {:fx/type map-sync-pane
+          :index-only true
+          :map-name map-name
+          :spring-isolation-dir spring-root}]}
+       {:fx/type :v-box
+        :children
+        [
+         {:fx/type fx.minimap/minimap-pane
+          :map-name map-name
+          :server-key server-key}
+         {:fx/type :label
+          :text (str "Map: " map-name)}
+         {:fx/type :flow-pane
+          :children
+          [
+           {:fx/type :label
+            :text (str " Display (px): ")}
+           {:fx/type :combo-box
+            :value minimap-size
+            :items fx.minimap/minimap-sizes
+            :on-value-changed {:event/type :spring-lobby/assoc
+                               :key :minimap-size}}
+           {:fx/type :combo-box
+            :value minimap-type
+            :items fx.battle/minimap-types
+            :on-value-changed {:event/type :spring-lobby/assoc
+                               :key :minimap-type}}]}]}]}}))
 
 (defn- main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]

@@ -470,23 +470,34 @@
              :scripttags script-data
              :server-key nil
              :start-positions start-positions})
-          {:fx/type :h-box
-           :alignment :center-left
+          {:fx/type :label
+           :text (str "Map: " map-name)}
+          {:fx/type :flow-pane
            :children
-           [{:fx/type :label
-             :text (str " Size: "
-                        (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
-                          (str
-                            (when map-width (quot map-width 64))
-                            " x "
-                            (when map-height (quot map-height 64)))))}
-            {:fx/type :pane
-             :h-box/hgrow :always}
+           [
+            {:fx/type :label
+             :text (str " Display (px): ")}
+            (let [
+                  minimap-size (fx/sub-val context :minimap-size)
+                  minimap-size (or (u/to-number minimap-size)
+                                   fx.minimap/default-minimap-size)]
+              {:fx/type :combo-box
+               :value minimap-size
+               :items fx.minimap/minimap-sizes
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :minimap-size}})
             {:fx/type :combo-box
              :value replay-minimap-type
              :items minimap-types
              :on-value-changed {:event/type :spring-lobby/assoc
-                                :key :replay-minimap-type}}]}]
+                                :key :replay-minimap-type}}]}
+          {:fx/type :label
+           :text (str " Map size: "
+                      (when-let [{:keys [map-width map-height]} (-> replay-map-details :smf :header)]
+                        (str
+                          (when map-width (quot map-width 64))
+                          " x "
+                          (when map-height (quot map-height 64)))))}]
          (when show-sync
            [sync-pane]))}]}))
 
@@ -1367,12 +1378,20 @@
            :style {:-fx-font-size 24}
            :text " Loading replays..."})]
        (when selected-replay
-         [{:fx/type ext-recreate-on-key-changed
-           :key (str (or (fs/canonical-path selected-replay-file)
-                         selected-replay-id))
-           :desc
-           {:fx/type replay-view
-            :show-sync-left true}}]))}))
+         (let [minimap-size (fx/sub-val context :minimap-size)]
+           [{:fx/type :v-box
+             :style {:-fx-max-height (+ 100 minimap-size)}
+             :children
+             [
+              {:fx/type ext-recreate-on-key-changed
+               :key (str
+                      [(or (fs/canonical-path selected-replay-file)
+                           selected-replay-id)
+                       minimap-size])
+               :desc
+               {:fx/type replay-view
+                :v-box/vgrow :always
+                :show-sync-left true}}]}])))}))
 
 
 (defn replays-window-impl
