@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.66](https://github.com/skynet-gh/skylobby/releases/tag/0.7.66) - 2022-01-22
+
+- Prevent bot name from containing whitespace
+- Fix modoption issue when changing servers
+
 ## [0.7.65](https://github.com/skynet-gh/skylobby/releases/tag/0.7.65) - 2022-01-22
 
 - Add minimap start points for replays with box starts
