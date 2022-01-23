@@ -2681,34 +2681,35 @@
         (event-handler (merge e {:event/type ::join-direct-message}))))))
 
 
-(defmethod event-handler ::join-channel [{:keys [channel-name client-data]}]
-  (future
-    (try
-      (let [server-key (u/server-key client-data)]
-        (swap! *state
-          (fn [state]
-            (-> state
-                (assoc-in [:by-server server-key :join-channel-name] "")
-                (assoc-in [:my-channels server-key channel-name] {}))))
-        (message/send-message *state client-data (str "JOIN " channel-name)))
-      (catch Exception e
-        (log/error e "Error joining channel" channel-name)))))
+(defmethod event-handler ::join-channel
+  [{:keys [channel-name server-key]}]
+  (let [{:keys [by-server]} (swap! *state
+                              (fn [state]
+                                (-> state
+                                    (assoc-in [:by-server server-key :join-channel-name] "")
+                                    (assoc-in [:my-channels server-key channel-name] {}))))
+        client-data (get-in by-server [server-key :client-data])]
+    (future
+      (try
+        (message/send-message *state client-data (str "JOIN " channel-name))
+        (catch Exception e
+          (log/error e "Error joining channel" channel-name))))))
 
 (defmethod event-handler ::leave-channel
-  [{:keys [channel-name client-data] :fx/keys [^Event event]}]
+  [{:keys [channel-name server-key] :fx/keys [^Event event]}]
   (.consume event)
-  (future
-    (try
-      (let [server-key (u/server-key client-data)]
-        (swap! *state
-          (fn [state]
-            (-> state
-                (update-in [:by-server server-key :my-channels] dissoc channel-name)
-                (update-in [:my-channels server-key] dissoc channel-name)))))
-      (when-not (string/starts-with? channel-name "@")
-        (message/send-message *state client-data (str "LEAVE " channel-name)))
-      (catch Exception e
-        (log/error e "Error leaving channel" channel-name)))))
+  (let [{:keys [by-server]} (swap! *state
+                              (fn [state]
+                                (-> state
+                                    (update-in [:by-server server-key :my-channels] dissoc channel-name)
+                                    (update-in [:my-channels server-key] dissoc channel-name))))
+        client-data (get-in by-server [server-key :client-data])]
+    (future
+      (try
+        (when-not (string/starts-with? channel-name "@")
+          (message/send-message *state client-data (str "LEAVE " channel-name)))
+        (catch Exception e
+          (log/error e "Error leaving channel" channel-name))))))
 
 
 (defmethod event-handler ::friend-request [{:keys [client-data username]}]
