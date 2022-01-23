@@ -14,7 +14,6 @@
     :keys [server-key]}]
   (let [
         channels (fx/sub-val context get-in [:by-server server-key :channels])
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         items (->> (vals channels)
                    u/non-battle-channels
@@ -57,11 +56,11 @@
                {:text "Leave"
                 :on-action {:event/type :spring-lobby/leave-channel
                             :channel-name channel-name
-                            :client-data client-data}}
+                            :server-key server-key}}
                {:text "Join"
                 :on-action {:event/type :spring-lobby/join-channel
                             :channel-name channel-name
-                            :client-data client-data}}))})}}]}))
+                            :server-key server-key}}))})}}]}))
 
 (defn channels-table [state]
   (tufte/profile {:dynamic? true

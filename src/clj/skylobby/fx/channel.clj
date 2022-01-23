@@ -128,6 +128,7 @@
         chat-color-username (fx/sub-val context :chat-color-username)
         chat-highlight-username (fx/sub-val context :chat-highlight-username)
         chat-highlight-words (fx/sub-val context :chat-highlight-words)
+        hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
         hide-spads-messages (fx/sub-val context :hide-spads-messages)
         hide-vote-messages (fx/sub-val context :hide-vote-messages)
@@ -166,9 +167,11 @@
               (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
               (remove
                 (fn [{:keys [message-type text]}]
-                  (and (= :ex message-type)
-                       text
-                       (string/starts-with? text "* BarManager|"))))
+                  (if hide-barmanager-messages
+                    (and (= :ex message-type)
+                         text
+                         (string/starts-with? text "* BarManager|"))
+                    false)))
               reverse)
          (fn [lines]
            (channel-document

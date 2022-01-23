@@ -84,6 +84,7 @@
         extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
         extra-replay-sources (fx/sub-val context :extra-replay-sources)
         focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
+        hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
         hide-spads-messages (fx/sub-val context :hide-spads-messages)
         hide-vote-messages (fx/sub-val context :hide-vote-messages)
@@ -982,6 +983,15 @@
                                     :key :hide-joinas-spec}}
              {:fx/type :label
               :text " Hide \"!joinas spec\" messages"}]}
+           {:fx/type :h-box
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean hide-barmanager-messages)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :hide-barmaager-messages}}
+             {:fx/type :label
+              :text " Hide \"BarManager\" messages"}]}
            {:fx/type :label
             :text "Hide message types:"
             :style {:-fx-font-size 20}}
@@ -1005,7 +1015,7 @@
           :children
           [
            {:fx/type :button
-            :on-action 
+            :on-action
             {:event/type :spring-lobby/add-task
              :task {:spring-lobby/task-type :spring-lobby/check-app-update}}
             :disable (boolean (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/check-app-update)))

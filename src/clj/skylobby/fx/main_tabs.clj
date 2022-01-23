@@ -46,7 +46,6 @@
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
@@ -90,7 +89,7 @@
              :closable (not (u/battle-channel-name? channel-name))
              :on-close-request {:event/type :spring-lobby/leave-channel
                                 :channel-name channel-name
-                                :client-data client-data}
+                                :server-key server-key}
              :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
              :content
              {:fx/type ext-recreate-on-key-changed
@@ -414,7 +413,7 @@
                    :text ""
                    :on-action {:event/type :spring-lobby/join-channel
                                :channel-name join-channel-name
-                               :client-data client-data}
+                               :server-key server-key}
                    :graphic
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-plus:20:white"}}
@@ -425,7 +424,7 @@
                                      :path [:by-server server-key :join-channel-name]}
                    :on-action {:event/type :spring-lobby/join-channel
                                :channel-name join-channel-name
-                               :client-data client-data}}]}]}]}]}}
+                               :server-key server-key}}]}]}]}]}}
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text "Console"}
