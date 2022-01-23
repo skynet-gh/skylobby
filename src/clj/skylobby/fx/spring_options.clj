@@ -221,20 +221,23 @@
   [{:keys [current-options event-data modoptions option-key server-key singleplayer]}]
   (let [sorted (sort-by (comp u/to-number first) modoptions)
         by-section (split-by (comp #{"section"} :type second) sorted)]
-    {:fx/type :scroll-pane
-     :fit-to-width true
-     :hbar-policy :never
-     :content
-     {:fx/type :v-box
-      :alignment :top-left
-      :children
-      (mapv
-        (fn [section]
-          {:fx/type modoptions-table
-           :current-options current-options
-           :event-data event-data
-           :modoptions section
-           :option-key option-key
-           :server-key server-key
-           :singleplayer singleplayer})
-        by-section)}}))
+    {:fx/type ext-recreate-on-key-changed
+     :key (str server-key)
+     :desc
+     {:fx/type :scroll-pane
+      :fit-to-width true
+      :hbar-policy :never
+      :content
+      {:fx/type :v-box
+       :alignment :top-left
+       :children
+       (mapv
+         (fn [section]
+           {:fx/type modoptions-table
+            :current-options current-options
+            :event-data event-data
+            :modoptions section
+            :option-key option-key
+            :server-key server-key
+            :singleplayer singleplayer})
+         by-section)}}}))

@@ -873,7 +873,8 @@
                                            :is-bot (-> i :user :client-status :bot)
                                            :id i}}}}})))}}]))}}}))
 
-(def player-width 320)
+(def player-width 340)
+(def player-skill-width 72)
 
 (defn players-not-a-table
   [{:fx/keys [context]
@@ -979,9 +980,9 @@
                            :h-box/hgrow :always}
                           {:fx/type :label
                            :alignment :center-left
-                           :style {:-fx-min-width 64
-                                   :-fx-pref-width 64
-                                   :-fx-max-width 64}
+                           :style {:-fx-min-width player-skill-width
+                                   :-fx-pref-width player-skill-width
+                                   :-fx-max-width player-skill-width}
                            :text
                            (str (:skill player)
                                 " "
