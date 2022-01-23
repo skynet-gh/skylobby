@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.67](https://github.com/skynet-gh/skylobby/releases/tag/0.7.67) - 2022-01-23
+
+- Add bot kick and options buttons in by team view
+- Add bot owner and type to tooltip in table view
+- Fix potential timing issue with joining and leaving chat channels
+
 ## [0.7.66](https://github.com/skynet-gh/skylobby/releases/tag/0.7.66) - 2022-01-22
 
 - Prevent bot name from containing whitespace
