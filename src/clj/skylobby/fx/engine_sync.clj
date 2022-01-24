@@ -1,7 +1,6 @@
 (ns skylobby.fx.engine-sync
   (:require
     [cljfx.api :as fx]
-    [clojure.java.io :as io]
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
@@ -34,7 +33,6 @@
         engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
                            (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version))
         engine-file (:file engine-details)
-        extracting (fx/sub-val context :extracting)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :file-cache)
         importables-by-path (fx/sub-val context :importables-by-path)
@@ -44,7 +42,8 @@
                             (map (comp :download-url :downloadable))
                             set)
         extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
-                           (map (comp fs/canonical-path :file))
+                           (mapcat (juxt :file :dest))
+                           (map fs/canonical-path)
                            set)
         download-source-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
                                           (map :download-source-name)
@@ -92,7 +91,7 @@
                             (if dest-exists -1 2))
                  resource-filename (:resource-filename downloadable)
                  extract-target (when (and spring-isolation-dir resource-filename)
-                                  (io/file spring-isolation-dir "engine" resource-filename))
+                                  (fs/file spring-isolation-dir "engine" resource-filename))
                  extract-exists (fs/file-exists? file-cache extract-target)]
              (concat
                (when (or (not engine-details)
@@ -138,13 +137,11 @@
                                   (get download-sources-by-name download-source-name))}
                                :else nil))}])
                (when dest-exists
-                 (let [extracting (or (get extracting dest-path)
-                                      (contains? extract-tasks dest-path)
+                 (let [extracting (or (contains? extract-tasks dest-path)
+                                      (contains? extract-tasks (fs/canonical-path extract-target))
                                       (contains? download-tasks url))]
                    (when (or extracting
-                             (and
-                               (fs/file-status file-cache extract-target)
-                               (not extract-exists)))
+                             (not extract-exists))
                      [{:severity (if engine-details
                                    0
                                    (if extract-exists -1 2))
@@ -157,9 +154,12 @@
                                   (str "Extracting " dest " to " extract-target)
                                   (str "Click to extract to " extract-target))
                        :force-action true
-                       :action {:event/type :spring-lobby/extract-7z
-                                :file dest
-                                :dest extract-target}}]))))))
+                       :action
+                       {:event/type :spring-lobby/add-task
+                        :task
+                        {:spring-lobby/task-type :spring-lobby/extract-7z
+                         :file dest
+                         :dest extract-target}}}]))))))
          (or
            (->> downloadables-by-url
              vals
