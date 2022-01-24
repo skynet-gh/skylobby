@@ -4929,12 +4929,12 @@
 
 (defmethod event-handler ::select-replay
   [{:fx/keys [event]}]
-  (future
+  (let [{:keys [replay-id file]} event]
     (swap! *state
       (fn [state]
-        (cond-> state
-          true (assoc :selected-replay-file (:file event))
-          (:id event) (assoc :selected-replay-id (:id event)))))))
+        (cond-> (assoc state :selected-replay-file file)
+                replay-id
+                (assoc :selected-replay-id replay-id))))))
 
 
 (defn process-bar-replay [replay]
