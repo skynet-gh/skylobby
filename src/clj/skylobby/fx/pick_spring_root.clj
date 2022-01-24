@@ -129,7 +129,8 @@
               :text "Or set a custom directory:"}
              {:fx/type :button
               :style-class ["button" "skylobby-normal"]
-              :on-action {:event/type :spring-lobby/file-chooser-spring-root}
+              :on-action {:event/type :spring-lobby/file-chooser-spring-root
+                          :spring-isolation-dir spring-isolation-dir}
               :style {:-fx-font-size 18}
               :text "Pick custom Spring directory"
               :graphic

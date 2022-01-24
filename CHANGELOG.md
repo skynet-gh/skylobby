@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.68](https://github.com/skynet-gh/skylobby/releases/tag/0.7.68) - 2022-01-24
+
+- Fix issues with auto get resources
+- Fix select replay id key
+- Auto extract engine if it is downloaded
+- Fix rapid packages update cooldown when no engine
+- Fix engine sync pane extract button
+
 ## [0.7.67](https://github.com/skynet-gh/skylobby/releases/tag/0.7.67) - 2022-01-23
 
 - Add bot kick and options buttons in by team view

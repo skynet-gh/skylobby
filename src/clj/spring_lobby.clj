@@ -644,10 +644,16 @@
                                        (filter (comp #{::engine} :resource-type))
                                        (filter (partial resource/could-be-this-engine? battle-version))
                                        first)
+              engine-download-dest (resource/resource-dest spring-root engine-downloadable)
+              engine-extract-dest (fs/file spring-root "engine" (fs/filename engine-download-dest))
               engine-download-task (->> all-tasks
                                         (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
                                         (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
                                         first)
+              engine-extract-task (->> all-tasks
+                                       (filter (comp #{::extract-7z} ::task-type))
+                                       (filter (comp (partial resource/same-resource-filename? engine-downloadable) fs/filename :file))
+                                       first)
               mod-downloadable (->> downloadables
                                     (filter (comp #{::mod} :resource-type))
                                     (filter (partial resource/could-be-this-mod? battle-modname))
@@ -660,6 +666,10 @@
                                      (filter (comp #{::refresh-mods} ::task-type))
                                      (map (comp fs/canonical-path :spring-root))
                                      set)
+              engine-refresh-tasks (->> all-tasks
+                                        (filter (comp #{::refresh-engines} ::task-type))
+                                        (map (comp fs/canonical-path :spring-root))
+                                        set)
               no-mod (->> mods
                           (filter (comp #{battle-modname} :mod-name))
                           first
@@ -686,17 +696,35 @@
                          (and (not engine-importable)
                               engine-downloadable
                               (not engine-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-downloadable))))
+                              (not (fs/file-exists? file-cache engine-download-dest)))
                          (do
                            (log/info "Adding task to auto download engine" engine-downloadable)
                            {::task-type ::download-and-extract
                             :downloadable engine-downloadable
                             :spring-isolation-dir spring-root})
                          (and (not engine-importable)
+                              engine-downloadable
+                              (not engine-download-task)
+                              (fs/file-exists? file-cache engine-download-dest)
+                              (not engine-extract-task)
+                              (not (fs/file-exists? file-cache engine-extract-dest)))
+                         (do
+                           (log/info "Adding task to extract engine archive" engine-download-dest)
+                           {::task-type ::extract-7z
+                            :file engine-download-dest
+                            :dest engine-extract-dest})
+                         (and (not engine-importable)
                               (not engine-downloadable)
                               engine-download-source-name
                               (check-cooldown cooldowns [:download-source engine-download-source-name])
                               (not (contains? download-source-tasks engine-download-source-name)))
+                         (and (not (contains? engine-refresh-tasks spring-root-path))
+                              (fs/file-exists? file-cache engine-extract-dest))
+                         (do
+                           (log/info "Refreshing engines to pick up" engine-extract-dest)
+                           {::task-type ::refresh-engines
+                            :priorites [engine-extract-dest]
+                            :spring-root spring-root})
                          (do
                            (log/info "Adding task to update download source" engine-download-source-name "looking for" battle-version)
                            (merge
@@ -783,7 +811,7 @@
                               (not update-rapid-task)
                               engine-file
                               (not sdp-file-exists)
-                              (check-cooldown cooldowns [:rapid rapid-id]))
+                              (check-cooldown cooldowns [:rapid spring-root-path rapid-id]))
                          (do
                            (log/info "Adding task to auto download rapid" rapid-id)
                            {::task-type ::rapid-download
@@ -801,6 +829,7 @@
                             :spring-isolation-dir spring-root})
                          (and (not rapid-id)
                               (not rapid-task)
+                              engine-file
                               (not update-rapid-task)
                               (check-cooldown cooldowns [:update-rapid spring-root-path]))
                          (do
@@ -1123,7 +1152,7 @@
 
 (defn auto-get-resources-watcher [_k state-atom old-state new-state]
   (when (and (:auto-get-resources new-state)
-             (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
+             (some (comp server-needs-battle-status-sync-check second) (:by-server new-state)))
     (try
       (when-let [tasks (->> new-state
                             :by-server
@@ -4619,11 +4648,11 @@
 
 (defmethod event-handler ::extract-7z
   [{:keys [file dest]}]
-  (future
+  (let [path (fs/canonical-path file)]
+    (swap! *state assoc-in [:extracting path] true)
     (fs/update-file-cache! *state file dest)
-    (let [path (fs/canonical-path file)]
+    (future
       (try
-        (swap! *state assoc-in [:extracting path] true)
         (if dest
           (fs/extract-7z-fast file dest)
           (fs/extract-7z-fast file))
@@ -4929,12 +4958,12 @@
 
 (defmethod event-handler ::select-replay
   [{:fx/keys [event]}]
-  (future
+  (let [{:keys [replay-id file]} event]
     (swap! *state
       (fn [state]
-        (cond-> state
-          true (assoc :selected-replay-file (:file event))
-          (:id event) (assoc :selected-replay-id (:id event)))))))
+        (cond-> (assoc state :selected-replay-file file)
+                replay-id
+                (assoc :selected-replay-id replay-id))))))
 
 
 (defn process-bar-replay [replay]
