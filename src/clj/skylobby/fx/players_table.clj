@@ -477,7 +477,7 @@
                            singleplayer "singleplayer"
                            :else "multiplayer")]
     {:fx/type ext-recreate-on-key-changed
-     :key players-table-columns
+     :key (str players-table-columns)
      :desc
      {:fx/type ext-table-column-auto-size
       :items
@@ -943,7 +943,7 @@
       :vgap 16
       :children
       (concat
-        (map
+        (mapv
           (fn [[ally players]]
             (let [ally-n (u/to-number ally)
                   players (->> players (sort-by (comp u/to-number :id :battle-status)))]
