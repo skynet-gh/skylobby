@@ -2646,7 +2646,7 @@
                         :skilluncertainty 0))))))))
 
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
-  (let [battle-id event
+  (let [battle-id (:battle-id event)
         wait-time 1000
         state (swap! *state update-in [:by-server server-key]
                 (fn [{:keys [users] :as server-data}]

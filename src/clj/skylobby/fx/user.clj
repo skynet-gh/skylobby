@@ -31,6 +31,8 @@
                                       [username battle])
                                     (:users battle))))
                               (into {}))
+        battle-password (fx/sub-val context :battle-password)
+        battles (fx/sub-val context get-in [:by-server server-key :battles])
         now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type ext-table-column-auto-size
      :items (->> users
@@ -66,8 +68,10 @@
                                :text "Join Battle"
                                :on-action {:event/type :spring-lobby/join-battle
                                            :battle battle
+                                           :battle-password battle-password
                                            :client-data client-data
-                                           :selected-battle battle-id}}])
+                                           :selected-battle battle-id
+                                           :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}])
                            (if (contains? friends username)
                              [{:fx/type :menu-item
                                :text "Unfriend"
