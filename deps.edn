@@ -5,10 +5,10 @@
  :deps
  {
   aleph/aleph {:mvn/version "0.4.7-alpha10"}
-  cheshire/cheshire {:mvn/version  "5.10.1"}
+  cheshire/cheshire {:mvn/version  "5.10.2"}
   clj-jgit/clj-jgit {:mvn/version "0.8.10"}
   clj-http/clj-http {:mvn/version "3.12.3"}
-  cljfx/cljfx {:mvn/version "1.7.18"
+  cljfx/cljfx {:mvn/version "1.7.19"
                :exclusions [org.openjfx/javafx-web]}
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
@@ -64,9 +64,9 @@
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.0"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
-  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.33"}
-  org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
-  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
+  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.35"}
+  org.slf4j/jul-to-slf4j {:mvn/version "1.7.35"}
+  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.35"}
   ring/ring-anti-forgery {:mvn/version "1.3.0"}
   ring/ring-core {:mvn/version "1.9.5"}
   shams/priority-queue {:mvn/version "0.1.2"}
@@ -132,7 +132,7 @@
    :replace-deps
    {
     clj-jgit/clj-jgit {:mvn/version "0.8.10"}
-    cljfx/cljfx {:mvn/version "1.7.18"
+    cljfx/cljfx {:mvn/version "1.7.19"
                  :exclusions [org.openjfx/javafx-web]}
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
@@ -209,9 +209,9 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     org.clojure/tools.reader {:mvn/version "1.3.6"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
-    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.33"}
-    org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
-    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.35"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.35"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.35"}
     ring/ring-anti-forgery {:mvn/version "1.3.0"}
     ring/ring-core {:mvn/version "1.9.5"}
     smee/binary {:mvn/version "0.5.5"}}}
@@ -296,9 +296,9 @@
     org.clojure/core.async {:mvn/version "1.5.648"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
-    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.33"}
-    org.slf4j/jul-to-slf4j {:mvn/version "1.7.33"}
-    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.33"}
+    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.35"}
+    org.slf4j/jul-to-slf4j {:mvn/version "1.7.35"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.35"}
     ring/ring-anti-forgery {:mvn/version "1.3.0"}
     ring/ring-core {:mvn/version "1.9.5"}
     smee/binary {:mvn/version "0.5.5"}}}
@@ -312,6 +312,7 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:-BuildOutputUseNewStyle" "--enable-http" "--enable-https"
                "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-cli-native-windows
@@ -321,6 +322,7 @@
                "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-H:-BuildOutputUseNewStyle" "--enable-http" "--enable-https"
                "-H:Name=skylobby-cli"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :reveal
@@ -329,7 +331,7 @@
    {cider/cider-nrepl {:mvn/version "0.28.1"}
     cider/orchard {:mvn/version "0.9.1"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
-    cljfx/cljfx {:mvn/version "1.7.18"}
+    cljfx/cljfx {:mvn/version "1.7.19"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
@@ -337,7 +339,7 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
-    vlaaad/reveal {:mvn/version "1.3.263"}}
+    vlaaad/reveal {:mvn/version "1.3.264"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts ["--main" "vlaaad.reveal" "repl"]}
   :test-once
