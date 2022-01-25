@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.70](https://github.com/skynet-gh/skylobby/releases/tag/0.7.70) - 2022-01-25
+
+- Fix auto rejoin battle
+
 ## [0.7.69](https://github.com/skynet-gh/skylobby/releases/tag/0.7.69) - 2022-01-24
 
 - Fix some issues with battles table and joining battles
