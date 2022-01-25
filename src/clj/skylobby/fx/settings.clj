@@ -69,13 +69,200 @@
          children)}
       {:fx/type :pane})))
 
+(defn battle-settings
+  [{:fx/keys [context]
+    :keys [settings-search]}]
+  (let [
+        debug-spring (fx/sub-val context :debug-spring)
+        increment-ids (fx/sub-val context :increment-ids)
+        join-battle-as-player (fx/sub-val context :join-battle-as-player)
+        leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
+        ready-on-unspec (fx/sub-val context :ready-on-unspec)
+        ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
+        ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
+        show-closed-battles (fx/sub-val context :show-closed-battles)
+        show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
+        show-team-skills (fx/sub-val context :show-team-skills)
+        unready-after-game (fx/sub-val context :unready-after-game)]
+    {:fx/type filterable-section
+     :search settings-search
+     :title " Battle"
+     :children
+     [
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean join-battle-as-player)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :join-battle-as-player}}
+        {:fx/type :label
+         :text " Join battles as a player (not spec)"}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean (fx/sub-val context :battle-as-tab))
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :battle-as-tab}}
+        {:fx/type :label
+         :text " Show battle view as a tab"}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean unready-after-game)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :unready-after-game}}
+        {:fx/type :label
+         :text " Unready after game"}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean ready-on-unspec)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :ready-on-unspec}}
+        {:fx/type :label
+         :text " Ready on unspec"}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean (fx/sub-val context :auto-rejoin-battle))
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :auto-rejoin-battle}}
+        {:fx/type :label
+         :text " Rejoin battle on rehost or reconnect"}]}
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :children
+       [
+        {:fx/type :check-box
+         :selected (boolean leave-battle-on-close-window)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :leave-battle-on-close-window}}
+        {:fx/type :label
+         :text " Leave battle on close window"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [
+        {:fx/type :label
+         :text " Players display type: "}
+        {:fx/type :combo-box
+         :value (or (fx/sub-val context :battle-players-display-type)
+                    "group")
+         :items ["group" "table"]
+         :on-value-changed {:event/type :spring-lobby/assoc
+                            :key :battle-players-display-type}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [
+        {:fx/type :label
+         :text " Color player name: "}
+        {:fx/type :combo-box
+         :value (or (fx/sub-val context :battle-players-color-type)
+                    (first u/player-name-color-types))
+         :items u/player-name-color-types
+         :on-value-changed {:event/type :spring-lobby/assoc
+                            :key :battle-players-color-type}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [
+        {:fx/type :label
+         :text " Layout: "}
+        {:fx/type :combo-box
+         :value (fx/sub-val context :battle-layout)
+         :items battle-layouts
+         :on-value-changed {:event/type :spring-lobby/assoc
+                            :key :battle-layout}}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean (fx/sub-val context :auto-get-resources))
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :auto-get-resources}}
+        {:fx/type :label
+         :text " Auto import or download resources"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean show-team-skills)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :show-team-skills}}
+        {:fx/type :label
+         :text " Show team skills"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean increment-ids)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :increment-ids}}
+        {:fx/type :label
+         :text " Number team and player ids starting at one"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean show-closed-battles)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :show-closed-battles}}
+        {:fx/type :label
+         :text " Show closed battles as tabs"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean ring-when-game-ends)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :ring-when-game-ends}}
+        {:fx/type :label
+         :text " Ring when game ends"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean ring-on-auto-unspec)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :ring-on-auto-unspec}}
+        {:fx/type :label
+         :text " Ring on auto unspec"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean show-hidden-modoptions)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :show-hidden-modoptions}}
+        {:fx/type :label
+         :text " Show hidden modoptions"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean debug-spring)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :debug-spring}}
+        {:fx/type :label
+         :text " Debug spring mode (write script and show command)"}]}]}))
+
 (defn settings-root
   [{:fx/keys [context]}]
   (let [
         battles-table-images (fx/sub-val context :battles-table-images)
         chat-auto-complete (fx/sub-val context :chat-auto-complete)
         chat-font-size (fx/sub-val context :chat-font-size)
-        debug-spring (fx/sub-val context :debug-spring)
         extra-import-name (fx/sub-val context :extra-import-name)
         extra-import-path (fx/sub-val context :extra-import-path)
         extra-import-sources (fx/sub-val context :extra-import-sources)
@@ -90,26 +277,16 @@
         hide-vote-messages (fx/sub-val context :hide-vote-messages)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-battle-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
-        increment-ids (fx/sub-val context :increment-ids)
-        join-battle-as-player (fx/sub-val context :join-battle-as-player)
-        leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
         media-player (fx/sub-val context :media-player)
         music-dir (fx/sub-val context :music-dir)
         music-volume (fx/sub-val context :music-volume)
         players-table-columns (fx/sub-val context :players-table-columns)
         prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
-        ready-on-unspec (fx/sub-val context :ready-on-unspec)
-        ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
         ring-sound-file (fx/sub-val context :ring-sound-file)
         ring-volume (fx/sub-val context :ring-volume)
-        ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
         settings-search (fx/sub-val context :settings-search)
-        show-closed-battles (fx/sub-val context :show-closed-battles)
-        show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
-        show-team-skills (fx/sub-val context :show-team-skills)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
-        unready-after-game (fx/sub-val context :unready-after-game)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -310,178 +487,8 @@
                       :-fx-max-width 480}
               :on-text-changed {:event/type :spring-lobby/assoc
                                 :key :chat-highlight-words}}]}
-         {:fx/type filterable-section
-          :search settings-search
-          :title " Battle"
-          :children
-          [
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean join-battle-as-player)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :join-battle-as-player}}
-             {:fx/type :label
-              :text " Join battles as a player (not spec)"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean (fx/sub-val context :battle-as-tab))
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :battle-as-tab}}
-             {:fx/type :label
-              :text " Show battle view as a tab"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean unready-after-game)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :unready-after-game}}
-             {:fx/type :label
-              :text " Unready after game"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean ready-on-unspec)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :ready-on-unspec}}
-             {:fx/type :label
-              :text " Ready on unspec"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean (fx/sub-val context :auto-rejoin-battle))
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :auto-rejoin-battle}}
-             {:fx/type :label
-              :text " Rejoin battle on rehost or reconnect"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean leave-battle-on-close-window)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :leave-battle-on-close-window}}
-             {:fx/type :label
-              :text " Leave battle on close window"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [
-             {:fx/type :label
-              :text " Players display type: "}
-             {:fx/type :combo-box
-              :value (or (fx/sub-val context :battle-players-display-type)
-                         "group")
-              :items ["group" "table"]
-              :on-value-changed {:event/type :spring-lobby/assoc
-                                 :key :battle-players-display-type}}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [
-             {:fx/type :label
-              :text " Color player name: "}
-             {:fx/type :combo-box
-              :value (or (fx/sub-val context :battle-players-color-type)
-                         (first u/player-name-color-types))
-              :items u/player-name-color-types
-              :on-value-changed {:event/type :spring-lobby/assoc
-                                 :key :battle-players-color-type}}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [
-             {:fx/type :label
-              :text " Layout: "}
-             {:fx/type :combo-box
-              :value (fx/sub-val context :battle-layout)
-              :items battle-layouts
-              :on-value-changed {:event/type :spring-lobby/assoc
-                                 :key :battle-layout}}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean (fx/sub-val context :auto-get-resources))
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :auto-get-resources}}
-             {:fx/type :label
-              :text " Auto import or download resources"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean show-team-skills)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :show-team-skills}}
-             {:fx/type :label
-              :text " Show team skills"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean increment-ids)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :increment-ids}}
-             {:fx/type :label
-              :text " Number team and player ids starting at one"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean show-closed-battles)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :show-closed-battles}}
-             {:fx/type :label
-              :text " Show closed battles as tabs"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean ring-when-game-ends)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :ring-when-game-ends}}
-             {:fx/type :label
-              :text " Ring when game ends"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean ring-on-auto-unspec)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :ring-on-auto-unspec}}
-             {:fx/type :label
-              :text " Ring on auto unspec"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean show-hidden-modoptions)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :show-hidden-modoptions}}
-             {:fx/type :label
-              :text " Show hidden modoptions"}]}
-           {:fx/type :h-box
-            :alignment :center-left
-            :children
-            [{:fx/type :check-box
-              :selected (boolean debug-spring)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :debug-spring}}
-             {:fx/type :label
-              :text " Debug spring mode (write script and show command)"}]}]}
+         {:fx/type battle-settings
+          :settings-search settings-search}
          {:fx/type filterable-section
           :search settings-search
           :title " Performance"
