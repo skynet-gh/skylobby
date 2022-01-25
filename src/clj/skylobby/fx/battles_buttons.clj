@@ -25,7 +25,8 @@
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle])
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])]
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        battle (fx/sub-val context get-in [:by-server server-key :battle])]
     {:fx/type :v-box
      :alignment :top-left
      :children
@@ -42,6 +43,7 @@
                  :text "Join Battle"
                  :disable (boolean (and needs-password (string/blank? battle-password)))
                  :on-action {:event/type :spring-lobby/join-battle
+                             :battle battle
                              :battle-password battle-password
                              :client-data client-data
                              :selected-battle selected-battle
@@ -55,6 +57,11 @@
                    :on-action {:event/type :spring-lobby/host-battle}
                    :on-text-changed {:event/type :spring-lobby/assoc
                                      :key :battle-password}}]))))
+         (when battle
+           [{:fx/type :button
+             :text "Leave Battle"
+             :on-action {:event/type :spring-lobby/leave-battle
+                         :client-data client-data}}])
          [
           {:fx/type :button
            :text "Host Battle"

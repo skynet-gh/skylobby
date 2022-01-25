@@ -120,19 +120,19 @@
        :props {:selection-mode :single
                :on-selected-item-changed {:event/type :spring-lobby/select-battle
                                           :server-key server-key}
-               :selected-item selected-battle}
+               :selected-item (get battles-by-id selected-battle)}
        :desc
        {:fx/type ext-table-column-auto-size
-        :items (mapv :battle-id filtered-battles)
+        :items filtered-battles
         :desc
         {:fx/type :table-view
          :style {:-fx-font-size 15}
          :column-resize-policy :constrained
          :row-factory
          {:fx/cell-type :table-row
-          :describe (fn [battle-id]
+          :describe (fn [battle-data]
                       (let [
-                            {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data} (get battles-by-id battle-id)
+                            {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username]} battle-data
                             battle-users (:users battle-data)]
                         {:on-mouse-clicked
                          {:event/type :spring-lobby/on-mouse-clicked-battles-row
@@ -197,8 +197,10 @@
                               :text "Join Battle"
                               :on-action {:event/type :spring-lobby/join-battle
                                           :battle battle
+                                          :battle-password battle-password
                                           :client-data client-data
-                                          :selected-battle battle-id}}]
+                                          :selected-battle battle-id
+                                          :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}]
                             (when (-> users (get host-username) :client-status :bot)
                               (concat
                                 [{:fx/type :menu-item
@@ -221,7 +223,7 @@
           {:fx/type :table-column
            :text "Game"
            :pref-width 240
-           :cell-value-factory (comp :battle-modname battles-by-id)
+           :cell-value-factory :battle-modname
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -236,7 +238,7 @@
            :text "Status"
            :resizable false
            :pref-width 112
-           :cell-value-factory battles-by-id
+           :cell-value-factory identity
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -273,24 +275,27 @@
           {:fx/type :table-column
            :text "Map"
            :pref-width 200
-           :cell-value-factory (comp :battle-map battles-by-id)
+           :cell-value-factory :battle-map
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
             (fn [battle-map]
-              {:text (str battle-map)
+              {:text ""
                :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal (if (contains? maps-by-name battle-map)
-                                "mdi-check:16:green"
-                                "mdi-close:16:red")}})}}
+               {:fx/type :label
+                :text (str battle-map)
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal (if (contains? maps-by-name battle-map)
+                                 "mdi-check:16:green"
+                                 "mdi-close:16:red")}}})}}
           {:fx/type :table-column
            :text "Play (Spec)"
            :resizable false
            :pref-width 100
            :cell-value-factory (juxt
-                                 (comp count :users battles-by-id)
-                                 #(or (u/to-number (:battle-spectators (get battles-by-id %))) 0))
+                                 (comp count :users)
+                                 #(or (u/to-number (:battle-spectators %)) 0))
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -302,7 +307,7 @@
           {:fx/type :table-column
            :text "Battle Name"
            :pref-width 200
-           :cell-value-factory (comp :battle-title battles-by-id)
+           :cell-value-factory :battle-title
            :cell-factory
            {:fx/cell-type :table-cell
             :describe (fn [battle-title] {:text (str battle-title)})}}
@@ -310,7 +315,7 @@
            :text "Country"
            :resizable false
            :pref-width 64
-           :cell-value-factory #(:country (get users (:host-username (get battles-by-id %))))
+           :cell-value-factory #(:country (get users (:host-username %)))
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
@@ -322,7 +327,7 @@
           {:fx/type :table-column
            :text "Host"
            :pref-width 100
-           :cell-value-factory (comp :host-username battles-by-id)
+           :cell-value-factory :host-username
            :cell-factory
            {:fx/cell-type :table-cell
             :describe (fn [host-username] {:text (str host-username)})}}]}}}]}))
@@ -426,105 +431,109 @@
        :props {:selection-mode :single
                :on-selected-item-changed {:event/type :spring-lobby/select-battle
                                           :server-key server-key}
-               :selected-item selected-battle}
+               :selected-item (get battles-by-id selected-battle)}
        :desc
        {:fx/type :table-view
         :style {:-fx-font-size 15}
-        :items (mapv :battle-id filtered-battles)
+        :items filtered-battles
         :row-factory
         {:fx/cell-type :table-row
-         :describe (fn [battle-id]
-                     (let [
-                           {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username] :as battle-data} (get battles-by-id battle-id)
-                           battle-users (:users battle-data)]
-                       {:on-mouse-clicked
-                        {:event/type :spring-lobby/on-mouse-clicked-battles-row
-                         :battle battle
-                         :battle-password battle-password
-                         :client-data client-data
-                         :selected-battle selected-battle
-                         :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
-                        :tooltip
-                        {:fx/type tooltip-nofocus/lifecycle
-                         :style {:-fx-font-size 16}
-                         :show-delay skylobby.fx/tooltip-show-delay
-                         :text ""
-                         :graphic
-                         {:fx/type :v-box
-                          :children
-                          (concat
-                            [
+         :editable false
+         :describe
+         (fn [battle-data]
+           (let [
+                 {:keys [battle-engine battle-id battle-map battle-modname battle-title battle-version host-username]} battle-data
+                 battle-users (:users battle-data)]
+             {:on-mouse-clicked
+              {:event/type :spring-lobby/on-mouse-clicked-battles-row
+               :battle battle
+               :battle-password battle-password
+               :client-data client-data
+               :selected-battle selected-battle
+               :battle-passworded (= "1" (-> battles (get selected-battle) :battle-passworded))}
+              :tooltip
+              {:fx/type tooltip-nofocus/lifecycle
+               :style {:-fx-font-size 16}
+               :show-delay skylobby.fx/tooltip-show-delay
+               :text ""
+               :graphic
+               {:fx/type :v-box
+                :children
+                (concat
+                  [
+                   {:fx/type :label
+                    :text (str battle-title "\n")}
+                   {:fx/type :label
+                    :text (str "Map: " battle-map)
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (if (contains? maps-by-name battle-map)
+                                     "mdi-check:16:green"
+                                     "mdi-close:16:red")}}
+                   {:fx/type :label
+                    :text (str "Game: " battle-modname)
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (if (contains? mods-by-name battle-modname)
+                                     "mdi-check:16:green"
+                                     "mdi-close:16:red")}}
+                   {:fx/type :label
+                    :text (str "Engine: " battle-engine " " battle-version "\n")
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal (if (contains? engines-by-version battle-version)
+                                     "mdi-check:16:green"
+                                     "mdi-close:16:red")}}
+                   {:fx/type :label
+                    :text (str "Players:\n\n")}]
+                  (->> battle-users
+                       keys
+                       (sort String/CASE_INSENSITIVE_ORDER)
+                       (map
+                         (fn [player]
+                           (let [country (:country (get users player))]
                              {:fx/type :label
-                              :text (str battle-title "\n")}
-                             {:fx/type :label
-                              :text (str "Map: " battle-map)
+                              :text player
                               :graphic
-                              {:fx/type font-icon/lifecycle
-                               :icon-literal (if (contains? maps-by-name battle-map)
-                                               "mdi-check:16:green"
-                                               "mdi-close:16:red")}}
-                             {:fx/type :label
-                              :text (str "Game: " battle-modname)
-                              :graphic
-                              {:fx/type font-icon/lifecycle
-                               :icon-literal (if (contains? mods-by-name battle-modname)
-                                               "mdi-check:16:green"
-                                               "mdi-close:16:red")}}
-                             {:fx/type :label
-                              :text (str "Engine: " battle-engine " " battle-version "\n")
-                              :graphic
-                              {:fx/type font-icon/lifecycle
-                               :icon-literal (if (contains? engines-by-version battle-version)
-                                               "mdi-check:16:green"
-                                               "mdi-close:16:red")}}
-                             {:fx/type :label
-                              :text (str "Players:\n\n")}]
-                            (->> battle-users
-                                 keys
-                                 (sort String/CASE_INSENSITIVE_ORDER)
-                                 (map
-                                   (fn [player]
-                                     (let [country (:country (get users player))]
-                                       {:fx/type :label
-                                        :text player
-                                        :graphic
-                                        {:fx/type flag-icon/flag-icon
-                                         :no-text true
-                                         :country-code country}})))))}}
-                        :context-menu
-                        {:fx/type :context-menu
-                         :items
-                         (concat
-                           [{:fx/type :menu-item
-                             :text "Join Battle"
-                             :on-action {:event/type :spring-lobby/join-battle
-                                         :battle battle
-                                         :client-data client-data
-                                         :selected-battle battle-id}}]
-                           (when (-> users (get host-username) :client-status :bot)
-                             (concat
-                               [{:fx/type :menu-item
-                                 :text "!status battle"
-                                 :on-action {:event/type :spring-lobby/send-message
-                                             :client-data client-data
-                                             :channel-name (u/user-channel-name host-username)
-                                             :message "!status battle"
-                                             :server-key server-key}}]
-                               (when (-> users (get host-username) :client-status :ingame)
-                                 [{:fx/type :menu-item
-                                   :text "!status game"
-                                   :on-action {:event/type :spring-lobby/send-message
-                                               :client-data client-data
-                                               :channel-name (u/user-channel-name host-username)
-                                               :message "!status game"
-                                               :server-key server-key}}]))))}}))}
+                              {:fx/type flag-icon/flag-icon
+                               :no-text true
+                               :country-code country}})))))}}
+              :context-menu
+              {:fx/type :context-menu
+               :items
+               (concat
+                 [{:fx/type :menu-item
+                   :text "Join Battle"
+                   :on-action {:event/type :spring-lobby/join-battle
+                               :battle battle
+                               :battle-password battle-password
+                               :client-data client-data
+                               :selected-battle battle-id
+                               :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}]
+                 (when (-> users (get host-username) :client-status :bot)
+                   (concat
+                     [{:fx/type :menu-item
+                       :text "!status battle"
+                       :on-action {:event/type :spring-lobby/send-message
+                                   :client-data client-data
+                                   :channel-name (u/user-channel-name host-username)
+                                   :message "!status battle"
+                                   :server-key server-key}}]
+                     (when (-> users (get host-username) :client-status :ingame)
+                       [{:fx/type :menu-item
+                         :text "!status game"
+                         :on-action {:event/type :spring-lobby/send-message
+                                     :client-data client-data
+                                     :channel-name (u/user-channel-name host-username)
+                                     :message "!status game"
+                                     :server-key server-key}}]))))}}))}
         :columns
         [{:fx/type :table-column
           :text "Minimap"
           :pref-width (+ 8 battles-map-size)
           :resizable false
           :sortable false
-          :cell-value-factory (comp :battle-map battles-by-id)
+          :cell-value-factory :battle-map
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -558,7 +567,7 @@
           :text "Details"
           :sortable false
           :pref-width 480
-          :cell-value-factory battles-by-id
+          :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -593,7 +602,7 @@
           :text "Resources"
           :sortable false
           :pref-width 480
-          :cell-value-factory battles-by-id
+          :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
@@ -628,7 +637,7 @@
           :text "Status"
           :resizable false
           :pref-width 112
-          :cell-value-factory battles-by-id
+          :cell-value-factory identity
           :cell-factory
           {:fx/cell-type :table-cell
            :describe

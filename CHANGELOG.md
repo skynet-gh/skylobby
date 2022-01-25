@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.69](https://github.com/skynet-gh/skylobby/releases/tag/0.7.69) - 2022-01-24
+
+- Fix some issues with battles table and joining battles
+- Add Leave Battle button to battles buttons
+- Add sync status to players tooltip
+
 ## [0.7.68](https://github.com/skynet-gh/skylobby/releases/tag/0.7.68) - 2022-01-24
 
 - Fix issues with auto get resources

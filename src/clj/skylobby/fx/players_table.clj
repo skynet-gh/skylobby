@@ -304,6 +304,32 @@
 
 (def player-status-width 72)
 
+(defn player-status-tooltip-label
+  [{:fx/keys [context]
+    :keys [battle-status client-status user]}]
+  (let [
+        now (or (fx/sub-val context :now) (u/curr-millis))]
+    {:fx/type :label
+     :text
+     (str
+       (case (int (or (:sync battle-status) 0))
+         1 "Synced"
+         2 "Unsynced"
+         "Unknown sync")
+       "\n"
+       (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
+       (when (u/to-bool (:mode battle-status))
+         (str "\n" (if (:ready battle-status) "Ready" "Unready")))
+       (when (:ingame client-status)
+         "\nIn game")
+       (when-let [away-start-time (:away-start-time user)]
+         (when (and (:away client-status) away-start-time)
+           (str "\nAway: "
+                (let [diff (- now away-start-time)]
+                  (if (< diff 30000)
+                    " just now"
+                    (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}))
+
 (defn player-status
   [{:fx/keys [context]
     :keys [player server-key]}]
@@ -311,7 +337,6 @@
         client-status (:client-status user)
         host-username (fx/sub-ctx context sub/host-username server-key)
         am-host (= username host-username)
-        now (or (fx/sub-val context :now) (u/curr-millis))
         singleplayer (or (not server-key) (= :local server-key))]
     {:fx/type :label
      :style {:-fx-min-width player-status-width
@@ -322,25 +347,12 @@
      {:fx/type tooltip-nofocus/lifecycle
       :show-delay skylobby.fx/tooltip-show-delay
       :style {:-fx-font-size 16}
-      :text
-      (str
-        (case (int (or (:sync battle-status) 0))
-          1 "Synced"
-          2 "Unsynced"
-          "Unknown sync")
-        "\n"
-        (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
-        (when (u/to-bool (:mode battle-status))
-          (str "\n" (if (:ready battle-status) "Ready" "Unready")))
-        (when (:ingame client-status)
-          "\nIn game")
-        (when-let [away-start-time (:away-start-time user)]
-          (when (and (:away client-status) away-start-time)
-            (str "\nAway: "
-                 (let [diff (- now away-start-time)]
-                   (if (< diff 30000)
-                     " just now"
-                     (str " " (u/format-duration (java-time/duration (- now away-start-time) :millis)))))))))}
+      :text ""
+      :graphic
+      {:fx/type player-status-tooltip-label
+       :battle-status battle-status
+       :client-status client-status
+       :user user}}
      :graphic
      {:fx/type :h-box
       :alignment :center-left
@@ -420,7 +432,13 @@
           [{:fx/type :label
             :text "Country: "}
            {:fx/type flag-icon/flag-icon
-            :country-code country}]}]))}})
+            :country-code country}]}])
+      (let [{:keys [battle-status client-status user]} player]
+        [
+         {:fx/type player-status-tooltip-label
+          :battle-status battle-status
+          :client-status client-status
+          :user user}]))}})
 
 (defn players-table-impl
   [{:fx/keys [context]
