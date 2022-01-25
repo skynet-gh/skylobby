@@ -60,7 +60,7 @@
              (let [downloadables (vals downloadables-by-url)]
                [{:fx/type :flow-pane
                  :children
-                 (map
+                 (mapv
                    (fn [map-name]
                      (let [downloadable (->> downloadables
                                              (filter (partial resource/could-be-this-map? map-name))
@@ -254,7 +254,7 @@
               :hgap 5
               :padding 5
               :children
-              (map
+              (mapv
                 (fn [{:keys [map-name]}]
                   {:fx/type :button
                    :style

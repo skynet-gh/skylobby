@@ -34,7 +34,7 @@
   [{:keys [in-progress issues resource]}]
   (let [worst-severity (reduce
                          (fn [worst {:keys [severity]}]
-                           (max worst severity))
+                           ((fnil max -1 -1) worst severity))
                          -1
                          issues)
         overall-in-progress (or in-progress
@@ -58,7 +58,7 @@
                     (if (zero? worst-severity) " synced"
                       " status:"))
          :style {:-fx-font-size 16}}]
-       (map
+       (mapv
          (fn [{:keys [action choice choices force-action human-text in-progress on-choice-changed severity text tooltip] :or {severity 2}}]
            (let [font-style {:-fx-font-size 12}
                  display-text (or human-text

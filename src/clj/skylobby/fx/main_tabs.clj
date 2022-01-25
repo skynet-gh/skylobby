@@ -42,7 +42,7 @@
            (.requestFocus text-field)))))))
 
 
-(defn- my-channels-view-impl
+(defn my-channels-view-impl
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [
@@ -210,7 +210,7 @@
             :on-value-changed {:event/type :spring-lobby/assoc
                                :key :minimap-type}}]}]}]}}))
 
-(defn- main-tab-view-impl
+(defn main-tab-view-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-as-tab (fx/sub-val context :battle-as-tab)
         join-channel-name (fx/sub-val context get-in [:by-server server-key :join-channel-name])

@@ -8,6 +8,12 @@
 (set! *warn-on-reflection* true)
 
 
+(deftest importer-root
+  (is (map?
+        (fx.import/importer-root
+          {:fx/context (fx/create-context nil)}))))
+
+
 (deftest import-window
   (is (map?
         (fx.import/import-window

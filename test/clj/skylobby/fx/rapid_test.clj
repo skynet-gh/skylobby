@@ -8,6 +8,12 @@
 (set! *warn-on-reflection* true)
 
 
+(deftest rapid-download-root
+  (is (map?
+        (fx.rapid/rapid-download-root
+          {:fx/context (fx/create-context nil)}))))
+
+
 (deftest rapid-download-window
   (is (map?
         (fx.rapid/rapid-download-window

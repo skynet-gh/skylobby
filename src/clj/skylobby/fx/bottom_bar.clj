@@ -88,7 +88,7 @@
       {:fx/type :pane})))
 
 
-(defn- bottom-bar-impl
+(defn bottom-bar-impl
   [{:fx/keys [context]}]
   (let [media-player (fx/sub-val context :media-player)
         music-now-playing (fx/sub-val context :music-now-playing)

@@ -1,21 +1,20 @@
-(ns skylobby.fx.user-test
+(ns skylobby.fx.matchmaking-test
   (:require
     [cljfx.api :as fx]
     [clojure.test :refer [deftest is]]
-    [skylobby.fx.user :as fx.user]))
+    [skylobby.fx.matchmaking :as fx.matchmaking]))
 
 
 (set! *warn-on-reflection* true)
 
 
-(deftest users-view
+(deftest matchmaking-view
   (is (map?
-        (fx.user/users-view-impl
+        (fx.matchmaking/matchmaking-view
           {:fx/context (fx/create-context nil)}))))
 
 
-
-(deftest users-table
+(deftest matchmaking-window
   (is (map?
-        (fx.user/users-table-impl
+        (fx.matchmaking/matchmaking-window-impl
           {:fx/context (fx/create-context nil)}))))

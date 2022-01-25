@@ -15,7 +15,7 @@
 (set! *warn-on-reflection* true)
 
 
-(defn- users-table-impl
+(defn users-table-impl
   [{:fx/keys [context]
     :keys [users server-key]}]
   (let [ignore-users (fx/sub-val context :ignore-users)
@@ -219,7 +219,7 @@
       (users-table-impl state))))
 
 
-(defn- users-view-impl
+(defn users-view-impl
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [filter-users (fx/sub-val context :filter-users)

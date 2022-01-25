@@ -35,7 +35,7 @@
     :else nil))
 
 
-(defn- mod-sync-pane-impl
+(defn mod-sync-pane-impl
   [{:fx/keys [context]
     :keys [dependency engine-version index-only mod-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)

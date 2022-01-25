@@ -16,7 +16,7 @@
 (def battle-chat-window-height 1000)
 
 
-(defn- battle-chat-window-impl
+(defn battle-chat-window-impl
   [{:fx/keys [context]
     :keys [screen-bounds]}]
   (let [pop-out-chat (fx/sub-val context :pop-out-chat)

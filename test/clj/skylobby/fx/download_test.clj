@@ -8,6 +8,18 @@
 (set! *warn-on-reflection* true)
 
 
+(deftest downloader-root
+  (is (map?
+        (fx.download/downloader-root
+          {:fx/context (fx/create-context nil)})))
+  (is (map?
+        (fx.download/downloader-root
+          {:fx/context (fx/create-context {:downloadables-by-url {"url" {:download-source-name "d"
+                                                                         :resource-filename "f1"}}
+                                           :download-source-name "d"
+                                           :download-filter "f"})}))))
+
+
 (deftest download-window
   (is (map?
         (fx.download/download-window
