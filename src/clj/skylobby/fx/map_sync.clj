@@ -14,7 +14,7 @@
 (set! *warn-on-reflection* true)
 
 
-(defn- map-sync-pane-impl
+(defn map-sync-pane-impl
   [{:fx/keys [context]
     :keys [battle-map index-only map-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)

@@ -118,7 +118,7 @@
      (when (seq messages)
        (.build builder)))))
 
-(defn- channel-view-history-impl
+(defn channel-view-history-impl
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
   (let [messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
@@ -211,7 +211,7 @@
                       :channel-name channel-name
                       :server-key server-key}}))
 
-(defn- channel-view-input
+(defn channel-view-input
   [{:fx/keys [context]
     :keys [channel-name disable server-key usernames]}]
   (let [
@@ -283,7 +283,7 @@
                           (str "mdi-message-bulleted-off:" font-icon-size ":red")
                           (str "mdi-message:" font-icon-size ":white"))}}])}))
 
-(defn- channel-view-users
+(defn channel-view-users
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
   (let [users (fx/sub-val context get-in [:by-server server-key :channels channel-name :users])]

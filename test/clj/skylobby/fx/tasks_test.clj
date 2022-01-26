@@ -8,6 +8,13 @@
 (set! *warn-on-reflection* true)
 
 
+(deftest tasks-root
+  (is (map?
+        (fx.tasks/tasks-root
+          {:fx/context (fx/create-context nil)
+           :screen-bounds {}})))
+  )
+
 (deftest tasks-window
   (is (map?
         (fx.tasks/tasks-window

@@ -1,30 +1,65 @@
 [
 {
-  "name":"[C"}
-,
+  "name":"[C"
+},
 {
-  "name":"[Ljava.lang.Object;"}
-,
+  "name":"[Ljava.lang.Object;"
+},
 {
-  "name":"clojure.core.async.impl.channels.ManyToManyChannel"}
-,
+  "name":"clojure.core.async.impl.channels.ManyToManyChannel"
+},
 {
   "name":"com.sun.org.apache.xerces.internal.jaxp.datatype.DatatypeFactoryImpl",
-  "methods":[{"name":"<init>","parameterTypes":[] }]}
-,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
 {
-  "name":"java.security.SecureRandomParameters"}
-,
+  "name":"java.beans.PropertyVetoException"
+},
+{
+  "name":"java.io.IOException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.Exception",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.Object",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"getClass","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.Throwable",
+  "queryAllPublicMethods":true,
+  "methods":[
+    {"name":"getCause","parameterTypes":[] }, 
+    {"name":"getLocalizedMessage","parameterTypes":[] }, 
+    {"name":"getMessage","parameterTypes":[] }, 
+    {"name":"getStackTrace","parameterTypes":[] }, 
+    {"name":"getSuppressed","parameterTypes":[] }
+  ]
+},
+{
+  "name":"java.net.BindException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.net.SocketException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.security.SecureRandomParameters"
+},
 {
   "name":"sun.security.provider.DRBG",
-  "methods":[{"name":"<init>","parameterTypes":["java.security.SecureRandomParameters"] }]}
-,
+  "methods":[{"name":"<init>","parameterTypes":["java.security.SecureRandomParameters"] }]
+},
 {
   "name":"sun.security.provider.SHA",
-  "methods":[{"name":"<init>","parameterTypes":[] }]}
-,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
 {
   "name":"sun.security.provider.SHA2$SHA256",
-  "methods":[{"name":"<init>","parameterTypes":[] }]}
-
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+}
 ]

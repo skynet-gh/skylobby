@@ -24,7 +24,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 21.3.0
+          graalvm-version: 22.0.0.2
           native-image: true
       - uses: actions/cache@v2
         with:
@@ -56,7 +56,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 21.3.0
+          graalvm-version: 22.0.0.2
           native-image: true
       - uses: actions/cache@v2
         with:
@@ -85,7 +85,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 21.3.0
+          graalvm-version: 22.0.0.2
           native-image: true
       - uses: actions/cache@v2
         with:

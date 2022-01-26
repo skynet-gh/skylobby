@@ -9,6 +9,18 @@
 (set! *warn-on-reflection* true)
 
 
+(deftest chat-log-document
+  (is (some?
+        (fx.replay/chat-log-document
+          [{:command 7}
+           {:command 31
+            :map-draw-action 0}
+           {:command 51
+            :team-action 2}
+           {:command 3}]
+          {}))))
+
+
 (deftest replay-view
   (is (map?
         (fx.replay/replay-view {:fx/context (fx/create-context nil)})))
@@ -46,41 +58,30 @@
               :replays-window-details true})}))))
 
 
-(deftest replays-window-impl
+(deftest replays-root
   (is (map?
-        (fx.replay/replays-window-impl
-          {:fx/context (fx/create-context nil)
-           :screen-bounds {}})))
-  (is (map?
-        (fx.replay/replays-window-impl
-          {:fx/context (fx/create-context {:show-replays true})
-           :screen-bounds {}})))
-  (is (map?
-        (fx.replay/replays-window-impl
+        (fx.replay/replays-root
           {:fx/context
            (fx/create-context
-             {:show-replays true
-              :parsed-replays-by-path
+             {:parsed-replays-by-path
               {"."
-               {:filename ".sdfz"}}})
-           :screen-bounds {}})))
+               {:filename ".sdfz"}}})})))
   (is (map?
         (let [f (fs/file ".")]
-          (fx.replay/replays-window-impl
+          (fx.replay/replays-root
             {:fx/context
              (fx/create-context
-               {:show-replays true
+               {
                 :parsed-replays-by-path
                 {(fs/canonical-path f)
                  {:filename ".sdfz"}}
-                :selected-replay-file f})
-             :screen-bounds {}}))))
+                :selected-replay-file f})}))))
   (is (map?
         (let [f (fs/file ".")]
-          (fx.replay/replays-window-impl
+          (fx.replay/replays-root
             {:fx/context
              (fx/create-context
-               {:show-replays true
+               {
                 :parsed-replays-by-path
                 {(fs/canonical-path f)
                  {:filename ".sdfz"}}
@@ -89,8 +90,17 @@
                 :filter-replay-type "."
                 :filter-replay-min-players 1
                 :filter-replay-max-players 2
-                :filter-replay ". ."})
-             :screen-bounds {}})))))
+                :filter-replay ". ."})})))))
+
+(deftest replays-window-impl
+  (is (map?
+        (fx.replay/replays-window-impl
+          {:fx/context (fx/create-context nil)
+           :screen-bounds {}})))
+  (is (map?
+        (fx.replay/replays-window-impl
+          {:fx/context (fx/create-context {:show-replays true})
+           :screen-bounds {}}))))
 
 
 (deftest standalone-replay-window

@@ -678,7 +678,7 @@
           {:keys [last-battle] :as state} (swap! state-atom assoc-in [:by-server server-key :battles battle-id] battle)
           last-battle (get last-battle server-key)
           {:keys [client-data username]} (-> state :by-server (get server-key))]
-      (when (and (:auto-reoin-battle state)
+      (when (and (:auto-rejoin-battle state)
                  (not= host-username username)
                  (= host-username (:host-username last-battle))
                  (:should-rejoin last-battle))

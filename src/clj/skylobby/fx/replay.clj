@@ -94,7 +94,7 @@
                        Color/YELLOW)
         css-color (some-> javafx-color str u/hex-color-to-css)
         is-spec (and (not (string/blank? player)) (not color))
-        dest-type (case (int dest)
+        dest-type (case (int (or dest 0))
                     252 :ally
                     253 :spec
                     254 :global
@@ -1378,7 +1378,8 @@
            :style {:-fx-font-size 24}
            :text " Loading replays..."})]
        (when selected-replay
-         (let [minimap-size (fx/sub-val context :minimap-size)]
+         (let [minimap-size (or (fx/sub-val context :minimap-size)
+                                fx.minimap/default-minimap-size)]
            [{:fx/type :v-box
              :style {:-fx-max-height (+ 100 minimap-size)}
              :children

@@ -16,7 +16,7 @@
 (def battles-window-height 1000)
 
 
-(defn- battles-window-view-impl
+(defn battles-window-impl
   [{:fx/keys [context]
     :keys [screen-bounds]}]
   (let [
@@ -55,4 +55,4 @@
   (tufte/profile {:dynamic? true
                   :id :skylobby/ui}
     (tufte/p :battles-window
-      (battles-window-view-impl state))))
+      (battles-window-impl state))))

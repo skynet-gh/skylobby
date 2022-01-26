@@ -22,7 +22,7 @@
 (def battles-map-size 128)
 
 
-(defn- battles-table-impl
+(defn battles-table-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-password (fx/sub-val context :battle-password)
         filter-battles (fx/sub-val context :filter-battles)
@@ -332,7 +332,7 @@
            {:fx/cell-type :table-cell
             :describe (fn [host-username] {:text (str host-username)})}}]}}}]}))
 
-(defn- battles-table-with-images-impl
+(defn battles-table-with-images-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-password (fx/sub-val context :battle-password)
         filter-battles (fx/sub-val context :filter-battles)

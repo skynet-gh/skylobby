@@ -1190,7 +1190,7 @@
             :children
             (->> vote-messages
                  (filter (comp #{:called-vote :cancelling-vote :game-starting-cancel :vote-cancelled :vote-failed :vote-passed} :spads-message-type :spads))
-                 (map
+                 (mapv
                    (fn [{:keys [spads timestamp]}]
                      (let [{:keys [spads-message-type vote-data]} spads]
                        {:fx/type :h-box
@@ -1199,7 +1199,8 @@
                         (concat
                           [{:fx/type :label
                             :style {:-fx-font-family monospace-font-family}
-                            :text (str (u/format-hours timestamp) " ")}
+                            :text (str (when (number? timestamp) (u/format-hours timestamp))
+                                       " ")}
                            {:fx/type font-icon/lifecycle
                             :icon-literal (case spads-message-type
                                             :called-vote "mdi-phone:16:blue"

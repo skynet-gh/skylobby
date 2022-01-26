@@ -31,7 +31,7 @@
     :source :http}])
 
 
-(defn- mods-view-impl
+(defn mods-view-impl
   [{:fx/keys [context]
     :keys [engine-file flow mod-name on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
@@ -44,7 +44,7 @@
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
         games (filter :is-game mods)
         spring-root-path (fs/canonical-path spring-isolation-dir)
-        on-value-changed (or on-value-changed 
+        on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
                               :path [:by-spring-root spring-root-path :mod-name]})
         selected-mod-file (:file (get mods-by-name mod-name))]

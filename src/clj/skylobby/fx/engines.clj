@@ -21,7 +21,7 @@
   ["104.0.1-1828-g1f481b7 BAR"])
 
 
-(defn- engines-view-impl
+(defn engines-view-impl
   [{:fx/keys [context]
     :keys [engine-version flow on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
