@@ -54,12 +54,16 @@
                         :else 0)]
          [{:severity severity
            :text "info"
-           :human-text map-name
+           :human-text (if map-name
+                         map-name
+                         "No map specified")
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file map-details))
                       (if indexed-map
                         (str "Loading map details for '" map-name "'")
-                        (str "Map '" map-name "' not found locally")))}])
+                        (if map-name
+                          (str "Map '" map-name "' not found locally")
+                          "No map specified")))}])
        (when (and no-map-details at-max-tries (empty? map-update-tasks))
          [{:severity 2
            :text "retry"

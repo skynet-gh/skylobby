@@ -594,11 +594,11 @@
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
               tasks-by-type (group-by :spring-lobby/task-type all-tasks)
               rapid-task (->> all-tasks
-                              (filter (comp #{::rapid-download} :task-type))
+                              (filter (comp #{::rapid-download} ::task-type))
                               (filter (comp #{rapid-id} :rapid-id))
                               first)
               update-rapid-task (->> all-tasks
-                                     (filter (comp #{::update-rapid ::update-rapid-packages}))
+                                     (filter (comp #{::update-rapid ::update-rapid-packages} ::task-type))
                                      first)
               importables (vals importables-by-path)
               map-importable (some->> importables
@@ -645,7 +645,8 @@
                                        (filter (partial resource/could-be-this-engine? battle-version))
                                        first)
               engine-download-dest (resource/resource-dest spring-root engine-downloadable)
-              engine-extract-dest (fs/file spring-root "engine" (fs/filename engine-download-dest))
+              engine-extract-dest (when engine-download-dest
+                                    (fs/file spring-root "engine" (fs/filename engine-download-dest)))
               engine-download-task (->> all-tasks
                                         (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
                                         (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
@@ -718,6 +719,12 @@
                               engine-download-source-name
                               (check-cooldown cooldowns [:download-source engine-download-source-name])
                               (not (contains? download-source-tasks engine-download-source-name)))
+                         (do
+                           (log/info "Adding task to update download source" engine-download-source-name "looking for" battle-version)
+                           (merge
+                             {::task-type :spring-lobby/update-downloadables
+                              :force true}
+                             (get download-sources-by-name engine-download-source-name)))
                          (and (not (contains? engine-refresh-tasks spring-root-path))
                               (fs/file-exists? file-cache engine-extract-dest))
                          (do
@@ -725,12 +732,6 @@
                            {::task-type ::refresh-engines
                             :priorites [engine-extract-dest]
                             :spring-root spring-root})
-                         (do
-                           (log/info "Adding task to update download source" engine-download-source-name "looking for" battle-version)
-                           (merge
-                             {::task-type :spring-lobby/update-downloadables
-                              :force true}
-                             (get download-sources-by-name engine-download-source-name)))
                          :else
                          (when battle-version
                            (log/info "Nothing to do to auto get engine" battle-version

@@ -64,116 +64,124 @@
                           -1 2))]
          [{:severity severity
            :text "info"
-           :human-text (str "Spring " engine-version)
+           :human-text (if engine-version
+                         (str "Spring " engine-version)
+                         "No engine version specified")
            :choice engine-file
            :choices (map :file indexed-engines)
            :on-choice-changed {:event/type :spring-lobby/assoc-in
                                :path [:engine-overrides spring-root-path engine-version]}
            :tooltip (if (zero? severity)
                       (fs/canonical-path (:file engine-details))
-                      (str "Engine '" engine-version "' not found locally"))}])
-       (mapcat
-         (fn [downloadable]
-           (let [
-                 url (:download-url downloadable)
-                 download (get http-download url)
-                 download-source-name (engine-download-source engine-version)
-                 in-progress (or (:running download)
-                                 (contains? download-tasks url)
-                                 (and (not downloadable)
-                                      download-source-name
-                                      (contains? download-source-update-tasks download-source-name)))
-                 dest (resource/resource-dest spring-isolation-dir downloadable)
-                 dest-path (fs/canonical-path dest)
-                 dest-exists (fs/file-exists? file-cache dest)
-                 severity (if engine-details
-                            0
-                            (if dest-exists -1 2))
-                 resource-filename (:resource-filename downloadable)
-                 extract-target (when (and spring-isolation-dir resource-filename)
-                                  (fs/file spring-isolation-dir "engine" resource-filename))
-                 extract-exists (fs/file-exists? file-cache extract-target)]
-             (concat
-               (when (or (not engine-details)
-                         (and
-                           (fs/file-status file-cache dest)
-                           (not dest-exists)))
-                 [{:severity severity
-                   :text "download"
-                   :human-text (if in-progress
-                                 (if (and (not downloadable) download-source-name)
-                                   (str "Updating download source " download-source-name)
-                                   (str "Downloading " (u/download-progress download)))
-                                 (if downloadable
-                                   (if dest-exists
-                                     (str "Downloaded " (fs/filename dest))
-                                     (str "Download from " (:download-source-name downloadable)))
-                                   (if download-source-name
-                                     (str "Update download source " download-source-name)
-                                     "No download found")))
-                   :tooltip (if in-progress
-                              (if (and (not downloadable) download-source-name)
-                                (str "Updating download source " download-source-name)
-                                (str "Downloading " (u/download-progress download)))
-                              (if dest-exists
-                                (str "Downloaded to " dest-path)
-                                (str "Download " url)))
-                   :in-progress in-progress
-                   :force-action true
-                   :action (when-not dest-exists
-                             (cond
-                               downloadable
-                               {:event/type :spring-lobby/add-task
-                                :task
-                                {:spring-lobby/task-type :spring-lobby/download-and-extract
-                                 :downloadable downloadable
-                                 :spring-isolation-dir spring-isolation-dir}}
-                               download-source-name
-                               {:event/type :spring-lobby/add-task
-                                :task
-                                (merge
-                                  {:spring-lobby/task-type :spring-lobby/update-downloadables
-                                   :force true}
-                                  (get download-sources-by-name download-source-name))}
-                               :else nil))}])
-               (when dest-exists
-                 (let [extracting (or (contains? extract-tasks dest-path)
-                                      (contains? extract-tasks (fs/canonical-path extract-target))
-                                      (contains? download-tasks url))]
-                   (when (or extracting
-                             (not extract-exists))
-                     [{:severity (if engine-details
-                                   0
-                                   (if extract-exists -1 2))
-                       :text "extract"
-                       :in-progress extracting
-                       :human-text (if extracting
-                                     (str "Extracting " resource-filename)
-                                     (str "Extract " resource-filename))
-                       :tooltip (if extracting
-                                  (str "Extracting " dest " to " extract-target)
-                                  (str "Click to extract to " extract-target))
-                       :force-action true
-                       :action
-                       {:event/type :spring-lobby/add-task
-                        :task
-                        {:spring-lobby/task-type :spring-lobby/extract-7z
-                         :file dest
-                         :dest extract-target}}}]))))))
-         (or
-           (->> downloadables-by-url
-             vals
-             (filter (comp #{:spring-lobby/engine} :resource-type))
-             (filter (partial resource/could-be-this-engine? engine-version))
-             seq)
-           [nil]))
-       (when refresh-in-progress
+                      (if engine-version
+                        (str "Engine '" engine-version "' not found locally")
+                        "No engine version specified"))}])
+       (when engine-version
+         (mapcat
+           (fn [downloadable]
+             (let [
+                   url (:download-url downloadable)
+                   download (get http-download url)
+                   download-source-name (engine-download-source engine-version)
+                   in-progress (or (:running download)
+                                   (contains? download-tasks url)
+                                   (and (not downloadable)
+                                        download-source-name
+                                        (contains? download-source-update-tasks download-source-name)))
+                   dest (resource/resource-dest spring-isolation-dir downloadable)
+                   dest-path (fs/canonical-path dest)
+                   dest-exists (fs/file-exists? file-cache dest)
+                   severity (if engine-details
+                              0
+                              (if dest-exists -1 2))
+                   resource-filename (:resource-filename downloadable)
+                   extract-target (when (and spring-isolation-dir resource-filename)
+                                    (fs/file spring-isolation-dir "engine" resource-filename))
+                   extract-exists (fs/file-exists? file-cache extract-target)]
+               (concat
+                 (when (or (not engine-details)
+                           (and
+                             (fs/file-status file-cache dest)
+                             (not dest-exists)))
+                   [{:severity severity
+                     :text "download"
+                     :human-text (if in-progress
+                                   (if (and (not downloadable) download-source-name)
+                                     (str "Updating download source " download-source-name)
+                                     (str "Downloading " (u/download-progress download)))
+                                   (if downloadable
+                                     (if dest-exists
+                                       (str "Downloaded " (fs/filename dest))
+                                       (str "Download from " (:download-source-name downloadable)))
+                                     (if download-source-name
+                                       (str "Update download source " download-source-name)
+                                       "No download found")))
+                     :tooltip (if in-progress
+                                (if (and (not downloadable) download-source-name)
+                                  (str "Updating download source " download-source-name)
+                                  (str "Downloading " (u/download-progress download)))
+                                (if dest-exists
+                                  (str "Downloaded to " dest-path)
+                                  (str "Download " url)))
+                     :in-progress in-progress
+                     :force-action true
+                     :action (when-not dest-exists
+                               (cond
+                                 downloadable
+                                 {:event/type :spring-lobby/add-task
+                                  :task
+                                  {:spring-lobby/task-type :spring-lobby/download-and-extract
+                                   :downloadable downloadable
+                                   :spring-isolation-dir spring-isolation-dir}}
+                                 download-source-name
+                                 {:event/type :spring-lobby/add-task
+                                  :task
+                                  (merge
+                                    {:spring-lobby/task-type :spring-lobby/update-downloadables
+                                     :force true}
+                                    (get download-sources-by-name download-source-name))}
+                                 :else nil))}])
+                 (when dest-exists
+                   (let [extracting (or (contains? extract-tasks dest-path)
+                                        (contains? extract-tasks (fs/canonical-path extract-target))
+                                        (contains? download-tasks url))]
+                     (when (or extracting
+                               (not extract-exists))
+                       [{:severity (if engine-details
+                                     0
+                                     (if extract-exists -1 2))
+                         :text "extract"
+                         :in-progress extracting
+                         :human-text (if extracting
+                                       (str "Extracting " resource-filename)
+                                       (str "Extract " resource-filename))
+                         :tooltip (if extracting
+                                    (str "Extracting " dest " to " extract-target)
+                                    (str "Click to extract to " extract-target))
+                         :force-action true
+                         :action
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          {:spring-lobby/task-type :spring-lobby/extract-7z
+                           :file dest
+                           :dest extract-target}}}]))))))
+           (or
+             (->> downloadables-by-url
+               vals
+               (filter (comp #{:spring-lobby/engine} :resource-type))
+               (filter (partial resource/could-be-this-engine? engine-version))
+               seq)
+             [nil])))
+       (when (and engine-version
+                  refresh-in-progress)
          [{:severity -1
            :text "refresh"
            :human-text "Refreshing engines"
            :tooltip "Refreshing engines"
            :in-progress true}])
-       (when (and (not engine-details) (not (engine-download-source engine-version)))
+       (when (and engine-version
+                  (not engine-details)
+                  (not (engine-download-source engine-version)))
          (let [springname (str "Spring " engine-version)
                springfiles-searched (contains? springfiles-search-results springname)
                springfiles-search-result (get springfiles-search-results springname)
@@ -208,7 +216,8 @@
                                (fs/linux?) "engine_linux*"
                                :else "**")
                    :springname springname})})}]))
-       (when-not engine-details
+       (when (and engine-version
+                  (not engine-details))
          (let [importable (some->> importables-by-path
                                    vals
                                    (filter (comp #{:spring-lobby/engine} :resource-type))
