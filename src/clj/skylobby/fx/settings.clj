@@ -362,7 +362,9 @@
                                   :key :spring-isolation-dir-draft}}
                {:fx/type :button
                 :style-class ["button" "skylobby-normal"]
-                :on-action {:event/type :spring-lobby/file-chooser-spring-root}
+                :on-action {:event/type :spring-lobby/file-chooser-dir
+                            :initial-dir spring-isolation-dir
+                            :path [:spring-isolation-dir]}
                 :text ""
                 :graphic
                 {:fx/type font-icon/lifecycle
@@ -906,11 +908,14 @@
                {:fx/type :text-field
                 :disable true
                 :text (str (fs/canonical-path music-dir))
-                :style {:-fx-max-width 480}}
+                :style {:-fx-max-width 480
+                        :-fx-pref-width 480}}
                {:fx/type :button
                 :style-class ["button" "skylobby-normal"]
-                :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                            :target [:music-dir]}
+                :on-action {:event/type :spring-lobby/file-chooser-dir
+                            :initial-dir music-dir
+                            :path [:music-dir]
+                            :post-task {:spring-lobby/task-type :spring-lobby/update-music-queue}}
                 :text ""
                 :graphic
                 {:fx/type font-icon/lifecycle

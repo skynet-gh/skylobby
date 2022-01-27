@@ -2113,6 +2113,28 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn update-music-queue
+  [state-atom]
+  (log/debug "Updating music queue")
+  (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
+    (if music-dir
+      (let [music-files (music-files music-dir)]
+        (if (or media-player music-stopped)
+          (swap! state-atom assoc :music-queue music-files)
+          (let [music-file (or (next-value music-files music-now-playing)
+                               (first music-files))
+                media-player (music-player
+                               {:music-file music-file
+                                :music-volume music-volume})]
+            (swap! state-atom assoc
+                   :media-player media-player
+                   :music-now-playing music-file
+                   :music-queue music-files))))
+      (log/debug "No music dir" music-dir))))
+
+(defmethod task-handler ::update-music-queue [_]
+  (update-music-queue *state))
+
 (defn- update-music-queue-chimer-fn [state-atom]
   (log/info "Starting update music queue chimer")
   (let [chimer
@@ -2121,22 +2143,7 @@
             (java-time/plus (java-time/instant))
             (java-time/duration 30 :seconds))
           (fn [_chimestamp]
-            (log/debug "Updating music queue")
-            (let [{:keys [media-player music-dir music-now-playing music-stopped music-volume]} @state-atom]
-              (if music-dir
-                (let [music-files (music-files music-dir)]
-                  (if (or media-player music-stopped)
-                    (swap! state-atom assoc :music-queue music-files)
-                    (let [music-file (or (next-value music-files music-now-playing)
-                                         (first music-files))
-                          media-player (music-player
-                                         {:music-file music-file
-                                          :music-volume music-volume})]
-                      (swap! state-atom assoc
-                             :media-player media-player
-                             :music-now-playing music-file
-                             :music-queue music-files))))
-                (log/debug "No music dir" music-dir))))
+            (update-music-queue state-atom))
           {:error-handler
            (fn [e]
              (log/error e "Error updating music queue")
@@ -3289,17 +3296,20 @@
 
 
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
-(defmethod event-handler ::file-chooser-spring-root
-  [{:fx/keys [^Event event] :keys [spring-isolation-dir target] :or {target [:spring-isolation-dir]}}]
+(defmethod event-handler ::file-chooser-dir
+  [{:fx/keys [^Event event]
+    :keys [initial-dir path post-task]}]
   (try
     (let [^Node node (.getTarget event)
           window (.getWindow (.getScene node))
           chooser (doto (DirectoryChooser.)
                     (.setTitle "Select Spring Directory")
-                    (.setInitialDirectory spring-isolation-dir))]
+                    (.setInitialDirectory initial-dir))]
       (when-let [file (.showDialog chooser window)]
-        (log/info "Setting spring isolation dir at" target "to" file)
-        (swap! *state assoc-in target file)))
+        (log/info "Setting spring isolation dir at" path "to" file)
+        (swap! *state assoc-in path file)
+        (when post-task
+          (task/add-task! *state post-task))))
     (catch Exception e
       (log/error e "Error showing spring directory chooser"))))
 

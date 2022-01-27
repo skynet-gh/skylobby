@@ -199,8 +199,9 @@
                  {:fx/type font-icon/lifecycle
                   :icon-literal "mdi-close:16:white"}}])
              [{:fx/type :button
-               :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                           :target [:server-spring-root-draft]}
+               :on-action {:event/type :spring-lobby/file-chooser-dir
+                           :initial-dir server-spring-root-draft
+                           :path [:server-spring-root-draft]}
                :text ""
                :graphic
                {:fx/type font-icon/lifecycle
