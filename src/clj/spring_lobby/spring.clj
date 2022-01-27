@@ -399,7 +399,7 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data debug-spring engine-version engines engines-by-version ^MediaPlayer media-player music-paused script-txt
+   {:keys [client-data engine-version engines engines-by-version script-txt
            ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
@@ -407,11 +407,12 @@
         now (u/curr-millis)
         server-key (u/server-key client-data)
         battle-id (-> state :battle :battle-id)
-        {:keys [engine-overrides refresh-replays-after-game ring-when-game-ends]} (swap! state-atom
-                                                                                    (fn [state]
-                                                                                      (-> state
-                                                                                          (assoc-in [:spring-starting server-key battle-id] false)
-                                                                                          (assoc-in [:spring-running server-key battle-id] true))))
+        {:keys [debug-spring engine-overrides ^MediaPlayer media-player music-paused refresh-replays-after-game ring-when-game-ends]}
+        (swap! state-atom
+          (fn [state]
+            (-> state
+                (assoc-in [:spring-starting server-key battle-id] false)
+                (assoc-in [:spring-running server-key battle-id] true))))
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
