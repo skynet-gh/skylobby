@@ -1,5 +1,6 @@
 (ns skylobby.server
   (:require
+    [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.spec.alpha :as s]
@@ -81,43 +82,52 @@
                        :packer packer
                        :wrap-recv-evs? false})
         {:keys [ch-recv send-fn connected-uids]} chsk-server
-        broadcast (fn [message]
-                    (let [uids (:any @connected-uids)]
-                      (log/debug "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
-                      (doseq [uid uids]
-                        (send-fn uid message))))
+        broadcast (fn [uids message]
+                    (log/debug "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
+                    (doseq [uid uids]
+                      (send-fn uid message)))
+        push-channel (async/chan (async/sliding-buffer 1))
+        _ (future
+            (loop []
+              (when-let [[old-state new-state] (async/<!! push-channel)]
+                (let [uids (:any @connected-uids)]
+                  (when-not (empty? uids)
+                    (let [new-servers-data (servers-data new-state)]
+                      (when (not= (servers-data old-state)
+                                  new-servers-data)
+                        (broadcast uids [:skylobby/servers new-servers-data])))
+                    (let [new-auto-launch (:auto-launch new-state)]
+                      (when (not= (:auto-launch old-state)
+                                  new-auto-launch)
+                        (broadcast uids [:skylobby/auto-launch new-auto-launch])))
+                    (let [new-logins (:logins new-state)]
+                      (when (not= (:logins old-state)
+                                  new-logins)
+                        (broadcast uids [:skylobby/logins new-logins])))
+                    (doseq [[server-key server-data] (:by-server new-state)]
+                      (let [{:keys [auto-unspec battle battles channels users]} server-data]
+                        (when (not= auto-unspec
+                                    (get-in old-state [:by-server server-key :auto-unspec]))
+                          (broadcast uids [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
+                        (when (not= battle
+                                    (get-in old-state [:by-server server-key :battle]))
+                          (broadcast uids [:skylobby/battle {:server-key server-key :battle battle}]))
+                        (when (not= battles
+                                    (get-in old-state [:by-server server-key :battles]))
+                          (broadcast uids [:skylobby/battles {:server-key server-key :battles battles}]))
+                        (when (not= users
+                                    (get-in old-state [:by-server server-key :users]))
+                          (broadcast uids [:skylobby/users {:server-key server-key :users users}]))
+                        (doseq [[channel-name channel-data] channels]
+                          (when (not= channel-data
+                                      (get-in old-state [:by-server server-key :channels channel-name]))
+                            (broadcast uids [:skylobby/chat {:server-key server-key :channel-name channel-name :channel-data channel-data}])))))))
+                (recur))))
         push-watcher (fn [_ref _k old-state new-state]
-                       (let [new-servers-data (servers-data new-state)]
-                         (when (not= (servers-data old-state)
-                                     new-servers-data)
-                           (broadcast [:skylobby/servers new-servers-data])))
-                       (let [new-auto-launch (:auto-launch new-state)]
-                         (when (not= (:auto-launch old-state)
-                                     new-auto-launch)
-                           (broadcast [:skylobby/auto-launch new-auto-launch])))
-                       (let [new-logins (:logins new-state)]
-                         (when (not= (:logins old-state)
-                                     new-logins)
-                           (broadcast [:skylobby/logins new-logins])))
-                       (doseq [[server-key server-data] (:by-server new-state)]
-                         (let [{:keys [auto-unspec battle battles channels users]} server-data]
-                           (when (not= auto-unspec
-                                       (get-in old-state [:by-server server-key :auto-unspec]))
-                             (broadcast [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
-                           (when (not= battle
-                                       (get-in old-state [:by-server server-key :battle]))
-                             (broadcast [:skylobby/battle {:server-key server-key :battle battle}]))
-                           (when (not= battles
-                                       (get-in old-state [:by-server server-key :battles]))
-                             (broadcast [:skylobby/battles {:server-key server-key :battles battles}]))
-                           (when (not= users
-                                       (get-in old-state [:by-server server-key :users]))
-                             (broadcast [:skylobby/users {:server-key server-key :users users}]))
-                           (doseq [[channel-name channel-data] channels]
-                             (when (not= channel-data
-                                         (get-in old-state [:by-server server-key :channels channel-name]))
-                               (broadcast [:skylobby/chat {:server-key server-key :channel-name channel-name :channel-data channel-data}]))))))]
+                       (async/>!! push-channel [old-state new-state]))]
+    (remove-watch state-atom :push-watcher)
     (add-watch state-atom :push-watcher push-watcher)
+    (remove-watch connected-uids :connected-uids)
     (add-watch connected-uids :connected-uids
       (fn [_ _ old-ids new-ids]
         (when (not= old-ids new-ids)

@@ -211,13 +211,24 @@
                       :channel-name channel-name
                       :server-key server-key}}))
 
+(defn channel-send-button
+  [{:fx/keys [context]
+    :keys [channel-name disable server-key]}]
+  (let [
+        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])]
+    {:fx/type :button
+     :text "Send"
+     :disable (boolean (or disable (string/blank? message-draft)))
+     :on-action {:event/type :spring-lobby/send-message
+                 :channel-name channel-name
+                 :message message-draft
+                 :server-key server-key}}))
+
 (defn channel-view-input
   [{:fx/keys [context]
     :keys [channel-name disable server-key usernames]}]
   (let [
         chat-auto-complete (fx/sub-val context :chat-auto-complete)
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        message-draft (fx/sub-val context get-in [:by-server server-key :message-drafts channel-name])
         is-battle-channel (u/battle-channel-name? channel-name)
         mute-path [:mute server-key (if is-battle-channel :battle channel-name)]
         mute (fx/sub-val context get-in mute-path)
@@ -226,14 +237,10 @@
      :style-class ["skylobby-chat-input"]
      :children
      (concat
-       [{:fx/type :button
-         :text "Send"
-         :disable (boolean (or disable (string/blank? message-draft)))
-         :on-action {:event/type :spring-lobby/send-message
-                     :channel-name channel-name
-                     :client-data client-data
-                     :message message-draft
-                     :server-key server-key}}
+       [{:fx/type channel-send-button
+         :channel-name channel-name
+         :disable disable
+         :server-key server-key}
         {:fx/type ext-recreate-on-key-changed
          :key chat-auto-complete
          :h-box/hgrow :always
