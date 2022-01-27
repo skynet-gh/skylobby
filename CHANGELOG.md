@@ -2,6 +2,12 @@
 
 ## [0.7.71](https://github.com/skynet-gh/skylobby/releases/tag/0.7.71) - 2022-01-26
 
+- Fix music fade when starting a game
+- Fix issues with auto get resources
+- Update music queue immediately when changing dir
+
+## [0.7.71](https://github.com/skynet-gh/skylobby/releases/tag/0.7.71) - 2022-01-26
+
 - Fix HostIP in start script when hosting
 - Fix Fix Colors when hosting
 - Fix login error messages
