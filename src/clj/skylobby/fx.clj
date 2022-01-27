@@ -350,7 +350,10 @@
    (let [screen-bounds (screen-bounds-fallback screen-bounds)]
      (max
        (min
-         (or setting Integer/MIN_VALUE)
+         (or setting
+             (when (and (:min-x screen-bounds) (:max-x screen-bounds))
+               (quot (+ (:min-x screen-bounds) (:max-x screen-bounds)) 2))
+             Integer/MIN_VALUE)
          (or (:max-x screen-bounds) 0))
        (or (:min-x screen-bounds) 0)))))
 
@@ -361,7 +364,10 @@
    (let [screen-bounds (screen-bounds-fallback screen-bounds)]
      (max
        (min
-         (or setting Integer/MIN_VALUE)
+         (or setting
+             (when (and (:min-y screen-bounds) (:max-y screen-bounds))
+               (quot (+ (:min-y screen-bounds) (:max-y screen-bounds)) 2))
+             Integer/MIN_VALUE)
          (or (:max-y screen-bounds) 0))
        (or (:min-y screen-bounds) 0)))))
 

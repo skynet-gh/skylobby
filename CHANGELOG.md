@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.71](https://github.com/skynet-gh/skylobby/releases/tag/0.7.71) - 2022-01-26
+
+- Fix HostIP in start script when hosting
+- Fix Fix Colors when hosting
+- Fix login error messages
+- Add new task category for Rapid so it can run in parallel to http downloads
+
 ## [0.7.70](https://github.com/skynet-gh/skylobby/releases/tag/0.7.70) - 2022-01-25
 
 - Fix auto rejoin battle

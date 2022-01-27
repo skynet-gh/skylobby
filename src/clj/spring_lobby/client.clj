@@ -150,13 +150,12 @@
   (let [[_all username] (re-find #"\w+ (.*)" m)
         state (swap! state-atom
                 (fn [state]
-                  (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
-                    (-> state
-                        (update-in [:by-server server-key]
-                             assoc
-                             :username username
-                             :accepted true)
-                        (update :login-error dissoc server-url)))))
+                  (-> state
+                      (update-in [:by-server server-key]
+                           assoc
+                           :username username
+                           :accepted true)
+                      (update :login-error dissoc server-key))))
         server-data (-> state :by-server (get server-key))
         client-data (:client-data server-data)
         my-channels (concat
@@ -330,10 +329,9 @@
   (log/info (str "Login denied: '" m "'"))
   (let [[old-state] (swap-vals! state-atom
                       (fn [state]
-                        (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
-                          (-> state
-                              (update-in [:by-server server-key] dissoc :accepted :client-data)
-                              (assoc-in [:login-error server-url] m)))))
+                        (-> state
+                            (update-in [:by-server server-key] dissoc :accepted :client-data)
+                            (assoc-in [:login-error server-key] m))))
         client-data (-> old-state :by-server (get server-key) :client-data)]
     (disconnect state-atom client-data)))
 

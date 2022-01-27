@@ -1413,74 +1413,78 @@
                            {:fx/type :pane
                             :style {:-fx-pref-height 8}}
                            resources-buttons]}
-                         {:fx/type :flow-pane
-                          :vgap 5
-                          :hgap 5
-                          :padding 5
-                          :children
-                          (if singleplayer
-                            (concat
-                              [{:fx/type :h-box
-                                :alignment :center-left
-                                :children
-                                [{:fx/type engines-view
-                                  :engine-version engine-version
-                                  :spring-isolation-dir spring-root
-                                  :suggest true
-                                  :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                     :path [:by-server :local :battles :singleplayer :battle-version]}}]}]
-                              [{:fx/type mods-view
-                                :mod-name mod-name
-                                :spring-isolation-dir spring-root
-                                :suggest true
-                                :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                   :path [:by-server :local :battles :singleplayer :battle-modname]}}]
-                              [{:fx/type :h-box
-                                :alignment :center-left
-                                :children
-                                [{:fx/type maps-view
-                                  :map-name map-name
-                                  :spring-isolation-dir spring-root
-                                  :suggest true
-                                  :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                     :path [:by-server :local :battles :singleplayer :battle-map]}}]}])
-                            (concat
-                              [
-                               {:fx/type engine-sync-pane
-                                :engine-version engine-version
-                                :spring-isolation-dir spring-root}
-                               {:fx/type mod-sync-pane
-                                :engine-version engine-version
-                                :mod-name mod-name
-                                :spring-isolation-dir spring-root}]
-                              (map
-                                (fn [{:keys [mod-name]}]
-                                  {:fx/type mod-sync-pane
-                                   :dependency true
+                         {:fx/type :scroll-pane
+                          :fit-to-width true
+                          :hbar-policy :never
+                          :content
+                          {:fx/type :flow-pane
+                           :vgap 5
+                           :hgap 5
+                           :padding 5
+                           :children
+                           (if singleplayer
+                             (concat
+                               [{:fx/type :h-box
+                                 :alignment :center-left
+                                 :children
+                                 [{:fx/type engines-view
                                    :engine-version engine-version
-                                   :mod-name mod-name
-                                   :spring-isolation-dir spring-root})
-                                mod-dependencies)
-                              [{:fx/type map-sync-pane
-                                :map-name map-name
-                                :spring-isolation-dir spring-root}
-                               resources-buttons
-                               {:fx/type :h-box
-                                :alignment :center-left
-                                :children
-                                [{:fx/type :check-box
-                                  :selected (boolean (fx/sub-val context :auto-get-resources))
-                                  :on-selected-changed {:event/type :spring-lobby/assoc
-                                                        :key :auto-get-resources}}
-                                 {:fx/type :label
-                                  :text " Auto import or download resources"}]}
-                               {:fx/type :h-box
-                                :alignment :center-left
-                                :children
-                                [{:fx/type :label
-                                  :text "Force sync check: "}
-                                 {:fx/type sync-button
-                                  :server-key server-key}]}]))})
+                                   :spring-isolation-dir spring-root
+                                   :suggest true
+                                   :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                      :path [:by-server :local :battles :singleplayer :battle-version]}}]}]
+                               [{:fx/type mods-view
+                                 :mod-name mod-name
+                                 :spring-isolation-dir spring-root
+                                 :suggest true
+                                 :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                    :path [:by-server :local :battles :singleplayer :battle-modname]}}]
+                               [{:fx/type :h-box
+                                 :alignment :center-left
+                                 :children
+                                 [{:fx/type maps-view
+                                   :map-name map-name
+                                   :spring-isolation-dir spring-root
+                                   :suggest true
+                                   :on-value-changed {:event/type :spring-lobby/assoc-in
+                                                      :path [:by-server :local :battles :singleplayer :battle-map]}}]}])
+                             (concat
+                               [
+                                {:fx/type engine-sync-pane
+                                 :engine-version engine-version
+                                 :spring-isolation-dir spring-root}
+                                {:fx/type mod-sync-pane
+                                 :engine-version engine-version
+                                 :mod-name mod-name
+                                 :spring-isolation-dir spring-root}]
+                               (map
+                                 (fn [{:keys [mod-name]}]
+                                   {:fx/type mod-sync-pane
+                                    :dependency true
+                                    :engine-version engine-version
+                                    :mod-name mod-name
+                                    :spring-isolation-dir spring-root})
+                                 mod-dependencies)
+                               [{:fx/type map-sync-pane
+                                 :map-name map-name
+                                 :spring-isolation-dir spring-root}
+                                resources-buttons
+                                {:fx/type :h-box
+                                 :alignment :center-left
+                                 :children
+                                 [{:fx/type :check-box
+                                   :selected (boolean (fx/sub-val context :auto-get-resources))
+                                   :on-selected-changed {:event/type :spring-lobby/assoc
+                                                         :key :auto-get-resources}}
+                                  {:fx/type :label
+                                   :text " Auto import or download resources"}]}
+                                {:fx/type :h-box
+                                 :alignment :center-left
+                                 :children
+                                 [{:fx/type :label
+                                   :text "Force sync check: "}
+                                  {:fx/type sync-button
+                                   :server-key server-key}]}]))}})
         resources-pane (if-not old-battle
                          resources-pane
                          {:fx/type :pane})]

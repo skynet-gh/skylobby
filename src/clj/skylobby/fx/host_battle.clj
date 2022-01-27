@@ -81,22 +81,28 @@
          [
           {:fx/type :label
            :text (str " Spring root for this server:  " spring-root)}
-          {:fx/type :label
-           :text " Battle Name: "}
-          {:fx/type :text-field
-           :text (str battle-title)
-           :prompt-text "Battle Title"
-           :on-action host-battle-action
-           :on-text-changed {:event/type :spring-lobby/assoc
-                             :key :battle-title}}
-          {:fx/type :label
-           :text " Battle Password: "}
-          {:fx/type :text-field
-           :text (str battle-password)
-           :prompt-text "Battle Password"
-           :on-action host-battle-action
-           :on-text-changed {:event/type :spring-lobby/assoc
-                             :key :battle-password}}
+          {:fx/type :h-box
+           :children
+           [
+            {:fx/type :label
+             :text " Battle Name: "}
+            {:fx/type :text-field
+             :text (str battle-title)
+             :prompt-text "Battle Title"
+             :on-action host-battle-action
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :battle-title}}]}
+          {:fx/type :h-box
+           :children
+           [
+            {:fx/type :label
+             :text " Battle Password: "}
+            {:fx/type :text-field
+             :text (str battle-password)
+             :prompt-text "Battle Password"
+             :on-action host-battle-action
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :battle-password}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -112,6 +118,17 @@
              {:fx/type :text-formatter
               :value-converter :integer
               :value (int (or (u/to-number battle-port) 8452))}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :label
+             :text " You will need to have this port reachable from other players, see"}
+            (let [url "https://portforward.com/"]
+              {:fx/type :hyperlink
+               :text url
+               :on-action {:event/type :spring-lobby/desktop-browse-url
+                           :url url}})]}
           {:fx/type :h-box
            :alignment :center-left
            :children

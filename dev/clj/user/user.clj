@@ -6,6 +6,7 @@
     [clj-http.client :as http]
     [cljfx.api :as fx]
     [cljfx.css :as css]
+    [clojure.core.async :as async]
     [clojure.datafy :refer [datafy]]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
@@ -93,9 +94,7 @@
   (try
     (println "Requiring spring-lobby ns")
     (require 'spring-lobby)
-    (let [new-state-var (find-var 'spring-lobby/*state)
-          new-state-atom (var-get new-state-var)]
-      (remove-watch new-state-atom :ui-state) ; to prevent leak
+    (let [new-state-var (find-var 'spring-lobby/*state)]
       (alter-var-root new-state-var (constantly *state)))
     (alter-var-root (find-var 'spring-lobby/*ui-state) (constantly *ui-state))
     (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))]
@@ -131,6 +130,11 @@
     (let [{:keys [chimers]} @init-state]
       (doseq [chimer chimers]
         (stop-chimer chimer)))
+    (try
+      (let [filter-replays-channel (var-get (find-var 'spring-lobby/filter-replays-channel))]
+        (async/close! filter-replays-channel))
+      (catch Throwable e
+        (println e)))
     (try
       (binding [*ns* *ns*]
         (let [res (refresh :after 'user/rerender)]
@@ -187,7 +191,6 @@
      (let [add-ui-state-watcher-fn (var-get (find-var 'spring-lobby/add-ui-state-watcher))
            initial-state-fn (var-get (find-var 'spring-lobby/initial-state))
            initial-state (initial-state-fn)]
-       (remove-watch *state :ui-state) ; to prevent leak
        (add-ui-state-watcher-fn *state *ui-state)
        (reset! *state initial-state)
        (swap! *state assoc :css (css/register :skylobby.fx/current

@@ -729,7 +729,7 @@
            [{:fx/type :table-column
              :text "Color"
              :resizable false
-             :pref-width 130
+             :pref-width 140
              :cell-value-factory (juxt :team-color u/nickname identity)
              :cell-factory
              {:fx/cell-type :table-cell

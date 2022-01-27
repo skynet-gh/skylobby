@@ -323,7 +323,8 @@
   (->> (dissoc by-server :local)
        (remove (comp string/blank? first))
        (filter (comp :accepted second))
-       (map first)))
+       (map first)
+       (sort-by name)))
 
 
 ; https://stackoverflow.com/a/17328219/984393

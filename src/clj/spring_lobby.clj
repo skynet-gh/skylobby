@@ -2815,7 +2815,7 @@
               (client/connect state-atom (assoc state :client-data client-data)))))
         (catch Exception e
           (log/error e "Connect error")
-          (swap! state-atom assoc-in [:by-server server-key :login-error] (str (.getMessage e)))
+          (swap! state-atom assoc-in [:login-error server-key] (str (.getMessage e)))
           (update-disconnected! *state server-key)))
       nil)))
 
@@ -3759,19 +3759,20 @@
 
 (defn- update-battle-status
   "Sends a message to update battle status for yourself or a bot of yours."
-  [client-data {:keys [is-bot id]} battle-status team-color]
+  [client-data {:keys [is-bot is-me id] :as opts} battle-status team-color]
   (let [player-name (or (:bot-name id) (:username id))]
     (if client-data
       (let [prefix (if is-bot
                      (str "UPDATEBOT " player-name)
                      "MYBATTLESTATUS")]
-        (log/debug player-name (pr-str battle-status) team-color)
-        (message/send-message *state client-data
-          (str prefix
-               " "
-               (cu/encode-battle-status battle-status)
-               " "
-               (or team-color "0"))))
+        (if (or is-bot is-me)
+          (message/send-message *state client-data
+            (str prefix
+                 " "
+                 (cu/encode-battle-status battle-status)
+                 " "
+                 (or team-color "0")))
+          (log/error (ex-info "stacktrace" {}) "Call to update-battle-status for non-bot non-me player" opts battle-status team-color)))
       (let [data {:battle-status battle-status
                   :team-color team-color}]
         (log/info "No client, assuming singleplayer")
@@ -3796,14 +3797,10 @@
              :client-status (assoc client-status :away away)))))
 
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
-  (future
-    (try
-      (if (or is-me is-bot)
-        (update-battle-status client-data (assoc opts :id id) (:battle-status id) color-int)
-        (message/send-message *state client-data
-          (str "FORCETEAMCOLOR " (:username id) " " color-int)))
-      (catch Exception e
-        (log/error e "Error updating color")))))
+  (if (or is-me is-bot)
+    (update-battle-status client-data (assoc opts :id id) (:battle-status id) color-int)
+    (message/send-message *state client-data
+      (str "FORCETEAMCOLOR " (:username id) " " color-int))))
 
 (defn- update-team [client-data id {:keys [is-me is-bot] :as opts} player-id]
   (future
@@ -4266,16 +4263,12 @@
 
 (defmethod event-handler ::battle-color-action
   [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]
-  (future
-    (try
-      (let [^ColorPicker source (.getSource event)
-            javafx-color (.getValue source)
-            color-int (fx.color/javafx-color-to-spring javafx-color)]
-        (when is-me
-          (swap! *state assoc :preferred-color color-int))
-        (update-color client-data id opts color-int))
-      (catch Exception e
-        (log/error e "Error updating battle color")))))
+  (let [^ColorPicker source (.getSource event)
+        javafx-color (.getValue source)
+        color-int (fx.color/javafx-color-to-spring javafx-color)]
+    (when is-me
+      (swap! *state assoc :preferred-color color-int))
+    (update-color client-data id opts color-int)))
 
 (defmethod event-handler ::battle-balance [{:keys [client-data channel-name]}]
   @(event-handler
@@ -4304,7 +4297,7 @@
                      is-me (= (:username e) (:username id))
                      color (color/player-color battle-status teams-by-allyteam)
                      opts {:id id :is-me is-me :is-bot is-bot}]
-                 (update-battle-status client-data opts battle-status color))))
+                 (update-color client-data id opts color))))
            doall))
     @(event-handler
        {:event/type ::send-message

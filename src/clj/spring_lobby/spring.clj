@@ -196,8 +196,9 @@
                                   (str (:name modinfo) " " (:version modinfo))
                                   (:battle-modname battle))]
               {"gametype" gametype})
-            (when-let [hostip (:battle-ip battle)]
-              (when-not is-host
+            (if is-host
+              {"hostip" "0.0.0.0"}
+              (when-let [hostip (:battle-ip battle)]
                 {"hostip" hostip}))
             (if-let [hostport (:battle-port battle)]
               {"hostport" hostport}
