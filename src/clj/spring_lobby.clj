@@ -2815,7 +2815,7 @@
               (client/connect state-atom (assoc state :client-data client-data)))))
         (catch Exception e
           (log/error e "Connect error")
-          (swap! state-atom assoc-in [:by-server server-key :login-error] (str (.getMessage e)))
+          (swap! state-atom assoc-in [:login-error server-key] (str (.getMessage e)))
           (update-disconnected! *state server-key)))
       nil)))
 

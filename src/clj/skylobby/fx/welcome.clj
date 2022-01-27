@@ -150,7 +150,7 @@
   (let [server-key (fx/sub-ctx context skylobby.fx/welcome-server-key-sub)
         agreement (fx/sub-val context get-in [:by-server server-key :agreement])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        login-error (fx/sub-val context get-in [:by-server server-key :login-error])
+        login-error (fx/sub-val context get-in [:login-error server-key])
         server (fx/sub-val context :server)
         servers (fx/sub-val context :servers)
         password (fx/sub-val context :password)
@@ -194,11 +194,10 @@
                :text url
                :on-action {:event/type :spring-lobby/desktop-browse-url
                            :url url}})]}])
-       (when-let [login-error (str " " (get login-error (first server)))]
+       (when login-error
          [{:fx/type :label
            :text (str " " login-error)
-           :style {:-fx-text-fill "#FF0000"
-                   :-fx-max-width "360px"}}])
+           :style {:-fx-text-fill "red"}}])
        [{:fx/type :h-box
          :alignment :center-left
          :children
