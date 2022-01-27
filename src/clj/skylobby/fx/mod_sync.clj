@@ -92,14 +92,18 @@
                         0)]
          [{:severity severity
            :text "info"
-           :human-text mod-name
+           :human-text (if mod-name
+                         mod-name
+                         "No game version specified")
            :tooltip (if (zero? severity)
                       canonical-path
                       (if indexed-mod
                         (if exact-version-match
                           (str "Loading mod details for '" mod-name "' at " (:file indexed-mod))
                           "Cannot determine exact version match")
-                        (str "Game '" mod-name "' not found locally")))}])
+                        (if mod-name
+                          (str "Game '" mod-name "' not found locally")
+                          "No game version specified")))}])
        (when (and indexed-mod (not exact-version-match))
          [{:severity 1
            :text "mismatch"

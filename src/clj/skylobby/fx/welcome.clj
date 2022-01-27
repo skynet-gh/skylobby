@@ -270,9 +270,9 @@
                [{:fx/type :button
                  :style-class ["button" "skylobby-normal"]
                  :text "Change"
-                 :on-action {:event/type :spring-lobby/file-chooser-spring-root
-                             :spring-isolation-dir (or server-spring-root spring-root)
-                             :target [:servers server-url :spring-isolation-dir]}
+                 :on-action {:event/type :spring-lobby/file-chooser-dir
+                             :initial-dir (or server-spring-root spring-root)
+                             :path [:servers server-url :spring-isolation-dir]}
                  :graphic
                  {:fx/type font-icon/lifecycle
                   :icon-literal "mdi-file-find:20"}}])}]})
