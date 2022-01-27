@@ -12,23 +12,31 @@
     :spring-lobby/refresh-maps})
 
 (def resource-tasks
-  #{:spring-lobby/import
+  #{
     :spring-lobby/map-details
-    :spring-lobby/mod-details})
+    :spring-lobby/mod-details
+    :spring-lobby/update-cached-minimaps})
 
 (def download-tasks
-  #{:spring-lobby/download-and-extract
+  #{
+    :spring-lobby/download-and-extract
     :spring-lobby/download-springfiles
     :spring-lobby/extract-7z
     :spring-lobby/import
-    :spring-lobby/http-downloadable
+    :spring-lobby/http-downloadable})
+
+(def rapid-tasks
+  #{
     :spring-lobby/rapid-download
     :spring-lobby/update-rapid
     :spring-lobby/update-rapid-packages
     :spring-lobby/delete-corrupt-rapid})
 
 (def task-kinds
-  [:spring-lobby/index-task :spring-lobby/resource-task :spring-lobby/download-task
+  [:spring-lobby/index-task
+   :spring-lobby/resource-task
+   :spring-lobby/download-task
+   :spring-lobby/rapid-task
    :spring-lobby/other-task])
 
 (defn task-kind [{:spring-lobby/keys [task-type]}]
@@ -36,6 +44,7 @@
     (contains? index-tasks task-type) :spring-lobby/index-task
     (contains? resource-tasks task-type) :spring-lobby/resource-task
     (contains? download-tasks task-type) :spring-lobby/download-task
+    (contains? rapid-tasks task-type) :spring-lobby/rapid-task
     :else :spring-lobby/other-task))
 
 (defn add-task-state [state task]
