@@ -153,6 +153,7 @@
     "mapname" "Dworld Duo"
     "hostport" 8452
     "ishost" 1
+    "hostip" "0.0.0.0"
     "myplayername" "me"
     "modoptions" {}
     "team0"
@@ -229,6 +230,7 @@
 \t}
 
 \tgametype = Balanced Annihilation V10.24;
+\thostip = 0.0.0.0;
 \thostport = 8452;
 \tishost = 1;
 \tmapname = Dworld Duo;
