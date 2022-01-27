@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.7.71](https://github.com/skynet-gh/skylobby/releases/tag/0.7.71) - 2022-01-26
+## [0.7.72](https://github.com/skynet-gh/skylobby/releases/tag/0.7.72) - 2022-01-27
 
 - Fix music fade when starting a game
 - Fix issues with auto get resources
