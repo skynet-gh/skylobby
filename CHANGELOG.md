@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.73](https://github.com/skynet-gh/skylobby/releases/tag/0.7.73) - 2022-01-28
+
+- Add button for Teiserver join queue
+- Fix performance issue with many open servers
+
 ## [0.7.72](https://github.com/skynet-gh/skylobby/releases/tag/0.7.72) - 2022-01-27
 
 - Fix music fade when starting a game
