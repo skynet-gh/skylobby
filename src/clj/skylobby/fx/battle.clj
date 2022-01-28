@@ -1328,7 +1328,7 @@
                       {:fx/type fx.channel/channel-view
                        :h-box/hgrow :always
                        :channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key battle-id)
-                       :disable old-battle
+                       :disable (boolean old-battle)
                        :hide-users true
                        :server-key server-key
                        :usernames (keys (or battle-users {}))}]}

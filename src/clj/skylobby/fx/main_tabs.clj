@@ -217,6 +217,7 @@
         pop-out-battle (fx/sub-val context :pop-out-battle)
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
         selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])
+        selected-server-tab (fx/sub-val context :selected-server-tab)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         channels (fx/sub-val context get-in [:by-server server-key :channels])
@@ -286,9 +287,13 @@
                                            ["skylobby-tab-focus"]))
             :on-selection-changed (fn [^javafx.event.Event ev] (focus-text-field (.getTarget ev)))
             :content
-            (if battle-id
+            (cond
+              (not= selected-server-tab server-key)
+              {:fx/type :pane}
+              battle-id
               {:fx/type fx.battle/battle-view
                :server-key server-key}
+              :else
               {:fx/type :h-box
                :alignment :top-left
                :children
