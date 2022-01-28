@@ -132,6 +132,46 @@
                      (.hide popup)))
                  lifecycle/dynamic)}))
 
+(defn battle-queue-button
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
+        am-spec (fx/sub-ctx context sub/am-spec server-key)
+        am-in-queue (->> messages
+                         (filter (comp #{"Coordinator"} :username))
+                         (filter :text)
+                         reverse
+                         (reduce
+                           (fn [am-in-queue {:keys [text]}]
+                             (cond
+                               (string/starts-with? text "You are now in the join-queue")
+                               true
+                               (string/starts-with? text "You have been removed from the join queue")
+                               false
+                               :else
+                               am-in-queue))
+                           false))]
+    (if am-in-queue
+      {:fx/type :button
+       :text "Leave Queue"
+       :disable (not am-spec)
+       :on-action {:event/type :spring-lobby/send-message
+                   :channel-name channel-name
+                   :client-data client-data
+                   :message "$%leaveq"
+                   :server-key server-key}}
+      {:fx/type :button
+       :text "Join Queue"
+       :disable (not am-spec)
+       :on-action {:event/type :spring-lobby/send-message
+                   :channel-name channel-name
+                   :client-data client-data
+                   :message "$%joinq"
+                   :server-key server-key}})))
+
 (defn battle-buttons
   [{:fx/keys [context]
     :keys [server-key my-player team-counts team-skills]}]
@@ -500,24 +540,32 @@
                                       :team-color my-team-color}}})
             {:fx/type :label
              :text " Ready "}]
-           [{:fx/type ext-recreate-on-key-changed
-             :key (str am-spec)
-             :desc
-             {:fx/type :check-box
-              :selected (boolean auto-unspec)
-              :style {:-fx-padding "10px"
-                      :-fx-font-size 15}
-              :on-selected-changed
-              {:event/type :spring-lobby/auto-unspec
-               :client-data (when-not singleplayer client-data)
-               :is-me true
-               :is-bot false
-               :id my-player
-               :ready-on-unspec ready-on-unspec
-               :server-key server-key}}}
-            {:fx/type :label
-             :style {:-fx-font-size 15}
-             :text "Auto Unspec "}])}
+           (if (contains? (:compflags client-data) "teiserver")
+             [{:fx/type :h-box
+               :style {:-fx-font-size 16}
+               :alignment :center-left
+               :children
+               [
+                {:fx/type battle-queue-button
+                 :server-key server-key}]}]
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str am-spec)
+               :desc
+               {:fx/type :check-box
+                :selected (boolean auto-unspec)
+                :style {:-fx-padding "10px"
+                        :-fx-font-size 15}
+                :on-selected-changed
+                {:event/type :spring-lobby/auto-unspec
+                 :client-data (when-not singleplayer client-data)
+                 :is-me true
+                 :is-bot false
+                 :id my-player
+                 :ready-on-unspec ready-on-unspec
+                 :server-key server-key}}}
+              {:fx/type :label
+               :style {:-fx-font-size 15}
+               :text "Auto Unspec "}]))}
         {:fx/type :h-box
          :alignment :center-left
          :style {:-fx-font-size 24}
