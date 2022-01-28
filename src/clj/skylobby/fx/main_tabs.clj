@@ -148,11 +148,14 @@
         indexed-mod (get mods-by-name mod-name)
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         sides (spring/mod-sides mod-details)
-        minimap-type (fx/sub-val context :minimap-type)]
+        minimap-type (fx/sub-val context :minimap-type)
+        height (+ minimap-size 80)]
     {:fx/type ext-recreate-on-key-changed
      :key (str minimap-size)
      :desc
      {:fx/type :h-box
+      :pref-height height
+      :max-height height
       :children
       [
        {:fx/type :v-box
