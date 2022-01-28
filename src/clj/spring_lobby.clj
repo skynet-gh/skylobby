@@ -5108,15 +5108,17 @@
 
 (defmethod event-handler ::send-message [{:keys [channel-name client-data message no-clear-draft no-history server-key] :as e}]
   (let [server-key (or server-key (u/server-key client-data))
-        {:keys [by-server]} (swap! *state update-in [:by-server server-key]
-                              (fn [server-data]
-                                (cond-> server-data
+        {:keys [by-server]} (swap! *state
+                              (fn [state]
+                                (cond-> (update-in state [:by-server server-key]
+                                          (fn [server-data]
+                                            (cond-> server-data
+                                                    (not no-history)
+                                                    (update-in [:channels channel-name :sent-messages] conj message)
+                                                    (not no-history)
+                                                    (assoc-in [:channels channel-name :history-index] default-history-index))))
                                         (not no-clear-draft)
-                                        (update :message-drafts dissoc channel-name)
-                                        (not no-history)
-                                        (update-in [:channels channel-name :sent-messages] conj message)
-                                        (not no-history)
-                                        (assoc-in [:channels channel-name :history-index] default-history-index))))
+                                        (update-in [:message-drafts server-key] dissoc channel-name))))
         client-data (or (get-in by-server [server-key :client-data])
                         client-data)]
     (future
@@ -5195,16 +5197,16 @@
                      (= KeyCode/DOWN code) dec
                      :else nil)]
       (try
-        (swap! *state update-in [:by-server server-key]
-          (fn [server-data]
-            (let [{:keys [history-index sent-messages]} (-> server-data :channels (get channel-name))
+        (swap! *state
+          (fn [state]
+            (let [{:keys [history-index sent-messages]} (get-in state [:by-server server-key :channels channel-name])
                   new-history-index (max default-history-index
                                          (min (dec (count sent-messages))
                                               (dir (or history-index default-history-index))))
                   history-message (nth sent-messages new-history-index "")]
-              (-> server-data
-                  (assoc-in [:message-drafts channel-name] history-message)
-                  (assoc-in [:channels channel-name :history-index] new-history-index)))))
+              (-> state
+                  (assoc-in [:by-server server-key :channels channel-name :history-index] new-history-index)
+                  (assoc-in [:message-drafts server-key channel-name] history-message)))))
         (catch Exception e
           (log/error e "Error setting chat history message"))))))
 
