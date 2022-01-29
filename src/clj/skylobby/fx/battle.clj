@@ -912,6 +912,7 @@
                  :on-value-changed {:event/type :spring-lobby/assoc
                                     :key :minimap-type}}
                 {:fx/type :label
+                 :alignment :center-left
                  :text (str " Map size: "
                             (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                               (str
@@ -1515,7 +1516,7 @@
                           :style (if singleplayer
                                    {:-fx-font-size 20}
                                    {:-fx-font-size 18
-                                    :-fx-pref-width 660})
+                                    :-fx-pref-width 720})
                           :children
                           [
                            {:fx/type engines-view
