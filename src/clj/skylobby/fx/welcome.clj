@@ -72,7 +72,7 @@
             :icon-literal "mdi-close-octagon:16"}}]))}))
 
 
-(def local-buttons-width 180)
+(def local-buttons-width 200)
 (def local-buttons-text-gap 16)
 
 (defn singleplayer-buttons

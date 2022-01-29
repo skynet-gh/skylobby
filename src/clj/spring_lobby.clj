@@ -5345,6 +5345,28 @@
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 
+(defmethod event-handler ::join-direct-connect
+  [{:keys [direct-connect-ip direct-connect-port direct-connect-username]}]
+  (swap! *state assoc-in [:by-server :direct] {:username direct-connect-username})
+  (future
+    (try
+      (let [response (clj-http/post
+                       (str "http://" direct-connect-ip ":" direct-connect-port "/api/direct-connect")
+                       {:content-type :transit+json
+                        :form-params
+                        {:command :join
+                         :opts
+                         {:direct-connect-ip direct-connect-ip
+                          :direct-connect-port direct-connect-port
+                          :direct-connect-username direct-connect-username}}
+                        :transit-opts
+                        {:encode {:handlers {}}
+                         :decode {:handlers {}}}})]
+        (log/info (with-out-str (pprint response))))
+      (catch Exception e
+        (log/error e "Error joining direct connect")))))
+
+
 (def state-watch-chimers
   [
    [:auto-get-resources-watcher auto-get-resources-watcher 2]

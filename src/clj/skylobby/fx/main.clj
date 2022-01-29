@@ -82,13 +82,10 @@
              :text "Join"
              :disable (or (string/blank? direct-connect-username)
                           (not (.isValidInet4Address ip-validator direct-connect-ip)))
-             :on-action {:event/type :spring-lobby/assoc-in ; TODO
-                         :path [:by-server :direct]
-                         :value
-                         {:battle {:battle-id :direct}
-                          :battles {:direct {:host-ip direct-connect-ip
-                                             :host-port direct-connect-port}}
-                          :username direct-connect-username}}}
+             :on-action {:event/type :spring-lobby/join-direct-connect
+                         :direct-connect-ip direct-connect-ip
+                         :direct-connect-port direct-connect-port
+                         :direct-connect-username direct-connect-username}}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -111,7 +108,8 @@
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
-        show-direct-connect (fx/sub-val context :show-direct-connect)
+        show-direct-connect (or (fx/sub-val context :show-direct-connect)
+                                (fx/sub-val context get-in [:by-server :direct]))
         show-http (fx/sub-val context :show-downloader)
         show-import (fx/sub-val context :show-importer)
         show-rapid (fx/sub-val context :show-rapid-downloader)
@@ -303,8 +301,8 @@
               :graphic {:fx/type :label
                         :text "LAN / Direct Connect"
                         :style {:-fx-font-size 18}}
-              :on-close-request {:event/type :spring-lobby/dissoc
-                                 :key :show-direct-connect}
+              :on-close-request {:event/type :spring-lobby/dissoc-in
+                                 :path [:by-server :direct]}
               :content
               {:fx/type direct-connect-tab}}])
           (mapv
