@@ -197,11 +197,12 @@
         show-accolades (fx/sub-val context :show-accolades)]
     (if (and show-accolades accolade-for)
       {:fx/type :h-box
+       :style {:-fx-font-size 18}
        :alignment :center-left
        :children
        (concat
          [{:fx/type :label
-           :text (str " Accolade for" accolade-for ": ")}]
+           :text (str " Accolade for " accolade-for ": ")}]
          (mapv
            (fn [{:keys [text desc n]}]
              {:fx/type :button
@@ -218,8 +219,8 @@
             {:text "None"
              :desc "Regardless of skill they were there when you needed them and tried to help the team."
              :n 0}
-            {:text "MVP"
-             :desc "Quite clearly the most valuable player on the their team."
+            {:text "Good Teammate"
+             :desc "Regardless of skill they were there when you needed them and tried to help the team."
              :n 1}
             {:text "MVP"
              :desc "Quite clearly the most valuable player on the their team."
