@@ -122,6 +122,7 @@
         show-spring-picker (and (fx/sub-val context :show-spring-picker)
                                 (not (fx/sub-val context :spring-lobby.main/spring-root-arg)))
         show-tasks (fx/sub-val context :show-tasks-window)
+        show-accolades (fx/sub-val context :show-accolades)
         windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
                   (when show-spring-picker ["spring"])
@@ -327,7 +328,9 @@
                                                       (and
                                                         (contains? my-channels channel-name)
                                                         (not (contains? (get mute server-key) channel-name))
-                                                        (not (contains? ignore-channels-set channel-name))))
+                                                        (not (contains? ignore-channels-set channel-name))
+                                                        (or (not show-accolades)
+                                                            (not= channel-name (u/user-channel-name "AccoladesBot")))))
                                                     (keys (get-in needs-focus [server-key "chat"]))))))
                                 ["tab" "skylobby-tab-focus"]
                                 ["tab"])]
