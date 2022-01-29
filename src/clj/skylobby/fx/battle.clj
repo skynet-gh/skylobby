@@ -189,7 +189,9 @@
                               (let [[_all username] (re-find #"You have an opportunity to leave feedback on one of the players in your last game. We have selected (.*)" text)]
                                 (cond
                                   username username
-                                  (string/starts-with? text "Thank you for your feedback, this Accolade will be bestowed.")
+                                  (or
+                                    (string/starts-with? text "Thank you for your feedback, this Accolade will be bestowed.")
+                                    (string/starts-with? text "I'm not currently awaiting feedback for a player"))
                                   nil
                                   :else
                                   accolade-for)))
@@ -1516,7 +1518,7 @@
                           :style (if singleplayer
                                    {:-fx-font-size 20}
                                    {:-fx-font-size 18
-                                    :-fx-pref-width 720})
+                                    :-fx-pref-width 760})
                           :children
                           [
                            {:fx/type engines-view
