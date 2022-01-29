@@ -3496,12 +3496,14 @@
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
         (spring/start-game *state state)
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!cv start")
-            :no-clear-draft true}))
+        (do
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!cv start")
+              :no-clear-draft true})
+          (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] false)))
       (catch Exception e
         (log/error e "Error starting battle")))))
 
