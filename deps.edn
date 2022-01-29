@@ -22,6 +22,7 @@
   com.taoensso/timbre {:mvn/version "5.1.2"}
   com.taoensso/tufte {:mvn/version "2.2.0"}
   commons-io/commons-io {:mvn/version "2.11.0"}
+  commons-validator/commons-validator {:mvn/version "1.7"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
   digest/digest {:mvn/version "1.4.10"}
@@ -59,7 +60,7 @@
   org.clojure/tools.logging {:mvn/version "1.2.4"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.1"}
-  org.fxmisc.flowless/flowless {:mvn/version "0.6.7"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.6.8"}
   org.fxmisc.richtext/richtextfx {:mvn/version "0.10.7"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.0"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.0"}

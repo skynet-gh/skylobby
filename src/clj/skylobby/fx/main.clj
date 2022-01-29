@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
@@ -16,15 +17,101 @@
     [skylobby.fx.tasks :as fx.tasks]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (org.apache.commons.validator.routines InetAddressValidator)))
 
 
 (set! *warn-on-reflection* true)
 
 
+(def ip-validator (InetAddressValidator/getInstance))
+
+
+(defn direct-connect-tab
+  [{:fx/keys [context]}]
+  (let [battle-id (fx/sub-val context get-in [:by-server :direct :battle :battle-id])
+        direct-connect-ip (fx/sub-val context :direct-connect-ip)
+        direct-connect-port (or (fx/sub-val context :direct-connect-port)
+                                u/ipc-port)
+        direct-connect-username (fx/sub-val context :direct-connect-username)]
+    {:fx/type :v-box
+     :children
+     [
+      (if battle-id
+        {:fx/type fx.battle/battle-view
+         :v-box/vgrow :always
+         :server-key :direct}
+        {:fx/type :h-box
+         :style {:-fx-font-size 20}
+         :v-box/vgrow :always
+         :children
+         [{:fx/type :pane
+           :h-box/hgrow :always}
+          {:fx/type :v-box
+           :alignment :center
+           :children
+           [{:fx/type :pane
+             :v-box/vgrow :always}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "Username: "}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :text-field
+               :text (str direct-connect-username)
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :direct-connect-username}}]}
+            {:fx/type :button
+             :style-class ["button" "skylobby-normal"]
+             :text "Host"
+             :disable (string/blank? direct-connect-username)
+             :on-action {:event/type :spring-lobby/assoc-in
+                         :path [:by-server :direct]
+                         :value
+                         {:battle {:battle-id :direct
+                                   :users {direct-connect-username {}}}
+                          :battles {:direct {:host-username direct-connect-username}}
+                          :username direct-connect-username}}}
+            {:fx/type :label
+             :text "or"}
+            {:fx/type :button
+             :style-class ["button" "skylobby-normal"]
+             :text "Join"
+             :disable (or (string/blank? direct-connect-username)
+                          (not (.isValidInet4Address ip-validator direct-connect-ip)))
+             :on-action {:event/type :spring-lobby/assoc-in ; TODO
+                         :path [:by-server :direct]
+                         :value
+                         {:battle {:battle-id :direct}
+                          :battles {:direct {:host-ip direct-connect-ip
+                                             :host-port direct-connect-port}}
+                          :username direct-connect-username}}}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "Host IP: "}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :text-field
+               :text (str direct-connect-ip)
+               :prompt-text "0.0.0.0"
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :direct-connect-ip}}]}
+            {:fx/type :pane
+             :v-box/vgrow :always}]}
+          {:fx/type :pane
+           :h-box/hgrow :always}]})
+      {:fx/type fx.bottom-bar/bottom-bar}]}))
+
+
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
+        show-direct-connect (fx/sub-val context :show-direct-connect)
         show-http (fx/sub-val context :show-downloader)
         show-import (fx/sub-val context :show-importer)
         show-rapid (fx/sub-val context :show-rapid-downloader)
@@ -56,6 +143,7 @@
                       (when show-tasks
                         ["tasks"])))
                   (when show-singleplayer ["singleplayer"])
+                  (when show-direct-connect ["direct"])
                   valid-server-keys)
                   ;#_(when (seq valid-server-keys) ["multi"]))
         tab-id-set (set tab-ids)
@@ -207,6 +295,17 @@
                  :v-box/vgrow :always
                  :server-key :local}
                 {:fx/type fx.bottom-bar/bottom-bar}]}}])
+          (when show-direct-connect
+            [{:fx/type :tab
+              :id "direct"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "LAN / Direct Connect"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/dissoc
+                                 :key :show-direct-connect}
+              :content
+              {:fx/type direct-connect-tab}}])
           (mapv
             (fn [server-key]
               (let [

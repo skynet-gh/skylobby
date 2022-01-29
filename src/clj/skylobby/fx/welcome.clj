@@ -95,6 +95,18 @@
       {:fx/type :button
        :style-class ["button" "skylobby-normal"]
        :pref-width local-buttons-width
+       :text "LAN/Direct"
+       :on-action {:event/type :spring-lobby/toggle-window
+                   :windows-as-tabs true
+                   :key :show-direct-connect}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-lan-connect:30"}}
+      {:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
        :text "Replays"
        :on-action {:event/type :spring-lobby/toggle-window
                    :windows-as-tabs (fx/sub-val context :windows-as-tabs)

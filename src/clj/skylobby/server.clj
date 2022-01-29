@@ -338,8 +338,13 @@
      :content-length (connection-content-length resource)
      :last-modified  (connection-last-modified resource)}))
 
+(defn direct-connect-handler-fn [state-atom]
+  (fn [request]
+    (log/info request)))
+
 (defn handler [state-atom]
-  (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)]
+  (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)
+        direct-connect-handler (direct-connect-handler-fn state-atom)]
     (ring/ring-handler
       (ring/router
         [
@@ -351,7 +356,8 @@
                           :responses  {200 {:body {:total int?}}}
                           :handler    (fn [{{{:keys [x y]} :query} :parameters}]
                                         {:status 200
-                                         :body   {:total (+ x y)}})}}]]
+                                         :body   {:total (+ x y)}})}}]
+          ["/direct-connect" {:post {:handler direct-connect-handler}}]]
          ["/ipc"
           ["/replay" {:get {:parameters {:query {:path string?}}}
                       :responses {200 {:body {:path string?}}}

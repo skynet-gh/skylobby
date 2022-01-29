@@ -574,7 +574,8 @@
                             (merge
                               {:event/type :spring-lobby/kick-battle
                                :client-data client-data
-                               :singleplayer singleplayer}
+                               :singleplayer singleplayer
+                               :server-key server-key}
                               (select-keys id [:bot-name :username]))
                             :graphic
                             {:fx/type font-icon/lifecycle
@@ -1000,7 +1001,8 @@
                                (merge
                                  {:event/type :spring-lobby/kick-battle
                                   :client-data client-data
-                                  :singleplayer singleplayer}
+                                  :singleplayer singleplayer
+                                  :server-key server-key}
                                  (select-keys player [:bot-name :username]))
                                :graphic
                                {:fx/type font-icon/lifecycle

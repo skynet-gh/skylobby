@@ -169,7 +169,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
@@ -1157,7 +1157,7 @@
     (try
       (when-let [tasks (->> new-state
                             :by-server
-                            (remove (comp #{:local} first))
+                            (remove (comp keyword? first))
                             (mapcat
                               (fn [[server-key new-server]]
                                 (let [old-server (-> old-state :by-server (get server-key))]
@@ -2885,7 +2885,8 @@
    :show-scenarios-window "scenarios"
    :show-settings-window "settings"
    :show-spring-picker "spring"
-   :show-tasks-window "tasks"})
+   :show-tasks-window "tasks"
+   :show-direct-connect "direct"})
 
 (def tab-to-window-key
   (clojure.set/map-invert window-to-tab))
@@ -3396,19 +3397,19 @@
         (log/error e "Error suggesting map")))))
 
 (defmethod event-handler ::kick-battle
-  [{:keys [bot-name client-data singleplayer username]}]
+  [{:keys [bot-name client-data server-key singleplayer username]}]
   (future
     (try
-      (if singleplayer
+      (if (keyword? server-key)
         (do
-          (log/info "Singleplayer battle kick")
+          (log/info "Special server battle kick")
           (swap! *state
                  (fn [state]
                    (-> state
-                       (update-in [:by-server :local :battles :singleplayer :bots] dissoc bot-name)
-                       (update-in [:by-server :local :battle :bots] dissoc bot-name)
-                       (update-in [:by-server :local :battles :singleplayer :users] dissoc username)
-                       (update-in [:by-server :local :battle :users] dissoc username)))))
+                       (update-in [:by-server server-key :battles :singleplayer :bots] dissoc bot-name)
+                       (update-in [:by-server server-key :battle :bots] dissoc bot-name)
+                       (update-in [:by-server server-key :battles :singleplayer :users] dissoc username)
+                       (update-in [:by-server server-key :battle :users] dissoc username)))))
         (if bot-name
           (message/send-message *state client-data (str "REMOVEBOT " bot-name))
           (message/send-message *state client-data (str "KICKFROMBATTLE " username))))
@@ -3427,7 +3428,7 @@
         (str desired-name 0)))))
 
 (defmethod event-handler ::add-bot
-  [{:keys [battle bot-username bot-name bot-version client-data side-indices singleplayer username]}]
+  [{:keys [battle bot-username bot-name bot-version client-data server-key side-indices singleplayer username]}]
   (swap! *state dissoc :show-add-bot)
   (future
     (try
@@ -3445,9 +3446,9 @@
             bot-status (cu/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-        (if singleplayer
+        (if (keyword? server-key)
           (do
-            (log/info "Singleplayer add bot")
+            (log/info "Special server add bot")
             (swap! *state
                    (fn [state]
                      (let [bot-data {:bot-name bot-username
@@ -3457,8 +3458,8 @@
                                      :battle-status status
                                      :owner username}]
                        (-> state
-                           (assoc-in [:by-server :local :battles :singleplayer :bots bot-username] bot-data)
-                           (assoc-in [:by-server :local :battle :bots bot-username] bot-data))))))
+                           (assoc-in [:by-server server-key :battles (:battle-id battle) :bots bot-username] bot-data)
+                           (assoc-in [:by-server server-key :battle :bots bot-username] bot-data))))))
           (message/send-message *state client-data message)))
       (catch Exception e
         (log/error e "Error adding bot")))))
@@ -4850,34 +4851,34 @@
 
 
 (defmethod event-handler ::singleplayer-engine-changed
-  [{:fx/keys [event] :keys [engine-version spring-root]}]
+  [{:fx/keys [event] :keys [battle-id engine-version server-key spring-root] :or {battle-id :singleplayer server-key :local}}]
   (let [engine-version (or engine-version event)]
     (swap! *state
       (fn [server]
         (-> server
             (assoc :engine-filter "")
             (assoc-in [:by-spring-root (fs/canonical-path spring-root) :engine-version] engine-version)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-version] engine-version))))))
+            (assoc-in [:by-server server-key :battles battle-id :battle-version] engine-version))))))
 
 (defmethod event-handler ::singleplayer-mod-changed
-  [{:fx/keys [event] :keys [mod-name spring-root]}]
+  [{:fx/keys [event] :keys [battle-id mod-name server-key spring-root] :or {battle-id :singleplayer server-key :local}}]
   (let [mod-name (or mod-name event)]
     (swap! *state
       (fn [server]
         (-> server
             (assoc :mod-filter "")
             (assoc-in [:by-spring-root (fs/canonical-path spring-root) :mod-name] mod-name)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-modname] mod-name))))))
+            (assoc-in [:by-server server-key :battles battle-id :battle-modname] mod-name))))))
 
 (defmethod event-handler ::singleplayer-map-changed
-  [{:fx/keys [event] :keys [map-name spring-root]}]
+  [{:fx/keys [event] :keys [battle-id map-name server-key spring-root] :or {battle-id :local server-key :singleplayer}}]
   (let [map-name (or map-name event)]
     (swap! *state
       (fn [server]
         (-> server
             (assoc :map-input-prefix "")
             (assoc-in [:by-spring-root (fs/canonical-path spring-root) :map-name] map-name)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-map] map-name))))))
+            (assoc-in [:by-server server-key :battles battle-id :battle-map] map-name))))))
 
 
 (defmethod event-handler ::scan-imports

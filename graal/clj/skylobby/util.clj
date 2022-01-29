@@ -314,13 +314,15 @@
 
 
 (defn valid-servers [by-server]
-  (->> (dissoc by-server :local)
+  (->> by-server
+       (remove (comp keyword? first))
        (remove (comp string/blank? first))
        (filter (comp :accepted second))))
 
 
 (defn valid-server-keys [by-server]
-  (->> (dissoc by-server :local)
+  (->> by-server
+       (remove (comp keyword? first))
        (remove (comp string/blank? first))
        (filter (comp :accepted second))
        (map first)
