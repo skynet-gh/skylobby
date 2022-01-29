@@ -155,14 +155,26 @@
                                am-in-queue))
                            false))]
     (if am-in-queue
-      {:fx/type :button
-       :text "Leave Queue"
-       :disable (not am-spec)
-       :on-action {:event/type :spring-lobby/send-message
-                   :channel-name channel-name
-                   :client-data client-data
-                   :message "$%leaveq"
-                   :server-key server-key}}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [
+        {:fx/type :button
+         :text "Leave Queue"
+         :disable (not am-spec)
+         :on-action {:event/type :spring-lobby/send-message
+                     :channel-name channel-name
+                     :client-data client-data
+                     :message "$%leaveq"
+                     :server-key server-key}}
+        {:fx/type :button
+         :text "Queue Status"
+         :disable (not am-spec)
+         :on-action {:event/type :spring-lobby/send-message
+                     :channel-name channel-name
+                     :client-data client-data
+                     :message "$%status"
+                     :server-key server-key}}]}
       {:fx/type :button
        :text "Join Queue"
        :disable (not am-spec)
