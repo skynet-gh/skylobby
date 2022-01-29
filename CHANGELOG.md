@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.74](https://github.com/skynet-gh/skylobby/releases/tag/0.7.74) - 2022-01-30
+
+- Add UI for AccoladesBot
+- Use modinfo to determine mod dependencies
+- Add filtering for modoptions
+- Add join queue status button
+
 ## [0.7.73](https://github.com/skynet-gh/skylobby/releases/tag/0.7.73) - 2022-01-28
 
 - Add button for Teiserver join queue
