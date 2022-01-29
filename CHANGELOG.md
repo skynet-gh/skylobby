@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.74](https://github.com/skynet-gh/skylobby/releases/tag/0.7.74) - 2022-01-28
+
+- Add UI for AccoladesBot
+
 ## [0.7.73](https://github.com/skynet-gh/skylobby/releases/tag/0.7.73) - 2022-01-28
 
 - Add button for Teiserver join queue
