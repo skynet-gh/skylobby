@@ -218,9 +218,17 @@
                 {:text (str (:def i))})))}}]}]}))
 
 (defn modoptions-view
-  [{:keys [current-options event-data modoptions option-key server-key singleplayer]}]
+  [{:fx/keys [context]
+    :keys [current-options event-data modoptions option-key server-key singleplayer]}]
   (let [sorted (sort-by (comp u/to-number first) modoptions)
-        by-section (split-by (comp #{"section"} :type second) sorted)]
+        by-section (split-by (comp #{"section"} :type second) sorted)
+        filter-modoptions (fx/sub-val context :filter-modoptions)
+        filter-lc (or (when filter-modoptions (string/lower-case filter-modoptions))
+                      "")
+        show-only-changed-modoptions (fx/sub-val context :show-only-changed-modoptions)
+        scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+        changed-options (or current-options
+                            (get-in scripttags ["game" (or option-key "modoptions")]))]
     {:fx/type ext-recreate-on-key-changed
      :key (str server-key)
      :desc
@@ -231,13 +239,57 @@
       {:fx/type :v-box
        :alignment :top-left
        :children
-       (mapv
-         (fn [section]
-           {:fx/type modoptions-table
-            :current-options current-options
-            :event-data event-data
-            :modoptions section
-            :option-key option-key
-            :server-key server-key
-            :singleplayer singleplayer})
-         by-section)}}}))
+       (concat
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text " Filter: "}
+            {:fx/type :text-field
+             :text (str filter-modoptions)
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :filter-modoptions}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :check-box
+             :selected (boolean show-only-changed-modoptions)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :show-only-changed-modoptions}}
+            {:fx/type :label
+             :text " Show only changed "}]}]
+         (->> by-section
+              (map
+                (fn [section]
+                  (->> section
+                       (filter
+                         (fn [[_ modoption]]
+                           (if-not (string/blank? filter-modoptions)
+                             (some
+                               (fn [kw]
+                                 (when-let [s (get modoption kw)]
+                                   (string/includes? (string/lower-case s) filter-lc)))
+                               [:key :name :desc])
+                             true)))
+                       (into {}))))
+              (map
+                (fn [section]
+                  (->> section
+                       (filter
+                         (fn [[_ modoption]]
+                           (if show-only-changed-modoptions
+                             (or (= "section" (:type modoption))
+                                 (contains? changed-options (:key modoption)))
+                             true)))
+                       (into {}))))
+              (remove (comp empty? second))
+              (mapv
+                (fn [section]
+                  {:fx/type modoptions-table
+                   :current-options current-options
+                   :event-data event-data
+                   :modoptions section
+                   :option-key option-key
+                   :server-key server-key
+                   :singleplayer singleplayer}))))}}}))
