@@ -1522,7 +1522,7 @@
                           :style (if singleplayer
                                    {:-fx-font-size 20}
                                    {:-fx-font-size 18
-                                    :-fx-pref-width 760})
+                                    :-fx-pref-width 800})
                           :children
                           [
                            {:fx/type engines-view
