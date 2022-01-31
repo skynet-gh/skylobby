@@ -16,7 +16,7 @@
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.minimap :as fx.minimap]
-    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
+    [skylobby.fx.mod-sync :as fx.mod-sync]
     [skylobby.fx.players-table :refer [players-table]]
     [skylobby.fx.user :as fx.user]
     [skylobby.util :as u]
@@ -180,7 +180,7 @@
          {:fx/type engine-sync-pane
           :engine-version engine-version
           :spring-isolation-dir spring-root}
-         {:fx/type mod-sync-pane
+         {:fx/type fx.mod-sync/mod-and-deps-sync-pane
           :engine-version engine-version
           :index-only true
           :mod-name mod-name

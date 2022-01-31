@@ -19,14 +19,13 @@
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.minimap :as fx.minimap]
-    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
+    [skylobby.fx.mod-sync :as fx.mod-sync]
     [skylobby.fx.mods :refer [mods-view]]
     [skylobby.fx.players-table :refer [players-table]]
     [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [skylobby.resource :as resource]
     [skylobby.util :as u]
     [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
@@ -1396,15 +1395,8 @@
         mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
         map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
-        {:keys [engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
+        {:keys [engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-root)
         engine-details (get engines-by-version engine-version)
-        mod-dependencies (->> mod-name
-                              resource/mod-dependencies
-                              (map (fn [mod-name]
-                                     (let [indexed-mod (get mods-by-name mod-name)]
-                                       {:mod-name mod-name
-                                        :indexed indexed-mod
-                                        :details indexed-mod}))))
         engine-file (:file engine-details)
         battle-users (or (:users old-battle)
                          (fx/sub-val context get-in [:by-server server-key :battle :users]))
@@ -1601,18 +1593,10 @@
                                 {:fx/type engine-sync-pane
                                  :engine-version engine-version
                                  :spring-isolation-dir spring-root}
-                                {:fx/type mod-sync-pane
+                                {:fx/type fx.mod-sync/mod-and-deps-sync-pane
                                  :engine-version engine-version
                                  :mod-name mod-name
                                  :spring-isolation-dir spring-root}]
-                               (map
-                                 (fn [{:keys [mod-name]}]
-                                   {:fx/type mod-sync-pane
-                                    :dependency true
-                                    :engine-version engine-version
-                                    :mod-name mod-name
-                                    :spring-isolation-dir spring-root})
-                                 mod-dependencies)
                                [{:fx/type map-sync-pane
                                  :map-name map-name
                                  :spring-isolation-dir spring-root}

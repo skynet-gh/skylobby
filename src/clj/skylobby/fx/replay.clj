@@ -16,7 +16,7 @@
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.map-sync :refer [map-sync-pane]]
     [skylobby.fx.minimap :as fx.minimap]
-    [skylobby.fx.mod-sync :refer [mod-sync-pane]]
+    [skylobby.fx.mod-sync :as fx.mod-sync]
     [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.sub :as sub]
@@ -349,7 +349,7 @@
               {:fx/type engine-sync-pane
                :engine-version selected-engine-version
                :spring-isolation-dir spring-isolation-dir})
-            {:fx/type mod-sync-pane
+            {:fx/type fx.mod-sync/mod-and-deps-sync-pane
              :engine-version selected-engine-version
              :mod-name mod-name
              :spring-isolation-dir spring-isolation-dir}
