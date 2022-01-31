@@ -5353,6 +5353,8 @@
       (let [response (clj-http/post
                        (str "http://" direct-connect-ip ":" direct-connect-port "/api/direct-connect")
                        {:content-type :transit+json
+                        :as :transit+json
+                        :accept :transit+json
                         :form-params
                         {:command :join
                          :opts
@@ -5362,7 +5364,8 @@
                         :transit-opts
                         {:encode {:handlers {}}
                          :decode {:handlers {}}}})]
-        (log/info (with-out-str (pprint response))))
+        (log/info (with-out-str (pprint response)))
+        (swap! *state assoc-in [:by-server :direct] (get-in response [:body :state])))
       (catch Exception e
         (log/error e "Error joining direct connect")))))
 
