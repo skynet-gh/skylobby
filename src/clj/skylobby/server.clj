@@ -3,6 +3,7 @@
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
+    [clojure.pprint :refer [pprint]]
     [clojure.spec.alpha :as s]
     [hiccup.core :as hiccup]
     [muuntaja.core :as m]
@@ -338,14 +339,33 @@
      :content-length (connection-content-length resource)
      :last-modified  (connection-last-modified resource)}))
 
+
+(defmulti handle-direct-connect (fn [_state-atom request] (get-in request [:body-params :command])))
+
+(defmethod handle-direct-connect :default [_state-atom request]
+  (log/info "No method to handle direct connect request" (with-out-str (pprint request))))
+
+(defmethod handle-direct-connect :join [state-atom request]
+  (let [{:keys [direct-connect-username]} (get-in request [:body-params :opts])
+        [old-state new-state] (swap-vals! state-atom update-in [:by-server :direct :battle :users]
+                                (fn [users]
+                                  (if (contains? users direct-connect-username)
+                                    users
+                                    (assoc users direct-connect-username {}))))]
+    (if (= old-state new-state)
+      {:deny :username-taken}
+      {:ok :joined
+       :state (get-in new-state [:by-server :direct])})))
+
+
 (defn direct-connect-handler-fn [state-atom]
   (fn [request]
-    (let [debug (dissoc request :reitit.core/match)]
-      (log/info debug)
-      (log/info (with-out-str (clojure.pprint/pprint debug)))
+    (let [debug (dissoc request :reitit.core/match)
+          response (or (handle-direct-connect state-atom request)
+                       {:state (get-in @state-atom [:by-server :direct])})]
+      (log/info (with-out-str (pprint debug)))
       {:status 200
-       :headers {"Content-Type" "text/html"}
-       :body "ok"})))
+       :body response})))
 
 (defn handler [state-atom]
   (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)
