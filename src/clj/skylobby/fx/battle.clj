@@ -172,6 +172,73 @@
                    :message "$%joinq"
                    :server-key server-key}})))
 
+(defn battle-accolades
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [
+        accolades-bot-name "AccoladesBot"
+        channel-name (u/user-channel-name accolades-bot-name)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
+        accolade-for (->> messages
+                          (filter (comp #{accolades-bot-name} :username))
+                          (filter :text)
+                          reverse
+                          (reduce
+                            (fn [accolade-for {:keys [text]}]
+                              (let [[_all username] (re-find #"You have an opportunity to leave feedback on one of the players in your last game. We have selected (.*)" text)]
+                                (cond
+                                  username username
+                                  (or
+                                    (string/starts-with? text "Thank you for your feedback, this Accolade will be bestowed.")
+                                    (string/starts-with? text "I'm not currently awaiting feedback for a player"))
+                                  nil
+                                  :else
+                                  accolade-for)))
+                            nil))
+        show-accolades (fx/sub-val context :show-accolades)]
+    (if (and show-accolades accolade-for)
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :alignment :center-left
+       :children
+       (concat
+         [{:fx/type :label
+           :text (str " Accolade for " accolade-for ": ")}]
+         (mapv
+           (fn [{:keys [text desc n]}]
+             {:fx/type :button
+              :text (str text)
+              :tooltip {:fx/type :tooltip
+                        :text (str desc)}
+              :on-action {:event/type :spring-lobby/send-message
+                          :channel-name channel-name
+                          :client-data client-data
+                          :message (str n)
+                          :server-key server-key}})
+           ; TODO parse from messages
+           [
+            {:text "None"
+             :desc "Regardless of skill they were there when you needed them and tried to help the team."
+             :n 0}
+            {:text "Good Teammate"
+             :desc "Regardless of skill they were there when you needed them and tried to help the team."
+             :n 1}
+            {:text "MVP"
+             :desc "Quite clearly the most valuable player on the their team."
+             :n 2}
+            {:text "Sportsmanship"
+             :desc "Humble in defeat and magnanimous in victory."
+             :n 3}
+            {:text "Strategist"
+             :desc "Knew what to build when, always two steps ahead of their opponents."
+             :n 4}
+            {:text "Teacher"
+             :desc "Made others feel welcome and helped them improve at the game."
+             :n 5}]))}
+      {:fx/type :pane})))
+
+
 (defn battle-buttons
   [{:fx/keys [context]
     :keys [server-key my-player team-counts team-skills]}]
@@ -341,156 +408,173 @@
                        {:fx/type :label
                         :text " Interleave Player IDs "}]}]))
         debug-spring (boolean (fx/sub-val context :debug-spring))]
-    {:fx/type :flow-pane
-     :style {:-fx-font-size 16}
-     :hgap 4
-     :orientation :horizontal
+    {:fx/type :v-box
      :children
-     (concat
-       sync-buttons
-       [{:fx/type :pane
-         :pref-width 16}]
-       buttons
-       (when (or singleplayer (not am-spec))
+     [
+      {:fx/type :flow-pane
+       :style {:-fx-font-size 16}
+       :hgap 4
+       :orientation :horizontal
+       :children
+       (concat
+         sync-buttons
+         [{:fx/type :pane
+           :pref-width 16}]
+         buttons
+         (when (or singleplayer (not am-spec))
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type fx/ext-let-refs
+               :refs {::add-bot-button
+                      {:fx/type :button
+                       :text "Add AI"
+                       :disable (boolean (fx/sub-val context :show-add-bot))
+                       :on-action {:event/type :spring-lobby/toggle
+                                   :key :show-add-bot}}}
+               :desc {:fx/type fx/ext-let-refs
+                      :refs {::add-bot-popup {:fx/type ext-with-shown-on
+                                              :props (when (fx/sub-val context :show-add-bot)
+                                                       {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
+                                              :desc {:fx/type :tooltip
+                                                     :anchor-location :window-bottom-left
+                                                     :auto-hide true
+                                                     :auto-fix true
+                                                     :on-hidden {:event/type :spring-lobby/dissoc
+                                                                 :key :show-add-bot}
+                                                     :graphic
+                                                     {:fx/type :v-box
+                                                      :style {:-fx-font-size 16}
+                                                      :children
+                                                      (concat
+                                                        [
+                                                         {:fx/type :h-box
+                                                          :alignment :center-left
+                                                          :children
+                                                          [
+                                                           {:fx/type :label
+                                                            :text " AI: "}
+                                                           {:fx/type :combo-box
+                                                            :value bot-name
+                                                            :disable (empty? bot-names)
+                                                            :on-value-changed {:event/type :spring-lobby/change-bot-name
+                                                                               :bots bots}
+                                                            :items (sort bot-names)}]}
+                                                         {:fx/type :h-box
+                                                          :alignment :center-left
+                                                          :children
+                                                          [
+                                                           {:fx/type :label
+                                                            :text " Version: "}
+                                                           {:fx/type ext-recreate-on-key-changed
+                                                            :key (str bot-name)
+                                                            :desc
+                                                            {:fx/type :combo-box
+                                                             :value bot-version
+                                                             :disable (string/blank? bot-name)
+                                                             :on-value-changed {:event/type :spring-lobby/assoc
+                                                                                :key :bot-version}
+                                                             :items (or bot-versions [])}}]}
+                                                         {:fx/type :h-box
+                                                          :alignment :center-left
+                                                          :children
+                                                          [{:fx/type :label
+                                                            :text " Name: "}
+                                                           {:fx/type :text-field
+                                                            :prompt-text "AI Name"
+                                                            :text (str bot-username)
+                                                            :on-text-changed {:event/type :spring-lobby/assoc
+                                                                              :key :bot-username}}]}]
+                                                        (when (re-find #"\s" bot-username)
+                                                          [{:fx/type :label
+                                                            :style {:-fx-text-fill "red"}
+                                                            :text "Name cannot contain whitespace"}])
+                                                        [{:fx/type :button
+                                                          :text "Add"
+                                                          :disable (boolean
+                                                                     (or
+                                                                       (string/blank? bot-name)
+                                                                       (string/blank? bot-version)
+                                                                       (string/blank? bot-username)
+                                                                       (re-find #"\s" bot-username)))
+                                                          :on-action
+                                                          {:event/type :spring-lobby/add-bot
+                                                           :battle battle
+                                                           :bot-username bot-username
+                                                           :bot-name bot-name
+                                                           :bot-version bot-version
+                                                           :client-data client-data
+                                                           :server-key server-key
+                                                           :side-indices (keys sides)
+                                                           :singleplayer singleplayer
+                                                           :username username}}])}}}}
+                      :desc {:fx/type fx/ext-get-ref :ref ::add-bot-button}}}]}])
          [{:fx/type :h-box
            :alignment :center-left
            :children
-           [{:fx/type fx/ext-let-refs
-             :refs {::add-bot-button
-                    {:fx/type :button
-                     :text "Add AI"
-                     :disable (boolean (fx/sub-val context :show-add-bot))
-                     :on-action {:event/type :spring-lobby/toggle
-                                 :key :show-add-bot}}}
-             :desc {:fx/type fx/ext-let-refs
-                    :refs {::add-bot-popup {:fx/type ext-with-shown-on
-                                            :props (when (fx/sub-val context :show-add-bot)
-                                                     {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
-                                            :desc {:fx/type :tooltip
-                                                   :anchor-location :window-bottom-left
-                                                   :auto-hide true
-                                                   :auto-fix true
-                                                   :on-hidden {:event/type :spring-lobby/dissoc
-                                                               :key :show-add-bot}
-                                                   :graphic
-                                                   {:fx/type :v-box
-                                                    :style {:-fx-font-size 16}
-                                                    :children
-                                                    (concat
-                                                      [
-                                                       {:fx/type :h-box
-                                                        :alignment :center-left
-                                                        :children
-                                                        [
-                                                         {:fx/type :label
-                                                          :text " AI: "}
-                                                         {:fx/type :combo-box
-                                                          :value bot-name
-                                                          :disable (empty? bot-names)
-                                                          :on-value-changed {:event/type :spring-lobby/change-bot-name
-                                                                             :bots bots}
-                                                          :items (sort bot-names)}]}
-                                                       {:fx/type :h-box
-                                                        :alignment :center-left
-                                                        :children
-                                                        [
-                                                         {:fx/type :label
-                                                          :text " Version: "}
-                                                         {:fx/type ext-recreate-on-key-changed
-                                                          :key (str bot-name)
-                                                          :desc
-                                                          {:fx/type :combo-box
-                                                           :value bot-version
-                                                           :disable (string/blank? bot-name)
-                                                           :on-value-changed {:event/type :spring-lobby/assoc
-                                                                              :key :bot-version}
-                                                           :items (or bot-versions [])}}]}
-                                                       {:fx/type :h-box
-                                                        :alignment :center-left
-                                                        :children
-                                                        [{:fx/type :label
-                                                          :text " Name: "}
-                                                         {:fx/type :text-field
-                                                          :prompt-text "AI Name"
-                                                          :text (str bot-username)
-                                                          :on-text-changed {:event/type :spring-lobby/assoc
-                                                                            :key :bot-username}}]}]
-                                                      (when (re-find #"\s" bot-username)
-                                                        [{:fx/type :label
-                                                          :style {:-fx-text-fill "red"}
-                                                          :text "Name cannot contain whitespace"}])
-                                                      [{:fx/type :button
-                                                        :text "Add"
-                                                        :disable (boolean
-                                                                   (or
-                                                                     (string/blank? bot-name)
-                                                                     (string/blank? bot-version)
-                                                                     (string/blank? bot-username)
-                                                                     (re-find #"\s" bot-username)))
-                                                        :on-action
-                                                        {:event/type :spring-lobby/add-bot
-                                                         :battle battle
-                                                         :bot-username bot-username
-                                                         :bot-name bot-name
-                                                         :bot-version bot-version
-                                                         :client-data client-data
-                                                         :side-indices (keys sides)
-                                                         :singleplayer singleplayer
-                                                         :username username}}])}}}}
-                    :desc {:fx/type fx/ext-get-ref :ref ::add-bot-button}}}]}])
-       [{:fx/type :h-box
-         :alignment :center-left
-         :children
-         (concat
-           (when (and am-host (not singleplayer))
-             (let [filter-replay-lc (if filter-host-replay
-                                      (string/lower-case filter-host-replay)
-                                      "")]
-               [{:fx/type :label
-                 :text " Replay: "}
-                {:fx/type :combo-box
-                 :prompt-text " < host a replay > "
-                 :style {:-fx-max-width 300}
-                 :value (get-in scripttags ["game" "demofile"])
-                 :on-value-changed {:event/type :spring-lobby/assoc-in
-                                    :path [:by-server server-key :battle :scripttags "game" "demofile"]}
-                 :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
-                 :on-hidden {:event/type :spring-lobby/dissoc
-                             :key :filter-host-replay}
-                 :items (->> parsed-replays-by-path
-                             (filter (comp :filename second))
-                             (filter (comp #(string/includes? (string/lower-case %) filter-replay-lc)
-                                           :filename
-                                           second))
-                             (sort-by (comp :filename second))
-                             reverse
-                             (mapv first))
-                 :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]))
-           (when (get-in scripttags ["game" "demofile"])
-             [{:fx/type :button
-               :on-action {:event/type :spring-lobby/dissoc-in
-                           :path [:battle :scripttags "game" "demofile"]}
-               :graphic
-               {:fx/type font-icon/lifecycle
-                :icon-literal (str "mdi-close:" font-icon-size ":white")}}]))}
-        {:fx/type :pane
-         :pref-width 16}]
-       (when (and am-spec
-                  (not singleplayer))
-         [{:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type ext-recreate-on-key-changed
-             :key (str am-spec)
-             :desc
-             {:fx/type :check-box
-              :selected (boolean auto-launch)
-              :style {:-fx-padding "10px"}
-              :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                    :path [:auto-launch server-key]}}}
-            {:fx/type :label
-             :text "Auto Launch "}]}])
-       (when-not singleplayer
+           (concat
+             (when (and am-host (not singleplayer))
+               (let [filter-replay-lc (if filter-host-replay
+                                        (string/lower-case filter-host-replay)
+                                        "")]
+                 [{:fx/type :label
+                   :text " Replay: "}
+                  {:fx/type :combo-box
+                   :prompt-text " < host a replay > "
+                   :style {:-fx-max-width 300}
+                   :value (get-in scripttags ["game" "demofile"])
+                   :on-value-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:by-server server-key :battle :scripttags "game" "demofile"]}
+                   :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
+                   :on-hidden {:event/type :spring-lobby/dissoc
+                               :key :filter-host-replay}
+                   :items (->> parsed-replays-by-path
+                               (filter (comp :filename second))
+                               (filter (comp #(string/includes? (string/lower-case %) filter-replay-lc)
+                                             :filename
+                                             second))
+                               (sort-by (comp :filename second))
+                               reverse
+                               (mapv first))
+                   :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]))
+             (when (get-in scripttags ["game" "demofile"])
+               [{:fx/type :button
+                 :on-action {:event/type :spring-lobby/dissoc-in
+                             :path [:battle :scripttags "game" "demofile"]}
+                 :graphic
+                 {:fx/type font-icon/lifecycle
+                  :icon-literal (str "mdi-close:" font-icon-size ":white")}}]))}
+          {:fx/type :pane
+           :pref-width 16}]
+         (when (and am-spec
+                    (not singleplayer))
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str am-spec)
+               :desc
+               {:fx/type :check-box
+                :selected (boolean auto-launch)
+                :style {:-fx-padding "10px"}
+                :on-selected-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:auto-launch server-key]}}}
+              {:fx/type :label
+               :text "Auto Launch "}]}])
+         (when-not singleplayer
+           [{:fx/type :h-box
+             :alignment :center-left
+             :style {:-fx-font-size 16}
+             :children
+             [{:fx/type ext-recreate-on-key-changed
+               :key (str [am-spec am-away])
+               :desc
+               {:fx/type :combo-box
+                :value (if am-away "Away" "Here")
+                :items ["Away" "Here"]
+                :on-value-changed {:event/type :spring-lobby/on-change-away
+                                   :client-data (when-not singleplayer client-data)
+                                   :client-status (assoc my-client-status :away (not am-away))}}}]}])
          [{:fx/type :h-box
            :alignment :center-left
            :style {:-fx-font-size 16}
@@ -499,239 +583,228 @@
              :key (str [am-spec am-away])
              :desc
              {:fx/type :combo-box
-              :value (if am-away "Away" "Here")
-              :items ["Away" "Here"]
-              :on-value-changed {:event/type :spring-lobby/on-change-away
+              :value (if am-spec "Spectating" "Playing")
+              :items ["Spectating" "Playing"]
+              :on-value-changed {:event/type :spring-lobby/on-change-spectate
                                  :client-data (when-not singleplayer client-data)
-                                 :client-status (assoc my-client-status :away (not am-away))}}}]}])
-       [{:fx/type :h-box
-         :alignment :center-left
-         :style {:-fx-font-size 16}
-         :children
-         [{:fx/type ext-recreate-on-key-changed
-           :key (str [am-spec am-away])
-           :desc
-           {:fx/type :combo-box
-            :value (if am-spec "Spectating" "Playing")
-            :items ["Spectating" "Playing"]
-            :on-value-changed {:event/type :spring-lobby/on-change-spectate
-                               :client-data (when-not singleplayer client-data)
-                               :is-me true
-                               :is-bot false
-                               :id my-player
-                               :ready-on-unspec ready-on-unspec
-                               :server-key server-key}}}]}
-        {:fx/type :h-box
-         :alignment :center-left
-         :style {:-fx-font-size 24}
-         :children
-         (if-not am-spec
-           [(let [ready (:ready my-battle-status)]
-              {:fx/type ext-recreate-on-key-changed
-               :key (str am-spec)
-               :desc
-               {:fx/type :check-box
-                :selected (boolean ready)
-                :style {:-fx-padding "10px"}
-                :on-selected-changed {:event/type :spring-lobby/battle-ready-change
-                                      :client-data client-data
-                                      :username username
-                                      :battle-status my-battle-status
-                                      :team-color my-team-color}}})
-            {:fx/type :label
-             :text " Ready "}]
-           (if (contains? (:compflags client-data) "teiserver")
-             [{:fx/type :h-box
-               :style {:-fx-font-size 16}
-               :alignment :center-left
-               :children
-               [
-                {:fx/type battle-queue-button
-                 :server-key server-key}]}]
-             [{:fx/type ext-recreate-on-key-changed
-               :key (str am-spec)
-               :desc
-               {:fx/type :check-box
-                :selected (boolean auto-unspec)
-                :style {:-fx-padding "10px"
-                        :-fx-font-size 15}
-                :on-selected-changed
-                {:event/type :spring-lobby/auto-unspec
-                 :client-data (when-not singleplayer client-data)
-                 :is-me true
-                 :is-bot false
-                 :id my-player
-                 :ready-on-unspec ready-on-unspec
-                 :server-key server-key}}}
+                                 :is-me true
+                                 :is-bot false
+                                 :id my-player
+                                 :ready-on-unspec ready-on-unspec
+                                 :server-key server-key}}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :style {:-fx-font-size 24}
+           :children
+           (if-not am-spec
+             [(let [ready (:ready my-battle-status)]
+                {:fx/type ext-recreate-on-key-changed
+                 :key (str am-spec)
+                 :desc
+                 {:fx/type :check-box
+                  :selected (boolean ready)
+                  :style {:-fx-padding "10px"}
+                  :on-selected-changed {:event/type :spring-lobby/battle-ready-change
+                                        :client-data client-data
+                                        :username username
+                                        :battle-status my-battle-status
+                                        :team-color my-team-color}}})
               {:fx/type :label
-               :style {:-fx-font-size 15}
-               :text "Auto Unspec "}]))}
-        {:fx/type :h-box
-         :alignment :center-left
-         :style {:-fx-font-size 24}
-         :children
-         (concat
-           [
-            {:fx/type fx.ext.node/with-tooltip-props
-             :props
-             {:tooltip
-              {:fx/type tooltip-nofocus/lifecycle
-               :show-delay skylobby.fx/tooltip-show-delay
-               :style {:-fx-font-size 16}
-               :text (cond
-                       debug-spring "Write script.txt and show Spring command"
-                       am-host (if singleplayer
-                                 "Start the game"
-                                 "You are the host, start the game")
-                       host-ingame "Join game in progress"
-                       :else (str "Call vote to start the game"))}}
-             :desc
-             {:fx/type :button
-              :text (cond
-                      spring-starting
-                      "Game starting"
-                      spring-running
-                      "Game running"
-                      (and am-spec (not host-ingame) (not singleplayer))
-                      "Game not running"
-                      :else
-                      (if debug-spring
-                        "Debug Spring"
-                        (str (if (and (not singleplayer) (or host-ingame am-spec))
-                               "Join" "Start")
-                             " Game")))
-              :disable (boolean
-                         (or spring-starting
-                             spring-running
-                             (and debug-spring (fx/sub-val context :show-spring-debug))
-                             (and (not singleplayer)
-                                  (or (and (not host-ingame) am-spec)
-                                      (not in-sync)))))
-              :on-action
-              (merge
-                {:event/type :spring-lobby/start-battle}
-                (let [resources (fx/sub-ctx context sub/spring-resources spring-root)]
-                  (if singleplayer
-                    resources
-                    (dissoc resources :engine-version :map-name :mod-name)))
-                {:battle battle
-                 :battles battles
-                 :users users
-                 :username username}
-                {:am-host am-host
-                 :am-spec am-spec
-                 :battle-map-details battle-map-details
-                 :battle-mod-details battle-mod-details
-                 :battle-status my-battle-status
-                 :channel-name channel-name
-                 :client-data client-data
-                 :debug-spring debug-spring
-                 :host-ingame host-ingame
-                 :singleplayer singleplayer
-                 :spring-isolation-dir spring-root})}}]
-           (when (and spring-running singleplayer)
-             [{:fx/type fx.ext.node/with-tooltip-props
+               :text " Ready "}]
+             (if (contains? (:compflags client-data) "teiserver")
+               [{:fx/type :h-box
+                 :style {:-fx-font-size 16}
+                 :alignment :center-left
+                 :children
+                 [
+                  {:fx/type battle-queue-button
+                   :server-key server-key}]}]
+               [{:fx/type ext-recreate-on-key-changed
+                 :key (str am-spec)
+                 :desc
+                 {:fx/type :check-box
+                  :selected (boolean auto-unspec)
+                  :style {:-fx-padding "10px"
+                          :-fx-font-size 15}
+                  :on-selected-changed
+                  {:event/type :spring-lobby/auto-unspec
+                   :client-data (when-not singleplayer client-data)
+                   :is-me true
+                   :is-bot false
+                   :id my-player
+                   :ready-on-unspec ready-on-unspec
+                   :server-key server-key}}}
+                {:fx/type :label
+                 :style {:-fx-font-size 15}
+                 :text "Auto Unspec "}]))}
+          {:fx/type :h-box
+           :alignment :center-left
+           :style {:-fx-font-size 24}
+           :children
+           (concat
+             [
+              {:fx/type fx.ext.node/with-tooltip-props
                :props
                {:tooltip
                 {:fx/type tooltip-nofocus/lifecycle
                  :show-delay skylobby.fx/tooltip-show-delay
                  :style {:-fx-font-size 16}
-                 :text "Allow another copy of spring to run"}}
+                 :text (cond
+                         debug-spring "Write script.txt and show Spring command"
+                         am-host (if singleplayer
+                                   "Start the game"
+                                   "You are the host, start the game")
+                         host-ingame "Join game in progress"
+                         :else (str "Call vote to start the game"))}}
                :desc
                {:fx/type :button
-                :style-class ["button" "skylobby-normal"]
-                :text ""
+                :text (cond
+                        spring-starting
+                        "Game starting"
+                        spring-running
+                        "Game running"
+                        (and am-spec (not host-ingame) (not singleplayer))
+                        "Game not running"
+                        :else
+                        (if debug-spring
+                          "Debug Spring"
+                          (str (if (and (not singleplayer) (or host-ingame am-spec))
+                                 "Join" "Start")
+                               " Game")))
+                :disable (boolean
+                           (or spring-starting
+                               spring-running
+                               (and debug-spring (fx/sub-val context :show-spring-debug))
+                               (and (not singleplayer)
+                                    (or (and (not host-ingame) am-spec)
+                                        (not in-sync)))))
                 :on-action
-                {:event/type :spring-lobby/assoc-in
-                 :path [:spring-running :local battle-id]
-                 :value false}
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-content-copy:20"}}}]))}]
-       (when am-host
-         [{:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text " Balance: "}
-            {:fx/type :button
-             :text "FFA"
-             :on-action {:event/type :spring-lobby/battle-teams-ffa
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}
-            {:fx/type :button
-             :text "2 teams"
-             :on-action {:event/type :spring-lobby/battle-teams-2
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}
-            {:fx/type :button
-             :text "3 teams"
-             :on-action {:event/type :spring-lobby/battle-teams-3
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}
-            {:fx/type :button
-             :text "4 teams"
-             :on-action {:event/type :spring-lobby/battle-teams-4
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}
-            {:fx/type :button
-             :text "5 teams"
-             :on-action {:event/type :spring-lobby/battle-teams-5
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}
-            {:fx/type :button
-             :text "Humans vs Bots"
-             :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
-                         :am-host am-host
-                         :battle battle
-                         :client-data (when-not singleplayer client-data)
-                         :interleave-ally-player-ids interleave-ally-player-ids
-                         :server-key server-key
-                         :users users
-                         :username username}}]}])
-       [{:fx/type :label
-         :style {:-fx-font-size 24}
-         :text (str " "
-                    (when (< 1 (count team-counts))
-                      (string/join "v" team-counts)))}]
-       (when (< 4 (count team-counts))
+                (merge
+                  {:event/type :spring-lobby/start-battle}
+                  (let [resources (fx/sub-ctx context sub/spring-resources spring-root)]
+                    (if singleplayer
+                      resources
+                      (dissoc resources :engine-version :map-name :mod-name)))
+                  {:battle battle
+                   :battles battles
+                   :users users
+                   :username username}
+                  {:am-host am-host
+                   :am-spec am-spec
+                   :battle-map-details battle-map-details
+                   :battle-mod-details battle-mod-details
+                   :battle-status my-battle-status
+                   :channel-name channel-name
+                   :client-data client-data
+                   :debug-spring debug-spring
+                   :host-ingame host-ingame
+                   :singleplayer singleplayer
+                   :spring-isolation-dir spring-root})}}]
+             (when (and spring-running singleplayer)
+               [{:fx/type fx.ext.node/with-tooltip-props
+                 :props
+                 {:tooltip
+                  {:fx/type tooltip-nofocus/lifecycle
+                   :show-delay skylobby.fx/tooltip-show-delay
+                   :style {:-fx-font-size 16}
+                   :text "Allow another copy of spring to run"}}
+                 :desc
+                 {:fx/type :button
+                  :style-class ["button" "skylobby-normal"]
+                  :text ""
+                  :on-action
+                  {:event/type :spring-lobby/assoc-in
+                   :path [:spring-running :local battle-id]
+                   :value false}
+                  :graphic
+                  {:fx/type font-icon/lifecycle
+                   :icon-literal "mdi-content-copy:20"}}}]))}]
+         (when am-host
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text " Balance: "}
+              {:fx/type :button
+               :text "FFA"
+               :on-action {:event/type :spring-lobby/battle-teams-ffa
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "2 teams"
+               :on-action {:event/type :spring-lobby/battle-teams-2
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "3 teams"
+               :on-action {:event/type :spring-lobby/battle-teams-3
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "4 teams"
+               :on-action {:event/type :spring-lobby/battle-teams-4
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "5 teams"
+               :on-action {:event/type :spring-lobby/battle-teams-5
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}
+              {:fx/type :button
+               :text "Humans vs Bots"
+               :on-action {:event/type :spring-lobby/battle-teams-humans-vs-bots
+                           :am-host am-host
+                           :battle battle
+                           :client-data (when-not singleplayer client-data)
+                           :interleave-ally-player-ids interleave-ally-player-ids
+                           :server-key server-key
+                           :users users
+                           :username username}}]}])
          [{:fx/type :label
-           :style {:-fx-font-size 16}
-           :text (str " " (count team-counts) "-way ffa")}])
-       (when show-team-skills
-         [{:fx/type :label
-           :style {:-fx-font-size 16}
+           :style {:-fx-font-size 24}
            :text (str " "
-                      (when (< 1 (count team-skills))
-                        (str
-                          "("
-                          (string/join ", " team-skills)
-                          ")")))}]))}))
+                      (when (< 1 (count team-counts))
+                        (string/join "v" team-counts)))}]
+         (when (< 4 (count team-counts))
+           [{:fx/type :label
+             :style {:-fx-font-size 16}
+             :text (str " " (count team-counts) "-way ffa")}])
+         (when show-team-skills
+           [{:fx/type :label
+             :style {:-fx-font-size 16}
+             :text (str " "
+                        (when (< 1 (count team-skills))
+                          (str
+                            "("
+                            (string/join ", " team-skills)
+                            ")")))}]))}
+      {:fx/type battle-accolades
+       :server-key server-key}]}))
 
 
 (defn battle-tabs
