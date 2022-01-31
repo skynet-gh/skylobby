@@ -1485,7 +1485,6 @@
   (log/info "Refreshing replays")
   (let [before (u/curr-millis)
         {:keys [parsed-replays-by-path] :as state} @state-atom
-        existing-paths (set (keys parsed-replays-by-path))
         all-files (mapcat
                     (fn [{:keys [file recursive replay-source-name]}]
                       (let [files (fs/replay-files file {:recursive recursive})]
@@ -1494,10 +1493,16 @@
                           (juxt (constantly replay-source-name) identity)
                           files)))
                     (fx.replay/replay-sources state))
-        todo (->> all-files
-                  (remove (comp existing-paths fs/canonical-path second))
-                  shuffle)
         all-paths (set (map (comp fs/canonical-path second) all-files))
+        old-valid-replay? (old-valid-replay-fn all-paths)
+        valid-replay? (valid-replay-fn all-paths)
+        existing-valid-paths (->> parsed-replays-by-path
+                                  (filter valid-replay?)
+                                  keys
+                                  set)
+        todo (->> all-files
+                  (remove (comp existing-valid-paths fs/canonical-path second))
+                  shuffle)
         this-round (take replays-batch-size todo)
         parsed-replays (->> this-round
                             (map
@@ -1508,8 +1513,7 @@
                                    {:source-name source})]))
                             doall)]
     (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
-    (let [old-valid-replay? (old-valid-replay-fn all-paths)
-          valid-replay? (valid-replay-fn all-paths)
+    (let [
           new-state (swap! state-atom
                       (fn [state]
                         (let [old-replays (:parsed-replays-by-path state)
@@ -3492,12 +3496,14 @@
         (async/<!! (async/timeout 1000)))
       (if (or am-host am-spec host-ingame)
         (spring/start-game *state state)
-        @(event-handler
-           {:event/type ::send-message
-            :channel-name channel-name
-            :client-data client-data
-            :message (str "!cv start")
-            :no-clear-draft true}))
+        (do
+          @(event-handler
+             {:event/type ::send-message
+              :channel-name channel-name
+              :client-data client-data
+              :message (str "!cv start")
+              :no-clear-draft true})
+          (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] false)))
       (catch Exception e
         (log/error e "Error starting battle")))))
 

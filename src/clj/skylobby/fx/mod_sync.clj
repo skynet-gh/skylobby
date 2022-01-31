@@ -358,3 +358,27 @@
                   :id :skylobby/ui}
     (tufte/p :mod-sync-pane
       (mod-sync-pane-impl state))))
+
+
+(defn mod-and-deps-sync-pane
+  [{:fx/keys [context]
+    :keys [mod-name spring-isolation-dir]
+    :as props}]
+  (let [
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)
+        mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        mod-dependencies (vals (get-in mod-details [:modinfo :depend]))]
+    {:fx/type :v-box
+     :children
+     (concat
+       [(merge
+          {:fx/type mod-sync-pane}
+          props)]
+       (mapv
+         (fn [mod-name]
+           (merge
+             props
+             {:fx/type mod-sync-pane
+              :dependency true
+              :mod-name mod-name}))
+         mod-dependencies))}))
