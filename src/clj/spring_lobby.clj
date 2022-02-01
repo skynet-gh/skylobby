@@ -4501,7 +4501,7 @@
 
 
 (defmethod event-handler ::rapid-download
-  [{:keys [engine-file rapid-id spring-isolation-dir]}]
+  [{:keys [engine-file rapid-id spring-isolation-dir] :as task}]
   (swap! *state
     (fn [state]
       (-> state
@@ -4543,10 +4543,22 @@
                     (log/info "(pr-downloader" rapid-id "err)" line)
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
-          (.waitFor process)))
+          (let [exit-code (.waitFor process)]
+            (log/info "pr-downloader exited with code" exit-code)
+            (when (not= 0 exit-code)
+              (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
+              (task/add-task! *state
+                {::task-type ::delete-corrupt-rapid
+                 :spring-root spring-isolation-dir
+                 :update-rapid-task task})))))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
-        (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
+        (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e))
+        (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
+        (task/add-task! *state
+          {::task-type ::delete-corrupt-rapid
+           :spring-root spring-isolation-dir
+           :update-rapid-task task}))
       (finally
         (task/add-tasks! *state
           [{::task-type ::update-rapid-packages
