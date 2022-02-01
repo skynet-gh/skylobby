@@ -1829,7 +1829,11 @@
              (when-let [heightmap-image (:heightmap-image smf)]
                (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
                  (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))
-             (swap! *state assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))))
+             (swap! *state
+               (fn [state]
+                 (-> state
+                     (assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))
+                     (assoc-in [:cached-minimap-updated map-name] (u/curr-millis)))))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
        (task/add-task! *state
@@ -3179,7 +3183,7 @@
     (try
       (if selected-battle
         (let [server-key (u/server-key client-data)]
-          (if battle
+          (if (:battle-id battle)
             (do
               (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
                                                                                 :battle-password battle-password
@@ -4497,7 +4501,7 @@
 
 
 (defmethod event-handler ::rapid-download
-  [{:keys [engine-file rapid-id spring-isolation-dir]}]
+  [{:keys [engine-file rapid-id spring-isolation-dir] :as task}]
   (swap! *state
     (fn [state]
       (-> state
@@ -4539,10 +4543,22 @@
                     (log/info "(pr-downloader" rapid-id "err)" line)
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
-          (.waitFor process)))
+          (let [exit-code (.waitFor process)]
+            (log/info "pr-downloader exited with code" exit-code)
+            (when (not= 0 exit-code)
+              (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
+              (task/add-task! *state
+                {::task-type ::delete-corrupt-rapid
+                 :spring-root spring-isolation-dir
+                 :update-rapid-task task})))))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
-        (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e)))
+        (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e))
+        (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
+        (task/add-task! *state
+          {::task-type ::delete-corrupt-rapid
+           :spring-root spring-isolation-dir
+           :update-rapid-task task}))
       (finally
         (task/add-tasks! *state
           [{::task-type ::update-rapid-packages

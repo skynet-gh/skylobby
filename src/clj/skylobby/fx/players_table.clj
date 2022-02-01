@@ -442,7 +442,7 @@
 
 (defn players-table-impl
   [{:fx/keys [context]
-    :keys [mod-name players read-only server-key]}]
+    :keys [battle-id mod-name players read-only scripttags server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
@@ -453,8 +453,11 @@
         increment-ids (fx/sub-val context :increment-ids)
         players-table-columns (fx/sub-val context :players-table-columns)
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
-        scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
-        battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])
+        scripttags (or scripttags
+                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
+        battle-id (or battle-id
+                      (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
         mod-name (or mod-name
                      (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
         spring-root (fx/sub-ctx context sub/spring-root server-key)
@@ -477,7 +480,7 @@
                            singleplayer "singleplayer"
                            :else "multiplayer")]
     {:fx/type ext-recreate-on-key-changed
-     :key (str players-table-columns)
+     :key (pr-str [server-key selected-tab-main battle-id players-table-columns])
      :desc
      {:fx/type ext-table-column-auto-size
       :items
@@ -611,7 +614,7 @@
            [{:fx/type :table-column
              :text "Skill"
              :resizable false
-             :pref-width 80
+             :pref-width 100
              :cell-value-factory (juxt sort-skill :skilluncertainty :skill)
              :cell-factory
              {:fx/cell-type :table-cell
@@ -663,27 +666,30 @@
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :ally
-                    {:text ""
-                     :graphic
-                     {:fx/type ext-recreate-on-key-changed
-                      :key [battle-id (u/nickname i) increment-ids]
-                      :desc
-                      {:fx/type :combo-box
-                       :value (-> i :battle-status :ally str)
-                       :on-value-changed {:event/type :spring-lobby/battle-ally-changed
-                                          :client-data (when-not singleplayer client-data)
-                                          :is-me (= (:username i) username)
-                                          :is-bot (-> i :user :client-status :bot)
-                                          :id i}
-                       :items (map str (take 16 (iterate inc 0)))
-                       :button-cell incrementing-cell
-                       :cell-factory {:fx/cell-type :list-cell
-                                      :describe incrementing-cell}
-                       :disable (or read-only
-                                    (not username)
-                                    (not (or am-host
-                                             (= (:username i) username)
-                                             (= (:owner i) username))))}}})))}}])
+                    (let [disable (or read-only
+                                      (not username)
+                                      (not (or am-host
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))]
+                      {:text ""
+                       :graphic
+                       {:fx/type ext-recreate-on-key-changed
+                        :key (pr-str [(u/nickname i) increment-ids])
+                        :desc
+                        (merge
+                          {:fx/type :combo-box
+                           :value (-> i :battle-status :ally str)
+                           :items (map str (take 16 (iterate inc 0)))
+                           :button-cell incrementing-cell
+                           :cell-factory {:fx/cell-type :list-cell
+                                          :describe incrementing-cell}
+                           :disable (boolean disable)}
+                          (when-not disable
+                            {:on-value-changed {:event/type :spring-lobby/battle-ally-changed
+                                                :client-data (when-not singleplayer client-data)
+                                                :is-me (= (:username i) username)
+                                                :is-bot (-> i :user :client-status :bot)
+                                                :id i}}))}}))))}}])
          (when (:team players-table-columns)
            [{:fx/type :table-column
              :text "Team"
@@ -703,28 +709,31 @@
                                 :id :skylobby/player-table}
                   (tufte/p :team
                     (let [items (map str (take 16 (iterate inc 0)))
-                          value (str id)]
+                          value (str id)
+                          disable (or read-only
+                                      (not username)
+                                      (not (or am-host
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))]
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
                         :key [battle-id (u/nickname i) increment-ids]
                         :desc
-                        {:fx/type :combo-box
-                         :value value
-                         :on-value-changed {:event/type :spring-lobby/battle-team-changed
-                                            :client-data (when-not singleplayer client-data)
-                                            :is-me (= (:username i) username)
-                                            :is-bot (-> i :user :client-status :bot)
-                                            :id i}
-                         :items items
-                         :button-cell incrementing-cell
-                         :cell-factory {:fx/cell-type :list-cell
-                                        :describe incrementing-cell}
-                         :disable (or read-only
-                                      (not username)
-                                      (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))}}}))))}}])
+                        (merge
+                          {:fx/type :combo-box
+                           :value value
+                           :items items
+                           :button-cell incrementing-cell
+                           :cell-factory {:fx/cell-type :list-cell
+                                          :describe incrementing-cell}
+                           :disable (boolean disable)}
+                          (when-not disable
+                            {:on-value-changed {:event/type :spring-lobby/battle-team-changed
+                                                :client-data (when-not singleplayer client-data)
+                                                :is-me (= (:username i) username)
+                                                :is-bot (-> i :user :client-status :bot)
+                                                :id i}}))}}))))}}])
          (when (:color players-table-columns)
            [{:fx/type :table-column
              :text "Color"
@@ -738,23 +747,26 @@
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :color
-                    {:text ""
-                     :graphic
-                     {:fx/type ext-recreate-on-key-changed
-                      :key [battle-id nickname]
-                      :desc
-                      {:fx/type :color-picker
-                       :value (fx.color/spring-color-to-javafx team-color)
-                       :on-action {:event/type :spring-lobby/battle-color-action
-                                   :client-data (when-not singleplayer client-data)
-                                   :is-me (= (:username i) username)
-                                   :is-bot (-> i :user :client-status :bot)
-                                   :id i}
-                       :disable (or read-only
-                                    (not username)
-                                    (not (or am-host
-                                             (= (:username i) username)
-                                             (= (:owner i) username))))}}})))}}])
+                    (let [disable (or read-only
+                                      (not username)
+                                      (not (or am-host
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))]
+                      {:text ""
+                       :graphic
+                       {:fx/type ext-recreate-on-key-changed
+                        :key (pr-str [nickname])
+                        :desc
+                        (merge
+                          {:fx/type :color-picker
+                           :value (fx.color/spring-color-to-javafx team-color)
+                           :disable (boolean disable)}
+                          (when-not disable
+                            {:on-action {:event/type :spring-lobby/battle-color-action
+                                         :client-data (when-not singleplayer client-data)
+                                         :is-me (= (:username i) username)
+                                         :is-bot (-> i :user :client-status :bot)
+                                         :id i}}))}}))))}}])
          (when (:spectator players-table-columns)
            [{:fx/type :table-column
              :text "Spectator"
@@ -772,26 +784,29 @@
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :spectator
-                    (let [is-spec (-> i :battle-status :mode u/to-bool not boolean)]
+                    (let [is-spec (-> i :battle-status :mode u/to-bool not boolean)
+                          disable (or read-only
+                                      (not username)
+                                      (not (or (and am-host (not is-spec))
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))]
                       {:text ""
                        :alignment :center
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
-                        :key [battle-id (u/nickname i)]
+                        :key (pr-str [server-key selected-tab-main battle-id (u/nickname i)])
                         :desc
-                        {:fx/type :check-box
-                         :selected (boolean is-spec)
-                         :on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                               :client-data (when-not singleplayer client-data)
-                                               :is-me (= (:username i) username)
-                                               :is-bot (-> i :user :client-status :bot)
-                                               :id i
-                                               :ready-on-unspec ready-on-unspec}
-                         :disable (or read-only
-                                      (not username)
-                                      (not (or (and am-host (not is-spec))
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))}}}))))}}])
+                        (merge
+                          {:fx/type :check-box
+                           :selected (boolean is-spec)
+                           :disable (boolean disable)}
+                          (when-not disable
+                            {:on-selected-changed {:event/type :spring-lobby/battle-spectate-change
+                                                   :client-data (when-not singleplayer client-data)
+                                                   :is-me (= (:username i) username)
+                                                   :is-bot (-> i :user :client-status :bot)
+                                                   :id i
+                                                   :ready-on-unspec ready-on-unspec}}))}}))))}}])
          (when (:faction players-table-columns)
            [{:fx/type :table-column
              :text "Faction"
@@ -814,24 +829,27 @@
                      :graphic
                      (cond
                        (seq side-items)
-                       {:fx/type ext-recreate-on-key-changed
-                        :key [battle-id (u/nickname i)]
-                        :desc
-                        {:fx/type :combo-box
-                         :value (->> i :battle-status :side (get sides) str)
-                         :on-value-changed {:event/type :spring-lobby/battle-side-changed
-                                            :client-data (when-not singleplayer client-data)
-                                            :is-me (= (:username i) username)
-                                            :is-bot (-> i :user :client-status :bot)
-                                            :id i
-                                            :indexed-mod indexed-mod
-                                            :sides sides}
-                         :items side-items
-                         :disable (or read-only
-                                      (not username)
-                                      (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))}}
+                       (let [disable (or read-only
+                                         (not username)
+                                         (not (or am-host
+                                                  (= (:username i) username)
+                                                  (= (:owner i) username))))]
+                         {:fx/type ext-recreate-on-key-changed
+                          :key (pr-str [server-key selected-tab-main battle-id (u/nickname i)])
+                          :desc
+                          (merge
+                            {:fx/type :combo-box
+                             :value (->> i :battle-status :side (get sides) str)
+                             :items side-items
+                             :disable (boolean disable)}
+                            (when-not disable
+                              {:on-value-changed {:event/type :spring-lobby/battle-side-changed
+                                                  :client-data (when-not singleplayer client-data)
+                                                  :is-me (= (:username i) username)
+                                                  :is-bot (-> i :user :client-status :bot)
+                                                  :id i
+                                                  :indexed-mod indexed-mod
+                                                  :sides sides}}))})
                        (seq mod-details-tasks)
                        {:fx/type :label
                         :text "loading..."}
@@ -889,22 +907,25 @@
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :bonus
-                    {:text ""
-                     :graphic
-                     {:fx/type ext-recreate-on-key-changed
-                      :key [battle-id (u/nickname i)]
-                      :desc
-                      {:fx/type :text-field
-                       :disable (boolean (or read-only
-                                             am-spec))
-                       :text-formatter
-                       {:fx/type :text-formatter
-                        :value-converter :integer
-                        :value (int (or bonus 0))
-                        :on-value-changed {:event/type :spring-lobby/battle-handicap-change
-                                           :client-data (when-not singleplayer client-data)
-                                           :is-bot (-> i :user :client-status :bot)
-                                           :id i}}}}})))}}]))}}}))
+                    (let [disable (boolean (or read-only
+                                               am-spec))]
+                      {:text ""
+                       :graphic
+                       {:fx/type ext-recreate-on-key-changed
+                        :key (pr-str [server-key selected-tab-main battle-id (u/nickname i)])
+                        :desc
+                        {:fx/type :text-field
+                         :disable disable
+                         :text-formatter
+                         (merge
+                           {:fx/type :text-formatter
+                            :value-converter :integer
+                            :value (int (or bonus 0))}
+                           (when-not disable
+                             {:on-value-changed {:event/type :spring-lobby/battle-handicap-change
+                                                 :client-data (when-not singleplayer client-data)
+                                                 :is-bot (-> i :user :client-status :bot)
+                                                 :id i}}))}}}))))}}]))}}}))
 
 (def player-width 340)
 (def player-skill-width 72)

@@ -95,7 +95,7 @@
         music-paused (fx/sub-val context :music-paused)
         music-queue (fx/sub-val context :music-queue)
         music-volume (fx/sub-val context :music-volume)
-        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        all-tasks (fx/sub-ctx context skylobby.fx/all-tasks-sub)
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)]
     {:fx/type :h-box
      :alignment :center-left
@@ -220,7 +220,7 @@
                      :key :show-settings-window}}
         {:fx/type :button
          :style-class ["button" "skylobby-normal"]
-         :text (str (count tasks-by-type) " tasks")
+         :text (str (count all-tasks) " tasks")
          :on-action {:event/type :spring-lobby/toggle-window
                      :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                      :key :show-tasks-window}
