@@ -215,7 +215,12 @@
        :children
        (concat
          [{:fx/type :label
-           :text (str " Accolade for " accolade-for ": ")}]
+           :text (str " Accolade for ")}
+          {:fx/type :label
+           :style {:-fx-font-weight "bold"}
+           :text (str accolade-for)}
+          {:fx/type :label
+           :text (str ": ")}]
          (mapv
            (fn [{:keys [text desc n]}]
              {:fx/type :button
