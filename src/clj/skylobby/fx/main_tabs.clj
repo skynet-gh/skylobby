@@ -165,10 +165,12 @@
           :style {:-fx-font-size 20}
           :text (str (:battle-title selected-battle-details))}
          {:fx/type players-table
+          :battle-id selected-battle-id
           :players (fx.battle/battle-players-and-bots
                      {:battle selected-battle-details
                       :users users})
           :read-only true
+          :scripttags {}
           :server-key server-key
           :sides sides}]}
        {:fx/type :flow-pane
