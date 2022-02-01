@@ -4,6 +4,7 @@
     [clojure.string :as string]
     [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
+    clojure.core.memoize
     java-time
     [skylobby.fs :as fs]
     skylobby.fx
@@ -13,7 +14,9 @@
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (javafx.scene.image Image)))
 
 
 (set! *warn-on-reflection* true)
@@ -332,6 +335,15 @@
            {:fx/cell-type :table-cell
             :describe (fn [host-username] {:text (str host-username)})}}]}}}]}))
 
+
+(defn minimap-image [map-name _minimap-updated]
+  (let [url (-> map-name fs/minimap-image-cache-file io/as-url str)]
+    (Image. url battles-map-size battles-map-size true false true)))
+
+(def minimap-image-memoized
+  (clojure.core.memoize/lru minimap-image))
+
+
 (defn battles-table-with-images-impl
   [{:fx/keys [context] :keys [server-key]}]
   (let [battle-password (fx/sub-val context :battle-password)
@@ -351,6 +363,7 @@
         filter-lc (when-not (string/blank? filter-battles)
                     (string/lower-case filter-battles))
         now (fx/sub-val context :now)
+        cached-minimap-updated (fx/sub-val context :cached-minimap-updated)
         filtered-battles (->> battles
                               vals
                               (filter :battle-title)
@@ -537,7 +550,7 @@
           :cell-factory
           {:fx/cell-type :table-cell
            :describe
-           (fn [battle-map]
+           (fn [map-name]
              {:text ""
               :graphic
               {:fx/type :stack-pane
@@ -558,11 +571,7 @@
                   :-fx-pref-height battles-map-size
                   :-fx-max-height battles-map-size}}
                 {:fx/type :image-view
-                 :image {:url (-> battle-map fs/minimap-image-cache-file io/as-url str)
-                         :background-loading true
-                         :requested-width battles-map-size
-                         :requested-height battles-map-size
-                         :preserve-ratio true}}]}})}}
+                 :image (minimap-image-memoized map-name (get cached-minimap-updated map-name))}]}})}}
          {:fx/type :table-column
           :text "Details"
           :sortable false

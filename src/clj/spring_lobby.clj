@@ -1829,7 +1829,11 @@
              (when-let [heightmap-image (:heightmap-image smf)]
                (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
                  (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))
-             (swap! *state assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))))
+             (swap! *state
+               (fn [state]
+                 (-> state
+                     (assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))
+                     (assoc-in [:cached-minimap-updated map-name] (u/curr-millis)))))))
          (log/error "Map is missing file" (:map-name map-details))))
      (when (seq next-round)
        (task/add-task! *state
