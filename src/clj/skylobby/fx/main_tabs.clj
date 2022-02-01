@@ -196,6 +196,7 @@
         [
          {:fx/type fx.minimap/minimap-pane
           :map-name map-name
+          :scripttags {}
           :server-key server-key}
          {:fx/type :label
           :text (str "Map: " map-name)}
