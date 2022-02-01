@@ -3183,7 +3183,7 @@
     (try
       (if selected-battle
         (let [server-key (u/server-key client-data)]
-          (if battle
+          (if (:battle-id battle)
             (do
               (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
                                                                                 :battle-password battle-password
