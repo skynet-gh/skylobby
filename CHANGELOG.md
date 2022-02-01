@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.75](https://github.com/skynet-gh/skylobby/releases/tag/0.7.75) - 2022-02-01
+
+- Fix join battle issue
+- Fix issue with battle preview
+- Add more delete of corrupt rapid
+
 ## [0.7.74](https://github.com/skynet-gh/skylobby/releases/tag/0.7.74) - 2022-01-30
 
 - Add UI for AccoladesBot
