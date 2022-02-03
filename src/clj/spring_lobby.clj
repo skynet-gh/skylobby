@@ -1917,7 +1917,11 @@
                                                (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
                                                  map-data
                                                  (conj relevant-map-data)))))
-                                    [map-file (:map-name map-data)]))))]
+                                    [map-file (:map-name map-data)]))))
+           priority-maps (map (fn [map-file]
+                                {:map-name (get map-file-to-name map-file)
+                                 :file map-file})
+                              priorities)]
        (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
        (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
               (fn [maps]
@@ -1932,15 +1936,15 @@
        (if next-round
          (do
            (log/info "Scheduling map load since there are" next-round-count "maps left to load")
+           (when (seq priority-maps)
+             (task/add-task! state-atom {::task-type ::update-cached-minimaps
+                                         :maps priority-maps}))
            (task/add-task! state-atom
              {::task-type ::refresh-maps
               :spring-root spring-root
               :todo next-round-count}))
          (task/add-task! state-atom {::task-type ::update-cached-minimaps
-                                     :priorities (map (fn [map-file]
-                                                        {:map-name (get map-file-to-name map-file)
-                                                         :file map-file})
-                                                      priorities)}))
+                                     :priorities priority-maps}))
        {:todo-count next-round-count}))))
 
 
@@ -2617,11 +2621,12 @@
 
 
 (defmethod task-handler ::update-cached-minimaps
-  [{:keys [priorities]}]
-  (let [{:keys [by-spring-root]} @*state
-        all-maps (mapcat :maps (vals by-spring-root))]
-    (log/info "Found" (count all-maps) "maps to update cached minimaps for")
-    (update-cached-minimaps all-maps {:priorities priorities})))
+  [{:keys [maps priorities]}]
+  (let [todo-maps (or maps
+                      (let [{:keys [by-spring-root]} @*state]
+                        (mapcat :maps (vals by-spring-root))))]
+    (log/info "Found" (count todo-maps) "maps to update cached minimaps for")
+    (update-cached-minimaps todo-maps {:priorities priorities})))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
