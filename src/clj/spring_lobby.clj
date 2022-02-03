@@ -1703,19 +1703,18 @@
          spring-root-path (fs/canonical-path spring-root)
          {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
          mods (-> state :by-spring-root (get spring-root-path) :mods)
-         {:keys [rapid archive directory]} (group-by ::fs/source mods)
-         known-file-paths (set (map (comp fs/canonical-path :file) (remove :error (concat archive directory))))
-         known-rapid-paths (set (map (comp fs/canonical-path :file) (remove :error rapid)))
+         error-files (->> mods (filter :error) (map :file))
+         {:keys [directory]} (group-by ::fs/source mods)
+         known-paths (set (map (comp fs/canonical-path :file) mods))
          mod-files (fs/mod-files spring-root)
          sdp-files (rapid/sdp-files spring-root)
          _ (log/info "Found" (count mod-files) "files and"
                      (count sdp-files) "rapid archives to scan for mods")
-         to-add-file (set
-                       (concat
-                         (remove (comp known-file-paths fs/canonical-path) mod-files)
-                         (map :file directory))) ; always scan dirs in case git changed
-         to-add-rapid (remove (comp known-rapid-paths fs/canonical-path) sdp-files)
+         to-add-file (set (remove (comp known-paths fs/canonical-path) mod-files))
+         to-add-rapid (remove (comp known-paths fs/canonical-path) sdp-files)
          todo (shuffle (concat to-add-file to-add-rapid))
+         _ (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
+                     "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
          ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
@@ -1747,7 +1746,14 @@
                                      (contains? battle-rapid-hashes id)))))))
                          (concat priorities))
          _ (log/info "Prioritizing mods in battles" (pr-str priorities))
-         this-round (concat priorities (take mods-batch-size todo))
+         this-round (concat priorities
+                      (if (<= (count todo) mods-batch-size) ; add errors if there's not a full round left
+                        (do
+                          (log/info "Adding mod directories and mods with errors to scan")
+                          (concat todo
+                                  (map :file directory) ; re-scan directories just before errors
+                                  error-files))
+                        (take mods-batch-size todo)))
          all-paths (set (filter some? (map (comp fs/canonical-path :file) mods)))
          missing-files (set
                          (concat
@@ -1758,13 +1764,10 @@
          next-round
          (->> (drop mods-batch-size todo)
               (remove (comp all-paths fs/canonical-path))
-              (remove fs/is-directory?)
               seq)]
      (apply fs/update-file-cache! state-atom all-paths)
-     (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
-               "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
      (when (seq this-round)
-       (log/info "Adding" (count this-round) "mods this iteration"))
+       (log/info "Adding" (count this-round) "mods this iteration:" (with-out-str (pprint this-round))))
      (doseq [file this-round]
        (log/info "Reading mod from" file)
        (update-mod *state spring-root-path file {:delete-invalid-sdp delete-invalid-sdp :use-git-mod-version use-git-mod-version}))
@@ -1779,15 +1782,18 @@
                              (fn [{:keys [error mod-name]}]
                                (and (not error)
                                     (string/blank? mod-name))))
+                           (filter (comp (partial instance? File) :file))
                            (remove (comp missing-files fs/canonical-path :file))
                            set)))
                   (dissoc :update-mods))))
-     (when next-round
-       (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-       (task/add-task! state-atom
-         {::task-type ::refresh-mods
-          :spring-root spring-root
-          :todo (count next-round)}))
+     (if next-round
+       (do
+         (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
+         (task/add-task! state-atom
+           {::task-type ::refresh-mods
+            :spring-root spring-root
+            :todo (count next-round)}))
+       (log/info "Finished mod refresh"))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
 
@@ -1857,15 +1863,15 @@
          spring-root-path (fs/canonical-path spring-root)
          maps (-> state :by-spring-root (get spring-root-path) :maps)
          map-files (fs/map-files spring-root)
-         known-files (->> maps (remove :error) (map :file) set)
+         known-files (->> maps (map :file) set)
+         error-files (->> maps (filter :error) (map :file))
          known-paths (->> known-files (map fs/canonical-path) set)
          todo (->> map-files
                    (remove
                      (fn [file]
-                       (and
-                         (not (fs/is-directory? file))
-                         (contains? known-paths (fs/canonical-path file)))))
+                       (contains? known-paths (fs/canonical-path file))))
                    shuffle)
+         _ (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
          battle-maps (->> state
                           :by-server
                           (map second)
@@ -1884,12 +1890,18 @@
                                {:resource-filename (fs/filename f)})))
                          (concat priorities))
          _ (log/info "Prioritizing maps in battles" (pr-str priorities))
-         this-round (concat priorities (take maps-batch-size todo))
+         this-round (concat priorities
+                      (if (<= (count todo) maps-batch-size) ; add errors if there's not a full round left
+                        (do
+                          (log/info "Adding map directories and maps with errors to scan")
+                          (concat todo
+                                  (filter fs/is-directory? map-files) ; re-scan directories just before errors
+                                  error-files))
+                        (take maps-batch-size todo)))
          next-round (drop maps-batch-size todo)
          all-paths (set (filter some? (map (comp fs/canonical-path :file) maps)))
          next-round (->> next-round
                          (remove (comp all-paths fs/canonical-path))
-                         (remove fs/is-directory?)
                          seq)
          next-round-count (count next-round)
          missing-paths (set
@@ -1901,10 +1913,9 @@
                                 (remove (partial fs/descendant? spring-root))
                                 (map fs/canonical-path))))]
      (apply fs/update-file-cache! state-atom map-files)
-     (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
      (fs/make-dirs fs/maps-cache-root)
      (when (seq this-round)
-       (log/info "Adding" (count this-round) "maps this iteration"))
+       (log/info "Adding" (count this-round) "maps this iteration:" (with-out-str (pprint this-round))))
      (let [map-file-to-name (into {}
                               (for [map-file this-round]
                                 (do
@@ -1913,10 +1924,12 @@
                                         relevant-map-data (select-keys map-data [:error :file :map-name])]
                                     (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
                                            (fn [maps]
-                                             (set
-                                               (cond-> (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file) maps)
-                                                 map-data
-                                                 (conj relevant-map-data)))))
+                                             (let [valid-maps (->> maps
+                                                                   (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file)))]
+                                               (set
+                                                 (cond-> valid-maps
+                                                   map-data
+                                                   (conj relevant-map-data))))))
                                     [map-file (:map-name map-data)]))))
            priority-maps (map (fn [map-file]
                                 {:map-name (get map-file-to-name map-file)
@@ -1932,6 +1945,7 @@
                          (and (not error)
                               (string/blank? map-name))))
                      (remove (comp missing-paths fs/canonical-path :file))
+                     (filter (comp (partial instance? File) :file))
                      set)))
        (if next-round
          (do
@@ -1943,8 +1957,10 @@
              {::task-type ::refresh-maps
               :spring-root spring-root
               :todo next-round-count}))
-         (task/add-task! state-atom {::task-type ::update-cached-minimaps
-                                     :priorities priority-maps}))
+         (do
+           (log/info "Finished map refresh")
+           (task/add-task! state-atom {::task-type ::update-cached-minimaps
+                                       :priorities priority-maps})))
        {:todo-count next-round-count}))))
 
 
