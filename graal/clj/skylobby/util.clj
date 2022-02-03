@@ -535,3 +535,12 @@
   (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
 
 
+(defn modoption-value
+  "Returns the normalized modoption value to be used in the start script."
+  [modoption-type raw-value]
+  (if (or (= "list" modoption-type)
+          (= "string" modoption-type))
+    (str raw-value)
+    (if (= "bool" modoption-type)
+      (to-number (to-bool raw-value))
+      (to-number raw-value))))
