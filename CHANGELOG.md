@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.76](https://github.com/skynet-gh/skylobby/releases/tag/0.7.76) - 2022-02-03
+
+- Fix map and game refresh corrupt with files
+- Fix SDD detection not case insensitive
+- Fix game not launching when in sync and host start
+- Fix filtering modoptions by changed only
+- Add caching of current battle minimaps
+
 ## [0.7.75](https://github.com/skynet-gh/skylobby/releases/tag/0.7.75) - 2022-02-01
 
 - Fix join battle issue
