@@ -54,6 +54,7 @@
                    (sort-by (comp u/to-number first))
                    (map second)
                    (filter :key)
+                   (remove (comp #{"section"} :type)) ; remove sections in middle
                    (map #(update % :key (comp keyword string/lower-case))))
         event-data (or event-data
                        {:event/type :spring-lobby/modoption-change})]
@@ -279,11 +280,19 @@
                        (filter
                          (fn [[_ modoption]]
                            (if show-only-changed-modoptions
-                             (or (= "section" (:type modoption))
-                                 (contains? changed-options (:key modoption)))
-                             true)))
-                       (into {}))))
-              (remove (comp empty? second))
+                             (let [k (when (:key modoption)
+                                       (string/lower-case (:key modoption)))
+                                   t (:type modoption)]
+                               (or (= "section" t)
+                                   (and (contains? changed-options k)
+                                        (not= (u/modoption-value t (get changed-options k))
+                                              (u/modoption-value t (:def modoption))))))
+                             true))))))
+              (remove
+                (fn [section]
+                  (->> section
+                       (remove (comp #{"section"} :type second))
+                       empty?)))
               (mapv
                 (fn [section]
                   {:fx/type modoptions-table

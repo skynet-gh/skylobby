@@ -432,6 +432,10 @@
     (or (string/ends-with? filename ".sd7")
         (string/ends-with? filename ".sdz"))))
 
+(defn is-sdd-filename? [filename]
+  (when filename
+    (string/ends-with? (string/lower-case filename) ".sdd")))
+
 (defn spring-files-and-dirs [f]
   (->> f
        list-files
@@ -440,7 +444,7 @@
            (every-pred is-file? (comp spring-archive? filename))
            (every-pred
              is-directory?
-             #(string/ends-with? (filename %) ".sdd"))))))
+             (comp is-sdd-filename? filename))))))
 
 (defn map-files
   [root]
@@ -1022,7 +1026,7 @@
            (read-zip-map file opts)
            (and (is-file? file) (string/ends-with? filename ".sd7"))
            (read-7z-map-fast file opts)
-           (and (is-directory? file) (string/ends-with? filename ".sdd"))
+           (and (is-directory? file) (is-sdd-filename? filename))
            (read-map-directory file opts)
            :else
            {:error true})
@@ -1217,7 +1221,7 @@
   ([^java.io.File file opts]
    (let [filename (filename file)]
      (cond
-       (and (is-directory? file) (string/ends-with? filename ".sdd"))
+       (and (is-directory? file) (is-sdd-filename? filename))
        (read-mod-directory file opts)
        (string/ends-with? filename ".sdz")
        (read-mod-zip-file file opts)

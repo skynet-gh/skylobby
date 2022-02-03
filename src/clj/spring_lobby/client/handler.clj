@@ -88,7 +88,7 @@
 
 (defn start-game-if-synced
   [state-atom {:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
-  (let [{:keys [battle battles]} server-data
+  (let [{:keys [battle battles username]} server-data
         spring-root (or (-> servers (get (-> server-data :client-data :server-url)) :spring-isolation-dir)
                         spring-isolation-dir)
         {:keys [engines maps mods]} (-> by-spring-root (get (fs/canonical-path spring-root)))
@@ -96,8 +96,10 @@
         {:keys [battle-map battle-modname battle-version]} battle-detail
         has-engine (->> engines (filter (comp #{battle-version} :engine-version)) first)
         has-mod (->> mods (filter (comp #{battle-modname} :mod-name)) first)
-        has-map (->> maps (filter (comp #{battle-map} :map-name)) first)]
-    (if (and has-engine has-mod has-map)
+        has-map (->> maps (filter (comp #{battle-map} :map-name)) first)
+        my-sync-status (get-in battle [:users username :battle-status :sync])]
+    (if (or (= 1 my-sync-status)
+            (and has-engine has-mod has-map))
       (do
         (log/info "Starting game to join host")
         (future
