@@ -594,7 +594,8 @@
          runtime (Runtime/getRuntime)
          process (.exec runtime cmdarray)]
      (.waitFor process 1000 java.util.concurrent.TimeUnit/MILLISECONDS)
-     (let [sync-version (string/trim (slurp (.getInputStream process)))]
+     (let [output (slurp (.getInputStream process))
+           sync-version (-> output string/split-lines last string/trim)]
        (log/info "Discovered sync-version of" engine-exe "is" (str "'" sync-version "'"))
        sync-version))))
 
