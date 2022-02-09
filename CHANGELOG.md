@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.78](https://github.com/skynet-gh/skylobby/releases/tag/0.7.78) - 2022-02-09
+
+- Fix engine version re-checking
+- Add output of raw spring stdout and stderr to `skylobby-spring.log` file
+- Fix some issue with importing file to itself
+- Add player colors to battle preview
+- Add Report Bug button leading to GitHub issues
+
 ## [0.7.77](https://github.com/skynet-gh/skylobby/releases/tag/0.7.77) - 2022-02-09
 
 - Fix engine version detection with multiple lines of output
