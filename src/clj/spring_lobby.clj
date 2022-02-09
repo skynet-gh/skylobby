@@ -727,6 +727,7 @@
                          (do
                            (log/info "Refreshing engines to pick up" engine-extract-dest)
                            {::task-type ::refresh-engines
+                            :force true
                             :priorites [engine-extract-dest]
                             :spring-root spring-root})
                          :else
@@ -1134,6 +1135,7 @@
                   (update :tasks-by-kind
                     task/add-multiple-tasks
                     [{::task-type ::refresh-engines
+                      :force true
                       :spring-root spring-isolation-dir}
                      {::task-type ::refresh-mods
                       :spring-root spring-isolation-dir}
@@ -4822,6 +4824,7 @@
     (task/add-tasks! *state
       (concat
         [{::task-type ::refresh-engines
+          :force true
           :spring-root spring-root}
          {::task-type ::refresh-mods
           :spring-root spring-root
