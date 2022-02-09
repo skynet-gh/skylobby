@@ -165,6 +165,8 @@
           :style {:-fx-font-size 20}
           :text (str (:battle-title selected-battle-details))}
          {:fx/type players-table
+          :v-box/vgrow :always
+          :auto-color true
           :battle-id selected-battle-id
           :players (fx.battle/battle-players-and-bots
                      {:battle selected-battle-details

@@ -72,7 +72,7 @@
             :icon-literal "mdi-close-octagon:16"}}]))}))
 
 
-(def local-buttons-width 180)
+(def local-buttons-width 200)
 (def local-buttons-text-gap 16)
 
 (defn singleplayer-buttons
@@ -141,6 +141,17 @@
        :graphic
        {:fx/type font-icon/lifecycle
         :icon-literal "mdi-settings:30"}}
+      {:fx/type :button
+       :style-class ["button" "skylobby-normal"]
+       :pref-width local-buttons-width
+       :text "Report Bug"
+       :on-action {:event/type :spring-lobby/desktop-browse-url
+                   :url "https://github.com/skynet-gh/skylobby/issues"}
+       :alignment :center-left
+       :graphic-text-gap local-buttons-text-gap
+       :graphic
+       {:fx/type font-icon/lifecycle
+        :icon-literal "mdi-bug:30"}}
       {:fx/type :pane
        :v-box/vgrow :always}])})
 
@@ -338,6 +349,13 @@
    [
     {:fx/type :pane
      :v-box/vgrow :always}
+    {:fx/type :hyperlink
+     :style {:-fx-font-size 24}
+     :text (str "skylobby " u/app-version)
+     :on-action {:event/type :spring-lobby/desktop-browse-url
+                 :url "https://github.com/skynet-gh/skylobby/wiki/User-Guide"}}
+    {:fx/type :pane
+     :pref-height 20}
     {:fx/type :h-box
      :children
      [

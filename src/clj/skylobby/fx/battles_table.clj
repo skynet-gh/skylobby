@@ -295,7 +295,7 @@
           {:fx/type :table-column
            :text "Play (Spec)"
            :resizable false
-           :pref-width 100
+           :pref-width 110
            :cell-value-factory (juxt
                                  (comp count :users)
                                  #(or (u/to-number (:battle-spectators %)) 0))

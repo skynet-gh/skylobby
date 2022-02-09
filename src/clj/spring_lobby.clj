@@ -563,6 +563,11 @@
   (let [{:keys [mirrors]} springfiles-search-result]
     (rand-nth mirrors)))
 
+
+(defn import-dest-is-source? [spring-root {:keys [resource-file] :as importable}]
+  (= (fs/canonical-path resource-file)
+     (fs/canonical-path (resource/resource-dest spring-root importable))))
+
 (defn server-auto-resources [_old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
@@ -605,6 +610,7 @@
               map-import-task (->> all-tasks
                                    (filter (comp #{::import} ::task-type))
                                    (filter (comp (partial resource/same-resource-file? map-importable) :importable))
+                                   (remove (partial import-dest-is-source? spring-root))
                                    first)
               no-map (->> maps
                           (filter (comp #{battle-map} :map-name))
@@ -632,6 +638,7 @@
               engine-importable (some->> importables
                                          (filter (comp #{::engine} :resource-type))
                                          (filter (partial resource/could-be-this-engine? battle-version))
+                                         (remove (partial import-dest-is-source? spring-root))
                                          first)
               engine-import-task (->> all-tasks
                                       (filter (comp #{::import} ::task-type))
@@ -727,6 +734,7 @@
                          (do
                            (log/info "Refreshing engines to pick up" engine-extract-dest)
                            {::task-type ::refresh-engines
+                            :force true
                             :priorites [engine-extract-dest]
                             :spring-root spring-root})
                          :else
@@ -1134,6 +1142,7 @@
                   (update :tasks-by-kind
                     task/add-multiple-tasks
                     [{::task-type ::refresh-engines
+                      :force true
                       :spring-root spring-isolation-dir}
                      {::task-type ::refresh-mods
                       :spring-root spring-isolation-dir}
@@ -4822,6 +4831,7 @@
     (task/add-tasks! *state
       (concat
         [{::task-type ::refresh-engines
+          :force true
           :spring-root spring-root}
          {::task-type ::refresh-mods
           :spring-root spring-root

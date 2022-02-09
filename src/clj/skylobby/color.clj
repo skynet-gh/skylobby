@@ -187,28 +187,29 @@
 
 
 (defn player-color [{:keys [ally id]} teams-by-allyteam]
-  (let [^java.util.List allyteam-players (get teams-by-allyteam ally)
-        player-index (.indexOf allyteam-players id)
-        team-count (count teams-by-allyteam)
-        web-color (or
-                    (get
+  (when-let [^java.util.List allyteam-players (get teams-by-allyteam ally)]
+    (let [
+          player-index (.indexOf allyteam-players id)
+          team-count (count teams-by-allyteam)
+          web-color (or
                       (get
-                        (if (= 2 team-count)
-                          (let [max-team-size (reduce (fnil max 0) 0 (map count (vals teams-by-allyteam)))]
-                            (reduce
-                              (fn [chosen [min-team-size colors]]
-                                (or chosen
-                                  (when (<= min-team-size max-team-size)
-                                    colors)))
-                              nil
-                              team-colors-by-min-size))
-                          (get colors-by-team-count team-count))
-                        ally)
-                      player-index)
-                    (get ffa-colors-web id))]
-    (when web-color
-      (fx.color/javafx-color-to-spring
-        (Color/web web-color)))))
+                        (get
+                          (if (= 2 team-count)
+                            (let [max-team-size (reduce (fnil max 0) 0 (map count (vals teams-by-allyteam)))]
+                              (reduce
+                                (fn [chosen [min-team-size colors]]
+                                  (or chosen
+                                    (when (<= min-team-size max-team-size)
+                                      colors)))
+                                nil
+                                team-colors-by-min-size))
+                            (get colors-by-team-count team-count))
+                          ally)
+                        player-index)
+                      (get ffa-colors-web id))]
+      (when web-color
+        (fx.color/javafx-color-to-spring
+          (Color/web web-color))))))
 
 
 ; https://github.com/beyond-all-reason/Beyond-All-Reason/blob/5572edc/luaui/Widgets/gui_advplayerslist.lua#L1524
