@@ -227,7 +227,9 @@
                resource-path (fs/canonical-path resource-file)
                dest (resource/resource-dest spring-isolation-dir importable)
                dest-exists (fs/file-exists? file-cache dest)]
-           (when importable
+           (when (and importable
+                      (not= (fs/canonical-path resource-file)
+                            (fs/canonical-path dest)))
              [{:severity (if dest-exists -1 2)
                :text "import"
                :human-text (if importable
