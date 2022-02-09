@@ -349,6 +349,13 @@
    [
     {:fx/type :pane
      :v-box/vgrow :always}
+    {:fx/type :hyperlink
+     :style {:-fx-font-size 24}
+     :text (str "skylobby " u/app-version)
+     :on-action {:event/type :spring-lobby/desktop-browse-url
+                 :url "https://github.com/skynet-gh/skylobby/wiki/User-Guide"}}
+    {:fx/type :pane
+     :pref-height 20}
     {:fx/type :h-box
      :children
      [
