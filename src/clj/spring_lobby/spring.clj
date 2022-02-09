@@ -381,6 +381,7 @@
 
 (defn get-envp [] nil)
 
+
 (defn wait-for-spring [^java.lang.Process process state-atom spring-log-state {:keys [infolog-dest]}]
   (let [exit-code (.waitFor process)]
     (log/info "Spring exited with code" exit-code)
@@ -396,6 +397,8 @@
                :spring-log spring-log
                :spring-crash-infolog-file infolog-dest
                :spring-crash-archive-not-found archive-not-found)))))
+
+(def spring-out-filename "skylobby-spring.log")
 
 (defn start-game
   [state-atom
@@ -413,6 +416,7 @@
             (-> state
                 (assoc-in [:spring-starting server-key battle-id] false)
                 (assoc-in [:spring-running server-key battle-id] true))))
+        spring-out-file (fs/file (fs/app-root) spring-out-filename)
         pre-game-fn (fn []
                       (try
                         (if (and media-player (not music-paused))
@@ -454,7 +458,9 @@
                                   (let [res (copy-spring-settings source-dir spring-isolation-dir)]
                                     (log/info "Copied Spring settings" res)))
                                 (log/info "Game specific settings do not exist, skipping"))))
-                          (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state)))))))
+                          (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state))))))
+                      (locking spring-out-filename
+                        (spit spring-out-file "")))
         infologs-dir (fs/file spring-isolation-dir "infologs")
         infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))
         post-game-fn (fn []
@@ -551,15 +557,18 @@
             (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
                   ^"[Ljava.lang.String;" envp (get-envp)
                   runtime (Runtime/getRuntime)
-                  process (.exec runtime cmdarray envp spring-isolation-dir)]
+                  process (.exec runtime cmdarray envp spring-isolation-dir)
+                  pid (.pid process)]
               (log/info "Running '" command "'")
               (async/thread
                 (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
                   (loop []
                     (if-let [line (.readLine reader)]
                       (do
-                        (log/info "(spring out)" line)
+                        (log/info "(spring" pid "out)" line)
                         (swap! spring-log-state conj {:stream :out :line line})
+                        (locking spring-out-filename
+                          (spit spring-out-file (str line \newline) :append true))
                         (recur))
                       (log/info "Spring stdout stream closed")))))
               (async/thread
@@ -567,8 +576,10 @@
                   (loop []
                     (if-let [line (.readLine reader)]
                       (do
-                        (log/info "(spring err)" line)
+                        (log/info "(spring" pid "err)" line)
                         (swap! spring-log-state conj {:stream :err :line line})
+                        (locking spring-out-filename
+                          (spit spring-out-file (str line \newline) :append true))
                         (recur))
                       (log/info "Spring stderr stream closed")))))
               (try
@@ -616,13 +627,14 @@
       (log/info "Running '" command "'")
       (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
             ^"[Ljava.lang.String;" envp (get-envp)
-            process (.exec runtime cmdarray envp spring-isolation-dir)]
+            process (.exec runtime cmdarray envp spring-isolation-dir)
+            pid (.pid process)]
         (async/thread
           (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
             (loop []
               (if-let [line (.readLine reader)]
                 (do
-                  (log/info "(spring out)" line)
+                  (log/info "(spring" pid "out)" line)
                   (swap! spring-log-state conj {:stream :out :line line})
                   (recur))
                 (log/info "Spring stdout stream closed")))))
@@ -631,7 +643,7 @@
             (loop []
               (if-let [line (.readLine reader)]
                 (do
-                  (log/info "(spring err)" line)
+                  (log/info "(spring" pid "err)" line)
                   (swap! spring-log-state conj {:stream :err :line line})
                   (recur))
                 (log/info "Spring stderr stream closed")))))
