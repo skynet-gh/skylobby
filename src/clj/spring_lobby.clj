@@ -299,10 +299,7 @@
 
 (def ^:dynamic *state (atom {}))
 (def ^:dynamic *ui-state
-  (atom
-    (fx/create-context
-      {}
-      (cache-factory-with-threshold cache/lru-cache-factory 4096))))
+  (atom (fx/create-context {} cache/lru-cache-factory)))
 
 (def main-stage-atom (atom nil))
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.77](https://github.com/skynet-gh/skylobby/releases/tag/0.7.77) - 2022-02-09
+
+- Fix engine version detection with multiple lines of output
+
 ## [0.7.76](https://github.com/skynet-gh/skylobby/releases/tag/0.7.76) - 2022-02-03
 
 - Fix map and game refresh corrupt with files
