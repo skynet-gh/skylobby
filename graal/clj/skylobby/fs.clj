@@ -881,6 +881,43 @@
     {:map-name (map-name smf-path)
      :smf (assoc smf-data ::source smf-path)}))
 
+(defn parse-extracted-7z-map [extracted opts]
+  (merge
+    (when-let [[path smf-bytes]
+               (->> extracted
+                    (filter (comp #(string/ends-with? % ".smf") first))
+                    first)]
+      (read-7z-smf-bytes path smf-bytes opts))
+    (when-let [[path mapinfo-bytes]
+               (->> extracted
+                    (filter (comp #{"mapinfo.lua"}
+                                  string/lower-case
+                                  first))
+                    first)]
+      (parse-mapinfo file (slurp mapinfo-bytes) path))
+    (when-let [[path mapoptions-bytes]
+               (->> extracted
+                    (filter (comp #{"mapoptions.lua"}
+                                  string/lower-case
+                                  first))
+                    first)]
+      (parse-mapoptions file (slurp mapoptions-bytes) path))
+    (when-let [[path smd-bytes]
+               (->> extracted
+                    (filter (comp #(string/ends-with? % ".smd") first))
+                    first)]
+      (let [smd (spring-script/parse-script (slurp smd-bytes))]
+        {:smd (assoc smd ::source path)}))))
+
+(defn filter-7z-map-entry? [path]
+  (let [
+        path-lc (string/lower-case path)]
+    (or
+      (string/ends-with? path-lc ".smd")
+      (string/ends-with? path-lc ".smf")
+      (string/ends-with? path-lc "mapinfo.lua")
+      (string/ends-with? path-lc "mapoptions.lua"))))
+
 (defn read-7z-map-fast
   ([^java.io.File file]
    (read-7z-map-fast file nil))
@@ -893,13 +930,8 @@
      (let [n (.getNumberOfItems archive)
            ids (filter
                  (fn [id]
-                   (let [path (.getProperty archive id PropID/PATH)
-                         path-lc (string/lower-case path)]
-                     (or
-                       (string/ends-with? path-lc ".smd")
-                       (string/ends-with? path-lc ".smf")
-                       (string/ends-with? path-lc "mapinfo.lua")
-                       (string/ends-with? path-lc "mapoptions.lua"))))
+                   (let [path (.getProperty archive id PropID/PATH)]
+                     (filter-7z-map-entry? path)))
                  (take n (iterate inc 0)))
            extracted-state (atom {})
            callback-state (atom {})]
@@ -943,33 +975,37 @@
                    (setCompleted [_this complete]
                      (swap! callback-state assoc :complete complete)
                      (log/trace "completed" complete))))
-       (let [extracted @extracted-state]
-         (merge
-           (when-let [[path smf-bytes]
-                      (->> extracted
-                           (filter (comp #(string/ends-with? % ".smf") first))
-                           first)]
-             (read-7z-smf-bytes path smf-bytes opts))
-           (when-let [[path mapinfo-bytes]
-                      (->> extracted
-                           (filter (comp #{"mapinfo.lua"}
-                                         string/lower-case
-                                         first))
-                           first)]
-             (parse-mapinfo file (slurp mapinfo-bytes) path))
-           (when-let [[path mapoptions-bytes]
-                      (->> extracted
-                           (filter (comp #{"mapoptions.lua"}
-                                         string/lower-case
-                                         first))
-                           first)]
-             (parse-mapoptions file (slurp mapoptions-bytes) path))
-           (when-let [[path smd-bytes]
-                      (->> extracted
-                           (filter (comp #(string/ends-with? % ".smd") first))
-                           first)]
-             (let [smd (spring-script/parse-script (slurp smd-bytes))]
-               {:smd (assoc smd ::source path)}))))))))
+       (parse-extracted-7z-map @extracted-state opts)))))
+
+(defn read-7z-map-apache
+  ([^java.io.File file]
+   (read-7z-map-fast file nil))
+  ([^java.io.File file opts]
+   (let [options-builder (doto (SevenZFileOptions/builder)
+                           (.withTryToRecoverBrokenArchives true)
+                           (.withUseDefaultNameForUnnamedEntries true))
+         ^SevenZFileOptions options (.build options-builder)
+         sevenz-file (new SevenZFile file options)
+         extracted-state (atom {})]
+     (loop []
+       (when-let [^SevenZArchiveEntry entry (try
+                                              (.getNextEntry sevenz-file)
+                                              (catch Exception e
+                                                (log/error e "Error getting next entry")
+                                                :invalid))]
+         (if (not= :invalid entry)
+           (let [path (.getName entry)]
+             (when (filter-7z-map-entry? path)
+               (let [
+                     size (.getSize entry)
+                     content (byte-array size)]
+                 (log/info "Reading" path "from" file "size" size)
+                 (.read sevenz-file content 0 size)
+                 (when-not (.isDirectory entry)
+                   (swap! extracted-state assoc path content)))))
+           (log/warn "Skiping invalid 7z entry in" file))
+         (recur)))
+     (parse-extracted-7z-map @extracted-state opts))))
 
 (defn read-smf-file
   ([smf-file]
@@ -1026,11 +1062,17 @@
            (and (is-file? file) (string/ends-with? filename ".sdz"))
            (read-zip-map file opts)
            (and (is-file? file) (string/ends-with? filename ".sd7"))
-           (read-7z-map-fast file opts)
+           (try
+             (read-7z-map-fast file opts)
+             (catch Exception e
+               (log/error e "Error reading map with native 7zip, falling back on Apache commons-compress")
+               (read-7z-map-apache file opts)))
            (and (is-directory? file) (is-sdd-filename? filename))
            (read-map-directory file opts)
            :else
-           {:error true})
+           (do
+             (log/error "No method to read map file" file opts)
+             {:error true}))
          (catch Exception e
            (log/warn e "Error reading map data for" filename)
            {:error true}))))))

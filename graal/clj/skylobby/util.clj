@@ -424,11 +424,13 @@
   (log/merge-config!
     {:min-level :info
      :appenders
-     {:rotor (rotor/rotor-appender
-               {:path log-path
-                :max-size 5000000
-                :backlog 5
-                :output-fn (partial log/default-output-fn {:stacktrace-fonts {}})})}})
+     {:rotor
+      (assoc
+        (rotor/rotor-appender
+          {:path log-path
+           :max-size 5000000
+           :backlog 5})
+        :output-fn (partial log/default-output-fn {:stacktrace-fonts {}}))}})
   (log/handle-uncaught-jvm-exceptions!))
 
 
