@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.79](https://github.com/skynet-gh/skylobby/releases/tag/0.7.79) - 2022-02-12
+
+- Add fallback on Apache commons-compress for 7z maps
+- Fix colors in rotated log files
+- Fix battle preview players by team colors
+
 ## [0.7.78](https://github.com/skynet-gh/skylobby/releases/tag/0.7.78) - 2022-02-09
 
 - Fix engine version re-checking
