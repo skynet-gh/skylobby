@@ -440,6 +440,21 @@
           :client-status client-status
           :user user}]))}})
 
+(defn add-players-colors [players]
+  (let [
+        by-allyteam (->> players
+                         (filter (comp u/to-bool :mode :battle-status))
+                         (group-by (comp :ally :battle-status)))
+        teams-by-allyteam (->> by-allyteam
+                               (map
+                                 (fn [[k vs]]
+                                   [k (vec (sort (map (comp :id :battle-status) vs)))]))
+                               (into {}))]
+    (map
+      (fn [{:keys [battle-status] :as player}]
+        (assoc player :team-color (color/player-color battle-status teams-by-allyteam)))
+      players)))
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [auto-color battle-id mod-name players read-only scripttags server-key]}]
@@ -468,20 +483,9 @@
         side-items (->> sides seq (sort-by first) (map second))
         singleplayer (or (not server-key) (= :local server-key))
         username (fx/sub-val context get-in [:by-server server-key :username])
-        by-allyteam (->> players
-                         (filter (comp u/to-bool :mode :battle-status))
-                         (group-by (comp :ally :battle-status)))
-        teams-by-allyteam (->> by-allyteam
-                               (map
-                                 (fn [[k vs]]
-                                   [k (vec (sort (map (comp :id :battle-status) vs)))]))
-                               (into {}))
-        players-with-color (->> players
-                                (map
-                                  (fn [{:keys [battle-status] :as player}]
-                                    (if auto-color
-                                      (assoc player :team-color (color/player-color battle-status teams-by-allyteam))
-                                      player))))
+        players-with-color (if auto-color
+                             (add-players-colors players)
+                             players)
         players-with-skill (map (partial add-parsed-skill scripttags) players-with-color)
         incrementing-cell (fn [id]
                             {:text
@@ -946,7 +950,7 @@
 
 (defn players-not-a-table
   [{:fx/keys [context]
-    :keys [players read-only server-key]}]
+    :keys [auto-color players read-only server-key]}]
   (let [
         singleplayer (or (not server-key) (= :local server-key))
         css-class-suffix (cond
@@ -954,7 +958,10 @@
                            singleplayer "singleplayer"
                            :else "multiplayer")
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
-        players-with-skill (map (partial add-parsed-skill scripttags) players)
+        players-with-color (if auto-color
+                             (add-players-colors players)
+                             players)
+        players-with-skill (map (partial add-parsed-skill scripttags) players-with-color)
         playing-by-ally (->> players-with-skill
                              (filter (comp :mode :battle-status))
                              (group-by (comp :ally :battle-status)))
