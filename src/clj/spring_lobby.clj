@@ -13,6 +13,7 @@
     [clojure.set]
     [clojure.string :as string]
     crypto.random
+    [datahike.api :as d]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -5450,6 +5451,15 @@
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (try
+     (let [cfg {:store {:backend :file
+                        :path (fs/canonical-path (fs/file (fs/app-root) "database"))
+                        :id "skylobby"}}
+           _ (d/create-database cfg)
+           conn (d/connect cfg)]
+       (swap! state-atom assoc :database-connection conn))
+     (catch Exception e
+       (log/error e "Error creating datahike database")))
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)

@@ -30,7 +30,6 @@
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   http-kit/http-kit {:mvn/version "2.5.3"}
-  io.aviso/pretty {:mvn/version "1.1.1"}
   io.netty/netty-codec {:mvn/version "4.1.74.Final"}
   io.netty/netty-codec-http {:mvn/version "4.1.74.Final"}
   io.netty/netty-handler {:mvn/version "4.1.74.Final"}
@@ -39,6 +38,7 @@
   io.netty/netty-resolver-dns {:mvn/version "4.1.74.Final"}
   io.netty/netty-transport {:mvn/version "4.1.74.Final"}
   io.netty/netty-transport-native-epoll {:mvn/version "4.1.74.Final"}
+  io.replikativ/datahike {:mvn/version "0.4.1483"}
   hashp/hashp {:mvn/version "0.2.1"}
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.10"}
