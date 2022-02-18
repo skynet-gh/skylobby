@@ -18,6 +18,15 @@
 (set! *warn-on-reflection* true)
 
 
+(defprotocol RapidIndex
+  (rapid-id-by-hash [this spring-root rapid-hash])
+  (rapid-data-by-version [this spring-root version])
+  (rapid-data-by-id [this spring-root id])
+  (rapid-data-by-hash [this spring-root rapid-hash])
+  (update-rapid-datum [this spring-root rapid-datum])
+  (update-rapid-data [this spring-root rapid-data]))
+
+
 ; https://springrts.com/wiki/Rapid
 
 

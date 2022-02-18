@@ -2,6 +2,9 @@
   "resources":{
   "includes":[
     {
+      "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
+    }, 
+    {
       "pattern":"\\QWindows-amd64/lib7-Zip-JBinding.dll\\E"
     }, 
     {
@@ -15,6 +18,9 @@
     }, 
     {
       "pattern":"\\Qorg/apache/http/client/version.properties\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/h2/util/data.zip\\E"
     }, 
     {
       "pattern":"\\Qpublic/css/tachyons.min.css\\E"

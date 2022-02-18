@@ -308,6 +308,7 @@
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -371,7 +372,17 @@
             :check-box
             {:fx/type :check-box
              :selected (boolean use-git-mod-version)
-             :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}]}
+             :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-rapid)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-rapid}}
+             {:fx/type :label
+              :text " Use on-disk database for rapid index"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Spring"

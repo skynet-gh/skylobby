@@ -16,6 +16,9 @@
   clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
+  com.github.seancorfield/honeysql {:mvn/version "2.2.868"}
+  com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
+  com.h2database/h2 {:mvn/version "2.1.210"}
   com.taoensso/encore {:mvn/version "3.21.0"}
   com.taoensso/nippy {:mvn/version "3.1.1"}
   com.taoensso/sente {:mvn/version "1.16.2"}
@@ -94,9 +97,14 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
-   :jvm-opts ["-server" "-Xms128m" "-Xmx8g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+   :jvm-opts [
+              "-server"
+              "-Xms32m" "-Xmx2g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+              "-XX:+UseStringDeduplication"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
-              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
+              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
+              "--add-opens=java.base/java.nio=ALL-UNNAMED"
+              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
    :main-opts ["--main" "repl"]}
   :cljs
   {:extra-paths ["src/cljs" "graal/cljc"]
@@ -173,6 +181,9 @@
     {:git/url   "https://github.com/clj-easy/graal-config"
      :git/sha   "0dc2862e1b1c9871eef4c306ef77da3610a2bd93"
      :deps/root "config/com.taoensso/nippy"}
+    com.github.seancorfield/honeysql {:mvn/version "2.2.868"}
+    com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
+    com.h2database/h2 {:mvn/version "2.1.210"}
     com.taoensso/encore {:mvn/version "3.21.0"}
     com.taoensso/nippy {:mvn/version "3.1.1"}
     com.taoensso/sente {:mvn/version "1.16.2"}

@@ -3,6 +3,7 @@
     [clojure.core.cache :as cache]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
+    clojure.set
     [clojure.string :as string]
     [me.raynes.fs :as raynes-fs]
     [skylobby.client.gloss :as gloss]
@@ -640,12 +641,12 @@
         (apply fs/update-file-cache! state-atom (rapid/sdp-files spring-isolation-dir)))))
   (defmethod task-handler :spring-lobby/update-rapid
     [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
-    (swap! state-atom assoc :rapid-update true)
     (let [before (u/curr-millis)
-          {:keys [by-spring-root file-cache] :as state} @state-atom
-          engines (-> by-spring-root (get (fs/canonical-path spring-isolation-dir)) :engines)
-          engine-version (or engine-version (:engine-version state))
+          {:keys [by-spring-root db file-cache use-db-for-rapid] :as state} @state-atom
           spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
+          spring-root-path (fs/canonical-path spring-isolation-dir)
+          engines (get-in by-spring-root [spring-root-path :engines])
+          engine-version (or engine-version (:engine-version state))
           preferred-engine-details (resource/engine-details engines engine-version)
           engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                            preferred-engine-details
@@ -694,52 +695,85 @@
                                 (filter :version)
                                 (sort-by :version version/version-compare)
                                 reverse)
-            _ (log/info "Found" (count rapid-versions) "rapid versions")
-            rapid-data-by-hash (->> rapid-versions
-                                    (remove (comp #(string/ends-with? % ":test") :id))
-                                    ; prevents duplicates, uses specific version
-                                    (map (juxt :hash identity))
-                                    (into {}))
-            rapid-data-by-id (->> rapid-versions
-                                  (map (juxt :id identity))
-                                  (into {}))
-            rapid-data-by-version (->> rapid-versions
-                                       (remove (comp #(string/ends-with? % ":test") :id))
-                                       ; prevents duplicates, uses specific version
-                                       (map (juxt :version identity))
-                                       (into {}))]
-        (when (and mod-name
-                   (not (get rapid-data-by-version mod-name)))
-          (log/warn "Against all odds rapid update has not found version" mod-name
-                    "delete the local repos")
-          (reset! needs-rapid-delete true))
-        (swap! state-atom
-          (fn [state]
-            (-> state
-                (update-in [:rapid-by-spring-root (fs/canonical-path spring-isolation-dir)]
-                  (fn [rapid]
-                    (-> rapid
-                        (assoc :rapid-updated (u/curr-millis))
-                        (assoc :rapid-repos rapid-repos)
-                        (update :rapid-data-by-hash merge rapid-data-by-hash)
-                        (update :rapid-data-by-id merge rapid-data-by-id)
-                        (update :rapid-data-by-version merge rapid-data-by-version)
-                        (update :rapid-versions (fn [old-versions]
-                                                  (set
-                                                    (vals
-                                                      (merge
-                                                        (into {}
-                                                          (map (juxt :id identity) old-versions))
-                                                        (into {}
-                                                          (map (juxt :id identity) rapid-versions))))))))))
-                (update :file-cache merge new-files))))
+            _ (log/info "Found" (count rapid-versions) "rapid versions")]
+        (if (and db use-db-for-rapid)
+          (let [_ (log/info "Using database for rapid" db)
+                data (mapv
+                       (fn [data]
+                         (-> data
+                             (select-keys [:id :hash :detail :version])
+                             (clojure.set/rename-keys
+                               {:id ::rapid/id
+                                :hash ::rapid/hash
+                                :detail ::rapid/detail
+                                :version ::rapid/version})
+                             (assoc ::rapid/spring-root spring-root-path)))
+                       rapid-versions)
+                before (u/curr-millis)]
+            (rapid/update-rapid-data db spring-root-path data)
+            (log/info "Wrote" (count rapid-versions) "to database in" (- (u/curr-millis) before) "ms")
+            (swap! state-atom
+              (fn [state]
+                (-> state
+                    (update-in [:rapid-by-spring-root spring-root-path]
+                      (fn [rapid]
+                        (-> rapid
+                            (assoc :rapid-updated (u/curr-millis))
+                            (assoc :rapid-repos rapid-repos))))
+                    (update :file-cache merge new-files)
+                    (update :rapid-by-spring-root
+                      (fn [rapid-by-spring-root]
+                        (reduce-kv
+                          (fn [m k v]
+                            (assoc m k (dissoc v :rapid-data-by-hash :rapid-data-by-id :rapid-data-by-version :rapid-versions)))
+                          {}
+                          rapid-by-spring-root)))))))
+          (let [
+                rapid-data-by-hash (->> rapid-versions
+                                        (remove (comp #(string/ends-with? % ":test") :id))
+                                        ; prevents duplicates, uses specific version
+                                        (map (juxt :hash identity))
+                                        (into {}))
+                rapid-data-by-id (->> rapid-versions
+                                      (map (juxt :id identity))
+                                      (into {}))
+                rapid-data-by-version (->> rapid-versions
+                                           (remove (comp #(string/ends-with? % ":test") :id))
+                                           ; prevents duplicates, uses specific version
+                                           (map (juxt :version identity))
+                                           (into {}))]
+            (when (and mod-name
+                       (not (get rapid-data-by-version mod-name)))
+              (log/warn "Against all odds rapid update has not found version" mod-name
+                        "delete the local repos")
+              (reset! needs-rapid-delete true))
+            (swap! state-atom
+              (fn [state]
+                (-> state
+                    (update-in [:rapid-by-spring-root spring-root-path]
+                      (fn [rapid]
+                        (-> rapid
+                            (assoc :rapid-updated (u/curr-millis))
+                            (assoc :rapid-repos rapid-repos)
+                            (update :rapid-data-by-hash merge rapid-data-by-hash)
+                            (update :rapid-data-by-id merge rapid-data-by-id)
+                            (update :rapid-data-by-version merge rapid-data-by-version)
+                            (update :rapid-versions (fn [old-versions]
+                                                      (set
+                                                        (vals
+                                                          (merge
+                                                            (into {}
+                                                              (map (juxt :id identity) old-versions))
+                                                            (into {}
+                                                              (map (juxt :id identity) rapid-versions))))))))))
+                    (update :file-cache merge new-files))))))
         (when @needs-rapid-delete
           (task/add-task! state-atom
             {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
              :spring-root spring-isolation-dir
              :update-rapid-task task}))
         (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
-      (u/update-cooldown state-atom [:update-rapid (fs/canonical-path spring-isolation-dir)])
+      (u/update-cooldown state-atom [:update-rapid spring-root-path])
       (task/add-tasks! state-atom
         [
          {:spring-lobby/task-type :spring-lobby/update-rapid-packages
@@ -748,11 +782,15 @@
   (defmethod task-handler :spring-lobby/update-rapid-packages
     [{:keys [spring-isolation-dir]}]
     (swap! state-atom assoc :rapid-update true)
-    (let [{:keys [rapid-by-spring-root] :as state} @state-atom
+    (let [{:keys [db rapid-by-spring-root use-db-for-rapid] :as state} @state-atom
           spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
           spring-root-path (fs/canonical-path spring-isolation-dir)
           {:keys [rapid-data-by-hash]} (get rapid-by-spring-root spring-root-path)
           sdp-files (doall (rapid/sdp-files spring-isolation-dir))
+          get-by-hash-fn (fn [rapid-hash]
+                           (if (and db use-db-for-rapid)
+                             (rapid/rapid-data-by-hash db spring-root-path rapid-hash)
+                             (get rapid-data-by-hash rapid-hash)))
           packages (->> sdp-files
                         (filter some?)
                         (map
@@ -760,7 +798,7 @@
                             (let [rapid-data
                                   (->> f
                                        rapid/sdp-hash
-                                       (get rapid-data-by-hash))]
+                                       get-by-hash-fn)]
                               {:id (->> rapid-data :id str)
                                :filename (-> f fs/filename str)
                                :version (->> rapid-data :version str)})))

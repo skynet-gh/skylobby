@@ -39,6 +39,7 @@
     [skylobby.resource :as resource]
     [skylobby.server :as server]
     [skylobby.spring.script :as spring-script]
+    [skylobby.sql :as sql]
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
@@ -168,14 +169,116 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
-   :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+  [:auto-get-resources
+   :auto-get-replay-resources
+   :auto-launch
+   :auto-rejoin-battle
+   :auto-refresh-replays
+   :battle-as-tab
+   :battle-layout
+   :battle-password
+   :battle-players-color-type
+   :battle-players-display-type
+   :battle-port
+   :battle-resource-details
+   :battle-title
+   :battles-layout
+   :battles-table-images
+   :bot-name
+   :bot-version
+   :chat-auto-complete
+   :chat-auto-scroll
+   :chat-color-username
+   :chat-font-size
+   :chat-highlight-username
+   :chat-highlight-words
+   :client-id-override
+   :client-id-type
+   :console-auto-scroll
+   :console-ignore-message-types
+   :css
+   :debug-spring
+   :direct-connect-chat-commands
+   :direct-connect-ip :direct-connect-password
+   :direct-connect-port
+   :direct-connect-protocol
+   :direct-connect-username
+   :disable-tasks
+   :disable-tasks-while-in-game
+   :divider-positions
+   :engine-overrides
+   :extra-import-sources
+   :extra-replay-sources
+   :filter-replay
+   :filter-replay-type
+   :filter-replay-max-players
+   :filter-replay-min-players
+   :filter-users
+   :focus-chat-on-message
+   :friend-users
+   :hide-barmanager-messages
+   :hide-empty-battles
+   :hide-joinas-spec
+   :hide-locked-battles
+   :hide-passworded-battles
+   :hide-spads-messages
+   :hide-vote-messages
+   :highlight-tabs-with-new-battle-messages
+   :highlight-tabs-with-new-chat-messages
+   :ignore-users
+   :increment-ids
+   :interleave-ally-player-ids
+   :ipc-server-enabled
+   :ipc-server-port
+   :join-battle-as-player
+   :leave-battle-on-close-window
+   :logins :minimap-size
+   :music-dir
+   :music-stopped
+   :music-volume
+   :mute
+   :mute-ring
+   :my-channels
+   :password
+   :players-table-columns
+   :pop-out-battle
+   :preferred-color
+   :preferred-factions
+   :prevent-non-host-rings
+   :rapid-repo
+   :rapid-spring-root
+   :ready-on-unspec
+   :refresh-replays-after-game
+   :replay-source-enabled
+   :replays-window-dedupe
+   :replays-window-details
+   :ring-on-auto-unspec
+   :ring-sound-file
+   :ring-volume
+   :scenarios-engine-version
+   :scenarios-spring-root
+   :server
+   :servers
+   :show-accolades
+   :show-battle-preview
+   :show-closed-battles
+   :show-hidden-modoptions
+   :show-spring-picker
+   :show-team-skills
+   :show-vote-log
+   :spring-isolation-dir
+   :spring-settings
+   :uikeys
+   :unready-after-game
+   :use-db-for-downloadables
+   :use-db-for-rapid
+   :use-db-for-replays
+   :use-default-ring-sound
+   :use-git-mod-version
+   :user-agent-override
+   :username
+   :windows-as-tabs
+   :window-states])
 
 
 (defn- select-config [state]
@@ -847,9 +950,6 @@
 (defmethod task-handler :default [task]
   (when task
     (log/warn "Unknown task type" task)))
-
-(task-handlers/add-handlers handle-task *state)
-; TODO not during init?
 
 
 (defn handle-task!
@@ -4213,11 +4313,16 @@
   (start-ipc-server *state {:force true}))
 
 
+(defmethod task-handler ::init-sql-db [_]
+  (sql/init-db *state {:force true}))
+
+
 (defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (task-handlers/add-handlers handle-task *state)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)
@@ -4283,6 +4388,7 @@
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server state-atom)
+     (sql/init-db state-atom)
      {:chimers
       (concat
         task-chimers

@@ -12,8 +12,10 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle-sync :as battle-sync]
+    [skylobby.cli.util :as cu]
     [skylobby.fs :as fs]
     [skylobby.server-stub :as server]
+    [skylobby.sql :as sql]
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
@@ -128,13 +130,14 @@
     :filename "importables.edn"}
    {:select-fn select-downloadables
     :filename "downloadables.edn"}
+   #_ ; disable rapid data load, use sql now
    {:select-fn select-rapid
     :filename "rapid.edn"
     :nippy true}
    {:select-fn select-replays
     :filename "replays.edn"}])
 
-(defn select-parsed-replays-keys 
+(defn select-parsed-replays-keys
   [state]
   (select-keys state [:invalid-replay-paths :parsed-replays-by-path]))
 
@@ -178,10 +181,10 @@
                              :bonus true}
      :ready-on-unspec true
      :refresh-replays-after-game true
+     :servers u/default-servers
      :show-battle-preview true
      :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
-     :servers u/default-servers
      :use-default-ring-sound true
      :windows-as-tabs true}
     (apply
@@ -197,7 +200,9 @@
      :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
-     :console-auto-scroll true}))
+     :console-auto-scroll true
+     :use-db-for-rapid true}))
+
 
 (defmulti event-handler :event/type)
 (defmulti task-handler :spring-lobby/task-type)
@@ -362,7 +367,9 @@
                        {:port port
                         :ip "127.0.0.1"})]
           (swap! *state assoc :ipc-server server)))
-      (log/warn "IPC port unavailable" port))))
+      (do
+        (log/warn "IPC port unavailable" port)
+        (cu/print-and-exit -1 (str "Server port unavailable: " port))))))
 
 
 (def state-watch-chimers
@@ -423,6 +430,7 @@
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
+     (sql/init-db state-atom {:force true})
      {:chimers
       (concat
         task-chimers
