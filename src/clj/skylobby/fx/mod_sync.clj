@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.datalevin :as db]
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.sub :as sub]
@@ -45,6 +46,12 @@
         importables-by-path (fx/sub-val context :importables-by-path)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        datalevin (fx/sub-val context :datalevin)
+        get-rapid-data-by-version (fn [version]
+                                    (if use-db-for-rapid
+                                      (db/rapid-data-by-version datalevin spring-root-path version)
+                                      (get rapid-data-by-version version)))
         rapid-downloads-by-id (fx/sub-val context :rapid-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
@@ -209,7 +216,7 @@
              (when (and mod-name
                         (not is-unversioned)
                         (not (some #(re-find % mod-name) no-rapid)))
-               (let [rapid-data (get rapid-data-by-version mod-name)
+               (let [rapid-data (get-rapid-data-by-version mod-name)
                      rapid-id (:id rapid-data)
                      rapid-download (get rapid-downloads-by-id rapid-id)
                      running (some? (get rapid-tasks-by-id rapid-id))

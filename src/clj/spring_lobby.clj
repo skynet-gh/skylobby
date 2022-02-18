@@ -13,6 +13,7 @@
     [clojure.set]
     [clojure.string :as string]
     crypto.random
+    [datalevin.core :as datalevin]
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
@@ -168,14 +169,114 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
-   :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+  [:auto-get-resources
+   :auto-get-replay-resources
+   :auto-launch
+   :auto-rejoin-battle
+   :auto-refresh-replays
+   :battle-as-tab
+   :battle-layout
+   :battle-password
+   :battle-players-color-type
+   :battle-players-display-type
+   :battle-port
+   :battle-resource-details
+   :battle-title
+   :battles-layout
+   :battles-table-images
+   :bot-name
+   :bot-version
+   :chat-auto-complete
+   :chat-auto-scroll
+   :chat-color-username
+   :chat-font-size
+   :chat-highlight-username
+   :chat-highlight-words
+   :client-id-override
+   :client-id-type
+   :console-auto-scroll
+   :console-ignore-message-types
+   :css
+   :debug-spring
+   :direct-connect-chat-commands
+   :direct-connect-ip :direct-connect-password
+   :direct-connect-port
+   :direct-connect-protocol
+   :direct-connect-username
+   :disable-tasks
+   :disable-tasks-while-in-game
+   :divider-positions
+   :engine-overrides
+   :extra-import-sources
+   :extra-replay-sources
+   :filter-replay
+   :filter-replay-type
+   :filter-replay-max-players
+   :filter-replay-min-players
+   :filter-users
+   :focus-chat-on-message
+   :friend-users
+   :hide-barmanager-messages
+   :hide-empty-battles
+   :hide-joinas-spec
+   :hide-locked-battles
+   :hide-passworded-battles
+   :hide-spads-messages
+   :hide-vote-messages
+   :highlight-tabs-with-new-battle-messages
+   :highlight-tabs-with-new-chat-messages
+   :ignore-users
+   :increment-ids
+   :interleave-ally-player-ids
+   :ipc-server-enabled
+   :ipc-server-port
+   :join-battle-as-player
+   :leave-battle-on-close-window
+   :logins :minimap-size
+   :music-dir
+   :music-stopped
+   :music-volume
+   :mute
+   :mute-ring
+   :my-channels
+   :password
+   :players-table-columns
+   :pop-out-battle
+   :preferred-color
+   :preferred-factions
+   :prevent-non-host-rings
+   :rapid-repo
+   :rapid-spring-root
+   :ready-on-unspec
+   :refresh-replays-after-game
+   :replay-source-enabled
+   :replays-window-dedupe
+   :replays-window-details
+   :ring-on-auto-unspec
+   :ring-sound-file
+   :ring-volume
+   :scenarios-engine-version
+   :scenarios-spring-root
+   :server
+   :servers
+   :show-accolades
+   :show-battle-preview
+   :show-closed-battles
+   :show-hidden-modoptions
+   :show-spring-picker
+   :show-team-skills
+   :show-vote-log
+   :spring-isolation-dir
+   :spring-settings
+   :uikeys
+   :unready-after-game
+   :use-db-for-rapid
+   :use-default-ring-sound
+   :use-git-mod-version
+   :user-agent-override
+   :username
+   :windows-as-tabs
+   :window-states])
 
 
 (defn- select-config [state]
@@ -4213,11 +4314,41 @@
   (start-ipc-server *state {:force true}))
 
 
+
+(def datalevin-schema
+  {
+   ::rapid/id
+   {:db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity}
+   ::rapid/hash
+   {:db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   ::rapid/detail
+   {:db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   ::rapid/version
+   {:db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   ::rapid/spring-root
+   {:db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}})
+
+(defn initialize-database [state-atom]
+  (try
+    (let [conn (datalevin/create-conn (fs/canonical-path (fs/file (fs/app-root) "datalevin")) datalevin-schema)]
+      (swap! state-atom assoc :datalevin conn))
+    (catch Exception e
+      (log/error e "Error creating database"))))
+
+
+
 (defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (initialize-database state-atom)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)

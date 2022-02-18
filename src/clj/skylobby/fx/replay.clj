@@ -6,6 +6,7 @@
     [clojure.string :as string]
     clojure.set
     [cljfx.api :as fx]
+    ;[skylobby.datalevin :as db]
     java-time
     [skylobby.fs :as fs]
     skylobby.fx
@@ -512,7 +513,7 @@
   (.toZoneId (TimeZone/getDefault)))
 
 
-(defn replays-table
+(defn replays-table-impl
   [{:fx/keys [context]}]
   (let [replay-downloads-by-engine (fx/sub-val context :replay-downloads-by-engine)
         replay-downloads-by-map (fx/sub-val context :replay-downloads-by-map)
@@ -534,6 +535,12 @@
         http-download (fx/sub-val context :http-download)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        ;datalevin (fx/sub-val context :datalevin)
+        get-rapid-data (fn [version]
+                         (when-not use-db-for-rapid
+                           ;(db/rapid-data-by-version datalevin spring-root-path version)
+                           (get rapid-data-by-version version)))
         rapid-download (fx/sub-val context :rapid-download)
         replays-tags (fx/sub-val context :replays-tags)
         replays-watched (fx/sub-val context :replays-watched)
@@ -818,7 +825,7 @@
                           matching-mod (get mods-by-name mod-version)
                           mod-downloadable (get replay-downloads-by-mod mod-version)
                           mod-importable (get replay-imports-by-mod mod-version)
-                          mod-rapid (get rapid-data-by-version mod-version)
+                          mod-rapid (get-rapid-data mod-version)
                           map-name (:replay-map-name i)
                           matching-map (get maps-by-name map-name)
                           map-downloadable (get replay-downloads-by-map map-name)
@@ -1032,6 +1039,13 @@
                         (not matching-map)
                         {:fx/type :label
                          :text " No map, select replay for more options"}))])}})}}])}}}}))
+
+(defn replays-table [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :replays-table
+      (replays-table-impl state))))
+
 
 
 (defn download-replays-window [{:fx/keys [context]}]

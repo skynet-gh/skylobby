@@ -25,6 +25,7 @@
   commons-validator/commons-validator {:mvn/version "1.7"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
+  datalevin/datalevin {:mvn/version "0.5.28"}
   digest/digest {:mvn/version "1.4.10"}
   expound/expound {:mvn/version "0.9.0"}
   gloss/gloss {:mvn/version "0.2.6"}
@@ -94,9 +95,14 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
-   :jvm-opts ["-server" "-Xms128m" "-Xmx8g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+   :jvm-opts [
+              "-server"
+              "-Xms32m" "-Xmx2g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+              "-XX:+UseStringDeduplication"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
-              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
+              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
+              "--add-opens=java.base/java.nio=ALL-UNNAMED"
+              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
    :main-opts ["--main" "repl"]}
   :cljs
   {:extra-paths ["src/cljs" "graal/cljc"]

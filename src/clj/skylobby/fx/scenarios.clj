@@ -4,6 +4,7 @@
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.datalevin :as db]
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
@@ -36,9 +37,15 @@
         spring-root-path (fs/canonical-path spring-root)
         {:keys [rapid-data-by-hash rapid-data-by-id]} (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path])
         latest-rapid-id "byar-chobby:test"
-        rapid-data (get rapid-data-by-id latest-rapid-id)
+        datalevin (fx/sub-val context :datalevin)
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        rapid-data (if use-db-for-rapid
+                     (db/rapid-data-by-id datalevin spring-root-path latest-rapid-id)
+                     (get rapid-data-by-id latest-rapid-id))
         rapid-hash (:hash rapid-data)
-        rapid-id (:id (get rapid-data-by-hash rapid-hash))
+        rapid-id (if use-db-for-rapid
+                   (db/rapid-id-by-hash datalevin spring-root-path rapid-hash)
+                   (:id (get rapid-data-by-hash rapid-hash)))
         rapid-version (:version rapid-data)
         {:keys [engines engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         latest-local-bar (->> mods-by-name
@@ -113,7 +120,7 @@
            :on-value-changed {:event/type :spring-lobby/assoc-in
                               :key :scenarios-engine-version}}]}
         {:fx/type :label
-         :text (str " Latest version is " (get-in rapid-data-by-id [latest-rapid-id :version]))}]
+         :text (str " Latest version is " rapid-version)}]
        (if indexed-mod
          [
           {:fx/type :button
