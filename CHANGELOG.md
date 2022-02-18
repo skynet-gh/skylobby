@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.80](https://github.com/skynet-gh/skylobby/releases/tag/0.7.80) - 2022-02-18
+
+- Add setting to disable battle preview
+
 ## [0.7.79](https://github.com/skynet-gh/skylobby/releases/tag/0.7.79) - 2022-02-12
 
 - Add fallback on Apache commons-compress for 7z maps
