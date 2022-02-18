@@ -285,6 +285,7 @@
         ring-sound-file (fx/sub-val context :ring-sound-file)
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
+        show-battle-preview (fx/sub-val context :show-battle-preview)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
@@ -339,7 +340,17 @@
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :battles-table-images}}
              {:fx/type :label
-              :text " Images view of battles"}]}]}
+              :text " Images view of battles"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean show-battle-preview)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :show-battle-preview}}
+             {:fx/type :label
+              :text " Preview battles on click"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Default Spring Dir"
