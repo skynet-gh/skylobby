@@ -6,7 +6,7 @@
  {
   aleph/aleph {:mvn/version "0.4.7-alpha10"}
   cheshire/cheshire {:mvn/version  "5.10.2"}
-  clj-jgit/clj-jgit {:mvn/version "0.8.10"}
+  clj-jgit/clj-jgit {:mvn/version "1.0.2"}
   clj-http/clj-http {:mvn/version "3.12.3"}
   cljfx/cljfx {:mvn/version "1.7.19"
                :exclusions [org.openjfx/javafx-web]}
@@ -133,7 +133,7 @@
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
    :replace-deps
    {
-    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
+    clj-jgit/clj-jgit {:mvn/version "1.0.2"}
     cljfx/cljfx {:mvn/version "1.7.19"
                  :exclusions [org.openjfx/javafx-web]}
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
@@ -164,7 +164,7 @@
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
-    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
+    clj-jgit/clj-jgit {:mvn/version "1.0.2"}
     clojail/clojail {:mvn/version "1.0.6"}
     clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
     com.evocomputing/colors {:mvn/version "1.0.6"}
@@ -267,7 +267,7 @@
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
-    clj-jgit/clj-jgit {:mvn/version "0.8.10"}
+    clj-jgit/clj-jgit {:mvn/version "1.0.2"}
     clojail/clojail {:mvn/version "1.0.6"}
     clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
     com.evocomputing/colors {:mvn/version "1.0.6"}
