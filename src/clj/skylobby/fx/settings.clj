@@ -80,6 +80,7 @@
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
         ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
+        show-accolades (fx/sub-val context :show-accolades)
         show-closed-battles (fx/sub-val context :show-closed-battles)
         show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
         show-team-skills (fx/sub-val context :show-team-skills)
@@ -193,6 +194,15 @@
                                :key :auto-get-resources}}
         {:fx/type :label
          :text " Auto import or download resources"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
+         :selected (boolean show-accolades)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :show-accolades}}
+        {:fx/type :label
+         :text " Show accolades panel"}]}
       {:fx/type :h-box
        :alignment :center-left
        :children

@@ -33,6 +33,18 @@
   (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
     (:battle-status my-battle-state)))
 
+(defn my-sync-status [context server-key]
+  (let [my-battle-status (fx/sub-ctx context my-battle-status server-key)]
+    (int
+      (if (= :direct server-key)
+        (let [battle-id (fx/sub-val context get-battle-id server-key)]
+          (if (and (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
+                   (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+                   (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map]))
+            1
+            2))
+        (or (:sync my-battle-status) 0)))))
+
 (defn my-team-color [context server-key]
   (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
     (:team-color my-battle-state)))

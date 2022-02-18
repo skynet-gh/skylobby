@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
@@ -16,15 +17,99 @@
     [skylobby.fx.tasks :as fx.tasks]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (org.apache.commons.validator.routines InetAddressValidator)))
 
 
 (set! *warn-on-reflection* true)
 
 
+(def ip-validator (InetAddressValidator/getInstance))
+
+
+(defn direct-connect-tab
+  [{:fx/keys [context]}]
+  (let [battle-id (fx/sub-val context get-in [:by-server :direct :battle :battle-id])
+        direct-connect-ip (fx/sub-val context :direct-connect-ip)
+        direct-connect-port (or (fx/sub-val context :direct-connect-port)
+                                u/ipc-port)
+        direct-connect-username (fx/sub-val context :direct-connect-username)]
+    {:fx/type :v-box
+     :children
+     [
+      (if battle-id
+        {:fx/type fx.battle/battle-view
+         :v-box/vgrow :always
+         :server-key :direct}
+        {:fx/type :h-box
+         :style {:-fx-font-size 20}
+         :v-box/vgrow :always
+         :children
+         [{:fx/type :pane
+           :h-box/hgrow :always}
+          {:fx/type :v-box
+           :alignment :center
+           :children
+           [{:fx/type :pane
+             :v-box/vgrow :always}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "Username: "}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :text-field
+               :text (str direct-connect-username)
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :direct-connect-username}}]}
+            {:fx/type :button
+             :style-class ["button" "skylobby-normal"]
+             :text "Host"
+             :disable (string/blank? direct-connect-username)
+             :on-action {:event/type :spring-lobby/assoc-in
+                         :path [:by-server :direct]
+                         :value
+                         {:battle {:battle-id :direct
+                                   :users {direct-connect-username {}}}
+                          :battles {:direct {:host-username direct-connect-username}}
+                          :username direct-connect-username}}}
+            {:fx/type :label
+             :text "or"}
+            {:fx/type :button
+             :style-class ["button" "skylobby-normal"]
+             :text "Join"
+             :disable (or (string/blank? direct-connect-username)
+                          (not (.isValidInet4Address ip-validator direct-connect-ip)))
+             :on-action {:event/type :spring-lobby/join-direct-connect
+                         :direct-connect-ip direct-connect-ip
+                         :direct-connect-port direct-connect-port
+                         :direct-connect-username direct-connect-username}}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "Host IP: "}
+              {:fx/type :pane
+               :h-box/hgrow :always}
+              {:fx/type :text-field
+               :text (str direct-connect-ip)
+               :prompt-text "0.0.0.0"
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :direct-connect-ip}}]}
+            {:fx/type :pane
+             :v-box/vgrow :always}]}
+          {:fx/type :pane
+           :h-box/hgrow :always}]})
+      {:fx/type fx.bottom-bar/bottom-bar}]}))
+
+
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
+        show-direct-connect (or (fx/sub-val context :show-direct-connect)
+                                (fx/sub-val context get-in [:by-server :direct]))
         show-http (fx/sub-val context :show-downloader)
         show-import (fx/sub-val context :show-importer)
         show-rapid (fx/sub-val context :show-rapid-downloader)
@@ -35,6 +120,7 @@
         show-spring-picker (and (fx/sub-val context :show-spring-picker)
                                 (not (fx/sub-val context :spring-lobby.main/spring-root-arg)))
         show-tasks (fx/sub-val context :show-tasks-window)
+        show-accolades (fx/sub-val context :show-accolades)
         windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
                   (when show-spring-picker ["spring"])
@@ -56,6 +142,7 @@
                       (when show-tasks
                         ["tasks"])))
                   (when show-singleplayer ["singleplayer"])
+                  (when show-direct-connect ["direct"])
                   valid-server-keys)
                   ;#_(when (seq valid-server-keys) ["multi"]))
         tab-id-set (set tab-ids)
@@ -207,6 +294,17 @@
                  :v-box/vgrow :always
                  :server-key :local}
                 {:fx/type fx.bottom-bar/bottom-bar}]}}])
+          (when show-direct-connect
+            [{:fx/type :tab
+              :id "direct"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "LAN / Direct Connect"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/dissoc-in
+                                 :path [:by-server :direct]}
+              :content
+              {:fx/type direct-connect-tab}}])
           (mapv
             (fn [server-key]
               (let [
@@ -228,7 +326,9 @@
                                                       (and
                                                         (contains? my-channels channel-name)
                                                         (not (contains? (get mute server-key) channel-name))
-                                                        (not (contains? ignore-channels-set channel-name))))
+                                                        (not (contains? ignore-channels-set channel-name))
+                                                        (or (not show-accolades)
+                                                            (not= channel-name (u/user-channel-name "AccoladesBot")))))
                                                     (keys (get-in needs-focus [server-key "chat"]))))))
                                 ["tab" "skylobby-tab-focus"]
                                 ["tab"])]

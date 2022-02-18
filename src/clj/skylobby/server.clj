@@ -338,8 +338,18 @@
      :content-length (connection-content-length resource)
      :last-modified  (connection-last-modified resource)}))
 
+(defn direct-connect-handler-fn [state-atom]
+  (fn [request]
+    (let [debug (dissoc request :reitit.core/match)]
+      (log/info debug)
+      (log/info (with-out-str (clojure.pprint/pprint debug)))
+      {:status 200
+       :headers {"Content-Type" "text/html"}
+       :body "ok"})))
+
 (defn handler [state-atom]
-  (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)]
+  (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)
+        direct-connect-handler (direct-connect-handler-fn state-atom)]
     (ring/ring-handler
       (ring/router
         [
@@ -351,7 +361,9 @@
                           :responses  {200 {:body {:total int?}}}
                           :handler    (fn [{{{:keys [x y]} :query} :parameters}]
                                         {:status 200
-                                         :body   {:total (+ x y)}})}}]]
+                                         :body   {:total (+ x y)}})}}]
+          ["/direct-connect" {:get {:handler direct-connect-handler}
+                              :post {:handler direct-connect-handler}}]]
          ["/ipc"
           ["/replay" {:get {:parameters {:query {:path string?}}}
                       :responses {200 {:body {:path string?}}}
@@ -404,7 +416,7 @@
                                                      (log/error e "Http handler exception")
                                                      (handler e request))}))
                              content-type/wrap-content-type
-                             muuntaja/format-response-middleware
+                             muuntaja/format-middleware
                              rrc/coerce-response-middleware]}})
       (ring/create-default-handler
         {:not-found (fn [r] (assoc (index r) :status 404))

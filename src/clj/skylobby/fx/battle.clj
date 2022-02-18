@@ -51,8 +51,7 @@
 (defn sync-button [{:fx/keys [context]
                     :keys [server-key]}]
   (let [
-        my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
-        my-sync-status (int (or (:sync my-battle-status) 0))
+        my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         sync-button-style (dissoc
                             (case my-sync-status
                               1 ok-severity
@@ -317,7 +316,7 @@
         am-away (:away my-client-status)
         my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
         my-team-color (fx/sub-ctx context sub/my-team-color server-key)
-        my-sync-status (int (or (:sync my-battle-status) 0))
+        my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         in-sync (= 1 (:sync my-battle-status))
         ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
         discord-channel (discord/channel-to-promote {:mod-name mod-name
@@ -893,7 +892,7 @@
                  (cond
                    singleplayer
                    {:event/type :spring-lobby/assoc-in
-                    :path [:by-server :local :battles :singleplayer :battle-map]}
+                    :path [:by-server server-key :battles :singleplayer :battle-map]}
                    am-host
                    {:event/type :spring-lobby/battle-map-change
                     :client-data client-data}
@@ -929,6 +928,7 @@
                  :on-value-changed {:event/type :spring-lobby/assoc
                                     :key :minimap-type}}
                 {:fx/type :label
+                 :alignment :center-left
                  :text (str " Map size: "
                             (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                               (str
@@ -1516,14 +1516,23 @@
                              {:fx/type font-icon/lifecycle
                               :icon-literal (str "mdi-download:16:white")}}]}
         singleplayer (= :local server-key)
-        resources-pane (if singleplayer
+        direct-connect (= :direct server-key)
+        am-host (fx/sub-ctx context sub/am-host server-key)
+        resources-pane (if (or singleplayer
+                               (and direct-connect
+                                    am-host))
                          {:fx/type :v-box
-                          :style {:-fx-font-size 20}
+                          :style (if singleplayer
+                                   {:-fx-font-size 20}
+                                   {:-fx-font-size 18
+                                    :-fx-pref-width 800})
                           :children
                           [
                            {:fx/type engines-view
                             :engine-version engine-version
                             :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed
+                                               :battle-id battle-id
+                                               :server-key server-key
                                                :spring-root spring-root}
                             :spring-isolation-dir spring-root}
                            (if (seq engine-details)
@@ -1531,6 +1540,8 @@
                               :engine-file engine-file
                               :mod-name mod-name
                               :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed
+                                                 :battle-id battle-id
+                                                 :server-key server-key
                                                  :spring-root spring-root}
                               :spring-isolation-dir spring-root}
                              {:fx/type :label
@@ -1538,6 +1549,8 @@
                            {:fx/type maps-view
                             :map-name map-name
                             :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed
+                                               :battle-id battle-id
+                                               :server-key server-key
                                                :spring-root spring-root}
                             :spring-isolation-dir spring-root}
                            {:fx/type :pane
