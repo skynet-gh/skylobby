@@ -63,6 +63,7 @@
         rapid-tasks-by-id (->> (concat
                                  (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid)
                                  (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download))
+                               (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
                                (map (juxt :rapid-id identity))
                                (into {}))
         mod-file (or (:file mod-details) (:file indexed-mod))
@@ -220,6 +221,7 @@
                      rapid-update-tasks (->> tasks-by-type
                                              (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
                                              (mapcat second)
+                                             (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
                                              seq)
                      rapid-repo (resource/mod-repo-name mod-name)
                      rapid-update-id (when rapid-repo (str rapid-repo ":test"))
