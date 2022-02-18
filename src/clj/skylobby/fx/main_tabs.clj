@@ -265,6 +265,7 @@
         vertical (= "vertical" (fx/sub-val context :battles-layout))
         selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
+        show-battle-preview (fx/sub-val context :show-battle-preview)
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
@@ -335,14 +336,18 @@
                 {:fx/type :h-box
                  :children
                  (concat
-                   (when (and vertical selected-battle-details)
+                   (when (and vertical
+                              selected-battle-details
+                              show-battle-preview)
                      [{:fx/type battle-details
                        :server-key server-key
                        :h-box/hgrow :always}])
                    [(assoc users-view :h-box/hgrow :always)])}]}
               {:fx/type fx.battles-buttons/battles-buttons-view
                :server-key server-key}]
-             (when (and (not vertical) selected-battle-details)
+             (when (and (not vertical)
+                        selected-battle-details
+                        show-battle-preview)
                [{:fx/type battle-details
                  :server-key server-key
                  :h-box/hgrow :always}]))}}]

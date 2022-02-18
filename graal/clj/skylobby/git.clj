@@ -23,7 +23,7 @@
 
 (defn- repo-latest-id [repo]
   (when-let [^RevCommit first-log (first (git/git-log repo))]
-    (ObjectId/toString (.getId first-log))))
+    (ObjectId/toString (:id first-log))))
 
 (defn latest-id [^File f]
   (with-open [repo (git/load-repo f)]
@@ -61,7 +61,7 @@
 
 (defn reset-hard [^File f commit-id]
   (with-open [repo (git/load-repo f)]
-    (git/git-reset repo commit-id :hard)))
+    (git/git-reset repo :ref commit-id :mode :hard)))
 
 (defn- repo-tag-list [^Git repo]
   (for [^Ref tag (.call (.tagList repo))]
