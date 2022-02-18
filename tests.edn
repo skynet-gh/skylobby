@@ -4,4 +4,5 @@
    :kaocha.testable/id   :unit
    :kaocha/ns-patterns   ["-test$"]
    :kaocha/source-paths  ["src/clj" "graal/clj"]
-   :kaocha/test-paths    ["test/clj"]}]}
+   :kaocha/test-paths    ["test/clj"]}]
+ :kaocha.watch/type :hawk}

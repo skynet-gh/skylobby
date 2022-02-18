@@ -44,7 +44,7 @@
   jarohen/chime {:mvn/version "0.3.3"}
   manifold/manifold {:mvn/version "0.2.3"}
   me.raynes/fs {:mvn/version "1.4.6"}
-  metosin/reitit {:mvn/version "0.5.15"}
+  metosin/reitit {:mvn/version "0.5.16"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.apache.commons/commons-collections4 {:mvn/version "4.4"}
@@ -52,7 +52,7 @@
   org.clj-commons/byte-streams {:mvn/version "0.2.10"}
   org.clojure/core.cache {:mvn/version "1.0.225"}
   org.clojure/core.memoize {:mvn/version "1.0.257"}
-  org.clojure/clojure {:mvn/version "1.11.0-beta1"}
+  org.clojure/clojure {:mvn/version "1.11.0-rc1"}
   org.clojure/core.async {:mvn/version "1.5.648"}
   org.clojure/spec.alpha {:mvn/version "0.3.218"}
   org.clojure/test.check {:mvn/version "1.1.1"}
@@ -84,8 +84,8 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.github.clojure/tools.build {:git/tag "v0.7.5"
-                                   :git/sha "34727f7"
+    io.github.clojure/tools.build {:git/tag "v0.7.7"
+                                   :git/sha "1474ad6"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.9.0"}
@@ -104,8 +104,8 @@
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.github.clojure/tools.build {:git/tag "v0.7.5"
-                                   :git/sha "34727f7"
+    io.github.clojure/tools.build {:git/tag "v0.7.7"
+                                   :git/sha "1474ad6"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.9.0"}
@@ -124,10 +124,10 @@
     com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    metosin/reitit {:mvn/version "0.5.15"}
+    metosin/reitit {:mvn/version "0.5.16"}
     re-frame/re-frame {:mvn/version "1.2.0"}
     reagent/reagent {:mvn/version "1.1.0"}
-    thheller/shadow-cljs {:mvn/version "2.17.2"}}
+    thheller/shadow-cljs {:mvn/version "2.17.3"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
@@ -139,8 +139,8 @@
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.taoensso/timbre {:mvn/version "5.1.2"}
     io.aviso/pretty {:mvn/version "1.1.1"}
-    io.github.clojure/tools.build {:git/tag "v0.7.5"
-                                   :git/sha "34727f7"
+    io.github.clojure/tools.build {:git/tag "v0.7.7"
+                                   :git/sha "1474ad6"
                                    :exclusions [org.slf4j/slf4j-nop]}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -148,13 +148,13 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
-    lambdaisland/kaocha {:mvn/version "1.60.977"}}
+    lambdaisland/kaocha {:mvn/version "1.63.998"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :skylobby
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.7.5"
-                                   :git/sha "34727f7"}}
+    io.github.clojure/tools.build {:git/tag "v0.7.7"
+                                   :git/sha "1474ad6"}}
    :ns-default skylobby}
   :skylobby-deps
   {:replace-deps
@@ -199,7 +199,7 @@
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.2.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
-    metosin/reitit {:mvn/version "0.5.15"}
+    metosin/reitit {:mvn/version "0.5.16"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
@@ -257,8 +257,8 @@
   :skylobby-cli
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.7.5"
-                                   :git/sha "34727f7"}}
+    io.github.clojure/tools.build {:git/tag "v0.7.7"
+                                   :git/sha "1474ad6"}}
    :ns-default skylobby-cli}
   :skylobby-cli-deps
   {:replace-deps
@@ -291,7 +291,7 @@
     instaparse/instaparse {:mvn/version "1.4.10"}
     jarohen/chime {:mvn/version "0.3.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
-    metosin/reitit {:mvn/version "0.5.15"}
+    metosin/reitit {:mvn/version "0.5.16"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
@@ -349,7 +349,7 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
-    lambdaisland/kaocha {:mvn/version "1.60.977"}}
+    lambdaisland/kaocha {:mvn/version "1.63.998"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["src/clj" "graal/clj" "test/clj"]}
