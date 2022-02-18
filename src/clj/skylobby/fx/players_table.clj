@@ -496,7 +496,8 @@
         css-class-suffix (cond
                            (not server-key) "replay"
                            singleplayer "singleplayer"
-                           :else "multiplayer")]
+                           :else "multiplayer")
+        server-type (u/server-type server-key)]
     {:fx/type ext-recreate-on-key-changed
      :key (pr-str [server-key selected-tab-main battle-id players-table-columns])
      :desc
@@ -593,9 +594,10 @@
                            {:fx/type :button
                             :on-action
                             (merge
-                              {:event/type :spring-lobby/kick-battle
+                              {:event/type :skylobby.fx.event.battle/kick
                                :client-data client-data
-                               :singleplayer singleplayer}
+                               :singleplayer singleplayer
+                               :server-key server-key}
                               (select-keys id [:bot-name :username]))
                             :graphic
                             {:fx/type font-icon/lifecycle
@@ -703,11 +705,18 @@
                                           :describe incrementing-cell}
                            :disable (boolean disable)}
                           (when-not disable
-                            {:on-value-changed {:event/type :spring-lobby/battle-ally-changed
-                                                :client-data (when-not singleplayer client-data)
-                                                :is-me (= (:username i) username)
-                                                :is-bot (-> i :user :client-status :bot)
-                                                :id i}}))}}))))}}])
+                            {:on-value-changed
+                             (if (#{:direct-host :direct-client} server-type)
+                               {:event/type :skylobby.fx.event.battle/ally-changed
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :server-key server-key}
+                               {:event/type :spring-lobby/battle-ally-changed
+                                :client-data (when-not singleplayer client-data)
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i})}))}}))))}}])
          (when (:team players-table-columns)
            [{:fx/type :table-column
              :text "Team"
@@ -747,11 +756,18 @@
                                           :describe incrementing-cell}
                            :disable (boolean disable)}
                           (when-not disable
-                            {:on-value-changed {:event/type :spring-lobby/battle-team-changed
-                                                :client-data (when-not singleplayer client-data)
-                                                :is-me (= (:username i) username)
-                                                :is-bot (-> i :user :client-status :bot)
-                                                :id i}}))}}))))}}])
+                            {:on-value-changed
+                             (if (#{:direct-host :direct-client} server-type)
+                               {:event/type :skylobby.fx.event.battle/team-changed
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :server-key server-key}
+                               {:event/type :spring-lobby/battle-team-changed
+                                :client-data (when-not singleplayer client-data)
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i})}))}}))))}}])
          (when (:color players-table-columns)
            [{:fx/type :table-column
              :text "Color"
@@ -780,11 +796,18 @@
                            :value (fx.color/spring-color-to-javafx team-color)
                            :disable (boolean disable)}
                           (when-not disable
-                            {:on-action {:event/type :spring-lobby/battle-color-action
-                                         :client-data (when-not singleplayer client-data)
-                                         :is-me (= (:username i) username)
-                                         :is-bot (-> i :user :client-status :bot)
-                                         :id i}}))}}))))}}])
+                            {:on-action
+                             (if (#{:direct-host :direct-client} server-type)
+                               {:event/type :skylobby.fx.event.battle/color-changed
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :server-key server-key}
+                               {:event/type :spring-lobby/battle-color-action
+                                :client-data (when-not singleplayer client-data)
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i})}))}}))))}}])
          (when (:spectator players-table-columns)
            [{:fx/type :table-column
              :text "Spectator"
@@ -819,17 +842,25 @@
                            :selected (boolean is-spec)
                            :disable (boolean disable)}
                           (when-not disable
-                            {:on-selected-changed {:event/type :spring-lobby/battle-spectate-change
-                                                   :client-data (when-not singleplayer client-data)
-                                                   :is-me (= (:username i) username)
-                                                   :is-bot (-> i :user :client-status :bot)
-                                                   :id i
-                                                   :ready-on-unspec ready-on-unspec}}))}}))))}}])
+                            {:on-selected-changed
+                             (if (#{:direct-host :direct-client} server-type)
+                               {:event/type :skylobby.fx.event.battle/spectate-changed
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :ready-on-unspec ready-on-unspec
+                                :server-key server-key}
+                               {:event/type :spring-lobby/battle-spectate-change
+                                :client-data (when-not singleplayer client-data)
+                                :is-me (= (:username i) username)
+                                :is-bot (-> i :user :client-status :bot)
+                                :id i
+                                :ready-on-unspec ready-on-unspec})}))}}))))}}])
          (when (:faction players-table-columns)
            [{:fx/type :table-column
              :text "Faction"
              :resizable false
-             :pref-width 120
+             :pref-width 140
              :cell-value-factory (juxt
                                    sort-playing
                                    sort-side
@@ -861,13 +892,22 @@
                              :items side-items
                              :disable (boolean disable)}
                             (when-not disable
-                              {:on-value-changed {:event/type :spring-lobby/battle-side-changed
-                                                  :client-data (when-not singleplayer client-data)
-                                                  :is-me (= (:username i) username)
-                                                  :is-bot (-> i :user :client-status :bot)
-                                                  :id i
-                                                  :indexed-mod indexed-mod
-                                                  :sides sides}}))})
+                              {:on-value-changed
+                               (if (#{:direct-host :direct-client} server-type)
+                                 {:event/type :skylobby.fx.event.battle/side-changed
+                                  :is-me (= (:username i) username)
+                                  :is-bot (-> i :user :client-status :bot)
+                                  :id i
+                                  :indexed-mod indexed-mod
+                                  :server-key server-key
+                                  :sides sides}
+                                 {:event/type :spring-lobby/battle-side-changed
+                                  :client-data (when-not singleplayer client-data)
+                                  :is-me (= (:username i) username)
+                                  :is-bot (-> i :user :client-status :bot)
+                                  :id i
+                                  :indexed-mod indexed-mod
+                                  :sides sides})}))})
                        (seq mod-details-tasks)
                        {:fx/type :label
                         :text "loading..."}
@@ -940,10 +980,16 @@
                             :value-converter :integer
                             :value (int (or bonus 0))}
                            (when-not disable
-                             {:on-value-changed {:event/type :spring-lobby/battle-handicap-change
-                                                 :client-data (when-not singleplayer client-data)
-                                                 :is-bot (-> i :user :client-status :bot)
-                                                 :id i}}))}}}))))}}]))}}}))
+                             {:on-value-changed
+                              (if (#{:direct-host :direct-client} server-type)
+                                {:event/type :skylobby.fx.event.battle/handicap-changed
+                                 :is-bot (-> i :user :client-status :bot)
+                                 :id i
+                                 :server-key server-key}
+                                {:event/type :spring-lobby/battle-handicap-change
+                                 :client-data (when-not singleplayer client-data)
+                                 :is-bot (-> i :user :client-status :bot)
+                                 :id i})}))}}}))))}}]))}}}))
 
 (def player-width 340)
 (def player-skill-width 72)
@@ -1042,7 +1088,8 @@
                                (merge
                                  {:event/type :spring-lobby/kick-battle
                                   :client-data client-data
-                                  :singleplayer singleplayer}
+                                  :singleplayer singleplayer
+                                  :server-key server-key}
                                  (select-keys player [:bot-name :username]))
                                :graphic
                                {:fx/type font-icon/lifecycle

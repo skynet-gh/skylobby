@@ -10,6 +10,7 @@
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
     [skylobby.fs :as fs]
+    [skylobby.fx.event :as fx.event]
     [skylobby.task :as task]
     [skylobby.util :as u]
     [spring-lobby.client.message :as client]
@@ -402,13 +403,14 @@
 
 (defn start-game
   [state-atom
-   {:keys [client-data engine-version engines engines-by-version script-txt
+   {:keys [client-data engine-version engines engines-by-version script-txt server-key
            ^java.io.File spring-isolation-dir
            spring-settings username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
         now (u/curr-millis)
-        server-key (u/server-key client-data)
+        server-key (or server-key
+                       (u/server-key client-data))
         battle-id (-> state :battle :battle-id)
         {:keys [debug-spring engine-overrides ^MediaPlayer media-player music-paused refresh-replays-after-game ring-when-game-ends]}
         (swap! state-atom
@@ -515,10 +517,13 @@
                        (when refresh-replays-after-game
                          (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays})))
         set-ingame (fn [ingame]
-                     (client/send-message state-atom client-data
-                       (str "MYSTATUS "
-                            (cu/encode-client-status
-                              (assoc my-client-status :ingame ingame)))))
+                     (log/info "Setting ingame" ingame "for" server-key)
+                     (if (#{:direct-client :direct-host} (u/server-type server-key))
+                       (fx.event/update-user-state state-atom server-key {:username username} {:client-status {:ingame ingame}})
+                       (client/send-message state-atom client-data
+                         (str "MYSTATUS "
+                              (cu/encode-client-status
+                                (assoc my-client-status :ingame ingame))))))
         spring-log-state (atom [])]
     (try
       (log/info "Preparing to start game")
@@ -538,7 +543,7 @@
                                     first
                                     :file))
             engine-file (io/file engine-dir (fs/spring-executable))
-            _ (log/info "Engine executable" engine-file)
+            _ (log/info "Engine executable" (pr-str engine-file))
             _ (fs/set-executable engine-file)
             script-file (io/file spring-isolation-dir "script.txt")
             script-file-param (fs/wslpath script-file)
@@ -594,7 +599,7 @@
                   (log/error t "Fatal error waiting for Spring to close")
                   (throw t)))))))
       (catch Exception e
-        (log/error e "Error starting game"))
+        (log/error e "Error starting game" {:spring-isolation-dir spring-isolation-dir}))
       (finally
         (swap! state-atom
           (fn [state]

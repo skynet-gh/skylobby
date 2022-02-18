@@ -259,6 +259,7 @@
                                  (map first)
                                  (map u/user-channel-name)
                                  set)
+        show-accolades (fx/sub-val context :show-accolades)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
         mute (fx/sub-val context :mute)
@@ -365,7 +366,9 @@
                                                           (and
                                                             (contains? my-channels channel-name)
                                                             (not (contains? (get mute server-key) channel-name))
-                                                            (not (contains? ignore-channels-set channel-name))))
+                                                            (not (contains? ignore-channels-set channel-name))
+                                                            (or (not show-accolades)
+                                                                (not= channel-name (u/user-channel-name "AccoladesBot")))))
                                                         (keys (get-in needs-focus [server-key "chat"]))))
                                          ["skylobby-tab-focus"]))
           :content
