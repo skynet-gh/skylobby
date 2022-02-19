@@ -4,7 +4,7 @@
 
 
 (def lib 'skylobby/skylobby)
-(def version "0.7.19") ; TODO
+(def version "0.7.81") ; TODO version from git
 (def src-dirs ["graal/clj" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
