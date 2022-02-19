@@ -4546,7 +4546,8 @@
             command [(fs/canonical-path pr-downloader-file)
                      "--filesystem-writepath" (fs/wslpath root)
                      "--rapid-download" rapid-id]
-            runtime (Runtime/getRuntime)]
+            runtime (Runtime/getRuntime)
+            detected-sdp-atom (atom nil)]
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp nil
@@ -4571,11 +4572,18 @@
                   (do
                     (swap! *state assoc-in [:rapid-download rapid-id :message] line)
                     (log/info "(pr-downloader" rapid-id "err)" line)
+                    (when-let [[_all sdp] (re-find #" for ([0-9a-f]+)$")]
+                      (reset! detected-sdp-atom sdp))
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (let [exit-code (.waitFor process)]
             (log/info "pr-downloader exited with code" exit-code)
             (when (not= 0 exit-code)
+              (if-let [sdp @detected-sdp-atom]
+                (let [sdp-file (rapid/sdp-file spring-isolation-dir (rapid/sdp-filename sdp))]
+                  (log/info "Non-zero pr-downloader exit, deleting corrupt sdp file" sdp-file)
+                  (raynes-fs/delete sdp-file))
+                (log/info "No sdp file detected"))
               (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
               (task/add-task! *state
                 {::task-type ::delete-corrupt-rapid
