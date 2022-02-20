@@ -1722,7 +1722,6 @@
          todo (shuffle (concat to-add-file to-add-rapid))
          _ (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
                      "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-         ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
                           (map second)
@@ -1731,7 +1730,7 @@
                               (let [{:keys [battle-id]} battle]
                                 (get-in battles [battle-id :battle-modname]))))
                           (filter some?))
-         battle-rapid-data (map rapid-data-by-version battle-mods)
+         battle-rapid-data (map (partial get rapid-data-by-version) battle-mods)
          battle-rapid-hashes (->> battle-rapid-data
                                   (map :hash)
                                   (filter some?)
