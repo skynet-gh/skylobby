@@ -10,10 +10,10 @@
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
-    [clojure.set]
+    clojure.set
     [clojure.string :as string]
     crypto.random
-    [datahike.api :as d]
+    [datahike.api :as datahike]
     hashp.core
     java-time
     [manifold.deferred :as deferred]
@@ -169,14 +169,28 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
-   :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab
+   :battle-layout :battle-password :battle-players-color-type :battle-players-display-type
+   :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images
+   :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size
+   :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip
+   :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions
+   :engine-overrides :extra-import-sources :extra-replay-sources :filter-replay :filter-replay-type
+   :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
+   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec
+   :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages
+   :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users
+   :increment-ids :interleave-ally-player-ids :join-battle-as-player :leave-battle-on-close-window
+   :logins :minimap-size :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels
+   :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions
+   :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec
+   :refresh-replays-after-game :replays-window-dedupe :replays-window-details :ring-on-auto-unspec
+   :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers
+   :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions
+   :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir :spring-settings
+   :uikeys :unready-after-game :use-db-for-rapid :use-default-ring-sound :use-git-mod-version
+   :user-agent-override :username :windows-as-tabs :window-states])
 
 
 (defn- select-config [state]
@@ -4387,12 +4401,13 @@
 
 (defmethod task-handler ::update-rapid
   [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
-  (swap! *state assoc :rapid-update true)
-  (let [before (u/curr-millis)
-        {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
-        engines (-> by-spring-root (get (fs/canonical-path spring-isolation-dir)) :engines)
-        engine-version (or engine-version (:engine-version state))
+  (let [
+        {:keys [by-spring-root database-connection file-cache use-db-for-rapid] :as state} (swap! *state assoc :rapid-update true)
+        before (u/curr-millis)
         spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        engines (get-in by-spring-root [spring-root-path :engines])
+        engine-version (or engine-version (:engine-version state))
         preferred-engine-details (spring/engine-details engines engine-version)
         engine-details (if (and preferred-engine-details (:file preferred-engine-details))
                          preferred-engine-details
@@ -4443,42 +4458,74 @@
                               (filter :version)
                               (sort-by :version version/version-compare)
                               reverse)
-          _ (log/info "Found" (count rapid-versions) "rapid versions")
-          rapid-data-by-hash (->> rapid-versions
-                                  (remove (comp #(string/ends-with? % ":test") :id))
-                                  ; prevents duplicates, uses specific version
-                                  (map (juxt :hash identity))
-                                  (into {}))
-          rapid-data-by-id (->> rapid-versions
-                                (map (juxt :id identity))
-                                (into {}))
-          rapid-data-by-version (->> rapid-versions
-                                     (remove (comp #(string/ends-with? % ":test") :id))
-                                     ; prevents duplicates, uses specific version
-                                     (map (juxt :version identity))
-                                     (into {}))]
-      (swap! *state
-        (fn [state]
-          (-> state
-              (update-in [:rapid-by-spring-root (fs/canonical-path spring-isolation-dir)]
-                (fn [rapid]
-                  (-> rapid
-                      (assoc :rapid-updated (u/curr-millis))
-                      (assoc :rapid-repos rapid-repos)
-                      (update :rapid-data-by-hash merge rapid-data-by-hash)
-                      (update :rapid-data-by-id merge rapid-data-by-id)
-                      (update :rapid-data-by-version merge rapid-data-by-version)
-                      (update :rapid-versions (fn [old-versions]
-                                                (set
-                                                  (vals
-                                                    (merge
-                                                      (into {}
-                                                        (map (juxt :id identity) old-versions))
-                                                      (into {}
-                                                        (map (juxt :id identity) rapid-versions))))))))))
-              (update :file-cache merge new-files))))
+          _ (log/info "Found" (count rapid-versions) "rapid versions")]
+      (if use-db-for-rapid
+        (let [before (u/curr-millis)
+              p 100
+              partitioned (->> rapid-versions
+                               (mapv
+                                 (fn [data]
+                                   (-> data
+                                       (select-keys [:id :hash :detail :version])
+                                       (clojure.set/rename-keys
+                                         {:id ::rapid/id
+                                          :hash ::rapid/hash
+                                          :detail ::rapid/detail
+                                          :version ::rapid/version})
+                                       (assoc ::rapid/spring-root spring-root-path))))
+                               (partition-all p))]
+          (doall
+            (map-indexed
+              (fn [i data]
+                (log/info "Wrote" (* p i) "of" (count rapid-versions) "to database")
+                (datahike/transact database-connection data))
+              partitioned))
+          (log/info "Wrote" (count rapid-versions) "to database in" (- (u/curr-millis) before) "ms")
+          (swap! *state
+            (fn [state]
+              (-> state
+                  (update-in [:rapid-by-spring-root spring-root-path]
+                    (fn [rapid]
+                      (-> rapid
+                          (assoc :rapid-updated (u/curr-millis))
+                          (assoc :rapid-repos rapid-repos)
+                          (dissoc :rapid-data-by-id :rapid-data-by-version :rapid-versions))))
+                  (update :file-cache merge new-files)))))
+        (let [rapid-data-by-hash (->> rapid-versions
+                                      (remove (comp #(string/ends-with? % ":test") :id))
+                                      ; prevents duplicates, uses specific version
+                                      (map (juxt :hash identity))
+                                      (into {}))
+              rapid-data-by-id (->> rapid-versions
+                                    (map (juxt :id identity))
+                                    (into {}))
+              rapid-data-by-version (->> rapid-versions
+                                         (remove (comp #(string/ends-with? % ":test") :id))
+                                         ; prevents duplicates, uses specific version
+                                         (map (juxt :version identity))
+                                         (into {}))]
+          (swap! *state
+            (fn [state]
+              (-> state
+                  (update-in [:rapid-by-spring-root spring-root-path]
+                    (fn [rapid]
+                      (-> rapid
+                          (assoc :rapid-updated (u/curr-millis))
+                          (assoc :rapid-repos rapid-repos)
+                          (update :rapid-data-by-hash merge rapid-data-by-hash)
+                          (update :rapid-data-by-id merge rapid-data-by-id)
+                          (update :rapid-data-by-version merge rapid-data-by-version)
+                          (update :rapid-versions (fn [old-versions]
+                                                    (set
+                                                      (vals
+                                                        (merge
+                                                          (into {}
+                                                            (map (juxt :id identity) old-versions))
+                                                          (into {}
+                                                            (map (juxt :id identity) rapid-versions))))))))))
+                  (update :file-cache merge new-files))))))
       (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
-    (update-cooldown *state [:update-rapid (fs/canonical-path spring-isolation-dir)])
+    (update-cooldown *state [:update-rapid spring-root-path])
     (task/add-tasks! *state
       [
        (merge
@@ -4488,12 +4535,21 @@
 
 (defmethod task-handler ::update-rapid-packages
   [{:keys [spring-isolation-dir]}]
-  (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-by-spring-root] :as state} @*state
+  (let [{:keys [database-connection rapid-by-spring-root use-db-for-rapid] :as state} (swap! *state assoc :rapid-update true)
         spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
         spring-root-path (fs/canonical-path spring-isolation-dir)
         {:keys [rapid-data-by-hash]} (get rapid-by-spring-root spring-root-path)
         sdp-files (doall (rapid/sdp-files spring-isolation-dir))
+        get-by-hash-fn (fn [rapid-hash]
+                         (if use-db-for-rapid
+                           (datahike.api/q
+                             '[:find [?i]
+                               :where
+                               [?id :skylobby.rapid/spring-root spring-root-path]
+                               [?id :skylobby.rapid/hash rapid-hash]
+                               [?id :skylobby.rapid/id ?i]]
+                             @database-connection)
+                           (get rapid-data-by-hash rapid-hash)))
         packages (->> sdp-files
                       (filter some?)
                       (map
@@ -4501,7 +4557,7 @@
                           (let [rapid-data
                                 (->> f
                                      rapid/sdp-hash
-                                     (get rapid-data-by-hash))]
+                                     get-by-hash-fn)]
                             {:id (->> rapid-data :id str)
                              :filename (-> f fs/filename str)
                              :version (->> rapid-data :version str)})))
@@ -5454,20 +5510,48 @@
     (log/warn "IPC port unavailable" u/ipc-port)))
 
 
+(def database-config {:store {:backend :file
+                              :path (fs/canonical-path (fs/file (fs/app-root) "database"))
+                              :id "skylobby"}})
+
+(def database-schema
+  [
+   {:db/ident ::rapid/id
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity}
+   {:db/ident ::rapid/hash
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident ::rapid/detail
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident ::rapid/version
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident ::rapid/spring-root
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}])
+
+
+(defn initialize-database [state-atom]
+   (try
+     (datahike/create-database database-config)
+     (catch Exception e
+       (log/error e "Error creating datahike database")))
+   (try
+     (let [conn (datahike/connect database-config)]
+       (swap! state-atom assoc :database-connection conn)
+       (datahike/transact conn {:tx-data database-schema}))
+     (catch Exception e
+       (log/error e "Error connecting to datahike database"))))
+
 (defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
-   (try
-     (let [cfg {:store {:backend :file
-                        :path (fs/canonical-path (fs/file (fs/app-root) "database"))
-                        :id "skylobby"}}
-           _ (d/create-database cfg)
-           conn (d/connect cfg)]
-       (swap! state-atom assoc :database-connection conn))
-     (catch Exception e
-       (log/error e "Error creating datahike database")))
+   (initialize-database state-atom)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)

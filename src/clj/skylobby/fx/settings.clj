@@ -298,6 +298,7 @@
         show-battle-preview (fx/sub-val context :show-battle-preview)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -360,7 +361,17 @@
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :show-battle-preview}}
              {:fx/type :label
-              :text " Preview battles on click"}]}]}
+              :text " Preview battles on click"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-rapid)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-rapid}}
+             {:fx/type :label
+              :text " Use on-disk database for rapid index"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Default Spring Dir"
