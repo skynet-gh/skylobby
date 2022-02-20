@@ -1722,7 +1722,6 @@
          todo (shuffle (concat to-add-file to-add-rapid))
          _ (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
                      "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-         ; TODO prioritize mods in battles
          battle-mods (->> state
                           :by-server
                           (map second)
@@ -1731,7 +1730,7 @@
                               (let [{:keys [battle-id]} battle]
                                 (get-in battles [battle-id :battle-modname]))))
                           (filter some?))
-         battle-rapid-data (map rapid-data-by-version battle-mods)
+         battle-rapid-data (map (partial get rapid-data-by-version) battle-mods)
          battle-rapid-hashes (->> battle-rapid-data
                                   (map :hash)
                                   (filter some?)
@@ -4544,7 +4543,8 @@
             command [(fs/canonical-path pr-downloader-file)
                      "--filesystem-writepath" (fs/wslpath root)
                      "--rapid-download" rapid-id]
-            runtime (Runtime/getRuntime)]
+            runtime (Runtime/getRuntime)
+            detected-sdp-atom (atom nil)]
         (log/info "Running '" command "'")
         (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
               ^"[Ljava.lang.String;" envp nil
@@ -4569,11 +4569,18 @@
                   (do
                     (swap! *state assoc-in [:rapid-download rapid-id :message] line)
                     (log/info "(pr-downloader" rapid-id "err)" line)
+                    (when-let [[_all sdp] (re-find #" for ([0-9a-f]+)$" line)]
+                      (reset! detected-sdp-atom sdp))
                     (recur))
                   (log/info "pr-downloader" rapid-id "stderr stream closed")))))
           (let [exit-code (.waitFor process)]
             (log/info "pr-downloader exited with code" exit-code)
             (when (not= 0 exit-code)
+              (if-let [sdp @detected-sdp-atom]
+                (let [sdp-file (rapid/sdp-file spring-isolation-dir (rapid/sdp-filename sdp))]
+                  (log/info "Non-zero pr-downloader exit, deleting corrupt sdp file" sdp-file)
+                  (raynes-fs/delete sdp-file))
+                (log/info "No sdp file detected"))
               (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
               (task/add-task! *state
                 {::task-type ::delete-corrupt-rapid

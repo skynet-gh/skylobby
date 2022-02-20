@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.81](https://github.com/skynet-gh/skylobby/releases/tag/0.7.81) - 2022-02-20
+
+- Add delete of SDP file on rapid error
+
 ## [0.7.80](https://github.com/skynet-gh/skylobby/releases/tag/0.7.80) - 2022-02-18
 
 - Add setting to disable battle preview
