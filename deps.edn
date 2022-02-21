@@ -203,7 +203,7 @@
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.2.3"}
     me.raynes/fs {:mvn/version "1.4.6"}
-    metosin/reitit {:mvn/version "0.5.16"}
+    metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
@@ -243,8 +243,7 @@
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--report-unsupported-elements-at-runtime"
                "-J-Xmx7g" "-H:+StaticExecutableWithDynamicLibC"
-               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=8"
-               ;"-H:+TraceNativeToolUsage"
+               "-H:+ReportExceptionStackTraces"
                "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-native-mac

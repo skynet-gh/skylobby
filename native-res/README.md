@@ -35,13 +35,13 @@ Replace the versions with the ones on your system.
 Clean previous runs
 
 ```
-clj -T:skylobby-cli clean
+clj -T:skylobby clean
 ```
 
 Build the jar
 
 ```
-clj -T:skylobby-cli uber
+clj -T:skylobby uber
 ```
 
 ### Linux
@@ -52,16 +52,16 @@ You should delete the existing configs, otherwise you will have leftovers from p
 rm native-res/linux/META-INF/native-image/skylobby/*
 ```
 
-Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example downloads and extracts a Spring engine, so it executes 7zip, which is required in order to build the native image properly:
+Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example starts the web UI, you will need to kill it manually:
 
 ```
-$GRAALVM_HOME/bin/java -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.cli,output-dir=native-res/linux/META-INF/native-image/skylobby -agentlib:native-image-agent=config-merge-dir=native-res/linux/META-INF/native-image/skylobby -jar target/skylobby-cli-0.0.1-standalone.jar get 105.0
+$GRAALVM_HOME/bin/java -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.main,output-dir=native-res/linux/META-INF/native-image/skylobby -agentlib:native-image-agent=config-merge-dir=native-res/linux/META-INF/native-image/skylobby -jar target/skylobby.jar
 ```
 
 You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
 
 ```
-clj -M:skylobby-cli-deps:skylobby-cli-native-linux
+clj -M:skylobby-deps:skylobby-native-linux
 ```
 
 ### Windows
@@ -72,14 +72,14 @@ You should delete the existing configs, otherwise you will have leftovers from p
 rm native-res/windows/META-INF/native-image/skylobby/*
 ```
 
-Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example downloads and extracts a Spring engine, so it executes 7zip, which is required in order to build the native image properly:
+Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example starts the web UI, you will need to kill it manually:
 
 ```
-& "$env:GRAALVM_HOME\bin\java" -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.cli,output-dir=native-res\windows\META-INF\native-image\skylobby -agentlib:native-image-agent=config-merge-dir=native-res\windows\META-INF\native-image\skylobby -jar target\skylobby-cli-0.0.1-standalone.jar get 105.0
+& "$env:GRAALVM_HOME\bin\java" -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.main,output-dir=native-res\windows\META-INF\native-image\skylobby -agentlib:native-image-agent=config-merge-dir=native-res\windows\META-INF\native-image\skylobby -jar target\skylobby.jar
 ```
 
 You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
 
 ```
-clj -M:skylobby-cli-deps:skylobby-cli-native-windows
+clj -M:skylobby-deps:skylobby-native-windows
 ```

@@ -4,12 +4,12 @@
 
 
 (def lib 'skylobby/skylobby)
-(def version "0.7.19") ; TODO
+(def version (b/git-process {:git-args "describe --tags --abbrev=0"}))
 (def src-dirs ["graal/clj" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
                             :aliases [:skylobby-deps]}))
-(def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
+(def uber-file (format "target/%s.jar" (name lib)))
 
 
 (defn clean [_]
