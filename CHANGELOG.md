@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.88](https://github.com/skynet-gh/skylobby/releases/tag/0.7.82) - 2022-02-21
+
+- Disable utf-8 for now because some servers send invalid data
+- Increase cache size for UI
+
 ## [0.7.81](https://github.com/skynet-gh/skylobby/releases/tag/0.7.81) - 2022-02-20
 
 - Add delete of SDP file on rapid error
