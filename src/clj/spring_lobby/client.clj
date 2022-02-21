@@ -55,9 +55,7 @@
   (gloss/compile-frame
     (gloss/delimited-frame
       ["\n"]
-      (gloss/string :utf-8))
-    str
-    str)) ; TODO parse here
+      (gloss/string :ISO-8859-1))))
 
 (def client-status-protocol
   (gloss/compile-frame
