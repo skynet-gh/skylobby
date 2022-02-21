@@ -1,9 +1,11 @@
 (ns skylobby.fx.sub
   (:require
     [cljfx.api :as fx]
+    [clojure.string :as string]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]))
+    [spring-lobby.spring :as spring]
+    [version-clj.core :as version]))
 
 
 (set! *warn-on-reflection* true)
@@ -88,3 +90,18 @@
               server-url (fx/sub-ctx context server-url server-key)]
           (-> servers (get server-url) :spring-isolation-dir)))
       (fx/sub-val context :spring-isolation-dir)))
+
+(defn games [context spring-root]
+  (let [{:keys [mods]} (fx/sub-ctx context spring-resources spring-root)]
+    (filter :is-game mods)))
+
+(defn filtered-games [context spring-root]
+  (let [
+        games (fx/sub-ctx context games spring-root)
+        mod-filter (fx/sub-val context :mod-filter)
+        filter-lc (if mod-filter (string/lower-case mod-filter) "")]
+    (->> games
+         (map :mod-name)
+         (filter string?)
+         (filter #(string/includes? (string/lower-case %) filter-lc))
+         (sort version/version-compare))))
