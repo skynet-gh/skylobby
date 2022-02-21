@@ -33,33 +33,9 @@
   [{:fx/keys [context]
     :keys [screen-bounds]}]
   (let [
-        battle-password (fx/sub-val context :battle-password)
-        battle-port (fx/sub-val context :battle-port)
-        battle-nat-type (or (fx/sub-val context :battle-nat-type) 0)
-        battle-title (fx/sub-val context :battle-title)
-        engine-filter (fx/sub-val context :engine-filter)
-        map-input-prefix (fx/sub-val context :map-input-prefix)
-        mod-filter (fx/sub-val context :mod-filter)
         server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        scripttags (fx/sub-val context get-in [:by-server server-key :scripttags])
-        show-host-battle-window (fx/sub-val context :show-host-battle-window)
-        spring-root (fx/sub-ctx context sub/spring-root server-key)
-        {:keys [engine-version map-name maps mod-name mods]} (fx/sub-ctx context sub/spring-resources spring-root)
-        host-battle-action {:event/type :spring-lobby/host-battle
-                            :host-battle-state
-                            {:host-port battle-port
-                             :title battle-title
-                             :nat-type battle-nat-type
-                             :battle-password battle-password
-                             :engine-version engine-version
-                             :map-name map-name
-                             :mod-name mod-name
-                             :mod-hash -1
-                             :map-hash -1}
-                            :client-data client-data
-                            :scripttags scripttags
-                            :use-git-mod-version (fx/sub-val context :use-git-mod-version)}]
+        show-host-battle-window (fx/sub-val context :show-host-battle-window)]
     {:fx/type :stage
      :showing (boolean (and client-data show-host-battle-window))
      :title (str u/app-name " Host Battle")
@@ -75,97 +51,124 @@
       :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root
       (if show-host-battle-window
-        {:fx/type :v-box
-         :style {:-fx-font-size 16}
-         :children
-         [
-          {:fx/type :label
-           :text (str " Spring root for this server:  " spring-root)}
-          {:fx/type :h-box
+        (let [
+              battle-password (fx/sub-val context :battle-password)
+              battle-port (fx/sub-val context :battle-port)
+              battle-nat-type (or (fx/sub-val context :battle-nat-type) 0)
+              battle-title (fx/sub-val context :battle-title)
+              engine-filter (fx/sub-val context :engine-filter)
+              map-input-prefix (fx/sub-val context :map-input-prefix)
+              mod-filter (fx/sub-val context :mod-filter)
+              server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
+              client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+              scripttags (fx/sub-val context get-in [:by-server server-key :scripttags])
+              spring-root (fx/sub-ctx context sub/spring-root server-key)
+              {:keys [engine-version map-name maps mod-name mods]} (fx/sub-ctx context sub/spring-resources spring-root)
+              host-battle-action {:event/type :spring-lobby/host-battle
+                                  :host-battle-state
+                                  {:host-port battle-port
+                                   :title battle-title
+                                   :nat-type battle-nat-type
+                                   :battle-password battle-password
+                                   :engine-version engine-version
+                                   :map-name map-name
+                                   :mod-name mod-name
+                                   :mod-hash -1
+                                   :map-hash -1}
+                                  :client-data client-data
+                                  :scripttags scripttags
+                                  :use-git-mod-version (fx/sub-val context :use-git-mod-version)}]
+          {:fx/type :v-box
+           :style {:-fx-font-size 16}
            :children
            [
             {:fx/type :label
-             :text " Battle Name: "}
-            {:fx/type :text-field
-             :text (str battle-title)
-             :prompt-text "Battle Title"
-             :on-action host-battle-action
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :battle-title}}]}
-          {:fx/type :h-box
-           :children
-           [
-            {:fx/type :label
-             :text " Battle Password: "}
-            {:fx/type :text-field
-             :text (str battle-password)
-             :prompt-text "Battle Password"
-             :on-action host-battle-action
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :battle-password}}]}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [
-            {:fx/type :label
-             :text " Port: "}
-            {:fx/type :text-field
-             :text (str battle-port)
-             :prompt-text "8452"
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :battle-port}
-             :text-formatter
-             {:fx/type :text-formatter
-              :value-converter :integer
-              :value (int (or (u/to-number battle-port) 8452))}}]}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [
-            {:fx/type :label
-             :text " You will need to have this port reachable from other players, see"}
-            (let [url "https://portforward.com/"]
-              {:fx/type :hyperlink
-               :text url
-               :on-action {:event/type :spring-lobby/desktop-browse-url
-                           :url url}})]}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [
-            {:fx/type :label
-             :text " NAT Type: "}
-            {:fx/type :combo-box
-             :value battle-nat-type
-             :items [0 1 2]
-             :on-value-changed {:event/type :spring-lobby/assoc
-                                :key :battle-nat-type}
-             :button-cell nat-cell
-             :cell-factory
-             {:fx/cell-type :list-cell
-              :describe nat-cell}}]}
-          {:fx/type engines-view
-           :engine-filter engine-filter
-           :engine-version engine-version
-           :flow false
-           :spring-isolation-dir spring-root}
-          {:fx/type mods-view
-           :flow false
-           :mod-filter mod-filter
-           :mod-name mod-name
-           :mods mods
-           :spring-isolation-dir spring-root}
-          {:fx/type maps-view
-           :flow false
-           :map-name map-name
-           :maps maps
-           :map-input-prefix map-input-prefix
-           :spring-isolation-dir spring-root}
-          {:fx/type :pane
-           :v-box/vgrow :always}
-          {:fx/type :button
-           :text "Host Battle"
-           :on-action host-battle-action}]}
+             :text (str " Spring root for this server:  " spring-root)}
+            {:fx/type :h-box
+             :children
+             [
+              {:fx/type :label
+               :text " Battle Name: "}
+              {:fx/type :text-field
+               :text (str battle-title)
+               :prompt-text "Battle Title"
+               :on-action host-battle-action
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :battle-title}}]}
+            {:fx/type :h-box
+             :children
+             [
+              {:fx/type :label
+               :text " Battle Password: "}
+              {:fx/type :text-field
+               :text (str battle-password)
+               :prompt-text "Battle Password"
+               :on-action host-battle-action
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :battle-password}}]}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [
+              {:fx/type :label
+               :text " Port: "}
+              {:fx/type :text-field
+               :text (str battle-port)
+               :prompt-text "8452"
+               :on-text-changed {:event/type :spring-lobby/assoc
+                                 :key :battle-port}
+               :text-formatter
+               {:fx/type :text-formatter
+                :value-converter :integer
+                :value (int (or (u/to-number battle-port) 8452))}}]}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [
+              {:fx/type :label
+               :text " You will need to have this port reachable from other players, see"}
+              (let [url "https://portforward.com/"]
+                {:fx/type :hyperlink
+                 :text url
+                 :on-action {:event/type :spring-lobby/desktop-browse-url
+                             :url url}})]}
+            {:fx/type :h-box
+             :alignment :center-left
+             :children
+             [
+              {:fx/type :label
+               :text " NAT Type: "}
+              {:fx/type :combo-box
+               :value battle-nat-type
+               :items [0 1 2]
+               :on-value-changed {:event/type :spring-lobby/assoc
+                                  :key :battle-nat-type}
+               :button-cell nat-cell
+               :cell-factory
+               {:fx/cell-type :list-cell
+                :describe nat-cell}}]}
+            {:fx/type engines-view
+             :engine-filter engine-filter
+             :engine-version engine-version
+             :flow false
+             :spring-isolation-dir spring-root}
+            {:fx/type mods-view
+             :flow false
+             :mod-filter mod-filter
+             :mod-name mod-name
+             :mods mods
+             :spring-isolation-dir spring-root}
+            {:fx/type maps-view
+             :flow false
+             :map-name map-name
+             :maps maps
+             :map-input-prefix map-input-prefix
+             :spring-isolation-dir spring-root}
+            {:fx/type :pane
+             :v-box/vgrow :always}
+            {:fx/type :button
+             :text "Host Battle"
+             :on-action host-battle-action}]})
         {:fx/type :pane})}}))
 
 (defn host-battle-window [state]

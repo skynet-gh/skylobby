@@ -11,8 +11,7 @@
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]
-    [version-clj.core :as version]))
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -38,11 +37,10 @@
   (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
         http-download (fx/sub-val context :http-download)
         rapid-download (fx/sub-val context :rapid-download)
-        mod-filter (fx/sub-val context :mod-filter)
-        {:keys [mods mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        {:keys [mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
-        games (filter :is-game mods)
+        games (fx/sub-ctx context sub/games spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
@@ -115,12 +113,8 @@
                    known-games))}]
              [{:fx/type :label
                :text " No games"}])
-           (let [filter-lc (if mod-filter (string/lower-case mod-filter) "")
-                 filtered-games (->> games
-                                     (map :mod-name)
-                                     (filter string?)
-                                     (filter #(string/includes? (string/lower-case %) filter-lc))
-                                     (sort version/version-compare))]
+           (let [
+                 filtered-games (fx/sub-ctx context sub/filtered-games spring-isolation-dir)]
              [{:fx/type ext-recreate-on-key-changed
                :key (str mod-name)
                :desc

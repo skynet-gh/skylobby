@@ -174,7 +174,7 @@
                         :text "Importer"
                         :style {:-fx-font-size 18}}
               :on-close-request {:event/type :spring-lobby/assoc
-                                 :key :show-downloader
+                                 :key :show-importer
                                  :value false}
               :content
               {:fx/type fx.import/importer-root}}])
