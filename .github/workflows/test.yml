@@ -19,9 +19,10 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'adopt'
-      - uses: DeLaGuardo/setup-clojure@3.7
+      - uses: DeLaGuardo/setup-clojure@4.0
         with:
           cli: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/cache@v2
         with:
           path: ~/.m2/repository
@@ -43,8 +44,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'adopt'
-      - uses: DeLaGuardo/setup-clojure@3.7
+      - uses: DeLaGuardo/setup-clojure@4.0
         with:
           cli: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: clojure -M:coverage:headless
       - run: bash <(curl -s https://codecov.io/bash) -f target/coverage/codecov.json

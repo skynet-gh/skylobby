@@ -112,9 +112,13 @@
     org.clojure/tools.namespace {:mvn/version "1.2.0"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
-   :jvm-opts ["-server" "-Xms128m" "-Xmx1g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+   :jvm-opts ["-server"
+              "-Xms32m" "-Xmx1g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+              "-XX:+UseStringDeduplication"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
-              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
+              "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
+              "--add-opens=java.base/java.nio=ALL-UNNAMED"
+              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
    :main-opts ["--main" "repl" "headless"]}
   :cljs
   {:extra-paths ["src/cljs"]
@@ -127,7 +131,7 @@
     metosin/reitit {:mvn/version "0.5.16"}
     re-frame/re-frame {:mvn/version "1.2.0"}
     reagent/reagent {:mvn/version "1.1.0"}
-    thheller/shadow-cljs {:mvn/version "2.17.3"}}
+    thheller/shadow-cljs {:mvn/version "2.17.4"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "dev/clj/jar"]
