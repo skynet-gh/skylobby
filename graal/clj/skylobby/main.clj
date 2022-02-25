@@ -3,7 +3,8 @@
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
     skylobby
-    [skylobby.util :as u])
+    [skylobby.util :as u]
+    [taoensso.timbre :as log])
   (:gen-class))
 
 
@@ -18,6 +19,9 @@
 
 
 (defn -main [& args]
+  (let [version (or (u/manifest-version) "UNKNOWN")]
+    (log/info "skylobby" version)
+    (alter-var-root #'skylobby.util/app-version (fn [& _] version)))
   (let [{:keys [errors options]} (cli/parse-opts args cli-options)]
     (if errors
       (do

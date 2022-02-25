@@ -61,6 +61,11 @@
        :describe server-cell}}}))
 
 
+(defn- encoding-cell
+  [encoding]
+  {:text (str (name encoding))})
+
+
 (def servers-window-keys
   [:css :server-alias :server-auto-connect :server-edit :server-host :server-port
    :server-spring-root-draft :server-ssl :servers :show-servers-window])
@@ -71,6 +76,7 @@
   (let [server-alias (fx/sub-val context :server-alias)
         server-auto-connect (fx/sub-val context :server-auto-connect)
         server-edit (fx/sub-val context :server-edit)
+        server-encoding (fx/sub-val context :server-encoding)
         server-host (fx/sub-val context :server-host)
         server-port (fx/sub-val context :server-port)
         server-spring-root-draft (fx/sub-val context :server-spring-root-draft)
@@ -182,6 +188,21 @@
           {:fx/type :h-box
            :alignment :center-left
            :children
+           [{:fx/type :label
+             :alignment :center
+             :text " Encoding: "}
+            {:fx/type :combo-box
+             :value (or server-encoding u/default-client-encoding)
+             :items u/client-encodings
+             :button-cell encoding-cell
+             :on-value-changed {:event/type :spring-lobby/assoc
+                                :key :server-encoding}
+             :cell-factory
+             {:fx/cell-type :list-cell
+              :describe encoding-cell}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
            (concat
              [{:fx/type :label
                :alignment :center
@@ -209,6 +230,7 @@
           (let [server-data {:port port
                              :host server-host
                              :alias server-alias
+                             :encoding server-encoding
                              :spring-isolation-dir (fs/file server-spring-root-draft)
                              :auto-connect (boolean server-auto-connect)
                              :ssl (boolean server-ssl)}]

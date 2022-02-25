@@ -51,11 +51,11 @@
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
-(def protocol
+(defn protocol [encoding]
   (gloss/compile-frame
     (gloss/delimited-frame
       ["\n"]
-      (gloss/string :ISO-8859-1))))
+      (gloss/string (or encoding u/default-client-encoding)))))
 
 (def client-status-protocol
   (gloss/compile-frame
@@ -98,7 +98,7 @@
 (defn client
   ([server-url]
    (client server-url nil))
-  ([server-url {:keys [ssl]}]
+  ([server-url {:keys [encoding ssl]}]
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
          raw-client (tcp/client (merge
@@ -109,7 +109,8 @@
                                     {:pipeline-transform
                                      (fn [pipeline]
                                        (log/info "Saving TCP pipeline for TLS upgrade")
-                                       (reset! pipeline-atom pipeline))})))]
+                                       (reset! pipeline-atom pipeline))})))
+         protocol (protocol encoding)]
      {:client-deferred (d/chain raw-client
                          #(wrap-duplex-stream protocol %))
       :pipeline-atom pipeline-atom})))
@@ -153,32 +154,44 @@
                            assoc
                            :username username
                            :accepted true)
-                      (update :login-error dissoc server-key))))
+                      (update :login-error dissoc server-key)
+                      (update :normal-logout dissoc server-key))))
+        server-data (-> state :by-server (get server-key))
+        client-data (:client-data server-data)]
+    (ping-loop state-atom server-key client-data)))
+
+(defmethod handler/handle "MOTD" [_state-atom _server-url m]
+  (log/trace "motd" m))
+
+(defmethod handler/handle "LOGININFOEND" [state-atom server-key _m]
+  (let [state @state-atom
         server-data (-> state :by-server (get server-key))
         client-data (:client-data server-data)
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
+    (log/info "End of login info, sending initial commands")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "PING")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "CHANNELS")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "FRIENDLIST")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "FRIENDREQUESTLIST")
+    (async/<!! (async/timeout 1000))
     (when (u/matchmaking? server-data)
+      (async/<!! (async/timeout 1000))
       (message/send-message state-atom client-data "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
         (if (and channel-name
                  (not (u/battle-channel-name? channel-name))
                  (not (u/user-channel-name? channel-name)))
-          (message/send-message state-atom client-data (str "JOIN " channel-name))
-          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))
-    (ping-loop state-atom server-key client-data)))
-
-(defmethod handler/handle "MOTD" [_state-atom _server-url m]
-  (log/trace "motd" m))
-
-(defmethod handler/handle "LOGININFOEND" [_state-atom _server-url _m]
-  (log/trace "end of login info"))
+          (do
+            (async/<!! (async/timeout 1000))
+            (message/send-message state-atom client-data (str "JOIN " channel-name)))
+          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))))
 
 (defn ping-loop [state-atom server-key client-data]
   (let [ping-loop-future (future
@@ -215,7 +228,11 @@
                        (try
                          (log/info "print loop thread started")
                          (loop []
-                           (when-let [d (s/take! client)]
+                           (when-let [d (try
+                                          (s/take! client)
+                                          (catch java.nio.charset.MalformedInputException e
+                                            (swap! state-atom assoc-in [:login-error server-key] "Character encoding error")
+                                            (log/error e "Encoding error")))]
                              (when-let [m @d]
                                (log/info (str "[" server-key "]") "<" (str "'" m "'"))
                                (try
@@ -345,10 +362,9 @@
             (let [msg (string/trim args)
                   [old-state] (swap-vals! state-atom
                                  (fn [state]
-                                    (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
-                                      (-> state
-                                          (update-in [:by-server server-key] dissoc :accepted :client-data)
-                                          (assoc-in [:login-error server-url] msg)))))
+                                    (-> state
+                                        (update-in [:by-server server-key] dissoc :accepted :client-data)
+                                        (assoc-in [:login-error server-key] msg))))
                   client-data (-> old-state :by-server (get server-key) :client-data)]
               (disconnect state-atom client-data))
             nil))))))

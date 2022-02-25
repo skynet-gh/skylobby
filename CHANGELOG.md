@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.83](https://github.com/skynet-gh/skylobby/releases/tag/0.7.83) - 2022-02-25
+
+- Add server setting for character encoding
+- Spread out commands on login to avoid overwhelming server
+- Ensure error message shown when non-user-requested disconnect happens
+- Minor web UI improvements
+- Fix native image build
+
 ## [0.7.82](https://github.com/skynet-gh/skylobby/releases/tag/0.7.82) - 2022-02-21
 
 - Disable utf-8 for now because some servers send invalid data
