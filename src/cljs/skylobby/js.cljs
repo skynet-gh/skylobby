@@ -10,6 +10,7 @@
     [reitit.frontend.controllers :as rfc]
     [reitit.frontend.easy :as rfe]
     [re-frame.core :as rf]
+    [skylobby.data :as data]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
@@ -474,6 +475,23 @@
     (boolean (get-in db [:by-server server-key :auto-unspec]))))
 
 
+(rf/reg-sub ::filter-battles
+  (fn [db]
+    (::filter-battles db)))
+
+(rf/reg-sub ::hide-empty-battles
+  (fn [db]
+    (boolean (::hide-empty-battles db))))
+
+(rf/reg-sub ::hide-locked-battles
+  (fn [db]
+    (boolean (::hide-locked-battles db))))
+
+(rf/reg-sub ::hide-passworded-battles
+  (fn [db]
+    (boolean (::hide-passworded-battles db))))
+
+
 (defn listen [query-v]
   @(rf/subscribe query-v))
 
@@ -585,13 +603,48 @@
         username (-> parameters :query :username)
         server-key (get-server-key server-url username)
         current-battle (listen [::battle server-key])
-        battles (->> (listen [::battles server-key])
-                     (sort-by (comp count :users second))
-                     reverse)
+        filter-battles (listen [::filter-battles])
+        hide-empty-battles (listen [::hide-empty-battles])
+        hide-locked-battles (listen [::hide-locked-battles])
+        hide-passworded-battles (listen [::hide-passworded-battles])
+        battles (data/filter-battles
+                  (listen [::battles server-key])
+                  {:filter-battles filter-battles
+                   :hide-empty-battles hide-empty-battles
+                   :hide-locked-battles hide-locked-battles
+                   :hide-passworded-battles hide-passworded-battles})
         users (listen [::users server-key])]
     [:div
      [nav]
      [server-nav]
+     [:div
+      {:class "flex justify-center"}
+      [:label {:class "mr2 lh-copy"} " Filter: "]
+      [:input
+       {:class "input-reset ba b--black-20 mb2 mr2 db"
+        :auto-focus true
+        :autoComplete "off"
+        :on-change #(rf/dispatch [::assoc ::filter-battles (-> % .-target .-value)])
+        :type "text"
+        :value filter-battles}]
+      [:input
+       {:class "mr2 mb2"
+        :type "checkbox"
+        :on-change #(rf/dispatch [::assoc ::hide-locked-battles (-> % .-target .-checked)])
+        :checked hide-locked-battles}]
+      [:label {:class "mr2 lh-copy"} " Hide locked "]
+      [:input
+       {:class "mr2 mb2"
+        :type "checkbox"
+        :on-change #(rf/dispatch [::assoc ::hide-passworded-battles (-> % .-target .-checked)])
+        :checked hide-passworded-battles}]
+      [:label {:class "mr2 lh-copy"} " Hide passworded "]
+      [:input
+       {:class "mr2 mb2"
+        :type "checkbox"
+        :on-change #(rf/dispatch [::assoc ::hide-empty-battles (-> % .-target .-checked)])
+        :checked hide-empty-battles}]
+      [:label {:class "mr2 lh-copy"} " Hide empty "]]
      [:div {:class "flex justify-center"}
       [:table
        {:style {:flex-grow 1}}
@@ -607,8 +660,8 @@
          [:th "Engine"]
          [:th "Owner"]]]
        [:tbody
-        (for [[battle-id battle] battles]
-          (let [{:keys [host-username]} battle
+        (for [battle battles]
+          (let [{:keys [battle-id host-username]} battle
                 {:keys [game-start-time] :as user-data} (get users host-username)
                 ingame (-> user-data :client-status :ingame)]
             ^{:key battle-id}

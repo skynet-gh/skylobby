@@ -372,7 +372,7 @@
                                   (if filter-lc
                                     (or (and battle-map (string/includes? (string/lower-case battle-map) filter-lc))
                                         (and battle-modname (string/includes? (string/lower-case battle-modname) filter-lc))
-                                        (string/includes? (string/lower-case battle-title) filter-lc))
+                                        (and battle-title (string/includes? (string/lower-case battle-title) filter-lc)))
                                     true)))
                               (remove
                                 (fn [{:keys [battle-passworded]}]
