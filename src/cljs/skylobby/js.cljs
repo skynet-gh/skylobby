@@ -1030,7 +1030,10 @@
              :style {:max-width "100%"
                      :max-height "100%"
                      :object-fit "contain"}}])]])
-     (let [my-battle-status (get-in battle [:users username :battle-status])]
+     (let [my-battle-status (get-in battle [:users username :battle-status])
+           {:keys [host-username]} battle
+           my-client-status (get-in users [username :client-status])
+           host-client-status (get-in users [host-username :client-status])]
        [:div {:class "flex justify-center"}
         [:div {:class "flex items-center mb2 mh2"}
          [:input
@@ -1077,8 +1080,18 @@
         [:span {:style {:flex-grow 1}}]
         [:button
          {:class "f3 mh4 mv2"
-          :on-click #(rf/dispatch [::start-battle server-key])}
-         "Join Game"]
+          :on-click #(rf/dispatch [::start-battle server-key])
+          :disabled (boolean
+                      (or (:ingame my-client-status)
+                          (and (not (:ingame host-client-status))
+                               (not (:mode my-battle-status)))))}
+         (if (:ingame my-client-status)
+           "Game Running"
+           (if (:ingame host-client-status)
+             "Join Game"
+             (if (:mode my-battle-status) ; playing
+               "Start Game"
+               "Game not running")))]
         [:span {:style {:flex-grow 1}}]
         [:div {:class "flex items-center mb2 mh2"}
          [:label " Minimap type: "]
