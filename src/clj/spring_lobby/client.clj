@@ -157,30 +157,41 @@
                       (update :login-error dissoc server-key)
                       (update :normal-logout dissoc server-key))))
         server-data (-> state :by-server (get server-key))
+        client-data (:client-data server-data)]
+    (ping-loop state-atom server-key client-data)))
+
+(defmethod handler/handle "MOTD" [_state-atom _server-url m]
+  (log/trace "motd" m))
+
+(defmethod handler/handle "LOGININFOEND" [state-atom server-key _m]
+  (let [state @state-atom
+        server-data (-> state :by-server (get server-key))
         client-data (:client-data server-data)
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
+    (log/info "End of login info, sending initial commands")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "PING")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "CHANNELS")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "FRIENDLIST")
+    (async/<!! (async/timeout 1000))
     (message/send-message state-atom client-data "FRIENDREQUESTLIST")
+    (async/<!! (async/timeout 1000))
     (when (u/matchmaking? server-data)
+      (async/<!! (async/timeout 1000))
       (message/send-message state-atom client-data "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
         (if (and channel-name
                  (not (u/battle-channel-name? channel-name))
                  (not (u/user-channel-name? channel-name)))
-          (message/send-message state-atom client-data (str "JOIN " channel-name))
-          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))
-    (ping-loop state-atom server-key client-data)))
-
-(defmethod handler/handle "MOTD" [_state-atom _server-url m]
-  (log/trace "motd" m))
-
-(defmethod handler/handle "LOGININFOEND" [_state-atom _server-url _m]
-  (log/trace "end of login info"))
+          (do
+            (async/<!! (async/timeout 1000))
+            (message/send-message state-atom client-data (str "JOIN " channel-name)))
+          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))))
 
 (defn ping-loop [state-atom server-key client-data]
   (let [ping-loop-future (future
