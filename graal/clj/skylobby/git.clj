@@ -1,12 +1,11 @@
 (ns skylobby.git
   "Utils for working with git resources."
   (:require
-    [clj-jgit.porcelain :as git]
-    [taoensso.timbre :as log])
+    [clj-jgit.porcelain :as git])
   (:import
     (java.io File)
     (org.eclipse.jgit.api Git)
-    (org.eclipse.jgit.lib ObjectId ProgressMonitor Ref Repository)
+    (org.eclipse.jgit.lib ObjectId Ref Repository)
     (org.eclipse.jgit.revwalk RevCommit)))
 
 
@@ -28,32 +27,6 @@
 (defn latest-id [^File f]
   (with-open [repo (git/load-repo f)]
     (repo-latest-id repo)))
-
-(defn clone-repo
-  ([repo-url dest {:keys [on-begin-task on-end-task on-start]}]
-   (let [repo (git/git-clone repo-url
-                             :dir dest
-                             :monitor
-                             (reify ProgressMonitor
-                               (beginTask [_this title total-work]
-                                 (log/info "beginTask" title total-work)
-                                 (when (fn? on-begin-task)
-                                   (on-begin-task title total-work)))
-                               (endTask [_this]
-                                 (log/info "endTask")
-                                 (when (fn? on-begin-task)
-                                   (on-end-task)))
-                               (isCancelled [_this]
-                                 false)
-                               (start [_this total-tasks]
-                                 (log/info "start" total-tasks)
-                                 (when (fn? on-start)
-                                   (on-start total-tasks)))
-                               (update [_this completed]
-                                 (log/trace "update" completed))))]
-     (log/info "Cloned" repo-url
-               (pr-str (latest-id repo)))
-     repo)))
 
 (defn fetch [^File f]
   (with-open [repo (git/load-repo f)]
