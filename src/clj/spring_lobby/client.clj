@@ -51,11 +51,11 @@
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
 
-(def protocol
+(defn protocol [encoding]
   (gloss/compile-frame
     (gloss/delimited-frame
       ["\n"]
-      (gloss/string :ISO-8859-1))))
+      (gloss/string (or encoding u/default-client-encoding)))))
 
 (def client-status-protocol
   (gloss/compile-frame
@@ -98,7 +98,7 @@
 (defn client
   ([server-url]
    (client server-url nil))
-  ([server-url {:keys [ssl]}]
+  ([server-url {:keys [encoding ssl]}]
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
          raw-client (tcp/client (merge
@@ -109,7 +109,8 @@
                                     {:pipeline-transform
                                      (fn [pipeline]
                                        (log/info "Saving TCP pipeline for TLS upgrade")
-                                       (reset! pipeline-atom pipeline))})))]
+                                       (reset! pipeline-atom pipeline))})))
+         protocol (protocol encoding)]
      {:client-deferred (d/chain raw-client
                          #(wrap-duplex-stream protocol %))
       :pipeline-atom pipeline-atom})))
@@ -153,7 +154,8 @@
                            assoc
                            :username username
                            :accepted true)
-                      (update :login-error dissoc server-key))))
+                      (update :login-error dissoc server-key)
+                      (update :normal-logout dissoc server-key))))
         server-data (-> state :by-server (get server-key))
         client-data (:client-data server-data)
         my-channels (concat
@@ -215,7 +217,11 @@
                        (try
                          (log/info "print loop thread started")
                          (loop []
-                           (when-let [d (s/take! client)]
+                           (when-let [d (try
+                                          (s/take! client)
+                                          (catch java.nio.charset.MalformedInputException e
+                                            (swap! state-atom assoc-in [:login-error server-key] "Character encoding error")
+                                            (log/error e "Encoding error")))]
                              (when-let [m @d]
                                (log/info (str "[" server-key "]") "<" (str "'" m "'"))
                                (try
@@ -345,10 +351,9 @@
             (let [msg (string/trim args)
                   [old-state] (swap-vals! state-atom
                                  (fn [state]
-                                    (let [server-url (-> state :by-server (get server-key) :client-data :server-url)]
-                                      (-> state
-                                          (update-in [:by-server server-key] dissoc :accepted :client-data)
-                                          (assoc-in [:login-error server-url] msg)))))
+                                    (-> state
+                                        (update-in [:by-server server-key] dissoc :accepted :client-data)
+                                        (assoc-in [:login-error server-key] msg))))
                   client-data (-> old-state :by-server (get server-key) :client-data)]
               (disconnect state-atom client-data))
             nil))))))

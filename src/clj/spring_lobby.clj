@@ -2805,31 +2805,45 @@
 
 
 (defn- update-disconnected!
-  [state-atom server-key]
-  (log/info "Disconnecting from" (pr-str server-key))
-  (let [[old-state _new-state] (swap-vals! state-atom
-                                 (fn [state]
-                                   (-> state
-                                       (update :by-server dissoc server-key)
-                                       (update :needs-focus dissoc server-key))))
-        {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
-    (if client-data
-      (client/disconnect *state client-data)
-      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No client to disconnect!"))
-    (if ping-loop
-      (future-cancel ping-loop)
-      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No ping loop to cancel!"))
-    (if print-loop
-      (future-cancel print-loop)
-      (log/warn (ex-info "stacktrace" {:server-key server-key}) "No print loop to cancel!")))
-  nil)
+  ([state-atom server-key]
+   (update-disconnected! state-atom server-key nil))
+  ([state-atom server-key {:keys [user-requested]}]
+   (log/info "Disconnecting from" (pr-str server-key))
+   (let [[old-state _new-state] (swap-vals! state-atom
+                                  (fn [state]
+                                    (let [normal-logout (get-in state [:normal-logout server-key])]
+                                      (cond-> (update state :by-server dissoc server-key)
+                                              true
+                                              (update :needs-focus dissoc server-key)
+                                              (and (not normal-logout)
+                                                   (not user-requested))
+                                              (assoc-in [:login-error server-key] "Connection lost")
+                                              user-requested
+                                              (assoc-in [:normal-logout server-key] true)))))
+         {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
+     (if client-data
+       (client/disconnect *state client-data)
+       (do
+         (log/trace (ex-info "stacktrace" {:server-key server-key}) "No client to disconnect!")
+         (log/info "No client to disconnect for" server-key)))
+     (if ping-loop
+       (future-cancel ping-loop)
+       (do
+         (log/trace (ex-info "stacktrace" {:server-key server-key}) "No ping loop to cancel!")
+         (log/info "No ping loop to disconnect for" server-key)))
+     (if print-loop
+       (future-cancel print-loop)
+       (do
+         (log/trace (ex-info "stacktrace" {:server-key server-key}) "No print loop to cancel!")
+         (log/info "No print loop to disconnect for" server-key))))
+   nil))
 
 (defmethod event-handler ::print-state [_e]
   (pprint *state))
 
 
 (defmethod event-handler ::disconnect [{:keys [server-key]}]
-  (update-disconnected! *state server-key))
+  (update-disconnected! *state server-key {:user-requested true}))
 
 (defn- connect
   [state-atom {:keys [client-data server] :as state}]
@@ -3040,6 +3054,7 @@
   (let [[_server-url server-data] event]
     (swap! *state assoc
            :server-edit event
+           :server-encoding (:encoding server-data)
            :server-host (:host server-data)
            :server-port (:port server-data)
            :server-alias (:alias server-data)

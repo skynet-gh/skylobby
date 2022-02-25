@@ -32,6 +32,11 @@
 (def minimap-size 512) ; display size in UI
 (def start-pos-r 10.0) ; start position radius
 
+(def default-client-encoding :utf-8)
+(def client-encodings
+  [default-client-encoding
+   :ISO-8859-1
+   :ascii])
 
 (defn agent-string []
   (str app-name "-" app-version))
