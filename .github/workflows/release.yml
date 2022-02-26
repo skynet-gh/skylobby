@@ -76,7 +76,7 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_x86_64.rpm
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.rpm
-          asset_content_type: application/vnd.debian.binary-package
+          asset_content_type: application/x-binary
   build-mac:
     runs-on: macOS-latest
     steps:
@@ -178,7 +178,7 @@ jobs:
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-windows.msi
           asset_content_type: application/x-msi
   mark-latest-release:
-    needs: [build-deb, build-exe, build-dmg]
+    needs: [build-linux, build-windows, build-mac]
     runs-on: ubuntu-latest
     steps:
       - uses: ncipollo/release-action@v1
