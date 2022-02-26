@@ -5,7 +5,7 @@ on:
     types: [created]
 
 jobs:
-  build-deb:
+  build-linux:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -57,8 +57,28 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.deb
           asset_content_type: application/vnd.debian.binary-package
-  build-dmg:
-    runs-on: macOS-10.15
+      - uses: docker/login-action@v1
+        with:
+          image: fedora:35
+          volumes: ${{ github.workspace }}:/workspace
+          run: |
+            yum install -y rpm-build wget
+            wget https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.2%2B8/OpenJDK17U-jdk_x64_linux_hotspot_17.0.2_8.tar.gz
+            tar xf OpenJDK17U-jdk_x64_linux_hotspot_17.0.2_8.tar.gz
+            export JAVA_HOME="/jdk-17.0.2+8"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            cd /workspace
+            jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
+      - uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_x86_64.rpm
+          asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.rpm
+          asset_content_type: application/vnd.debian.binary-package
+  build-mac:
+    runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
       - uses: FranzDiebold/github-env-vars-action@v2.3.1
@@ -102,8 +122,8 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.dmg
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_mac.dmg
           asset_content_type: application/x-apple-diskimage
-  build-exe:
-    runs-on: windows-2019
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: FranzDiebold/github-env-vars-action@v2.3.1
@@ -159,7 +179,7 @@ jobs:
           asset_content_type: application/x-msi
   mark-latest-release:
     needs: [build-deb, build-exe, build-dmg]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: ncipollo/release-action@v1
         with:
