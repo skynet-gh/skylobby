@@ -74,7 +74,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-1_x86_64.rpm
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-1.x86_64.rpm
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.rpm
           asset_content_type: application/x-binary
   build-mac:
