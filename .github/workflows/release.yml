@@ -57,7 +57,7 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.deb
           asset_content_type: application/vnd.debian.binary-package
-      - uses: docker/login-action@v1
+      - uses: kohlerdominik/docker-run-action@v1
         with:
           image: fedora:35
           volumes: ${{ github.workspace }}:/workspace
