@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.84](https://github.com/skynet-gh/skylobby/releases/tag/0.7.84) - 2022-02-25
+
+- Add RPM package build
+
 ## [0.7.83](https://github.com/skynet-gh/skylobby/releases/tag/0.7.83) - 2022-02-25
 
 - Add server setting for character encoding
