@@ -69,13 +69,12 @@ jobs:
             export PATH="$JAVA_HOME/bin:$PATH"
             cd /workspace
             jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
-            ls -lsa
       - uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_x86_64.rpm
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}-1_x86_64.rpm
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.rpm
           asset_content_type: application/x-binary
   build-mac:
