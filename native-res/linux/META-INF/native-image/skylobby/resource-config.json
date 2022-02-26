@@ -1,5 +1,7 @@
 {
   "resources":{
-  "includes":[]},
+  "includes":[{
+      "pattern":"\\Qpublic/js/main.js\\E"
+    }]},
   "bundles":[]
 }
