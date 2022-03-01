@@ -157,20 +157,22 @@
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
   []
-  (when-let [{:keys [ipc-server]} @*state]
-    (when (fn? ipc-server)
-      (ipc-server)))
-  (if (u/is-port-open? u/ipc-port)
-    (do
-      (log/info "Starting IPC server on port" u/ipc-port)
-      (let [handler (server/handler *state)
-            server (http-kit/run-server
-                     (-> handler
-                         wrap-keyword-params
-                         wrap-params)
-                     {:port u/ipc-port})]
-        (swap! *state assoc :ipc-server server)))
-    (log/warn "IPC port unavailable" u/ipc-port)))
+  (let [port u/default-ipc-port]
+    (when-let [{:keys [ipc-server]} @*state]
+      (when (fn? ipc-server)
+        (ipc-server)))
+    (if (u/is-port-open? port)
+      (do
+        (log/info "Starting IPC server on port" port)
+        (let [handler (server/handler *state)
+              server (http-kit/run-server
+                       (-> handler
+                           wrap-keyword-params
+                           wrap-params)
+                       {:port port
+                        :ip "127.0.0.1"})]
+          (swap! *state assoc :ipc-server server)))
+      (log/warn "IPC port unavailable" port))))
 
 
 (def state-watch-chimers

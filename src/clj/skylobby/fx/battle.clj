@@ -51,8 +51,7 @@
 (defn sync-button [{:fx/keys [context]
                     :keys [server-key]}]
   (let [
-        my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
-        my-sync-status (int (or (:sync my-battle-status) 0))
+        my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         sync-button-style (dissoc
                             (case my-sync-status
                               1 ok-severity
@@ -317,7 +316,7 @@
         am-away (:away my-client-status)
         my-battle-status (fx/sub-ctx context sub/my-battle-status server-key)
         my-team-color (fx/sub-ctx context sub/my-team-color server-key)
-        my-sync-status (int (or (:sync my-battle-status) 0))
+        my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         in-sync (= 1 (:sync my-battle-status))
         ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
         discord-channel (discord/channel-to-promote {:mod-name mod-name
@@ -357,8 +356,11 @@
                          :on-action {:event/type :spring-lobby/clear-map-and-mod-details
                                      :map-resource indexed-map
                                      :mod-resource indexed-mod}}])
+        server-type (u/server-type server-key)
+        direct-connect (#{:direct-client :direct-host} server-type)
         buttons (concat
-                  (when-not am-host
+                  (when (and (not am-host)
+                             (not direct-connect))
                     [{:fx/type :button
                       :text "Balance"
                       :on-action {:event/type :spring-lobby/battle-balance
@@ -368,16 +370,18 @@
                                   :client-data (when-not singleplayer client-data)
                                   :users users
                                   :username username}}])
-                  [{:fx/type :button
-                    :text "Fix Colors"
-                    :on-action {:event/type :spring-lobby/battle-fix-colors
-                                :am-host am-host
-                                :battle battle
-                                :channel-name channel-name
-                                :client-data (when-not singleplayer client-data)
-                                :users users
-                                :username username}}]
-                  (when-not singleplayer
+                  (when-not direct-connect
+                    [{:fx/type :button
+                      :text "Fix Colors"
+                      :on-action {:event/type :spring-lobby/battle-fix-colors
+                                  :am-host am-host
+                                  :battle battle
+                                  :channel-name channel-name
+                                  :client-data (when-not singleplayer client-data)
+                                  :users users
+                                  :username username}}])
+                  (when (and (not singleplayer)
+                             (not direct-connect))
                     [{:fx/type :button
                       :text "Ring Specs"
                       :disable (boolean ringing-specs)
@@ -410,7 +414,8 @@
                          :client-data client-data
                          :message "!promote"
                          :server-key server-key})}])
-                  (when am-host
+                  (when (and am-host
+                             (not direct-connect))
                     [{:fx/type :h-box
                       :alignment :center-left
                       :children
@@ -437,7 +442,9 @@
          [{:fx/type :pane
            :pref-width 16}]
          buttons
-         (when (or singleplayer (not am-spec))
+         (when (and (or singleplayer
+                        (not am-spec))
+                    (not direct-connect))
            [{:fx/type :h-box
              :alignment :center-left
              :children
@@ -529,7 +536,9 @@
            :alignment :center-left
            :children
            (concat
-             (when (and am-host (not singleplayer))
+             (when (and am-host
+                        (not singleplayer)
+                        (not direct-connect))
                (let [filter-replay-lc (if filter-host-replay
                                         (string/lower-case filter-host-replay)
                                         "")]
@@ -601,13 +610,21 @@
              {:fx/type :combo-box
               :value (if am-spec "Spectating" "Playing")
               :items ["Spectating" "Playing"]
-              :on-value-changed {:event/type :spring-lobby/on-change-spectate
-                                 :client-data (when-not singleplayer client-data)
-                                 :is-me true
-                                 :is-bot false
-                                 :id my-player
-                                 :ready-on-unspec ready-on-unspec
-                                 :server-key server-key}}}]}
+              :on-value-changed
+              (if direct-connect
+                {:event/type :skylobby.fx.event.battle/on-change-spectate
+                 :is-me true
+                 :is-bot false
+                 :id my-player
+                 :ready-on-unspec ready-on-unspec
+                 :server-key server-key}
+                {:event/type :spring-lobby/on-change-spectate
+                 :client-data (when-not singleplayer client-data)
+                 :is-me true
+                 :is-bot false
+                 :id my-player
+                 :ready-on-unspec ready-on-unspec
+                 :server-key server-key})}}]}
           {:fx/type :h-box
            :alignment :center-left
            :style {:-fx-font-size 24}
@@ -620,39 +637,45 @@
                  {:fx/type :check-box
                   :selected (boolean ready)
                   :style {:-fx-padding "10px"}
-                  :on-selected-changed {:event/type :spring-lobby/battle-ready-change
-                                        :client-data client-data
-                                        :username username
-                                        :battle-status my-battle-status
-                                        :team-color my-team-color}}})
+                  :on-selected-changed
+                  (if direct-connect
+                    {:event/type :skylobby.fx.event.battle/ready-changed
+                     :server-key server-key
+                     :username username}
+                    {:event/type :spring-lobby/battle-ready-change
+                     :client-data client-data
+                     :username username
+                     :battle-status my-battle-status
+                     :team-color my-team-color})}})
               {:fx/type :label
                :text " Ready "}]
-             (if (contains? (:compflags client-data) "teiserver")
-               [{:fx/type :h-box
-                 :style {:-fx-font-size 16}
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type battle-queue-button
-                   :server-key server-key}]}]
-               [{:fx/type ext-recreate-on-key-changed
-                 :key (str am-spec)
-                 :desc
-                 {:fx/type :check-box
-                  :selected (boolean auto-unspec)
-                  :style {:-fx-padding "10px"
-                          :-fx-font-size 15}
-                  :on-selected-changed
-                  {:event/type :spring-lobby/auto-unspec
-                   :client-data (when-not singleplayer client-data)
-                   :is-me true
-                   :is-bot false
-                   :id my-player
-                   :ready-on-unspec ready-on-unspec
-                   :server-key server-key}}}
-                {:fx/type :label
-                 :style {:-fx-font-size 15}
-                 :text "Auto Unspec "}]))}
+             (when-not direct-connect
+               (if (contains? (:compflags client-data) "teiserver")
+                 [{:fx/type :h-box
+                   :style {:-fx-font-size 16}
+                   :alignment :center-left
+                   :children
+                   [
+                    {:fx/type battle-queue-button
+                     :server-key server-key}]}]
+                 [{:fx/type ext-recreate-on-key-changed
+                   :key (str am-spec)
+                   :desc
+                   {:fx/type :check-box
+                    :selected (boolean auto-unspec)
+                    :style {:-fx-padding "10px"
+                            :-fx-font-size 15}
+                    :on-selected-changed
+                    {:event/type :spring-lobby/auto-unspec
+                     :client-data (when-not singleplayer client-data)
+                     :is-me true
+                     :is-bot false
+                     :id my-player
+                     :ready-on-unspec ready-on-unspec
+                     :server-key server-key}}}
+                  {:fx/type :label
+                   :style {:-fx-font-size 15}
+                   :text "Auto Unspec "}])))}
           {:fx/type :h-box
            :alignment :center-left
            :style {:-fx-font-size 24}
@@ -679,18 +702,28 @@
                         "Game starting"
                         spring-running
                         "Game running"
-                        (and am-spec (not host-ingame) (not singleplayer))
+                        (not in-sync)
+                        "Not synced"
+                        (or
+                          (and am-spec
+                               (not host-ingame)
+                               (not singleplayer))
+                          (and (not host-ingame)
+                               (= :direct-client server-type)))
                         "Game not running"
                         :else
                         (if debug-spring
                           "Debug Spring"
-                          (str (if (and (not singleplayer) (or host-ingame am-spec))
+                          (str (if (and (not singleplayer)
+                                        (or host-ingame am-spec))
                                  "Join" "Start")
                                " Game")))
                 :disable (boolean
                            (or spring-starting
                                spring-running
                                (and debug-spring (fx/sub-val context :show-spring-debug))
+                               (and (= :direct-client server-type)
+                                    (not host-ingame))
                                (and (not singleplayer)
                                     (or (and (not host-ingame) am-spec)
                                         (not in-sync)))))
@@ -701,7 +734,10 @@
                     (if singleplayer
                       resources
                       (dissoc resources :engine-version :map-name :mod-name)))
-                  {:battle battle
+                  {:battle (merge
+                             battle
+                             (when direct-connect
+                               {:battle-ip (:hostname server-key)}))
                    :battles battles
                    :users users
                    :username username}
@@ -714,9 +750,13 @@
                    :client-data client-data
                    :debug-spring debug-spring
                    :host-ingame host-ingame
+                   :server-key server-key
                    :singleplayer singleplayer
                    :spring-isolation-dir spring-root})}}]
-             (when (and spring-running singleplayer)
+             (when (and (or spring-starting 
+                            spring-running) 
+                        (or singleplayer
+                            direct-connect))
                [{:fx/type fx.ext.node/with-tooltip-props
                  :props
                  {:tooltip
@@ -730,12 +770,16 @@
                   :text ""
                   :on-action
                   {:event/type :spring-lobby/assoc-in
-                   :path [:spring-running :local battle-id]
+                   :path [(if spring-starting
+                            :spring-starting
+                            :spring-running)
+                          server-key battle-id]
                    :value false}
                   :graphic
                   {:fx/type font-icon/lifecycle
                    :icon-literal "mdi-content-copy:20"}}}]))}]
-         (when am-host
+         (when (and am-host
+                    (not direct-connect))
            [{:fx/type :h-box
              :alignment :center-left
              :children
@@ -893,7 +937,7 @@
                  (cond
                    singleplayer
                    {:event/type :spring-lobby/assoc-in
-                    :path [:by-server :local :battles :singleplayer :battle-map]}
+                    :path [:by-server server-key :battles :singleplayer :battle-map]}
                    am-host
                    {:event/type :spring-lobby/battle-map-change
                     :client-data client-data}
@@ -929,6 +973,7 @@
                  :on-value-changed {:event/type :spring-lobby/assoc
                                     :key :minimap-type}}
                 {:fx/type :label
+                 :alignment :center-left
                  :text (str " Map size: "
                             (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
                               (str
@@ -944,12 +989,19 @@
                   {:fx/type :combo-box
                    :value startpostype
                    :items (map str (vals spring/startpostypes))
-                   :disable (and (not singleplayer) am-spec)
-                   :on-value-changed {:event/type :spring-lobby/battle-startpostype-change
-                                      :am-host am-host
-                                      :channel-name channel-name
-                                      :client-data client-data
-                                      :singleplayer singleplayer}}]
+                   :disable (boolean
+                              (and (not singleplayer)
+                                   (not am-host)
+                                   am-spec))
+                   :on-value-changed
+                   (if (= :direct-host (u/server-type server-key))
+                     {:event/type :skylobby.fx.event.battle/startpostype-changed
+                      :server-key server-key}
+                     {:event/type :spring-lobby/battle-startpostype-change
+                      :am-host am-host
+                      :channel-name channel-name
+                      :client-data client-data
+                      :singleplayer singleplayer})}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
@@ -1516,29 +1568,44 @@
                              {:fx/type font-icon/lifecycle
                               :icon-literal (str "mdi-download:16:white")}}]}
         singleplayer (= :local server-key)
-        resources-pane (if singleplayer
+        server-type (u/server-type server-key)
+        direct-connect-server (= :direct-host server-type)
+        resources-pane (if (or singleplayer
+                               direct-connect-server)
                          {:fx/type :v-box
-                          :style {:-fx-font-size 20}
+                          :style (if singleplayer
+                                   {:-fx-font-size 20}
+                                   {:-fx-font-size 18
+                                    :-fx-pref-width 800})
                           :children
                           [
                            {:fx/type engines-view
                             :engine-version engine-version
-                            :on-value-changed {:event/type :spring-lobby/singleplayer-engine-changed
-                                               :spring-root spring-root}
+                            :on-value-changed
+                            {:event/type :skylobby.fx.event.battle/engine-changed
+                             :battle-id battle-id
+                             :server-key server-key
+                             :spring-root spring-root}
                             :spring-isolation-dir spring-root}
                            (if (seq engine-details)
                              {:fx/type mods-view
                               :engine-file engine-file
                               :mod-name mod-name
-                              :on-value-changed {:event/type :spring-lobby/singleplayer-mod-changed
-                                                 :spring-root spring-root}
+                              :on-value-changed
+                              {:event/type :skylobby.fx.event.battle/mod-changed
+                               :battle-id battle-id
+                               :server-key server-key
+                               :spring-root spring-root}
                               :spring-isolation-dir spring-root}
                              {:fx/type :label
                               :text " Game: Get an engine first"})
                            {:fx/type maps-view
                             :map-name map-name
-                            :on-value-changed {:event/type :spring-lobby/singleplayer-map-changed
-                                               :spring-root spring-root}
+                            :on-value-changed
+                            {:event/type :skylobby.fx.event.battle/map-changed
+                             :battle-id battle-id
+                             :server-key server-key
+                             :spring-root spring-root}
                             :spring-isolation-dir spring-root}
                            {:fx/type :pane
                             :style {:-fx-pref-height 8}}
@@ -1607,7 +1674,8 @@
                                  :server-key server-key}]}])}})
         resources-pane (if-not old-battle
                          resources-pane
-                         {:fx/type :pane})]
+                         {:fx/type :pane})
+        direct-connect (#{:direct-client :direct-host} (u/server-type server-key))]
     {:fx/type :v-box
      :children
      [
@@ -1619,14 +1687,16 @@
        (concat
          (when battle-id
            (concat
-             [{:fx/type :button
-               :text "Leave Battle"
-               :on-action {:event/type :spring-lobby/leave-battle
-                           :client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-                           :server-key server-key}}
-              {:fx/type :pane
-               :h-box/margin 4}]
-             (when-not singleplayer
+             (when-not direct-connect
+               [{:fx/type :button
+                 :text "Leave Battle"
+                 :on-action {:event/type :spring-lobby/leave-battle
+                             :client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+                             :server-key server-key}}
+                {:fx/type :pane
+                 :h-box/margin 4}])
+             (when (and (not singleplayer)
+                        (not direct-connect))
                [(if (fx/sub-val context :pop-out-battle)
                   {:fx/type :button
                    :text "Pop In Battle "
@@ -1645,7 +1715,8 @@
                                :value true}})])
              [{:fx/type :pane
                :h-box/margin 4}]
-             (when-not singleplayer
+             (when (and (not singleplayer)
+                        (not direct-connect))
                [(if pop-out-chat
                   {:fx/type :button
                    :text "Pop In Chat "

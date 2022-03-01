@@ -190,9 +190,11 @@
          :text (str map-name)
          :style {:-fx-font-size 16}}
         {:fx/type :label
-         :text (if (seq map-details)
-                 "(no image)"
-                 "(loading...)")
+         :text (if (string/blank? map-name)
+                 "(no map)"
+                 (if (seq map-details)
+                    "(no image)"
+                    "(loading...)"))
          :alignment :center}]}
       {:fx/type ext-recreate-on-key-changed
        :key (or cached-minimap-updated 0)

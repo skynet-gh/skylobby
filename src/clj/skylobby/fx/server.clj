@@ -13,8 +13,6 @@
 (set! *warn-on-reflection* true)
 
 
-(def default-server-port 8200)
-
 (def server-window-width 640)
 (def server-window-height 400)
 
@@ -85,7 +83,7 @@
         show-servers-window (fx/sub-val context :show-servers-window)
         url (first server-edit)
         port (if (string/blank? (str server-port))
-               default-server-port (str server-port))
+               u/default-server-port (str server-port))
         server-url (str server-host ":" port)]
     {:fx/type :stage
      :showing (boolean show-servers-window)

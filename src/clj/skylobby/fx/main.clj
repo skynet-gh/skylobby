@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
+    [clojure.string :as string]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
@@ -16,15 +17,142 @@
     [skylobby.fx.tasks :as fx.tasks]
     [skylobby.fx.welcome :as fx.welcome]
     [skylobby.util :as u]
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (org.apache.commons.validator.routines InetAddressValidator)))
 
 
 (set! *warn-on-reflection* true)
 
 
+(def ip-validator (InetAddressValidator/getInstance))
+
+
+(defn direct-connect-tab
+  [{:fx/keys [context]}]
+  (let [
+        direct-connect-ip (fx/sub-val context :direct-connect-ip)
+        direct-connect-port (fx/sub-val context :direct-connect-port)
+        direct-connect-port (int (or (when integer? direct-connect-port) direct-connect-port
+                                      u/default-server-port))
+        direct-connect-username (fx/sub-val context :direct-connect-username)
+        direct-connect-password (fx/sub-val context :direct-connect-password)
+        server-keys (set (fx/sub-val context u/complex-server-keys))
+        server-key {:server-type :direct
+                    :protocol :skylobby
+                    :hostname direct-connect-ip
+                    :port direct-connect-port
+                    :username direct-connect-username}
+        host-server-key (assoc server-key :host true :hostname "localhost")
+        client-server-key (assoc server-key :host false)
+        login-error (fx/sub-val context :login-error)]
+    {:fx/type :v-box
+     :children
+     [
+      {:fx/type :h-box
+       :style {:-fx-font-size 20}
+       :v-box/vgrow :always
+       :children
+       [{:fx/type :pane
+         :h-box/hgrow :always}
+        {:fx/type :v-box
+         :alignment :center
+         :children
+         [{:fx/type :pane
+           :v-box/vgrow :always}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "Username: "}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :text-field
+             :text (str direct-connect-username)
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :direct-connect-username}}]}
+          #_
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "Password: "}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :text-field
+             :text (str direct-connect-password)
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :direct-connect-password}}]}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "Port: "}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :text-field
+             :text-formatter
+             {:fx/type :text-formatter
+              :value-converter :integer
+              :value direct-connect-port
+              :on-value-changed {:event/type :spring-lobby/assoc
+                                 :key :direct-connect-port}}}]}
+          {:fx/type :button
+           :style-class ["button" "skylobby-normal"]
+           :text "Host"
+           :disable (or (string/blank? direct-connect-username)
+                        (contains? server-keys host-server-key))
+           :on-action {:event/type :skylobby.fx.event.direct/host
+                       :direct-connect-password direct-connect-password
+                       :direct-connect-port direct-connect-port
+                       :direct-connect-username direct-connect-username}}
+          {:fx/type :label
+           :style {:-fx-text-fill "red"}
+           :text (str
+                   (when-let [error (:direct-host login-error)]
+                     (str "Error: " error)))}
+          {:fx/type :label
+           :text "or"}
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type :label
+             :text "Host IP: "}
+            {:fx/type :pane
+             :h-box/hgrow :always}
+            {:fx/type :text-field
+             :text (str direct-connect-ip)
+             :prompt-text "0.0.0.0"
+             :on-text-changed {:event/type :spring-lobby/assoc
+                               :key :direct-connect-ip}}]}
+          {:fx/type :button
+           :style-class ["button" "skylobby-normal"]
+           :text "Join"
+           :disable (or (string/blank? direct-connect-username)
+                        (not (.isValidInet4Address ip-validator direct-connect-ip))
+                        (contains? server-keys client-server-key))
+           :on-action {:event/type :skylobby.fx.event.direct/join
+                       :direct-connect-ip direct-connect-ip
+                       :direct-connect-password direct-connect-password
+                       :direct-connect-port direct-connect-port
+                       :direct-connect-username direct-connect-username}}
+          {:fx/type :label
+           :style {:-fx-text-fill "red"}
+           :text (str
+                   (when-let [error (:direct-client login-error)]
+                     (str "Error: " error)))}
+          {:fx/type :pane
+           :v-box/vgrow :always}]}
+        {:fx/type :pane
+         :h-box/hgrow :always}]}
+      {:fx/type fx.bottom-bar/bottom-bar}]}))
+
+
 (defn main-window-impl
   [{:fx/keys [context]}]
   (let [valid-server-keys (fx/sub-ctx context skylobby.fx/valid-server-keys-sub)
+        complex-server-keys (fx/sub-val context u/complex-server-keys)
+        show-direct-connect (fx/sub-val context :show-direct-connect)
         show-http (fx/sub-val context :show-downloader)
         show-import (fx/sub-val context :show-importer)
         show-rapid (fx/sub-val context :show-rapid-downloader)
@@ -35,6 +163,7 @@
         show-spring-picker (and (fx/sub-val context :show-spring-picker)
                                 (not (fx/sub-val context :spring-lobby.main/spring-root-arg)))
         show-tasks (fx/sub-val context :show-tasks-window)
+        show-accolades (fx/sub-val context :show-accolades)
         windows-as-tabs (fx/sub-val context :windows-as-tabs)
         tab-ids (concat
                   (when show-spring-picker ["spring"])
@@ -56,6 +185,8 @@
                       (when show-tasks
                         ["tasks"])))
                   (when show-singleplayer ["singleplayer"])
+                  (when show-direct-connect ["direct"])
+                  (map str complex-server-keys)
                   valid-server-keys)
                   ;#_(when (seq valid-server-keys) ["multi"]))
         tab-id-set (set tab-ids)
@@ -207,6 +338,40 @@
                  :v-box/vgrow :always
                  :server-key :local}
                 {:fx/type fx.bottom-bar/bottom-bar}]}}])
+          (when show-direct-connect
+            [{:fx/type :tab
+              :id "direct"
+              :closable true
+              :graphic {:fx/type :label
+                        :text "LAN / Direct Connect"
+                        :style {:-fx-font-size 18}}
+              :on-close-request {:event/type :spring-lobby/dissoc
+                                 :key :show-direct-connect}
+              :content
+              {:fx/type direct-connect-tab}}])
+          (mapv
+            (fn [server-key]
+              ; TODO more than just direct connect
+              ; TODO direct connect server vs client
+              {:fx/type :tab
+               :id (str server-key)
+               :closable true
+               :graphic {:fx/type :label
+                         :text (str (name (:server-type server-key))
+                                    " "
+                                    (:username server-key)
+                                    "@"
+                                    (:hostname server-key)
+                                    ":"
+                                    (:port server-key))
+                         :style {:-fx-font-size 18}}
+               :on-close-request {:event/type :spring-lobby/disconnect
+                                  :server-key server-key}
+               :content
+               {:fx/type fx.battle/battle-view
+                :v-box/vgrow :always
+                :server-key server-key}})
+            complex-server-keys)
           (mapv
             (fn [server-key]
               (let [
@@ -228,7 +393,9 @@
                                                       (and
                                                         (contains? my-channels channel-name)
                                                         (not (contains? (get mute server-key) channel-name))
-                                                        (not (contains? ignore-channels-set channel-name))))
+                                                        (not (contains? ignore-channels-set channel-name))
+                                                        (or (not show-accolades)
+                                                            (not= channel-name (u/user-channel-name "AccoladesBot")))))
                                                     (keys (get-in needs-focus [server-key "chat"]))))))
                                 ["tab" "skylobby-tab-focus"]
                                 ["tab"])]

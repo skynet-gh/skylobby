@@ -1,10 +1,12 @@
 (ns skylobby.fx.sub
   (:require
     [cljfx.api :as fx]
+    [clojure.edn :as edn]
     [clojure.string :as string]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [spring-lobby.spring :as spring]
+    [taoensso.timbre :as log]
     [version-clj.core :as version]))
 
 
@@ -34,6 +36,18 @@
 (defn my-battle-status [context server-key]
   (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
     (:battle-status my-battle-state)))
+
+(defn my-sync-status [context server-key]
+  (let [my-battle-status (fx/sub-ctx context my-battle-status server-key)]
+    (int
+      (if (= :direct server-key)
+        (let [battle-id (fx/sub-val context get-battle-id server-key)]
+          (if (and (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
+                   (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+                   (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map]))
+            1
+            2))
+        (or (:sync my-battle-status) 0)))))
 
 (defn my-team-color [context server-key]
   (let [my-battle-state (fx/sub-ctx context my-battle-state server-key)]
@@ -105,3 +119,11 @@
          (filter string?)
          (filter #(string/includes? (string/lower-case %) filter-lc))
          (sort version/version-compare))))
+
+(defn parsed-selected-server-tab [context]
+  (let [selected-server-tab (fx/sub-val context :selected-server-tab)]
+    (or (try
+          (edn/read-string selected-server-tab)
+          (catch Exception e
+            (log/debug e "Error parsing selected server tab edn")))
+        selected-server-tab)))

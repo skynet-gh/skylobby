@@ -32,6 +32,9 @@
     [skylobby.fx.color :as fx.color]
     [skylobby.fx.download :as fx.download :refer [download-sources-by-name]]
     [skylobby.fx.engine-sync :as fx.engine-sync]
+    [skylobby.fx.event.battle :as fx.event.battle]
+    [skylobby.fx.event.chat :as fx.event.chat]
+    [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.git :as git]
@@ -169,10 +172,10 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
+   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
    :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
@@ -258,6 +261,8 @@
      :increment-ids true
      :interleave-ally-player-ids true
      :is-java (u/is-java? (u/process-command))
+     :ipc-server-enabled false
+     :ipc-server-port u/default-ipc-port
      :leave-battle-on-close-window true
      :players-table-columns {:skill true
                              :ally true
@@ -546,7 +551,7 @@
     state
     [:server :servers]))
 
-(defn- update-battle-status-sync-relevant-data [state]
+(defn update-battle-status-sync-relevant-data [state]
   (-> state
       (select-keys [:by-server :by-spring-root :mod-details :map-details :servers :spring-isolation-dir])
       (update :by-server
@@ -569,16 +574,19 @@
   (= (fs/canonical-path resource-file)
      (fs/canonical-path (resource/resource-dest spring-root importable))))
 
-(defn server-auto-resources [_old-state new-state old-server new-server]
+(defn server-needs-battle-status-sync-check [server-data]
+  (and (get-in server-data [:battle :battle-id])
+       (let [username (:username server-data)
+             sync-status (get-in server-data [:battle :users username :battle-status :sync])]
+         (not= sync-status 1))))
+
+(defn server-auto-resources [server-key _old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
       (when #_(or (not= (auto-get-resources-server-relevant-keys old-server)
                         (auto-get-resources-server-relevant-keys new-server)))
-            (and (-> new-server :battle :battle-id)
-                 (let [username (:username new-server)
-                       sync-status (-> new-server :battle :users (get username) :battle-status :sync)]
-                   (not= 1 sync-status)))
-        (log/info "Auto getting resources for" (u/server-key (:client-data new-server)))
+            (server-needs-battle-status-sync-check new-server)
+        (log/info "Auto getting resources for" server-key)
         (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
                       rapid-by-spring-root servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
               {:keys [battle battles client-data]} new-server
@@ -838,6 +846,7 @@
                               (not rapid-task)
                               engine-file
                               (not update-rapid-task)
+                              (not (string/blank? battle-modname))
                               (check-cooldown cooldowns [:update-rapid spring-root-path]))
                          (do
                            (log/info "Adding task to update rapid looking for" battle-modname)
@@ -919,12 +928,6 @@
       (catch Exception e
         (log/error e "Error in :battle-map-details state watcher")))))
 
-
-(defn server-needs-battle-status-sync-check [server-data]
-  (and (-> server-data :battle :battle-id)
-       (let [username (:username server-data)
-             sync-status (some-> server-data :battle :users (get username) :battle-status :sync u/to-number int)]
-         (not= sync-status 1))))
 
 (defn battle-mod-details-watcher [_k state-atom old-state new-state]
   (when (not= (battle-mod-details-relevant-data old-state)
@@ -1164,11 +1167,11 @@
     (try
       (when-let [tasks (->> new-state
                             :by-server
-                            (remove (comp #{:local} first))
+                            (remove (comp keyword? first))
                             (mapcat
                               (fn [[server-key new-server]]
                                 (let [old-server (-> old-state :by-server (get server-key))]
-                                  (server-auto-resources old-state new-state old-server new-server))))
+                                  (server-auto-resources server-key old-state new-state old-server new-server))))
                             (filter some?)
                             seq)]
         (log/info "Adding" (count tasks) "to auto get resources")
@@ -1219,27 +1222,30 @@
             (log/error e "Error in :fix-selected-server state watcher")))))))
 
 
-(defn update-battle-status-sync-watcher [_k _ref old-state new-state]
-  (when (or (not= (update-battle-status-sync-relevant-data old-state)
-                  (update-battle-status-sync-relevant-data new-state))
-            (some (comp server-needs-battle-status-sync-check second :by-server) new-state))
-    (log/info "Checking servers for battle sync status updates")
+(defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
+  (when #_(or (not= (update-battle-status-sync-relevant-data old-state)
+                    (update-battle-status-sync-relevant-data new-state)))
+        (some (comp server-needs-battle-status-sync-check second) (-> new-state :by-server seq))
     (try
-      (doseq [[server-key new-server] (->> new-state :by-server u/valid-servers seq)]
-        (if (and (= (:servers old-state) (:servers new-state))
+      (log/info "Checking servers for battle sync status updates")
+      (doseq [[server-key new-server] (concat
+                                        (->> new-state :by-server u/valid-servers)
+                                        (->> new-state u/complex-servers))]
+        (if (and (= (:servers old-state)
+                    (:servers new-state))
                  (not (server-needs-battle-status-sync-check new-server)))
           (log/debug "Server" server-key "does not need battle sync status check")
           (let [
                 _ (log/info "Checking battle sync status for" server-key)
-                old-server (-> old-state :by-server (get server-key))
-                server-url (-> new-server :client-data :server-url)
+                old-server (get-in old-state [:by-server server-key])
+                server-url (get-in new-server [:client-data :server-url])
                 {:keys [servers spring-isolation-dir]} new-state
-                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                spring-root (or (get-in servers [server-url :spring-isolation-dir])
                                 spring-isolation-dir)
                 spring-root-path (fs/canonical-path spring-root)
 
-                old-spring (-> old-state :by-spring-root (get spring-root-path))
-                new-spring (-> new-state :by-spring-root (get spring-root-path))
+                old-spring (get-in old-state [:by-spring-root spring-root-path])
+                new-spring (get-in new-state [:by-spring-root spring-root-path])
 
                 old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
                 new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
@@ -1247,9 +1253,10 @@
                 new-sync-number (handler/sync-number new-sync)
                 battle (:battle new-server)
                 client-data (:client-data new-server)
-                my-username (:username client-data)
-                {:keys [battle-status team-color]} (-> battle :users (get my-username))
-                old-sync-number (-> battle :users (get my-username) :battle-status :sync)
+                my-username (or (:username client-data)
+                                (:username new-server))
+                {:keys [battle-status team-color]} (get-in battle [:users my-username])
+                old-sync-number (get-in battle [:users my-username :battle-status :sync])
                 battle-id (:battle-id battle)
                 battle-changed (not= battle-id
                                      (-> old-server :battle :battle-id))]
@@ -1261,9 +1268,15 @@
                 (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
                 (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
                           "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
-              (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-                (message/send-message *state client-data
-                  (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0))))))))
+              (if (#{:direct-client :direct-host} (u/server-type server-key))
+                (fx.event.battle/update-player-state
+                  state-atom
+                  server-key
+                  {:username my-username}
+                  {:battle-status {:sync new-sync-number}})
+                (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+                  (message/send-message *state client-data
+                    (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
       (catch Exception e
         (log/error e "Error in :update-battle-status-sync state watcher")))))
 
@@ -2546,7 +2559,9 @@
 
 (defn update-battle-sync-statuses [state-atom]
   (let [state @state-atom]
-    (doseq [[server-key server-data] (-> state :by-server u/valid-servers seq)]
+    (doseq [[server-key server-data] (concat
+                                       (-> state :by-server u/valid-servers)
+                                       (-> state u/complex-servers))]
       (let [server-url (-> server-data :client-data :server-url)
             {:keys [servers spring-isolation-dir]} state
             spring-root (or (-> servers (get server-url) :spring-isolation-dir)
@@ -2565,9 +2580,15 @@
                    (not= old-sync-number new-sync-number))
           (log/info "Updating battle sync status for" server-key "from" old-sync-number
                     "to" new-sync-number)
-          (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-            (message/send-message state-atom client-data
-              (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
+          (if (#{:direct-client :direct-host} (u/server-type server-key))
+            (fx.event.battle/update-player-state
+              state-atom
+              server-key
+              {:username username}
+              {:battle-status {:sync new-sync-number}})
+            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+              (message/send-message state-atom client-data
+                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0))))))))))
 
 
 (defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
@@ -2843,7 +2864,16 @@
 
 
 (defmethod event-handler ::disconnect [{:keys [server-key]}]
-  (update-disconnected! *state server-key {:user-requested true}))
+  (if (map? server-key)
+    (let [[old-state _new-state] (swap-vals! *state update :by-server dissoc server-key)
+          {:keys [client-close-fn server-close-fn]} (get-in old-state [:by-server server-key])]
+      (when (fn? server-close-fn)
+        (log/info "Closing server for" server-key)
+        (server-close-fn))
+      (when (fn? client-close-fn)
+        (log/info "Closing client for" server-key)
+        (client-close-fn)))
+    (update-disconnected! *state server-key {:user-requested true})))
 
 (defn- connect
   [state-atom {:keys [client-data server] :as state}]
@@ -2934,7 +2964,8 @@
    :show-scenarios-window "scenarios"
    :show-settings-window "settings"
    :show-spring-picker "spring"
-   :show-tasks-window "tasks"})
+   :show-tasks-window "tasks"
+   :show-direct-connect "direct"})
 
 (def tab-to-window-key
   (clojure.set/map-invert window-to-tab))
@@ -3445,27 +3476,6 @@
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
-(defmethod event-handler ::kick-battle
-  [{:keys [bot-name client-data singleplayer username]}]
-  (future
-    (try
-      (if singleplayer
-        (do
-          (log/info "Singleplayer battle kick")
-          (swap! *state
-                 (fn [state]
-                   (-> state
-                       (update-in [:by-server :local :battles :singleplayer :bots] dissoc bot-name)
-                       (update-in [:by-server :local :battle :bots] dissoc bot-name)
-                       (update-in [:by-server :local :battles :singleplayer :users] dissoc username)
-                       (update-in [:by-server :local :battle :users] dissoc username)))))
-        (if bot-name
-          (message/send-message *state client-data (str "REMOVEBOT " bot-name))
-          (message/send-message *state client-data (str "KICKFROMBATTLE " username))))
-      (catch Exception e
-        (log/error e "Error kicking from battle")))))
-
-
 (defn available-name [existing-names desired-name]
   (if-not (contains? (set existing-names) desired-name)
     desired-name
@@ -3477,7 +3487,7 @@
         (str desired-name 0)))))
 
 (defmethod event-handler ::add-bot
-  [{:keys [battle bot-username bot-name bot-version client-data side-indices singleplayer username]}]
+  [{:keys [battle bot-username bot-name bot-version client-data server-key side-indices username]}]
   (swap! *state dissoc :show-add-bot)
   (future
     (try
@@ -3495,9 +3505,9 @@
             bot-status (cu/encode-battle-status status)
             bot-color (u/random-color)
             message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-        (if singleplayer
+        (if (keyword? server-key)
           (do
-            (log/info "Singleplayer add bot")
+            (log/info "Special server add bot")
             (swap! *state
                    (fn [state]
                      (let [bot-data {:bot-name bot-username
@@ -3507,8 +3517,8 @@
                                      :battle-status status
                                      :owner username}]
                        (-> state
-                           (assoc-in [:by-server :local :battles :singleplayer :bots bot-username] bot-data)
-                           (assoc-in [:by-server :local :battle :bots bot-username] bot-data))))))
+                           (assoc-in [:by-server server-key :battles (:battle-id battle) :bots bot-username] bot-data)
+                           (assoc-in [:by-server server-key :battle :bots bot-username] bot-data))))))
           (message/send-message *state client-data message)))
       (catch Exception e
         (log/error e "Error adding bot")))))
@@ -3524,34 +3534,36 @@
 
 
 (defmethod event-handler ::start-battle
-  [{:keys [am-host am-spec battle-status channel-name client-data host-ingame] :as state}]
-  (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] true)
-  (future
-    (try
-      (when-not (:mode battle-status)
-        (if (and (:server-url client-data)
-                 (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
-                     (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
-          @(event-handler
-             {:event/type ::send-message
-              :channel-name channel-name
-              :client-data client-data
-              :message (str "!joinas spec")
-              :no-clear-draft true})
-          (log/info "Skipping !joinas spec for this server"))
-        (async/<!! (async/timeout 1000)))
-      (if (or am-host am-spec host-ingame)
-        (spring/start-game *state state)
-        (do
-          @(event-handler
-             {:event/type ::send-message
-              :channel-name channel-name
-              :client-data client-data
-              :message (str "!cv start")
-              :no-clear-draft true})
-          (swap! *state assoc-in [:spring-starting (u/server-key client-data) (-> state :battle :battle-id)] false)))
-      (catch Exception e
-        (log/error e "Error starting battle")))))
+  [{:keys [am-host am-spec battle-status channel-name client-data host-ingame server-key] :as state}]
+  (let [server-key (or server-key
+                       (u/server-key client-data))]
+    (swap! *state assoc-in [:spring-starting server-key (-> state :battle :battle-id)] true)
+    (future
+      (try
+        (when-not (:mode battle-status)
+          (if (and (:server-url client-data)
+                   (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
+                       (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :client-data client-data
+                :message (str "!joinas spec")
+                :no-clear-draft true})
+            (log/info "Skipping !joinas spec for this server"))
+          (async/<!! (async/timeout 1000)))
+        (if (or am-host am-spec host-ingame)
+          (spring/start-game *state state)
+          (do
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :client-data client-data
+                :message (str "!cv start")
+                :no-clear-draft true})
+            (swap! *state assoc-in [:spring-starting server-key (-> state :battle :battle-id)] false)))
+        (catch Exception e
+          (log/error e "Error starting battle"))))))
 
 
 (defmethod event-handler ::play-scenario
@@ -4922,37 +4934,6 @@
   (swap! *state assoc :chat-auto-scroll false))
 
 
-(defmethod event-handler ::singleplayer-engine-changed
-  [{:fx/keys [event] :keys [engine-version spring-root]}]
-  (let [engine-version (or engine-version event)]
-    (swap! *state
-      (fn [server]
-        (-> server
-            (assoc :engine-filter "")
-            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :engine-version] engine-version)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-version] engine-version))))))
-
-(defmethod event-handler ::singleplayer-mod-changed
-  [{:fx/keys [event] :keys [mod-name spring-root]}]
-  (let [mod-name (or mod-name event)]
-    (swap! *state
-      (fn [server]
-        (-> server
-            (assoc :mod-filter "")
-            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :mod-name] mod-name)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-modname] mod-name))))))
-
-(defmethod event-handler ::singleplayer-map-changed
-  [{:fx/keys [event] :keys [map-name spring-root]}]
-  (let [map-name (or map-name event)]
-    (swap! *state
-      (fn [server]
-        (-> server
-            (assoc :map-input-prefix "")
-            (assoc-in [:by-spring-root (fs/canonical-path spring-root) :map-name] map-name)
-            (assoc-in [:by-server :local :battles :singleplayer :battle-map] map-name))))))
-
-
 (defmethod event-handler ::scan-imports
   [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
   (doseq [import-source sources]
@@ -5422,23 +5403,49 @@
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
 
 
+(defn stop-ipc-server
+  [state-atom]
+  (let [{:keys [ipc-server]} @state-atom]
+    (when (fn? ipc-server)
+      (log/info "Stopping IPC server")
+      (ipc-server)
+      (swap! state-atom dissoc :ipc-server))))
+
+(defmethod task-handler ::stop-ipc-server [_]
+  (stop-ipc-server *state))
+
 (defn start-ipc-server
   "Starts an HTTP server so that replays and battles can be loaded into running instance."
-  []
-  (when-let [{:keys [ipc-server]} @*state]
-    (when (fn? ipc-server)
-      (ipc-server)))
-  (if (u/is-port-open? u/ipc-port)
-    (do
-      (log/info "Starting IPC server on port" u/ipc-port)
-      (let [handler (server/handler *state)
-            server (http-kit/run-server
-                     (-> handler
-                         wrap-keyword-params
-                         wrap-params)
-                     {:port u/ipc-port})]
-        (swap! *state assoc :ipc-server server)))
-    (log/warn "IPC port unavailable" u/ipc-port)))
+  ([state-atom]
+   (start-ipc-server state-atom nil))
+  ([state-atom opts]
+   (let [{:keys [ipc-server-port ipc-server-enabled]} @state-atom
+         port (or ipc-server-port u/default-ipc-port)]
+     (stop-ipc-server state-atom)
+     (cond
+       (and (not ipc-server-enabled)
+            (not (:force opts)))
+       (log/info "IPC server disabled")
+       (not (u/is-port-open? port))
+       (log/warn "IPC port unavailable" port)
+       :else
+       (try
+         (log/info "Starting IPC server on port" port)
+         (let [handler (server/handler *state)
+               server (http-kit/run-server
+                        (-> handler
+                            wrap-keyword-params
+                            wrap-params)
+                        {:port port
+                         :ip "127.0.0.1"})]
+           (swap! *state assoc :ipc-server server))
+         (catch Exception e
+           (log/error e "Error starting IPC server")
+           (swap! *state assoc :ipc-server-error e)))))))
+
+
+(defmethod task-handler ::start-ipc-server [_]
+  (start-ipc-server *state {:force true}))
 
 
 (defn init
@@ -5457,6 +5464,13 @@
          (spit custom-css-file (slurp (::css/url skylobby.fx/default-style)))))
      (catch Exception e
        (log/error e "Error creating custom CSS file")))
+   (try
+     (log/info "Adding event handler methods from other ns")
+     (fx.event.battle/add-methods event-handler state-atom)
+     (fx.event.chat/add-methods event-handler state-atom)
+     (fx.event.direct/add-methods event-handler state-atom)
+     (catch Exception e
+       (log/error e "Error adding event handler methods")))
    (log/info "Initializing periodic jobs")
    (let [task-chimers (->> task/task-kinds
                            (map (partial tasks-chimer-fn state-atom))
@@ -5502,7 +5516,7 @@
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
-     (start-ipc-server)
+     (start-ipc-server state-atom)
      {:chimers
       (concat
         task-chimers

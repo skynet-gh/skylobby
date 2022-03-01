@@ -80,6 +80,7 @@
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
         ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
+        show-accolades (fx/sub-val context :show-accolades)
         show-closed-battles (fx/sub-val context :show-closed-battles)
         show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
         show-team-skills (fx/sub-val context :show-team-skills)
@@ -197,6 +198,15 @@
        :alignment :center-left
        :children
        [{:fx/type :check-box
+         :selected (boolean show-accolades)
+         :on-selected-changed {:event/type :spring-lobby/assoc
+                               :key :show-accolades}}
+        {:fx/type :label
+         :text " Show accolades panel"}]}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       [{:fx/type :check-box
          :selected (boolean show-team-skills)
          :on-selected-changed {:event/type :spring-lobby/assoc
                                :key :show-team-skills}}
@@ -277,6 +287,9 @@
         hide-vote-messages (fx/sub-val context :hide-vote-messages)
         highlight-tabs-with-new-battle-messages (fx/sub-val context :highlight-tabs-with-new-battle-messages)
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
+        ipc-server (fx/sub-val context :ipc-server)
+        ipc-server-enabled (fx/sub-val context :ipc-server-enabled)
+        ipc-server-port (fx/sub-val context :ipc-server-port)
         media-player (fx/sub-val context :media-player)
         music-dir (fx/sub-val context :music-dir)
         music-volume (fx/sub-val context :music-volume)
@@ -431,6 +444,68 @@
                 :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}
                {:fx/type :label
                 :text " Use git to version .sdd games"}]}])}
+         (let [
+               starting (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/start-ipc-server))
+               stopping (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/stop-ipc-server))
+               stopping-or-starting (boolean (or starting stopping))]
+           {:fx/type filterable-section
+            :search settings-search
+            :title "Server"
+            :children
+            [
+             {:fx/type :label
+              :text "HTTP server used for Web UI and replay file association"}
+             {:fx/type :h-box
+              :style {:-fx-font-size 18}
+              :children
+              [
+               {:fx/type :check-box
+                :selected (boolean ipc-server-enabled)
+                :on-selected-changed {:event/type :spring-lobby/assoc
+                                      :key :ipc-server-enabled}}
+               {:fx/type :label
+                :text " Run server on start"}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [{:fx/type :label
+                :text " Port: "}
+               {:fx/type :text-field
+                :text-formatter
+                {:fx/type :text-formatter
+                 :value-converter :integer
+                 :value (int (or (when (integer? ipc-server-port) ipc-server-port)
+                                 u/default-ipc-port))
+                 :on-value-changed {:event/type :spring-lobby/assoc
+                                    :key :ipc-server-port}}}]}
+             {:fx/type :label
+              :text (cond
+                      starting "Server starting..."
+                      stopping "Server stopping..."
+                      (fn? ipc-server) "Server running"
+                      :else "Server not running")}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              (if (fn? ipc-server)
+                [{:fx/type :button
+                  :text "Restart server"
+                  :disable stopping-or-starting
+                  :on-action
+                  {:event/type :spring-lobby/add-task
+                   :task {:spring-lobby/task-type :spring-lobby/start-ipc-server}}}
+                 {:fx/type :button
+                  :text "Stop server"
+                  :disable stopping-or-starting
+                  :on-action
+                  {:event/type :spring-lobby/add-task
+                   :task {:spring-lobby/task-type :spring-lobby/stop-ipc-server}}}]
+                [{:fx/type :button
+                  :text "Start server"
+                  :disable stopping-or-starting
+                  :on-action
+                  {:event/type :spring-lobby/add-task
+                   :task {:spring-lobby/task-type :spring-lobby/start-ipc-server}}}])}]})
          {:fx/type filterable-section
           :search settings-search
           :title " Chat"
@@ -733,7 +808,7 @@
               :text-formatter
               {:fx/type :text-formatter
                :value-converter :integer
-               :value (int (or (when (number? chat-font-size) chat-font-size)
+               :value (int (or (when (integer? chat-font-size) chat-font-size)
                                fx.channel/default-font-size))
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :chat-font-size}}}]}]}

@@ -26,7 +26,8 @@
 (def app-name "skylobby")
 (def ^:dynamic app-version nil)
 
-(def ^:dynamic ipc-port 12345)
+(def default-ipc-port 12345)
+(def default-server-port 8200)
 
 
 (def minimap-size 512) ; display size in UI
@@ -129,10 +130,23 @@
   (URLDecoder/decode s (.name (StandardCharsets/UTF_8))))
 
 
+(defn server-type
+  "Returns a keyword representing the type of server given its key. Used for dispatching actions
+  based on these broad server groups."
+  [server-key]
+  (cond
+    (string? server-key) :spring-lobby
+    (= :local server-key) :singleplayer
+    (map? server-key)
+    (if (:host server-key)
+      :direct-host
+      :direct-client)
+    :else nil))
+
 (defn server-key [{:keys [server-url username]}]
   (if (and server-url username)
     (str username "@" server-url)
-    :local))
+    :local)) ; TODO
 
 
 (defn battle-id-channel-name [battle-id]
@@ -318,18 +332,32 @@
       :mod-name-only (:name modinfo)})))
 
 
+; servers defined by string
 (defn valid-servers [by-server]
-  (->> (dissoc by-server :local)
+  (->> by-server
+       (filter (comp string? first))
        (remove (comp string/blank? first))
        (filter (comp :accepted second))))
 
 
 (defn valid-server-keys [by-server]
-  (->> (dissoc by-server :local)
-       (remove (comp string/blank? first))
-       (filter (comp :accepted second))
+  (->> by-server
+       valid-servers
        (map first)
        (sort-by name)))
+
+
+; servers defined by maps
+(defn complex-servers [state]
+  (->> state
+       :by-server
+       (filter (comp map? first))))
+
+(defn complex-server-keys [state]
+  (->> state
+       complex-servers
+       (map first)
+       (sort-by str))) ; TODO maybe
 
 
 ; https://stackoverflow.com/a/17328219/984393

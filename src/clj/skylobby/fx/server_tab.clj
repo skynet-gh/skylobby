@@ -16,7 +16,7 @@
     :keys [server-key]}]
   (let [battle-as-tab (fx/sub-val context :battle-as-tab)
         pop-out-battle (fx/sub-val context :pop-out-battle)
-        battle (fx/sub-ctx context get-in [:by-server server-key :battle])
+        battle (fx/sub-val context get-in [:by-server server-key :battle])
         in-battle (and (seq battle)
                        (or (not (:battle-id battle))
                            (not pop-out-battle)))

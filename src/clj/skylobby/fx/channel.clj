@@ -6,6 +6,7 @@
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
+    [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.util :as u]
@@ -203,7 +204,7 @@
      :text (str message-draft)
      :on-text-changed {:event/type :spring-lobby/assoc-in
                        :path [:message-drafts server-key channel-name]}
-     :on-action {:event/type :spring-lobby/send-message
+     :on-action {:event/type :skylobby.fx.event.chat/send
                  :channel-name channel-name
                  :message message-draft
                  :server-key server-key}
@@ -219,7 +220,7 @@
     {:fx/type :button
      :text "Send"
      :disable (boolean (or disable (string/blank? message-draft)))
-     :on-action {:event/type :spring-lobby/send-message
+     :on-action {:event/type :skylobby.fx.event.chat/send
                  :channel-name channel-name
                  :message message-draft
                  :server-key server-key}}))
@@ -331,10 +332,12 @@
 
 (defn channel-view-impl
   [{:fx/keys [context] :keys [channel-name disable hide-users server-key usernames]}]
-  (let [selected-server-tab (fx/sub-val context :selected-server-tab)]
+  (let [selected-server-tab (fx/sub-val context :selected-server-tab)
+        parsed-selected-server-tab (fx/sub-ctx context sub/parsed-selected-server-tab)]
     {:fx/type :h-box
      :children
-     (if (= server-key selected-server-tab)
+     (if (or (= server-key selected-server-tab)
+             (= server-key parsed-selected-server-tab))
        (concat
          [{:fx/type :v-box
            :h-box/hgrow :always

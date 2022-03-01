@@ -109,8 +109,6 @@
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
             (alter-var-root #'fs/app-root-override (constantly app-root-override)))
-          (when-let [port (:port options)]
-            (alter-var-root #'u/ipc-port (constantly port)))
           (when-let [replay-sources (seq (:replay-source options))]
             (let [replay-sources-override (map
                                             (fn [source]
@@ -134,6 +132,8 @@
                             (let [f (fs/file (:spring-root options))]
                               {:spring-isolation-dir f
                                ::spring-root-arg f}))
+                          (when-let [port (:port options)]
+                            {:ipc-server-port port})
                           (when (contains? options :music-dir)
                             {:music-dir (fs/file (:music-dir options))})
                           (when (contains? options :music-volume)
@@ -220,7 +220,8 @@
                   (fs/init-7z!)
                   (log/info "Finished 7Zip init"))
                 (spring-lobby/init spring-lobby/*state)
-                (spring-lobby/browse-url (str "http://localhost:" u/ipc-port)))
+                (spring-lobby/browse-url (str "http://localhost:" (or (:port options)
+                                                                      u/default-ipc-port))))
               :else
               (do
                 (log/info "Creating renderer")
@@ -256,13 +257,14 @@
   (log/info "Main" (pr-str args))
   (let [{:keys [arguments]} (cli/parse-opts args [])
         replay-file (parse-replay-file arguments)
-        opening-replay? (some? replay-file)]
+        opening-replay? (some? replay-file)
+        port u/default-ipc-port]
     (try
-      (if (and opening-replay? (not (u/is-port-open? u/ipc-port)))
+      (if (and opening-replay? (not (u/is-port-open? port)))
         (do
-          (log/info "Sending IPC to existing skylobby instance on port" u/ipc-port)
+          (log/info "Sending IPC to existing skylobby instance on port" port)
           (clj-http/post
-            (str "http://localhost:" u/ipc-port "/replay")
+            (str "http://localhost:" port "/replay")
             {:query-params {:path (fs/canonical-path replay-file)}})
           (System/exit 0))
         (apply -ui-main args))
