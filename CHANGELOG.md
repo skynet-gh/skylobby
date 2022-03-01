@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.0](https://github.com/skynet-gh/skylobby/releases/tag/0.8.0) - 2022-02-28
+
+- Add LAN / direct hosting
+- Fix battle panel display when not as tab
+
 ## [0.7.84](https://github.com/skynet-gh/skylobby/releases/tag/0.7.84) - 2022-02-25
 
 - Add RPM package build
