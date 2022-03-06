@@ -10,11 +10,11 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ilammy/msvc-dev-cmd@v1.10.0
       - uses: microsoft/setup-msbuild@v1.1
         with:
-          vs-version: '16.11.8'
+          vs-version: '16.11.10'
           msbuild-architecture: x64
       # https://github.com/clojure-lsp/clojure-lsp/blob/419f58c/.github/workflows/release.yml#L300-L304
       - uses: al-cheb/configure-pagefile-action@v1.2
@@ -46,14 +46,14 @@ jobs:
         shell: powershell
       - run: clojure -M:skylobby-deps:skylobby-native-windows
         shell: powershell
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: skylobby.exe
           path: skylobby.exe
   mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
@@ -76,14 +76,14 @@ jobs:
       - run: npm install
       - run: clojure -M:cljs compile frontend
       - run: clojure -M:skylobby-deps:skylobby-native-mac
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: skylobby-mac
           path: skylobby
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
@@ -106,7 +106,7 @@ jobs:
       - run: npm install
       - run: clojure -M:cljs compile frontend
       - run: clojure -M:skylobby-deps:skylobby-native-linux
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: skylobby-linux
           path: skylobby
