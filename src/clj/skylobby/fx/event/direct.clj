@@ -48,7 +48,7 @@
         (catch Exception e
           (log/error e "Error starting direct connect server")))))
   (defmethod multifn ::join
-    [{:keys [direct-connect-ip direct-connect-port direct-connect-username]}]
+    [{:keys [direct-connect-ip direct-connect-port direct-connect-protocol direct-connect-username]}]
     (swap! state-atom assoc-in [:login-error :direct-client] nil)
     (future
       (try
@@ -67,7 +67,7 @@
                 {
                  :host direct-connect-ip
                  :port direct-connect-port
-                 :protcol :http
+                 :protcol (or direct-connect-protocol :http)
                  :type   :ws
                  :packer packer
                  :wrap-recv-evs? false})

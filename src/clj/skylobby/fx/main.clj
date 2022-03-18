@@ -60,87 +60,138 @@
          :children
          [{:fx/type :pane
            :v-box/vgrow :always}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "Username: "}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :text-field
-             :text (str direct-connect-username)
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :direct-connect-username}}]}
-          #_
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "Password: "}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :text-field
-             :text (str direct-connect-password)
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :direct-connect-password}}]}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "Port: "}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :text-field
-             :text-formatter
-             {:fx/type :text-formatter
-              :value-converter :integer
-              :value direct-connect-port
-              :on-value-changed {:event/type :spring-lobby/assoc
-                                 :key :direct-connect-port}}}]}
-          {:fx/type :button
-           :style-class ["button" "skylobby-normal"]
-           :text "Host"
-           :disable (or (string/blank? direct-connect-username)
-                        (contains? server-keys host-server-key))
-           :on-action {:event/type :skylobby.fx.event.direct/host
-                       :direct-connect-password direct-connect-password
-                       :direct-connect-port direct-connect-port
-                       :direct-connect-username direct-connect-username}}
-          {:fx/type :label
-           :style {:-fx-text-fill "red"}
-           :text (str
-                   (when-let [error (:direct-host login-error)]
-                     (str "Error: " error)))}
-          {:fx/type :label
-           :text "or"}
-          {:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "Host IP: "}
-            {:fx/type :pane
-             :h-box/hgrow :always}
-            {:fx/type :text-field
-             :text (str direct-connect-ip)
-             :prompt-text "0.0.0.0"
-             :on-text-changed {:event/type :spring-lobby/assoc
-                               :key :direct-connect-ip}}]}
-          {:fx/type :button
-           :style-class ["button" "skylobby-normal"]
-           :text "Join"
-           :disable (or (string/blank? direct-connect-username)
-                        (not (.isValidInet4Address ip-validator direct-connect-ip))
-                        (contains? server-keys client-server-key))
-           :on-action {:event/type :skylobby.fx.event.direct/join
-                       :direct-connect-ip direct-connect-ip
-                       :direct-connect-password direct-connect-password
-                       :direct-connect-port direct-connect-port
-                       :direct-connect-username direct-connect-username}}
-          {:fx/type :label
-           :style {:-fx-text-fill "red"}
-           :text (str
-                   (when-let [error (:direct-client login-error)]
-                     (str "Error: " error)))}
+          {:fx/type :tab-pane
+           :tabs
+           [{:fx/type :tab
+             :graphic {:fx/type :label
+                       :text "Host"}
+             :content
+             {:fx/type :v-box
+              :children
+              [
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Username: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text (str direct-connect-username)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-username}}]}
+                #_
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Password: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text (str direct-connect-password)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-password}}]}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Port: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text-formatter
+                   {:fx/type :text-formatter
+                    :value-converter :integer
+                    :value direct-connect-port
+                    :on-value-changed {:event/type :spring-lobby/assoc
+                                       :key :direct-connect-port}}}]}
+                {:fx/type :button
+                 :style-class ["button" "skylobby-normal"]
+                 :text "Host"
+                 :disable (or (string/blank? direct-connect-username)
+                              (contains? server-keys host-server-key))
+                 :on-action {:event/type :skylobby.fx.event.direct/host
+                             :direct-connect-password direct-connect-password
+                             :direct-connect-port direct-connect-port
+                             :direct-connect-username direct-connect-username}}
+                {:fx/type :label
+                 :style {:-fx-text-fill "red"}
+                 :text (str
+                         (when-let [error (:direct-host login-error)]
+                           (str "Error: " error)))}]}}
+            {:fx/type :tab
+             :graphic {:fx/type :label
+                       :text "Join"}
+             :content
+             {:fx/type :v-box
+              :children
+              [
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Username: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text (str direct-connect-username)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-username}}]}
+                #_
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Password: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text (str direct-connect-password)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-password}}]}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Port: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text-formatter
+                   {:fx/type :text-formatter
+                    :value-converter :integer
+                    :value direct-connect-port
+                    :on-value-changed {:event/type :spring-lobby/assoc
+                                       :key :direct-connect-port}}}]}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Host IP: "}
+                  {:fx/type :pane
+                   :h-box/hgrow :always}
+                  {:fx/type :text-field
+                   :text (str direct-connect-ip)
+                   :prompt-text "0.0.0.0"
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-ip}}]}
+                {:fx/type :button
+                 :style-class ["button" "skylobby-normal"]
+                 :text "Join"
+                 :disable (or (string/blank? direct-connect-username)
+                              (not (.isValidInet4Address ip-validator direct-connect-ip))
+                              (contains? server-keys client-server-key))
+                 :on-action {:event/type :skylobby.fx.event.direct/join
+                             :direct-connect-ip direct-connect-ip
+                             :direct-connect-password direct-connect-password
+                             :direct-connect-port direct-connect-port
+                             :direct-connect-username direct-connect-username}}
+                {:fx/type :label
+                 :style {:-fx-text-fill "red"}
+                 :text (str
+                         (when-let [error (:direct-client login-error)]
+                           (str "Error: " error)))}]}}]}
           {:fx/type :pane
            :v-box/vgrow :always}]}
         {:fx/type :pane
