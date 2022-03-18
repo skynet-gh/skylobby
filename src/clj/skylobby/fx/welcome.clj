@@ -217,10 +217,6 @@
                :text url
                :on-action {:event/type :spring-lobby/desktop-browse-url
                            :url url}})]}])
-       (when login-error
-         [{:fx/type :label
-           :text (str " " login-error)
-           :style {:-fx-text-fill "red"}}])
        [{:fx/type :h-box
          :alignment :center-left
          :children
@@ -298,8 +294,17 @@
                              :path [:servers server-url :spring-isolation-dir]}
                  :graphic
                  {:fx/type font-icon/lifecycle
-                  :icon-literal "mdi-file-find:20"}}])}]})
-        {:fx/type :h-box
+                  :icon-literal "mdi-file-find:20"}}])}]})]
+       (when login-error
+         [{:fx/type :label
+           :style {:-fx-font-size 24}
+           :text "Error:"}
+          {:fx/type :text-area
+           :editable false
+           :text (str (string/trim login-error))
+           :pref-row-count 3
+           :style {:-fx-text-fill "red"}}])
+       [{:fx/type :h-box
          :spacing 10
          :children
          (concat

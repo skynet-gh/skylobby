@@ -2828,17 +2828,18 @@
 (defn- update-disconnected!
   ([state-atom server-key]
    (update-disconnected! state-atom server-key nil))
-  ([state-atom server-key {:keys [user-requested]}]
+  ([state-atom server-key {:keys [error-message user-requested]}]
    (log/info "Disconnecting from" (pr-str server-key))
    (let [[old-state _new-state] (swap-vals! state-atom
                                   (fn [state]
                                     (let [normal-logout (get-in state [:normal-logout server-key])]
-                                      (cond-> (update state :by-server dissoc server-key)
-                                              true
-                                              (update :needs-focus dissoc server-key)
+                                      (cond-> (-> state
+                                                  (update :by-server dissoc server-key)
+                                                  (update :needs-focus dissoc server-key)
+                                                  (update :needs-focus dissoc server-key))
                                               (and (not normal-logout)
                                                    (not user-requested))
-                                              (assoc-in [:login-error server-key] "Connection lost")
+                                              (update-in [:login-error server-key] str "\n" (or error-message "Connection lost"))
                                               user-requested
                                               (assoc-in [:normal-logout server-key] true)))))
          {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
@@ -2884,11 +2885,11 @@
           (s/on-closed client
             (fn []
               (log/info "client closed")
-              (update-disconnected! *state server-key)))
+              (update-disconnected! *state server-key {:error-message "Connection closed"})))
           (s/on-drained client
             (fn []
               (log/info "client drained")
-              (update-disconnected! *state server-key)))
+              (update-disconnected! *state server-key {:error-message "Connection drained"})))
           (if (s/closed? client)
             (log/warn "client was closed on create")
             (let [[server-url _server-data] server
@@ -2902,7 +2903,7 @@
               (client/connect state-atom (assoc state :client-data client-data)))))
         (catch Exception e
           (log/error e "Connect error")
-          (swap! state-atom assoc-in [:login-error server-key] (str (.getMessage e)))
+          (swap! state-atom update-in [:login-error server-key] str "\nException: " (.getMessage e))
           (update-disconnected! *state server-key)))
       nil)))
 
@@ -2924,6 +2925,8 @@
                          (update-in [:by-server server-key]
                            assoc :client-data client-data
                                  :server server)
+                         true
+                         (update :login-error dissoc server-key)
                          (not no-focus)
                          (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))

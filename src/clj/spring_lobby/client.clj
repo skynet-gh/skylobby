@@ -231,7 +231,7 @@
                            (when-let [d (try
                                           (s/take! client)
                                           (catch java.nio.charset.MalformedInputException e
-                                            (swap! state-atom assoc-in [:login-error server-key] "Character encoding error")
+                                            (swap! state-atom update-in [:login-error server-key] str "\nCharacter encoding error")
                                             (log/error e "Encoding error")))]
                              (when-let [m @d]
                                (log/info (str "[" server-key "]") "<" (str "'" m "'"))
@@ -346,7 +346,7 @@
                       (fn [state]
                         (-> state
                             (update-in [:by-server server-key] dissoc :accepted :client-data)
-                            (assoc-in [:login-error server-key] m))))
+                            (update-in [:login-error server-key] str "\nDENIED: " m))))
         client-data (-> old-state :by-server (get server-key) :client-data)]
     (disconnect state-atom client-data)))
 
@@ -364,7 +364,7 @@
                                  (fn [state]
                                     (-> state
                                         (update-in [:by-server server-key] dissoc :accepted :client-data)
-                                        (assoc-in [:login-error server-key] msg))))
+                                        (update-in [:login-error server-key] str "\nDENIED: " msg))))
                   client-data (-> old-state :by-server (get server-key) :client-data)]
               (disconnect state-atom client-data))
             nil))))))
