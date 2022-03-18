@@ -8,14 +8,11 @@
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.import :as fx.import]
-    [skylobby.fx.replay :as fx.replay]
+    [skylobby.fx.sub :as sub]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
     [spring-lobby.sound :as sound]
-    [taoensso.timbre :as log]
-    [taoensso.tufte :as tufte])
-  (:import
-    (java.nio.file Paths)))
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -279,7 +276,6 @@
         extra-replay-name (fx/sub-val context :extra-replay-name)
         extra-replay-path (fx/sub-val context :extra-replay-path)
         extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
-        extra-replay-sources (fx/sub-val context :extra-replay-sources)
         focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
         hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
@@ -295,12 +291,12 @@
         music-volume (fx/sub-val context :music-volume)
         players-table-columns (fx/sub-val context :players-table-columns)
         prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
+        replay-source-enabled (fx/sub-val context :replay-source-enabled)
+        replay-sources (fx/sub-ctx context sub/replay-sources)
         ring-sound-file (fx/sub-val context :ring-sound-file)
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
-        spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
-        spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -363,87 +359,28 @@
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :show-battle-preview}}
              {:fx/type :label
-              :text " Preview battles on click"}]}]}
+              :text " Preview battles on click"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-git-mod-version)
+              :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}
+             {:fx/type :label
+              :text " Use git to version .sdd games"}]}]}
          {:fx/type filterable-section
           :search settings-search
-          :title "Default Spring Dir"
+          :title "Spring"
           :children
-          (concat
-            [
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [
-               {:fx/type :text-field
-                :text (str
-                        (or
-                          spring-isolation-dir-draft
-                          (fs/canonical-path spring-isolation-dir)
-                          spring-isolation-dir))
-                :style {:-fx-pref-width 480
-                        :-fx-max-width 500}
-                :on-text-changed {:event/type :spring-lobby/assoc
-                                  :key :spring-isolation-dir-draft}}
-               {:fx/type :button
-                :style-class ["button" "skylobby-normal"]
-                :on-action {:event/type :spring-lobby/file-chooser-dir
-                            :initial-dir spring-isolation-dir
-                            :path [:spring-isolation-dir]}
-                :text ""
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-file-find:16"}}]}]
-            (when spring-isolation-dir-draft
-              (let [valid (try
-                            (and (not (string/blank? spring-isolation-dir-draft))
-                                 (Paths/get (some-> spring-isolation-dir-draft str fs/file .toURI)))
-                            (catch Exception e
-                              (log/trace e "Invalid spring path" spring-isolation-dir-draft)))]
-                [{:fx/type :h-box
-                  :children
-                  [
-                   {:fx/type :button
-                    :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
-                    :disable (boolean (not valid))
-                    :text (if valid
-                            "Save new spring dir"
-                            "Invalid spring dir")
-                    :graphic
-                    {:fx/type font-icon/lifecycle
-                     :icon-literal "mdi-content-save:16:white"}}
-                   {:fx/type :button
-                    :on-action {:event/type :spring-lobby/dissoc
-                                :key :spring-isolation-dir-draft}
-                    :text "Cancel"}]}]))
-            [{:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :label
-                :text " Preset: "}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/default-spring-root)}
-                :text "Skylobby"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/bar-root)}
-                :text "Beyond All Reason"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/spring-root)}
-                :text "Spring"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean use-git-mod-version)
-                :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}
-               {:fx/type :label
-                :text " Use git to version .sdd games"}]}])}
+          [
+           {:fx/type :button
+            :style-class ["button" "skylobby-normal"]
+            :style {:-fx-font-size 18}
+            :text "Configure Spring directory"
+            :on-action {:event/type :spring-lobby/toggle-window
+                        :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                        :key :show-spring-picker}}]}
          (let [
                starting (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/start-ipc-server))
                stopping (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/stop-ipc-server))
@@ -659,7 +596,7 @@
                                   :key :extra-import-path}}]}]}
          {:fx/type filterable-section
           :search settings-search
-          :title " Replay Sources"
+          :title " Replays"
           :children
           [
              {:fx/type :h-box
@@ -682,6 +619,29 @@
                                       :key :refresh-replays-after-game}}
                {:fx/type :label
                 :text " Refresh replays after game"}]}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Replay sources from Spring roots:"}
+             {:fx/type :v-box
+              :children
+              (map
+                (fn [{:keys [file]}]
+                  (let [path (fs/canonical-path file)]
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     [{:fx/type :check-box
+                       :on-action {:event/type :spring-lobby/assoc-in
+                                   :path [:replay-source-enabled path]}
+                       :selected (or (not (contains? replay-source-enabled path))
+                                     (get replay-source-enabled path))}
+                      {:fx/type :label
+                       :text (str " " path)
+                       :style {:-fx-font-size 18}}]}))
+                (filter :builtin replay-sources))}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Custom replay sources:"}
              {:fx/type :v-box
               :children
               (map
@@ -713,7 +673,10 @@
                       {:fx/type :label
                        :text (str " " (fs/canonical-path file))
                        :style {:-fx-font-size 14}}]}]})
-                (fx.replay/replay-sources {:extra-replay-sources extra-replay-sources}))}
+                (remove :builtin replay-sources))}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Add replay source:"}
              {:fx/type :h-box
               :alignment :center-left
               :children
@@ -726,10 +689,20 @@
                             :extra-replay-path extra-replay-path
                             :extra-replay-name extra-replay-name
                             :extra-replay-recursive extra-replay-recursive}
-                :text ""
+                :text (cond
+                        (string/blank? extra-replay-path)
+                        "Set replay sourcce path"
+                        (string/blank? extra-replay-name)
+                        "Set replay sourcce name"
+                        :else
+                        "Add replay source")
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-plus:16"}}
+                 :icon-literal "mdi-plus:16"}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
                {:fx/type :label
                 :text " Name: "}
                {:fx/type :text-field
@@ -746,6 +719,20 @@
                 :text (str extra-replay-path)
                 :on-text-changed {:event/type :spring-lobby/assoc
                                   :key :extra-replay-path}}
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :on-action {:event/type :spring-lobby/file-chooser-dir
+                            :as-path true
+                            :initial-dir extra-replay-path
+                            :path [:extra-replay-path]}
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-file-find:16"}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
                {:fx/type :label
                 :text " Recursive: "}
                {:fx/type :check-box

@@ -46,12 +46,6 @@
 (def replays-window-height 1200)
 
 
-(defn replay-sources [{:keys [extra-replay-sources]}]
-  (concat
-    (fs/builtin-replay-sources)
-    extra-replay-sources))
-
-
 (defn- min-skill [coll]
   (when (seq coll)
     (reduce min Long/MAX_VALUE coll)))
@@ -1153,7 +1147,12 @@
                          sort)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
         refresh-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-replays)
-        sources (replay-sources {:extra-replay-sources extra-replay-sources})]
+        servers (fx/sub-ctx context :servers)
+        spring-isolation-dir (fx/sub-ctx context :spring-isolation-dir)
+        sources (fs/replay-sources
+                  {:extra-replay-sources extra-replay-sources
+                   :servers servers
+                   :spring-isolation-dir spring-isolation-dir})]
     {:fx/type :v-box
      :style {:-fx-font-size 14}
      :children

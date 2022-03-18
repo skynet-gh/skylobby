@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     [clojure.edn :as edn]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [spring-lobby.spring :as spring]
@@ -127,3 +128,13 @@
           (catch Exception e
             (log/debug e "Error parsing selected server tab edn")))
         selected-server-tab)))
+
+(defn replay-sources [context]
+  (let [
+        extra-replay-sources (fx/sub-val context :extra-replay-sources)
+        servers (fx/sub-val context :servers)
+        spring-isolation-dir (fx/sub-val context :spring-isolation-dir)]
+    (fs/replay-sources
+      {:extra-replay-sources extra-replay-sources
+       :servers servers
+       :spring-isolation-dir spring-isolation-dir})))
