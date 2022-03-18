@@ -1357,7 +1357,7 @@
                                                    (mapcat identity (:replay-allyteam-player-names replay))
                                                    (when replays-filter-specs
                                                      (:replay-spec-names replay)))
-                                         players (map u/sanitize-filter players)]
+                                         players-sanitized (map u/sanitize-filter players)]
                                      (every?
                                        (some-fn
                                          (partial includes-term? (:replay-id replay))
@@ -1366,7 +1366,8 @@
                                          (partial includes-term? (:replay-engine-version replay))
                                          (partial includes-term? (:replay-mod-name replay))
                                          (partial includes-term? (:replay-map-name replay))
-                                         (fn [term] (some #(includes-term? % term) players)))
+                                         (fn [term] (some #(includes-term? % term) players))
+                                         (fn [term] (some #(includes-term? % term) players-sanitized)))
                                        filter-terms)))))
                              doall)
                 replays (if replays-window-dedupe
