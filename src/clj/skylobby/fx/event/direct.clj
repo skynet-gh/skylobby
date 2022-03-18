@@ -43,7 +43,11 @@
                            :server-close-fn server-close-fn
                            :username direct-connect-username}]
           (if server-close-fn
-            (swap! state-atom update-in [:by-server server-key] merge server-data)
+            (swap! state-atom
+              (fn [state]
+                (-> state
+                    (update-in [:by-server server-key] merge server-data)
+                    (assoc :selected-server-tab (str server-key)))))
             (swap! state-atom update :by-server dissoc server-key)))
         (catch Exception e
           (log/error e "Error starting direct connect server")))))
@@ -82,6 +86,10 @@
                     :client client
                     :client-close-fn client-close-fn
                     :username direct-connect-username}]
-          (swap! state-atom assoc-in [:by-server server-key] data))
+          (swap! state-atom
+            (fn [state]
+              (-> state
+                  (assoc-in [:by-server server-key] data)
+                  (assoc :selected-server-tab (str server-key))))))
         (catch Exception e
           (log/error e "Error joining direct connect"))))))
