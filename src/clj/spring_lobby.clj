@@ -35,6 +35,7 @@
     [skylobby.fx.event.battle :as fx.event.battle]
     [skylobby.fx.event.chat :as fx.event.chat]
     [skylobby.fx.event.direct :as fx.event.direct]
+    [skylobby.fx.event.minimap :as fx.event.minimap]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.git :as git]
@@ -3643,7 +3644,9 @@
                                      (< (- y close-size) ey (+ y close-size)))
                                allyteam))))
                        start-boxes)]
-          (when target (log/info "Mousedown on close button for box" target))
+          (if target
+            (log/info "Mousedown on close button for box" target)
+            (log/info "Mousedown to start start box for allyteam" allyteam-id))
           (swap! *state assoc :drag-allyteam {:allyteam-id allyteam-id
                                               :startx ex
                                               :starty ey
@@ -5472,6 +5475,7 @@
      (fx.event.battle/add-methods event-handler state-atom)
      (fx.event.chat/add-methods event-handler state-atom)
      (fx.event.direct/add-methods event-handler state-atom)
+     (fx.event.minimap/add-methods event-handler state-atom)
      (catch Exception e
        (log/error e "Error adding event handler methods")))
    (log/info "Initializing periodic jobs")

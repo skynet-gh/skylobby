@@ -172,6 +172,7 @@
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         startpostype (spring/startpostype-name (get-in scripttags ["game" "startpostype"]))
         singleplayer (= server-key :local)
+        direct-connect (#{:direct-client :direct-host} (u/server-type server-key))
         cached-minimap-updated (fx/sub-val context get-in [:cached-minimap-updated (fs/canonical-path (:file map-details))])]
     {:fx/type :stack-pane
      :style
@@ -213,7 +214,9 @@
                               :starting-points starting-points
                               :start-boxes start-boxes}
            :on-mouse-dragged {:event/type :spring-lobby/minimap-mouse-dragged}
-           :on-mouse-released {:event/type :spring-lobby/minimap-mouse-released
+           :on-mouse-released {:event/type (if direct-connect
+                                             :skylobby.fx.event.minimap/mouse-released
+                                             :spring-lobby/minimap-mouse-released)
                                :am-host am-host
                                :am-spec am-spec
                                :channel-name channel-name
@@ -222,6 +225,7 @@
                                :minimap-scale minimap-scale
                                :minimap-width minimap-width
                                :minimap-height minimap-height
+                               :server-key server-key
                                :singleplayer singleplayer}})
         {:fx/type :canvas
          :width (int (* minimap-scale minimap-width))
