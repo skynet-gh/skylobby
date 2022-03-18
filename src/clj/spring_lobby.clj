@@ -5593,6 +5593,22 @@
       (catch Exception e
         (log/error e "Error connecting to auto servers")))))
 
+(defmethod event-handler ::check-public-ip [_]
+  (swap! *state dissoc :direct-connect-public-ip)
+  (future
+    (try
+      (let [result (clj-http/get "https://icanhazip.com/")
+            ip (string/trim (str (:body result)))]
+        (swap! *state assoc :direct-connect-public-ip ip))
+      (catch Exception e
+        (log/error e "Error getting public IP from icanhazip, falling back on api.ipify.org")
+        (try
+          (let [result (clj-http/get "http://api.ipify.org/")
+                ip (string/trim (str (:body result)))]
+            (swap! *state assoc :direct-connect-public-ip ip))
+          (catch Exception e
+            (log/error e "Error getting public IP from api.ipify.org")))))))
+
 
 (defn init-async [state-atom]
   (future

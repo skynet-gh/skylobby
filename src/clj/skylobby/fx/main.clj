@@ -37,6 +37,7 @@
                                       u/default-server-port))
         direct-connect-username (fx/sub-val context :direct-connect-username)
         direct-connect-password (fx/sub-val context :direct-connect-password)
+        direct-connect-public-ip (fx/sub-val context :direct-connect-public-ip)
         server-keys (set (fx/sub-val context u/complex-server-keys))
         server-key {:server-type :direct
                     :protocol :skylobby
@@ -119,7 +120,22 @@
                  :style {:-fx-text-fill "red"}
                  :text (str
                          (when-let [error (:direct-host login-error)]
-                           (str "Error: " error)))}]}}
+                           (str "Error: " error)))}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 (concat
+                   [
+                    {:fx/type :label
+                     :text (str " Public IP: ")}]
+                   (when direct-connect-public-ip
+                     [{:fx/type :text-field
+                       :editable false
+                       :text (str direct-connect-public-ip)}])
+                   [{:fx/type :button
+                     :style-class ["button" "skylobby-normal"]
+                     :text "Check"
+                     :on-action {:event/type :spring-lobby/check-public-ip}}])}]}}
             {:fx/type :tab
              :graphic {:fx/type :label
                        :text "Join"}
