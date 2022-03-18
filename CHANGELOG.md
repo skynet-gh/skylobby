@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.2](https://github.com/skynet-gh/skylobby/releases/tag/0.8.2) - 2022-03-18
+
+- Use spring roots as replay sources
+- Fix replays filter not matching some exact names
+- Add search for checkbox settings by name
+
 ## [0.8.1](https://github.com/skynet-gh/skylobby/releases/tag/0.8.1) - 2022-03-17
 
 - Fix multiple login errors overriding each other
