@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1](https://github.com/skynet-gh/skylobby/releases/tag/0.8.1) - 2022-03-17
+
+- Fix multiple login errors overriding each other
+- Add direct connect start boxes and start points minimap dragging
+- Improve layout of direct connect by splitting into Host and Join tabs
+
 ## [0.8.0](https://github.com/skynet-gh/skylobby/releases/tag/0.8.0) - 2022-02-28
 
 - Add LAN / direct hosting
