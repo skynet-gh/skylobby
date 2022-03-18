@@ -8,14 +8,11 @@
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.import :as fx.import]
-    [skylobby.fx.replay :as fx.replay]
+    [skylobby.fx.sub :as sub]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
     [spring-lobby.sound :as sound]
-    [taoensso.timbre :as log]
-    [taoensso.tufte :as tufte])
-  (:import
-    (java.nio.file Paths)))
+    [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
@@ -40,10 +37,51 @@
    "horizontal"])
 
 
+(defn highlighted-label [{:keys [title search]}]
+  (let [search-lc (if search
+                    (string/lower-case search)
+                    "")
+        title-lc (if title
+                   (string/lower-case title)
+                   "")
+        i (when-not (string/blank? search-lc)
+            (string/index-of title-lc search-lc))]
+    {:fx/type :h-box
+     :children
+     (if i
+       [{:fx/type :label
+         :text (str (subs title 0 i))}
+        {:fx/type :label
+         :text (str (subs title i (+ i (count search-lc))))
+         :style {:-fx-font-weight "bold"}}
+        {:fx/type :label
+         :text (str (subs title (+ i (count search-lc))))}]
+       [{:fx/type :label
+         :text (str title)}])}))
+
+(defn filterable-checkbox-setting [{:keys [check-box search title]}]
+  (let [search-lc (string/lower-case (string/trim (or search "")))
+        title-lc (string/lower-case (or title ""))]
+    (if (string/includes? title-lc search-lc)
+      {:fx/type :h-box
+       :style {:-fx-font-size 18}
+       :alignment :center-left
+       :children
+       [check-box
+        {:fx/type highlighted-label
+         :search search
+         :title title}]}
+      {:fx/type :pane})))
+
 (defn filterable-section [{:keys [children search title]}]
   (let [search-lc (string/lower-case (string/trim (or search "")))
-        title-lc (string/lower-case title)]
-    (if (string/includes? title-lc search-lc)
+        title-lc (string/lower-case title)
+        children-titles (->> children
+                             (map :title)
+                             (filter some?)
+                             (map string/lower-case))]
+    (if (or (string/includes? title-lc search-lc)
+            (some #(string/includes? % search-lc) children-titles))
       {:fx/type :v-box
        :pref-width 580
        :min-width 580
@@ -51,21 +89,10 @@
        :children
        (concat
          [
-          (let [i (when-not (string/blank? search-lc)
-                    (string/index-of title-lc search-lc))]
-            {:fx/type :h-box
-             :style {:-fx-font-size 24}
-             :children
-             (if i
-               [{:fx/type :label
-                 :text (str (subs title 0 i))}
-                {:fx/type :label
-                 :text (str (subs title i (+ i (count search-lc))))
-                 :style {:-fx-font-weight "bold"}}
-                {:fx/type :label
-                 :text (str (subs title (+ i (count search-lc))))}]
-               [{:fx/type :label
-                 :text (str title)}])})]
+          {:fx/type highlighted-label
+           :style {:-fx-font-size 24}
+           :search search
+           :title title}]
          children)}
       {:fx/type :pane})))
 
@@ -90,66 +117,54 @@
      :title " Battle"
      :children
      [
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean join-battle-as-player)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :join-battle-as-player}}
-        {:fx/type :label
-         :text " Join battles as a player (not spec)"}]}
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean (fx/sub-val context :battle-as-tab))
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :battle-as-tab}}
-        {:fx/type :label
-         :text " Show battle view as a tab"}]}
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean unready-after-game)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :unready-after-game}}
-        {:fx/type :label
-         :text " Unready after game"}]}
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean ready-on-unspec)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :ready-on-unspec}}
-        {:fx/type :label
-         :text " Ready on unspec"}]}
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean (fx/sub-val context :auto-rejoin-battle))
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :auto-rejoin-battle}}
-        {:fx/type :label
-         :text " Rejoin battle on rehost or reconnect"}]}
-      {:fx/type :h-box
-       :style {:-fx-font-size 18}
-       :children
-       [
-        {:fx/type :check-box
-         :selected (boolean leave-battle-on-close-window)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :leave-battle-on-close-window}}
-        {:fx/type :label
-         :text " Leave battle on close window"}]}
+      {:fx/type filterable-checkbox-setting
+       :title " Join battles as a player (not spec)"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean join-battle-as-player)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :join-battle-as-player}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Show battle view as a tab"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean (fx/sub-val context :battle-as-tab))
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :battle-as-tab}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Unready after game"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean unready-after-game)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :unready-after-game}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Ready on unspec"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean ready-on-unspec)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :ready-on-unspec}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Rejoin battle on rehost or reconnect"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean (fx/sub-val context :auto-rejoin-battle))
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :auto-rejoin-battle}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Leave battle on close window"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean leave-battle-on-close-window)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :leave-battle-on-close-window}}}
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -185,87 +200,78 @@
          :items battle-layouts
          :on-value-changed {:event/type :spring-lobby/assoc
                             :key :battle-layout}}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean (fx/sub-val context :auto-get-resources))
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :auto-get-resources}}
-        {:fx/type :label
-         :text " Auto import or download resources"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean show-accolades)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :show-accolades}}
-        {:fx/type :label
-         :text " Show accolades panel"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean show-team-skills)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :show-team-skills}}
-        {:fx/type :label
-         :text " Show team skills"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean increment-ids)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :increment-ids}}
-        {:fx/type :label
-         :text " Number team and player ids starting at one"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean show-closed-battles)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :show-closed-battles}}
-        {:fx/type :label
-         :text " Show closed battles as tabs"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean ring-when-game-ends)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :ring-when-game-ends}}
-        {:fx/type :label
-         :text " Ring when game ends"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean ring-on-auto-unspec)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :ring-on-auto-unspec}}
-        {:fx/type :label
-         :text " Ring on auto unspec"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean show-hidden-modoptions)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :show-hidden-modoptions}}
-        {:fx/type :label
-         :text " Show hidden modoptions"}]}
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [{:fx/type :check-box
-         :selected (boolean debug-spring)
-         :on-selected-changed {:event/type :spring-lobby/assoc
-                               :key :debug-spring}}
-        {:fx/type :label
-         :text " Debug spring mode (write script and show command)"}]}]}))
+      {:fx/type filterable-checkbox-setting
+       :title " Auto import or download resources"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean (fx/sub-val context :auto-get-resources))
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :auto-get-resources}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Show accolades panel"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean show-accolades)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :show-accolades}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Show team skills"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean show-team-skills)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :show-team-skills}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Number team and player ids starting at one"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean increment-ids)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :increment-ids}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Show closed battles as tabs"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean show-closed-battles)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :show-closed-battles}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Ring when game ends"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean ring-when-game-ends)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :ring-when-game-ends}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Ring on auto unspec"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean ring-on-auto-unspec)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :ring-on-auto-unspec}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Show hidden modoptions"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean show-hidden-modoptions)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :show-hidden-modoptions}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Debug spring mode (write script and show command)"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean debug-spring)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :debug-spring}}}]}))
 
 (defn settings-root
   [{:fx/keys [context]}]
@@ -279,7 +285,6 @@
         extra-replay-name (fx/sub-val context :extra-replay-name)
         extra-replay-path (fx/sub-val context :extra-replay-path)
         extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
-        extra-replay-sources (fx/sub-val context :extra-replay-sources)
         focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
         hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
@@ -295,12 +300,12 @@
         music-volume (fx/sub-val context :music-volume)
         players-table-columns (fx/sub-val context :players-table-columns)
         prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
+        replay-source-enabled (fx/sub-val context :replay-source-enabled)
+        replay-sources (fx/sub-ctx context sub/replay-sources)
         ring-sound-file (fx/sub-val context :ring-sound-file)
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
-        spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
-        spring-isolation-dir-draft (fx/sub-val context :spring-isolation-dir-draft)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -334,116 +339,49 @@
           :title "General"
           :children
           [
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean windows-as-tabs)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :windows-as-tabs}}
-             {:fx/type :label
-              :text " Use tabs instead of some windows"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean battles-table-images)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :battles-table-images}}
-             {:fx/type :label
-              :text " Images view of battles"}]}
-           {:fx/type :h-box
-            :style {:-fx-font-size 18}
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean show-battle-preview)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :show-battle-preview}}
-             {:fx/type :label
-              :text " Preview battles on click"}]}]}
+           {:fx/type filterable-checkbox-setting
+            :title " Use tabs instead of some windows"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean windows-as-tabs)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :windows-as-tabs}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Images view of battles"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean battles-table-images)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :battles-table-images}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Preview battles on click"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean show-battle-preview)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :show-battle-preview}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Use git to version .sdd games"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean use-git-mod-version)
+             :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}]}
          {:fx/type filterable-section
           :search settings-search
-          :title "Default Spring Dir"
+          :title "Spring"
           :children
-          (concat
-            [
-             {:fx/type :h-box
-              :alignment :center-left
-              :children
-              [
-               {:fx/type :text-field
-                :text (str
-                        (or
-                          spring-isolation-dir-draft
-                          (fs/canonical-path spring-isolation-dir)
-                          spring-isolation-dir))
-                :style {:-fx-pref-width 480
-                        :-fx-max-width 500}
-                :on-text-changed {:event/type :spring-lobby/assoc
-                                  :key :spring-isolation-dir-draft}}
-               {:fx/type :button
-                :style-class ["button" "skylobby-normal"]
-                :on-action {:event/type :spring-lobby/file-chooser-dir
-                            :initial-dir spring-isolation-dir
-                            :path [:spring-isolation-dir]}
-                :text ""
-                :graphic
-                {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-file-find:16"}}]}]
-            (when spring-isolation-dir-draft
-              (let [valid (try
-                            (and (not (string/blank? spring-isolation-dir-draft))
-                                 (Paths/get (some-> spring-isolation-dir-draft str fs/file .toURI)))
-                            (catch Exception e
-                              (log/trace e "Invalid spring path" spring-isolation-dir-draft)))]
-                [{:fx/type :h-box
-                  :children
-                  [
-                   {:fx/type :button
-                    :on-action {:event/type :spring-lobby/save-spring-isolation-dir}
-                    :disable (boolean (not valid))
-                    :text (if valid
-                            "Save new spring dir"
-                            "Invalid spring dir")
-                    :graphic
-                    {:fx/type font-icon/lifecycle
-                     :icon-literal "mdi-content-save:16:white"}}
-                   {:fx/type :button
-                    :on-action {:event/type :spring-lobby/dissoc
-                                :key :spring-isolation-dir-draft}
-                    :text "Cancel"}]}]))
-            [{:fx/type :h-box
-              :alignment :center-left
-              :children
-              [{:fx/type :label
-                :text " Preset: "}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/default-spring-root)}
-                :text "Skylobby"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/bar-root)}
-                :text "Beyond All Reason"}
-               {:fx/type :button
-                :on-action {:event/type :spring-lobby/assoc
-                            :key :spring-isolation-dir
-                            :value (fs/spring-root)}
-                :text "Spring"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean use-git-mod-version)
-                :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}
-               {:fx/type :label
-                :text " Use git to version .sdd games"}]}])}
+          [
+           {:fx/type :button
+            :style-class ["button" "skylobby-normal"]
+            :style {:-fx-font-size 18}
+            :text "Configure Spring directory"
+            :on-action {:event/type :spring-lobby/toggle-window
+                        :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                        :key :show-spring-picker}}]}
          (let [
                starting (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/start-ipc-server))
                stopping (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/stop-ipc-server))
@@ -455,16 +393,14 @@
             [
              {:fx/type :label
               :text "HTTP server used for Web UI and replay file association"}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean ipc-server-enabled)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :ipc-server-enabled}}
-               {:fx/type :label
-                :text " Run server on start"}]}
+             {:fx/type filterable-checkbox-setting
+              :title " Run server on start"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean ipc-server-enabled)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :ipc-server-enabled}}}
              {:fx/type :h-box
               :alignment :center-left
               :children
@@ -511,62 +447,54 @@
           :title " Chat"
           :children
           [
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [{:fx/type :check-box
-                :selected (boolean chat-auto-complete)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :chat-auto-complete}}
-               {:fx/type :label
-                :text " Auto complete suggestions"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [{:fx/type :check-box
-                :selected (boolean focus-chat-on-message)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :focus-chat-on-message}}
-               {:fx/type :label
-                :text " Focus chat on incoming message"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [{:fx/type :check-box
-                :selected (boolean highlight-tabs-with-new-chat-messages)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :highlight-tabs-with-new-chat-messages}}
-               {:fx/type :label
-                :text " Highlight tabs with new chat messages"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [{:fx/type :check-box
-                :selected (boolean highlight-tabs-with-new-battle-messages)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :highlight-tabs-with-new-battle-messages}}
-               {:fx/type :label
-                :text " Highlight tabs with new battle messages"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :chat-color-username))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :chat-color-username}}
-               {:fx/type :label
-                :text " Color my username"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :chat-highlight-username))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :chat-highlight-username}}
-               {:fx/type :label
-                :text " Highlight my username in messages"}]}
+             {:fx/type filterable-checkbox-setting
+              :title " Auto complete suggestions"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean chat-auto-complete)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :chat-auto-complete}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Focus chat on incoming message"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean focus-chat-on-message)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :focus-chat-on-message}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Highlight tabs with new chat messages"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean highlight-tabs-with-new-chat-messages)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :highlight-tabs-with-new-chat-messages}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Highlight tabs with new battle messages"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean highlight-tabs-with-new-battle-messages)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :highlight-tabs-with-new-battle-messages}}}
+             {:fx/type filterable-checkbox-setting
+              :text " Color my username"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :chat-color-username))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :chat-color-username}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Highlight my username in messages"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :chat-highlight-username))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :chat-highlight-username}}}
              {:fx/type :label
               :text "Highlight words (comma or space separated): "}
              {:fx/type :text-field
@@ -582,26 +510,22 @@
           :title " Performance"
           :children
           [
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :disable-tasks))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :disable-tasks}}
-               {:fx/type :label
-                :text " Disable tasks"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :disable-tasks-while-in-game))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :disable-tasks-while-in-game}}
-               {:fx/type :label
-                :text " Disable tasks while in game"}]}]}
+           {:fx/type filterable-checkbox-setting
+            :title " Disable tasks"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :disable-tasks))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :disable-tasks}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Disable tasks while in game"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :disable-tasks-while-in-game))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :disable-tasks-while-in-game}}}]}
          {:fx/type filterable-section
           :search settings-search
           :title " Import Sources"
@@ -659,29 +583,48 @@
                                   :key :extra-import-path}}]}]}
          {:fx/type filterable-section
           :search settings-search
-          :title " Replay Sources"
+          :title " Replays"
           :children
           [
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
+             {:fx/type filterable-checkbox-setting
+              :title " Auto refresh replays"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :auto-refresh-replays))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :auto-refresh-replays}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Refresh replays after game"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :refresh-replays-after-game))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :refresh-replays-after-game}}}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Replay sources from Spring roots:"}
+             {:fx/type :v-box
               :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :auto-refresh-replays))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :auto-refresh-replays}}
-               {:fx/type :label
-                :text " Auto refresh replays"}]}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean (fx/sub-val context :refresh-replays-after-game))
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :refresh-replays-after-game}}
-               {:fx/type :label
-                :text " Refresh replays after game"}]}
+              (map
+                (fn [{:keys [file]}]
+                  (let [path (fs/canonical-path file)]
+                    {:fx/type :h-box
+                     :alignment :center-left
+                     :children
+                     [{:fx/type :check-box
+                       :on-action {:event/type :spring-lobby/assoc-in
+                                   :path [:replay-source-enabled path]}
+                       :selected (or (not (contains? replay-source-enabled path))
+                                     (get replay-source-enabled path))}
+                      {:fx/type :label
+                       :text (str " " path)
+                       :style {:-fx-font-size 18}}]}))
+                (filter :builtin replay-sources))}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Custom replay sources:"}
              {:fx/type :v-box
               :children
               (map
@@ -713,7 +656,10 @@
                       {:fx/type :label
                        :text (str " " (fs/canonical-path file))
                        :style {:-fx-font-size 14}}]}]})
-                (fx.replay/replay-sources {:extra-replay-sources extra-replay-sources}))}
+                (remove :builtin replay-sources))}
+             {:fx/type :label
+              :style {:-fx-font-size 20}
+              :text " Add replay source:"}
              {:fx/type :h-box
               :alignment :center-left
               :children
@@ -726,10 +672,20 @@
                             :extra-replay-path extra-replay-path
                             :extra-replay-name extra-replay-name
                             :extra-replay-recursive extra-replay-recursive}
-                :text ""
+                :text (cond
+                        (string/blank? extra-replay-path)
+                        "Set replay sourcce path"
+                        (string/blank? extra-replay-name)
+                        "Set replay sourcce name"
+                        :else
+                        "Add replay source")
                 :graphic
                 {:fx/type font-icon/lifecycle
-                 :icon-literal "mdi-plus:16"}}
+                 :icon-literal "mdi-plus:16"}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
                {:fx/type :label
                 :text " Name: "}
                {:fx/type :text-field
@@ -746,6 +702,20 @@
                 :text (str extra-replay-path)
                 :on-text-changed {:event/type :spring-lobby/assoc
                                   :key :extra-replay-path}}
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :on-action {:event/type :spring-lobby/file-chooser-dir
+                            :as-path true
+                            :initial-dir extra-replay-path
+                            :path [:extra-replay-path]}
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-file-find:16"}}]}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
                {:fx/type :label
                 :text " Recursive: "}
                {:fx/type :check-box
@@ -916,16 +886,14 @@
           :children
           (concat
             [
-               {:fx/type :h-box
-                :style {:-fx-font-size 18}
-                :children
-                [
-                 {:fx/type :check-box
-                  :selected (boolean use-default-ring-sound)
-                  :on-selected-changed {:event/type :spring-lobby/assoc
-                                        :key :use-default-ring-sound}}
-                 {:fx/type :label
-                  :text " Use default ring sound"}]}]
+             {:fx/type filterable-checkbox-setting
+              :title " Use default ring sound"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean use-default-ring-sound)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :use-default-ring-sound}}}]
             (when-not use-default-ring-sound
               [
                {:fx/type :label
@@ -969,16 +937,14 @@
               :text "Test Ring"}
              {:fx/type :pane
               :pref-height 8}
-             {:fx/type :h-box
-              :style {:-fx-font-size 18}
-              :children
-              [
-               {:fx/type :check-box
-                :selected (boolean prevent-non-host-rings)
-                :on-selected-changed {:event/type :spring-lobby/assoc
-                                      :key :prevent-non-host-rings}}
-               {:fx/type :label
-                :text " Prevent rings except from host"}]}])}
+             {:fx/type filterable-checkbox-setting
+              :title " Prevent rings except from host"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean prevent-non-host-rings)
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :prevent-non-host-rings}}}])}
          {:fx/type filterable-section
           :search settings-search
           :title " Music"
@@ -1063,33 +1029,30 @@
           :title " SPADS Messages"
           :children
           [
-           {:fx/type :h-box
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean hide-vote-messages)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :hide-vote-messages}}
-             {:fx/type :label
-              :text " Hide user vote messages"}]}
-           {:fx/type :h-box
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean hide-joinas-spec)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :hide-joinas-spec}}
-             {:fx/type :label
-              :text " Hide \"!joinas spec\" messages"}]}
-           {:fx/type :h-box
-            :children
-            [
-             {:fx/type :check-box
-              :selected (boolean hide-barmanager-messages)
-              :on-selected-changed {:event/type :spring-lobby/assoc
-                                    :key :hide-barmaager-messages}}
-             {:fx/type :label
-              :text " Hide \"BarManager\" messages"}]}
+           {:fx/type filterable-checkbox-setting
+            :title " Hide user vote messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean hide-vote-messages)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :hide-vote-messages}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Hide \"!joinas spec\" messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean hide-joinas-spec)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :hide-joinas-spec}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Hide \"BarManager\" messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean hide-barmanager-messages)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :hide-barmaager-messages}}}
            {:fx/type :label
             :text "Hide message types:"
             :style {:-fx-font-size 20}}

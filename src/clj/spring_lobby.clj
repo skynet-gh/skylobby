@@ -37,7 +37,6 @@
     [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.event.minimap :as fx.event.minimap]
     [skylobby.fx.import :as fx.import]
-    [skylobby.fx.replay :as fx.replay]
     [skylobby.git :as git]
     [skylobby.http :as http]
     [skylobby.rapid :as rapid]
@@ -177,7 +176,7 @@
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game
+   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
    :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
    :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
 
@@ -1357,7 +1356,7 @@
                                                    (mapcat identity (:replay-allyteam-player-names replay))
                                                    (when replays-filter-specs
                                                      (:replay-spec-names replay)))
-                                         players (map u/sanitize-filter players)]
+                                         players-sanitized (map u/sanitize-filter players)]
                                      (every?
                                        (some-fn
                                          (partial includes-term? (:replay-id replay))
@@ -1366,7 +1365,8 @@
                                          (partial includes-term? (:replay-engine-version replay))
                                          (partial includes-term? (:replay-mod-name replay))
                                          (partial includes-term? (:replay-map-name replay))
-                                         (fn [term] (some #(includes-term? % term) players)))
+                                         (fn [term] (some #(includes-term? % term) players))
+                                         (fn [term] (some #(includes-term? % term) players-sanitized)))
                                        filter-terms)))))
                              doall)
                 replays (if replays-window-dedupe
@@ -1505,7 +1505,7 @@
   [state-atom]
   (log/info "Refreshing replays")
   (let [before (u/curr-millis)
-        {:keys [parsed-replays-by-path] :as state} @state-atom
+        {:keys [parsed-replays-by-path replay-sources-enabled] :as state} @state-atom
         all-files (mapcat
                     (fn [{:keys [file recursive replay-source-name]}]
                       (let [files (fs/replay-files file {:recursive recursive})]
@@ -1513,7 +1513,12 @@
                         (map
                           (juxt (constantly replay-source-name) identity)
                           files)))
-                    (fx.replay/replay-sources state))
+                    (filter
+                      (fn [{:keys [file]}]
+                        (let [path (fs/canonical-path file)]
+                          (or (not (contains? replay-sources-enabled path))
+                              (get replay-sources-enabled path))))
+                      (fs/replay-sources state)))
         all-paths (set (map (comp fs/canonical-path second) all-files))
         old-valid-replay? (old-valid-replay-fn all-paths)
         valid-replay? (valid-replay-fn all-paths)
@@ -3384,7 +3389,7 @@
 ; https://github.com/cljfx/cljfx/blob/ec3c34e619b2408026b9f2e2ff8665bebf70bf56/examples/e33_file_chooser.clj
 (defmethod event-handler ::file-chooser-dir
   [{:fx/keys [^Event event]
-    :keys [initial-dir path post-task]}]
+    :keys [as-path initial-dir path post-task]}]
   (try
     (let [^Node node (.getTarget event)
           window (.getWindow (.getScene node))
@@ -3393,7 +3398,10 @@
                     (.setInitialDirectory initial-dir))]
       (when-let [file (.showDialog chooser window)]
         (log/info "Setting spring isolation dir at" path "to" file)
-        (swap! *state assoc-in path file)
+        (let [v (if as-path
+                  (fs/canonical-path file)
+                  file)]
+          (swap! *state assoc-in path v))
         (when post-task
           (task/add-task! *state post-task))))
     (catch Exception e

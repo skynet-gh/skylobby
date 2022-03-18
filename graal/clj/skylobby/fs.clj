@@ -795,6 +795,18 @@
           servers)))))
 
 
+(defn replay-sources [{:keys [extra-replay-sources] :as state}]
+  (let [all-spring-roots (spring-roots state)]
+    (concat
+      (mapv
+        (fn [spring-root]
+          {
+           :file (replays-dir spring-root)
+           :builtin true})
+        all-spring-roots)
+      extra-replay-sources)))
+
+
 ; map
 
 (defn read-zip-smf
