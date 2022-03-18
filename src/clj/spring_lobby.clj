@@ -35,6 +35,7 @@
     [skylobby.fx.event.battle :as fx.event.battle]
     [skylobby.fx.event.chat :as fx.event.chat]
     [skylobby.fx.event.direct :as fx.event.direct]
+    [skylobby.fx.event.minimap :as fx.event.minimap]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.git :as git]
@@ -172,7 +173,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
@@ -2828,17 +2829,18 @@
 (defn- update-disconnected!
   ([state-atom server-key]
    (update-disconnected! state-atom server-key nil))
-  ([state-atom server-key {:keys [user-requested]}]
+  ([state-atom server-key {:keys [error-message user-requested]}]
    (log/info "Disconnecting from" (pr-str server-key))
    (let [[old-state _new-state] (swap-vals! state-atom
                                   (fn [state]
                                     (let [normal-logout (get-in state [:normal-logout server-key])]
-                                      (cond-> (update state :by-server dissoc server-key)
-                                              true
-                                              (update :needs-focus dissoc server-key)
+                                      (cond-> (-> state
+                                                  (update :by-server dissoc server-key)
+                                                  (update :needs-focus dissoc server-key)
+                                                  (update :needs-focus dissoc server-key))
                                               (and (not normal-logout)
                                                    (not user-requested))
-                                              (assoc-in [:login-error server-key] "Connection lost")
+                                              (update-in [:login-error server-key] str "\n" (or error-message "Connection lost"))
                                               user-requested
                                               (assoc-in [:normal-logout server-key] true)))))
          {:keys [client-data ping-loop print-loop]} (-> old-state :by-server (get server-key))]
@@ -2884,11 +2886,11 @@
           (s/on-closed client
             (fn []
               (log/info "client closed")
-              (update-disconnected! *state server-key)))
+              (update-disconnected! *state server-key {:error-message "Connection closed"})))
           (s/on-drained client
             (fn []
               (log/info "client drained")
-              (update-disconnected! *state server-key)))
+              (update-disconnected! *state server-key {:error-message "Connection drained"})))
           (if (s/closed? client)
             (log/warn "client was closed on create")
             (let [[server-url _server-data] server
@@ -2902,7 +2904,7 @@
               (client/connect state-atom (assoc state :client-data client-data)))))
         (catch Exception e
           (log/error e "Connect error")
-          (swap! state-atom assoc-in [:login-error server-key] (str (.getMessage e)))
+          (swap! state-atom update-in [:login-error server-key] str "\nException: " (.getMessage e))
           (update-disconnected! *state server-key)))
       nil)))
 
@@ -2924,6 +2926,8 @@
                          (update-in [:by-server server-key]
                            assoc :client-data client-data
                                  :server server)
+                         true
+                         (update :login-error dissoc server-key)
                          (not no-focus)
                          (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))
@@ -3640,7 +3644,9 @@
                                      (< (- y close-size) ey (+ y close-size)))
                                allyteam))))
                        start-boxes)]
-          (when target (log/info "Mousedown on close button for box" target))
+          (if target
+            (log/info "Mousedown on close button for box" target)
+            (log/info "Mousedown to start start box for allyteam" allyteam-id))
           (swap! *state assoc :drag-allyteam {:allyteam-id allyteam-id
                                               :startx ex
                                               :starty ey
@@ -5469,6 +5475,7 @@
      (fx.event.battle/add-methods event-handler state-atom)
      (fx.event.chat/add-methods event-handler state-atom)
      (fx.event.direct/add-methods event-handler state-atom)
+     (fx.event.minimap/add-methods event-handler state-atom)
      (catch Exception e
        (log/error e "Error adding event handler methods")))
    (log/info "Initializing periodic jobs")
@@ -5585,6 +5592,22 @@
       (auto-connect-servers *state)
       (catch Exception e
         (log/error e "Error connecting to auto servers")))))
+
+(defmethod event-handler ::check-public-ip [_]
+  (swap! *state dissoc :direct-connect-public-ip)
+  (future
+    (try
+      (let [result (clj-http/get "https://icanhazip.com/")
+            ip (string/trim (str (:body result)))]
+        (swap! *state assoc :direct-connect-public-ip ip))
+      (catch Exception e
+        (log/error e "Error getting public IP from icanhazip, falling back on api.ipify.org")
+        (try
+          (let [result (clj-http/get "http://api.ipify.org/")
+                ip (string/trim (str (:body result)))]
+            (swap! *state assoc :direct-connect-public-ip ip))
+          (catch Exception e
+            (log/error e "Error getting public IP from api.ipify.org")))))))
 
 
 (defn init-async [state-atom]

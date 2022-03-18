@@ -753,8 +753,8 @@
                    :server-key server-key
                    :singleplayer singleplayer
                    :spring-isolation-dir spring-root})}}]
-             (when (and (or spring-starting 
-                            spring-running) 
+             (when (and (or spring-starting
+                            spring-running)
                         (or singleplayer
                             direct-connect))
                [{:fx/type fx.ext.node/with-tooltip-props
