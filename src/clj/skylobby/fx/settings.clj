@@ -482,7 +482,7 @@
                :on-selected-changed {:event/type :spring-lobby/assoc
                                      :key :highlight-tabs-with-new-battle-messages}}}
              {:fx/type filterable-checkbox-setting
-              :text " Color my username"
+              :title " Color my username"
               :search settings-search
               :check-box
               {:fx/type :check-box
@@ -604,6 +604,14 @@
                :selected (boolean (fx/sub-val context :refresh-replays-after-game))
                :on-selected-changed {:event/type :spring-lobby/assoc
                                      :key :refresh-replays-after-game}}}
+             {:fx/type filterable-checkbox-setting
+              :title " Auto get selected replay resources"
+              :search settings-search
+              :check-box
+              {:fx/type :check-box
+               :selected (boolean (fx/sub-val context :auto-get-replay-resources))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :auto-get-replay-resources}}}
              {:fx/type :label
               :style {:-fx-font-size 20}
               :text " Replay sources from Spring roots:"}

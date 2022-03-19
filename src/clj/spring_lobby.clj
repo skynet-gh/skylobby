@@ -171,7 +171,7 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
    :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
@@ -245,6 +245,7 @@
 (defn initial-state []
   (merge
     {:auto-get-resources true
+     :auto-get-replay-resources true
      :auto-rejoin-battle true
      :battle-as-tab true
      :battle-layout "horizontal"
@@ -580,307 +581,315 @@
              sync-status (get-in server-data [:battle :users username :battle-status :sync])]
          (not= sync-status 1))))
 
+(defn auto-resources-tasks
+  [{:keys [battle-changed engine-version map-name mod-name spring-root]}
+   {:keys [by-spring-root cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path rapid-by-spring-root
+           springfiles-search-results tasks-by-kind]}]
+  (let [
+        spring-root-path (fs/canonical-path spring-root)
+        {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
+        {:keys [engines maps mods]} (get by-spring-root spring-root-path)
+        rapid-data (get rapid-data-by-version mod-name)
+        rapid-id (:id rapid-data)
+        sdp-file (rapid/sdp-file spring-root (rapid/sdp-filename (:hash rapid-data)))
+        sdp-file-exists (fs/exists? sdp-file)
+        all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
+        tasks-by-type (group-by :spring-lobby/task-type all-tasks)
+        rapid-task (->> all-tasks
+                        (filter (comp #{::rapid-download} ::task-type))
+                        (filter (comp #{rapid-id} :rapid-id))
+                        first)
+        update-rapid-task (->> all-tasks
+                               (filter (comp #{::update-rapid ::update-rapid-packages} ::task-type))
+                               first)
+        importables (vals importables-by-path)
+        map-importable (some->> importables
+                                (filter (comp #{::map} :resource-type))
+                                (filter (partial resource/could-be-this-map? map-name))
+                                first)
+        map-import-task (->> all-tasks
+                             (filter (comp #{::import} ::task-type))
+                             (filter (comp (partial resource/same-resource-file? map-importable) :importable))
+                             (remove (partial import-dest-is-source? spring-root))
+                             first)
+        no-map (->> maps
+                    (filter (comp #{map-name} :map-name))
+                    first
+                    not)
+        downloadables (vals downloadables-by-url)
+        map-downloadable (->> downloadables
+                              (filter (comp #{::map} :resource-type))
+                              (filter (partial resource/could-be-this-map? map-name))
+                              first)
+        map-download-task (->> all-tasks
+                               (filter (comp #{::http-downloadable} ::task-type))
+                               (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
+                               first)
+        search-springfiles-map-task (->> all-tasks
+                                         (filter (comp #{::search-springfiles} ::task-type))
+                                         (filter (comp #{map-name} :springname))
+                                         first)
+        download-springfiles-map-task (->> all-tasks
+                                           (filter (comp #{::download-springfiles ::http-downloadable} ::task-type))
+                                           (filter (comp #{map-name} :springname))
+                                           first)
+        engine-details (spring/engine-details engines engine-version)
+        engine-file (:file engine-details)
+        engine-importable (some->> importables
+                                   (filter (comp #{::engine} :resource-type))
+                                   (filter (partial resource/could-be-this-engine? engine-version))
+                                   (remove (partial import-dest-is-source? spring-root))
+                                   first)
+        engine-import-task (->> all-tasks
+                                (filter (comp #{::import} ::task-type))
+                                (filter (comp (partial resource/same-resource-file? engine-importable) :importable))
+                                first)
+        engine-downloadable (->> downloadables
+                                 (filter (comp #{::engine} :resource-type))
+                                 (filter (partial resource/could-be-this-engine? engine-version))
+                                 first)
+        engine-download-dest (resource/resource-dest spring-root engine-downloadable)
+        engine-extract-dest (when engine-download-dest
+                              (fs/file spring-root "engine" (fs/filename engine-download-dest)))
+        engine-download-task (->> all-tasks
+                                  (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
+                                  (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
+                                  first)
+        engine-extract-task (->> all-tasks
+                                 (filter (comp #{::extract-7z} ::task-type))
+                                 (filter (comp (partial resource/same-resource-filename? engine-downloadable) fs/filename :file))
+                                 first)
+        mod-downloadable (->> downloadables
+                              (filter (comp #{::mod} :resource-type))
+                              (filter (partial resource/could-be-this-mod? mod-name))
+                              first)
+        mod-download-task (->> all-tasks
+                               (filter (comp #{::http-downloadable} ::task-type))
+                               (filter (comp (partial resource/same-resource-filename? mod-downloadable) :downloadable))
+                               first)
+        mod-refresh-tasks (->> all-tasks
+                               (filter (comp #{::refresh-mods} ::task-type))
+                               (map (comp fs/canonical-path :spring-root))
+                               set)
+        engine-refresh-tasks (->> all-tasks
+                                  (filter (comp #{::refresh-engines} ::task-type))
+                                  (map (comp fs/canonical-path :spring-root))
+                                  set)
+        no-mod (->> mods
+                    (filter (comp #{mod-name} :mod-name))
+                    first
+                    not)
+        springfiles-search-result (get springfiles-search-results map-name)
+        springfiles-url (springfiles-url springfiles-search-result)
+        download-source-tasks (->> all-tasks
+                                   (filter (comp #{::update-downloadables}))
+                                   (map :download-source-name)
+                                   set)
+        engine-download-source-name (fx.engine-sync/engine-download-source engine-version)
+        tasks [(when
+                 (not engine-details)
+                 (cond
+                   (and engine-importable
+                        (not engine-import-task)
+                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-importable))))
+                   (do
+                     (log/info "Adding task to auto import engine" engine-importable)
+                     {::task-type ::import
+                      :importable engine-importable
+                      :spring-isolation-dir spring-root})
+                   (and (not engine-importable)
+                        engine-downloadable
+                        (not engine-download-task)
+                        (not (fs/file-exists? file-cache engine-download-dest)))
+                   (do
+                     (log/info "Adding task to auto download engine" engine-downloadable)
+                     {::task-type ::download-and-extract
+                      :downloadable engine-downloadable
+                      :spring-isolation-dir spring-root})
+                   (and (not engine-importable)
+                        engine-downloadable
+                        (not engine-download-task)
+                        (fs/file-exists? file-cache engine-download-dest)
+                        (not engine-extract-task)
+                        (not (fs/file-exists? file-cache engine-extract-dest)))
+                   (do
+                     (log/info "Adding task to extract engine archive" engine-download-dest)
+                     {::task-type ::extract-7z
+                      :file engine-download-dest
+                      :dest engine-extract-dest})
+                   (and (not engine-importable)
+                        (not engine-downloadable)
+                        engine-download-source-name
+                        (check-cooldown cooldowns [:download-source engine-download-source-name])
+                        (not (contains? download-source-tasks engine-download-source-name)))
+                   (do
+                     (log/info "Adding task to update download source" engine-download-source-name "looking for" engine-version)
+                     (merge
+                       {::task-type :spring-lobby/update-downloadables
+                        :force true}
+                       (get download-sources-by-name engine-download-source-name)))
+                   (and (not (contains? engine-refresh-tasks spring-root-path))
+                        (fs/file-exists? file-cache engine-extract-dest))
+                   (do
+                     (log/info "Refreshing engines to pick up" engine-extract-dest)
+                     {::task-type ::refresh-engines
+                      :force true
+                      :priorites [engine-extract-dest]
+                      :spring-root spring-root})
+                   :else
+                   (when engine-version
+                     (log/info "Nothing to do to auto get engine" engine-version
+                       (with-out-str
+                         (pprint
+                           {:importable engine-importable
+                            :downloadable engine-downloadable
+                            :download-source-name engine-download-source-name
+                            :download-task engine-download-task
+                            :spring-root spring-root}))))))
+               (when
+                 no-map
+                 (cond
+                   (and map-importable
+                        (not map-import-task)
+                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-importable))))
+                   (do
+                     (log/info "Adding task to auto import map" map-importable)
+                     {::task-type ::import
+                      :importable map-importable
+                      :spring-isolation-dir spring-root})
+                   (and (not map-importable)
+                        map-downloadable
+                        (not map-download-task)
+                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-downloadable))))
+                   (do
+                     (log/info "Adding task to auto download map" map-downloadable)
+                     {::task-type ::http-downloadable
+                      :downloadable map-downloadable
+                      :spring-isolation-dir spring-root})
+                   (and map-name
+                        (not map-importable)
+                        (not map-downloadable)
+                        (not (contains? springfiles-search-results map-name))
+                        (not search-springfiles-map-task))
+                   (do
+                     (log/info "Adding task to search springfiles for map" map-name)
+                     {::task-type ::search-springfiles
+                      :springname map-name
+                      :resource-type ::map
+                      :spring-isolation-dir spring-root})
+                   (and map-name
+                        (not map-importable)
+                        (not map-downloadable)
+                        springfiles-search-result
+                        ((fnil < 0) (:tries (get http-download springfiles-url)) resource/max-tries)
+                        (not download-springfiles-map-task)
+                        (not (::refresh-maps tasks-by-type)))
+                   (do
+                     (log/info "Adding task to download map" map-name "from springfiles")
+                     {::task-type ::download-springfiles
+                      :resource-type ::map
+                      :springname map-name
+                      :search-result (get springfiles-search-results map-name)
+                      :spring-isolation-dir spring-root})
+                   :else
+                   (when map-name
+                     (log/info "Nothing to do to auto get map" map-name))))
+               (when
+                 no-mod
+                 (cond
+                   (and rapid-id
+                        (not rapid-task)
+                        (not update-rapid-task)
+                        (not (contains? mod-refresh-tasks spring-root-path))
+                        engine-file
+                        sdp-file-exists)
+                   (do
+                     (log/info "Refreshing mods to pick up" sdp-file)
+                     {::task-type ::refresh-mods
+                      :delete-invalid-sdp true
+                      :priorites [sdp-file]
+                      :spring-root spring-root})
+                   (and rapid-id
+                        (not rapid-task)
+                        (not update-rapid-task)
+                        engine-file
+                        (not sdp-file-exists)
+                        (check-cooldown cooldowns [:rapid spring-root-path rapid-id]))
+                   (do
+                     (log/info "Adding task to auto download rapid" rapid-id)
+                     {::task-type ::rapid-download
+                      :engine-file engine-file
+                      :rapid-id rapid-id
+                      :spring-isolation-dir spring-root})
+                   (and (not rapid-id)
+                        mod-downloadable
+                        (not mod-download-task)
+                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root mod-downloadable))))
+                   (do
+                     (log/info "Adding task to auto download mod" mod-downloadable)
+                     {::task-type ::http-downloadable
+                      :downloadable mod-downloadable
+                      :spring-isolation-dir spring-root})
+                   (and (not rapid-id)
+                        (not rapid-task)
+                        engine-file
+                        (not update-rapid-task)
+                        (not (string/blank? mod-name))
+                        (check-cooldown cooldowns [:update-rapid spring-root-path]))
+                   (do
+                     (log/info "Adding task to update rapid looking for" mod-name)
+                     {::task-type ::update-rapid
+                      :engine-version engine-version
+                      :mod-name mod-name
+                      :spring-isolation-dir spring-root})
+                   :else
+                   (when mod-name
+                     (log/info "Nothing to do to auto get game" mod-name
+                       (with-out-str
+                         (pprint
+                           {:downloadable mod-downloadable
+                            :download-task mod-download-task
+                            :engine-file engine-file
+                            :refresh-tasks mod-refresh-tasks
+                            :rapid-data rapid-data
+                            :sdp-file sdp-file
+                            :sdp-file-exists sdp-file-exists
+                            :spring-root spring-root}))))))
+               (when
+                 (and no-mod
+                      (not rapid-id)
+                      (not rapid-task)
+                      (not update-rapid-task)
+                      battle-changed)
+                      ; ^ only do when first joining a battle
+                 (log/info "Adding task to update rapid looking for" mod-name)
+                 {::task-type ::update-rapid
+                  :engine-version engine-version
+                  :mod-name mod-name
+                  :spring-isolation-dir spring-root})]]
+    (filter some? tasks)))
+
 (defn server-auto-resources [server-key _old-state new-state old-server new-server]
   (when (:auto-get-resources new-state)
     (try
-      (when #_(or (not= (auto-get-resources-server-relevant-keys old-server)
-                        (auto-get-resources-server-relevant-keys new-server)))
-            (server-needs-battle-status-sync-check new-server)
+      (when (server-needs-battle-status-sync-check new-server)
         (log/info "Auto getting resources for" server-key)
-        (let [{:keys [cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path
-                      rapid-by-spring-root servers spring-isolation-dir springfiles-search-results tasks-by-kind]} new-state
+        (let [{:keys [
+                      servers spring-isolation-dir]} new-state
               {:keys [battle battles client-data]} new-server
               server-url (:server-url client-data)
               spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                               spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
-              {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
-              {:keys [engines maps mods]} (-> new-state :by-spring-root (get spring-root-path))
-              old-battle-details (-> old-server :battles (get (-> old-server :battle :battle-id)))
               {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
-              rapid-data (get rapid-data-by-version battle-modname)
-              rapid-id (:id rapid-data)
-              sdp-file (rapid/sdp-file spring-root (rapid/sdp-filename (:hash rapid-data)))
-              sdp-file-exists (fs/exists? sdp-file)
-              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
-              tasks-by-type (group-by :spring-lobby/task-type all-tasks)
-              rapid-task (->> all-tasks
-                              (filter (comp #{::rapid-download} ::task-type))
-                              (filter (comp #{rapid-id} :rapid-id))
-                              first)
-              update-rapid-task (->> all-tasks
-                                     (filter (comp #{::update-rapid ::update-rapid-packages} ::task-type))
-                                     first)
-              importables (vals importables-by-path)
-              map-importable (some->> importables
-                                      (filter (comp #{::map} :resource-type))
-                                      (filter (partial resource/could-be-this-map? battle-map))
-                                      first)
-              map-import-task (->> all-tasks
-                                   (filter (comp #{::import} ::task-type))
-                                   (filter (comp (partial resource/same-resource-file? map-importable) :importable))
-                                   (remove (partial import-dest-is-source? spring-root))
-                                   first)
-              no-map (->> maps
-                          (filter (comp #{battle-map} :map-name))
-                          first
-                          not)
-              downloadables (vals downloadables-by-url)
-              map-downloadable (->> downloadables
-                                    (filter (comp #{::map} :resource-type))
-                                    (filter (partial resource/could-be-this-map? battle-map))
-                                    first)
-              map-download-task (->> all-tasks
-                                     (filter (comp #{::http-downloadable} ::task-type))
-                                     (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
-                                     first)
-              search-springfiles-map-task (->> all-tasks
-                                               (filter (comp #{::search-springfiles} ::task-type))
-                                               (filter (comp #{battle-map} :springname))
-                                               first)
-              download-springfiles-map-task (->> all-tasks
-                                                 (filter (comp #{::download-springfiles ::http-downloadable} ::task-type))
-                                                 (filter (comp #{battle-map} :springname))
-                                                 first)
-              engine-details (spring/engine-details engines battle-version)
-              engine-file (:file engine-details)
-              engine-importable (some->> importables
-                                         (filter (comp #{::engine} :resource-type))
-                                         (filter (partial resource/could-be-this-engine? battle-version))
-                                         (remove (partial import-dest-is-source? spring-root))
-                                         first)
-              engine-import-task (->> all-tasks
-                                      (filter (comp #{::import} ::task-type))
-                                      (filter (comp (partial resource/same-resource-file? engine-importable) :importable))
-                                      first)
-              engine-downloadable (->> downloadables
-                                       (filter (comp #{::engine} :resource-type))
-                                       (filter (partial resource/could-be-this-engine? battle-version))
-                                       first)
-              engine-download-dest (resource/resource-dest spring-root engine-downloadable)
-              engine-extract-dest (when engine-download-dest
-                                    (fs/file spring-root "engine" (fs/filename engine-download-dest)))
-              engine-download-task (->> all-tasks
-                                        (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
-                                        (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
-                                        first)
-              engine-extract-task (->> all-tasks
-                                       (filter (comp #{::extract-7z} ::task-type))
-                                       (filter (comp (partial resource/same-resource-filename? engine-downloadable) fs/filename :file))
-                                       first)
-              mod-downloadable (->> downloadables
-                                    (filter (comp #{::mod} :resource-type))
-                                    (filter (partial resource/could-be-this-mod? battle-modname))
-                                    first)
-              mod-download-task (->> all-tasks
-                                     (filter (comp #{::http-downloadable} ::task-type))
-                                     (filter (comp (partial resource/same-resource-filename? mod-downloadable) :downloadable))
-                                     first)
-              mod-refresh-tasks (->> all-tasks
-                                     (filter (comp #{::refresh-mods} ::task-type))
-                                     (map (comp fs/canonical-path :spring-root))
-                                     set)
-              engine-refresh-tasks (->> all-tasks
-                                        (filter (comp #{::refresh-engines} ::task-type))
-                                        (map (comp fs/canonical-path :spring-root))
-                                        set)
-              no-mod (->> mods
-                          (filter (comp #{battle-modname} :mod-name))
-                          first
-                          not)
-              springfiles-search-result (get springfiles-search-results battle-map)
-              springfiles-url (springfiles-url springfiles-search-result)
-              download-source-tasks (->> all-tasks
-                                         (filter (comp #{::update-downloadables}))
-                                         (map :download-source-name)
-                                         set)
-              engine-download-source-name (fx.engine-sync/engine-download-source battle-version)
-              tasks [(when
-                       (and (= battle-version (:battle-version old-battle-details))
-                            (not engine-details))
-                       (cond
-                         (and engine-importable
-                              (not engine-import-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-importable))))
-                         (do
-                           (log/info "Adding task to auto import engine" engine-importable)
-                           {::task-type ::import
-                            :importable engine-importable
-                            :spring-isolation-dir spring-root})
-                         (and (not engine-importable)
-                              engine-downloadable
-                              (not engine-download-task)
-                              (not (fs/file-exists? file-cache engine-download-dest)))
-                         (do
-                           (log/info "Adding task to auto download engine" engine-downloadable)
-                           {::task-type ::download-and-extract
-                            :downloadable engine-downloadable
-                            :spring-isolation-dir spring-root})
-                         (and (not engine-importable)
-                              engine-downloadable
-                              (not engine-download-task)
-                              (fs/file-exists? file-cache engine-download-dest)
-                              (not engine-extract-task)
-                              (not (fs/file-exists? file-cache engine-extract-dest)))
-                         (do
-                           (log/info "Adding task to extract engine archive" engine-download-dest)
-                           {::task-type ::extract-7z
-                            :file engine-download-dest
-                            :dest engine-extract-dest})
-                         (and (not engine-importable)
-                              (not engine-downloadable)
-                              engine-download-source-name
-                              (check-cooldown cooldowns [:download-source engine-download-source-name])
-                              (not (contains? download-source-tasks engine-download-source-name)))
-                         (do
-                           (log/info "Adding task to update download source" engine-download-source-name "looking for" battle-version)
-                           (merge
-                             {::task-type :spring-lobby/update-downloadables
-                              :force true}
-                             (get download-sources-by-name engine-download-source-name)))
-                         (and (not (contains? engine-refresh-tasks spring-root-path))
-                              (fs/file-exists? file-cache engine-extract-dest))
-                         (do
-                           (log/info "Refreshing engines to pick up" engine-extract-dest)
-                           {::task-type ::refresh-engines
-                            :force true
-                            :priorites [engine-extract-dest]
-                            :spring-root spring-root})
-                         :else
-                         (when battle-version
-                           (log/info "Nothing to do to auto get engine" battle-version
-                             (with-out-str
-                               (pprint
-                                 {:importable engine-importable
-                                  :downloadable engine-downloadable
-                                  :download-source-name engine-download-source-name
-                                  :download-task engine-download-task
-                                  :spring-root spring-root}))))))
-                     (when
-                       (and (= battle-map (:battle-map old-battle-details))
-                            no-map)
-                       (cond
-                         (and map-importable
-                              (not map-import-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-importable))))
-                         (do
-                           (log/info "Adding task to auto import map" map-importable)
-                           {::task-type ::import
-                            :importable map-importable
-                            :spring-isolation-dir spring-root})
-                         (and (not map-importable)
-                              map-downloadable
-                              (not map-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-downloadable))))
-                         (do
-                           (log/info "Adding task to auto download map" map-downloadable)
-                           {::task-type ::http-downloadable
-                            :downloadable map-downloadable
-                            :spring-isolation-dir spring-root})
-                         (and battle-map
-                              (not map-importable)
-                              (not map-downloadable)
-                              (not (contains? springfiles-search-results battle-map))
-                              (not search-springfiles-map-task))
-                         (do
-                           (log/info "Adding task to search springfiles for map" battle-map)
-                           {::task-type ::search-springfiles
-                            :springname battle-map
-                            :resource-type ::map
-                            :spring-isolation-dir spring-root})
-                         (and battle-map
-                              (not map-importable)
-                              (not map-downloadable)
-                              springfiles-search-result
-                              ((fnil < 0) (:tries (get http-download springfiles-url)) resource/max-tries)
-                              (not download-springfiles-map-task)
-                              (not (::refresh-maps tasks-by-type)))
-                         (do
-                           (log/info "Adding task to download map" battle-map "from springfiles")
-                           {::task-type ::download-springfiles
-                            :resource-type ::map
-                            :springname battle-map
-                            :search-result (get springfiles-search-results battle-map)
-                            :spring-isolation-dir spring-root})
-                         :else
-                         (when battle-map
-                           (log/info "Nothing to do to auto get map" battle-map))))
-                     (when
-                       (and (= battle-modname (:battle-modname old-battle-details))
-                            no-mod)
-                       (cond
-                         (and rapid-id
-                              (not rapid-task)
-                              (not update-rapid-task)
-                              (not (contains? mod-refresh-tasks spring-root-path))
-                              engine-file
-                              sdp-file-exists)
-                         (do
-                           (log/info "Refreshing mods to pick up" sdp-file)
-                           {::task-type ::refresh-mods
-                            :delete-invalid-sdp true
-                            :priorites [sdp-file]
-                            :spring-root spring-root})
-                         (and rapid-id
-                              (not rapid-task)
-                              (not update-rapid-task)
-                              engine-file
-                              (not sdp-file-exists)
-                              (check-cooldown cooldowns [:rapid spring-root-path rapid-id]))
-                         (do
-                           (log/info "Adding task to auto download rapid" rapid-id)
-                           {::task-type ::rapid-download
-                            :engine-file engine-file
-                            :rapid-id rapid-id
-                            :spring-isolation-dir spring-root})
-                         (and (not rapid-id)
-                              mod-downloadable
-                              (not mod-download-task)
-                              (not (fs/file-exists? file-cache (resource/resource-dest spring-root mod-downloadable))))
-                         (do
-                           (log/info "Adding task to auto download mod" mod-downloadable)
-                           {::task-type ::http-downloadable
-                            :downloadable mod-downloadable
-                            :spring-isolation-dir spring-root})
-                         (and (not rapid-id)
-                              (not rapid-task)
-                              engine-file
-                              (not update-rapid-task)
-                              (not (string/blank? battle-modname))
-                              (check-cooldown cooldowns [:update-rapid spring-root-path]))
-                         (do
-                           (log/info "Adding task to update rapid looking for" battle-modname)
-                           {::task-type ::update-rapid
-                            :engine-version battle-version
-                            :mod-name battle-modname
-                            :spring-isolation-dir spring-root})
-                         :else
-                         (when battle-modname
-                           (log/info "Nothing to do to auto get game" battle-modname
-                             (with-out-str
-                               (pprint
-                                 {:downloadable mod-downloadable
-                                  :download-task mod-download-task
-                                  :engine-file engine-file
-                                  :refresh-tasks mod-refresh-tasks
-                                  :rapid-data rapid-data
-                                  :sdp-file sdp-file
-                                  :sdp-file-exists sdp-file-exists
-                                  :spring-root spring-root}))))))
-                     (when
-                       (and no-mod
-                            (not rapid-id)
-                            (not rapid-task)
-                            (not update-rapid-task)
-                            (-> new-server :battle :battle-id)
-                            (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))
-                              ; ^ only do when first joining a battle
-                       (log/info "Adding task to update rapid looking for" battle-modname)
-                       {::task-type ::update-rapid
-                        :engine-version battle-version
-                        :mod-name battle-modname
-                        :spring-isolation-dir spring-root})]]
-          (filter some? tasks)))
+              battle-changed (and (-> new-server :battle :battle-id)
+                                  (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))]
+          (auto-resources-tasks {
+                                 :battle-changed battle-changed
+                                 :engine-version battle-version
+                                 :map-name battle-modname
+                                 :mod-name battle-map
+                                 :spring-root spring-root}
+                                new-state)))
       (catch Exception e
         (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
 
@@ -908,8 +917,8 @@
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
           (when (and (or (not (resource/details? map-details))
                          (< tries resource/max-tries))
-                     (or (and (and (not (string/blank? new-map))
-                                   (not (resource/details? map-details)))
+                     (or (and (not (string/blank? new-map))
+                              (not (resource/details? map-details))
                               (or (not= old-battle-id new-battle-id)
                                   (not= old-map new-map)
                                   (and
@@ -1178,6 +1187,35 @@
         (task/add-tasks! state-atom tasks))
       (catch Exception e
         (log/error e "Error in :auto-get-resources state watcher")))))
+
+
+(defn selected-replay-needs-auto-get
+  [selected-replay {:keys [by-spring-root spring-isolation-dir]}]
+  (let [{:keys [replay-engine-version replay-map-name replay-mod-name]} selected-replay
+        {:keys [engines maps mods]} (get by-spring-root (fs/canonical-path spring-isolation-dir))]
+    (and selected-replay
+         (or (not (some (comp #{replay-engine-version} :engine-version) engines))
+             (not (some (comp #{replay-map-name} :map-name) maps))
+             (not (some (comp #{replay-mod-name} :mod-name) mods))))))
+
+(defn auto-get-replay-resources-watcher [_k state-atom _old-state new-state]
+  (let [{:keys [parsed-replays-by-path selected-replay-file spring-isolation-dir]} new-state
+        {:keys [replay-engine-version replay-map-name replay-mod-name] :as selected-replay} (get parsed-replays-by-path (fs/canonical-path selected-replay-file))]
+    (when (and (:auto-get-replay-resources new-state)
+               selected-replay
+               (selected-replay-needs-auto-get selected-replay new-state))
+      (try
+        (let [
+              tasks (auto-resources-tasks {:engine-version replay-engine-version
+                                           :map-name replay-map-name
+                                           :mod-name replay-mod-name
+                                           :spring-root spring-isolation-dir}
+                                          new-state)]
+          (when (seq tasks)
+            (log/info "Adding" (count tasks) "to auto get replay resources")
+            (task/add-tasks! state-atom tasks)))
+        (catch Exception e
+          (log/error e "Error in :auto-get-replay-resources state watcher"))))))
 
 
 (defn- fix-selected-replay-relevant-keys [state]
@@ -5409,6 +5447,7 @@
 (def state-watch-chimers
   [
    [:auto-get-resources-watcher auto-get-resources-watcher 2]
+   [:auto-get-replay-resources-watcher auto-get-replay-resources-watcher 2]
    [:battle-map-details-watcher battle-map-details-watcher 2]
    [:battle-mod-details-watcher battle-mod-details-watcher 2]
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
