@@ -702,7 +702,8 @@
                         "Game starting"
                         spring-running
                         "Game running"
-                        (not in-sync)
+                        (and (not singleplayer)
+                             (not in-sync))
                         "Not synced"
                         (or
                           (and am-spec

@@ -350,11 +350,23 @@
             {:fx/type map-sync-pane
              :map-name map-name
              :spring-isolation-dir spring-isolation-dir}]}
-          {:fx/type :button
-           :text " Refresh resources "
-           :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                       :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
-                       :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}]}]
+          {:fx/type :h-box
+           :alignment :center-left
+           :children
+           [
+            {:fx/type :button
+             :text " Refresh resources "
+             :on-action {:event/type :spring-lobby/clear-map-and-mod-details
+                         :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
+                         :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}
+            {:fx/type :pane
+             :pref-width 16}
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :auto-get-replay-resources))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :auto-get-replay-resources}}
+            {:fx/type :label
+             :text " Auto import or download resources"}]}]}]
     {:fx/type :h-box
      :style {:-fx-font-size 16}
      :alignment :center-left
