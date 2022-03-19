@@ -28,6 +28,10 @@
 (def ip-validator (InetAddressValidator/getInstance))
 
 
+(defn protocol-cell
+  [x]
+  {:text (name x)})
+
 (defn direct-connect-tab
   [{:fx/keys [context]}]
   (let [
@@ -37,6 +41,7 @@
                                       u/default-server-port))
         direct-connect-username (fx/sub-val context :direct-connect-username)
         direct-connect-password (fx/sub-val context :direct-connect-password)
+        direct-connect-protocol (or (fx/sub-val context :direct-connect-protocol) :http)
         direct-connect-public-ip (fx/sub-val context :direct-connect-public-ip)
         server-keys (set (fx/sub-val context u/complex-server-keys))
         server-key {:server-type :direct
@@ -107,6 +112,20 @@
                     :value direct-connect-port
                     :on-value-changed {:event/type :spring-lobby/assoc
                                        :key :direct-connect-port}}}]}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Protocol: "}
+                  {:fx/type :combo-box
+                   :value direct-connect-protocol
+                   :items [:http :https]
+                   :on-value-changed {:event/type :spring-lobby/assoc
+                                      :key :direct-connect-protocol}
+                   :button-cell protocol-cell
+                   :cell-factory
+                   {:fx/cell-type :list-cell
+                    :describe protocol-cell}}]}
                 {:fx/type :button
                  :style-class ["button" "skylobby-normal"]
                  :text "Host"
@@ -115,6 +134,7 @@
                  :on-action {:event/type :skylobby.fx.event.direct/host
                              :direct-connect-password direct-connect-password
                              :direct-connect-port direct-connect-port
+                             :direct-connect-protocol direct-connect-protocol
                              :direct-connect-username direct-connect-username}}
                 {:fx/type :label
                  :style {:-fx-text-fill "red"}
@@ -192,6 +212,20 @@
                    :prompt-text "0.0.0.0"
                    :on-text-changed {:event/type :spring-lobby/assoc
                                      :key :direct-connect-ip}}]}
+                {:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [{:fx/type :label
+                   :text "Protocol: "}
+                  {:fx/type :combo-box
+                   :value direct-connect-protocol
+                   :items [:http :https]
+                   :on-value-changed {:event/type :spring-lobby/assoc
+                                      :key :direct-connect-protocol}
+                   :button-cell protocol-cell
+                   :cell-factory
+                   {:fx/cell-type :list-cell
+                    :describe protocol-cell}}]}
                 {:fx/type :button
                  :style-class ["button" "skylobby-normal"]
                  :text "Join"
@@ -202,6 +236,7 @@
                              :direct-connect-ip direct-connect-ip
                              :direct-connect-password direct-connect-password
                              :direct-connect-port direct-connect-port
+                             :direct-connect-protocol direct-connect-protocol
                              :direct-connect-username direct-connect-username}}
                 {:fx/type :label
                  :style {:-fx-text-fill "red"}
