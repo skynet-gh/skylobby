@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.3](https://github.com/skynet-gh/skylobby/releases/tag/0.8.3) - 2022-03-19
+
+- Add setting to auto get replay resources
+- Fix singleplayer Start Game button text
+
 ## [0.8.2](https://github.com/skynet-gh/skylobby/releases/tag/0.8.2) - 2022-03-18
 
 - Use spring roots as replay sources
