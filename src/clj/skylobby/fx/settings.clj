@@ -88,11 +88,13 @@
        :max-width 580
        :children
        (concat
-         [
-          {:fx/type highlighted-label
+         [{:fx/type :pane
            :style {:-fx-font-size 24}
-           :search search
-           :title title}]
+           :children
+           [
+            {:fx/type highlighted-label
+             :search search
+             :title title}]}]
          children)}
       {:fx/type :pane})))
 
