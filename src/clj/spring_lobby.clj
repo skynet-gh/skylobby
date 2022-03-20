@@ -172,7 +172,7 @@
 
 (def config-keys
   [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
    :extra-replay-sources :filter-replay
    :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
    :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size

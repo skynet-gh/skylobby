@@ -1586,38 +1586,49 @@
                                    {:-fx-font-size 18
                                     :-fx-pref-width 800})
                           :children
-                          [
-                           {:fx/type engines-view
-                            :engine-version engine-version
-                            :on-value-changed
-                            {:event/type :skylobby.fx.event.battle/engine-changed
-                             :battle-id battle-id
-                             :server-key server-key
-                             :spring-root spring-root}
-                            :spring-isolation-dir spring-root}
-                           (if (seq engine-details)
-                             {:fx/type mods-view
-                              :engine-file engine-file
-                              :mod-name mod-name
+                          (concat
+                            [
+                             {:fx/type engines-view
+                              :engine-version engine-version
                               :on-value-changed
-                              {:event/type :skylobby.fx.event.battle/mod-changed
+                              {:event/type :skylobby.fx.event.battle/engine-changed
                                :battle-id battle-id
                                :server-key server-key
                                :spring-root spring-root}
                               :spring-isolation-dir spring-root}
-                             {:fx/type :label
-                              :text " Game: Get an engine first"})
-                           {:fx/type maps-view
-                            :map-name map-name
-                            :on-value-changed
-                            {:event/type :skylobby.fx.event.battle/map-changed
-                             :battle-id battle-id
-                             :server-key server-key
-                             :spring-root spring-root}
-                            :spring-isolation-dir spring-root}
-                           {:fx/type :pane
-                            :style {:-fx-pref-height 8}}
-                           resources-buttons]}
+                             (if (seq engine-details)
+                               {:fx/type mods-view
+                                :engine-file engine-file
+                                :mod-name mod-name
+                                :on-value-changed
+                                {:event/type :skylobby.fx.event.battle/mod-changed
+                                 :battle-id battle-id
+                                 :server-key server-key
+                                 :spring-root spring-root}
+                                :spring-isolation-dir spring-root}
+                               {:fx/type :label
+                                :text " Game: Get an engine first"})
+                             {:fx/type maps-view
+                              :map-name map-name
+                              :on-value-changed
+                              {:event/type :skylobby.fx.event.battle/map-changed
+                               :battle-id battle-id
+                               :server-key server-key
+                               :spring-root spring-root}
+                              :spring-isolation-dir spring-root}
+                             {:fx/type :pane
+                              :style {:-fx-pref-height 8}}
+                             resources-buttons]
+                            (when (= :direct-host server-type)
+                              [{:fx/type :h-box
+                                :alignment :center-left
+                                :children
+                                [{:fx/type :check-box
+                                  :selected (boolean (fx/sub-val context :direct-connect-chat-commands))
+                                  :on-selected-changed {:event/type :spring-lobby/assoc
+                                                        :key :direct-connect-chat-commands}}
+                                 {:fx/type :label
+                                  :text " Allow chat commands from clients"}]}]))}
                          {:fx/type :scroll-pane
                           :fit-to-width true
                           :hbar-policy :never

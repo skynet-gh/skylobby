@@ -133,11 +133,13 @@
   :skylobby.direct.client/chat
   [state-atom server-key {:keys [?data]}]
   (let [{:keys [channel-name]} ?data
-        [_old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
+        [_old-state {:keys [by-server direct-connect-chat-commands]}] (swap-vals! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
         {:keys [server]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::chat ?data])
-    (chat-msg-handler state-atom server-key ?data)))
+    (if direct-connect-chat-commands
+      (chat-msg-handler state-atom server-key ?data)
+      (log/info "Direct connect chat commands disabled"))))
 
 
 (defmethod chat-msg-handler "!engine"
