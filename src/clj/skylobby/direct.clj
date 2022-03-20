@@ -1,6 +1,7 @@
 (ns skylobby.direct
   (:require
     [clojure.edn :as edn]
+    [clojure.string :as string]
     [hiccup.core :as hiccup]
     [muuntaja.core :as m]
     [org.httpkit.server :as http-kit]
@@ -13,7 +14,10 @@
     [ring.middleware.content-type :as content-type]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.fx.event.battle :as fx.event.battle]
+    [skylobby.resource :as resource]
     [skylobby.util :as u]
+    [spring-lobby.spring :as spring]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
     [taoensso.sente.server-adapters.http-kit :refer (get-sch-adapter)]
@@ -118,6 +122,81 @@
         {:keys [server users]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::users users])))
+
+(defmulti chat-msg-handler (fn [_state-atom _server-key message] (first (string/split (or (:text message) "") #"\s+"))))
+
+(defmethod chat-msg-handler :default
+  [_state-atom _server-key message]
+  (log/info "No handler for message" message))
+
+(defmethod -event-msg-handler
+  :skylobby.direct.client/chat
+  [state-atom server-key {:keys [?data]}]
+  (let [{:keys [channel-name]} ?data
+        [_old-state {:keys [by-server direct-connect-chat-commands]}] (swap-vals! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
+        {:keys [server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::chat ?data])
+    (if direct-connect-chat-commands
+      (chat-msg-handler state-atom server-key ?data)
+      (log/info "Direct connect chat commands disabled"))))
+
+
+(defmethod chat-msg-handler "!engine"
+  [state-atom server-key message]
+  (log/info "Request to set engine" message)
+  ; TODO check if chat commands are allowed
+  (let [[_all engine-version] (re-find #"\w+ (.+)" (:text message))
+        engine-version (string/trim engine-version)]
+    (fx.event.battle/engine-changed state-atom {
+                                                :battle-id :direct
+                                                :engine-version engine-version
+                                                :server-key server-key})))
+
+(defmethod chat-msg-handler "!map"
+  [state-atom server-key message]
+  (log/info "Request to set map" message)
+  (let [[_all map-name] (re-find #"\w+ (.+)" (:text message))
+        map-name (string/trim map-name)]
+    (fx.event.battle/map-changed state-atom {
+                                             :battle-id :direct
+                                             :map-name map-name
+                                             :server-key server-key})))
+
+(defmethod chat-msg-handler "!mod"
+  [state-atom server-key message]
+  (log/info "Request to set mod" message)
+  (let [[_all mod-name] (re-find #"\w+ (.+)" (:text message))
+        mod-name (string/trim mod-name)]
+    (fx.event.battle/mod-changed state-atom {
+                                             :battle-id :direct
+                                             :mod-name mod-name
+                                             :server-key server-key})))
+
+(defmethod chat-msg-handler "!start"
+  [state-atom server-key message]
+  (log/info "Request to start battle game" message)
+  ; TODO dedupe with client
+  (let [state @state-atom
+        {:keys [by-server by-spring-root engine-overrides spring-isolation-dir]} state
+        {:keys [battle battles username] :as server-data} (get by-server server-key)
+        my-battle-status (get-in battle [:users username :battle-status])]
+    (spring/start-game
+      state-atom
+      (merge server-data
+        {:am-host false ; TODO
+         :am-spec true ; TODO
+         :battle (assoc battle :battle-ip (:hostname server-key))
+         :battles battles
+         :battle-status my-battle-status
+         :channel-name (u/battle-channel-name battle)
+         :engine-overrides engine-overrides
+         :host-ingame true
+         :server-key server-key
+         :spring-isolation-dir spring-isolation-dir}
+        (dissoc
+          (resource/spring-root-resources spring-isolation-dir by-spring-root)
+          :engine-version :map-name :mod-name)))))
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243

@@ -265,6 +265,9 @@
 (defn spring-headless-executable []
   (executable "spring-headless"))
 
+(defn spring-dedicated-executable []
+  (executable "spring-dedicated"))
+
 (defn pr-downloader-executable []
   (executable "pr-downloader"))
 

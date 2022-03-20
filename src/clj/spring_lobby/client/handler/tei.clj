@@ -90,3 +90,13 @@
   (if-let [[_all battle-id battle-title] (re-find #"[^\s]+ ([^\s]+)\s([^\t]+)" m)]
     (swap! state-atom assoc-in [:by-server server-key :battles battle-id :battle-title] battle-title)
     (log/error "Error parsing battle rename message")))
+
+
+(defmethod handler/handle "s.system.disconnect" [state-atom server-key m]
+  (let [[_all reason] (re-find #"[^\s]+ ([^\s]+)\s([^\t]+)" m)]
+    (case reason
+      "Flood protection"
+      (do
+        (log/info "Removing rejoin battle after flood protection")
+        (swap! state-atom update :last-battle dissoc server-key))
+      (log/warn "No specific handler for disconnect reason" reason))))

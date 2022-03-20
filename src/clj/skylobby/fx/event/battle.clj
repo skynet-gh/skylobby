@@ -26,53 +26,71 @@
       (send-fn [:skylobby.direct.client/player-state player-state])
       (log/warn "No send-fn" server-key))))
 
-(defn add-methods
-  [multifn state-atom] ; TODO need to move event handler out of spring-lobby ns
-  (defmethod multifn ::engine-changed
-    [{:fx/keys [event] :keys [battle-id engine-version server-key spring-root]}]
-    (let [engine-version (or engine-version event)
-          {:keys [by-server]}
-          (swap! state-atom
-            (fn [state]
+(defn engine-changed
+  [state-atom
+   {:fx/keys [event] :keys [battle-id engine-version server-key spring-root]}]
+  (let [engine-version (or engine-version event)
+        {:keys [by-server]}
+        (swap! state-atom
+          (fn [state]
+            (let [spring-root (or spring-root (:spring-isolation-dir state))]
               (-> state
                   (assoc :engine-filter "")
                   (assoc-in [:by-spring-root (fs/canonical-path spring-root) :engine-version] engine-version)
-                  (assoc-in [:by-server server-key :battles battle-id :battle-version] engine-version))))
-          server (get-in by-server [server-key :server])]
-      (when (= :direct-host (u/server-type server-key))
-        (if-let [broadcast-fn (:broadcast-fn server)]
-          (broadcast-fn [:skylobby.direct/battle-version engine-version])
-          (log/warn "No broadcast-fn found for server" server)))))
-  (defmethod multifn ::mod-changed
-    [{:fx/keys [event] :keys [battle-id mod-name server-key spring-root]}]
-    (let [mod-name (or mod-name event)
-          {:keys [by-server]}
-          (swap! state-atom
-            (fn [state]
-              (-> state
-                  (assoc :mod-filter "")
-                  (assoc-in [:by-spring-root (fs/canonical-path spring-root) :mod-name] mod-name)
-                  (assoc-in [:by-server server-key :battles battle-id :battle-modname] mod-name))))
-          server (get-in by-server [server-key :server])]
-      (when (= :direct-host (u/server-type server-key))
-        (if-let [broadcast-fn (:broadcast-fn server)]
-          (broadcast-fn [:skylobby.direct/battle-details {:battle-modname mod-name}])
-          (log/warn "No broadcast-fn found for server" server)))))
-  (defmethod multifn ::map-changed
-    [{:fx/keys [event] :keys [battle-id map-name server-key spring-root]}]
-    (let [map-name (or map-name event)
-          {:keys [by-server]}
-          (swap! state-atom
-            (fn [state]
+                  (assoc-in [:by-server server-key :battles battle-id :battle-version] engine-version)))))
+        server (get-in by-server [server-key :server])]
+    (when (= :direct-host (u/server-type server-key))
+      (if-let [broadcast-fn (:broadcast-fn server)]
+        (broadcast-fn [:skylobby.direct/battle-details {:battle-version engine-version}])
+        (log/warn "No broadcast-fn found for server" server)))))
+
+(defn map-changed
+  [state-atom
+   {:fx/keys [event] :keys [battle-id map-name server-key spring-root]}]
+  (let [map-name (or map-name event)
+        {:keys [by-server]}
+        (swap! state-atom
+          (fn [state]
+            (let [spring-root (or spring-root (:spring-isolation-dir state))]
               (-> state
                   (assoc :map-input-prefix "")
                   (assoc-in [:by-spring-root (fs/canonical-path spring-root) :map-name] map-name)
-                  (assoc-in [:by-server server-key :battles battle-id :battle-map] map-name))))
-          server (get-in by-server [server-key :server])]
-      (when (= :direct-host (u/server-type server-key))
-        (if-let [broadcast-fn (get-in by-server [server-key :server :broadcast-fn])]
-          (broadcast-fn [:skylobby.direct/battle-details {:battle-map map-name}])
-          (log/warn "No broadcast-fn found for server" server)))))
+                  (assoc-in [:by-server server-key :battles battle-id :battle-map] map-name)))))
+        server (get-in by-server [server-key :server])]
+    (when (= :direct-host (u/server-type server-key))
+      (if-let [broadcast-fn (get-in by-server [server-key :server :broadcast-fn])]
+        (broadcast-fn [:skylobby.direct/battle-details {:battle-map map-name}])
+        (log/warn "No broadcast-fn found for server" server)))))
+
+(defn mod-changed
+  [state-atom
+   {:fx/keys [event] :keys [battle-id mod-name server-key spring-root]}]
+  (let [mod-name (or mod-name event)
+        {:keys [by-server]}
+        (swap! state-atom
+          (fn [state]
+            (let [spring-root (or spring-root (:spring-isolation-dir state))]
+              (-> state
+                  (assoc :mod-filter "")
+                  (assoc-in [:by-spring-root (fs/canonical-path spring-root) :mod-name] mod-name)
+                  (assoc-in [:by-server server-key :battles battle-id :battle-modname] mod-name)))))
+        server (get-in by-server [server-key :server])]
+    (when (= :direct-host (u/server-type server-key))
+      (if-let [broadcast-fn (:broadcast-fn server)]
+        (broadcast-fn [:skylobby.direct/battle-details {:battle-modname mod-name}])
+        (log/warn "No broadcast-fn found for server" server)))))
+
+(defn add-methods
+  [multifn state-atom] ; TODO need to move event handler out of spring-lobby ns
+  (defmethod multifn ::engine-changed
+    [event-data]
+    (engine-changed state-atom event-data))
+  (defmethod multifn ::mod-changed
+    [event-data]
+    (mod-changed state-atom event-data))
+  (defmethod multifn ::map-changed
+    [event-data]
+    (map-changed state-atom event-data))
   (defmethod multifn ::kick
     [{:keys [bot-name client-data server-key username]}]
     (let [server-type (u/server-type server-key)]

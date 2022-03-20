@@ -8,47 +8,55 @@
     [taoensso.timbre :as log]))
 
 
+(defn host-direct-connect
+  [state-atom
+   {:keys [direct-connect-password direct-connect-port direct-connect-username spectate]}]
+  (let [direct-connect-port (or direct-connect-port 8200)
+        server-key {:server-type :direct
+                    :protocol :skylobby
+                    :host true
+                    :hostname "localhost"
+                    :port direct-connect-port
+                    :username direct-connect-username}
+        server-close-fn (direct/start-direct-connect state-atom server-key {:direct-connect-port direct-connect-port})
+        {:keys [by-spring-root spring-isolation-dir]} @state-atom
+        {:keys [engine-version map-name mod-name]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+        server-data {:battle {:battle-id :direct
+                              :scripttags {"game" {"startpostype" 1}}
+                              :users {direct-connect-username
+                                      {:battle-status
+                                       {:ally 0
+                                        :id 0
+                                        :mode (not spectate)
+                                        :ready true
+                                        :side 0}
+                                       :team-color (u/random-color)}}}
+                     :battles {:direct
+                               {:host-username direct-connect-username
+                                :battle-map map-name
+                                :battle-modname mod-name
+                                :battle-version engine-version}}
+                     :password direct-connect-password
+                     :server-close-fn server-close-fn
+                     :username direct-connect-username}]
+    (if server-close-fn
+      (swap! state-atom
+        (fn [state]
+          (-> state
+              (update-in [:by-server server-key] merge server-data)
+              (assoc :selected-server-tab (str server-key)))))
+      (do
+        (log/warn "")
+        (swap! state-atom update :by-server dissoc server-key)))))
+
 (defn add-methods
   [multifn state-atom] ; TODO need to move event handler out of spring-lobby ns
   (defmethod multifn ::host
-    [{:keys [direct-connect-password direct-connect-port direct-connect-username]}]
+    [params]
     (swap! state-atom assoc-in [:login-error :direct-host] nil)
     (future
       (try
-        (let [server-key {:server-type :direct
-                          :protocol :skylobby
-                          :host true
-                          :hostname "localhost"
-                          :port direct-connect-port
-                          :username direct-connect-username}
-              server-close-fn (direct/start-direct-connect state-atom server-key {:direct-connect-port direct-connect-port})
-              {:keys [by-spring-root spring-isolation-dir]} @state-atom
-              {:keys [engine-version map-name mod-name]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
-              server-data {:battle {:battle-id :direct
-                                    :scripttags {"game" {"startpostype" 1}}
-                                    :users {direct-connect-username
-                                            {:battle-status
-                                             {:ally 0
-                                              :id 0
-                                              :mode true
-                                              :ready true
-                                              :side 0}
-                                             :team-color (u/random-color)}}}
-                           :battles {:direct
-                                     {:host-username direct-connect-username
-                                      :battle-map map-name
-                                      :battle-modname mod-name
-                                      :battle-version engine-version}}
-                           :password direct-connect-password
-                           :server-close-fn server-close-fn
-                           :username direct-connect-username}]
-          (if server-close-fn
-            (swap! state-atom
-              (fn [state]
-                (-> state
-                    (update-in [:by-server server-key] merge server-data)
-                    (assoc :selected-server-tab (str server-key)))))
-            (swap! state-atom update :by-server dissoc server-key)))
+        (host-direct-connect state-atom params)
         (catch Exception e
           (log/error e "Error starting direct connect server")))))
   (defmethod multifn ::join

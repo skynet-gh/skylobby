@@ -11,11 +11,13 @@
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as sdfz]
     skylobby.fx
+    [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     [skylobby.git :as git]
     [skylobby.util :as u]
     spring-lobby
+    [spring-lobby.spring :as spring]
     [spring-lobby.replays :as replays]
     [taoensso.timbre :as log])
   (:import
@@ -32,6 +34,9 @@
                 (update m k conj v))]
    [nil "--css-file CSS_FILE" "Use the given file for CSS style"]
    [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
+   [nil "--direct-connect-port PORT" "Port to use for direct connect server / client"]
+   [nil "--direct-connect-password PASSWORD" "Password to use for direct connect server / client"]
+   [nil "--direct-connect-username USERNAME" "Username to use for direct connect server / client"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
    [nil "--music-dir MUSIC_DIR" "Set the music-dir config to the given directory"]
@@ -46,6 +51,8 @@
                 (update m k conj v))]
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
+   [nil "--spring-type SPRING_TYPE" "Set the spring engine executable type to use, \"dedicated\" or \"headless\"."
+    :parse-fn keyword]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]
    [nil "--update-copy-jar JAR_DEST" "Copy updated jar to the given location"]
    [nil "--window-maximized" "Start with the main window maximized"]])
@@ -109,6 +116,8 @@
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
             (alter-var-root #'fs/app-root-override (constantly app-root-override)))
+          (when-let [spring-type (:spring-type options)]
+            (alter-var-root #'spring/spring-type (constantly spring-type)))
           (when-let [replay-sources (seq (:replay-source options))]
             (let [replay-sources-override (map
                                             (fn [source]
@@ -222,6 +231,14 @@
                 (spring-lobby/init spring-lobby/*state)
                 (spring-lobby/browse-url (str "http://localhost:" (or (:port options)
                                                                       u/default-ipc-port))))
+              (= "direct" (first arguments))
+              (do
+                (log/info "Starting headless direct connect server")
+                (log/info "Start 7Zip init")
+                (fs/init-7z!)
+                (log/info "Finished 7Zip init")
+                (spring-lobby/init spring-lobby/*state)
+                (fx.event.direct/host-direct-connect spring-lobby/*state (assoc options :spectate true)))
               :else
               (do
                 (log/info "Creating renderer")

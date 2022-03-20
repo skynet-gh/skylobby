@@ -51,7 +51,11 @@
           (fn [reply]
             (when (cb-success? reply)
               (log/info "Server reply to join" reply)
-              (swap! state-atom assoc-in [:login-error :direct-client] (:reason reply))
+              (swap! state-atom
+                (fn [state]
+                  (-> state
+                      (assoc-in [:login-error :direct-client] (:reason reply))
+                      (assoc :selected-server-tab "direct"))))
               (disconnect state-atom server-key)))))
       (do
         (log/info "Channel socket state change: %s"              new-state-map)
@@ -72,7 +76,11 @@
 (defmethod -event-msg-handler :skylobby.direct/close
   [state-atom server-key {:keys [?data]}]
   (log/info "Server closed, disconnecting")
-  (swap! state-atom assoc-in [:login-error :direct-client] (:reason ?data))
+  (swap! state-atom
+    (fn [state]
+      (-> state
+          (assoc-in [:login-error :direct-client] (:reason ?data))
+          (assoc :selected-server-tab "direct"))))
   (disconnect state-atom server-key))
 
 
