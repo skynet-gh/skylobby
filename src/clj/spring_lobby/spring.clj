@@ -27,6 +27,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def ^:dynamic spring-type nil)
+
+
 (def startpostypes
   {0 "Fixed"
    1 "Random"
@@ -542,7 +545,11 @@
                                     (filter (comp #{engine-version} :engine-version))
                                     first
                                     :file))
-            engine-file (io/file engine-dir (fs/spring-executable))
+            engine-file (io/file engine-dir (case spring-type
+                                              :dedicated (fs/spring-dedicated-executable)
+                                              :headless (fs/spring-headless-executable)
+                                              ; else
+                                              (fs/spring-executable)))
             _ (log/info "Engine executable" (pr-str engine-file))
             _ (fs/set-executable engine-file)
             script-file (io/file spring-isolation-dir "script.txt")

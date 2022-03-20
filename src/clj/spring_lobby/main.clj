@@ -17,6 +17,7 @@
     [skylobby.git :as git]
     [skylobby.util :as u]
     spring-lobby
+    [spring-lobby.spring :as spring]
     [spring-lobby.replays :as replays]
     [taoensso.timbre :as log])
   (:import
@@ -50,6 +51,8 @@
                 (update m k conj v))]
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
+   [nil "--spring-type SPRING_TYPE" "Set the spring engine executable type to use, \"dedicated\" or \"headless\"."
+    :parse-fn keyword]
    [nil "--server-url SERVER_URL" "Set the selected server config by url"]
    [nil "--update-copy-jar JAR_DEST" "Copy updated jar to the given location"]
    [nil "--window-maximized" "Start with the main window maximized"]])
@@ -113,6 +116,8 @@
             (alter-var-root #'spring-lobby/disable-update-check (constantly true)))
           (when-let [app-root-override (:skylobby-root options)]
             (alter-var-root #'fs/app-root-override (constantly app-root-override)))
+          (when-let [spring-type (:spring-type options)]
+            (alter-var-root #'spring/spring-type (constantly spring-type)))
           (when-let [replay-sources (seq (:replay-source options))]
             (let [replay-sources-override (map
                                             (fn [source]
