@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4](https://github.com/skynet-gh/skylobby/releases/tag/0.8.4) - 2022-03-20
+
+- Fix auto get resources
+- Add handler to prevent rejoin battle on flood protect
+- Fix direct connect client chat
+- Add direct connect chat commands
+
 ## [0.8.3](https://github.com/skynet-gh/skylobby/releases/tag/0.8.3) - 2022-03-19
 
 - Add setting to auto get replay resources
