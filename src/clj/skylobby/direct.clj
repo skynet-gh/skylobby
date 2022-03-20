@@ -119,6 +119,15 @@
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::users users])))
 
+(defmethod -event-msg-handler
+  :skylobby.direct.client/chat
+  [state-atom server-key {:keys [?data]}]
+  (let [{:keys [channel-name]} ?data
+        [_old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
+        {:keys [server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::chat ?data])))
+
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243
 ; the default edn packer has issues in graalvm
