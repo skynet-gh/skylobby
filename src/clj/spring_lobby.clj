@@ -886,8 +886,8 @@
           (auto-resources-tasks {
                                  :battle-changed battle-changed
                                  :engine-version battle-version
-                                 :map-name battle-modname
-                                 :mod-name battle-map
+                                 :map-name battle-map
+                                 :mod-name battle-modname
                                  :spring-root spring-root}
                                 new-state)))
       (catch Exception e
