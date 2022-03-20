@@ -306,8 +306,9 @@
 
 (defn player-status-tooltip-label
   [{:fx/keys [context]
-    :keys [battle-status client-status user]}]
+    :keys [battle-status client-status server-key user username]}]
   (let [
+        host-username (fx/sub-ctx context sub/host-username server-key)
         now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type :label
      :text
@@ -318,6 +319,8 @@
          "Unknown sync")
        "\n"
        (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
+       (when (= host-username username)
+         "\nHost")
        (when (u/to-bool (:mode battle-status))
          (str "\n" (if (:ready battle-status) "Ready" "Unready")))
        (when (:ingame client-status)
@@ -352,7 +355,9 @@
       {:fx/type player-status-tooltip-label
        :battle-status battle-status
        :client-status client-status
-       :user user}}
+       :server-key server-key
+       :user user
+       :username username}}
      :graphic
      {:fx/type :h-box
       :alignment :center-left
@@ -384,6 +389,10 @@
            :else
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-account:16:white"})]
+        (when (and am-host
+                   (not (u/to-bool (:mode battle-status))))
+          [{:fx/type font-icon/lifecycle
+            :icon-literal "mdi-crown:16:orange"}])
         (when (:ingame client-status)
           [{:fx/type font-icon/lifecycle
             :icon-literal "mdi-sword:16:red"}])
@@ -391,7 +400,8 @@
           [{:fx/type font-icon/lifecycle
             :icon-literal "mdi-sleep:16:grey"}]))}}))
 
-(defn player-name-tooltip [{:keys [player]}]
+(defn player-name-tooltip
+  [{:keys [player server-key]}]
   {:fx/type tooltip-nofocus/lifecycle
    :show-delay skylobby.fx/tooltip-show-delay
    :style {:-fx-font-size 16
@@ -438,6 +448,7 @@
          {:fx/type player-status-tooltip-label
           :battle-status battle-status
           :client-status client-status
+          :server-key server-key
           :user user}]))}})
 
 (defn add-players-colors [players]
@@ -1110,7 +1121,8 @@
                              :props
                              {:tooltip
                               {:fx/type player-name-tooltip
-                               :player player}}
+                               :player player
+                               :server-key server-key}}
                              :desc
                              {:fx/type :text
                               :text (str " " (u/nickname player))
