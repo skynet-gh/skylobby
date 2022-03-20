@@ -3132,12 +3132,6 @@
   (let [[_server-url server-data] event]
     (swap! *state assoc
            :server-edit event
-           :server-encoding (:encoding server-data)
-           :server-host (:host server-data)
-           :server-port (:port server-data)
-           :server-alias (:alias server-data)
-           :server-auto-connect (:auto-connect server-data)
-           :server-ssl (:ssl server-data)
            :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data)))))
 
 (defmethod event-handler ::update-server
