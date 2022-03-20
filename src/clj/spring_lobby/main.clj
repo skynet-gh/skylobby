@@ -11,6 +11,7 @@
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as sdfz]
     skylobby.fx
+    [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     [skylobby.git :as git]
@@ -32,6 +33,9 @@
                 (update m k conj v))]
    [nil "--css-file CSS_FILE" "Use the given file for CSS style"]
    [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
+   [nil "--direct-connect-port PORT" "Port to use for direct connect server / client"]
+   [nil "--direct-connect-password PASSWORD" "Password to use for direct connect server / client"]
+   [nil "--direct-connect-username USERNAME" "Username to use for direct connect server / client"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
    [nil "--music-dir MUSIC_DIR" "Set the music-dir config to the given directory"]
@@ -222,6 +226,14 @@
                 (spring-lobby/init spring-lobby/*state)
                 (spring-lobby/browse-url (str "http://localhost:" (or (:port options)
                                                                       u/default-ipc-port))))
+              (= "direct" (first arguments))
+              (do
+                (log/info "Starting headless direct connect server")
+                (log/info "Start 7Zip init")
+                (fs/init-7z!)
+                (log/info "Finished 7Zip init")
+                (spring-lobby/init spring-lobby/*state)
+                (fx.event.direct/host-direct-connect spring-lobby/*state (assoc options :spectate true)))
               :else
               (do
                 (log/info "Creating renderer")
