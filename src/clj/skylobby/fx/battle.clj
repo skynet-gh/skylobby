@@ -160,7 +160,7 @@
         {:fx/type :button
          :text "Leave Queue"
          :disable (not am-spec)
-         :on-action {:event/type :spring-lobby/send-message
+         :on-action {:event/type :skylobby.fx.event.chat/send
                      :channel-name channel-name
                      :client-data client-data
                      :message "$%leaveq"
@@ -168,7 +168,7 @@
         {:fx/type :button
          :text "Queue Status"
          :disable (not am-spec)
-         :on-action {:event/type :spring-lobby/send-message
+         :on-action {:event/type :skylobby.fx.event.chat/send
                      :channel-name channel-name
                      :client-data client-data
                      :message "$%status"
@@ -176,7 +176,7 @@
       {:fx/type :button
        :text "Join Queue"
        :disable (not am-spec)
-       :on-action {:event/type :spring-lobby/send-message
+       :on-action {:event/type :skylobby.fx.event.chat/send
                    :channel-name channel-name
                    :client-data client-data
                    :message "$%joinq"
@@ -226,7 +226,7 @@
               :text (str text)
               :tooltip {:fx/type :tooltip
                         :text (str desc)}
-              :on-action {:event/type :spring-lobby/send-message
+              :on-action {:event/type :skylobby.fx.event.chat/send
                           :channel-name channel-name
                           :client-data client-data
                           :message (str n)
@@ -409,7 +409,7 @@
                                 :mod-name mod-name
                                 :team-counts team-counts}
                          :server-key server-key}
-                        {:event/type :spring-lobby/send-message
+                        {:event/type :skylobby.fx.event.chat/send
                          :channel-name channel-name
                          :client-data client-data
                          :message "!promote"
@@ -888,6 +888,7 @@
         file-cache (fx/sub-val context :file-cache)
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
         singleplayer (= :local server-key)
+        server-type (u/server-type server-key)
         spring-settings (fx/sub-val context :spring-settings)
         startpostype (fx/sub-ctx context sub/startpostype server-key)
         username (fx/sub-val context get-in [:by-server server-key :username])
@@ -924,7 +925,7 @@
               (let [{:keys [battle-status]} (-> battle :users (get username))
                     disable (boolean (and (not singleplayer) am-spec))]
                 {:fx/type maps-view
-                 :action-disable-rotate {:event/type :spring-lobby/send-message
+                 :action-disable-rotate {:event/type :skylobby.fx.event.chat/send
                                          :channel-name channel-name
                                          :client-data client-data
                                          :message "!rotationEndGame off"
@@ -939,6 +940,11 @@
                    singleplayer
                    {:event/type :spring-lobby/assoc-in
                     :path [:by-server server-key :battles :singleplayer :battle-map]}
+                   (= :direct-host server-type)
+                   {:event/type :skylobby.fx.event.battle/map-changed
+                    :battle-id battle-id
+                    :server-key server-key
+                    :spring-root spring-isolation-dir}
                    am-host
                    {:event/type :spring-lobby/battle-map-change
                     :client-data client-data}
@@ -946,7 +952,8 @@
                    {:event/type :spring-lobby/suggest-battle-map
                     :battle-status battle-status
                     :channel-name channel-name
-                    :client-data client-data})})
+                    :client-data client-data
+                    :server-key server-key})})
               (let [map-description (str (-> battle-map-details :mapinfo :description))]
                 {:fx/type fx.ext.node/with-tooltip-props
                  :props
@@ -1027,7 +1034,7 @@
                         (-> users (get host-username) :client-status :bot))
                [{:fx/type :button
                  :text "List Maps"
-                 :on-action {:event/type :spring-lobby/send-message
+                 :on-action {:event/type :skylobby.fx.event.chat/send
                              :channel-name channel-name
                              :client-data client-data
                              :message "!listmaps"
@@ -1325,7 +1332,7 @@
                  :style (assoc (dissoc ok-severity :-fx-background-color)
                                :-fx-font-size 20)
                  :text "Yes"
-                 :on-action {:event/type :spring-lobby/send-message
+                 :on-action {:event/type :skylobby.fx.event.chat/send
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote y"
@@ -1336,7 +1343,7 @@
                  :style (assoc (dissoc error-severity :-fx-background-color)
                                :-fx-font-size 20)
                  :text "No"
-                 :on-action {:event/type :spring-lobby/send-message
+                 :on-action {:event/type :skylobby.fx.event.chat/send
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote n"
@@ -1346,7 +1353,7 @@
                 {:fx/type :button
                  :text "Present"
                  :style {:-fx-font-size 20}
-                 :on-action {:event/type :spring-lobby/send-message
+                 :on-action {:event/type :skylobby.fx.event.chat/send
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote b"

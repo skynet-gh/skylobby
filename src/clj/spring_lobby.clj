@@ -3503,7 +3503,7 @@
         (log/error e "Error changing battle map")))))
 
 (defmethod event-handler ::suggest-battle-map
-  [{:fx/keys [event] :keys [battle-status channel-name client-data map-name]}]
+  [{:fx/keys [event] :keys [battle-status channel-name client-data map-name server-key]}]
   (future
     (try
       (cond
@@ -3512,11 +3512,12 @@
         :else
         (let [map-name (or map-name event)]
           @(event-handler
-             {:event/type ::send-message
+             {:event/type :skylobby.fx.event.chat/send
               :channel-name channel-name
               :client-data client-data
               :message (str "!map " map-name)
-              :no-clear-draft true})))
+              :no-clear-draft true
+              :server-key server-key})))
       (catch Exception e
         (log/error e "Error suggesting map")))))
 
