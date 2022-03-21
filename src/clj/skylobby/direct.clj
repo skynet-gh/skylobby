@@ -125,7 +125,12 @@
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::users users])))
 
-(defmulti chat-msg-handler (fn [_state-atom _server-key message] (first (string/split (or (:text message) "") #"\s+"))))
+(defmulti chat-msg-handler
+  (fn [_state-atom _server-key message]
+    (-> (or (:text message) "")
+        (string/split #"\s+")
+        first
+        string/lower-case)))
 
 (defmethod chat-msg-handler :default
   [_state-atom _server-key message]
@@ -205,6 +210,16 @@
                                              :battle-id :direct
                                              :mod-name mod-name
                                              :server-key server-key})))
+
+(defmethod chat-msg-handler "!bset"
+  [state-atom server-key message]
+  (log/info "Battle setting" message)
+  (let [[_all k v] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
+        state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" "modoptions" k] v) ; TODO map options, validate
+        {:keys [by-server]} state
+        {:keys [battle server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::battle-scripttags (:scripttags battle)])))
 
 (defmethod chat-msg-handler "!start"
   [state-atom server-key message]

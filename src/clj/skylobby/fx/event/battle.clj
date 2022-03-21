@@ -228,4 +228,24 @@
           (send-fn [:skylobby.direct.client/add-bot bot-data])
           (log/warn "No send-fn" server-key))
         ; else
-        nil))))
+        nil)))
+  (defmethod multifn ::modoption-change
+    [{:keys [am-host client-data modoption-key modoption-type option-key server-key] :fx/keys [event] :as e}]
+    (let [value (u/modoption-value modoption-type event)
+          option-key (or option-key "modoptions")
+          modoption-key-str (name modoption-key)
+          server-type (u/server-type server-key)]
+      (if (#{:singleplayer :direct-host} server-type)
+        (let [state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" option-key modoption-key-str] (str event))]
+          (when (#{:direct-host} server-type)
+            (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+              (let [scripttags (get-in state [:by-server server-key :battle :scripttags])]
+                (broadcast-fn [:skylobby.direct/battle-scripttags scripttags]))
+              (log/warn "No broadcast-fn" server-key))))
+        (if am-host
+          (message/send-message state-atom client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
+          (multifn
+            (assoc e
+                   :event/type :skylobby.fx.event.chat/send
+                   :no-clear-draft true
+                   :message (str "!bSet " modoption-key-str " " value))))))))
