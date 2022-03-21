@@ -3393,7 +3393,15 @@
                   ^"[Ljava.lang.String;" cmdarray (into-array String command)]
               (log/info "Running" (pr-str command))
               (.exec runtime cmdarray nil nil))
-            (log/info "No way to browse dir" file))))
+            (let [runtime (Runtime/getRuntime)
+                  dir-or-parent (if (fs/is-directory? file)
+                                  file
+                                  (fs/parent-file file))
+                  command ["xdg-open" (fs/canonical-path dir-or-parent)]
+                  ; https://stackoverflow.com/a/5116553
+                  ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+              (log/info "Running" (pr-str command))
+              (.exec runtime cmdarray nil nil)))))
       (catch Exception e
         (log/error e "Error browsing file" file)))))
 
@@ -3402,12 +3410,11 @@
     (if (.isSupported desktop Desktop$Action/BROWSE)
       (.browse desktop (java.net.URI. url))
       (when (fs/linux?)
-        (when (fs/linux?)
-          (let [runtime (Runtime/getRuntime)
-                command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
-                ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-            (log/info "Running" (pr-str command))
-            (.exec runtime cmdarray nil nil)))))))
+        (let [runtime (Runtime/getRuntime)
+              command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
+              ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+          (log/info "Running" (pr-str command))
+          (.exec runtime cmdarray nil nil))))))
 
 (defmethod event-handler ::desktop-browse-url
   [{:keys [url]}]
