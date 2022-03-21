@@ -596,9 +596,14 @@
                {:fx/type :combo-box
                 :value (if am-away "Away" "Here")
                 :items ["Away" "Here"]
-                :on-value-changed {:event/type :spring-lobby/on-change-away
-                                   :client-data (when-not singleplayer client-data)
-                                   :client-status (assoc my-client-status :away (not am-away))}}}]}])
+                :on-value-changed
+                {:event/type (if direct-connect
+                               :skylobby.fx.event.battle/away-changed
+                               :spring-lobby/on-change-away)
+                 :client-data (when-not singleplayer client-data)
+                 :client-status (assoc my-client-status :away (not am-away))
+                 :server-key server-key
+                 :username username}}}]}])
          [{:fx/type :h-box
            :alignment :center-left
            :style {:-fx-font-size 16}

@@ -10,6 +10,7 @@
   (:import
     (javafx.scene.control ColorPicker)))
 
+
 (defn update-player-state
   [state-atom server-key {:keys [username] :as id} player-state]
   ; TODO bots
@@ -24,6 +25,22 @@
     :direct-client
     (if-let [send-fn (get-in @state-atom [:by-server server-key :client :send-fn])]
       (send-fn [:skylobby.direct.client/player-state player-state])
+      (log/warn "No send-fn" server-key))))
+
+(defn update-user-state
+  [state-atom server-key {:keys [username] :as id} user-state]
+  ; TODO bots
+  (log/info "Updating user state for" id "with" user-state)
+  (case (u/server-type server-key)
+    :direct-host
+    (let [state (swap! state-atom update-in [:by-server server-key :users username] u/deep-merge user-state)]
+      (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+        (let [users (get-in state [:by-server server-key :users])]
+          (broadcast-fn [:skylobby.direct/users users]))
+        (log/warn "No broadcast-fn" server-key)))
+    :direct-client
+    (if-let [send-fn (get-in @state-atom [:by-server server-key :client :send-fn])]
+      (send-fn [:skylobby.direct.client/user-state user-state])
       (log/warn "No send-fn" server-key))))
 
 (defn engine-changed
@@ -203,6 +220,10 @@
     [{:keys [server-key username] :fx/keys [event]}]
     (let [ready (boolean event)]
       (update-player-state state-atom server-key {:username username} {:battle-status {:ready ready}})))
+  (defmethod multifn ::away-changed
+    [{:keys [server-key username] :fx/keys [event]}]
+    (let [away (= "Away" event)]
+      (update-user-state state-atom server-key {:username username} {:client-status {:away away}})))
   (defmethod multifn ::startpostype-changed
     [{:keys [server-key] :fx/keys [event]}]
     (let [startpostype (get spring/startpostypes-by-name event)
