@@ -442,96 +442,95 @@
          [{:fx/type :pane
            :pref-width 16}]
          buttons
-         (when (and (or singleplayer
-                        (not am-spec))
-                    (not direct-connect))
-           [{:fx/type :h-box
-             :alignment :center-left
-             :children
-             [{:fx/type fx/ext-let-refs
-               :refs {::add-bot-button
-                      {:fx/type :button
-                       :text "Add AI"
-                       :disable (boolean (fx/sub-val context :show-add-bot))
-                       :on-action {:event/type :spring-lobby/toggle
-                                   :key :show-add-bot}}}
-               :desc {:fx/type fx/ext-let-refs
-                      :refs {::add-bot-popup {:fx/type ext-with-shown-on
-                                              :props (when (fx/sub-val context :show-add-bot)
-                                                       {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
-                                              :desc {:fx/type :tooltip
-                                                     :anchor-location :window-bottom-left
-                                                     :auto-hide true
-                                                     :auto-fix true
-                                                     :on-hidden {:event/type :spring-lobby/dissoc
-                                                                 :key :show-add-bot}
-                                                     :graphic
-                                                     {:fx/type :v-box
-                                                      :style {:-fx-font-size 16}
-                                                      :children
-                                                      (concat
+         [{:fx/type :h-box
+           :alignment :center-left
+           :children
+           [{:fx/type fx/ext-let-refs
+             :refs {::add-bot-button
+                    {:fx/type :button
+                     :text "Add AI"
+                     :disable (boolean (fx/sub-val context :show-add-bot))
+                     :on-action {:event/type :spring-lobby/assoc
+                                 :key :show-add-bot
+                                 :value server-key}}}
+             :desc {:fx/type fx/ext-let-refs
+                    :refs {::add-bot-popup {:fx/type ext-with-shown-on
+                                            :props (when (= (fx/sub-val context :show-add-bot)
+                                                            server-key)
+                                                     {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
+                                            :desc {:fx/type :tooltip
+                                                   :anchor-location :window-bottom-left
+                                                   :auto-hide true
+                                                   :auto-fix true
+                                                   :on-hidden {:event/type :spring-lobby/dissoc
+                                                               :key :show-add-bot}
+                                                   :graphic
+                                                   {:fx/type :v-box
+                                                    :style {:-fx-font-size 16}
+                                                    :children
+                                                    (concat
+                                                      [
+                                                       {:fx/type :h-box
+                                                        :alignment :center-left
+                                                        :children
                                                         [
-                                                         {:fx/type :h-box
-                                                          :alignment :center-left
-                                                          :children
-                                                          [
-                                                           {:fx/type :label
-                                                            :text " AI: "}
-                                                           {:fx/type :combo-box
-                                                            :value bot-name
-                                                            :disable (empty? bot-names)
-                                                            :on-value-changed {:event/type :spring-lobby/change-bot-name
-                                                                               :bots bots}
-                                                            :items (sort bot-names)}]}
-                                                         {:fx/type :h-box
-                                                          :alignment :center-left
-                                                          :children
-                                                          [
-                                                           {:fx/type :label
-                                                            :text " Version: "}
-                                                           {:fx/type ext-recreate-on-key-changed
-                                                            :key (str bot-name)
-                                                            :desc
-                                                            {:fx/type :combo-box
-                                                             :value bot-version
-                                                             :disable (string/blank? bot-name)
-                                                             :on-value-changed {:event/type :spring-lobby/assoc
-                                                                                :key :bot-version}
-                                                             :items (or bot-versions [])}}]}
-                                                         {:fx/type :h-box
-                                                          :alignment :center-left
-                                                          :children
-                                                          [{:fx/type :label
-                                                            :text " Name: "}
-                                                           {:fx/type :text-field
-                                                            :prompt-text "AI Name"
-                                                            :text (str bot-username)
-                                                            :on-text-changed {:event/type :spring-lobby/assoc
-                                                                              :key :bot-username}}]}]
-                                                        (when (re-find #"\s" bot-username)
-                                                          [{:fx/type :label
-                                                            :style {:-fx-text-fill "red"}
-                                                            :text "Name cannot contain whitespace"}])
-                                                        [{:fx/type :button
-                                                          :text "Add"
-                                                          :disable (boolean
-                                                                     (or
-                                                                       (string/blank? bot-name)
-                                                                       (string/blank? bot-version)
-                                                                       (string/blank? bot-username)
-                                                                       (re-find #"\s" bot-username)))
-                                                          :on-action
-                                                          {:event/type :spring-lobby/add-bot
-                                                           :battle battle
-                                                           :bot-username bot-username
-                                                           :bot-name bot-name
-                                                           :bot-version bot-version
-                                                           :client-data client-data
-                                                           :server-key server-key
-                                                           :side-indices (keys sides)
-                                                           :singleplayer singleplayer
-                                                           :username username}}])}}}}
-                      :desc {:fx/type fx/ext-get-ref :ref ::add-bot-button}}}]}])
+                                                         {:fx/type :label
+                                                          :text " AI: "}
+                                                         {:fx/type :combo-box
+                                                          :value bot-name
+                                                          :disable (empty? bot-names)
+                                                          :on-value-changed {:event/type :spring-lobby/change-bot-name
+                                                                             :bots bots}
+                                                          :items (sort bot-names)}]}
+                                                       {:fx/type :h-box
+                                                        :alignment :center-left
+                                                        :children
+                                                        [
+                                                         {:fx/type :label
+                                                          :text " Version: "}
+                                                         {:fx/type ext-recreate-on-key-changed
+                                                          :key (str bot-name)
+                                                          :desc
+                                                          {:fx/type :combo-box
+                                                           :value bot-version
+                                                           :disable (string/blank? bot-name)
+                                                           :on-value-changed {:event/type :spring-lobby/assoc
+                                                                              :key :bot-version}
+                                                           :items (or bot-versions [])}}]}
+                                                       {:fx/type :h-box
+                                                        :alignment :center-left
+                                                        :children
+                                                        [{:fx/type :label
+                                                          :text " Name: "}
+                                                         {:fx/type :text-field
+                                                          :prompt-text "AI Name"
+                                                          :text (str bot-username)
+                                                          :on-text-changed {:event/type :spring-lobby/assoc
+                                                                            :key :bot-username}}]}]
+                                                      (when (re-find #"\s" bot-username)
+                                                        [{:fx/type :label
+                                                          :style {:-fx-text-fill "red"}
+                                                          :text "Name cannot contain whitespace"}])
+                                                      [{:fx/type :button
+                                                        :text "Add"
+                                                        :disable (boolean
+                                                                   (or
+                                                                     (string/blank? bot-name)
+                                                                     (string/blank? bot-version)
+                                                                     (string/blank? bot-username)
+                                                                     (re-find #"\s" bot-username)))
+                                                        :on-action
+                                                        {:event/type :spring-lobby/add-bot
+                                                         :battle battle
+                                                         :bot-username bot-username
+                                                         :bot-name bot-name
+                                                         :bot-version bot-version
+                                                         :client-data client-data
+                                                         :server-key server-key
+                                                         :side-indices (keys sides)
+                                                         :singleplayer singleplayer
+                                                         :username username}}])}}}}
+                    :desc {:fx/type fx/ext-get-ref :ref ::add-bot-button}}}]}]
          [{:fx/type :h-box
            :alignment :center-left
            :children
@@ -708,7 +707,8 @@
                         (or
                           (and am-spec
                                (not host-ingame)
-                               (not singleplayer))
+                               (not singleplayer)
+                               (not= :direct-host server-type))
                           (and (not host-ingame)
                                (= :direct-client server-type)))
                         "Game not running"
@@ -716,6 +716,7 @@
                         (if debug-spring
                           "Debug Spring"
                           (str (if (and (not singleplayer)
+                                        (not= :direct-host server-type)
                                         (or host-ingame am-spec))
                                  "Join" "Start")
                                " Game")))
@@ -726,6 +727,7 @@
                                (and (= :direct-client server-type)
                                     (not host-ingame))
                                (and (not singleplayer)
+                                    (not= :direct-host server-type)
                                     (or (and (not host-ingame) am-spec)
                                         (not in-sync)))))
                 :on-action

@@ -97,17 +97,25 @@
       (future
         (try
           (case server-type
+            :direct-client
+            (if bot-name
+              (if-let [send-fn (get-in @state-atom [:by-server server-key :client :send-fn])]
+                (send-fn [:skylobby.direct.client/remove-bot {:bot-name bot-name}])
+                (log/warn "No send-fn" server-key))
+              (log/warn "No method to kick user" username "from" server-key))
             :direct-host
             (let [[_old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key]
                                                      (fn [server-data]
-                                                       (-> server-data
-                                                           (update-in [:battle :users] dissoc username))))
+                                                       (if bot-name
+                                                         (update-in server-data [:battle :bots] dissoc bot-name)
+                                                         (update-in server-data [:battle :users] dissoc username))))
                   {:keys [battle client-username server]} (get by-server server-key)
                   {:keys [broadcast-fn send-fn]} server]
               (if-let [client-id (->> client-username (filter (comp #{username} second)) first first)]
                 (send-fn client-id [::close {:reason "kicked by host"}])
                 (log/warn "No client-id found for user" username))
-              (broadcast-fn [:skylobby.direct/battle-users (:users battle)]))
+              (broadcast-fn [:skylobby.direct/battle-users (:users battle)])
+              (broadcast-fn [:skylobby.direct/battle-bots (:bots battle)]))
             :singleplayer
             (do
               (log/info "Special server battle kick")
@@ -202,4 +210,42 @@
       (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
         (let [scripttags (get-in state [:by-server server-key :battle :scripttags])]
           (broadcast-fn [:skylobby.direct/battle-scripttags scripttags]))
-        (log/warn "No broadcast-fn" server-key)))))
+        (log/warn "No broadcast-fn" server-key))))
+  (defmethod multifn ::add-bot
+    [{:keys [bot-data server-key]}]
+    (let [server-type (u/server-type server-key)
+          {:keys [bot-name]} bot-data
+          state (if (#{:singleplayer :direct-host} server-type)
+                  (swap! state-atom assoc-in [:by-server server-key :battle :bots bot-name] bot-data)
+                  @state-atom)]
+      (case (u/server-type server-key)
+        :direct-host
+        (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+          (broadcast-fn [:skylobby.direct/battle-bots (get-in state [:by-server server-key :battle :bots])])
+          (log/warn "No broadcast-fn" server-key))
+        :direct-client
+        (if-let [send-fn (get-in state [:by-server server-key :client :send-fn])]
+          (send-fn [:skylobby.direct.client/add-bot bot-data])
+          (log/warn "No send-fn" server-key))
+        ; else
+        nil)))
+  (defmethod multifn ::modoption-change
+    [{:keys [am-host client-data modoption-key modoption-type option-key server-key] :fx/keys [event] :as e}]
+    (let [value (u/modoption-value modoption-type event)
+          option-key (or option-key "modoptions")
+          modoption-key-str (name modoption-key)
+          server-type (u/server-type server-key)]
+      (if (#{:singleplayer :direct-host} server-type)
+        (let [state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" option-key modoption-key-str] (str event))]
+          (when (#{:direct-host} server-type)
+            (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+              (let [scripttags (get-in state [:by-server server-key :battle :scripttags])]
+                (broadcast-fn [:skylobby.direct/battle-scripttags scripttags]))
+              (log/warn "No broadcast-fn" server-key))))
+        (if am-host
+          (message/send-message state-atom client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
+          (multifn
+            (assoc e
+                   :event/type :skylobby.fx.event.chat/send
+                   :no-clear-draft true
+                   :message (str "!bSet " modoption-key-str " " value))))))))

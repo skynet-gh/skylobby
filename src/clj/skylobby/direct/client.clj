@@ -116,6 +116,11 @@
   (log/info "Battle users update" ?data)
   (swap! state-atom assoc-in [:by-server server-key :battle :users] ?data))
 
+(defmethod -event-msg-handler :skylobby.direct/battle-bots
+  [state-atom server-key {:keys [?data]}]
+  (log/info "Battle bots update" ?data)
+  (swap! state-atom assoc-in [:by-server server-key :battle :bots] ?data))
+
 (defmethod -event-msg-handler :skylobby.direct/battle-scripttags
   [state-atom server-key {:keys [?data]}]
   (log/info "Battle scripttags update" ?data)

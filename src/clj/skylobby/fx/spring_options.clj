@@ -57,7 +57,7 @@
                    (remove (comp #{"section"} :type)) ; remove sections in middle
                    (map #(update % :key (comp keyword string/lower-case))))
         event-data (or event-data
-                       {:event/type :spring-lobby/modoption-change})]
+                       {:event/type :skylobby.fx.event.battle/modoption-change})]
     {:fx/type :v-box
      :children
      [{:fx/type :label
@@ -131,6 +131,7 @@
                       :modoption-key (:key i)
                       :modoption-type (:type i)
                       :option-key option-key
+                      :server-key server-key
                       :singleplayer singleplayer)
                     :disable (and (not singleplayer) am-spec)}}}}
                 "string"
@@ -158,6 +159,7 @@
                       :modoption-key (:key i)
                       :modoption-type (:type i)
                       :option-key option-key
+                      :server-key server-key
                       :singleplayer singleplayer)}}}}
                 "number"
                 {:text ""
@@ -187,6 +189,7 @@
                        :modoption-key (:key i)
                        :modoption-type (:type i)
                        :option-key option-key
+                       :server-key server-key
                        :singleplayer singleplayer)}}}}}
                 "list"
                 {:text ""
@@ -213,6 +216,7 @@
                       :modoption-key (:key i)
                       :modoption-type (:type i)
                       :option-key option-key
+                      :server-key server-key
                       :singleplayer singleplayer)
                     :items (or (map (comp :key second) (:items i))
                                [])}}}}
