@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.5](https://github.com/skynet-gh/skylobby/releases/tag/0.8.5) - 2022-03-20
+
+- Add bots to direct connect battles
+- Add modoptions to direct connect battles
+- Make Add AI button show up when spec
+- Fix start game button for direct connect host when spec
+
 ## [0.8.4](https://github.com/skynet-gh/skylobby/releases/tag/0.8.4) - 2022-03-20
 
 - Fix auto get resources
