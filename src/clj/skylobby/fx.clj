@@ -30,7 +30,12 @@
   (atom {}))
 
 (defn window-changed [window k v]
-  (swap! window-states assoc-in [window k] v))
+  (swap! window-states update window
+    (fn [window-state]
+      (if (and (:maximized window-state)
+               (not= :maximized k))
+        window-state ; don't save size if maximized
+        (assoc window-state k v)))))
 
 (defn add-maximized-listener [window-key ^javafx.stage.Stage node]
   (let [maximized-property (.maximizedProperty node)]

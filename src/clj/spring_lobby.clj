@@ -3538,6 +3538,7 @@
     (try
       (let [existing-bots (keys (:bots battle))
             bot-username (available-name existing-bots bot-username)
+            bot-color (u/random-color)
             status (assoc cu/default-battle-status
                           :ready true
                           :mode true
@@ -3546,25 +3547,23 @@
                           :ally (battle/available-ally battle)
                           :side (if (seq side-indices)
                                   (rand-nth side-indices)
-                                  0))
-            bot-status (cu/encode-battle-status status)
-            bot-color (u/random-color)
-            message (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)]
-        (if (keyword? server-key)
-          (do
-            (log/info "Special server add bot")
-            (swap! *state
-                   (fn [state]
-                     (let [bot-data {:bot-name bot-username
-                                     :ai-name bot-name
-                                     :ai-version bot-version
-                                     :team-color bot-color
-                                     :battle-status status
-                                     :owner username}]
-                       (-> state
-                           (assoc-in [:by-server server-key :battles (:battle-id battle) :bots bot-username] bot-data)
-                           (assoc-in [:by-server server-key :battle :bots bot-username] bot-data))))))
-          (message/send-message *state client-data message)))
+                                  0))]
+        (case (u/server-type server-key)
+          :spring-lobby
+          (let [
+                bot-status (cu/encode-battle-status status)]
+            (message/send-message
+              *state client-data
+              (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)))
+          (event-handler
+            {:event/type :skylobby.fx.event.battle/add-bot
+             :bot-data {:bot-name bot-username
+                        :ai-name bot-name
+                        :ai-version bot-version
+                        :team-color bot-color
+                        :battle-status status
+                        :owner username}
+             :server-key server-key})))
       (catch Exception e
         (log/error e "Error adding bot")))))
 

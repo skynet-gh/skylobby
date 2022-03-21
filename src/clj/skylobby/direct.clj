@@ -78,7 +78,9 @@
         (send-fn uid [::battle-details battle-details])
         (send-fn uid [::battle-scripttags scripttags])
         (if-let [broadcast-fn (get-in new-state [:by-server server-key :server :broadcast-fn])]
-          (broadcast-fn [::battle-users (:users battle)])
+          (do
+            (broadcast-fn [::battle-users (:users battle)])
+            (broadcast-fn [::battle-bots (:bots battle)]))
           (log/warn "No broadcast-fn found for server" server-key))))))
 
 (defmethod -event-msg-handler
@@ -133,13 +135,44 @@
   :skylobby.direct.client/chat
   [state-atom server-key {:keys [?data]}]
   (let [{:keys [channel-name]} ?data
-        [_old-state {:keys [by-server direct-connect-chat-commands]}] (swap-vals! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
+        {:keys [by-server direct-connect-chat-commands]} (swap! state-atom update-in [:by-server server-key :channels channel-name :messages] conj ?data)
         {:keys [server]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::chat ?data])
     (if direct-connect-chat-commands
       (chat-msg-handler state-atom server-key ?data)
       (log/info "Direct connect chat commands disabled"))))
+
+(defmethod -event-msg-handler
+  :skylobby.direct.client/add-bot
+  [state-atom server-key {:keys [?data]}]
+  (let [{:keys [bot-name]} ?data
+        {:keys [by-server]} (swap! state-atom update-in [:by-server server-key :battle :bots]
+                              (fn [bots]
+                                (if (contains? bots bot-name)
+                                  bots
+                                  (assoc bots bot-name ?data))))
+        {:keys [battle server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::battle-bots (:bots battle)])))
+
+(defmethod -event-msg-handler
+  :skylobby.direct.client/remove-bot
+  [state-atom server-key {:keys [?data uid]}]
+  (let [{:keys [bot-name]} ?data
+        {:keys [by-server]} (swap! state-atom update-in [:by-server server-key]
+                              (fn [server-data]
+                                (let [username (get-in server-data [:client-username uid])]
+                                  (-> server-data
+                                      (update-in [:battle :bots]
+                                        (fn [bots]
+                                          (if (= username
+                                                 (get-in bots [bot-name :owner]))
+                                            (dissoc bots bot-name)
+                                            bots)))))))
+        {:keys [battle server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::battle-bots (:bots battle)])))
 
 
 (defmethod chat-msg-handler "!engine"
