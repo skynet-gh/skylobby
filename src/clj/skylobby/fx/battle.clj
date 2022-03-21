@@ -707,7 +707,8 @@
                         (or
                           (and am-spec
                                (not host-ingame)
-                               (not singleplayer))
+                               (not singleplayer)
+                               (not= :direct-host server-type))
                           (and (not host-ingame)
                                (= :direct-client server-type)))
                         "Game not running"
@@ -715,6 +716,7 @@
                         (if debug-spring
                           "Debug Spring"
                           (str (if (and (not singleplayer)
+                                        (not= :direct-host server-type)
                                         (or host-ingame am-spec))
                                  "Join" "Start")
                                " Game")))
@@ -725,6 +727,7 @@
                                (and (= :direct-client server-type)
                                     (not host-ingame))
                                (and (not singleplayer)
+                                    (not= :direct-host server-type)
                                     (or (and (not host-ingame) am-spec)
                                         (not in-sync)))))
                 :on-action
