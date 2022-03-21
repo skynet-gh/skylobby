@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.6](https://github.com/skynet-gh/skylobby/releases/tag/0.8.6) - 2022-03-21
+
+- Fix file browse on Linux
+- Fix away dropdown in direct connect battle
+
 ## [0.8.5](https://github.com/skynet-gh/skylobby/releases/tag/0.8.5) - 2022-03-20
 
 - Add bots to direct connect battles
