@@ -1,5 +1,6 @@
 (ns skylobby.direct
   (:require
+    [cheshire.core :as json]
     [clojure.edn :as edn]
     [clojure.string :as string]
     [hiccup.core :as hiccup]
@@ -114,6 +115,23 @@
     (broadcast-fn [::battle-users (:users battle)])))
 
 (defmethod -event-msg-handler
+  :skylobby.direct.client/bot-state
+  [state-atom server-key {:keys [?data uid]}]
+  (let [{:keys [bot-name]} ?data
+        [_old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key]
+                                           (fn [server-data]
+                                             (let [username (get-in server-data [:client-username uid])]
+                                               (if (and username
+                                                        bot-name
+                                                        (= username
+                                                           (get-in server-data [:battle :bots bot-name :owner])))
+                                                 (update-in server-data [:battle :bots bot-name] u/deep-merge ?data)
+                                                 server-data))))
+        {:keys [battle server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::battle-bots (:bots battle)])))
+
+(defmethod -event-msg-handler
   :skylobby.direct.client/user-state
   [state-atom server-key {:keys [?data uid]}]
   (let [[_old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key]
@@ -216,6 +234,17 @@
   (log/info "Battle setting" message)
   (let [[_all k v] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
         state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" "modoptions" k] v) ; TODO map options, validate
+        {:keys [by-server]} state
+        {:keys [battle server]} (get by-server server-key)
+        {:keys [broadcast-fn]} server]
+    (broadcast-fn [::battle-scripttags (:scripttags battle)])))
+
+(defmethod chat-msg-handler "!aiprofile"
+  [state-atom server-key message]
+  (log/info "AI profile change" message)
+  (let [[_all bot-name options-json] (re-find #"\w+ ([^\s]+)\s+(.+)" (:text message))
+        options (json/parse-string options-json)
+        state (swap! state-atom update-in [:by-server server-key :battle :scripttags "game" "bots" bot-name "options"] u/deep-merge options)
         {:keys [by-server]} state
         {:keys [battle server]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
