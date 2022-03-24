@@ -1307,7 +1307,7 @@
                 (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
                           "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
               (if (#{:direct-client :direct-host} (u/server-type server-key))
-                (fx.event.battle/update-player-state
+                (fx.event.battle/update-player-or-bot-state
                   state-atom
                   server-key
                   {:username my-username}
@@ -2625,7 +2625,7 @@
           (log/info "Updating battle sync status for" server-key "from" old-sync-number
                     "to" new-sync-number)
           (if (#{:direct-client :direct-host} (u/server-type server-key))
-            (fx.event.battle/update-player-state
+            (fx.event.battle/update-player-or-bot-state
               state-atom
               server-key
               {:username username}
@@ -4267,20 +4267,29 @@
     (swap! *state assoc-in [:by-server server-key :battle :scripttags "game" "bots" bot-username "options" (name modoption-key)] value)))
 
 (defmethod event-handler ::save-aioptions
-  [{:keys [am-host available-options bot-username channel-name client-data current-options]}]
-  (swap! *state assoc :show-ai-options-window false)
-  (when-not am-host
-    (let [available-option-keys (set (map (comp :key second) available-options))
-          options (->> current-options
-                       (filter (comp available-option-keys first))
-                       (into {}))
-          json-data (json/generate-string options)]
-      @(event-handler
-         {:event/type ::send-message
-          :channel-name channel-name
-          :client-data client-data
-          :no-clear-draft true
-          :message (str "!aiProfile " bot-username " " json-data)}))))
+  [{:keys [am-host available-options bot-username channel-name client-data current-options server-key]}]
+  (let [
+        {:keys [by-server] :as state} (swap! *state assoc :show-ai-options-window false)
+        scripttags (get-in by-server [server-key :battle :scripttags])
+        available-option-keys (set (map (comp :key second) available-options))
+        options (->> current-options
+                     (filter (comp available-option-keys first))
+                     (into {}))]
+    (if-not am-host
+      (let [
+            json-data (json/generate-string options)]
+        @(event-handler
+           {:event/type :skylobby.fx.event.chat/send
+            :channel-name channel-name
+            :client-data client-data
+            :no-clear-draft true
+            :message (str "!aiProfile " bot-username " " json-data)
+            :server-key server-key}))
+      (if (#{:direct-host} (u/server-type server-key))
+        (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+          (broadcast-fn [:skylobby.direct/battle-scripttags scripttags])
+          (log/warn "No broadcast-fn" server-key))
+        (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
 
 
 (defmethod event-handler ::battle-ready-change
