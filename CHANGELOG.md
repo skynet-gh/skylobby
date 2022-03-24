@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.7](https://github.com/skynet-gh/skylobby/releases/tag/0.8.7) - 2022-03-23
+
+- Fix bot state changes in direct connect battle
+
 ## [0.8.6](https://github.com/skynet-gh/skylobby/releases/tag/0.8.6) - 2022-03-21
 
 - Fix file browse on Linux
