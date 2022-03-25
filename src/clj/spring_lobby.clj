@@ -3377,31 +3377,51 @@
       (let [desktop (Desktop/getDesktop)
             file (if (fs/exists? file)
                    file
-                   (fs/first-existing-parent file))]
-        (if (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
+                   (fs/first-existing-parent file))
+            runtime (Runtime/getRuntime)]
+        (cond
+          (.isSupported desktop Desktop$Action/BROWSE_FILE_DIR)
           (if (fs/is-directory? file)
             (.browseFileDirectory desktop (fs/file file "dne"))
             (.browseFileDirectory desktop file))
-          (if (fs/wsl-or-windows?)
-            (let [runtime (Runtime/getRuntime)
-                  command (concat
-                            ["explorer.exe"]
-                            (if (fs/is-directory? file)
-                              [(fs/wslpath file)]
-                              ["/select," ; https://superuser.com/a/809644
-                               (str "\"" (fs/wslpath file) "\"")]))
-                  ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-              (log/info "Running" (pr-str command))
-              (.exec runtime cmdarray nil nil))
-            (let [runtime (Runtime/getRuntime)
-                  dir-or-parent (if (fs/is-directory? file)
-                                  file
-                                  (fs/parent-file file))
-                  command ["xdg-open" (fs/canonical-path dir-or-parent)]
-                  ; https://stackoverflow.com/a/5116553
-                  ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-              (log/info "Running" (pr-str command))
-              (.exec runtime cmdarray nil nil)))))
+          (fs/wsl-or-windows?)
+          (let [
+                command (concat
+                          ["explorer.exe"]
+                          (if (fs/is-directory? file)
+                            [(fs/wslpath file)]
+                            ["/select," ; https://superuser.com/a/809644
+                             (str "\"" (fs/wslpath file) "\"")]))
+                ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+            (log/info "Running" (pr-str command))
+            (.exec runtime cmdarray nil nil))
+          (fs/linux?)
+          (let [
+                command ["dbus-send" (str "--bus=" (System/getenv "DBUS_SESSION_BUS_ADDRESS")) 
+                         "--print-reply"
+                         "--dest=org.freedesktop.FileManager1"
+                         "--type=method_call" 
+                         "/org/freedesktop/FileManager1"
+                         "org.freedesktop.FileManager1.ShowItems"
+                         (str "array:string:" (-> file .toURI .toURL str))
+                         "string:"]
+                ^"[Ljava.lang.String;" cmdarray (into-array String command)
+                _ (log/info "Running" (pr-str command))
+                process (.exec runtime cmdarray nil nil)
+                out {:exit-code (.waitFor process)
+                     :stdout (slurp (.getInputStream process))
+                     :stderr (slurp (.getErrorStream process))}]
+            (log/info "Result from dbus-send" out))
+          :else
+          (let [
+                dir-or-parent (if (fs/is-directory? file)
+                                file
+                                (fs/parent-file file))
+                command ["xdg-open" (fs/canonical-path dir-or-parent)]
+                ; https://stackoverflow.com/a/5116553
+                ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+            (log/info "Running" (pr-str command))
+            (.exec runtime cmdarray nil nil))))
       (catch Exception e
         (log/error e "Error browsing file" file)))))
 
