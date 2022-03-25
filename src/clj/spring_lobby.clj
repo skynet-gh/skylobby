@@ -3375,6 +3375,7 @@
   (future
     (try
       (let [desktop (Desktop/getDesktop)
+            ^File
             file (if (fs/exists? file)
                    file
                    (fs/first-existing-parent file))

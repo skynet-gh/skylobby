@@ -7,6 +7,8 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* false)
+
 
 ; https://github.com/ptaoussanis/sente/blob/7a1fad84cad9839834648a3d89dce8c1807d2f70/src/taoensso/sente.cljc#L198
 (defn cb-error? [cb-reply-clj]

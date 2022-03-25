@@ -8,6 +8,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* false)
+
+
 (defn host-direct-connect
   [state-atom
    {:keys [direct-connect-password direct-connect-port direct-connect-username spectate]}]
