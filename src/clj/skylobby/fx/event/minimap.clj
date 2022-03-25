@@ -4,6 +4,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* false)
+
+
 (def min-box-size 0.05)
 
 (defn add-methods

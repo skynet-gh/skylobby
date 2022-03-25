@@ -11,6 +11,9 @@
     (javafx.scene.control ColorPicker)))
 
 
+(set! *warn-on-reflection* false)
+
+
 (defn update-player-or-bot-state
   [state-atom server-key {:keys [bot-name username] :as id} state-change]
   (let [is-bot (boolean bot-name)

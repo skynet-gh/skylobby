@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.8](https://github.com/skynet-gh/skylobby/releases/tag/0.8.8) - 2022-03-25
+
+- Use dbus-send for file open on Linux
+
 ## [0.8.7](https://github.com/skynet-gh/skylobby/releases/tag/0.8.7) - 2022-03-23
 
 - Fix bot state changes in direct connect battle

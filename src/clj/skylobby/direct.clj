@@ -25,6 +25,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* false)
+
+
 (defmulti -event-msg-handler (fn [_state-atom _server-key message] (:id message)))
 
 (defn event-msg-handler

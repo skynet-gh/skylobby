@@ -6,6 +6,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* false)
+
+
 (defn set-ignore
   ([state-atom server-key username ignore]
    (set-ignore state-atom server-key username ignore nil))
