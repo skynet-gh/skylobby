@@ -125,11 +125,12 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
-    org.clojure/core.async {:mvn/version "1.5.648"}
     com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.2.1"}
+    hashp/hashp {:mvn/version "0.2.1"}
     io.aviso/pretty {:mvn/version "1.1.1"}
     metosin/reitit {:mvn/version "0.5.17"}
+    org.clojure/core.async {:mvn/version "1.5.648"}
     re-frame/re-frame {:mvn/version "1.2.0"}
     reagent/reagent {:mvn/version "1.1.1"}
     thheller/shadow-cljs {:mvn/version "2.17.8"}}
