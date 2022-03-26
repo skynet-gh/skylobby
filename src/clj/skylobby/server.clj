@@ -213,74 +213,74 @@
                                           :spring-isolation-dir spring-root}
                                          (dissoc
                                            (resource/spring-root-resources spring-root by-spring-root)
-                                           :engine-version :map-name :mod-name))))
-      (defmethod -event-msg-handler
-        :skylobby/send-message
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key channel-name message]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [client-data]} (get by-server server-key)]
-          (event/send-message state-atom {:channel-name channel-name
-                                          :client-data client-data
-                                          :message message
-                                          :server-key server-key})))
-      (defmethod -event-msg-handler
-        :skylobby/set-battle-mode
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key mode]} ?data
-              {:keys [by-server ready-on-unspec]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false)
-          (event/set-battle-mode state-atom {:battle-status battle-status
-                                             :client-data client-data
-                                             :mode mode
-                                             :ready-on-unspec ready-on-unspec
-                                             :server-key server-key
-                                             :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-auto-unspec
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key auto-unspec]} ?data
-              {:keys [by-server ready-on-unspec]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (event/set-auto-unspec state-atom {
-                                             :auto-unspec auto-unspec
-                                             :battle-status battle-status
-                                             :client-data client-data
-                                             :ready-on-unspec ready-on-unspec
-                                             :server-key server-key
-                                             :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-battle-ready
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key ready]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (event/set-battle-ready state-atom {:client-data client-data
-                                              :battle-status battle-status
-                                              :ready ready
-                                              :server-key server-key
-                                              :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-away
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key away]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [client-data username users]} (get by-server server-key)
-              {:keys [client-status]} (get-in users [:users username])]
-          (event/set-client-status state-atom {:client-data client-data
-                                               :client-status (assoc client-status :away away)
-                                               :server-key server-key}))))
-   (sente/start-server-chsk-router! ch-recv event-msg-handler)
-   chsk-server))
+                                           :engine-version :map-name :mod-name)))))
+    (defmethod -event-msg-handler
+      :skylobby/send-message
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key channel-name message]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data]} (get by-server server-key)]
+        (event/send-message state-atom {:channel-name channel-name
+                                        :client-data client-data
+                                        :message message
+                                        :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/set-battle-mode
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key mode]} ?data
+            {:keys [by-server ready-on-unspec]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false)
+        (event/set-battle-mode state-atom {:battle-status battle-status
+                                           :client-data client-data
+                                           :mode mode
+                                           :ready-on-unspec ready-on-unspec
+                                           :server-key server-key
+                                           :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-auto-unspec
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key auto-unspec]} ?data
+            {:keys [by-server ready-on-unspec]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (event/set-auto-unspec state-atom {
+                                           :auto-unspec auto-unspec
+                                           :battle-status battle-status
+                                           :client-data client-data
+                                           :ready-on-unspec ready-on-unspec
+                                           :server-key server-key
+                                           :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-battle-ready
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key ready]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (event/set-battle-ready state-atom {:client-data client-data
+                                            :battle-status battle-status
+                                            :ready ready
+                                            :server-key server-key
+                                            :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-away
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key away]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data username users]} (get by-server server-key)
+            {:keys [client-status]} (get-in users [:users username])]
+        (event/set-client-status state-atom {:client-data client-data
+                                             :client-status (assoc client-status :away away)
+                                             :server-key server-key})))
+    (sente/start-server-chsk-router! ch-recv event-msg-handler)
+    chsk-server))
 
 
 (defn index [_]
