@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.10](https://github.com/skynet-gh/skylobby/releases/tag/0.8.10) - 2022-04-04
+
+- Add context menu to chat history with Copy and Select All
+
 ## [0.8.9](https://github.com/skynet-gh/skylobby/releases/tag/0.8.9) - 2022-03-30
 
 - Fix preferred faction not set when game details load
