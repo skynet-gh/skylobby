@@ -225,23 +225,6 @@
    :nippy true})
 
 
-(def default-servers
-  {
-   "lobby.springrts.com:8200"
-   {:host "lobby.springrts.com"
-    :port 8200
-    :alias "Spring Official"}
-   "server2.beyondallreason.info:8200"
-   {:host "bar.teifion.co.uk"
-    :port 8200
-    :alias "Beyond All Reason"}
-   "server2.beyondallreason.info:8201"
-   {:host "server2.beyondallreason.info"
-    :port 8201
-    :alias "Beyond All Reason (SSL)"
-    :ssl true}})
-
-
 (defn initial-state []
   (merge
     {:auto-get-resources true
@@ -279,7 +262,7 @@
      :show-battle-preview true
      :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
-     :servers default-servers
+     :servers u/default-servers
      :use-default-ring-sound true
      :windows-as-tabs true}
     (apply

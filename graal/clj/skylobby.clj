@@ -2,21 +2,217 @@
   (:require
     [chime.core :as chime]
     [clojure.core.async :as async]
+    [clojure.core.cache :as cache]
+    [clojure.edn :as edn]
+    [clojure.java.io :as io]
+    [clojure.string :as string]
     java-time
     [org.httpkit.server :as http-kit]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.fs :as fs]
     [skylobby.server-stub :as server]
     [skylobby.task :as task]
     [skylobby.util :as u]
+    [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
+    (java.io File)
+    (java.net URL)
     (java.time Duration)))
 
 
 (def ^:dynamic *state (atom {}))
 
+
+; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
+(defn- read-file-tag [cs]
+  (io/file cs))
+(defn- read-url-tag [spec]
+  (URL. spec))
+
+; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
+(def custom-readers
+  {'spring-lobby/java.io.File skylobby/read-file-tag
+   'spring-lobby/java.net.URL skylobby/read-url-tag})
+
+; https://stackoverflow.com/a/23592006
+(defmethod print-method File [f ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
+(defmethod print-method URL [url ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
+
+; TODO read spring-lobby but write skylobby
+
+
+; https://github.com/ptaoussanis/nippy#custom-types-v21
+(nippy/extend-freeze File :skylobby/file
+  [^File x data-output]
+  (.writeUTF data-output (fs/canonical-path x)))
+(nippy/extend-thaw :skylobby/file
+  [data-input]
+  (io/file (.readUTF data-input)))
+
+(nippy/extend-freeze URL :skylobby/url
+  [^File x data-output]
+  (.writeUTF data-output (str x)))
+(nippy/extend-thaw :skylobby/url
+  [data-input]
+  (URL. (.readUTF data-input)))
+
+
+(defn nippy-filename [edn-filename]
+  (when edn-filename
+    (string/replace edn-filename #"\.edn$" ".bin")))
+
+(defn slurp-config-edn
+  "Returns data loaded from a .edn file in this application's root directory."
+  [{:keys [filename nippy]}]
+  (try
+    (let [nippy-file (fs/config-file (nippy-filename filename))]
+      (if (and nippy (fs/exists? nippy-file))
+        (do
+          (log/info "Slurping config nippy from" nippy-file)
+          (nippy/thaw-from-file nippy-file))
+        (let [config-file (fs/config-file filename)]
+          (log/info "Slurping config edn from" config-file)
+          (when (fs/exists? config-file)
+            (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
+              (if (map? data)
+                (do
+                  (try
+                    (log/info "Backing up config file that we could parse")
+                    (fs/copy config-file (fs/config-file (str filename ".known-good")))
+                    (catch Exception e
+                      (log/error e "Error backing up config file")))
+                  data)
+                (do
+                  (log/warn "Config file data from" filename "is not a map")
+                  {})))))))
+    (catch Exception e
+      (log/warn e "Exception loading app edn file" filename)
+      (try
+        (log/info "Copying bad config file for debug")
+        (fs/copy (fs/config-file filename) (fs/config-file (str filename ".debug")))
+        (catch Exception e
+          (log/warn e "Exception copying bad edn file" filename)))
+      {})))
+
+
+(def config-keys
+  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
+   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
+   :extra-replay-sources :filter-replay
+   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
+   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
+   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
+   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
+   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+
+
+(defn- select-config [state]
+  (select-keys state config-keys))
+
+(defn- select-spring [state]
+  (select-keys state [:by-spring-root]))
+
+(defn- select-importables [state]
+  (select-keys state
+    [:importables-by-path]))
+
+(defn- select-downloadables [state]
+  (select-keys state
+    [:downloadables-by-url :downloadables-last-updated]))
+
+(defn select-rapid [state]
+  (select-keys state
+    [:rapid-by-spring-root]))
+
+(defn- select-replays [state]
+  (select-keys state
+    [:online-bar-replays :replays-tags :replays-watched]))
+
+
+(def state-to-edn
+  [{:select-fn select-config
+    :filename "config.edn"
+    :pretty true}
+   {:select-fn select-spring
+    :filename "spring.edn"}
+   {:select-fn select-importables
+    :filename "importables.edn"}
+   {:select-fn select-downloadables
+    :filename "downloadables.edn"}
+   {:select-fn select-rapid
+    :filename "rapid.edn"
+    :nippy true}
+   {:select-fn select-replays
+    :filename "replays.edn"}])
+
+(defn select-parsed-replays-keys 
+  [state]
+  (select-keys state [:invalid-replay-paths :parsed-replays-by-path]))
+
+(def parsed-replays-config
+  {:select-fn select-parsed-replays-keys
+   :filename "parsed-replays.edn"
+   :nippy true})
+
+(defn initial-state []
+  (merge
+    {:auto-get-resources true
+     :auto-get-replay-resources true
+     :auto-rejoin-battle true
+     :battle-as-tab true
+     :battle-layout "horizontal"
+     :battles-layout "horizontal"
+     :battle-players-color-type "player"
+     :battle-resource-details true
+     :chat-auto-complete false
+     :chat-color-username true
+     :chat-highlight-username true
+     :disable-tasks-while-in-game true
+     :hide-barmanager-messages true
+     :highlight-tabs-with-new-battle-messages true
+     :highlight-tabs-with-new-chat-messages true
+     :increment-ids true
+     :interleave-ally-player-ids true
+     :is-java (u/is-java? (u/process-command))
+     :ipc-server-enabled false
+     :ipc-server-port u/default-ipc-port
+     :leave-battle-on-close-window true
+     :players-table-columns {:skill true
+                             :ally true
+                             :team true
+                             :color true
+                             :status true
+                             :spectator true
+                             :faction true
+                             :country true
+                             :bonus true}
+     :ready-on-unspec true
+     :refresh-replays-after-game true
+     :show-battle-preview true
+     :show-spring-picker true
+     :spring-isolation-dir (fs/default-spring-root)
+     :servers u/default-servers
+     :use-default-ring-sound true
+     :windows-as-tabs true}
+    (apply
+      merge
+      (doall
+        (map slurp-config-edn state-to-edn)))
+    (slurp-config-edn parsed-replays-config)
+    {:tasks-by-kind {}
+     :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
+     ;:minimap-type (first fx.battle/minimap-types)
+     ;:replay-minimap-type (first fx.battle/minimap-types)
+     :map-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
+     :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
+     :chat-auto-scroll true
+     :console-auto-scroll true}))
 
 (defmulti event-handler :event/type)
 (defmulti task-handler ::task-type)
@@ -33,17 +229,25 @@
 (defn remove-task [task tasks]
   (disj (set tasks) task))
 
+(defn pop-task-fn [task-kind]
+  (fn [{:keys [tasks-by-kind] :as state}]
+    (if (empty? (get tasks-by-kind task-kind))
+      state
+      (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
+        (-> state
+            (update-in [:tasks-by-kind task-kind] (partial remove-task task))
+            (assoc-in [:current-tasks task-kind] task))))))
+
+(defn finish-task-fn [task-kind]
+  (fn [state]
+    (-> state
+        (assoc-in [:current-tasks task-kind] nil)
+        (update :task-threads dissoc task-kind))))
+
 (defn handle-task!
   ([state-atom task-kind]
    (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
-     (let [[_before after] (swap-vals! state-atom
-                             (fn [{:keys [tasks-by-kind] :as state}]
-                               (if (empty? (get tasks-by-kind task-kind))
-                                 state
-                                 (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
-                                   (-> state
-                                       (update-in [:tasks-by-kind task-kind] (partial remove-task task))
-                                       (assoc-in [:current-tasks task-kind] task))))))
+     (let [after (swap! state-atom (pop-task-fn task-kind))
            task (-> after :current-tasks (get task-kind))]
        (try
          (let [thread (Thread. (fn [] (handle-task task)))]
@@ -56,15 +260,19 @@
            (log/error t "Critical error running task"))
          (finally
            (when task
-             (swap! state-atom
-               (fn [state]
-                 (-> state
-                     (assoc-in [:current-tasks task-kind] nil)
-                     (update :task-threads dissoc task-kind)))))))
+             (swap! state-atom (finish-task-fn task-kind)))))
        task))))
 
 (defn- my-client-status [{:keys [username users]}]
   (-> users (get username) :client-status))
+
+(defn- tasks-chimer-handler [state-atom task-kind]
+  (fn [_chimestamp]
+    (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
+          in-any-game (some (comp :ingame my-client-status second) by-server)]
+      (if (or disable-tasks (and disable-tasks-while-in-game in-any-game))
+        (log/debug "Skipping task handler while in game")
+        (handle-task! state-atom task-kind)))))
 
 (defn- tasks-chimer-fn
   ([state-atom task-kind]
@@ -74,25 +282,21 @@
            (chime/periodic-seq
              (java-time/plus (java-time/instant) (Duration/ofMillis 10000))
              (Duration/ofMillis 1000))
-           (fn [_chimestamp]
-             (let [{:keys [by-server disable-tasks disable-tasks-while-in-game]} @state-atom
-                   in-any-game (some (comp :ingame my-client-status second) by-server)]
-               (if (or disable-tasks (and disable-tasks-while-in-game in-any-game))
-                 (log/debug "Skipping task handler while in game")
-                 (handle-task! state-atom task-kind))))
+           (tasks-chimer-handler state-atom task-kind)
            {:error-handler
             (fn [e]
               (log/error e "Error handling task of kind" task-kind)
               true)})]
      (fn [] (.close chimer)))))
 
+(defn- add-task [tasks task]
+  (set (conj tasks task)))
+
 (defn add-task! [state-atom task]
   (if task
     (let [task-kind (task/task-kind task)]
       (log/info "Adding task" (pr-str task) "to" task-kind)
-      (swap! state-atom update-in [:tasks-by-kind task-kind]
-        (fn [tasks]
-          (set (conj tasks task)))))
+      (swap! state-atom update-in [:tasks-by-kind task-kind] add-task task))
     (log/warn "Attempt to add nil task" task)))
 
 
