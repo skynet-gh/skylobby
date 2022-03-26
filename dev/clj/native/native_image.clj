@@ -1,8 +1,13 @@
 (ns native-image
   (:require
     [clojure.java.io :as io]
+    [clojure.tools.namespace.repl :refer [disable-unload! disable-reload!]]
     clj.native-image
     [clojure.tools.namespace.find :refer [find-namespaces-in-dir]]))
+
+
+(disable-unload!)
+(disable-reload!)
 
 
 ; adapted from https://github.com/taylorwood/clj.native-image/blob/master/src/clj/native_image.clj
