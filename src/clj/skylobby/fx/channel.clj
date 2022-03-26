@@ -3,7 +3,7 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word]]
+    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word ext-with-context-menu]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.sub :as sub]
@@ -12,6 +12,7 @@
     [skylobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.input Clipboard ClipboardContent)
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
@@ -141,7 +142,9 @@
         hide-spads-set (->> hide-spads-messages
                             (filter second)
                             (map first)
-                            set)]
+                            set)
+        area-id (str "channel-text-area") ; channel-name "-" server-key)
+        area-id-css (str "#" area-id)]
     {:fx/type ext-recreate-on-key-changed
      :key {:ignore ignore-users-set
            :joinas-spec hide-joinas-spec
@@ -154,38 +157,58 @@
       {:fx/type fx.virtualized-scroll-pane/lifecycle
        :event-filter {:event/type :spring-lobby/filter-channel-scroll}
        :content
-       {:fx/type fx.rich-text/lifecycle-fast
-        :editable false
-        :style (text-style chat-font-size)
-        :wrap-text true
-        :document
-        [
-         (->> messages
-              (remove (comp ignore-users-set :username))
-              (remove (comp ignore-users-set :on-behalf-of :relay))
-              (remove (comp hide-spads-set :spads-message-type :spads))
-              (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
-              (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
-              (remove
-                (fn [{:keys [message-type text]}]
-                  (if hide-barmanager-messages
-                    (and (= :ex message-type)
-                         text
-                         (string/starts-with? text "* BarManager|"))
-                    false)))
-              reverse)
-         (fn [lines]
-           (channel-document
-             lines
-             {:color-my-username chat-color-username
-              :highlight
-              (concat
-                (when chat-highlight-words
-                  (string/split chat-highlight-words #"[\s,]+"))
-                (when chat-highlight-username
-                  [username]))
-              :my-username username}))
-         chat-auto-scroll]}}}}))
+       {:fx/type ext-with-context-menu
+        :props {:context-menu {:fx/type :context-menu
+                               :items
+                               [{:fx/type :menu-item
+                                 :text "Copy"
+                                 :on-action
+                                 (fn [event]
+                                   (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                     (let [clipboard (Clipboard/getSystemClipboard)
+                                           content (ClipboardContent.)]
+                                       (.putString content (.getSelectedText area))
+                                       (.setContent clipboard content))))}
+                                {:fx/type :menu-item
+                                 :text "Select All"
+                                 :on-action
+                                 (fn [event]
+                                   (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                     (.selectAll area)))}]}}
+        :desc
+        {:fx/type fx.rich-text/lifecycle-fast
+         :id area-id
+         :editable false
+         :style (text-style chat-font-size)
+         :wrap-text true
+         :document
+         [
+          (->> messages
+               (remove (comp ignore-users-set :username))
+               (remove (comp ignore-users-set :on-behalf-of :relay))
+               (remove (comp hide-spads-set :spads-message-type :spads))
+               (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
+               (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
+               (remove
+                 (fn [{:keys [message-type text]}]
+                   (if hide-barmanager-messages
+                     (and (= :ex message-type)
+                          text
+                          (string/starts-with? text "* BarManager|"))
+                     false)))
+               reverse)
+          (fn [lines]
+            (channel-document
+              lines
+              {:color-my-username chat-color-username
+               :highlight
+               (concat
+                 (when chat-highlight-words
+                   (string/split chat-highlight-words #"[\s,]+"))
+                 (when chat-highlight-username
+                   [username]))
+               :my-username username}))
+          chat-auto-scroll]}}}}}))
 
 (defn channel-view-history
   [state]
