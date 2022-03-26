@@ -1,6 +1,7 @@
 (ns skylobby.js
   (:require
     [cljs.reader :as reader]
+    [clojure.edn :as edn]
     [clojure.string :as string]
     goog.string.format
     ["moment" :as moment]
@@ -10,6 +11,7 @@
     [reitit.frontend.controllers :as rfc]
     [reitit.frontend.easy :as rfe]
     [re-frame.core :as rf]
+    [skylobby.common.util :as cu]
     [skylobby.data :as data]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
@@ -19,7 +21,7 @@
 (set! *warn-on-infer* true)
 
 
-(declare nav)
+(declare servers-nav)
 
 
 (defrecord File [path])
@@ -163,9 +165,17 @@
 (defn get-server-key [server-url username]
   (str username "@" server-url))
 
+(defn params-server-key [parameters]
+  (if-let [s (get-in parameters [:path :server-key])]
+    (edn/read-string s)
+    (let [
+          server-url (-> parameters :path :server-url)
+          username (-> parameters :query :username)]
+      (get-server-key server-url username))))
+
 (rf/reg-event-db ::get-battles
   (fn [db [_t server-key]]
-    (log/info "Getting battles for" server-key)
+    (log/info "Getting battles for" (pr-str server-key))
     (chsk-send!
       [:skylobby/get-in [:by-server server-key :battles]]
       5000
@@ -178,7 +188,7 @@
 
 (rf/reg-event-db ::get-users
   (fn [db [_t server-key]]
-    (log/info "Getting users for" server-key)
+    (log/info "Getting users for" (pr-str server-key))
     (chsk-send!
       [:skylobby/get-in [:by-server server-key :users]]
       5000
@@ -208,7 +218,7 @@
 
 (rf/reg-event-db ::get-battle
   (fn [db [_t server-key]]
-    (log/info "Getting battle for" server-key)
+    (log/info "Getting battle for" (pr-str server-key))
     (chsk-send!
       [:skylobby/get-in [:by-server server-key :battle]]
       5000
@@ -221,7 +231,7 @@
 
 (rf/reg-event-db ::get-auto-unspec
   (fn [db [_t server-key]]
-    (log/info "Getting auto unspec for" server-key)
+    (log/info "Getting auto unspec for" (pr-str server-key))
     (chsk-send!
       [:skylobby/get-in [:by-server server-key :auto-unspec]]
       5000
@@ -233,7 +243,7 @@
 
 (rf/reg-event-db ::get-auto-launch
   (fn [db [_t server-key]]
-    (log/info "Getting auto launch for" server-key)
+    (log/info "Getting auto launch for" (pr-str server-key))
     (chsk-send!
       [:skylobby/get-in [:auto-launch server-key]]
       5000
@@ -502,7 +512,7 @@
         username-drafts (listen [::username-drafts])
         password-drafts (listen [::password-drafts])]
     [:div
-     [nav]
+     [servers-nav]
      [:div {:class "flex justify-center"}
       [:table
        [:thead
@@ -580,8 +590,7 @@
     [:div {:class "flex justify-center"}
      (for [route-name route-names]
        ^{:key route-name}
-       [:div {:key route-name
-              :class "pa3"}
+       [:div {:class "pa3"}
         [:a
          {:class (str header-class " "
                    (if (or (= route-name (-> current-route :data :name))
@@ -615,7 +624,7 @@
                    :hide-passworded-battles hide-passworded-battles})
         users (listen [::users server-key])]
     [:div
-     [nav]
+     [servers-nav]
      [server-nav]
      [:div
       {:class "flex justify-center"}
@@ -809,7 +818,7 @@
         username (-> parameters :query :username)
         server-key (get-server-key server-url username)]
     [:div
-     [nav]
+     [servers-nav]
      [server-nav]
      [:div {:class "flex justify-center"}
       [my-channels-nav {:channel-name channel-name :server-key server-key :server-url server-url :username username}]]]))
@@ -825,7 +834,7 @@
      {:class "flex"
       :style {:flex-flow "column"
               :height "100%"}}
-     [nav]
+     [servers-nav]
      [server-nav]
      [:div {:class "flex justify-center"}
       [my-channels-nav {:channel-name channel-name :server-key server-key :server-url server-url :username username}]]
@@ -873,9 +882,9 @@
 (defn room-page [_]
   (let [current-route (listen [::current-route])
         {:keys [parameters]} current-route
-        server-url (-> parameters :path :server-url)
-        username (-> parameters :query :username)
-        server-key (get-server-key server-url username)
+        server-key (params-server-key parameters)
+        username (or (:username server-key)
+                     (-> parameters :query :username))
         {:keys [scripttags] :as battle} (listen [::battle server-key])
         users (listen [::users server-key])
         minimap-size (or (listen [::minimap-size]) default-minimap-size)
@@ -885,8 +894,9 @@
      {:class "flex"
       :style {:flex-flow "column"
               :height "100%"}}
-     [nav]
-     [server-nav]
+     [servers-nav]
+     (when-not (cu/is-direct? server-key)
+       [server-nav])
      [:div
       {:class "flex justify-center"}
       [:button
@@ -1125,7 +1135,7 @@
 
 (defn server-page [_]
   [:div
-   [nav]
+   [servers-nav]
    [server-nav]])
 
 
@@ -1156,6 +1166,23 @@
        ;; Teardown can be done here.
        :stop  (fn [& _params]
                 (log/info "Leaving servers page"))}]}]
+   ["direct/:server-key"
+    {:name ::direct-battle
+     :view room-page
+     :link-text "Direct"
+     :controllers
+     [{:parameters {:path [:server-key]}
+       :start (fn [params]
+                (let [server-key (edn/read-string (get-in params [:path :server-key]))]
+                  (log/info "Entering direct connect battle" (pr-str server-key))
+                  (rf/dispatch [::get-battles server-key])
+                  (rf/dispatch [::get-users server-key])
+                  (rf/dispatch [::get-battle server-key])
+                  (rf/dispatch [::get-auto-launch server-key])
+                  (rf/dispatch [::get-auto-unspec server-key])))
+       :stop (fn [params]
+               (let [server-key (get-in params [:path :server-key])]
+                 (log/info "Leaving direct connect battle" server-key)))}]}]
    ["server/:server-url"
     {
      :view      server-page
@@ -1273,12 +1300,10 @@
     {:use-fragment false}))
 
 
-(defn nav []
+(defn servers-nav []
   (let [current-route (listen [::current-route])
         {:keys [parameters]} current-route
-        server-url (-> parameters :path :server-url)
-        username (-> parameters :query :username)
-        server-key (get-server-key server-url username)]
+        server-key (params-server-key parameters)]
     [:div
      [:div {:class "flex justify-center"}
       (let [route-name ::servers]
@@ -1292,16 +1317,23 @@
            :href (href route-name)}
           "Servers"]])
       (for [{:keys [server-id server-url username]} (filter :server-id (listen [::active-servers]))]
-        [:div {:key server-id
-               :class "pa3"}
-         [:a
-          {
-           :class (str header-class " "
-                    (if (= server-id server-key)
-                      "purple"
-                      "gray"))
-           :href (href ::battles {:server-url server-url} {:username username})}
-          server-id]])]]))
+        (let [is-direct (cu/is-direct? server-id)]
+          ^{:key (str server-id)}
+          [:div
+           {:class "pa3"}
+           [:a
+            {
+             :class (str header-class " "
+                      (if (= server-id server-key)
+                        "purple"
+                        "gray"))
+             :href (if is-direct
+                     (href ::direct-battle {:server-key server-id})
+                     (href ::battles {:server-url server-url} {:username username}))}
+            (if is-direct
+              (let [{:keys [server-type username hostname port]} server-id]
+                (str (name server-type) " " username "@" hostname ":" port))
+              server-id)]]))]]))
 
 
 (defn router-component [{:keys [router]}]
