@@ -150,15 +150,19 @@
 (defn refresh-on-file-change [context event]
   (when-let [file (:file event)]
     (let [f (io/file file)]
-      (when (and (.exists f) (not (.isDirectory f)))
-        (if @refreshing
-          (println "Duplicate file event, skipping refresh")
-          (try
-            (reset! refreshing true)
-            (refresh-rerender)
-            (catch Throwable e
-              (println e)
-              (throw e)))))))
+      (when (and (.exists f)
+                 (not (.isDirectory f)))
+        (if (string/starts-with? (.getName f) ".")
+          (println "Ignoring hidden file change" f)
+          (if @refreshing
+            (println "Duplicate file event, skipping refresh")
+            (try
+              (println "Refreshing due to file change" f)
+              (reset! refreshing true)
+              (refresh-rerender)
+              (catch Throwable e
+                (println e)
+                (throw e))))))))
   context)
 
 
