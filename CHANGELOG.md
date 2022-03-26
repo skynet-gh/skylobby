@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.9](https://github.com/skynet-gh/skylobby/releases/tag/0.8.9) - 2022-03-26
+
+- Add context menu to chat history with Copy and Select All
+
 ## [0.8.8](https://github.com/skynet-gh/skylobby/releases/tag/0.8.8) - 2022-03-25
 
 - Use dbus-send for file open on Linux
