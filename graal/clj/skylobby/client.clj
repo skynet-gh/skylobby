@@ -90,22 +90,26 @@
   ([server-url {:keys [encoding ssl]}]
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
-         raw-client nil
-         #_
-         (tcp/client (merge
-                       {:host host
-                        :port port
-                        :ssl? ssl}
-                       (when-not ssl ; starttls
-                         {:pipeline-transform
-                          (fn [pipeline]
-                            (log/info "Saving TCP pipeline for TLS upgrade")
-                            (reset! pipeline-atom pipeline))})))]
-         ;protocol (protocol encoding)]
-     {:client-deferred nil
-      #_
+         _ (require 'aleph.tcp)
+         tcp-client-fn (var-get (find-var 'aleph.tcp/client))
+         raw-client
+         (tcp-client-fn
+           (merge
+             {:host host
+              :port port
+              :ssl? ssl}
+             (when-not ssl ; starttls
+               {:pipeline-transform
+                (fn [pipeline]
+                  (log/info "Saving TCP pipeline for TLS upgrade")
+                  (reset! pipeline-atom pipeline))})))
+         _ (require 'skylobby.client.gloss)
+         protocol-fn (var-get (find-var 'skylobby.client.gloss/protocol))
+         protocol (protocol-fn encoding)
+         wrap-duplex-stream-fn (var-get (find-var 'skylobby.client.gloss/wrap-duplex-stream))]
+     {:client-deferred
       (d/chain raw-client
-        #(wrap-duplex-stream protocol %))
+        #(wrap-duplex-stream-fn protocol %))
       :pipeline-atom pipeline-atom})))
 
 (defmethod handler/handle :default [state-atom server-url m]
@@ -182,7 +186,7 @@
             (u/append-console-log state-atom server-key :server stls-response)
             (require 'skylobby.client.stls)
             (let [pipeline @pipeline-atom
-                  upgrade-pipeline-fn (var-get (find-var 'skylobby.client.stls))]
+                  upgrade-pipeline-fn (var-get (find-var 'skylobby.client.stls/upgrade-pipeline))]
               (when (upgrade-pipeline-fn pipeline)
                 (print-loop state-atom server-key client)))
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
