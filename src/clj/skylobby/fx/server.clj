@@ -69,7 +69,7 @@
   (-> (merge
         {:auto-connect false
          :encoding nil
-         :port 8200
+         :port u/default-server-port
          :ssl false}
         server-data)
       (update :port u/to-number)
@@ -161,7 +161,7 @@
              :text " Port: "}
             {:fx/type :text-field
              :text (str server-port)
-             :prompt-text "8200"
+             :prompt-text (str u/default-server-port)
              :on-text-changed {:event/type :spring-lobby/assoc-in
                                :key [:server-edit 1 :port]}}]}
           {:fx/type :h-box

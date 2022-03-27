@@ -14,7 +14,7 @@
 (defn host-direct-connect
   [state-atom
    {:keys [direct-connect-password direct-connect-port direct-connect-username spectate]}]
-  (let [direct-connect-port (or direct-connect-port 8200)
+  (let [direct-connect-port (or direct-connect-port u/default-server-port)
         server-key {:server-type :direct
                     :protocol :skylobby
                     :host true
