@@ -11,6 +11,7 @@
     [manifold.stream :as s]
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
+    ;[skylobby.client.stls :as stls]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -179,25 +180,11 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
-            #_
-            (let [^ChannelPipeline pipeline @pipeline-atom]
-              (if pipeline
-                (let [; https://github.com/clj-commons/aleph/blob/master/src/aleph/netty.clj#L721-L724
-                      ssl-context-builder (SslContextBuilder/forClient)
-                      _ (.trustManager ssl-context-builder InsecureTrustManagerFactory/INSTANCE)
-                      _ (.startTls ssl-context-builder true)
-                      ssl-context (.build ssl-context-builder)
-                      ch (.channel pipeline)
-                      engine (.newEngine ssl-context (.alloc ch))
-                      handler (SslHandler. engine false)
-                      handshake-future (.handshakeFuture handler)]
-                  (.addFirst pipeline "ssl" handler)
-                  (log/info "Added SslHandler to TCP pipeline")
-                  (log/info "Waiting for SSL handshake")
-                  (let [handshake @handshake-future]
-                    (log/info "SSL handshake finished" handshake))
-                  (print-loop state-atom server-key client))
-                (log/warn "No TCP pipeline to upgrade to TLS!")))
+            (require 'skylobby.client.stls)
+            (let [pipeline @pipeline-atom
+                  upgrade-pipeline-fn (var-get (find-var 'skylobby.client.stls))]
+              (when (upgrade-pipeline-fn pipeline)
+                (print-loop state-atom server-key client)))
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
 
 (defn disconnect [state-atom {:keys [server-key] :as client-data}]
