@@ -1,18 +1,7 @@
 {
   "rules": [
     { 
-      "excludeClasses": "io.netty.channel.epoll.Native",
-      "excludeClasses": "io.netty.channel.epoll.Epoll",
-      "excludeClasses": "io.netty.channel.epoll.EpollEventLoop",
-      "excludeClasses": "io.netty.channel.epoll.EpollEventArray",
-      "excludeClasses": "io.netty.channel.kqueue.KQueue",
-      "excludeClasses": "io.netty.channel.kqueue.KQueueEventLoop",
-      "excludeClasses": "io.netty.channel.kqueue.KQueueEventArray",
-      "excludeClasses": "io.netty.channel.kqueue.Native",
-      "excludeClasses": "io.netty.channel.unix.Limits",
-      "excludeClasses": "io.netty.channel.unix.Errors",
-      "excludeClasses": "io.netty.channel.unix.IovArray",
-      "excludeClasses": "io.netty.buffer.PooledByteBufAllocator"
+      "excludeClasses": "io.netty.**"
     }
   ]
 }

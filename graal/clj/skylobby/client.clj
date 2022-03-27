@@ -1,6 +1,6 @@
 (ns skylobby.client
   (:require
-    ;[aleph.tcp :as tcp]
+    aleph.tcp
     [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
@@ -9,9 +9,10 @@
     ;[gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
+    [skylobby.client.gloss :as gloss]
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
-    ;[skylobby.client.stls :as stls]
+    [skylobby.client.stls :as stls]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -90,10 +91,8 @@
   ([server-url {:keys [encoding ssl]}]
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
-         _ (require 'aleph.tcp)
-         tcp-client-fn (var-get (find-var 'aleph.tcp/client))
          raw-client
-         (tcp-client-fn
+         (aleph.tcp/client
            (merge
              {:host host
               :port port
@@ -103,13 +102,10 @@
                 (fn [pipeline]
                   (log/info "Saving TCP pipeline for TLS upgrade")
                   (reset! pipeline-atom pipeline))})))
-         _ (require 'skylobby.client.gloss)
-         protocol-fn (var-get (find-var 'skylobby.client.gloss/protocol))
-         protocol (protocol-fn encoding)
-         wrap-duplex-stream-fn (var-get (find-var 'skylobby.client.gloss/wrap-duplex-stream))]
+         protocol (gloss/protocol encoding)]
      {:client-deferred
       (d/chain raw-client
-        #(wrap-duplex-stream-fn protocol %))
+        #(gloss/wrap-duplex-stream protocol %))
       :pipeline-atom pipeline-atom})))
 
 (defmethod handler/handle :default [state-atom server-url m]
@@ -184,10 +180,8 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
-            (require 'skylobby.client.stls)
-            (let [pipeline @pipeline-atom
-                  upgrade-pipeline-fn (var-get (find-var 'skylobby.client.stls/upgrade-pipeline))]
-              (when (upgrade-pipeline-fn pipeline)
+            (let [pipeline @pipeline-atom]
+              (when (stls/upgrade-pipeline pipeline)
                 (print-loop state-atom server-key client)))
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
 

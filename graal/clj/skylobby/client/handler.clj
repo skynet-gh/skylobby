@@ -4,6 +4,7 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     crypto.random
+    [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.fs :as fs]
     [skylobby.spring :as spring]
@@ -137,9 +138,7 @@
 
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
-        _ (require 'skylobby.client.gloss)
-        decode-client-status-fn (var-get (find-var 'skylobby.client.gloss/decode-client-status)) 
-        decoded-status (decode-client-status-fn client-status)
+        decoded-status (gloss/decode-client-status client-status)
         now (u/curr-millis)
         [prev-state _curr-state] (swap-vals! state-atom update-in [:by-server server-key :users username]
                                    (fn [user-data]

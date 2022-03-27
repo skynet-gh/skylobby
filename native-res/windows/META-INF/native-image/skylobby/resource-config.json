@@ -2,151 +2,22 @@
   "resources":{
   "includes":[
     {
-      "pattern":"\\Qaleph/netty.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qaleph/tcp.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/char_sequence.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/char_sequence__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/graph.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/graph__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/protocols.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/protocols__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/pushback_stream.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/pushback_stream__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/utils.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams/utils__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qbyte_streams__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/codecs.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/codecs__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/formats.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/formats__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/protocols.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/protocols__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/structure.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core/structure__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/core__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/bits.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/bits__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/core.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/core__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/delimited.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes/delimited__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/bytes__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/primitives.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/primitives__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string/codecs.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string/codecs__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string/core.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string/core__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/data/string__init.class\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/io.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qgloss/io__init.class\\E"
-    }, 
-    {
       "pattern":"\\Qnet/jpountz/util/win32/amd64/liblz4-java.so\\E"
     }, 
     {
-      "pattern":"\\Qprimitive_math.clj\\E"
+      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.js.map\\E"
     }, 
     {
-      "pattern":"\\Qprimitive_math__init.class\\E"
+      "pattern":"\\Qpublic/js/cljs-runtime/module$node_modules$react_dom$cjs$react_dom_development.js.map\\E"
     }, 
     {
-      "pattern":"\\Qskylobby/client/gloss.clj\\E"
+      "pattern":"\\Qpublic/js/cljs-runtime/shadow.cljs.devtools.client.browser.js.map\\E"
     }, 
     {
-      "pattern":"\\Qskylobby/client/gloss__init.class\\E"
+      "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.appenders.core.js.map\\E"
     }, 
     {
-      "pattern":"\\Qskylobby/client/stls.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qskylobby/client/stls__init.class\\E"
+      "pattern":"\\Qpublic/js/main.js\\E"
     }
   ]},
   "bundles":[]
