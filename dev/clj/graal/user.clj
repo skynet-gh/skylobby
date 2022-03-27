@@ -31,6 +31,9 @@
 (def refreshing (atom false))
 
 
+(def ^:dynamic old-client-handler nil)
+
+
 (defn stop-chimer [chimer]
   (when chimer
     (try
@@ -39,6 +42,21 @@
       (catch Throwable e
         (println "error stopping chimer" chimer e)))))
 
+(defn client-handler [state-atom server-url message]
+  (try
+    (require 'skylobby.client)
+    (require 'skylobby.client.handler)
+    (let [new-handler (var-get (find-var 'skylobby.client.handler/handle))]
+      (when new-handler
+        (alter-var-root #'old-client-handler (constantly new-handler))))
+    (catch Throwable e
+      (println e "compile error, using old client handler")))
+  (try
+    (old-client-handler state-atom server-url message)
+    (catch Throwable e
+      (println e "exception in old client, probably unbound fn, fix asap")
+      (throw e))))
+
 (defn rerender []
   (try
     (println "Requiring skylobby ns")
@@ -46,8 +64,8 @@
     (require 'skylobby.main)
     (let [new-state-var (find-var 'skylobby/*state)]
       (alter-var-root new-state-var (constantly *state)))
-    ;(require 'spring-lobby.client)
-    ;(alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+    (require 'skylobby.client)
+    (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
     (try
       (let [init-fn (var-get (find-var 'skylobby/init))]
         (reset! init-state (init-fn *state {:skip-tasks true})))
@@ -118,10 +136,10 @@
            initial-state-fn (var-get (find-var 'skylobby/initial-state))
            initial-state (initial-state-fn)]
        (reset! *state initial-state))
-     ;(require 'spring-lobby.client)
-     ;(require 'spring-lobby.client.handler)
-     ;(alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
-     ;(alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+     (require 'skylobby.client)
+     (require 'skylobby.client.handler)
+     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'skylobby.client/handler))))
+     (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
      (require 'skylobby)
      (require 'skylobby.main)
      (let [init-fn (var-get (find-var 'skylobby/init))]

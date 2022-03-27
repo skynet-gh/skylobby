@@ -154,7 +154,7 @@
       [:skylobby/get-servers]
       5000
       (fn [reply]
-        (log/trace "Servers reply" reply)
+        (log/debug "Servers reply" reply)
         (if (sente/cb-success? reply)
           (do
             (log/trace "Got servers" reply)

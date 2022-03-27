@@ -40,21 +40,25 @@
    :ascii])
 
 
+(defn server-url [{:keys [host port]}]
+  (when (and host port)
+    (str host ":" port)))
+
 (def default-servers
-  {
-   "lobby.springrts.com:8200"
-   {:host "lobby.springrts.com"
-    :port 8200
-    :alias "Spring Official"}
-   "server2.beyondallreason.info:8200"
-   {:host "bar.teifion.co.uk"
-    :port 8200
-    :alias "Beyond All Reason"}
-   "server2.beyondallreason.info:8201"
-   {:host "server2.beyondallreason.info"
-    :port 8201
-    :alias "Beyond All Reason (SSL)"
-    :ssl true}})
+  (let [springlobby {:host "lobby.springrts.com"
+                     :port default-server-port
+                     :alias "Spring Official"}
+        bar {:host "bar.teifion.co.uk"
+             :port default-server-port
+             :alias "Beyond All Reason"}
+        bar-ssl {:host "server2.beyondallreason.info"
+                 :port 8201
+                 :alias "Beyond All Reason (SSL)"
+                 :ssl true}
+        servers [springlobby bar bar-ssl]]
+    (->> servers
+         (map (juxt server-url identity))
+         (into {}))))
 
 
 (defn agent-string []
