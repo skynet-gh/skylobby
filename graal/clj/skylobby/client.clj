@@ -1,14 +1,12 @@
 (ns skylobby.client
   (:require
-    aleph.netty
-    [aleph.tcp :as tcp]
-    byte-streams
+    ;[aleph.tcp :as tcp]
     [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.string :as string]
-    [gloss.core :as gloss]
-    [gloss.io :as gio]
+    ;[gloss.core :as gloss]
+    ;[gloss.io :as gio]
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [skylobby.client.handler :as handler]
@@ -17,8 +15,9 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
-    (io.netty.handler.ssl SslContextBuilder SslHandler)
-    (io.netty.handler.ssl.util InsecureTrustManagerFactory)
+    ;(io.netty.channel ChannelPipeline)
+    ;(io.netty.handler.ssl SslContextBuilder SslHandler)
+    ;(io.netty.handler.ssl.util InsecureTrustManagerFactory)
     (java.nio ByteBuffer)
     (manifold.stream SplicedStream)))
 
@@ -35,12 +34,14 @@
 
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
+#_
 (defn protocol [encoding]
   (gloss/compile-frame
     (gloss/delimited-frame
       ["\n"]
       (gloss/string (or encoding u/default-client-encoding)))))
 
+#_
 (def client-status-protocol
   (gloss/compile-frame
     (gloss/bit-map
@@ -53,19 +54,20 @@
 
 (def default-client-status "0")
 
+#_
 (defn decode-client-status [status-str]
   (dissoc
     (gio/decode client-status-protocol
-      (byte-streams/convert
+      (ByteBuffer/wrap
         (.array
           (.put
             (ByteBuffer/allocate 1)
-            (Byte/parseByte status-str)))
-        ByteBuffer))
+            (Byte/parseByte status-str)))))
     :prefix))
 
 ; https://aleph.io/examples/literate.html#aleph.examples.tcp
 
+#_
 (defn wrap-duplex-stream
   [protocol s]
   (let [out (s/stream)]
@@ -87,18 +89,22 @@
   ([server-url {:keys [encoding ssl]}]
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
-         raw-client (tcp/client (merge
-                                  {:host host
-                                   :port port
-                                   :ssl? ssl}
-                                  (when-not ssl ; starttls
-                                    {:pipeline-transform
-                                     (fn [pipeline]
-                                       (log/info "Saving TCP pipeline for TLS upgrade")
-                                       (reset! pipeline-atom pipeline))})))
-         protocol (protocol encoding)]
-     {:client-deferred (d/chain raw-client
-                         #(wrap-duplex-stream protocol %))
+         raw-client nil
+         #_
+         (tcp/client (merge
+                       {:host host
+                        :port port
+                        :ssl? ssl}
+                       (when-not ssl ; starttls
+                         {:pipeline-transform
+                          (fn [pipeline]
+                            (log/info "Saving TCP pipeline for TLS upgrade")
+                            (reset! pipeline-atom pipeline))})))]
+         ;protocol (protocol encoding)]
+     {:client-deferred nil
+      #_
+      (d/chain raw-client
+        #(wrap-duplex-stream protocol %))
       :pipeline-atom pipeline-atom})))
 
 (defmethod handler/handle :default [state-atom server-url m]
@@ -173,7 +179,8 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
-            (let [^io.netty.channel.ChannelPipeline pipeline @pipeline-atom]
+            #_
+            (let [^ChannelPipeline pipeline @pipeline-atom]
               (if pipeline
                 (let [; https://github.com/clj-commons/aleph/blob/master/src/aleph/netty.clj#L721-L724
                       ssl-context-builder (SslContextBuilder/forClient)

@@ -1,5 +1,6 @@
 (ns skylobby
   (:require
+    [clojure.java.io :as io]
     [clojure.tools.build.api :as b]))
 
 
@@ -22,6 +23,7 @@
   (b/compile-clj {:basis basis
                   :src-dirs src-dirs
                   :class-dir class-dir})
+  (spit (io/file "resources" (str (name lib) ".version")) version)
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis basis

@@ -5,7 +5,7 @@
     [clojure.string :as string]
     crypto.random
     [skylobby.client.message :as message]
-    [skylobby.client.util :as cu]
+    ;[skylobby.client.util :as cu]
     [skylobby.fs :as fs]
     [skylobby.spring :as spring]
     [skylobby.spring.script :as spring-script]
@@ -139,7 +139,7 @@
 
 (defmethod handle "CLIENTSTATUS" [state-atom server-key m]
   (let [[_all username client-status] (parse-client-status m)
-        decoded-status (cu/decode-client-status client-status)
+        decoded-status nil ;(cu/decode-client-status client-status)
         now (u/curr-millis)
         [prev-state _curr-state] (swap-vals! state-atom update-in [:by-server server-key :users username]
                                    (fn [user-data]

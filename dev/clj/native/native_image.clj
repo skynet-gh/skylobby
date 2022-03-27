@@ -24,12 +24,14 @@
       (compile (symbol ns)))
     (let [cp (clj.native-image/native-image-classpath)]
       (spit "native-image-args" (str "-cp " cp)))
-    (System/exit
-      (clj.native-image/exec-native-image
-        nat-image-path
-        (concat ["@native-image-args"] opts)
-        nil
-        main-ns))))
+    (let [args (concat ["@native-image-args"] opts)]
+      (println "Running native-image with options" (with-out-str (clojure.pprint/pprint args)))
+      (System/exit
+        (clj.native-image/exec-native-image
+          nat-image-path
+          args
+          nil
+          main-ns)))))
 
 (defn -main [main-ns & args]
   (try

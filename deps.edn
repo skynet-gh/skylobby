@@ -191,7 +191,7 @@
     commons-io/commons-io {:mvn/version "2.11.0"}
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
-    gloss/gloss {:mvn/version "0.2.6"}
+    ;gloss/gloss {:mvn/version "0.2.6"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
@@ -211,7 +211,7 @@
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
-    org.clj-commons/byte-streams {:mvn/version "0.2.10"}
+    ;org.clj-commons/byte-streams {:mvn/version "0.2.10"}
     org.clojure/clojure {:mvn/version "1.11.0"}
     org.clojure/core.async {:mvn/version "1.5.648"}
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
@@ -267,12 +267,13 @@
    {
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}}
+    ;com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
    :main-opts ["-m" "native-image" "skylobby.main"
                "--no-fallback"
                "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
+               ;"--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl,io.netty.handler.ssl.OpenSslContext,io.netty.handler.ssl.ReferenceCountedOpenSslContext,io.netty.handler.ssl.OpenSslServerContext,io.netty.channel.epoll.Epoll,io.netty.channel.epoll.EpollEventLoop,io.netty.channel.epoll.Native,io.netty.channel.epoll.EpollEventArray,io.netty.channel.DefaultFileRegion,io.netty.channel.unix.Errors,io.netty.channel.DefaultFileRegion,io.netty.channel.epoll.Native,io.netty.channel.epoll.Epoll,io.netty.channel.epoll.EpollEventLoop,io.netty.channel.epoll.EpollEventArray,io.netty.channel.kqueue.KQueue,io.netty.channel.kqueue.KQueueEventLoop,io.netty.channel.kqueue.KQueueEventArray,io.netty.channel.kqueue.Native,io.netty.channel.unix.Limits"
                "--initialize-at-build-time=io.aviso"
                "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
@@ -280,7 +281,34 @@
                "--initialize-at-build-time=skylobby$fn__32752"
                "--initialize-at-build-time=skylobby$fn__32758"
                "--initialize-at-build-time=skylobby$fn__32796"
+               "--initialize-at-build-time=skylobby$fn__35471"
+               "--initialize-at-build-time=skylobby$fn__35477"
                ; wtf are these fns
+               ;
+               "--initialize-at-run-time=byte_streams"
+               "--trace-class-initialization=byte_streams.utils$doit,byte_streams.graph$seq_conversion_fn,byte_streams$fn__29375,byte_streams.pushback_stream$eager_take__28923,byte_streams.graph$protocol_QMARK_,byte_streams$fn__29361,byte_streams.graph$class_satisfies_QMARK_,byte_streams$fn__29017,byte_streams.pushback_stream$put_buffer__28909,byte_streams.pushback_stream$walk,byte_streams.graph$type,byte_streams.pushback_stream$expand_either,byte_streams.graph$conversion_fn,byte_streams.pushback_stream$close__28916,byte_streams$fn__29365,byte_streams$this__29039,byte_streams.graph$fn__28411$G__28385__28416,byte_streams.pushback_stream.SynchronizedPushbackByteStream,byte_streams.char_sequence$decode_byte_source,byte_streams.pushback_stream$take__28930,byte_streams.char_sequence$parse_result,byte_streams.pushback_stream$put_array__28902,byte_streams.graph.Type,byte_streams.graph$implicit_conversions,byte_streams.protocols$fn__28293$G__28288__28298,byte_streams.graph$fn__28435$G__28387__28440,skylobby$fn__37938,byte_streams.pushback_stream$pushback_array__28937,skylobby$fn__37932,byte_streams$fn__29368,byte_streams.graph.ConversionGraph,byte_streams.graph$assignable_QMARK_,byte_streams.protocols$fn__28346$closeable_QMARK___28347,byte_streams.graph$fn__28545,byte_streams.graph.ConversionPath,byte_streams$fn__29027$fn__29028,byte_streams.graph$fn__28446$G__28381__28459,byte_streams.graph$conversion_fn$fn__28589,byte_streams.graph$fn__28465$G__28383__28472,byte_streams.protocols$fn__28309$G__28304__28318,byte_streams$fn__29370,byte_streams.pushback_stream$pushback_buffer__28944,byte_streams.graph$closeable_seq,byte_streams$fn__29013,byte_streams.graph$canonicalize,byte_streams$fn__29357,byte_streams$fn__29015,byte_streams.graph$fn__28422$G__28389__28429,byte_streams.char_sequence$coding_error_action,byte_streams.pushback_stream$prewalk,byte_streams.pushback_stream.PushbackByteStream,byte_streams.protocols$fn__28329$G__28324__28338,byte_streams.graph$fn__28396$G__28391__28405"
+               ;"--trace-class-initialization=io.netty.buffer.PooledByteBufAllocator"
+               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslServerContext"
+               "--initialize-at-run-time=io.netty.channel.epoll.Epoll"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop"
+               "--initialize-at-run-time=io.netty.channel.epoll.Native"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventArray"
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+               "--initialize-at-run-time=io.netty.channel.unix.Errors"
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+               "--initialize-at-run-time=io.netty.channel.epoll.Native"
+               "--initialize-at-run-time=io.netty.channel.epoll.Epoll"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
+               "--initialize-at-run-time=io.netty.channel.unix.Limits"
+               "--initialize-at-run-time=io.netty.channel.unix.Errors"
+               "--initialize-at-run-time=io.netty.channel.unix.IovArray"
                "--report-unsupported-elements-at-runtime"
                "-J-Xmx7g"
                "-H:+StaticExecutableWithDynamicLibC"
