@@ -3114,7 +3114,7 @@
   [{:fx/keys [event]}]
   (let [[_server-url server-data] event]
     (swap! *state assoc
-           :server-edit event
+           :server-edit server-data
            :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data)))))
 
 (defmethod event-handler ::update-server
