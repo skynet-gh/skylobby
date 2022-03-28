@@ -252,13 +252,17 @@
    :main-opts ["-m" "skylobby.main"]}
   :skylobby-native-linux
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
-   :main-opts ["-m" "native-image" "skylobby.main" "--no-fallback" "--allow-incomplete-classpath"
+   :main-opts ["-m" "native-image" "skylobby.main" 
+               "--no-fallback" 
+               "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
+               "--initialize-at-build-time=io.aviso" 
+               "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--report-unsupported-elements-at-runtime"
-               "-J-Xmx6g" "-H:+StaticExecutableWithDynamicLibC"
-               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
+               "-J-Xmx6g" 
+               "-H:+StaticExecutableWithDynamicLibC"
+               "-H:+ReportExceptionStackTraces"
                "-H:Name=skylobby"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
   :skylobby-native-windows

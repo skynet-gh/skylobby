@@ -1,6 +1,6 @@
 (ns skylobby.client
   (:require
-    aleph.tcp
+    ;[aleph.tcp :as tcp]
     [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
@@ -12,7 +12,8 @@
     [skylobby.client.gloss :as gloss]
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
-    [skylobby.client.stls :as stls]
+    ;[skylobby.client.stls :as stls]
+    [skylobby.client.tcp :as tcp]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -92,7 +93,7 @@
    (let [[host port] (parse-host-port server-url)
          pipeline-atom (atom nil)
          raw-client
-         (aleph.tcp/client
+         (tcp/client
            (merge
              {:host host
               :port port
@@ -180,9 +181,12 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
+            #_
             (let [pipeline @pipeline-atom]
               (when (stls/upgrade-pipeline pipeline)
                 (print-loop state-atom server-key client)))
+            (print-loop state-atom server-key client)
+            #_
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
 
 (defn disconnect [state-atom {:keys [server-key] :as client-data}]
