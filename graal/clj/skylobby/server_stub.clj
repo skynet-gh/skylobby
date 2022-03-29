@@ -37,7 +37,17 @@
   "Wraps `-event-msg-handler` with logging, error catching, etc."
   [{:as ev-msg :keys [id ?data event]}]
   (log/info id ?data event)
-  (-event-msg-handler ev-msg)) ; Handle event-msgs on a single thread
+  (try
+    (-event-msg-handler ev-msg) ; Handle event-msgs on a single thread
+    (catch Exception e
+      (println e)
+      (log/error "Error in event-msg-handler" (str e)))
+      ;(log/error e "Error in event-msg-handler"))
+    (catch Throwable e
+      (println e)
+      (log/error "Serious error in event-msg-handler" (str e)))))
+      ;(log/error e "Serious error in event-msg-handler"))))
+
 
 (defmethod -event-msg-handler
   :default ; Default/fallback case (no other matching handler)
@@ -161,9 +171,12 @@
     (defmethod -event-msg-handler
       :skylobby/connect-server
       [{:keys [?data]}]
+      (log/info "here")
       (let [
             {:keys [server-url username password]} ?data
+            _ (log/info "here")
             {:keys [logins servers]} @state-atom
+            _ (log/info "here")
             login (get logins server-url)
             username (or username
                          (:username login))
@@ -171,6 +184,7 @@
                          (:password login))
             server-key (u/server-key {:server-url server-url
                                       :username username})]
+        (log/info "here")
         (event/connect state-atom {:server [server-url (get servers server-url)]
                                    :server-key server-key
                                    :password password

@@ -104,10 +104,13 @@
                 (fn [pipeline]
                   (log/info "Saving TCP pipeline for TLS upgrade")
                   (reset! pipeline-atom pipeline))})))
-         protocol (gloss/protocol encoding)]
-     {:client-deferred
-      (d/chain raw-client
-        #(gloss/wrap-duplex-stream protocol %))
+         protocol (gloss/protocol encoding)
+         _ (log/info "here")
+         duplex-stream-fn (partial gloss/wrap-duplex-stream protocol)
+         _ (log/info "here")
+         client-deferred (d/chain raw-client duplex-stream-fn)]
+     (log/info "here")
+     {:client-deferred client-deferred
       :pipeline-atom pipeline-atom})))
 
 (defmethod handler/handle :default [state-atom server-url m]

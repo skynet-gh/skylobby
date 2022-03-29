@@ -135,11 +135,6 @@
 },
 {
   "name":"java.nio.ByteBuffer",
-  "queryAllPublicMethods":true,
-  "methods":[{"name":"limit","parameterTypes":["int"] }]
-},
-{
-  "name":"java.nio.HeapByteBuffer",
   "queryAllPublicMethods":true
 },
 {
