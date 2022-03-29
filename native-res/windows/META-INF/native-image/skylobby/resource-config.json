@@ -11,9 +11,6 @@
       "pattern":"\\Qpublic/js/cljs-runtime/module$node_modules$react_dom$cjs$react_dom_development.js.map\\E"
     }, 
     {
-      "pattern":"\\Qpublic/js/cljs-runtime/shadow.cljs.devtools.client.browser.js.map\\E"
-    }, 
-    {
       "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.appenders.core.js.map\\E"
     }, 
     {
