@@ -47,19 +47,19 @@
 
 
 ; https://github.com/ptaoussanis/nippy#custom-types-v21
-(nippy/extend-freeze File :skylobby/file
-  [^File x data-output]
-  (.writeUTF data-output (fs/canonical-path x)))
-(nippy/extend-thaw :skylobby/file
-  [data-input]
-  (io/file (.readUTF data-input)))
-
-(nippy/extend-freeze URL :skylobby/url
-  [^File x data-output]
-  (.writeUTF data-output (str x)))
-(nippy/extend-thaw :skylobby/url
-  [data-input]
-  (URL. (.readUTF data-input)))
+(defn register-nippy []
+  (nippy/extend-freeze File :skylobby/file
+    [^File x data-output]
+    (.writeUTF data-output (fs/canonical-path x)))
+  (nippy/extend-thaw :skylobby/file
+    [data-input]
+    (io/file (.readUTF data-input)))
+  (nippy/extend-freeze URL :skylobby/url
+    [^File x data-output]
+    (.writeUTF data-output (str x)))
+  (nippy/extend-thaw :skylobby/url
+    [data-input]
+    (URL. (.readUTF data-input))))
 
 
 (defn nippy-filename [edn-filename]
@@ -160,6 +160,7 @@
    :nippy true})
 
 (defn initial-state []
+  (register-nippy)
   (merge
     {:auto-get-resources true
      :auto-get-replay-resources true
