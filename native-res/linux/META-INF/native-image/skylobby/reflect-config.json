@@ -6,18 +6,100 @@
   "name":"[Ljava.lang.Object;"
 },
 {
+  "name":"[Ljava.lang.StackTraceElement;"
+},
+{
   "name":"[Ljava.nio.file.StandardCopyOption;"
 },
 {
+  "name":"aleph.netty.proxy$io.netty.channel.ChannelInitializer$ff19274a",
+  "queriedMethods":[
+    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
+    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
+  ]
+},
+{
+  "name":"clojure.core$eval177",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"clojure.core.async.impl.channels.ManyToManyChannel"
+},
+{
+  "name":"clojure.lang.Numbers",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"clojure.lang.PersistentArrayMap",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"create","parameterTypes":["java.util.Map"] }]
+},
+{
+  "name":"clojure.lang.RT",
+  "queryAllPublicMethods":true
 },
 {
   "name":"com.sun.org.apache.xerces.internal.jaxp.datatype.DatatypeFactoryImpl",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"io.netty.channel.ChannelInitializer",
+  "queriedMethods":[{"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"addLast","parameterTypes":["java.lang.String","io.netty.channel.ChannelHandler"] }]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline$HeadContext",
+  "queriedMethods":[
+    {"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
+    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
+    {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
+    {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
+    {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
+    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
+    {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }
+  ]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline$TailContext",
+  "queriedMethods":[
+    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
+    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
+  ]
+},
+{
   "name":"io.netty.channel.socket.nio.NioSocketChannel",
-  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.netty.util.ReferenceCountUtil",
+  "queryAllDeclaredMethods":true
 },
 {
   "name":"io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueColdProducerFields",
@@ -32,38 +114,39 @@
   "fields":[{"name":"producerIndex"}]
 },
 {
-  "name":"java.beans.PropertyVetoException"
+  "name":"java.lang.CharSequence"
 },
 {
-  "name":"java.lang.Exception",
-  "queryAllPublicMethods":true
+  "name":"java.lang.Integer"
 },
 {
-  "name":"java.lang.NullPointerException",
-  "queryAllPublicMethods":true
+  "name":"java.lang.Long"
 },
 {
-  "name":"java.lang.Object",
+  "name":"java.lang.String"
+},
+{
+  "name":"java.lang.management.ManagementFactory",
+  "methods":[{"name":"getRuntimeMXBean","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.management.RuntimeMXBean",
+  "methods":[{"name":"getName","parameterTypes":[] }]
+},
+{
+  "name":"java.nio.ByteBuffer",
   "queryAllPublicMethods":true,
-  "methods":[{"name":"getClass","parameterTypes":[] }]
+  "methods":[{"name":"limit","parameterTypes":["int"] }]
 },
 {
-  "name":"java.lang.RuntimeException",
+  "name":"java.nio.HeapByteBuffer",
   "queryAllPublicMethods":true
-},
-{
-  "name":"java.lang.Throwable",
-  "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getCause","parameterTypes":[] }, 
-    {"name":"getLocalizedMessage","parameterTypes":[] }, 
-    {"name":"getMessage","parameterTypes":[] }, 
-    {"name":"getStackTrace","parameterTypes":[] }, 
-    {"name":"getSuppressed","parameterTypes":[] }
-  ]
 },
 {
   "name":"java.security.SecureRandomParameters"
+},
+{
+  "name":"java.time.Duration"
 },
 {
   "name":"net.jpountz.lz4.LZ4HCJNICompressor",
@@ -83,6 +166,20 @@
   "fields":[{"name":"INSTANCE"}]
 },
 {
+  "name":"skylobby.client.tcp.InboundHandler",
+  "queriedMethods":[
+    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
+    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
+  ]
+},
+{
   "name":"sun.nio.ch.SelectorImpl",
   "fields":[
     {"name":"publicSelectedKeys"}, 
@@ -95,10 +192,6 @@
 },
 {
   "name":"sun.security.provider.SHA",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"sun.security.ssl.SSLContextImpl$TLSContext",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 }
 ]

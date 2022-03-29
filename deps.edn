@@ -294,6 +294,10 @@
 
                "--initialize-at-build-time=skylobby$fn__38343"
                "--initialize-at-build-time=skylobby$fn__38349"
+               "--initialize-at-build-time=skylobby$fn__38316"
+               "--initialize-at-build-time=skylobby$fn__38322"
+               "--initialize-at-build-time=skylobby$fn__38347"
+               "--initialize-at-build-time=skylobby$fn__38353"
 
                ;
 

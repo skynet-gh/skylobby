@@ -3,7 +3,6 @@
     [aleph.netty :as aleph-netty]
     [manifold.stream :as s]
     [manifold.deferred :as d]
-    [skylobby.client.netty :as netty]
     [clojure.tools.logging :as log])
   (:import
     (java.net
@@ -17,20 +16,84 @@
 ; removing things that cause native image issues
 
 
+(defrecord InboundHandler [d in raw-stream?]
+  ChannelHandler
+  ChannelInboundHandler
+
+  (handlerAdded 
+    [_ _])
+  (handlerRemoved
+    [_ _])
+  (exceptionCaught
+    [_ ctx ex]
+    (when-not (d/error! d ex)
+      (log/warn ex "error in TCP client")))
+  (channelRegistered
+    [_ ctx]
+    (.fireChannelRegistered ctx))
+  (channelUnregistered
+    [_ ctx]
+    (.fireChannelUnregistered ctx))
+  (channelInactive
+    [_ ctx]
+    (s/close! @in)
+    (.fireChannelInactive ctx))
+  (channelActive
+    [_ ctx]
+    (let [ch (.channel ctx)]
+      (d/success! d
+        (doto
+          (s/splice
+            (aleph-netty/sink ch true aleph-netty/to-byte-buf)
+            (reset! in (aleph-netty/source ch)))
+          (reset-meta! {:aleph/channel ch})))
+      (.fireChannelActive ctx)))
+  (channelRead
+    [_ ctx msg]
+    (aleph-netty/put! (.channel ctx) @in
+      (if raw-stream?
+        msg
+        (aleph-netty/release-buf->array msg))))
+  (channelReadComplete
+    [_ ctx]
+    (.fireChannelReadComplete ctx))
+  (userEventTriggered
+    [_ ctx evt]
+    (.fireUserEventTriggered ctx evt))
+  (channelWritabilityChanged
+    [_ ctx]
+    (.fireChannelWritabilityChanged ctx)))
+
+
 (defn- client-channel-handler
   [{:keys [raw-stream?]}]
   (let [d (d/deferred)
         in (atom nil)]
     [d
 
+     (map->InboundHandler
+       {:d d
+        :in in
+        :raw-stream? raw-stream?})
+     #_
      (reify
        ChannelHandler
        ChannelInboundHandler
 
+       (handlerAdded 
+         [_ _])
+       (handlerRemoved
+         [_ _])
        (exceptionCaught
          [_ ctx ex]
          (when-not (d/error! d ex)
            (log/warn ex "error in TCP client")))
+       (channelRegistered
+         [_ ctx]
+         (.fireChannelRegistered ctx))
+       (channelUnregistered
+         [_ ctx]
+         (.fireChannelUnregistered ctx))
        (channelInactive
          [_ ctx]
          (s/close! @in)
@@ -50,42 +113,17 @@
          (aleph-netty/put! (.channel ctx) @in
            (if raw-stream?
              msg
-             (aleph-netty/release-buf->array msg)))))
-     #_
-     (netty/channel-inbound-handler
+             (aleph-netty/release-buf->array msg))))
+       (channelReadComplete
+         [_ ctx]
+         (.fireChannelReadComplete ctx))
+       (userEventTriggered
+         [_ ctx evt]
+         (.fireUserEventTriggered ctx evt))
+       (channelWritabilityChanged
+         [_ ctx]
+         (.fireChannelWritabilityChanged ctx)))]))
 
-       :exception-caught
-       ([_ ctx ex]
-        (when-not (d/error! d ex)
-          (log/warn ex "error in TCP client")))
-
-       :channel-inactive
-       ([_ ctx]
-        (s/close! @in)
-        (.fireChannelInactive ctx))
-
-       :channel-active
-       ([_ ctx]
-        (let [ch (.channel ctx)]
-          (d/success! d
-            (doto
-              (s/splice
-                (netty/sink ch true netty/to-byte-buf)
-                (reset! in (netty/source ch)))
-              (reset-meta! {:aleph/channel ch}))))
-        (.fireChannelActive ctx))
-
-       :channel-read
-       ([_ ctx msg]
-        (netty/put! (.channel ctx) @in
-          (if raw-stream?
-            msg
-            (netty/release-buf->array msg))))
-
-       :close
-       ([_ ctx promise]
-        (.close ctx promise)
-        (d/error! d (IllegalStateException. "unable to connect"))))]))
 
 (defn client
   "Given a host and port, returns a deferred which yields a duplex stream that can be used
@@ -113,7 +151,6 @@
           (.addLast pipeline "handler" handler)
           (when pipeline-transform
             (pipeline-transform pipeline)))
-        (aleph-netty/insecure-ssl-client-context)
         (if ssl-context
           ssl-context
           (when ssl?
