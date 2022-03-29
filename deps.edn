@@ -192,7 +192,10 @@
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
     ;gloss/gloss {:mvn/version "0.2.6"}
-    io.github.casselc/gloss {:git/tag "0.0.0-SNAPSHOT" :git/sha "37a9f46"}
+    ;io.github.casselc/gloss {:git/tag "0.0.0-SNAPSHOT" :git/sha "37a9f46"}
+    ;gloss/gloss {:local/root "../gloss"}
+    io.github.skynet-gh/gloss {:git/tag "0.2.6+fix-match-loop" 
+                               :git/sha "ee99a12"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
