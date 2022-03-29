@@ -7,6 +7,7 @@
     [clojure.string :as string]
     ;[gloss.core :as gloss]
     ;[gloss.io :as gio]
+    java-time
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [skylobby.client.gloss :as gloss]
@@ -21,7 +22,7 @@
     ;(io.netty.channel ChannelPipeline)
     ;(io.netty.handler.ssl SslContextBuilder SslHandler)
     ;(io.netty.handler.ssl.util InsecureTrustManagerFactory)
-    (java.nio ByteBuffer)
+    ;(java.nio ByteBuffer)
     (manifold.stream SplicedStream)))
 
 
@@ -103,10 +104,13 @@
                 (fn [pipeline]
                   (log/info "Saving TCP pipeline for TLS upgrade")
                   (reset! pipeline-atom pipeline))})))
-         protocol (gloss/protocol encoding)]
-     {:client-deferred
-      (d/chain raw-client
-        #(gloss/wrap-duplex-stream protocol %))
+         protocol (gloss/protocol encoding)
+         _ (log/info "here")
+         duplex-stream-fn (partial gloss/wrap-duplex-stream protocol)
+         _ (log/info "here")
+         client-deferred (d/chain raw-client duplex-stream-fn)]
+     (log/info "here")
+     {:client-deferred client-deferred
       :pipeline-atom pipeline-atom})))
 
 (defmethod handler/handle :default [state-atom server-url m]
