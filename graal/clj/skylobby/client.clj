@@ -1,12 +1,10 @@
 (ns skylobby.client
   (:require
-    ;[aleph.tcp :as tcp]
+    [aleph.tcp :as tcp]
     [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.string :as string]
-    ;[gloss.core :as gloss]
-    ;[gloss.io :as gio]
     java-time
     [manifold.deferred :as d]
     [manifold.stream :as s]
@@ -14,7 +12,6 @@
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
     [skylobby.client.stls :as stls]
-    [skylobby.client.tcp :as tcp]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -37,50 +34,10 @@
   ; ^ found at springfightclub, was "sp u"
 
 
-; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
-#_
-(defn protocol [encoding]
-  (gloss/compile-frame
-    (gloss/delimited-frame
-      ["\n"]
-      (gloss/string (or encoding u/default-client-encoding)))))
-
-#_
-(def client-status-protocol
-  (gloss/compile-frame
-    (gloss/bit-map
-      :prefix 1
-      :bot 1
-      :access 1
-      :rank 3
-      :away 1
-      :ingame 1)))
-
 (def default-client-status "0")
-
-#_
-(defn decode-client-status [status-str]
-  (dissoc
-    (gio/decode client-status-protocol
-      (ByteBuffer/wrap
-        (.array
-          (.put
-            (ByteBuffer/allocate 1)
-            (Byte/parseByte status-str)))))
-    :prefix))
 
 ; https://aleph.io/examples/literate.html#aleph.examples.tcp
 
-#_
-(defn wrap-duplex-stream
-  [protocol s]
-  (let [out (s/stream)]
-    (s/connect
-      (s/map #(gio/encode protocol %) out)
-      s)
-    (s/splice
-      out
-      (gio/decode-stream s protocol))))
 
 (defn parse-host-port [server-url]
   (if-let [[_all host port] (re-find #"(.+):(\d+)$" server-url)]
