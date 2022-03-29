@@ -9,7 +9,11 @@
       InetSocketAddress)
     (io.netty.channel 
       ChannelHandler
-      ChannelInboundHandler)))
+      ChannelInboundHandler
+      ChannelPipeline)))
+
+
+(set! *warn-on-reflection* true)
 
 
 ; copied from https://raw.githubusercontent.com/clj-commons/aleph/master/src/aleph/tcp.clj
@@ -147,8 +151,8 @@
   (let [[s handler] (client-channel-handler options)]
     (->
       (aleph-netty/create-client
-        (fn [pipeline]
-          (.addLast pipeline "handler" handler)
+        (fn [^ChannelPipeline pipeline]
+          (.addLast pipeline "handler" ^ChannelHandler handler)
           (when pipeline-transform
             (pipeline-transform pipeline)))
         (if ssl-context

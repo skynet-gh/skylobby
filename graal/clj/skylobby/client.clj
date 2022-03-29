@@ -13,7 +13,7 @@
     [skylobby.client.gloss :as gloss]
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
-    ;[skylobby.client.stls :as stls]
+    [skylobby.client.stls :as stls]
     [skylobby.client.tcp :as tcp]
     [skylobby.util :as u]
     [taoensso.timbre :as log]
@@ -105,11 +105,8 @@
                   (log/info "Saving TCP pipeline for TLS upgrade")
                   (reset! pipeline-atom pipeline))})))
          protocol (gloss/protocol encoding)
-         _ (log/info "here")
          duplex-stream-fn (partial gloss/wrap-duplex-stream protocol)
-         _ (log/info "here")
          client-deferred (d/chain raw-client duplex-stream-fn)]
-     (log/info "here")
      {:client-deferred client-deferred
       :pipeline-atom pipeline-atom})))
 
@@ -185,12 +182,9 @@
           (let [stls-response @(s/take! client)]
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
-            #_
             (let [pipeline @pipeline-atom]
               (when (stls/upgrade-pipeline pipeline)
                 (print-loop state-atom server-key client)))
-            (print-loop state-atom server-key client)
-            #_
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
 
 (defn disconnect [state-atom {:keys [server-key] :as client-data}]
