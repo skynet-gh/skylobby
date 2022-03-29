@@ -16,6 +16,37 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"java.beans.PropertyVetoException"
+},
+{
+  "name":"java.lang.Exception",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.IllegalArgumentException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.Object",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"getClass","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.RuntimeException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.Throwable",
+  "queryAllPublicMethods":true,
+  "methods":[
+    {"name":"getCause","parameterTypes":[] }, 
+    {"name":"getLocalizedMessage","parameterTypes":[] }, 
+    {"name":"getMessage","parameterTypes":[] }, 
+    {"name":"getStackTrace","parameterTypes":[] }, 
+    {"name":"getSuppressed","parameterTypes":[] }
+  ]
+},
+{
   "name":"java.security.SecureRandomParameters"
 },
 {

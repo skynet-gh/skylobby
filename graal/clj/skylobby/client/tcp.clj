@@ -1,27 +1,57 @@
 (ns skylobby.client.tcp
   (:require
+    [aleph.netty :as aleph-netty]
     [manifold.stream :as s]
     [manifold.deferred :as d]
-    [aleph.netty :as netty]
+    [skylobby.client.netty :as netty]
     [clojure.tools.logging :as log])
   (:import
-    [java.net
-     InetSocketAddress]
-    [io.netty.channel
-     ChannelHandler
-     ChannelPipeline]))
+    (java.net
+      InetSocketAddress)
+    (io.netty.channel 
+      ChannelHandler
+      ChannelInboundHandler)))
 
 
 ; copied from https://raw.githubusercontent.com/clj-commons/aleph/master/src/aleph/tcp.clj
 ; removing things that cause native image issues
 
 
-(defn- ^ChannelHandler client-channel-handler
+(defn- client-channel-handler
   [{:keys [raw-stream?]}]
   (let [d (d/deferred)
         in (atom nil)]
     [d
 
+     (reify
+       ChannelHandler
+       ChannelInboundHandler
+
+       (exceptionCaught
+         [this ctx ex]
+         (when-not (d/error! d ex)
+           (log/warn ex "error in TCP client")))
+       (channelInactive
+         [_ ctx]
+         (s/close! @in)
+         (.fireChannelInactive ctx))
+       (channelActive
+         [_ ctx]
+         (let [ch (.channel ctx)]
+           (d/success! d
+             (doto
+               (s/splice
+                 (netty/sink ch true aleph-netty/to-byte-buf)
+                 (reset! in (netty/source ch)))
+               (reset-meta! {:aleph/channel ch})))
+           (.fireChannelActive ctx)))
+       (channelRead
+         [_ ctx msg]
+         (aleph-netty/put! (.channel ctx) @in
+           (if raw-stream?
+             msg
+             (aleph-netty/release-buf->array msg)))))
+     #_
      (netty/channel-inbound-handler
 
        :exception-caught
@@ -78,17 +108,18 @@
     :as options}]
   (let [[s handler] (client-channel-handler options)]
     (->
-      (netty/create-client
-        (fn [^ChannelPipeline pipeline]
-          (.addLast pipeline "handler" ^ChannelHandler handler)
+      (aleph-netty/create-client
+        (fn [pipeline]
+          (.addLast pipeline "handler" handler)
           (when pipeline-transform
             (pipeline-transform pipeline)))
+        (aleph-netty/insecure-ssl-client-context)
         (if ssl-context
           ssl-context
           (when ssl?
             (if insecure?
-              (netty/insecure-ssl-client-context)
-              (netty/ssl-client-context))))
+              (aleph-netty/insecure-ssl-client-context)
+              (aleph-netty/ssl-client-context))))
         bootstrap-transform
         (or remote-address (InetSocketAddress. ^String host (int port)))
         local-address

@@ -217,8 +217,8 @@
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     org.clojure/tools.logging {:mvn/version "1.2.4"}
-    org.clojure/tools.namespace {:mvn/version "1.2.0"}
-    org.clojure/tools.reader {:mvn/version "1.3.6"}
+    ;org.clojure/tools.namespace {:mvn/version "1.2.0"}
+    ;org.clojure/tools.reader {:mvn/version "1.3.6"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"} ; TODO vendor 3.0.2
     org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
     org.slf4j/jul-to-slf4j {:mvn/version "1.7.36"}
@@ -259,12 +259,92 @@
                "--initialize-at-build-time=io.aviso" 
                "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+               "--initialize-at-build-time=byte_streams"
+               "--initialize-at-build-time=byte_streams$fn__29391"
+               "--initialize-at-build-time=byte_streams$fn__29211$f__29015__auto____29213"
+               "--initialize-at-build-time=skylobby$fn__38384"
+               "--initialize-at-build-time=skylobby$fn__38390"
+               "--initialize-at-build-time=byte_streams$fn__29029"
+               "--initialize-at-build-time=byte_streams$fn__29377"
+               "--initialize-at-build-time=byte_streams$fn__29236$f__29015__auto____29238"
+               "--initialize-at-build-time=byte_streams$this__29055"
+               "--initialize-at-build-time=byte_streams$fn__29384"
+               "--initialize-at-build-time=byte_streams$fn__29228$f__29015__auto____29230"
+               "--initialize-at-build-time=byte_streams$fn__29302$f__29015__auto____29304"
+               "--initialize-at-build-time=byte_streams$fn__29092$f__29015__auto____29093"
+               "--initialize-at-build-time=byte_streams$fn__29043$fn__29044"
+               "--initialize-at-build-time=byte_streams$fn__29118$f__29015__auto____29119"
+               "--initialize-at-build-time=byte_streams$fn__29193$f__29015__auto____29195"
+               "--initialize-at-build-time=byte_streams$fn__29373"
+               "--initialize-at-build-time=byte_streams$fn__29142$f__29015__auto____29144"
+               "--initialize-at-build-time=byte_streams$fn__29346$f__29015__auto____29348"
+               "--initialize-at-build-time=byte_streams$fn__29294$f__29015__auto____29296"
+               "--initialize-at-build-time=byte_streams$fn__29258$f__29015__auto____29259"
+               "--initialize-at-build-time=byte_streams$fn__29033"
+               "--initialize-at-build-time=byte_streams$fn__29031"
+               "--initialize-at-build-time=yte_streams$fn__29336$f__29015__auto____29338"
+               "--initialize-at-build-time=byte_streams$fn__29381"
+               "--initialize-at-build-time=byte_streams$fn__29386"
+               "--initialize-at-build-time=byte_streams$fn__29173$f__29015__auto____29175"
+               "--initialize-at-build-time=byte_streams$fn__29336$f__29015__auto____29338"
+
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
+
+               ;
+
+               "--initialize-at-run-time=io.netty.channel.epoll.Native"
+               "--initialize-at-run-time=io.netty.channel.epoll.Epoll"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventArray"
+               "--initialize-at-run-time=io.netty.channel.unix.Errors"
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+
+               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslClientContext"
+               "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
+               "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom,io.netty.channel.unix,io.netty.channel.epoll,io.netty.channel.kqueue"
+
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+               "--initialize-at-run-time=io.netty.channel.epoll.Native"
+               "--initialize-at-run-time=io.netty.channel.epoll.Epoll"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop"
+               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventArray"
+               ;"--initialize-at-run-time=io.netty.channel.epoll.EpollSocketChannel"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
+               "--initialize-at-run-time=io.netty.channel.unix.Limits"
+               "--initialize-at-run-time=io.netty.channel.unix.Errors"
+               "--initialize-at-run-time=io.netty.channel.unix.IovArray"
+               "--initialize-at-run-time=io.netty.util.internal.logging.Log4J2Logger"
+
+               "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
+               ;"--initialize-at-run-time=io.netty.channel.epoll.EpollDatagramChannel"
+               ;"--initialize-at-run-time=io.netty.channel.epoll.EpollSocketChannel"
+               ;"--initialize-at-run-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
+
+               ;
+               ;"--trace-class-initialization=io.netty.channel.epoll.Native"
+               ;"--trace-class-initialization=io.netty.channel.epoll.AbstractEpollStreamChannel"
+               ;"--trace-class-initialization=io.netty.channel.epoll.EpollSocketChannel"
+               ;"--trace-class-initialization=io.netty.channel.epoll.EpollDatagramChannel"
+               "--trace-class-initialization=io.netty.handler.ssl.OpenSslClientContext"
+               "--trace-class-initialization=io.netty.internal.tcnative.SSLPrivateKeyMethod"
+               "--trace-class-initialization=io.netty.buffer.PooledByteBufAllocator"
+
                "--report-unsupported-elements-at-runtime"
                "-J-Xmx6g" 
                "-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces"
                "-H:Name=skylobby"]
-   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"
+              "-Dclojure.spec.skip-macros=true"]}
   :skylobby-native-windows
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/windows"]
    :extra-deps 
@@ -361,7 +441,8 @@
                "-J-Xmx6g" ;"-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
                "-H:Name=skylobby"]
-   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+   :jvm-opts ["-Dclojure.compiler.direct-linking=true"
+              "-Dclojure.spec.skip-macros=true"]}
   :skylobby-cli
   {:deps
    {
