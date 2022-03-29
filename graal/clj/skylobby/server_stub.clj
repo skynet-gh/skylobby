@@ -171,12 +171,9 @@
     (defmethod -event-msg-handler
       :skylobby/connect-server
       [{:keys [?data]}]
-      (log/info "here")
       (let [
             {:keys [server-url username password]} ?data
-            _ (log/info "here")
             {:keys [logins servers]} @state-atom
-            _ (log/info "here")
             login (get logins server-url)
             username (or username
                          (:username login))
@@ -184,7 +181,6 @@
                          (:password login))
             server-key (u/server-key {:server-url server-url
                                       :username username})]
-        (log/info "here")
         (event/connect state-atom {:server [server-url (get servers server-url)]
                                    :server-key server-key
                                    :password password

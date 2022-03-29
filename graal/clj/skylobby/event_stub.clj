@@ -30,11 +30,9 @@
 
 (defn- do-connect
   [state-atom {:keys [client-data server] :as state}]
-  (log/info "here")
   (let [{:keys [client-deferred server-key]} client-data]
     (try
       (let [^SplicedStream client @client-deferred]
-        (log/info "here")
         (s/on-closed client
           (fn []
             (log/info "client closed")
@@ -43,7 +41,6 @@
           (fn []
             (log/info "client drained")
             (update-disconnected! state-atom server-key)))
-        (log/info "here")
         (if (s/closed? client)
           (log/warn "client was closed on create")
           (let [[server-url _server-data] server
