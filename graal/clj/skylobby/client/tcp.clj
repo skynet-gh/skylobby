@@ -28,7 +28,7 @@
        ChannelInboundHandler
 
        (exceptionCaught
-         [this ctx ex]
+         [_ ctx ex]
          (when-not (d/error! d ex)
            (log/warn ex "error in TCP client")))
        (channelInactive
@@ -41,8 +41,8 @@
            (d/success! d
              (doto
                (s/splice
-                 (netty/sink ch true aleph-netty/to-byte-buf)
-                 (reset! in (netty/source ch)))
+                 (aleph-netty/sink ch true aleph-netty/to-byte-buf)
+                 (reset! in (aleph-netty/source ch)))
                (reset-meta! {:aleph/channel ch})))
            (.fireChannelActive ctx)))
        (channelRead

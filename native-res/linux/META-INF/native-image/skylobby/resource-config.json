@@ -1,7 +1,24 @@
 {
   "resources":{
-  "includes":[{
+  "includes":[
+    {
       "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
-    }]},
+    }, 
+    {
+      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.js.map\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/js/cljs-runtime/module$node_modules$react_dom$cjs$react_dom_development.js.map\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/js/cljs-runtime/shadow.cljs.devtools.client.shared.js.map\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.appenders.core.js.map\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/js/main.js\\E"
+    }
+  ]},
   "bundles":[]
 }

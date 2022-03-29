@@ -292,6 +292,9 @@
                "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
 
+               "--initialize-at-build-time=skylobby$fn__38343"
+               "--initialize-at-build-time=skylobby$fn__38349"
+
                ;
 
                "--initialize-at-run-time=io.netty.channel.epoll.Native"
@@ -328,6 +331,7 @@
                "--initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator"
                "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
                "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine"
 
                ;
                ;"--trace-class-initialization=io.netty.channel.epoll.Native"

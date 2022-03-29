@@ -77,14 +77,17 @@
               (.fireChannelWritabilityChanged ctx#)])))))
 
 
+#_
 (defn close [x]
   (if (instance? Channel x)
     (.close ^Channel x)
     (.close ^ChannelHandlerContext x)))
 
+#_
 (def sink-close-marker ::sink-close)
 
 
+#_
 (defn write-and-flush
   [x msg]
   (if (instance? Channel x)
@@ -92,6 +95,7 @@
     (.writeAndFlush ^ChannelHandlerContext x msg)))
 
 
+#_
 (defn- connection-stats [^Channel ch inbound?]
   (merge
     {:local-address (str (.localAddress ch))
@@ -105,6 +109,7 @@
       (when-let [^AtomicLong throughput (.get throughput ch)]
         {:throughput (.get throughput)}))))
 
+#_
 (manifold/def-sink ChannelSink
   [coerce-fn
    downstream?
@@ -160,6 +165,7 @@
   (put [this msg blocking? timeout timeout-value]
     (.put this msg blocking?)))
 
+#_
 (defn sink
   ([ch]
    (sink ch true identity (fn [])))
@@ -178,6 +184,7 @@
 
      (doto sink (reset-meta! {:aleph/channel ch})))))
 
+#_
 (defn source
   [^Channel ch]
   (let [src (s/stream*
