@@ -6,9 +6,6 @@
   "name":"[Ljava.lang.Object;"
 },
 {
-  "name":"[Ljava.lang.StackTraceElement;"
-},
-{
   "name":"[Ljava.nio.file.StandardCopyOption;"
 },
 {
@@ -103,12 +100,6 @@
 },
 {
   "name":"java.lang.CharSequence"
-},
-{
-  "name":"java.lang.Integer"
-},
-{
-  "name":"java.lang.Long"
 },
 {
   "name":"java.lang.String"
