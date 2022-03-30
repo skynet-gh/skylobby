@@ -16,10 +16,6 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
-    ;(io.netty.channel ChannelPipeline)
-    ;(io.netty.handler.ssl SslContextBuilder SslHandler)
-    ;(io.netty.handler.ssl.util InsecureTrustManagerFactory)
-    ;(java.nio ByteBuffer)
     (manifold.stream SplicedStream)))
 
 
