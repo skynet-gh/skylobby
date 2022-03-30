@@ -97,6 +97,10 @@
                       (when (not= (servers-data old-state)
                                   new-servers-data)
                         (broadcast uids [:skylobby/servers new-servers-data])))
+                    (let [new-login-error (:login-error new-state)]
+                      (when (not= (:login-error old-state)
+                                  new-login-error)
+                        (broadcast uids [:skylobby/login-error new-login-error])))
                     (let [new-auto-launch (:auto-launch new-state)]
                       (when (not= (:auto-launch old-state)
                                   new-auto-launch)
