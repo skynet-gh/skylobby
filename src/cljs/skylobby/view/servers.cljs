@@ -53,7 +53,7 @@
        " Password: "]
       [:input
        {:class "f4"
-        ;:type "password"
+        :type "password"
         :value password
         :on-blur #(rf/dispatch [:skylobby/set-server-password server-url (-> % .-target .-value)])
         :on-change #(rf/dispatch [:skylobby/assoc-in [:password-drafts server-url] (-> % .-target .-value)])}]]
