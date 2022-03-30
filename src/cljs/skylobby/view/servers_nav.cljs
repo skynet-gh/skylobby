@@ -16,8 +16,9 @@
     [:div
      [:div {:class "flex justify-center"}
       (let [route-name :skylobby/servers]
-        [:div {:key route-name
-               :class "pa3"}
+        ^{:key route-name}
+        [:div 
+         {:class "pa3"}
          [:a
           {:class (str css/header-class " "
                     (if (= route-name (-> current-route :data :name))

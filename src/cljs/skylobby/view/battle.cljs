@@ -22,6 +22,8 @@
 (defn listen [query-v]
   @(rf/subscribe query-v))
 
+(def title-class "light-gray")
+
 (defn room-page [_]
   (let [current-route (listen [:skylobby/current-route])
         {:keys [parameters]} current-route
@@ -83,17 +85,17 @@
            :display "block"}}
          [:thead
           [:tr
-           [:th "Nickname"]
-           [:th "Skill"]
-           [:th "Status"]
-           [:th "Ally"]
-           [:th "Team"]
-           [:th "Color"]
-           [:th "Spectator"]
-           [:th "Faction"]
-           [:th "Rank"]
-           [:th "Country"]
-           [:th "Bonus"]]]
+           [:th {:class title-class} "Nickname"]
+           [:th {:class title-class} "Skill"]
+           [:th {:class title-class} "Status"]
+           [:th {:class title-class} "Ally"]
+           [:th {:class title-class} "Team"]
+           [:th {:class title-class} "Color"]
+           #_[:th {:class title-class} "Spectator"]
+           [:th {:class title-class} "Faction"]
+           [:th {:class title-class} "Rank"]
+           [:th {:class title-class} "Country"]
+           [:th {:class title-class} "Bonus"]]]
          [:tbody
           (for [[username user] users-parsed]
             (let [
@@ -104,7 +106,8 @@
               [:tr
                {:style {:white-space "nowrap"}}
                [:td
-                {:style
+                {:class title-class
+                 :style
                  (merge
                    {:width "90%"
                     :text-align "center"
@@ -114,14 +117,16 @@
                      {:color color}))}
                 username]
                (let [{:keys [skill uncertainty]} user]
-                 [:td
-                  {:style
+                 [:td 
+                  {:class title-class
+                   :style
                    {:width "10%"}}
                   skill
                   " "
                   (when (number? uncertainty)
                     (apply str (repeat uncertainty "?")))])
                [:td
+                {:class title-class}
                 [:span.material-icons
                  (cond
                    (:bot client-status)
@@ -131,7 +136,7 @@
                    :else
                    "person")]
                 [:span.material-icons
-                 {:color
+                 {:class
                   (case sync-status
                     1 "green"
                     2 "red"
@@ -142,20 +147,37 @@
                    "sync_problem")]
                 (when (:ingame client-status)
                   [:span.material-icons
-                   {:color "red"}
+                   {:class "red"}
                    "sports_esports"])
                 (when (:away client-status)
                   [:span.material-icons
-                   {:color "grey"}
+                   {:class "gray"}
                    "bed"])]
-               [:td (:ally battle-status)]
-               [:td (:id battle-status)]
-               [:td {:style {:background color}}]
-               [:td (str (not (:mode battle-status)))]
-               [:td (str (:side battle-status))]
-               [:td (str (:rank client-status))]
-               [:td (str (:country user-details))]
-               [:td (str (:handicap battle-status))]]))]]
+               [:td 
+                {:class title-class}
+                (:ally battle-status)]
+               [:td 
+                {:class title-class}
+                (:id battle-status)]
+               [:td 
+                {:class title-class
+                 :style {:background color}}]
+               #_
+               [:td 
+                {:class title-class}
+                (str (not (:mode battle-status)))]
+               [:td 
+                {:class title-class}
+                (str (:side battle-status))]
+               [:td 
+                {:class title-class}
+                (str (:rank client-status))]
+               [:td 
+                {:class title-class}
+                (str (:country user-details))]
+               [:td 
+                {:class title-class}
+                (str (:handicap battle-status))]]))]]
         [:div
          {:style {:min-width "300px"}}
          [:div

@@ -87,6 +87,11 @@
   (log/trace "Servers: %s" ?data)
   (rf/dispatch [:skylobby/assoc :servers ?data]))
 
+(defmethod -event-msg-handler :skylobby/login-error
+  [{:keys [?data]}]
+  (log/trace "Login error: %s" ?data)
+  (rf/dispatch [:skylobby/assoc :login-error ?data]))
+
 (defmethod -event-msg-handler :skylobby/battles
   [{:keys [?data]}]
   (log/trace "Battles: %s" ?data)
@@ -325,7 +330,9 @@
     (chsk-send!
       [:skylobby/assoc-in [[:logins server-url :username] username]]
       5000)
-    (update db :username-drafts dissoc server-url)))
+    (-> db
+        (assoc-in [:logins server-url :username] username))))
+        ;(update :username-drafts dissoc server-url))))
 
 (rf/reg-event-db :skylobby/set-server-password
   (fn [db [_t server-url password]]
@@ -333,7 +340,9 @@
     (chsk-send!
       [:skylobby/assoc-in [[:logins server-url :password] password]]
       5000)
-    (update db :password-drafts dissoc server-url)))
+    (-> db
+        (assoc-in [:logins server-url :password] password))))
+        ;(update :password-drafts dissoc server-url))))
 
 
 (rf/reg-event-db :skylobby/set-away
@@ -412,6 +421,14 @@
 (rf/reg-sub :skylobby/servers
   (fn [db]
     (:servers db)))
+
+(rf/reg-sub :skylobby/login-error
+  (fn [db]
+    (:login-error db)))
+
+(rf/reg-sub :skylobby/server-url
+  (fn [db]
+    (:server-url db)))
 
 (rf/reg-sub :skylobby/battles
   (fn [db [_t server-key]]
@@ -663,9 +680,10 @@
 
 (defn router-component [{:keys [router]}]
   (let [current-route (listen [:skylobby/current-route])]
-    [:div
+    [:div {:class "bg-black h-100 light-gray sans-serif"}
      (when current-route
-       [(-> current-route :data :view) {:router router}])]))
+       [(-> current-route :data :view) 
+        {:router router}])]))
 
 
 (def debug? ^boolean goog.DEBUG)

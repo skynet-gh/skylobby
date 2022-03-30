@@ -2,4 +2,4 @@
 
 
 (def header-class
-  "f6 ba br-pill no-underline pv2 ph3 dib")
+  "f4 ba bw1 br3 no-underline pv2 ph3 dib")
