@@ -101,6 +101,10 @@
                          (when (not= (servers-data old-state)
                                      new-servers-data)
                            (broadcast [:skylobby/servers new-servers-data])))
+                       (let [new-login-error (:login-error new-state)]
+                         (when (not= (:login-error old-state)
+                                     new-login-error)
+                           (broadcast [:skylobby/login-error new-login-error])))
                        (let [new-auto-launch (:auto-launch new-state)]
                          (when (not= (:auto-launch old-state)
                                      new-auto-launch)
@@ -218,10 +222,10 @@
             {:keys [server-key channel-name message]} ?data
             {:keys [by-server]} @state-atom
             {:keys [client-data]} (get by-server server-key)]
-        (event/send-message state-atom {:channel-name channel-name
-                                        :client-data client-data
-                                        :message message
-                                        :server-key server-key})))
+        (event/send-chat state-atom {:channel-name channel-name
+                                     :client-data client-data
+                                     :message message
+                                     :server-key server-key})))
     (defmethod -event-msg-handler
       :skylobby/set-battle-mode
       [{:keys [?data]}]
