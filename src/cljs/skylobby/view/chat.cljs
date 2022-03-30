@@ -11,6 +11,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-infer* true)
+
+
 (defn listen [query-v]
   @(rf/subscribe query-v))
 
@@ -97,16 +100,19 @@
 
 (defn my-channels-nav [{:keys [server-key server-url username] :as params}]
   [:div {:class "flex justify-center"}
-   (for [[channel-name _] (listen [:skylobby/my-channels server-key])]
-     [:div {:key channel-name
-            :class "pa3"}
-      [:a
-       {:class (str css/header-class " "
-                 (if (= channel-name (:channel-name params))
-                   "green"
-                   "gray"))
-        :href (u/href :skylobby/chat {:server-url server-url :channel-name channel-name} {:username username})}
-       channel-name]])])
+   (if-let [my-channels (seq (remove (comp u/battle-channel-name? first) (listen [:skylobby/my-channels server-key])))]
+     (for [[channel-name _] my-channels]
+       [:div {:key channel-name
+              :class "pa3"}
+        [:a
+         {:class (str css/header-class " "
+                   (if (= channel-name (:channel-name params))
+                     "green"
+                     "gray"))
+          :href (u/href :skylobby/chat {:server-url server-url :channel-name channel-name} {:username username})}
+         channel-name]])
+     [:div.f3 
+      "No channels"])])
 
 (defn chat-page [_]
   (let [current-route (listen [:skylobby/current-route])

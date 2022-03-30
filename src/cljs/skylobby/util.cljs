@@ -1,6 +1,7 @@
 (ns skylobby.util
   (:require
     [clojure.edn :as edn]
+    [clojure.string :as string]
     [reitit.frontend.easy :as rfe]))
 
 
@@ -50,3 +51,7 @@
 (defn battle-channel-name [{:keys [battle-id channel-name]}]
   (or channel-name
       (str "__battle__" battle-id)))
+
+(defn battle-channel-name? [channel-name]
+  (and channel-name
+       (string/starts-with? channel-name "__battle__")))
