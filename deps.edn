@@ -125,6 +125,7 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
+    com.fulcrologic/fulcro {:mvn/version "3.5.15"}
     com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.2.1"}
     hashp/hashp {:mvn/version "0.2.1"}
