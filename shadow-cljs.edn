@@ -5,4 +5,10 @@
    :output-dir "resources/public/js"
    :asset-path "/js"
    :modules {:main {:entries [skylobby.js]
-                    :init-fn skylobby.js/init}}}}}
+                    :init-fn skylobby.js/init}}}
+  :main
+  {:target :browser
+   :output-dir "resources/public/js"
+   :asset-path "/js"
+   :modules {:main {:entries [skylobby.web]
+                    :init-fn skylobby.web/init}}}}}
