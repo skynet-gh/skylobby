@@ -322,6 +322,8 @@
                "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
                "--initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine"
 
+               "--initialize-at-build-time=byte_streams$fn__29207$f__29011__auto____29209,byte_streams$fn__29369,byte_streams$fn__29027,byte_streams$fn__29088$f__29011__auto____29089,byte_streams$fn__29380,byte_streams$fn__29169$f__29011__auto____29171,byte_streams$this__29051,byte_streams$fn__29290$f__29011__auto____29292,byte_streams$fn__29254$f__29011__auto____29255,byte_streams$fn__29298$f__29011__auto____29300,byte_streams$fn__29332$f__29011__auto____29334,byte_streams$fn__29039$fn__29040,byte_streams$fn__29224$f__29011__auto____29226,byte_streams$fn__29387,byte_streams$fn__29232$f__29011__auto____29234,byte_streams$fn__29342$f__29011__auto____29344,byte_streams$fn__29382,byte_streams$fn__29138$f__29011__auto____29140,byte_streams$fn__29189$f__29011__auto____29191,byte_streams$fn__29114$f__29011__auto____29115,byte_streams$fn__29025"
+
                "--report-unsupported-elements-at-runtime"
                "-J-Xmx6g" 
                "-H:+StaticExecutableWithDynamicLibC"
