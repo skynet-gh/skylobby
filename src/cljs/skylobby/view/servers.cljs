@@ -3,6 +3,7 @@
     [clojure.string :as string]
     [re-frame.core :as rf]
     [skylobby.view.servers-nav :as servers-nav]
+    [skylobby.view.side-nav :as side-nav]
     [skylobby.util :as u]))
 
 
@@ -24,6 +25,7 @@
         logged-in (contains? active-server-keys server-key)
         login-error (listen [:skylobby/login-error])]
     [:div
+     ;[side-nav/side-nav]
      [servers-nav/servers-nav]
      [:div {:class "flex justify-center mb2"}
       [:label 

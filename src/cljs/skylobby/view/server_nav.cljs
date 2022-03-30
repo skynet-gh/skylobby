@@ -5,9 +5,13 @@
     [skylobby.util :as u]))
 
 
+(set! *warn-on-infer* true)
+
+
 (def server-route-names
   {:skylobby/battles "Battles"
-   :skylobby/channels "Chat"})
+   :skylobby/channels "Chat"
+   :skylobby/console "Console"})
 
 
 (defn listen [query-v]
@@ -23,7 +27,7 @@
         route-names (concat
                       (when battle
                         [:skylobby/room])
-                      [:skylobby/battles :skylobby/channels])
+                      [:skylobby/battles :skylobby/channels :skylobby/console])
         battle-title (str "Battle: " (listen [:skylobby/battle-title server-key]))]
     [:div {:class "flex justify-center"}
      (for [route-name route-names]

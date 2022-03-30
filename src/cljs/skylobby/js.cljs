@@ -11,9 +11,12 @@
     [skylobby.view.battle :as battle-view]
     [skylobby.view.battles :as battles-view]
     [skylobby.view.chat :as chat-view]
+    [skylobby.view.console :as console-view]
+    [skylobby.view.replays :as replays-view]
     [skylobby.view.servers :as servers-view]
     [skylobby.view.server-nav :as server-nav]
     [skylobby.view.servers-nav :as servers-nav]
+    [skylobby.view.settings :as settings-view]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
@@ -165,6 +168,37 @@
           (log/error reply))))
     db))
 
+(rf/reg-event-db :skylobby/get-replays
+  (fn [db _event]
+    (log/debug "Getting replays")
+    (chsk-send!
+      [:skylobby/get-in [:parsed-replays-by-path]]
+      20000
+      (fn [reply]
+        (log/debug "Replays reply" (count reply))
+        (if (sente/cb-success? reply)
+          (do
+            (log/trace "Got replays" reply)
+            (rf/dispatch [:skylobby/assoc :parsed-replays-by-path reply]))
+          (log/error reply))))
+    db))
+
+(rf/reg-event-db :skylobby/get-settings
+  (fn [db _event]
+    (log/debug "Getting settings")
+    (chsk-send!
+      [:skylobby/get-settings]
+      5000
+      (fn [reply]
+        (log/debug "Settings reply" reply)
+        (if (sente/cb-success? reply)
+          (do
+            (log/trace "Got settings" reply)
+            (rf/dispatch [:skylobby/merge reply]))
+          (log/error reply))))
+    db))
+
+
 (defn get-server-key [server-url username]
   (str username "@" server-url))
 
@@ -206,6 +240,19 @@
         (log/trace "My channels reply for" server-key reply)
         (if (sente/cb-success? reply)
           (rf/dispatch [:skylobby/assoc-in [:by-server server-key :my-channels] reply])
+          (log/error reply))))
+    db))
+
+(rf/reg-event-db :skylobby/get-console-log
+  (fn [db [_t server-key]]
+    (log/info "Getting console log for" server-key)
+    (chsk-send!
+      [:skylobby/get-in [:by-server server-key :console-log]]
+      5000
+      (fn [reply]
+        (log/trace "Console log reply for" server-key reply)
+        (if (sente/cb-success? reply)
+          (rf/dispatch [:skylobby/assoc-in [:by-server server-key :console-log] reply])
           (log/error reply))))
     db))
 
@@ -323,6 +370,15 @@
       5000)
     (assoc-in db [:by-server server-key :chat-message] "")))
 
+(rf/reg-event-db :skylobby/send-command
+  (fn [db [_t server-key message]]
+    (log/info "Sending command in" server-key ": " message)
+    (chsk-send!
+      [:skylobby/send-command {:server-key server-key
+                               :message message}]
+      5000)
+    (assoc-in db [:by-server server-key :command-message] "")))
+
 
 (rf/reg-event-db :skylobby/set-server-username
   (fn [db [_t server-url username]]
@@ -386,6 +442,11 @@
     db))
 
 
+(rf/reg-event-db :skylobby/merge
+  (fn [db [_t m]]
+    (log/trace "Merge" m)
+    (merge db m)))
+
 (rf/reg-event-db :skylobby/assoc
   (fn [db [_t k v]]
     (log/trace "Assoc" k v)
@@ -421,6 +482,10 @@
 (rf/reg-sub :skylobby/servers
   (fn [db]
     (:servers db)))
+
+(rf/reg-sub :skylobby/replays
+  (fn [db]
+    (:parsed-replays-by-path db)))
 
 (rf/reg-sub :skylobby/login-error
   (fn [db]
@@ -461,6 +526,10 @@
   (fn [db [_t server-key channel-name]]
     (get-in db [:by-server server-key :chat channel-name])))
 
+(rf/reg-sub :skylobby/console-log
+  (fn [db [_t server-key channel-name]]
+    (get-in db [:by-server server-key :console-log])))
+
 (rf/reg-sub :skylobby/my-channels
   (fn [db [_t server-key]]
     (get-in db [:by-server server-key :my-channels])))
@@ -472,6 +541,14 @@
 (rf/reg-sub :skylobby/chat-message
   (fn [db [_t server-key]]
     (get-in db [:by-server server-key :chat-message])))
+
+(rf/reg-sub :skylobby/command-message
+  (fn [db [_t server-key]]
+    (get-in db [:by-server server-key :command-message])))
+
+(rf/reg-sub :skylobby/command-message
+  (fn [db [_t server-key]]
+    (get-in db [:by-server server-key :command-message])))
 
 (rf/reg-sub :skylobby/minimap-size
   (fn [db]
@@ -544,6 +621,28 @@
        ;; Teardown can be done here.
        :stop  (fn [& _params]
                 (log/info "Leaving servers page"))}]}]
+   ["replays"
+    {:name      :skylobby/replays
+     :view      replays-view/replays-page
+     :link-text "Replays"
+     :controllers
+     [{
+       :start (fn [& _params]
+                (log/info "Entering replays page")
+                (rf/dispatch [:skylobby/get-replays]))
+       :stop  (fn [& _params]
+                (log/info "Leaving replays page"))}]}]
+   ["settings"
+    {:name      :skylobby/settings
+     :view      settings-view/settings-page
+     :link-text "Settings"
+     :controllers
+     [{
+       :start (fn [& _params]
+                (log/info "Entering settings page")
+                (rf/dispatch [:skylobby/get-settings]))
+       :stop  (fn [& _params]
+                (log/info "Leaving settings page"))}]}]
    ["direct/:server-key"
     {:name :skylobby/direct-battle
      :view battle-view/room-page
@@ -640,6 +739,19 @@
          :stop  (fn [_params]
                   (log/info "Leaving chat page")
                   (rf/dispatch [:skylobby/clear-poll :poll-chat]))}]}]]
+    ["/console"
+     {:name      :skylobby/console
+      :view      console-view/console-page
+      :controllers
+      [{
+        :parameters {:path [:server-url]
+                     :query [:username]}
+        :start (fn [params]
+                 (let [server-key (get-server-key (get-in params [:path :server-url]) (get-in params [:query :username]))]
+                   (log/info "Entering console page" server-key)
+                   (rf/dispatch [:skylobby/get-console-log server-key])))
+        :stop  (fn [_params]
+                 (log/info "Leaving console page"))}]}]
     ["/room"
      {:name      :skylobby/room
       :view      battle-view/room-page

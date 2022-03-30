@@ -216,6 +216,17 @@
                                           :spring-isolation-dir spring-root}
                                          (resource/spring-root-resources spring-root by-spring-root)))))
     (defmethod -event-msg-handler
+      :skylobby/send-command
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key message]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data]} (get by-server server-key)]
+        (event/send-command state-atom {
+                                        :client-data client-data
+                                        :message message
+                                        :server-key server-key})))
+    (defmethod -event-msg-handler
       :skylobby/send-message
       [{:keys [?data]}]
       (let [

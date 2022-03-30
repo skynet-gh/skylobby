@@ -115,6 +115,8 @@
                          (log/info "Print loop ended")
                          (catch Exception e
                            (log/error e "Error in print loop"))
+                         (catch Throwable t
+                           (log/error t "Serious error in print loop"))
                          (finally
                            (when chimer
                              (.close chimer))))))]
@@ -161,7 +163,9 @@
                                    (recur))))
                              (log/info "Ping loop ended")
                              (catch Exception e
-                               (log/error e "Error in ping loop"))))]
+                               (log/error e "Error in ping loop"))
+                             (catch Throwable t
+                               (log/error t "Serious error in ping loop"))))]
     (swap! state-atom assoc-in [:by-server server-key :ping-loop] ping-loop-future)))
 
 

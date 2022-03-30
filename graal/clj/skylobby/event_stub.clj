@@ -136,6 +136,9 @@
              (update-in [:by-server server-key :channels channel-name :messages] conj {:text (str (if ignore "Ignored " "Unignored ") username)
                                                                                        :timestamp (u/curr-millis)
                                                                                        :message-type :info})))))))
+(defn send-command [state-atom {:keys [client-data message]}]
+  (message/send state-atom client-data message))
+
 
 (defn send-chat [state-atom {:keys [channel-name client-data message server-key] :as e}]
   (swap! state-atom update-in [:by-server server-key]

@@ -97,6 +97,10 @@
                       (when (not= (servers-data old-state)
                                   new-servers-data)
                         (broadcast uids [:skylobby/servers new-servers-data])))
+                    (let [new-login-error (:login-error new-state)]
+                      (when (not= (:login-error old-state)
+                                  new-login-error)
+                        (broadcast uids [:skylobby/login-error new-login-error])))
                     (let [new-auto-launch (:auto-launch new-state)]
                       (when (not= (:auto-launch old-state)
                                   new-auto-launch)
@@ -214,6 +218,17 @@
                                          (dissoc
                                            (resource/spring-root-resources spring-root by-spring-root)
                                            :engine-version :map-name :mod-name)))))
+    (defmethod -event-msg-handler
+      :skylobby/send-command
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key message]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data]} (get by-server server-key)]
+        (event/send-command state-atom {
+                                        :client-data client-data
+                                        :message message
+                                        :server-key server-key})))
     (defmethod -event-msg-handler
       :skylobby/send-message
       [{:keys [?data]}]
