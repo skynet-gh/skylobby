@@ -18,7 +18,6 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
-    (javafx.scene.input Clipboard ClipboardContent)
     (javafx.scene.paint Color)))
 
 
@@ -208,7 +207,7 @@
 (defn player-context-menu
   [{:fx/keys [context]
     :keys [battle-id host-is-bot host-ingame player read-only server-key]}]
-  (let [{:keys [owner team-color username user]} player
+  (let [{:keys [owner username user]} player
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         ignore-users (fx/sub-val context :ignore-users)
@@ -276,6 +275,7 @@
        [
         {:fx/type :menu-item
          :text (str "User ID: " (-> user :user-id))}
+        #_
         {:fx/type :menu-item
          :text (str "Copy color")
          :on-action (fn [_event]

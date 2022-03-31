@@ -6,7 +6,9 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
-    [skylobby.fx.sync :refer [ok-severity]]))
+    [skylobby.fx.sync :refer [ok-severity]])
+  (:import
+    (javafx.scene.input Clipboard ClipboardContent)))
 
 
 (set! *warn-on-reflection* true)
@@ -15,6 +17,7 @@
 (defn pick-spring-root-view
   [{:fx/keys [context]}]
   (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+        spring-root-path (fs/canonical-path spring-isolation-dir)
         {:keys [engines maps mods]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         default-spring-root (fs/default-spring-root)
         wanted-spring-roots [
@@ -51,12 +54,39 @@
               :text "Click the green button to continue, you can always change this in settings later."}
              {:fx/type :pane
               :pref-height 16}
-             {:fx/type :label
-              :style {:-fx-font-size 16}
-              :text "Current Spring directory:"}
+             {:fx/type :h-box
+              :alignment :center-left 
+              :children
+              [
+               {:fx/type :label
+                :style {:-fx-font-size 16}
+                :text "Current Spring directory: "}
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-content-copy:22"}
+                :tooltip {:fx/type :tooltip
+                          :text "Copy path to clipboard"}
+                :on-action (fn [_event]
+                            (let [clipboard (Clipboard/getSystemClipboard)
+                                  content (ClipboardContent.)]
+                              (.putString content (str spring-root-path))
+                              (.setContent clipboard content)))}
+               {:fx/type :button
+                :style-class ["button" "skylobby-normal"]
+                :text ""
+                :graphic
+                {:fx/type font-icon/lifecycle
+                 :icon-literal "mdi-folder:22"}
+                :tooltip {:fx/type :tooltip
+                          :text "Open in file browser"}
+                :on-action {:event/type :spring-lobby/desktop-browse-dir
+                            :file spring-isolation-dir}}]}
              {:fx/type :label
               :style {:-fx-font-size 18}
-              :text (str spring-isolation-dir)}
+              :text (str spring-root-path)}
              {:fx/type :pane
               :pref-height 16}
              {:fx/type :h-box
@@ -72,7 +102,7 @@
                {:fx/type :pane
                 :pref-width 16}
                {:fx/type :button
-                :disable (= (fs/canonical-path spring-isolation-dir)
+                :disable (= spring-root-path
                             (fs/canonical-path default-spring-root))
                 :on-action {:event/type :spring-lobby/assoc
                             :key :spring-isolation-dir
@@ -111,7 +141,7 @@
                   (if (fs/exists? file)
                     {:fx/type :button
                      :style {:-fx-font-size 18}
-                     :disable (= (fs/canonical-path spring-isolation-dir)
+                     :disable (= spring-root-path
                                  (fs/canonical-path file))
                      :on-action {:event/type :spring-lobby/assoc
                                  :key :spring-isolation-dir
