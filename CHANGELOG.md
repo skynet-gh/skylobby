@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.9](https://github.com/skynet-gh/skylobby/releases/tag/0.8.9) - 2022-03-30
+
+- Fix preferred faction not set when game details load
+- Add buttons to copy or open spring dir on spring tab
+
 ## [0.8.8](https://github.com/skynet-gh/skylobby/releases/tag/0.8.8) - 2022-03-25
 
 - Use dbus-send for file open on Linux

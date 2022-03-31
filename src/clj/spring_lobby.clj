@@ -78,7 +78,7 @@
 (set! *warn-on-reflection* true)
 
 
-(declare download-http-resource)
+(declare download-http-resource update-battle-status)
 
 
 (def wait-init-tasks-ms 20000)
@@ -2675,7 +2675,30 @@
           (log/info "Updating mod details for" mod-name)
           (let [mod-details (or (read-mod-data mod-file {:use-git-mod-version use-git-mod-version}) error-data)]
             (log/info "Got mod details for" mod-name mod-file (keys mod-details))
-            (swap! *state update :mod-details cache/miss cache-key mod-details)
+            (let [{:keys [by-server preferred-factions]} (swap! *state update :mod-details cache/miss cache-key mod-details)
+                  preferred-faction (get preferred-factions (:mod-name-only mod-details))
+                  servers-to-update (->> by-server
+                                         (map
+                                           (fn [[server-key server-data]]
+                                             (let [{:keys [battle battles client-data username]} server-data]
+                                               {:server-key server-key
+                                                :client-data client-data
+                                                :mod-name (get-in battles [(:battle-id battle) :battle-modname])
+                                                :user-data (assoc
+                                                             (get-in battle [:users username])
+                                                             :username username)})))
+                                         (filter (comp #{mod-name} :mod-name))
+                                         (remove (comp #{preferred-faction} :side :battle-status :user-data)))]
+              (when preferred-faction
+                (doseq [{:keys [client-data server-key user-data]} servers-to-update]
+                  (log/info "Fixing faction for" server-key user-data "to" preferred-faction)
+                  (let [{:keys [battle-status team-color username]} user-data]
+                    (update-battle-status
+                      client-data
+                      {:username username
+                       :is-me true
+                       :is-bot false}
+                      (assoc battle-status :side preferred-faction) team-color)))))
             (when (:error mod-details)
               (task/add-task! *state
                 {::task-type ::refresh-mods}))))
