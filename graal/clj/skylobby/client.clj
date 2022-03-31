@@ -16,6 +16,7 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
+    (java.time Duration)
     (manifold.stream SplicedStream)))
 
 
@@ -71,55 +72,58 @@
 (defn print-loop
   [state-atom server-key client]
   (let [print-loop (future
-                     (let [pd (tufte/new-pdata {:dynamic? true})
-                           chimer
-                           (chime/chime-at
-                             (chime/periodic-seq
-                               (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
-                               (java-time/duration 1 :minutes))
-                             (fn [_chimestamp]
-                               (if-let [m @@pd]
-                                 (log/info (str "Profiler stats for " server-key ":\n" (tufte/format-pstats m)))
-                                 (log/warn "No profiler stats to print for" server-key)))
-                             {:error-handler
-                              (fn [e]
-                                (log/error e "Error in profiler print")
-                                true)})]
-                       (try
-                         (log/info "Print loop thread started")
-                         (loop []
-                           (when-let [d (try
-                                          (s/take! client)
-                                          (catch java.nio.charset.MalformedInputException e
-                                            (swap! state-atom update-in [:login-error server-key] str "\nCharacter encoding error")
-                                            (log/error e "Encoding error")))]
-                             (when-let [m @d]
-                               (log/info (str "[" server-key "]") "<" (str "'" m "'"))
-                               (try
-                                 (let [t0 (System/nanoTime)
-                                       k (-> m
-                                             (string/split #"\s")
-                                             first)]
-                                   (swap! state-atom (u/append-console-log-fn server-key :server m))
-                                   (tufte/with-profiling pd {:dynamic? true
-                                                             :id :skylobby/client}
-                                     (handler state-atom server-key m)
-                                     (tufte/capture-time! pd k (- (System/nanoTime) t0))))
-                                 (catch Exception e
-                                   (log/error e "Error handling message" (str "'" m "'")))
-                                 (catch Throwable t
-                                   (log/error t "Critical error handling message" (str "'" m "'"))
-                                   (throw t)))
-                               (when-not (Thread/interrupted)
-                                 (recur)))))
-                         (log/info "Print loop ended")
-                         (catch Exception e
-                           (log/error e "Error in print loop"))
-                         (catch Throwable t
-                           (log/error t "Serious error in print loop"))
-                         (finally
-                           (when chimer
-                             (.close chimer))))))]
+                     (try
+                       (let [pd (tufte/new-pdata {:dynamic? true})
+                             chimer
+                             (chime/chime-at
+                               (chime/periodic-seq
+                                 (java-time/plus (java-time/instant) (Duration/ofMillis 60000))
+                                 (Duration/ofMillis 60000))
+                               (fn [_chimestamp]
+                                 (if-let [m @@pd]
+                                   (log/info (str "Profiler stats for " server-key ":\n" (tufte/format-pstats m)))
+                                   (log/warn "No profiler stats to print for" server-key)))
+                               {:error-handler
+                                (fn [e]
+                                  (log/error e "Error in profiler print")
+                                  true)})]
+                         (try
+                           (log/info "Print loop thread started")
+                           (loop []
+                             (when-let [d (try
+                                            (s/take! client)
+                                            (catch java.nio.charset.MalformedInputException e
+                                              (swap! state-atom update-in [:login-error server-key] str "\nCharacter encoding error")
+                                              (log/error e "Encoding error")))]
+                               (when-let [m @d]
+                                 (log/info (str "[" server-key "]") "<" (str "'" m "'"))
+                                 (try
+                                   (let [t0 (System/nanoTime)
+                                         k (-> m
+                                               (string/split #"\s")
+                                               first)]
+                                     (swap! state-atom (u/append-console-log-fn server-key :server m))
+                                     (tufte/with-profiling pd {:dynamic? true
+                                                               :id :skylobby/client}
+                                       (handler state-atom server-key m)
+                                       (tufte/capture-time! pd k (- (System/nanoTime) t0))))
+                                   (catch Exception e
+                                     (log/error e "Error handling message" (str "'" m "'")))
+                                   (catch Throwable t
+                                     (log/error t "Critical error handling message" (str "'" m "'"))
+                                     (throw t)))
+                                 (when-not (Thread/interrupted)
+                                   (recur)))))
+                           (log/info "Print loop ended")
+                           (catch Exception e
+                             (log/error e "Error in print loop"))
+                           (catch Throwable t
+                             (log/error t "Serious error in print loop"))
+                           (finally
+                             (when chimer
+                               (.close chimer)))))
+                       (catch Throwable t
+                         (log/error t "Serious error in print loop init"))))]
     (swap! state-atom assoc-in [:by-server server-key :print-loop] print-loop)))
 
 
@@ -138,8 +142,9 @@
             (log/info (str "[" server-key "]") "<" (str "'" stls-response "'"))
             (u/append-console-log state-atom server-key :server stls-response)
             (let [pipeline @pipeline-atom]
-              (when (stls/upgrade-pipeline pipeline)
-                (print-loop state-atom server-key client)))
+              (if (stls/upgrade-pipeline pipeline)
+                (print-loop state-atom server-key client)
+                (log/error "STLS upgrade did not return success")))
             (swap! state-atom assoc-in [:by-server server-key :client-data :ssl-upgraded] true)))))))
 
 (defn disconnect [state-atom {:keys [server-key] :as client-data}]
