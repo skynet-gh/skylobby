@@ -110,7 +110,10 @@
                                   new-logins)
                         (broadcast uids [:skylobby/logins new-logins])))
                     (doseq [[server-key server-data] (:by-server new-state)]
-                      (let [{:keys [auto-unspec battle battles channels users]} server-data]
+                      (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
+                        (when (not= console-log
+                                    (get-in old-state [:by-server server-key :console-log]))
+                          (broadcast uids [:skylobby/console-log {:server-key server-key :console-log console-log}]))
                         (when (not= auto-unspec
                                     (get-in old-state [:by-server server-key :auto-unspec]))
                           (broadcast uids [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
@@ -306,6 +309,7 @@
       [:meta {:charset "utf-8"}]
       [:title "skylobby"]]
      [:body
+      {:style {:background-color "#000"}}
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
