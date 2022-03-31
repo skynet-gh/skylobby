@@ -114,7 +114,10 @@
                                      new-logins)
                            (broadcast [:skylobby/logins new-logins])))
                        (doseq [[server-key server-data] (:by-server new-state)]
-                         (let [{:keys [auto-unspec battle battles channels users]} server-data]
+                         (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
+                           (when (not= console-log
+                                     (get-in old-state [:by-server server-key :console-log]))
+                             (broadcast [:skylobby/console-log {:server-key server-key :console-log console-log}]))
                            (when (not= auto-unspec
                                        (get-in old-state [:by-server server-key :auto-unspec]))
                              (broadcast [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
