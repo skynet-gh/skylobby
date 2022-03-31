@@ -119,6 +119,11 @@
   (let [{:keys [channel-name server-key channel-data]} ?data]
     (rf/dispatch [:skylobby/assoc-in [:by-server server-key :chat channel-name] channel-data])))
 
+(defmethod -event-msg-handler :skylobby/console-log
+  [{:keys [?data]}]
+  (let [{:keys [console-log server-key]} ?data]
+    (rf/dispatch [:skylobby/assoc-in [:by-server server-key :console-log] console-log])))
+
 (defmethod -event-msg-handler :skylobby/logins
   [{:keys [?data]}]
   (rf/dispatch [:skylobby/assoc :logins ?data]))
@@ -376,7 +381,12 @@
     (chsk-send!
       [:skylobby/send-command {:server-key server-key
                                :message message}]
-      5000)
+      5000
+      (fn [reply]
+        (log/trace "Console log reply for" server-key reply)
+        (if (sente/cb-success? reply)
+          (rf/dispatch [:skylobby/assoc-in [:by-server server-key :console-log] reply])
+          (log/error reply))))
     (assoc-in db [:by-server server-key :command-message] "")))
 
 
@@ -527,7 +537,7 @@
     (get-in db [:by-server server-key :chat channel-name])))
 
 (rf/reg-sub :skylobby/console-log
-  (fn [db [_t server-key channel-name]]
+  (fn [db [_t server-key]]
     (get-in db [:by-server server-key :console-log])))
 
 (rf/reg-sub :skylobby/my-channels
@@ -793,9 +803,10 @@
 (defn router-component [{:keys [router]}]
   (let [current-route (listen [:skylobby/current-route])]
     [:div {:class "bg-black h-100 light-gray sans-serif"}
-     (when current-route
-       [(-> current-route :data :view) 
-        {:router router}])]))
+     [:div {:class "bg-black h-auto"}
+      (when current-route
+        [(-> current-route :data :view) 
+         {:router router}])]]))
 
 
 (def debug? ^boolean goog.DEBUG)
