@@ -71,7 +71,8 @@
                                :server-url (:server-url client-data)
                                :username (:username client-data)}))))
    :logins (:logins state)
-   :servers (:servers state)})
+   :servers (:servers state)
+   :server-url (first (:server state))})
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243
@@ -303,13 +304,15 @@
    :body
    (hiccup/html
      [:head
-      [:meta {:charset "utf-8"}]]
+      [:meta {:charset "utf-8"}]
+      [:title "skylobby"]]
      [:body
+      {:style {:background-color "#000"}}
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
-      [:link {:rel "stylesheet" :href "https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"}]
-      [:link {:rel "stylesheet" :href "https://fonts.googleapis.com/icon?family=Material+Icons"}]
+      [:link {:rel "stylesheet" :href "/css/tachyons.min.css"}]
+      [:link {:rel "stylesheet" :href "/iconfont/material-icons.css"}]
       [:script {:src (str "/js/main.js?v=" (u/curr-millis))}]])
    :headers {"Content-Type" "text/html"}})
 
