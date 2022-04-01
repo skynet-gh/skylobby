@@ -63,7 +63,8 @@
                                :server-url (:server-url client-data)
                                :username (:username client-data)}))))
    :logins (:logins state)
-   :servers (:servers state)})
+   :servers (:servers state)
+   :server-url (first (:server state))})
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243

@@ -1,4 +1,4 @@
-(ns skylobby
+(ns skylobby.core
   (:require
     [chime.core :as chime]
     [clojure.core.async :as async]
@@ -34,8 +34,8 @@
 
 ; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
 (def custom-readers
-  {'spring-lobby/java.io.File skylobby/read-file-tag
-   'spring-lobby/java.net.URL skylobby/read-url-tag})
+  {'spring-lobby/java.io.File skylobby.core/read-file-tag
+   'spring-lobby/java.net.URL skylobby.core/read-url-tag})
 
 ; https://stackoverflow.com/a/23592006
 (defmethod print-method File [f ^java.io.Writer w]

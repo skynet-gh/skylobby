@@ -59,15 +59,15 @@
 
 (defn rerender []
   (try
-    (println "Requiring skylobby ns")
-    (require 'skylobby)
+    (println "Requiring skylobby.core ns")
+    (require 'skylobby.core)
     (require 'skylobby.main)
-    (let [new-state-var (find-var 'skylobby/*state)]
+    (let [new-state-var (find-var 'skylobby.core/*state)]
       (alter-var-root new-state-var (constantly *state)))
     (require 'skylobby.client)
     (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
     (try
-      (let [init-fn (var-get (find-var 'skylobby/init))]
+      (let [init-fn (var-get (find-var 'skylobby.core/init))]
         (reset! init-state (init-fn *state {:skip-tasks true})))
       (catch Throwable e
         (println "init error" e)
@@ -121,7 +121,7 @@
      [datafy pprint chime/chime-at string/split edn/read-string http/get]
      (hawk/watch! [{:paths ["graal/clj"]
                     :handler refresh-on-file-change}])
-     (require 'skylobby)
+     (require 'skylobby.core)
      (require 'skylobby.fs)
      (let [init-7z-fn (var-get (find-var 'skylobby.fs/init-7z!))]
        (future
@@ -131,18 +131,18 @@
            (println "Finished initializing 7zip")
            (catch Throwable e
              (println e)))))
-     (alter-var-root #'*state (constantly (var-get (find-var 'skylobby/*state))))
+     (alter-var-root #'*state (constantly (var-get (find-var 'skylobby.core/*state))))
      (let [
-           initial-state-fn (var-get (find-var 'skylobby/initial-state))
+           initial-state-fn (var-get (find-var 'skylobby.core/initial-state))
            initial-state (initial-state-fn)]
        (reset! *state initial-state))
      (require 'skylobby.client)
      (require 'skylobby.client.handler)
      (alter-var-root #'old-client-handler (constantly (var-get (find-var 'skylobby.client/handler))))
      (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
-     (require 'skylobby)
+     (require 'skylobby.core)
      (require 'skylobby.main)
-     (let [init-fn (var-get (find-var 'skylobby/init))]
+     (let [init-fn (var-get (find-var 'skylobby.core/init))]
        (reset! init-state (init-fn *state)))
      (catch Throwable e
        (println e)

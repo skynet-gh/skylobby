@@ -2,7 +2,7 @@
   (:require
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
-    skylobby
+    skylobby.core
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
@@ -40,7 +40,7 @@
       (let [
             before-state (u/curr-millis)
             _ (log/info "Loading initial state")
-            initial-state (skylobby/initial-state)
+            initial-state (skylobby.core/initial-state)
             state (merge
                     initial-state
                     (when (contains? options :spring-root)
@@ -48,5 +48,5 @@
                         {:spring-isolation-dir f
                          ::spring-root-arg f})))]
         (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
-        (reset! skylobby/*state state)
-        (skylobby/init skylobby/*state)))))
+        (reset! skylobby.core/*state state)
+        (skylobby.core/init skylobby.core/*state)))))

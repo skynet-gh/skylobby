@@ -11,8 +11,9 @@
   @(rf/subscribe query-v))
 
 (defn servers-page [_]
-  (let [{:keys [active-servers logins servers]} (listen [:skylobby/servers])
-        server-url (listen [:skylobby/server-url])
+  (let [{:keys [active-servers logins server-url servers]} (listen [:skylobby/servers])
+        server-url (or (listen [:skylobby/server-url])
+                       server-url)
         active-server-keys (set (map :server-key active-servers))
         username-drafts (listen [:skylobby/username-drafts])
         password-drafts (listen [:skylobby/password-drafts])
