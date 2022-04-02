@@ -166,6 +166,10 @@
   "queryAllPublicMethods":true
 },
 {
+  "name":"java.lang.IllegalArgumentException",
+  "queryAllPublicMethods":true
+},
+{
   "name":"java.lang.Integer"
 },
 {
@@ -179,6 +183,10 @@
   "name":"java.lang.Object",
   "queryAllPublicMethods":true,
   "methods":[{"name":"getClass","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.RuntimeException",
+  "queryAllPublicMethods":true
 },
 {
   "name":"java.lang.String"

@@ -399,8 +399,16 @@
                                            {:status 500
                                             :headers {"Content-Type" "text/html"}
                                             :body (str "Error getting minimap image for" map-name "type" minimap-type)})))}]
+         ["/favicon.ico" {:handler (fn [_request]
+                                     (ring.util.response/redirect "images/favicon.ico"))}]
          ["/js/*" (ring/create-resource-handler {:root "public/js"
-                                                 :not-found-handler index})]]
+                                                 :not-found-handler index})]
+         ["/css/*" (ring/create-resource-handler {:root "public/css"
+                                                  :not-found-handler index})]
+         ["/images/*" (ring/create-resource-handler {:root "public/images"
+                                                     :not-found-handler index})]
+         ["/iconfont/*" (ring/create-resource-handler {:root "public/iconfont"
+                                                       :not-found-handler index})]]
         {:conflicts (constantly nil)
          :data {:coercion   reitit.coercion.spec/coercion
                 :muuntaja   m/instance
