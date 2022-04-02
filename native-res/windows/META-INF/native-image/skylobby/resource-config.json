@@ -5,6 +5,18 @@
       "pattern":"\\Qnet/jpountz/util/win32/amd64/liblz4-java.so\\E"
     }, 
     {
+      "pattern":"\\Qpublic/css/tachyons.min.css\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/iconfont/material-icons.css\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/iconfont/material-icons.woff2\\E"
+    }, 
+    {
+      "pattern":"\\Qpublic/images/favicon.ico\\E"
+    }, 
+    {
       "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.dispatch.js.map\\E"
     }, 
     {

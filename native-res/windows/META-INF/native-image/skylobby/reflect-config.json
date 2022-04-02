@@ -12,6 +12,9 @@
   "name":"[Ljava.nio.file.StandardCopyOption;"
 },
 {
+  "name":"[Lreitit.Trie$Matcher;"
+},
+{
   "name":"aleph.netty.proxy$io.netty.channel.ChannelInitializer$ff19274a",
   "queriedMethods":[
     {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
