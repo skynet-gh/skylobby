@@ -1,4 +1,5 @@
 (ns skylobby.client.message
+  (:refer-clojure :exclude [send])
   (:require
     [clojure.string :as string]
     [manifold.stream :as s]

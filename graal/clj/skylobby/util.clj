@@ -17,7 +17,8 @@
     (java.util.jar Manifest)
     (java.util.zip CRC32)
     (org.apache.commons.codec.binary Hex)
-    (org.apache.commons.io FileUtils)))
+    (org.apache.commons.io FileUtils))
+  (:gen-class))
 
 
 (set! *warn-on-reflection* true)
@@ -70,13 +71,13 @@
     (agent-string)))
 
 
-(def main-class-name "spring_lobby.main")
+(def this-class-name "skylobby.util")
 
 
 ; https://stackoverflow.com/a/16431226/984393
 (defn manifest-version []
   (try
-    (when-let [clazz (Class/forName main-class-name)]
+    (when-let [clazz (Class/forName this-class-name)]
       (log/trace "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
         (log/trace "Discovered location" loc)
@@ -87,6 +88,14 @@
       (log/trace "Class not found, assuming running in dev and not as a jar"))
     (catch Exception e
       (log/trace e "Unable to read version from manifest"))))
+
+(defn version []
+  (or (try
+        (slurp (io/resource (str app-name ".version")))
+        (catch Exception e
+          (log/trace e "Error reading version from resource")))
+      (manifest-version)
+      "UNKNOWN"))
 
 
 (defn short-git-commit [git-commit-id]
@@ -540,7 +549,7 @@
   "Returns the file for the current running jar, or nil if it cannot be determined."
   []
   (try
-    (when-let [clazz (Class/forName main-class-name)]
+    (when-let [clazz (Class/forName this-class-name)]
       (log/debug "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation .toURI)]
         (io/file loc)))

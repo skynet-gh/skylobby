@@ -5,6 +5,7 @@
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
     java-time
+    [skylobby.cli.util :as cu]
     [skylobby.config :as config]
     [skylobby.fs :as fs]
     [skylobby.http :as http]
@@ -21,7 +22,7 @@
 
 
 (def cli-options
-  [[nil "--help" "Print help and exit"]
+  [["-h" "--help" "Print help and exit"]
    [nil "--version" "Print version and exit"]
    [nil "--skylobby-root SKYLOBBY_ROOT" "Set the config and log dir for skylobby"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
@@ -29,6 +30,23 @@
    [nil "--engine ENGINE" "Engine to use"]
    [nil "--game GAME" "Game to use"]
    [nil "--map MAP" "Map to use"]])
+
+
+(defn usage [options-summary]
+  (->> [""
+        (str u/app-name " demo CLI")
+        ""
+        (str "Usage: " u/app-name " cli [options] action")
+        ""
+        "Options:"
+        options-summary
+        ""
+        "Actions:"
+        "  get       Get a resource"
+        "  getall    Get a set of resources"
+        "  play      Start a spring game"
+        ""]
+       (string/join \newline)))
 
 
 (defn matching-download [downloadables-by-url spring-name]
@@ -219,24 +237,30 @@
 
 (defn -main [& args]
   (log/merge-config! {:appenders {:println {:min-level :info}}})
-  (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options)]
+  (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options)
+        command (first arguments)]
     (if errors
-      (do
-        (println "Error parsing arguments:\n\n"
-                 (string/join \newline errors))
-        (System/exit -1))
+      (apply cu/print-and-exit -1
+        "Error parsing arguments:\n"
+        errors)
       (cond
-        (or (= "help" (first arguments))
+        (or (= "help" command)
             (:help options))
-        (println summary)
-        (or (= "version" (first arguments))
+        (cu/print-and-exit 0
+          (usage summary))
+        (or (= "version" command)
             (:version options))
-        (println (str u/app-name " " "todo version"))
-        (= "get" (first arguments))
+        (cu/print-and-exit 0 (str u/app-name " " (u/version)))
+        (= "get" command)
         (get-resource (string/join " " (rest arguments)) options)
-        (= "getall" (first arguments))
+        (= "getall" command)
         (get-resources options)
-        (= "play" (first arguments))
+        (= "play" command)
         (play (string/join " " (rest arguments)) options)
+        (seq arguments)
+        (cu/print-and-exit -1
+          (str "Unknown action: " (pr-str arguments))
+          (usage summary))
         :else
-        (println "Unknown start option")))))
+        (cu/print-and-exit -1
+          (usage summary))))))
