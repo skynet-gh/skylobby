@@ -4,6 +4,7 @@
     [clojure.tools.cli :as cli]
     skylobby.core
     [skylobby.cli :as cli-demo]
+    [skylobby.cli.util :as cu]
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
@@ -15,31 +16,47 @@
 
 (def cli-options
   [
-   [nil "--help" "Print help and exit"]
+   ["-h" "--help" "Print help and exit"]
    [nil "--version" "Print version and exit"]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]])
 
 
+(defn usage [options-summary]
+  (->> [""
+        u/app-name
+        ""
+        (str "Usage: " u/app-name " [options] action")
+        ""
+        "Options:"
+        options-summary
+        ""
+        "Actions:"
+        "  cli       Demo CLI interface"
+        "  <none>    Start client service with web UI"
+        ""]
+       (string/join \newline)))
+
+
 (defn -main [& args]
-  (let [version (or (u/manifest-version) "UNKNOWN")]
-    (log/info "skylobby" version)
-    (alter-var-root #'skylobby.util/app-version (fn [& _] version)))
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
-        command (first arguments)]
-    (cond 
+        command (first arguments)
+        version (or (u/manifest-version) "UNKNOWN")]
+    (alter-var-root #'skylobby.util/app-version (fn [& _] version))
+    (cond
       errors
-      (do
-        (println "Error parsing arguments:\n\n"
-                 (string/join \newline errors))
-        (System/exit -1))
+      (apply cu/print-and-exit -1
+        "Error parsing arguments:\n"
+        errors)
       (or (= "help" command)
           (:help options))
-      (println summary)
+      (cu/print-and-exit 0 (usage summary))
       (or (= "version" command)
           (:version options))
-      (println (str u/app-name " " "todo version"))
+      (cu/print-and-exit 0 (str u/app-name " " version))
       (= "cli" command)
       (apply cli-demo/-main (rest arguments))
+      (seq arguments)
+      (cu/print-and-exit -1 "Unknown action: " (pr-str arguments))
       :else
       (let [
             before-state (u/curr-millis)
