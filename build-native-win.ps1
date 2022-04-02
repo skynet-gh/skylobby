@@ -2,6 +2,6 @@ npm install
 
 clojure -M:cljs compile frontend
 
-clojure -T:skylobby clean
+clojure -T:build clean
 
-clojure -M:skylobby-deps:skylobby-native-windows
+clojure -M:graal-deps:native-windows
