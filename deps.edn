@@ -55,6 +55,7 @@
   org.clojure/core.memoize {:mvn/version "1.0.257"}
   org.clojure/clojure {:mvn/version "1.11.0"}
   org.clojure/core.async {:mvn/version "1.5.648"}
+  org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
   org.clojure/spec.alpha {:mvn/version "0.3.218"}
   org.clojure/test.check {:mvn/version "1.1.1"}
   org.clojure/tools.cli {:mvn/version "1.0.206"}
@@ -142,15 +143,21 @@
   :skylobby-deps
   {:replace-deps
    {
-    aleph/aleph {:mvn/version "0.4.7"}
+    ;aleph/aleph {:mvn/version "0.4.7"}
+    io.github.skynet-gh/aleph {:git/tag "0.4.7+update-byte-streams"
+                               :git/sha "f60c671"}
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
     clj-jgit/clj-jgit {:mvn/version "0.8.10"}
     clojail/clojail {:mvn/version "1.0.6"}
-    clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
-    com.evocomputing/colors {:mvn/version "1.0.6"}
+    ;clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+    io.github.skynet-gh/clojure.java-time {:git/tag "0.3.3+exclude-abs"
+                                           :git/sha "bf11ca5"}
+    ;com.evocomputing/colors {:mvn/version "1.0.6"}
+    io.github.skynet-gh/jolby-colors {:git/tag "1.0.6+exclude-abs"
+                                      :git/sha "92e16b6"}
     ;com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.github.clj-easy/graal-config-clj-http
     {:git/url "https://github.com/clj-easy/graal-config"
@@ -171,8 +178,8 @@
     ;gloss/gloss {:mvn/version "0.2.6"}
     ;io.github.casselc/gloss {:git/tag "0.0.0-SNAPSHOT" :git/sha "37a9f46"}
     ;gloss/gloss {:local/root "../gloss"}
-    io.github.skynet-gh/gloss {:git/tag "0.2.6+fix-match-loop" 
-                               :git/sha "ee99a12"}
+    io.github.skynet-gh/gloss {:git/tag "0.2.6+update-byte-streams"
+                               :git/sha "7024e89"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.10"}
@@ -194,8 +201,16 @@
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
     org.clj-commons/byte-streams {:mvn/version "0.2.10"}
+    ;io.github.skynet-gh/byte-streams {:git/tag "0.2.10+fix-single-segment-ns"
+    ;                                  :git/sha "af8a7cd"}
+    ;io.github.skynet-gh/byte-streams {:git/tag "0.2.10+fix-single-segment-ns"
+    ;                                  :git/sha "2c811a1"}
+    primitive-math/primitive-math {:mvn/version "0.1.6"}
+    ;io.github.skynet-gh/primitive-math {:git/tag "0.1.6+fix-single-segment-nses"
+    ;                                    :git/sha "98a8ad1"}
     org.clojure/clojure {:mvn/version "1.11.0"}
     org.clojure/core.async {:mvn/version "1.5.648"}
+    org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     ;org.clojure/tools.logging {:mvn/version "1.2.4"}
@@ -235,11 +250,11 @@
    :main-opts ["-m" "skylobby.main"]}
   :skylobby-native-linux
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
-   :main-opts ["-m" "native-image" "skylobby.main" 
-               "--no-fallback" 
+   :main-opts ["-m" "native-image" "skylobby.main"
+               "--no-fallback"
                "--allow-incomplete-classpath"
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               "--initialize-at-build-time=io.aviso" 
+               "--initialize-at-build-time=io.aviso"
                "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--initialize-at-build-time=byte_streams"
@@ -301,7 +316,7 @@
                "--initialize-at-build-time=byte_streams$fn__29207$f__29011__auto____29209,byte_streams$fn__29369,byte_streams$fn__29027,byte_streams$fn__29088$f__29011__auto____29089,byte_streams$fn__29380,byte_streams$fn__29169$f__29011__auto____29171,byte_streams$this__29051,byte_streams$fn__29290$f__29011__auto____29292,byte_streams$fn__29254$f__29011__auto____29255,byte_streams$fn__29298$f__29011__auto____29300,byte_streams$fn__29332$f__29011__auto____29334,byte_streams$fn__29039$fn__29040,byte_streams$fn__29224$f__29011__auto____29226,byte_streams$fn__29387,byte_streams$fn__29232$f__29011__auto____29234,byte_streams$fn__29342$f__29011__auto____29344,byte_streams$fn__29382,byte_streams$fn__29138$f__29011__auto____29140,byte_streams$fn__29189$f__29011__auto____29191,byte_streams$fn__29114$f__29011__auto____29115,byte_streams$fn__29025"
 
                "--report-unsupported-elements-at-runtime"
-               "-J-Xmx6g" 
+               "-J-Xmx6g"
                "-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces"
                "-H:Name=skylobby"]
@@ -309,7 +324,7 @@
               "-Dclojure.spec.skip-macros=true"]}
   :skylobby-native-windows
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/windows"]
-   :extra-deps 
+   :extra-deps
    {
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
@@ -320,7 +335,7 @@
                "--allow-incomplete-classpath"
 
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               "--initialize-at-build-time=io.aviso" 
+               "--initialize-at-build-time=io.aviso"
                "--initialize-at-build-time=slf4j_timbre"
                "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
                "--initialize-at-build-time=byte_streams"
@@ -353,7 +368,7 @@
                "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
-               
+
                "--initialize-at-run-time=io.netty.handler.ssl.OpenSslClientContext"
                "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom,io.netty.channel.unix,io.netty.channel.epoll,io.netty.channel.kqueue"
                "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
@@ -391,7 +406,7 @@
               "-Dclojure.spec.skip-macros=true"]}
   :skylobby-native-mac
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
-   :extra-deps 
+   :extra-deps
    {
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
