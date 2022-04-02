@@ -40,7 +40,7 @@
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
         command (first arguments)
-        version (or (u/manifest-version) "UNKNOWN")]
+        version (u/version)]
     (alter-var-root #'skylobby.util/app-version (fn [& _] version))
     (cond
       errors

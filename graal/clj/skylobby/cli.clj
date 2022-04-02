@@ -238,8 +238,7 @@
 (defn -main [& args]
   (log/merge-config! {:appenders {:println {:min-level :info}}})
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options)
-        command (first arguments)
-        version (or (u/manifest-version) "UNKNOWN")]
+        command (first arguments)]
     (if errors
       (apply cu/print-and-exit -1
         "Error parsing arguments:\n"
@@ -251,7 +250,7 @@
           (usage summary))
         (or (= "version" command)
             (:version options))
-        (cu/print-and-exit 0 (str u/app-name " " version))
+        (cu/print-and-exit 0 (str u/app-name " " (u/version)))
         (= "get" command)
         (get-resource (string/join " " (rest arguments)) options)
         (= "getall" command)
