@@ -9,15 +9,15 @@ jobs:
   changelog:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - name: Get last version from tag
         id: lasttag
         shell: bash
         run: echo ::set-output name=version::$(git describe --abbrev=0 --tags --match '[0-9]*\.[0-9]*\.[0-9]*')
-      - uses: coditory/changelog-parser@v1
+      - uses: coditory/changelog-parser@v1.0.2
         id: changelog
       - if: ${{ steps.changelog.outputs.version != steps.lasttag.outputs.version }}
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.10.0
         with:
           body: ${{ steps.changelog.outputs.description }}
           prerelease: true
