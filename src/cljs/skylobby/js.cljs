@@ -487,9 +487,13 @@
 (rf/reg-event-db :skylobby/quit
   (fn [db _]
     (chsk-send! [:skylobby/quit]
-      5000
+      2000
       (fn [_reply]
         (.close js/window)))
+    (js/setTimeout
+      (fn []
+        (.close js/window))
+      3000)
     db))
 
 ; subs

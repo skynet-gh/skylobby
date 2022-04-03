@@ -40,19 +40,26 @@
 
 
 (defn browse-url [url]
-  (let [desktop (Desktop/getDesktop)]
-    (println "Browsing" url)
-    (if (.isSupported desktop Desktop$Action/BROWSE)
-      (.browse desktop (java.net.URI. url))
-      (let [runtime (Runtime/getRuntime)
-            command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
-            ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-        (.exec runtime cmdarray nil nil)))))
+  (if-let [desktop (when (Desktop/isDesktopSupported)
+                     (let [desktop (Desktop/getDesktop)]
+                       (when (.isSupported desktop Desktop$Action/BROWSE)
+                         desktop)))]
+    (.browse desktop (java.net.URI. url))
+    (let [runtime (Runtime/getRuntime)
+          ; https://stackoverflow.com/a/5116553
+          command (if (fs/windows?)
+                    ["explorer.exe" url]
+                    ["xdg-open" url])
+          ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+      (.exec runtime cmdarray nil nil))))
 
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
         command (first arguments)
         version (u/version)]
+    (if (fs/windows?)
+      (u/log-only-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
+      (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log")))))
     (alter-var-root #'skylobby.util/app-version (fn [& _] version))
     (cond
       errors

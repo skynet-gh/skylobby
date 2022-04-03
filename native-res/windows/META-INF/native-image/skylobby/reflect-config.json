@@ -335,6 +335,14 @@
   "fields":[{"name":"INSTANCE"}]
 },
 {
+  "name":"sun.awt.windows.WToolkit",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.java2d.marlin.DMarlinRenderingEngine",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"sun.nio.ch.SelectorImpl",
   "fields":[
     {"name":"publicSelectedKeys"}, 

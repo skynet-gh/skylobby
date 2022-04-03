@@ -497,6 +497,20 @@
         :output-fn (partial log/default-output-fn {:stacktrace-fonts {}}))}})
   (log/handle-uncaught-jvm-exceptions!))
 
+(defn log-only-to-file [log-path]
+  (log/merge-config!
+    {:min-level :info
+     :appenders
+     {:rotor
+      (assoc
+        (rotor/rotor-appender
+          {:path log-path
+           :max-size 5000000
+           :backlog 5})
+        :output-fn (partial log/default-output-fn {:stacktrace-fonts {}}))
+      :println {:enabled? false}}})
+  (log/handle-uncaught-jvm-exceptions!))
+
 
 ; https://stackoverflow.com/a/4883851/984393
 (defn is-port-open? [port]
