@@ -41,6 +41,24 @@
    :ascii])
 
 
+; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
+(defn- read-file-tag [cs]
+  (io/file cs))
+(defn- read-url-tag [spec]
+  (URL. spec))
+
+; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
+(def custom-readers
+  {'spring-lobby/java.io.File skylobby.util/read-file-tag
+   'spring-lobby/java.net.URL skylobby.util/read-url-tag})
+
+; https://stackoverflow.com/a/23592006
+(defmethod print-method java.io.File [^java.io.File f ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.io.File " (pr-str (.getCanonicalPath f)))))
+(defmethod print-method URL [url ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
+
+
 (defn server-url [{:keys [host port]}]
   (when (and host port)
     (str host ":" port)))

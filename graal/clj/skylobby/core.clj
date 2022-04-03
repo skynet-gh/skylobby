@@ -26,26 +26,6 @@
 (def ^:dynamic *state (atom {}))
 
 
-; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
-(defn- read-file-tag [cs]
-  (io/file cs))
-(defn- read-url-tag [spec]
-  (URL. spec))
-
-; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
-(def custom-readers
-  {'spring-lobby/java.io.File skylobby.core/read-file-tag
-   'spring-lobby/java.net.URL skylobby.core/read-url-tag})
-
-; https://stackoverflow.com/a/23592006
-(defmethod print-method File [f ^java.io.Writer w]
-  (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
-(defmethod print-method URL [url ^java.io.Writer w]
-  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
-
-; TODO read spring-lobby but write skylobby
-
-
 ; https://github.com/ptaoussanis/nippy#custom-types-v21
 (defn register-nippy []
   (nippy/extend-freeze File :skylobby/file
@@ -78,7 +58,7 @@
         (let [config-file (fs/config-file filename)]
           (log/info "Slurping config edn from" config-file)
           (when (fs/exists? config-file)
-            (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
+            (let [data (->> config-file slurp (edn/read-string {:readers u/custom-readers}))]
               (if (map? data)
                 (do
                   (try

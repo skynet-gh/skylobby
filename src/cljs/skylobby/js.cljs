@@ -30,6 +30,12 @@
 
 (reader/register-tag-parser! 'spring-lobby/java.io.File (fn [path] (File. path)))
 
+; https://stackoverflow.com/a/42917425
+(extend-protocol IPrintWithWriter
+  File 
+  (-pr-writer [f w _]
+    (write-all w "#spring-lobby/java.io.File " (pr-str (:path f)))))
+
 
 (def ?csrf-token
   (when-let [el (.getElementById js/document "sente-csrf-token")]
@@ -138,6 +144,14 @@
   (let [{:keys [auto-unspec server-key]} ?data]
     (rf/dispatch [:skylobby/assoc-in [:by-server server-key :auto-unspec] auto-unspec])))
 
+(defmethod -event-msg-handler :skylobby/spring-running
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/assoc :spring-running ?data]))
+
+(defmethod -event-msg-handler :skylobby/replays-watched
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/assoc :replays-watched ?data]))
+
 
 ; re-frame
 
@@ -166,10 +180,10 @@
       [:skylobby/get-servers]
       5000
       (fn [reply]
-        (log/debug "Servers reply" reply)
+        (log/trace "Servers reply" reply)
         (if (sente/cb-success? reply)
           (do
-            (log/trace "Got servers" reply)
+            (log/debug "Got servers" (count reply))
             (rf/dispatch [:skylobby/assoc :servers reply]))
           (log/error reply))))
     db))
@@ -496,6 +510,12 @@
       3000)
     db))
 
+(rf/reg-event-db :skylobby/watch-replay
+  (fn [db [_t data]]
+    (chsk-send! [:skylobby/watch-replay data])
+    db))
+
+
 ; subs
 
 (rf/reg-sub :skylobby/current-route
@@ -605,6 +625,14 @@
 (rf/reg-sub :skylobby/hide-passworded-battles
   (fn [db]
     (boolean (:skylobby/hide-passworded-battles db))))
+
+(rf/reg-sub :skylobby/replays-watched
+  (fn [db]
+    (:replays-watched db)))
+
+(rf/reg-sub :skylobby/spring-running
+  (fn [db]
+    (:spring-running db)))
 
 
 (defn listen [query-v]

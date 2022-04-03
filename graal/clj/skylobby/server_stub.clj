@@ -1,5 +1,6 @@
 (ns skylobby.server-stub
   (:require
+    [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.spec.alpha :as s]
@@ -19,6 +20,7 @@
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
@@ -79,8 +81,12 @@
 ; the default edn packer has issues in graalvm
 (deftype EdnPacker []
   interfaces/IPacker
-  (pack   [_ x] (pr-str          x))
-  (unpack [_ x] (edn/read-string x)))
+  (pack   [_ x] 
+    (pr-str x))
+  (unpack [_ x] 
+    (edn/read-string 
+      {:readers u/custom-readers}
+      x)))
 
 
 (defn init [state-atom]
@@ -114,6 +120,14 @@
                          (when (not= (:logins old-state)
                                      new-logins)
                            (broadcast [:skylobby/logins new-logins])))
+                       (let [new-spring-running (:spring-running new-state)]
+                         (when (not= (:spring-running old-state)
+                                     new-spring-running)
+                           (broadcast [:skylobby/spring-running new-spring-running])))
+                       (let [new-replays-watched (:replays-watched new-state)]
+                         (when (not= (:replays-watched old-state)
+                                     new-replays-watched)
+                           (broadcast [:skylobby/replays-watched new-replays-watched])))
                        (doseq [[server-key server-data] (:by-server new-state)]
                          (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
                            (when (not= console-log
@@ -219,6 +233,21 @@
                                           :host-ingame true
                                           :spring-isolation-dir spring-root}
                                          (resource/spring-root-resources spring-root by-spring-root)))))
+    (defmethod -event-msg-handler
+      :skylobby/watch-replay
+      [{:keys [?data]}]
+      (let [
+            {:keys [replay-file]} ?data
+            {:keys [by-spring-root engine-overrides parsed-replays-by-path spring-isolation-dir]} @state-atom
+            {:keys [engines]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+            {:keys [replay-engine-version]} (get parsed-replays-by-path (fs/canonical-path replay-file))]
+        (async/thread
+          (spring/watch-replay state-atom (merge
+                                            {:engine-version replay-engine-version
+                                             :engines engines
+                                             :engine-overrides engine-overrides
+                                             :replay-file replay-file
+                                             :spring-isolation-dir spring-isolation-dir})))))
     (defmethod -event-msg-handler
       :skylobby/send-command
       [{:keys [?data]}]
