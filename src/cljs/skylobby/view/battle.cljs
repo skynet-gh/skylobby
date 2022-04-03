@@ -212,9 +212,6 @@
            {:keys [host-username]} battle-details
            my-client-status (get-in users [username :client-status])
            host-client-status (get-in users [host-username :client-status])]
-       (println (keys battle))
-       (println host-username)
-       (println host-client-status)
        [:div {:class "flex justify-center"}
         [:div {:class "flex items-center mb2 mh2"}
          [:input

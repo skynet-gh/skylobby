@@ -18,6 +18,7 @@
     [skylobby.view.servers-nav :as servers-nav]
     [skylobby.view.settings :as settings-view]
     [skylobby.view.side-nav :as side-nav]
+    [skylobby.view.tasks :as tasks-view]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
@@ -634,6 +635,10 @@
   (fn [db]
     (:spring-running db)))
 
+(rf/reg-sub :skylobby/tasks
+  (fn [db]
+    (select-keys db [:current-tasks :tasks-by-kind])))
+
 
 (defn listen [query-v]
   @(rf/subscribe query-v))
@@ -694,6 +699,16 @@
                 (rf/dispatch [:skylobby/get-settings]))
        :stop  (fn [& _params]
                 (log/info "Leaving settings page"))}]}]
+   ["tasks"
+    {:name      :skylobby/tasks
+     :view      tasks-view/tasks-page
+     :link-text "Tasks"
+     :controllers
+     [{
+       :start (fn [& _params]
+                (log/info "Entering tasks page"))
+       :stop  (fn [& _params]
+                (log/info "Leaving tasks page"))}]}]
    ["quit"
     {:name      :skylobby/quit
      :view      (fn [_]
