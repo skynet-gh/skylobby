@@ -10,9 +10,12 @@
     [org.httpkit.server :as http-kit]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.auto-resources :as auto-resources]
+    [skylobby.battle-sync :as battle-sync]
     [skylobby.fs :as fs]
     [skylobby.server-stub :as server]
     [skylobby.task :as task]
+    [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
@@ -196,7 +199,7 @@
      :console-auto-scroll true}))
 
 (defmulti event-handler :event/type)
-(defmulti task-handler ::task-type)
+(defmulti task-handler :spring-lobby/task-type)
 
 (def ^:dynamic handle-task task-handler) ; for overriding in dev
 
@@ -204,7 +207,8 @@
 (defn add-task-handlers []
   (defmethod task-handler :default [task]
     (when task
-      (log/warn "Unknown task type" task))))
+      (log/warn "Unknown task type" task)))
+  (task-handlers/add-handlers task-handler *state))
 
 
 (defn remove-task [task tasks]
@@ -361,14 +365,14 @@
 
 
 (def state-watch-chimers
-  [])
-   ;[:auto-get-resources-watcher auto-get-resources-watcher 2000]
+  [
+   [:auto-get-resources-watcher auto-resources/auto-get-resources-watcher 2000]
    ;[:battle-map-details-watcher battle-map-details-watcher 2000]
    ;[:battle-mod-details-watcher battle-mod-details-watcher 2000]
    ;[:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10000]
    ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
    ;[:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10000]
-   ;[:update-battle-status-sync-watcher update-battle-status-sync-watcher 2000]])
+   [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2000]])
 
 (def wait-init-tasks-ms 20000)
 

@@ -21,6 +21,7 @@
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
+    [skylobby.task :as task]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
@@ -128,6 +129,10 @@
                          (when (not= (:replays-watched old-state)
                                      new-replays-watched)
                            (broadcast [:skylobby/replays-watched new-replays-watched])))
+                       (let [new-tasks (task/all-tasks new-state)]
+                         (when (not= (task/all-tasks old-state)
+                                     new-tasks)
+                           (broadcast [:skylobby/tasks new-tasks])))
                        (doseq [[server-key server-data] (:by-server new-state)]
                          (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
                            (when (not= console-log

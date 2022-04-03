@@ -25,10 +25,6 @@
         first)))
 
 
-(defn sync-number [sync-bool]
-  (if sync-bool 1 2))
-
-
 (def default-scripttags ; TODO read these from lua in map, mod/game, and engine
   {"game"
    {"startpostype" 1
@@ -107,6 +103,20 @@
                                                                       :username username})))))
     (log/warn "Unable to parse ADDUSER" (pr-str m))))
 
+(defmethod handle "REMOVEUSER" [state-atom server-key m]
+  (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
+        channel-name (u/user-channel-name username)]
+    (swap! state-atom update-in [:by-server server-key]
+      (fn [server-data]
+        (cond-> server-data
+                true
+                (update :users dissoc username)
+                (contains? (:my-channels server-data) channel-name)
+                (update-in [:channels channel-name :messages] conj {:text ""
+                                                                    :timestamp (u/curr-millis)
+                                                                    :message-type :leave
+                                                                    :username username}))))))
+
 
 (defn start-game-if-synced
   [state-atom {:keys [by-spring-root servers spring-isolation-dir] :as state} server-data]
@@ -144,6 +154,7 @@
                  {:engine has-engine
                   :mod has-mod
                   :map has-map})))))))
+
 
 (defn parse-client-status [m]
   (re-find #"\w+ ([^\s]+) (\w+)" m))
@@ -767,7 +778,7 @@
                                 :ally 0
                                 :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
                                           0)
-                                :sync (sync-number
+                                :sync (u/sync-number
                                         (resource/sync-status server-data spring mod-details map-details)))
             new-battle-status (if join-battle-as-player
                                 (assoc new-battle-status :mode true)

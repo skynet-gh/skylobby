@@ -80,6 +80,13 @@
          (into {}))))
 
 
+(defn is-bar-server-url? [server-url]
+  (and server-url
+       (or (string/starts-with? server-url "bar.teifion.co.uk")
+           (string/starts-with? server-url "road-flag.bnr.la")
+           (string/includes? server-url "beyondallreason.info"))))
+
+
 (defn agent-string []
   (str app-name "-" app-version))
 
@@ -642,3 +649,35 @@
     (if (= "bool" modoption-type)
       (to-number (to-bool raw-value))
       (to-number raw-value))))
+
+
+(defn server-needs-battle-status-sync-check [server-data]
+  (and (get-in server-data [:battle :battle-id])
+       (let [username (:username server-data)
+             sync-status (get-in server-data [:battle :users username :battle-status :sync])]
+         (not= sync-status 1))))
+
+
+(defn check-cooldown [cooldowns k]
+  (if-let [{:keys [tries updated]} (get cooldowns k)]
+    (if (and (number? tries) (number? updated))
+      (let [cd (< (curr-millis)
+                  (+ updated (* 1000 (Math/pow 2 tries))))] ; exponential backoff
+        (if cd
+          (do
+            (log/info k "is on cooldown")
+            false)
+          true))
+      true)
+    true))
+
+(defn update-cooldown [state-atom k]
+  (swap! state-atom update-in [:cooldowns k]
+    (fn [state]
+      (-> state
+          (update :tries (fnil inc 0))
+          (assoc :updated (curr-millis))))))
+
+
+(defn sync-number [sync-bool]
+  (if sync-bool 1 2))
