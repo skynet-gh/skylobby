@@ -3404,10 +3404,10 @@
             (.exec runtime cmdarray nil nil))
           (fs/linux?)
           (let [
-                command ["dbus-send" (str "--bus=" (System/getenv "DBUS_SESSION_BUS_ADDRESS")) 
+                command ["dbus-send" (str "--bus=" (System/getenv "DBUS_SESSION_BUS_ADDRESS"))
                          "--print-reply"
                          "--dest=org.freedesktop.FileManager1"
-                         "--type=method_call" 
+                         "--type=method_call"
                          "/org/freedesktop/FileManager1"
                          "org.freedesktop.FileManager1.ShowItems"
                          (str "array:string:" (-> file .toURI .toURL str))

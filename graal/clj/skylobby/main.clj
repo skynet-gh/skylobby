@@ -8,6 +8,8 @@
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
+  (:import
+    (java.awt Desktop Desktop$Action))
   (:gen-class))
 
 
@@ -37,10 +39,27 @@
        (string/join \newline)))
 
 
+(defn browse-url [url]
+  (if-let [desktop (when (Desktop/isDesktopSupported)
+                     (let [desktop (Desktop/getDesktop)]
+                       (when (.isSupported desktop Desktop$Action/BROWSE)
+                         desktop)))]
+    (.browse desktop (java.net.URI. url))
+    (let [runtime (Runtime/getRuntime)
+          ; https://stackoverflow.com/a/5116553
+          command (if (fs/windows?)
+                    ["explorer.exe" url]
+                    ["xdg-open" url])
+          ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+      (.exec runtime cmdarray nil nil))))
+
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
         command (first arguments)
         version (u/version)]
+    (if (fs/windows?)
+      (u/log-only-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
+      (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log")))))
     (alter-var-root #'skylobby.util/app-version (fn [& _] version))
     (cond
       errors
@@ -70,4 +89,5 @@
                          ::spring-root-arg f})))]
         (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
         (reset! skylobby.core/*state state)
-        (skylobby.core/init skylobby.core/*state)))))
+        (skylobby.core/init skylobby.core/*state)
+        (browse-url "http://localhost:12345")))))
