@@ -153,6 +153,10 @@
   [{:keys [?data]}]
   (rf/dispatch [:skylobby/assoc :replays-watched ?data]))
 
+(defmethod -event-msg-handler :skylobby/tasks
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/merge ?data]))
+
 
 ; re-frame
 

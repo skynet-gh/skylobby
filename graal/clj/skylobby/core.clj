@@ -17,6 +17,7 @@
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
+    [skylobby.watch :as watch]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -367,8 +368,8 @@
 (def state-watch-chimers
   [
    [:auto-get-resources-watcher auto-resources/auto-get-resources-watcher 2000]
-   ;[:battle-map-details-watcher battle-map-details-watcher 2000]
-   ;[:battle-mod-details-watcher battle-mod-details-watcher 2000]
+   [:battle-map-details-watcher watch/battle-map-details-watcher 2000]
+   [:battle-mod-details-watcher watch/battle-mod-details-watcher 2000]
    ;[:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10000]
    ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
    ;[:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10000]

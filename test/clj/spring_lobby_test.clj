@@ -42,15 +42,6 @@
           (remove-watch state :changes))))))
 
 
-(deftest set-sdd-modinfo-version
-  (is (= ""
-         (spring-lobby/set-sdd-modinfo-version "" "$VERSION")))
-  (is (= "version = '$VERSION'"
-         (spring-lobby/set-sdd-modinfo-version "version = 'xxxx'" "$VERSION")))
-  (is (= "version = 'git:xxxxxxx'"
-         (spring-lobby/set-sdd-modinfo-version "version = '$VERSION'" "git:xxxxxxx"))))
-
-
 (deftest available-name
   (is (= "bot"
          (spring-lobby/available-name [] "bot")))

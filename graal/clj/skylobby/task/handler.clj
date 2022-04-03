@@ -1,10 +1,14 @@
 (ns skylobby.task.handler
   (:require
+    [clojure.core.cache :as cache]
     [clojure.java.io :as io]
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [me.raynes.fs :as raynes-fs]
+    [skylobby.client.gloss :as gloss]
+    [skylobby.client.message :as message]
     [skylobby.fs :as fs]
+    [skylobby.fs.smf :as fs.smf]
     [skylobby.git :as git]
     [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
@@ -16,7 +20,288 @@
     (java.util.regex Matcher)))
 
 
+(def maps-batch-size 5)
 (def mods-batch-size 5)
+(def minimap-batch-size 3)
+
+
+(defn update-battle-sync-statuses [state-atom]
+  (let [state @state-atom]
+    (doseq [[server-key server-data] (concat
+                                       (-> state :by-server u/valid-servers)
+                                       (-> state u/complex-servers))]
+      (let [server-url (-> server-data :client-data :server-url)
+            {:keys [servers spring-isolation-dir]} state
+            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                            spring-isolation-dir)
+            spring-root-path (fs/canonical-path spring-root)
+
+            spring (-> state :by-spring-root (get spring-root-path))
+
+            new-sync-status (resource/sync-status server-data spring (:mod-details state) (:map-details state))
+
+            new-sync-number (u/sync-number new-sync-status)
+            {:keys [battle client-data username]} server-data
+            {:keys [battle-status team-color]} (-> battle :users (get username))
+            old-sync-number (-> battle :users (get username) :battle-status :sync)]
+        (when (and (:battle-id battle)
+                   (not= old-sync-number new-sync-number))
+          (log/info "Updating battle sync status for" server-key "from" old-sync-number
+                    "to" new-sync-number)
+          (if (#{:direct-client :direct-host} (u/server-type server-key))
+            (throw (ex-info "TODO direct connect" {}))
+            #_
+            (fx.event.battle/update-player-or-bot-state
+              state-atom
+              server-key
+              {:username username}
+              {:battle-status {:sync new-sync-number}})
+            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+              (message/send state-atom client-data
+                (str "MYBATTLESTATUS " (gloss/encode-battle-status new-battle-status) " " (or team-color 0))))))))))
+
+(defn- read-map-details [{:keys [map-name map-file]}]
+  (let [log-map-name (str "'" map-name "'")]
+    (try
+      (if map-file
+        (fs/read-map-data map-file)
+        (log/warn "No file found for map" log-map-name))
+      (catch Exception e
+        (log/error e "Error reading map data from" map-file)))))
+
+(defn- update-cached-minimaps
+  ([state-atom maps]
+   (update-cached-minimaps state-atom maps nil))
+  ([state-atom maps {:keys [priorities] :as opts}]
+   (let [to-update
+         (->> maps
+              (filter :map-name)
+              (filter
+                (fn [map-details]
+                  (let [
+                        heightmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "heightmap"}))
+                        metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
+                        minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
+                    (or (:force opts)
+                        (not (fs/exists? heightmap-file))
+                        (not (fs/exists? metalmap-file))
+                        (not (fs/exists? minimap-file))))))
+              (sort-by :map-name)
+              (concat priorities))
+         this-round (take minimap-batch-size to-update)
+         next-round (drop minimap-batch-size to-update)]
+     (log/info (count to-update) "maps do not have cached minimap image files")
+     (doseq [map-details this-round]
+       (if-let [map-file (:file map-details)]
+         (do
+           (log/info "Caching minimap for" map-file)
+           (let [{:keys [map-name smf]} (fs/read-map-data map-file {:map-images true})
+                 {:keys [minimap-height minimap-width]} smf]
+             (when-let [minimap-image (:minimap-image smf)]
+               (let [minimap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height minimap-image)]
+                 (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "minimap"}))))
+             (when-let [metalmap-image (:metalmap-image smf)]
+               (let [metalmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height metalmap-image)]
+                 (fs/write-image-png metalmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "metalmap"}))))
+             (when-let [heightmap-image (:heightmap-image smf)]
+               (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
+                 (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))
+             (swap! state-atom
+               (fn [state]
+                 (-> state
+                     (assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))
+                     (assoc-in [:cached-minimap-updated map-name] (u/curr-millis)))))))
+         (log/error "Map is missing file" (:map-name map-details))))
+     (when (seq next-round)
+       (task/add-task! state-atom
+         {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
+          :priorites priorities
+          :todo (count next-round)})))))
+
+(defn- refresh-maps
+  "Reads map details and caches for maps missing from :maps in state."
+  ([state-atom]
+   (refresh-maps state-atom nil))
+  ([state-atom spring-root]
+   (refresh-maps state-atom spring-root nil))
+  ([state-atom spring-root {:keys [priorities]}]
+   (log/info "Refreshing maps in" spring-root)
+   (let [before (u/curr-millis)
+         {:keys [spring-isolation-dir] :as state} @state-atom
+         spring-root (or spring-root spring-isolation-dir)
+         _ (log/info "Updating maps in" spring-root)
+         spring-root-path (fs/canonical-path spring-root)
+         maps (-> state :by-spring-root (get spring-root-path) :maps)
+         map-files (fs/map-files spring-root)
+         known-files (->> maps (map :file) set)
+         error-files (->> maps (filter :error) (map :file))
+         known-paths (->> known-files (map fs/canonical-path) set)
+         todo (->> map-files
+                   (remove
+                     (fn [file]
+                       (contains? known-paths (fs/canonical-path file))))
+                   shuffle)
+         _ (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
+         battle-maps (->> state
+                          :by-server
+                          (map second)
+                          (map
+                            (fn [{:keys [battle battles]}]
+                              (-> battles (get (:battle-id battle)) :battle-map)))
+                          (filter some?))
+         priorities (->> todo
+                         (filter
+                           (comp
+                             (fn [resource]
+                               (some
+                                 #(resource/could-be-this-map? % resource)
+                                 battle-maps))
+                             (fn [f]
+                               {:resource-filename (fs/filename f)})))
+                         (concat priorities))
+         _ (log/info "Prioritizing maps in battles" (pr-str priorities))
+         this-round (concat priorities
+                      (if (<= (count todo) maps-batch-size) ; add errors if there's not a full round left
+                        (do
+                          (log/info "Adding map directories and maps with errors to scan")
+                          (concat todo
+                                  (filter fs/is-directory? map-files) ; re-scan directories just before errors
+                                  error-files))
+                        (take maps-batch-size todo)))
+         next-round (drop maps-batch-size todo)
+         all-paths (set (filter some? (map (comp fs/canonical-path :file) maps)))
+         next-round (->> next-round
+                         (remove (comp all-paths fs/canonical-path))
+                         seq)
+         next-round-count (count next-round)
+         missing-paths (set
+                         (concat
+                           (->> known-files
+                                (remove fs/exists?)
+                                (map fs/canonical-path))
+                           (->> known-files
+                                (remove (partial fs/descendant? spring-root))
+                                (map fs/canonical-path))))]
+     (apply fs/update-file-cache! state-atom map-files)
+     (fs/make-dirs fs/maps-cache-root)
+     (when (seq this-round)
+       (log/info "Adding" (count this-round) "maps this iteration:" (with-out-str (pprint this-round))))
+     (let [map-file-to-name (into {}
+                              (for [map-file this-round]
+                                (do
+                                  (log/info "Reading" map-file)
+                                  (let [map-data (fs/read-map-data map-file)
+                                        relevant-map-data (select-keys map-data [:error :file :map-name])]
+                                    (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+                                           (fn [maps]
+                                             (let [valid-maps (->> maps
+                                                                   (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file)))]
+                                               (set
+                                                 (cond-> valid-maps
+                                                   map-data
+                                                   (conj relevant-map-data))))))
+                                    [map-file (:map-name map-data)]))))
+           priority-maps (map (fn [map-file]
+                                {:map-name (get map-file-to-name map-file)
+                                 :file map-file})
+                              priorities)]
+       (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
+       (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
+              (fn [maps]
+                (->> maps
+                     (filter (comp fs/canonical-path :file))
+                     (remove
+                       (fn [{:keys [error map-name]}]
+                         (and (not error)
+                              (string/blank? map-name))))
+                     (remove (comp missing-paths fs/canonical-path :file))
+                     (filter (comp (partial instance? java.io.File) :file))
+                     set)))
+       (if next-round
+         (do
+           (log/info "Scheduling map load since there are" next-round-count "maps left to load")
+           (when (seq priority-maps)
+             (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
+                                         :maps priority-maps}))
+           (task/add-task! state-atom
+             {:spring-lobby/task-type :spring-lobby/refresh-maps
+              :spring-root spring-root
+              :todo next-round-count}))
+         (do
+           (log/info "Finished map refresh")
+           (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
+                                       :priorities priority-maps})))
+       {:todo-count next-round-count}))))
+
+(defn refresh-maps-all-spring-roots [state-atom]
+  (let [spring-roots (fs/spring-roots @state-atom)]
+    (log/info "Refreshing maps in" (pr-str spring-roots))
+    (doseq [spring-root spring-roots]
+      (refresh-maps state-atom spring-root))))
+
+
+(defn- refresh-engines
+  "Reads engine details and updates missing engines in :engines in state."
+  ([state-atom]
+   (refresh-engines state-atom nil))
+  ([state-atom spring-root]
+   (refresh-engines state-atom spring-root nil))
+  ([state-atom spring-root opts]
+   (log/info "Refreshing engines in" spring-root)
+   (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
+   (let [before (u/curr-millis)
+         {:keys [spring-isolation-dir] :as state} @state-atom
+         spring-root (or spring-root spring-isolation-dir)
+         _ (log/info "Updating engines in" spring-root)
+         engine-dirs (fs/engine-dirs spring-root)
+         spring-root-path (fs/canonical-path spring-root)
+         known-canonical-paths (->> (-> state
+                                        :by-spring-root
+                                        (get spring-root-path))
+                                    :engines
+                                    (map (comp fs/canonical-path :file))
+                                    (filter some?)
+                                    set)
+         to-add (if (:force opts) ; refresh existing engines too
+                  engine-dirs
+                  (remove (comp known-canonical-paths fs/canonical-path) engine-dirs))
+         canonical-path-set (set (map fs/canonical-path engine-dirs))
+         missing-files (set
+                         (concat
+                           (->> known-canonical-paths
+                                (remove (comp fs/exists? io/file)))
+                           (->> known-canonical-paths
+                                (remove (comp (partial fs/descendant? spring-root) io/file)))))
+         to-remove (set
+                     (concat missing-files
+                             (remove canonical-path-set known-canonical-paths)))]
+     (apply fs/update-file-cache! state-atom known-canonical-paths)
+     (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
+     (doseq [engine-dir to-add]
+       (log/info "Detecting engine data for" engine-dir)
+       (let [engine-data (fs/engine-data engine-dir)]
+         (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
+                (fn [engines]
+                  (set
+                    (conj
+                      (remove (comp #{(fs/canonical-path engine-dir)} fs/canonical-path :file) engines)
+                      engine-data))))))
+     (log/debug "Removing" (count to-remove) "engines")
+     (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
+            (fn [engines]
+              (->> engines
+                   (filter (comp fs/canonical-path :file))
+                   (filter fs/is-current-engine-data?)
+                   (remove (comp to-remove fs/canonical-path :file))
+                   set)))
+     {:to-add-count (count to-add)
+      :to-remove-count (count to-remove)})))
+
+(defn refresh-engines-all-spring-roots [state-atom]
+  (let [spring-roots (fs/spring-roots @state-atom)]
+    (log/info "Refreshing engines in" (pr-str spring-roots))
+    (doseq [spring-root spring-roots]
+      (refresh-engines state-atom spring-root))))
 
 
 (defn set-sdd-modinfo-version [modinfo-str mod-version]
@@ -26,7 +311,7 @@
     (Matcher/quoteReplacement
       (str "version = '" mod-version "'"))))
 
-(defn- read-mod-data
+(defn read-mod-data
   ([f]
    (read-mod-data f nil))
   ([f {:keys [delete-invalid-sdp] :as opts}]
@@ -437,7 +722,90 @@
     (log/info "Attempting to delete corrupt rapid dir after error, then updating rapid again")
     (fs/delete-rapid-dir spring-root)
     (task/add-task! state-atom update-rapid-task))
+  (defmethod task-handler :spring-lobby/refresh-maps [{:keys [spring-root] :as opts}]
+    (if spring-root
+      (refresh-maps state-atom spring-root opts)
+      (refresh-maps-all-spring-roots state-atom)))
   (defmethod task-handler :spring-lobby/refresh-mods [{:keys [spring-root] :as opts}]
     (if spring-root
       (refresh-mods state-atom spring-root opts)
-      (refresh-mods-all-spring-roots state-atom))))
+      (refresh-mods-all-spring-roots state-atom)))
+  (defmethod task-handler :spring-lobby/refresh-engines [{:keys [spring-root] :as opts}]
+    (if spring-root
+      (refresh-engines state-atom spring-root opts)
+      (refresh-engines-all-spring-roots state-atom)))
+  (defmethod task-handler :spring-lobby/update-cached-minimaps
+    [{:keys [maps priorities]}]
+    (let [todo-maps (or maps
+                        (let [{:keys [by-spring-root]} @state-atom]
+                          (mapcat :maps (vals by-spring-root))))]
+      (log/info "Found" (count todo-maps) "maps to update cached minimaps for")
+      (update-cached-minimaps todo-maps {:priorities priorities})))
+  (defmethod task-handler :spring-lobby/map-details [{:keys [map-name map-file tries] :as map-data}]
+    (let [new-tries ((fnil inc 0) tries)
+          error-data {:error true
+                      :file map-file
+                      :map-name map-name
+                      :tries new-tries}
+          cache-key (fs/canonical-path map-file)]
+      (try
+        (if map-file
+          (do
+            (log/info "Updating battle map details for" map-name)
+            (let [map-details (read-map-details map-data)
+                  map-details (if (or (not map-details) (:error map-details))
+                                error-data
+                                map-details)]
+              (log/info "Got map details for" map-name map-file (keys map-details))
+              (swap! state-atom update :map-details cache/miss cache-key map-details)))
+          (do
+            (log/info "Map not found, setting empty details for" map-name)
+            (swap! state-atom update :map-details cache/miss cache-key {:tries new-tries})))
+        (catch Throwable t
+          (log/error t "Error updating map details")
+          (swap! state-atom update :map-details cache/miss cache-key error-data)
+          (throw t)))
+      (update-battle-sync-statuses state-atom)))
+  (defmethod task-handler :spring-lobby/mod-details
+    [{:keys [mod-name mod-file use-git-mod-version]}]
+    (let [error-data {:mod-name mod-name
+                      :file mod-file
+                      :error true
+                      :tries 1} ; TODO inc
+          cache-key (fs/canonical-path mod-file)]
+      (try
+        (if mod-file
+          (do
+            (log/info "Updating mod details for" mod-name)
+            (let [mod-details (or (read-mod-data mod-file {:use-git-mod-version use-git-mod-version}) error-data)]
+              (log/info "Got mod details for" mod-name mod-file (keys mod-details))
+              (swap! state-atom update :mod-details cache/miss cache-key mod-details)
+              (when (:error mod-details)
+                (task/add-task! state-atom
+                  {:spring-lobby/task-type :spring-lobby/refresh-mods}))))
+          (do
+            (log/info "Battle mod not found, setting empty details for" mod-name)
+            (swap! state-atom update :mod-details cache/miss cache-key {})))
+        (catch Throwable t
+          (log/error t "Error updating mod details")
+          (swap! state-atom update :mod-details cache/miss cache-key error-data)
+          (throw t)))
+      (update-battle-sync-statuses state-atom)))
+  (defmethod task-handler ::delete-corrupt-map-file
+    [{:keys [indexed-map spring-root]}]
+    (let [{:keys [file map-name]} indexed-map]
+      (log/info "Attempting to delete corrupt map" map-name "at" file)
+      (raynes-fs/delete file)
+      (fs/update-file-cache! state-atom file)
+      (task/add-task! state-atom
+        {::task-type ::refresh-maps
+         :spring-root spring-root})))
+  (defmethod task-handler ::delete-corrupt-mod-file
+    [{:keys [indexed-mod spring-root]}]
+    (let [{:keys [file mod-name]} indexed-mod]
+      (log/info "Attempting to delete corrupt mod" mod-name "at" file)
+      (raynes-fs/delete file)
+      (fs/update-file-cache! state-atom file)
+      (task/add-task! state-atom
+        {::task-type ::refresh-mods
+         :spring-root spring-root}))))

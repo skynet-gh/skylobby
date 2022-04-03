@@ -129,8 +129,9 @@
                          (when (not= (:replays-watched old-state)
                                      new-replays-watched)
                            (broadcast [:skylobby/replays-watched new-replays-watched])))
-                       (let [new-tasks (task/all-tasks new-state)]
-                         (when (not= (task/all-tasks old-state)
+                       (let [tasks-keys [:current-tasks :tasks-by-kind]
+                             new-tasks (select-keys new-state tasks-keys)]
+                         (when (not= (select-keys old-state tasks-keys)
                                      new-tasks)
                            (broadcast [:skylobby/tasks new-tasks])))
                        (doseq [[server-key server-data] (:by-server new-state)]

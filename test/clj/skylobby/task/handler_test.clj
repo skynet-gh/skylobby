@@ -14,3 +14,11 @@
   (is (= {:current 171880
           :total 1024954}
          (handler/parse-rapid-progress "[Progress]  17% [=====         ] 171880/1024954"))))
+
+(deftest set-sdd-modinfo-version
+  (is (= ""
+         (handler/set-sdd-modinfo-version "" "$VERSION")))
+  (is (= "version = '$VERSION'"
+         (handler/set-sdd-modinfo-version "version = 'xxxx'" "$VERSION")))
+  (is (= "version = 'git:xxxxxxx'"
+         (handler/set-sdd-modinfo-version "version = '$VERSION'" "git:xxxxxxx"))))
