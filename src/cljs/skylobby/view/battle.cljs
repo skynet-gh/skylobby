@@ -31,10 +31,14 @@
         username (or (:username server-key)
                      (-> parameters :query :username))
         {:keys [scripttags] :as battle} (listen [:skylobby/battle server-key])
+        battles (listen [:skylobby/battles server-key])
+        battle-details (get battles (:battle-id battle))
         users (listen [:skylobby/users server-key])
         minimap-size (or (listen [:skylobby/minimap-size]) default-minimap-size)
         minimap-px (str minimap-size "px")
-        minimap-type (or (listen [:skylobby/minimap-type]) default-minimap-type)]
+        minimap-type (or (listen [:skylobby/minimap-type]) default-minimap-type)
+        {:keys [servers]} (listen [:skylobby/servers])
+        spring-running (listen [:skylobby/spring-running])]
     [:div
      {:class "flex"
       :style {:flex-flow "column"
@@ -47,8 +51,7 @@
       [:button
        {:on-click (fn [] (rf/dispatch [:skylobby/leave-battle server-key]))}
        "Leave Battle"]]
-     (let [battles (listen [:skylobby/battles server-key])
-           battle-details (get battles (:battle-id battle))
+     (let [
            map-name (:battle-map battle-details)
            users-parsed (->> battle
                              :users
@@ -206,7 +209,7 @@
                      :max-height "100%"
                      :object-fit "contain"}}])]])
      (let [my-battle-status (get-in battle [:users username :battle-status])
-           {:keys [host-username]} battle
+           {:keys [host-username]} battle-details
            my-client-status (get-in users [username :client-status])
            host-client-status (get-in users [host-username :client-status])]
        [:div {:class "flex justify-center"}
@@ -254,7 +257,7 @@
            [:label {:class "lh-copy"} " Ready "]])
         [:span {:style {:flex-grow 1}}]
         [:button
-         {:class "f3 mh4 mv2"
+         {:class "f3 mh4 mv2 pointer"
           :on-click #(rf/dispatch [:skylobby/start-battle server-key])
           :disabled (boolean
                       (or (:ingame my-client-status)

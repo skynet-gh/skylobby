@@ -10,10 +10,14 @@
     [org.httpkit.server :as http-kit]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.auto-resources :as auto-resources]
+    [skylobby.battle-sync :as battle-sync]
     [skylobby.fs :as fs]
     [skylobby.server-stub :as server]
     [skylobby.task :as task]
+    [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
+    [skylobby.watch :as watch]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
@@ -24,26 +28,6 @@
 
 
 (def ^:dynamic *state (atom {}))
-
-
-; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
-(defn- read-file-tag [cs]
-  (io/file cs))
-(defn- read-url-tag [spec]
-  (URL. spec))
-
-; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
-(def custom-readers
-  {'spring-lobby/java.io.File skylobby.core/read-file-tag
-   'spring-lobby/java.net.URL skylobby.core/read-url-tag})
-
-; https://stackoverflow.com/a/23592006
-(defmethod print-method File [f ^java.io.Writer w]
-  (.write w (str "#spring-lobby/java.io.File " (pr-str (fs/canonical-path f)))))
-(defmethod print-method URL [url ^java.io.Writer w]
-  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
-
-; TODO read spring-lobby but write skylobby
 
 
 ; https://github.com/ptaoussanis/nippy#custom-types-v21
@@ -78,7 +62,7 @@
         (let [config-file (fs/config-file filename)]
           (log/info "Slurping config edn from" config-file)
           (when (fs/exists? config-file)
-            (let [data (->> config-file slurp (edn/read-string {:readers custom-readers}))]
+            (let [data (->> config-file slurp (edn/read-string {:readers u/custom-readers}))]
               (if (map? data)
                 (do
                   (try
@@ -216,7 +200,7 @@
      :console-auto-scroll true}))
 
 (defmulti event-handler :event/type)
-(defmulti task-handler ::task-type)
+(defmulti task-handler :spring-lobby/task-type)
 
 (def ^:dynamic handle-task task-handler) ; for overriding in dev
 
@@ -224,7 +208,8 @@
 (defn add-task-handlers []
   (defmethod task-handler :default [task]
     (when task
-      (log/warn "Unknown task type" task))))
+      (log/warn "Unknown task type" task)))
+  (task-handlers/add-handlers task-handler *state))
 
 
 (defn remove-task [task tasks]
@@ -381,14 +366,14 @@
 
 
 (def state-watch-chimers
-  [])
-   ;[:auto-get-resources-watcher auto-get-resources-watcher 2000]
-   ;[:battle-map-details-watcher battle-map-details-watcher 2000]
-   ;[:battle-mod-details-watcher battle-mod-details-watcher 2000]
+  [
+   [:auto-get-resources-watcher auto-resources/auto-get-resources-watcher 2000]
+   [:battle-map-details-watcher watch/battle-map-details-watcher 2000]
+   [:battle-mod-details-watcher watch/battle-mod-details-watcher 2000]
    ;[:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10000]
    ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
    ;[:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10000]
-   ;[:update-battle-status-sync-watcher update-battle-status-sync-watcher 2000]])
+   [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2000]])
 
 (def wait-init-tasks-ms 20000)
 

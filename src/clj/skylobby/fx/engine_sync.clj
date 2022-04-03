@@ -1,25 +1,17 @@
 (ns skylobby.fx.engine-sync
   (:require
     [cljfx.api :as fx]
-    [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
-    [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
+    [skylobby.http :as http]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 
 
 (set! *warn-on-reflection* true)
-
-
-(defn engine-download-source [engine-version]
-  (cond
-    (string/blank? engine-version) nil
-    (string/includes? engine-version "BAR") "BAR GitHub spring"
-    :else "SpringRTS buildbot"))
 
 
 (defn engine-sync-pane-impl
@@ -82,7 +74,7 @@
              (let [
                    url (:download-url downloadable)
                    download (get http-download url)
-                   download-source-name (engine-download-source engine-version)
+                   download-source-name (resource/engine-download-source engine-version)
                    in-progress (or (:running download)
                                    (contains? download-tasks url)
                                    (and (not downloadable)
@@ -139,7 +131,7 @@
                                   (merge
                                     {:spring-lobby/task-type :spring-lobby/update-downloadables
                                      :force true}
-                                    (get download-sources-by-name download-source-name))}
+                                    (get http/download-sources-by-name download-source-name))}
                                  :else nil))}])
                  (when dest-exists
                    (let [extracting (or (contains? extract-tasks dest-path)
@@ -181,7 +173,7 @@
            :in-progress true}])
        (when (and engine-version
                   (not engine-details)
-                  (not (engine-download-source engine-version)))
+                  (not (resource/engine-download-source engine-version)))
          (let [springname (str "Spring " engine-version)
                springfiles-searched (contains? springfiles-search-results springname)
                springfiles-search-result (get springfiles-search-results springname)

@@ -4,9 +4,9 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
-    [skylobby.fx.download :refer [download-sources-by-name]]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [sync-pane]]
+    [skylobby.http :as http]
     [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
@@ -180,7 +180,7 @@
                         (merge
                           {:spring-lobby/task-type :spring-lobby/update-downloadables
                            :force true}
-                          (get download-sources-by-name possible-source-name))}))}]
+                          (get http/download-sources-by-name possible-source-name))}))}]
                  (when (and springname (not (some #(re-find % springname) no-springfiles)))
                    [{:severity 2
                      :text "springfiles"

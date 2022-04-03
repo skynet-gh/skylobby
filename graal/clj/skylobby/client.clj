@@ -12,6 +12,7 @@
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
     [skylobby.client.stls :as stls]
+    skylobby.client.tei
     [skylobby.util :as u]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])

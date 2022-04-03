@@ -15,6 +15,8 @@
     :icon "movie"}
    {:route :skylobby/settings
     :icon "settings"}
+   {:route :skylobby/tasks
+    :icon "memory"}
    {:route :skylobby/quit
     :icon "logout"}])
 

@@ -6,6 +6,7 @@
     [skylobby.client :as client]
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
@@ -191,15 +192,20 @@
 (defn start-battle
   [state-atom {:keys [am-host am-spec battle-status channel-name client-data host-ingame] :as state}]
   (when-not (:mode battle-status)
-    (if (and (:server-url client-data)
-             (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
-                 (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
+    (if (u/is-bar-server-url? (:server-url client-data))
       (send-chat state-atom
         {:channel-name channel-name
          :client-data client-data
          :message (str "!joinas spec")})
       (log/info "Skipping !joinas spec for this server"))
-    (async/<!! (async/timeout 1000))))
+    (async/<!! (async/timeout 1000)))
+  (if (or am-host am-spec host-ingame)
+    (spring/start-game state-atom state)
+    (send-chat state-atom
+      {
+       :channel-name channel-name
+       :client-data client-data
+       :message (str "!cv start")})))
 
 (defn set-my-battle-status
   [state-atom client-data battle-status team-color]

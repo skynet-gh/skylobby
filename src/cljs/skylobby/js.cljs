@@ -18,6 +18,7 @@
     [skylobby.view.servers-nav :as servers-nav]
     [skylobby.view.settings :as settings-view]
     [skylobby.view.side-nav :as side-nav]
+    [skylobby.view.tasks :as tasks-view]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
@@ -29,6 +30,12 @@
 (defrecord File [path])
 
 (reader/register-tag-parser! 'spring-lobby/java.io.File (fn [path] (File. path)))
+
+; https://stackoverflow.com/a/42917425
+(extend-protocol IPrintWithWriter
+  File 
+  (-pr-writer [f w _]
+    (write-all w "#spring-lobby/java.io.File " (pr-str (:path f)))))
 
 
 (def ?csrf-token
@@ -138,6 +145,18 @@
   (let [{:keys [auto-unspec server-key]} ?data]
     (rf/dispatch [:skylobby/assoc-in [:by-server server-key :auto-unspec] auto-unspec])))
 
+(defmethod -event-msg-handler :skylobby/spring-running
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/assoc :spring-running ?data]))
+
+(defmethod -event-msg-handler :skylobby/replays-watched
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/assoc :replays-watched ?data]))
+
+(defmethod -event-msg-handler :skylobby/tasks
+  [{:keys [?data]}]
+  (rf/dispatch [:skylobby/merge ?data]))
+
 
 ; re-frame
 
@@ -166,10 +185,10 @@
       [:skylobby/get-servers]
       5000
       (fn [reply]
-        (log/debug "Servers reply" reply)
+        (log/trace "Servers reply" reply)
         (if (sente/cb-success? reply)
           (do
-            (log/trace "Got servers" reply)
+            (log/debug "Got servers" (count reply))
             (rf/dispatch [:skylobby/assoc :servers reply]))
           (log/error reply))))
     db))
@@ -496,6 +515,12 @@
       3000)
     db))
 
+(rf/reg-event-db :skylobby/watch-replay
+  (fn [db [_t data]]
+    (chsk-send! [:skylobby/watch-replay data])
+    db))
+
+
 ; subs
 
 (rf/reg-sub :skylobby/current-route
@@ -606,6 +631,18 @@
   (fn [db]
     (boolean (:skylobby/hide-passworded-battles db))))
 
+(rf/reg-sub :skylobby/replays-watched
+  (fn [db]
+    (:replays-watched db)))
+
+(rf/reg-sub :skylobby/spring-running
+  (fn [db]
+    (:spring-running db)))
+
+(rf/reg-sub :skylobby/tasks
+  (fn [db]
+    (select-keys db [:current-tasks :tasks-by-kind])))
+
 
 (defn listen [query-v]
   @(rf/subscribe query-v))
@@ -666,6 +703,16 @@
                 (rf/dispatch [:skylobby/get-settings]))
        :stop  (fn [& _params]
                 (log/info "Leaving settings page"))}]}]
+   ["tasks"
+    {:name      :skylobby/tasks
+     :view      tasks-view/tasks-page
+     :link-text "Tasks"
+     :controllers
+     [{
+       :start (fn [& _params]
+                (log/info "Entering tasks page"))
+       :stop  (fn [& _params]
+                (log/info "Leaving tasks page"))}]}]
    ["quit"
     {:name      :skylobby/quit
      :view      (fn [_]

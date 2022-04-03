@@ -36,12 +36,13 @@
        [:select
         {:class "f3"
          :on-change #(rf/dispatch [:skylobby/assoc :server-url (-> % .-target .-value)])
-         :value server-url}
-        (for [[server-url server-config] servers]
-          ^{:key server-url}
-          [:option
-           {:value server-url}
-           (str server-url)])]]
+         :value (str server-url)}
+        (for [server-url (keys servers)]
+          (let [server (str server-url)]
+            ^{:key server-url}
+            [:option
+             {:value server}
+             server]))]]
       [:div {:class "flex justify-center mb2"}
        [:label 
         {:class "f3 tc mr2"}
@@ -63,7 +64,7 @@
          :on-change #(rf/dispatch [:skylobby/assoc-in [:password-drafts server-url] (-> % .-target .-value)])}]]
       [:div {:class "flex justify-center"}
        [:button
-        {:class "f2 mt3 link dim ph3 pv1 mb2 dib white bg-near-black br2"
+        {:class "f2 mt3 link dim ph3 pv1 mb2 dib white bg-near-black br2 pointer"
          :on-click #(rf/dispatch
                       (if logged-in
                         [:skylobby/disconnect-server server-key]
