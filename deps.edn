@@ -356,15 +356,46 @@
    {
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}}
-   :main-opts ["-m" "native-image" "skylobby.main" "--no-fallback" "--allow-incomplete-classpath"
-               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               "--initialize-at-build-time=io.aviso" "--initialize-at-build-time=slf4j_timbre"
-               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
+    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
+   :main-opts ["-m" "native-image" "skylobby.main"
+
+               "-H:Name=skylobby"
+
+               "--no-fallback"
+               "--allow-incomplete-classpath"
                "--report-unsupported-elements-at-runtime"
-               "-J-Xmx6g" ;"-H:+StaticExecutableWithDynamicLibC"
-               "-H:+ReportExceptionStackTraces" ;"-H:NumberOfThreads=1"
-               "-H:Name=skylobby"]
+
+               "-J-Xmx6g"
+               "-H:+StaticExecutableWithDynamicLibC"
+               "-H:+ReportExceptionStackTraces"
+
+               ; build time
+               "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+
+               ; run time
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+
+               "--initialize-at-run-time=io.netty.channel.unix"
+               "--initialize-at-run-time=io.netty.channel.epoll"
+               "--initialize-at-run-time=io.netty.channel.kqueue"
+
+               "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
+               "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator"
+               "--initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslClientContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom"
+
+               "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
+
+               "--initialize-at-run-time=io.netty.util.internal.logging.Log4J2Logger"
+
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"
               "-Dclojure.spec.skip-macros=true"]}
   :reveal
