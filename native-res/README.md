@@ -8,7 +8,7 @@ You will need
 
 - [Clojure CLI tools](https://clojure.org/guides/getting_started) 1.10.3.933 or later
 - [GraalVM Java 11](https://github.com/graalvm/graalvm-ce-builds/releases/tag/vm-21.3.0) with native-image installed and `$GRAALVM_HOME` set
-- [clojure-native-image-agent jar](https://github.com/luontola/clojure-native-image-agent/releases)
+- [clojure-native-image-agent jar](https://github.com/skynet-gh/clojure-native-image-agent/releases/tag/v0.2.0%2Bfix-noclass%2Bcustom-ignore)
 
 ### Windows
 

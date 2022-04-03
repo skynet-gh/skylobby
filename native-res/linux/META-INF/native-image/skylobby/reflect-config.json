@@ -176,6 +176,10 @@
   "name":"java.lang.Integer"
 },
 {
+  "name":"java.lang.InterruptedException",
+  "queryAllPublicMethods":true
+},
+{
   "name":"java.lang.Long"
 },
 {
