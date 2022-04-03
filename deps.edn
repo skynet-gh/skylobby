@@ -254,78 +254,52 @@
   :skylobby-main
   {:replace-paths ["resources" "graal/clj" "graal/cljc"]
    :main-opts ["-m" "skylobby.main"]}
-  :skylobby-native-linux
+  :native-linux
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
+   :extra-deps
+   {
+    clj.native-image/clj.native-image
+    {:git/url "https://github.com/taylorwood/clj.native-image.git"
+     :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
+    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
    :main-opts ["-m" "native-image" "skylobby.main"
+
+               "-H:Name=skylobby"
+
                "--no-fallback"
                "--allow-incomplete-classpath"
-               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"
-               "--initialize-at-build-time=io.aviso"
-               "--initialize-at-build-time=slf4j_timbre"
-               "--initialize-at-build-time=com.github.fzakaria.slf4j.timbre"
-               "--initialize-at-build-time=byte_streams"
-               "--initialize-at-build-time=byte_streams$fn__29391"
-               "--initialize-at-build-time=byte_streams$fn__29211$f__29015__auto____29213"
-               "--initialize-at-build-time=byte_streams$fn__29029"
-               "--initialize-at-build-time=byte_streams$fn__29377"
-               "--initialize-at-build-time=byte_streams$fn__29236$f__29015__auto____29238"
-               "--initialize-at-build-time=byte_streams$this__29055"
-               "--initialize-at-build-time=byte_streams$fn__29384"
-               "--initialize-at-build-time=byte_streams$fn__29228$f__29015__auto____29230"
-               "--initialize-at-build-time=byte_streams$fn__29302$f__29015__auto____29304"
-               "--initialize-at-build-time=byte_streams$fn__29092$f__29015__auto____29093"
-               "--initialize-at-build-time=byte_streams$fn__29043$fn__29044"
-               "--initialize-at-build-time=byte_streams$fn__29118$f__29015__auto____29119"
-               "--initialize-at-build-time=byte_streams$fn__29193$f__29015__auto____29195"
-               "--initialize-at-build-time=byte_streams$fn__29373"
-               "--initialize-at-build-time=byte_streams$fn__29142$f__29015__auto____29144"
-               "--initialize-at-build-time=byte_streams$fn__29346$f__29015__auto____29348"
-               "--initialize-at-build-time=byte_streams$fn__29294$f__29015__auto____29296"
-               "--initialize-at-build-time=byte_streams$fn__29258$f__29015__auto____29259"
-               "--initialize-at-build-time=byte_streams$fn__29033"
-               "--initialize-at-build-time=byte_streams$fn__29031"
-               "--initialize-at-build-time=byte_streams$fn__29381"
-               "--initialize-at-build-time=byte_streams$fn__29386"
-               "--initialize-at-build-time=byte_streams$fn__29173$f__29015__auto____29175"
-               "--initialize-at-build-time=byte_streams$fn__29336$f__29015__auto____29338"
-
-               "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
-               "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
-               "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
-
-               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslClientContext"
-               "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom,io.netty.channel.unix,io.netty.channel.epoll,io.netty.channel.kqueue"
-               "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
-
-               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
-               "--initialize-at-run-time=io.netty.channel.epoll.Native"
-               "--initialize-at-run-time=io.netty.channel.epoll.Epoll"
-               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop"
-               "--initialize-at-run-time=io.netty.channel.epoll.EpollEventArray"
-               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
-               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
-               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
-               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
-               "--initialize-at-run-time=io.netty.channel.unix.Limits"
-               "--initialize-at-run-time=io.netty.channel.unix.Errors"
-               "--initialize-at-run-time=io.netty.channel.unix.IovArray"
-
-               "--initialize-at-run-time=io.netty.util.internal.logging.Log4J2Logger"
-
-               "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
-               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslContext"
-               "--initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator"
-               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
-               "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
-               "--initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine"
-
-               "--initialize-at-build-time=byte_streams$fn__29207$f__29011__auto____29209,byte_streams$fn__29369,byte_streams$fn__29027,byte_streams$fn__29088$f__29011__auto____29089,byte_streams$fn__29380,byte_streams$fn__29169$f__29011__auto____29171,byte_streams$this__29051,byte_streams$fn__29290$f__29011__auto____29292,byte_streams$fn__29254$f__29011__auto____29255,byte_streams$fn__29298$f__29011__auto____29300,byte_streams$fn__29332$f__29011__auto____29334,byte_streams$fn__29039$fn__29040,byte_streams$fn__29224$f__29011__auto____29226,byte_streams$fn__29387,byte_streams$fn__29232$f__29011__auto____29234,byte_streams$fn__29342$f__29011__auto____29344,byte_streams$fn__29382,byte_streams$fn__29138$f__29011__auto____29140,byte_streams$fn__29189$f__29011__auto____29191,byte_streams$fn__29114$f__29011__auto____29115,byte_streams$fn__29025"
-
                "--report-unsupported-elements-at-runtime"
+
                "-J-Xmx6g"
                "-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces"
-               "-H:Name=skylobby"]
+
+               ; build time
+               "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
+               "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+
+               ; run time
+               "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
+
+               "--initialize-at-run-time=io.netty.channel.unix"
+               "--initialize-at-run-time=io.netty.channel.epoll"
+               "--initialize-at-run-time=io.netty.channel.kqueue"
+
+               "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
+               "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator"
+               "--initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.OpenSslClientContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslContext"
+               "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
+               "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom"
+
+               "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
+
+               "--initialize-at-run-time=io.netty.util.internal.logging.Log4J2Logger"
+
+               "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"
               "-Dclojure.spec.skip-macros=true"]}
   :native-windows

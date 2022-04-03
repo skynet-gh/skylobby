@@ -30,44 +30,53 @@ Path=...;C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools
 
 Replace the versions with the ones on your system.
 
-## Generating
+## Linux
 
-Clean previous runs
-
-```
-clj -T:skylobby clean
-```
-
-Build the jar
+First build the jar with
 
 ```
-clj -T:skylobby uber
+./build-jar.sh
 ```
 
-### Linux
-
-Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example starts the web UI, you will need to kill it manually:
-
-```
-$GRAALVM_HOME/bin/java -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.main,output-dir=native-res/linux/META-INF/native-image/skylobby -agentlib:native-image-agent=config-output-dir=native-res/linux/META-INF/native-image/skylobby -jar target/skylobby.jar
-```
-
-You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
+Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) 
+and the GraalVM native-image-agent. Run with:
 
 ```
-clj -M:skylobby-deps:skylobby-native-linux
+./update-native-res.sh <args>
 ```
 
-### Windows
+Now use the program in order to reach areas you need to configure. Repeat this process for 
+different arguments if needed.
 
-Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent) and the GraalVM native-image-agent. This example starts the web UI, you will need to kill it manually:
-
-```
-& "$env:GRAALVM_HOME\bin\java" -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.main,output-dir=native-res\windows\META-INF\native-image\skylobby -agentlib:native-image-agent=config-output-dir=native-res\windows\META-INF\native-image\skylobby -jar target\skylobby.jar
-```
-
-You should now see the GraalVM config files populated in `native-res`. You can now build the native image:
+You should now see the GraalVM config files populated in `native-res`. You can now build the native 
+image:
 
 ```
-clj -M:skylobby-deps:skylobby-native-windows
+clj -M:graal-deps:native-linux
+```
+
+## Windows
+
+First build the jar with
+
+```
+./build-jar.ps1
+```
+
+
+Now run the jar with the [clojure-native-image-agent](https://github.com/luontola/clojure-native-image-agent)
+and the GraalVM native-image-agent. Run with:
+
+```
+./update-native-res.ps1 <args>
+```
+
+Now use the program in order to reach areas you need to configure. Repeat this process for 
+different arguments if needed.
+
+You should now see the GraalVM config files populated in `native-res`. You can now build the native 
+image:
+
+```
+clj -M:graal-deps:native-windows
 ```
