@@ -8,6 +8,8 @@
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
+  (:import
+    (java.awt Desktop Desktop$Action))
   (:gen-class))
 
 
@@ -36,6 +38,16 @@
         ""]
        (string/join \newline)))
 
+
+(defn browse-url [url]
+  (let [desktop (Desktop/getDesktop)]
+    (println "Browsing" url)
+    (if (.isSupported desktop Desktop$Action/BROWSE)
+      (.browse desktop (java.net.URI. url))
+      (let [runtime (Runtime/getRuntime)
+            command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
+            ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+        (.exec runtime cmdarray nil nil)))))
 
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
@@ -70,4 +82,5 @@
                          ::spring-root-arg f})))]
         (log/info "Loaded initial state in" (- (u/curr-millis) before-state) "ms")
         (reset! skylobby.core/*state state)
-        (skylobby.core/init skylobby.core/*state)))))
+        (skylobby.core/init skylobby.core/*state)
+        (browse-url "http://localhost:12345")))))

@@ -14,7 +14,9 @@
    {:route :skylobby/replays
     :icon "movie"}
    {:route :skylobby/settings
-    :icon "settings"}])
+    :icon "settings"}
+   {:route :skylobby/quit
+    :icon "logout"}])
 
 (defn side-nav [_]
   (let [current-route (listen [:skylobby/current-route])]

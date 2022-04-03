@@ -295,6 +295,13 @@
         (event/set-client-status state-atom {:client-data client-data
                                              :client-status (assoc client-status :away away)
                                              :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/quit
+      [_]
+      (log/info "User requested quit")
+      (broadcast [:skylobby/quit])
+      (shutdown-agents)
+      (System/exit 0))
     (sente/start-server-chsk-router! ch-recv event-msg-handler)
     chsk-server))
 

@@ -17,6 +17,7 @@
     [skylobby.view.server-nav :as server-nav]
     [skylobby.view.servers-nav :as servers-nav]
     [skylobby.view.settings :as settings-view]
+    [skylobby.view.side-nav :as side-nav]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
@@ -483,7 +484,15 @@
     (assoc-in db [:by-server server-key :battle] battle)))
 
 
-;
+(rf/reg-event-db :skylobby/quit
+  (fn [db _]
+    (chsk-send! [:skylobby/quit]
+      5000
+      (fn [_reply]
+        (.close js/window)))
+    db))
+
+; subs
 
 (rf/reg-sub :skylobby/current-route
   (fn [db]
@@ -653,6 +662,22 @@
                 (rf/dispatch [:skylobby/get-settings]))
        :stop  (fn [& _params]
                 (log/info "Leaving settings page"))}]}]
+   ["quit"
+    {:name      :skylobby/quit
+     :view      (fn [_]
+                  [:div {:class "flex"}
+                   [side-nav/side-nav]
+                   [:div {:class "flex-auto justify-center"}
+                    [:div {:class "flex justify-center mb2 f2"}
+                     "Quitting..."]]])
+     :link-text "Quit"
+     :controllers
+     [{
+       :start (fn [& _params]
+                (log/info "Quitting")
+                (rf/dispatch [:skylobby/quit]))
+       :stop  (fn [& _params]
+                (log/info "Leaving quit page"))}]}]
    ["direct/:server-key"
     {:name :skylobby/direct-battle
      :view battle-view/room-page
@@ -805,7 +830,7 @@
     [:div {:class "bg-black h-100 light-gray sans-serif"}
      [:div {:class "bg-black h-auto"}
       (when current-route
-        [(-> current-route :data :view) 
+        [(-> current-route :data :view)
          {:router router}])]]))
 
 
