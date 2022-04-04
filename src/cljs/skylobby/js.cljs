@@ -21,7 +21,8 @@
     [skylobby.view.tasks :as tasks-view]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
-    [taoensso.timbre :as log]))
+    [taoensso.timbre :as log]
+    [skylobby.util :as u]))
 
 
 (set! *warn-on-infer* true)
@@ -156,6 +157,11 @@
 (defmethod -event-msg-handler :skylobby/tasks
   [{:keys [?data]}]
   (rf/dispatch [:skylobby/merge ?data]))
+
+(defmethod -event-msg-handler :skylobby/spring-resources
+  [{:keys [?data]}]
+  (let [{:keys [spring-root-path resources]} ?data]
+    (rf/dispatch [:skylobby/assoc-in [:by-spring-root spring-root-path] resources])))
 
 
 ; re-frame
@@ -318,6 +324,19 @@
           (log/error reply))))
     db))
 
+(rf/reg-event-db :skylobby/get-spring-resources
+  (fn [db]
+    (log/info "Getting spring resources")
+    (chsk-send!
+      [:skylobby/get-spring-resources]
+      5000
+      (fn [reply]
+        (if (sente/cb-success? reply)
+          (rf/dispatch [:skylobby/merge reply])
+          (log/error reply))))
+    db))
+
+
 (rf/reg-event-db :skylobby/poll
   (fn [db [_t interval-key poll-data frequency]]
     (log/info "Polling" interval-key poll-data)
@@ -348,6 +367,16 @@
         (if (sente/cb-success? reply)
           (rf/dispatch [:skylobby/assoc-in [:by-server server-key :chat channel-name] reply])
           (log/error reply))))
+    db))
+
+(rf/reg-event-db :skylobby/get-battle-chat
+  (fn [db [_t server-key]]
+    (log/info "Getting battle chat for" server-key)
+    (when-let [battle-id (get-in db [:by-server server-key :battle :battle-id])]
+      (println battle-id)
+      (let [channel-name (u/battle-channel-name
+                           (get-in db [:by-server server-key :battles battle-id]))]
+        (rf/dispatch [:skylobby/get-chat server-key channel-name])))
     db))
 
 (rf/reg-event-db :skylobby/join-battle
@@ -454,6 +483,15 @@
       [:skylobby/assoc-in [[:auto-launch server-key] auto-launch]]
       5000)
     db))
+
+(rf/reg-event-db :skylobby/set-auto-get-resources
+  (fn [db [_t auto-get-resources]]
+    (log/info "Setting auto-get-resources to" auto-get-resources)
+    (chsk-send!
+      [:skylobby/assoc [:auto-get-resources auto-get-resources]]
+      5000)
+    (assoc db :auto-get-resources auto-get-resources)))
+
 
 (rf/reg-event-db :skylobby/set-battle-mode
   (fn [db [_t server-key mode]]
@@ -614,6 +652,10 @@
   (fn [db [_t server-key]]
     (boolean (get-in db [:by-server server-key :auto-unspec]))))
 
+(rf/reg-sub :skylobby/auto-get-resources
+  (fn [db]
+    (boolean (:auto-get-resources db))))
+
 
 (rf/reg-sub :skylobby/filter-battles
   (fn [db]
@@ -642,6 +684,19 @@
 (rf/reg-sub :skylobby/tasks
   (fn [db]
     (select-keys db [:current-tasks :tasks-by-kind])))
+
+(rf/reg-sub :skylobby/server-spring-resources
+  (fn [db [_t server-key]]
+    (let [{:keys [by-server by-spring-root servers spring-isolation-dir]} db
+          server-url (get-in by-server [server-key :client-data :server-url]) ; TODO server types
+          spring-root (or (get-in servers [server-url :spring-isolation-dir])
+                          spring-isolation-dir)]
+      (get by-spring-root (:path spring-root)))))
+
+(rf/reg-sub :skylobby/global-spring-resources
+  (fn [db]
+    (let [{:keys [by-spring-root spring-isolation-dir]} db]
+      (get by-spring-root (:path spring-isolation-dir)))))
 
 
 (defn listen [query-v]
@@ -689,7 +744,8 @@
      [{
        :start (fn [& _params]
                 (log/info "Entering replays page")
-                (rf/dispatch [:skylobby/get-replays]))
+                (rf/dispatch [:skylobby/get-replays])
+                (rf/dispatch [:skylobby/get-spring-resources]))
        :stop  (fn [& _params]
                 (log/info "Leaving replays page"))}]}]
    ["settings"
@@ -742,7 +798,9 @@
                   (rf/dispatch [:skylobby/get-users server-key])
                   (rf/dispatch [:skylobby/get-battle server-key])
                   (rf/dispatch [:skylobby/get-auto-launch server-key])
-                  (rf/dispatch [:skylobby/get-auto-unspec server-key])))
+                  (rf/dispatch [:skylobby/get-auto-unspec server-key])
+                  (rf/dispatch [:skylobby/get-spring-resources])
+                  (rf/dispatch [:skylobby/get-battle-chat server-key])))
        :stop (fn [params]
                (let [server-key (get-in params [:path :server-key])]
                  (log/info "Leaving direct connect battle" server-key)))}]}]
@@ -850,8 +908,9 @@
                  (let [server-url (get-in params [:path :server-url])
                        username (get-in params [:query :username])
                        server-key (get-server-key server-url username)]
-                   (log/info "Entering battle room for" server-key)))
-                   ;(rf/dispatch [:skylobby/get-battles server-key])
+                   (log/info "Entering battle room for" server-key)
+                   (rf/dispatch [:skylobby/get-spring-resources])
+                   (rf/dispatch [:skylobby/get-battle-chat server-key])))
                    ;(rf/dispatch [:skylobby/get-battle server-key])
                    ;(rf/dispatch [:skylobby/get-users server-key])))
         :stop  (fn [& _params]

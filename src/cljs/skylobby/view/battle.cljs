@@ -181,17 +181,36 @@
                [:td 
                 {:class title-class}
                 (str (:handicap battle-status))]]))]]
-        [:div
-         {:style {:min-width "300px"}}
-         [:div
-          {:class "ma1 ba br1 pa1"}
-          (str (:battle-engine battle-details) " " (:battle-version battle-details))]
-         [:div
-          {:class "ma1 ba br1 pa1"}
-          (str (:battle-modname battle-details))]
-         [:div
-          {:class "ma1 ba br1 pa1"}
-          (str (:battle-map battle-details))]]
+        (let [{:keys [engines maps mods]} (listen [:skylobby/server-spring-resources server-key])
+              {:keys [battle-version battle-map battle-modname]} battle-details
+              has-map (->> maps
+                           (filter (comp #{battle-map} :map-name))
+                           first)
+              has-mod (->> mods
+                           (filter (comp #{battle-modname} :mod-name))
+                           first)
+              has-engine (->> engines
+                              (filter (comp #{battle-version} :engine-version))
+                              first)
+              status (fn [has] (if has "green" "red"))]
+          [:div
+           {:style {:min-width "300px"}}
+           [:div
+            {:class (str "ma1 ba br1 pa1 " (status has-engine))}
+            (str (:battle-engine battle-details) " " battle-version)]
+           [:div
+            {:class (str "ma1 ba br1 pa1 " (status has-mod))}
+            (str battle-modname)] 
+           [:div
+            {:class (str "ma1 ba br1 pa1 " (status has-map))}
+            (str battle-map)]
+           [:div
+            [:input
+             {:class "mr2"
+              :type "checkbox"
+              :on-change #(rf/dispatch [:skylobby/set-auto-get-resources (-> % .-target .-checked)])
+              :checked (listen [:skylobby/auto-get-resources])}]
+            [:label {:class "lh-copy"} " Auto-get resources "]]])
         [:div
          {:class "flex justify-center"
           :style {
