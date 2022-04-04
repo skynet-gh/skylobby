@@ -152,20 +152,6 @@
   ]
 },
 {
-  "name":"skylobby.fs$read_7z_map_fast$reify$reify__23750",
-  "methods":[{"name":"write","parameterTypes":["byte[]"] }]
-},
-{
-  "name":"skylobby.fs$read_7z_map_fast$reify__23747",
-  "methods":[
-    {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
-    {"name":"prepareOperation","parameterTypes":["net.sf.sevenzipjbinding.ExtractAskMode"] }, 
-    {"name":"setCompleted","parameterTypes":["long"] }, 
-    {"name":"setOperationResult","parameterTypes":["net.sf.sevenzipjbinding.ExtractOperationResult"] }, 
-    {"name":"setTotal","parameterTypes":["long"] }
-  ]
-},
-{
   "name":"skylobby.fs.ExtractCallback",
   "methods":[
     {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
