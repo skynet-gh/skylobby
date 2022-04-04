@@ -1,5 +1,8 @@
 [
 {
+  "name":"[B"
+},
+{
   "name":"[C"
 },
 {
@@ -9,10 +12,16 @@
   "name":"[Ljava.lang.StackTraceElement;"
 },
 {
+  "name":"[Ljava.lang.String;"
+},
+{
   "name":"[Ljava.nio.file.StandardCopyOption;"
 },
 {
   "name":"[Lreitit.Trie$Matcher;"
+},
+{
+  "name":"[Lsun.security.pkcs.SignerInfo;"
 },
 {
   "name":"aleph.netty.proxy$io.netty.channel.ChannelInitializer$ff19274a",
@@ -21,6 +30,20 @@
     {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
     {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
     {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
+    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
+  ]
+},
+{
+  "name":"aleph.tcp$client_channel_handler$reify__19096",
+  "queriedMethods":[
+    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
+    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
+    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
     {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
     {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
     {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
@@ -37,6 +60,10 @@
 },
 {
   "name":"com.sun.crypto.provider.AESCipher$General",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.HmacCore$HmacSHA256",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -107,6 +134,11 @@
   ]
 },
 {
+  "name":"io.netty.handler.ssl.SslContextBuilder",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"build","parameterTypes":[] }]
+},
+{
   "name":"io.netty.handler.ssl.SslHandler",
   "queriedMethods":[
     {"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
@@ -141,6 +173,9 @@
 },
 {
   "name":"java.beans.PropertyVetoException"
+},
+{
+  "name":"java.io.File"
 },
 {
   "name":"java.lang.Byte",
@@ -201,7 +236,10 @@
 },
 {
   "name":"java.nio.ByteBuffer",
-  "methods":[{"name":"limit","parameterTypes":["int"] }]
+  "methods":[
+    {"name":"limit","parameterTypes":["int"] }, 
+    {"name":"position","parameterTypes":["int"] }
+  ]
 },
 {
   "name":"java.nio.HeapByteBuffer",
@@ -209,6 +247,9 @@
 },
 {
   "name":"java.security.SecureRandomParameters"
+},
+{
+  "name":"java.security.cert.X509Certificate"
 },
 {
   "name":"java.security.interfaces.ECPrivateKey"
@@ -226,6 +267,13 @@
   "name":"java.time.Duration"
 },
 {
+  "name":"java.util.Date"
+},
+{
+  "name":"javax.security.auth.x500.X500Principal",
+  "methods":[{"name":"<init>","parameterTypes":["sun.security.x509.X500Name"] }]
+},
+{
   "name":"net.jpountz.lz4.LZ4HCJNICompressor",
   "fields":[{"name":"INSTANCE"}],
   "methods":[{"name":"<init>","parameterTypes":["int"] }]
@@ -241,6 +289,22 @@
 {
   "name":"net.jpountz.lz4.LZ4JNISafeDecompressor",
   "fields":[{"name":"INSTANCE"}]
+},
+{
+  "name":"org.luaj.vm2.lib.Bit32Lib$Bit32Lib2",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.luaj.vm2.lib.Bit32Lib$Bit32LibV",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.luaj.vm2.lib.IoLib$IoLibV",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.luaj.vm2.lib.jse.LuajavaLib",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"sun.awt.X11.XToolkit",
@@ -302,6 +366,10 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"sun.security.provider.certpath.PKIXCertPathValidator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"sun.security.rsa.PSSParameters",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -318,7 +386,57 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"sun.security.rsa.RSASignature$SHA256withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"sun.security.ssl.SSLContextImpl$TLSContext",
   "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.ssl.TrustManagerFactoryImpl$PKIXFactory",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.util.ObjectIdentifier"
+},
+{
+  "name":"sun.security.x509.AuthorityInfoAccessExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.AuthorityKeyIdentifierExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.BasicConstraintsExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.CRLDistributionPointsExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.CertificateExtensions"
+},
+{
+  "name":"sun.security.x509.CertificatePoliciesExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.ExtendedKeyUsageExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.KeyUsageExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.SubjectAlternativeNameExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.SubjectKeyIdentifierExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
 }
 ]

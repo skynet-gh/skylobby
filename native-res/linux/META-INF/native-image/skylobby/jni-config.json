@@ -75,7 +75,33 @@
   ]
 },
 {
+  "name":"java.lang.Boolean",
+  "methods":[
+    {"name":"booleanValue","parameterTypes":[] }, 
+    {"name":"valueOf","parameterTypes":["boolean"] }
+  ]
+},
+{
+  "name":"java.lang.Double",
+  "methods":[{"name":"valueOf","parameterTypes":["double"] }]
+},
+{
+  "name":"java.lang.Integer",
+  "methods":[
+    {"name":"intValue","parameterTypes":[] }, 
+    {"name":"longValue","parameterTypes":[] }, 
+    {"name":"valueOf","parameterTypes":["int"] }
+  ]
+},
+{
+  "name":"java.lang.Long",
+  "methods":[{"name":"valueOf","parameterTypes":["long"] }]
+},
+{
   "name":"java.lang.OutOfMemoryError"
+},
+{
+  "name":"java.lang.String"
 },
 {
   "name":"java.lang.Thread",
@@ -86,6 +112,57 @@
   "methods":[
     {"name":"add","parameterTypes":["java.lang.Object"] }, 
     {"name":"clear","parameterTypes":[] }
+  ]
+},
+{
+  "name":"java.util.Date",
+  "methods":[{"name":"<init>","parameterTypes":["long"] }]
+},
+{
+  "name":"net.sf.sevenzipjbinding.ExtractAskMode",
+  "methods":[{"name":"getExtractAskModeByIndex","parameterTypes":["int"] }]
+},
+{
+  "name":"net.sf.sevenzipjbinding.ExtractOperationResult",
+  "methods":[{"name":"getOperationResult","parameterTypes":["int"] }]
+},
+{
+  "name":"net.sf.sevenzipjbinding.IArchiveOpenVolumeCallback"
+},
+{
+  "name":"net.sf.sevenzipjbinding.ICryptoGetTextPassword"
+},
+{
+  "name":"net.sf.sevenzipjbinding.impl.InArchiveImpl",
+  "fields":[
+    {"name":"jbindingSession"}, 
+    {"name":"sevenZipArchiveInstance"}, 
+    {"name":"sevenZipInStreamInstance"}
+  ],
+  "methods":[
+    {"name":"<init>","parameterTypes":[] }, 
+    {"name":"setArchiveFormat","parameterTypes":["java.lang.String"] }
+  ]
+},
+{
+  "name":"net.sf.sevenzipjbinding.impl.RandomAccessFileInStream",
+  "methods":[
+    {"name":"read","parameterTypes":["byte[]"] }, 
+    {"name":"seek","parameterTypes":["long","int"] }
+  ]
+},
+{
+  "name":"skylobby.fs$read_7z_map_fast$reify$reify__23750",
+  "methods":[{"name":"write","parameterTypes":["byte[]"] }]
+},
+{
+  "name":"skylobby.fs$read_7z_map_fast$reify__23747",
+  "methods":[
+    {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"prepareOperation","parameterTypes":["net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"setCompleted","parameterTypes":["long"] }, 
+    {"name":"setOperationResult","parameterTypes":["net.sf.sevenzipjbinding.ExtractOperationResult"] }, 
+    {"name":"setTotal","parameterTypes":["long"] }
   ]
 },
 {
