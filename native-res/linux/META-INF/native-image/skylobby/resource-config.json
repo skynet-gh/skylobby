@@ -2,6 +2,12 @@
   "resources":{
   "includes":[
     {
+      "pattern":"\\QLinux-amd64/lib7-Zip-JBinding.so\\E"
+    }, 
+    {
+      "pattern":"\\QLinux-amd64/sevenzipjbinding-lib.properties\\E"
+    }, 
+    {
       "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
     }, 
     {
@@ -24,6 +30,9 @@
     }, 
     {
       "pattern":"\\Qpublic/js/main.js\\E"
+    }, 
+    {
+      "pattern":"\\Qsevenzipjbinding-platforms.properties\\E"
     }, 
     {
       "pattern":"\\Qskylobby.version\\E"
