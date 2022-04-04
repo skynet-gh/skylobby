@@ -123,6 +123,14 @@
   "name":"net.sf.sevenzipjbinding.ICryptoGetTextPassword"
 },
 {
+  "name":"net.sf.sevenzipjbinding.SevenZip$DummyOpenArchiveCallback",
+  "methods":[{"name":"setTotal","parameterTypes":["java.lang.Long","java.lang.Long"] }]
+},
+{
+  "name":"net.sf.sevenzipjbinding.SevenZipException",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
   "name":"net.sf.sevenzipjbinding.impl.InArchiveImpl",
   "fields":[
     {"name":"jbindingSession"}, 
@@ -142,6 +150,16 @@
   ]
 },
 {
+  "name":"skylobby.fs.ExtractCallback",
+  "methods":[
+    {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"prepareOperation","parameterTypes":["net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"setCompleted","parameterTypes":["long"] }, 
+    {"name":"setOperationResult","parameterTypes":["net.sf.sevenzipjbinding.ExtractOperationResult"] }, 
+    {"name":"setTotal","parameterTypes":["long"] }
+  ]
+},
+{
   "name":"skylobby.fs.ExtractToDiskCallback",
   "methods":[
     {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
@@ -153,6 +171,10 @@
 },
 {
   "name":"skylobby.fs.OutToOutStream",
+  "methods":[{"name":"write","parameterTypes":["byte[]"] }]
+},
+{
+  "name":"skylobby.fs.SequentialOutToBaos",
   "methods":[{"name":"write","parameterTypes":["byte[]"] }]
 },
 {
