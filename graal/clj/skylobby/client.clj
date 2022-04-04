@@ -1,6 +1,5 @@
 (ns skylobby.client
   (:require
-    [aleph.tcp :as tcp]
     [chime.core :as chime]
     [clojure.core.async :as async]
     [clojure.edn :as edn]
@@ -12,6 +11,7 @@
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
     [skylobby.client.stls :as stls]
+    [skylobby.client.tcp :as tcp]
     skylobby.client.tei
     [skylobby.util :as u]
     [taoensso.timbre :as log]
