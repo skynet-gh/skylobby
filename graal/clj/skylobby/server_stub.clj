@@ -135,7 +135,17 @@
                                      new-tasks)
                            (broadcast [:skylobby/tasks new-tasks])))
                        (doseq [[server-key server-data] (:by-server new-state)]
-                         (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
+                         (let [{:keys [auto-unspec battle battles channels client-data console-log users]} server-data
+                               {:keys [servers]} new-state
+                               server-url (:server-url client-data)
+                               spring-root (or (get-in servers [server-url :spring-isolation-dir])
+                                               (:spring-isolation-dir new-state))
+                               spring-root-path (fs/canonical-path spring-root)
+                               new-resources (get-in new-state [:by-spring-root spring-root-path])]
+                           (when (not= (get-in old-state [:by-spring-root spring-root-path])
+                                       new-resources)
+                             (broadcast [:skylobby/spring-resources {:spring-root-path spring-root-path
+                                                                     :resources new-resources}]))
                            (when (not= console-log
                                      (get-in old-state [:by-server server-key :console-log]))
                              (broadcast [:skylobby/console-log {:server-key server-key :console-log console-log}]))
@@ -184,6 +194,12 @@
       (log/info "Get servers data" ?data)
       (when ?reply-fn
         (?reply-fn (servers-data @state-atom))))
+    (defmethod -event-msg-handler
+      :skylobby/get-spring-resources
+      [{:keys [?data ?reply-fn]}]
+      (log/info "Get spring resources" ?data)
+      (when ?reply-fn
+        (?reply-fn (select-keys @state-atom [:auto-get-resources :by-spring-root :spring-isolation-dir]))))
     (defmethod -event-msg-handler
       :skylobby/join-battle
       [{:keys [?data]}]
