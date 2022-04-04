@@ -57,9 +57,7 @@
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
         command (first arguments)
         version (u/version)]
-    (if (fs/windows?)
-      (u/log-only-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
-      (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log")))))
+    (u/log-to-file (fs/canonical-path (fs/config-file (str u/app-name ".log"))))
     (alter-var-root #'skylobby.util/app-version (fn [& _] version))
     (cond
       errors
