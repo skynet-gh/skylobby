@@ -166,6 +166,20 @@
   ]
 },
 {
+  "name":"skylobby.fs.ExtractCallback",
+  "methods":[
+    {"name":"getStream","parameterTypes":["int","net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"prepareOperation","parameterTypes":["net.sf.sevenzipjbinding.ExtractAskMode"] }, 
+    {"name":"setCompleted","parameterTypes":["long"] }, 
+    {"name":"setOperationResult","parameterTypes":["net.sf.sevenzipjbinding.ExtractOperationResult"] }, 
+    {"name":"setTotal","parameterTypes":["long"] }
+  ]
+},
+{
+  "name":"skylobby.fs.SequentialOutToBaos",
+  "methods":[{"name":"write","parameterTypes":["byte[]"] }]
+},
+{
   "name":"sun.awt.SunHints",
   "fields":[{"name":"INTVAL_STROKE_PURE"}]
 },
