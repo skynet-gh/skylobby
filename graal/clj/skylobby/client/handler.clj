@@ -1,5 +1,5 @@
 (ns skylobby.client.handler
-  (:require 
+  (:require
     [clojure.core.async :as async]
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
@@ -321,10 +321,10 @@
     (if (auto-unspec-ready?)
       (let [desired-ready (boolean ready-on-unspec)]
         (log/info "Auto-unspeccing")
-        (let [{:keys [ring-on-auto-unspec] :as state} (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)]
-          #_ ; TODO
+        (let [{:keys [ring-on-auto-unspec]} (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)]
           (when ring-on-auto-unspec
             (log/info "Playing ring for auto unspec")
+            #_ ; TODO
             (sound/play-ring state)))
         (message/send state-atom client-data
           (str "MYBATTLESTATUS "
@@ -789,64 +789,6 @@
       (catch Exception e
         (log/error e "Error handling REQUESTBATTLESTATUS")))))
 
-(defn parse-battleopened [m]
-  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
-
-(defmethod handle "BATTLEOPENED" [state-atom server-key m]
-  (if-let [[_all battle-id battle-type battle-nat-type host-username battle-ip battle-port battle-maxplayers battle-passworded battle-rank battle-maphash battle-engine battle-version battle-map battle-title battle-modname _ channel-name] (parse-battleopened m)]
-    (let [battle {:battle-id battle-id
-                  :battle-type battle-type
-                  :battle-nat-type battle-nat-type
-                  :host-username host-username
-                  :battle-ip battle-ip
-                  :battle-port battle-port
-                  :battle-maxplayers battle-maxplayers
-                  :battle-passworded battle-passworded
-                  :battle-rank battle-rank
-                  :battle-maphash battle-maphash
-                  :battle-engine battle-engine
-                  :battle-version battle-version
-                  :battle-map battle-map
-                  :battle-title battle-title
-                  :battle-modname battle-modname
-                  :channel-name channel-name
-                  :users {host-username {}}}
-          {:keys [last-battle] :as state} (swap! state-atom assoc-in [:by-server server-key :battles battle-id] battle)
-          last-battle (get last-battle server-key)
-          {:keys [client-data username]} (-> state :by-server (get server-key))]
-      (when (and (:auto-rejoin-battle state)
-                 (not= host-username username)
-                 (= host-username (:host-username last-battle))
-                 (:should-rejoin last-battle))
-        (message/send state-atom client-data
-          (str "JOINBATTLE " battle-id
-               (if battle-passworded
-                 (str " " (:battle-password state))
-                 (str " *"))
-               " " (crypto.random/hex 6)))))
-    (log/warn "Unable to parse BATTLEOPENED" (pr-str m))))
-
-(defn parse-updatebattleinfo [m]
-  (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) (.+)" m))
-
-(defmethod handle "UPDATEBATTLEINFO" [state-atom server-url m]
-  (let [[_all battle-id battle-spectators battle-locked battle-maphash battle-map] (parse-updatebattleinfo m)]
-    (swap! state-atom update-in [:by-server server-url]
-      (fn [{:keys [battle username] :as state}]
-        (let [my-battle-id (:battle-id battle)
-              old-battle-map (-> state (get :battles) (get battle-id) :battle-map)
-              my-battle (= my-battle-id battle-id)
-              map-changed (not= old-battle-map battle-map)]
-          (cond-> state
-                  true
-                  (update-in [:battles battle-id] assoc
-                    :battle-id battle-id
-                    :battle-spectators battle-spectators
-                    :battle-locked battle-locked
-                    :battle-maphash battle-maphash
-                    :battle-map battle-map)
-                  (and my-battle map-changed)
-                  (assoc-in [:battle :users username :battle-status :sync] 0)))))))
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]
   (let [[_all battle-id] (re-find #"\w+ (\w+)" m)]
@@ -936,15 +878,14 @@
 
 (defmethod handle "RING" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ ([^\s]+)" m)
-        {:keys [by-server mute-ring prevent-non-host-rings] :as state} @state-atom
+        {:keys [by-server mute-ring prevent-non-host-rings]} @state-atom
         {:keys [battle battles]} (-> by-server (get server-key))
         {:keys [host-username]} (get battles (:battle-id battle))]
     (if (or (and prevent-non-host-rings (not= username host-username))
             (get mute-ring server-key))
       (log/info "Ignoring ring from non-host" username)
-      (do
-        (log/info "Playing ring sound from" username)))))
-        ; TODO send to client (sound/play-ring state)))))
+      (log/info "Playing ring sound from" username))))
+      ; TODO send to client (sound/play-ring state)))))
 
 (defmethod handle "OK" [state-atom server-key m]
   (let [[_all command] (re-find #"[^\s]+ cmd=(.*)" m)]

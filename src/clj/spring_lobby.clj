@@ -13,7 +13,6 @@
     [clojure.set]
     [clojure.string :as string]
     crypto.random
-    hashp.core
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
@@ -594,7 +593,7 @@
                (selected-replay-needs-auto-get selected-replay new-state))
       (try
         (let [
-              tasks (auto-resources/auto-resources-tasks 
+              tasks (auto-resources/auto-resources-tasks
                       {:engine-version replay-engine-version
                        :map-name replay-map-name
                        :mod-name replay-mod-name
@@ -849,7 +848,7 @@
   (when task
     (log/warn "Unknown task type" task)))
 
-(task-handlers/add-handlers task-handler *state)
+(task-handlers/add-handlers handle-task *state)
 ; TODO not during init?
 
 
@@ -3408,13 +3407,13 @@
         (fs/move temp-dest dest))
       (case (:resource-type downloadable)
         ::map (task/add-task! *state {::task-type ::refresh-maps
-                                      :spring-root spring-isolation-dir 
+                                      :spring-root spring-isolation-dir
                                       :priorities [dest]})
         ::mod (task/add-task! *state {::task-type ::refresh-mods
-                                      :spring-root spring-isolation-dir 
+                                      :spring-root spring-isolation-dir
                                       :priorities [dest]})
         ::engine (task/add-task! *state {::task-type ::refresh-engines
-                                         :spring-root spring-isolation-dir 
+                                         :spring-root spring-isolation-dir
                                          :priorities [dest]})
         nil)
       (catch Exception e

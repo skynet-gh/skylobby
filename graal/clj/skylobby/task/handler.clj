@@ -158,7 +158,7 @@
      (when (seq next-round)
        (task/add-task! state-atom
          {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
-          :priorites priorities
+          :priorities priorities
           :todo (count next-round)})))))
 
 (defn- refresh-maps
@@ -413,14 +413,19 @@
                               (or (:engineoptions mod-data)
                                   (:modoptions mod-data))))]
      (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
-     (let [{:keys [mod-details use-git-mod-version]}
-           (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
-                  (fn [mods]
-                    (set
-                      (cond->
-                        (remove (comp #{path} fs/canonical-path :file) mods)
-                        mod-details (conj mod-details)))))
+     (let [
+           [old-state {:keys [by-spring-root mod-details use-git-mod-version]}]
+           (swap-vals! state-atom update-in [:by-spring-root spring-root-path :mods]
+             (fn [mods]
+               (set
+                 (cond->
+                   (remove (comp #{path} fs/canonical-path :file) mods)
+                   mod-details (conj mod-details)))))
            cached (get mod-details path)]
+       (log/info "Mod count in" spring-root-path "changed from"
+                 (count (get-in old-state [:by-spring-root spring-root-path :mods]))
+                 "to"
+                 (count (get-in by-spring-root [spring-root-path :mods])))
        (when (and cached
                   (not= (:mod-version cached)
                         (:mod-version mod-data)))
@@ -437,8 +442,8 @@
    (refresh-mods state-atom nil))
   ([state-atom spring-root]
    (refresh-mods state-atom spring-root nil))
-  ([state-atom spring-root {:keys [delete-invalid-sdp priorities]}]
-   (log/info "Refreshing mods in" spring-root)
+  ([state-atom spring-root {:keys [delete-invalid-sdp priorities] :as opts}]
+   (log/info "Refreshing mods in" spring-root opts)
    (let [before (u/curr-millis)
          {:keys [rapid-by-spring-root spring-isolation-dir use-git-mod-version] :as state} @state-atom
          spring-root (or spring-root spring-isolation-dir)
@@ -513,21 +518,24 @@
      (doseq [file this-round]
        (log/info "Reading mod from" file)
        (update-mod state-atom spring-root-path file {:delete-invalid-sdp delete-invalid-sdp :use-git-mod-version use-git-mod-version}))
-     (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
-     (swap! state-atom
-            (fn [state]
-              (-> state
-                  (update-in [:by-spring-root spring-root-path :mods]
-                    (fn [mods]
-                      (->> mods
-                           (remove
-                             (fn [{:keys [error mod-name]}]
-                               (and (not error)
-                                    (string/blank? mod-name))))
-                           (filter (comp (partial instance? java.io.File) :file))
-                           (remove (comp missing-files fs/canonical-path :file))
-                           set)))
-                  (dissoc :update-mods))))
+     (log/info "Removing mods with no name, and mods with missing files:" (pr-str missing-files))
+     (let [[old-state new-state]
+           (swap-vals! state-atom
+             (fn [state]
+               (update-in state [:by-spring-root spring-root-path :mods]
+                 (fn [mods]
+                   (->> mods
+                        (remove
+                          (fn [{:keys [error mod-name]}]
+                            (and (not error)
+                                 (string/blank? mod-name))))
+                        (filter (comp (partial instance? java.io.File) :file))
+                        (remove (comp missing-files fs/canonical-path :file))
+                        set)))))]
+       (log/info "Mod count in" spring-root-path "changed from"
+                 (count (get-in old-state [:by-spring-root spring-root-path :mods]))
+                 "to"
+                 (count (get-in new-state [:by-spring-root spring-root-path :mods]))))
      (if next-round
        (do
          (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
@@ -563,74 +571,73 @@
             (assoc-in [:rapid-download rapid-id] {:running true
                                                   :message "Preparing to run pr-downloader"})
             (assoc-in [:rapid-failures rapid-id] false))))
-    (future
-      (try
-        (let [^java.io.File root spring-isolation-dir
-              pr-downloader-file (fs/pr-downloader-file engine-file)
-              _ (fs/set-executable pr-downloader-file)
-              command [(fs/canonical-path pr-downloader-file)
-                       "--filesystem-writepath" (fs/wslpath root)
-                       "--rapid-download" rapid-id]
-              runtime (Runtime/getRuntime)
-              detected-sdp-atom (atom nil)]
-          (log/info "Running '" command "'")
-          (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-                ^"[Ljava.lang.String;" envp nil
-                ^java.lang.Process process (.exec runtime cmdarray envp root)]
-            (future
-              (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (let [progress (try (parse-rapid-progress line)
-                                        (catch Exception e
-                                          (log/debug e "Error parsing rapid progress")))]
-                      (swap! state-atom update-in [:rapid-download rapid-id] merge
-                             {:message line}
-                             progress)
-                      (log/info "(pr-downloader" rapid-id "out)" line)
-                      (recur))
-                    (log/info "pr-downloader" rapid-id "stdout stream closed")))))
-            (future
-              (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-                (loop []
-                  (if-let [line (.readLine reader)]
-                    (do
-                      (swap! state-atom assoc-in [:rapid-download rapid-id :message] line)
-                      (log/info "(pr-downloader" rapid-id "err)" line)
-                      (when-let [[_all sdp] (re-find #" for ([0-9a-f]+)$" line)]
-                        (reset! detected-sdp-atom sdp))
-                      (recur))
-                    (log/info "pr-downloader" rapid-id "stderr stream closed")))))
-            (let [exit-code (.waitFor process)]
-              (log/info "pr-downloader exited with code" exit-code)
-              (when (not= 0 exit-code)
-                (if-let [sdp @detected-sdp-atom]
-                  (let [sdp-file (rapid/sdp-file spring-isolation-dir (rapid/sdp-filename sdp))]
-                    (log/info "Non-zero pr-downloader exit, deleting corrupt sdp file" sdp-file)
-                    (raynes-fs/delete sdp-file))
-                  (log/info "No sdp file detected"))
-                (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
-                (task/add-task! state-atom
-                  {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
-                   :spring-root spring-isolation-dir
-                   :update-rapid-task task})))))
-        (catch Exception e
-          (log/error e "Error downloading" rapid-id)
-          (swap! state-atom assoc-in [:rapid-download rapid-id :message] (.getMessage e))
-          (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
-          (task/add-task! state-atom
-            {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
-             :spring-root spring-isolation-dir
-             :update-rapid-task task}))
-        (finally
-          (task/add-tasks! state-atom
-            [{:spring-lobby/task-type :spring-lobby/update-rapid-packages
-              :spring-isolation-dir spring-isolation-dir}
-             {:spring-lobby/task-type :spring-lobby/refresh-mods
-              :spring-root spring-isolation-dir}])
-          (swap! state-atom assoc-in [:rapid-download rapid-id :running] false)
-          (u/update-cooldown state-atom [:rapid rapid-id])
-          (apply fs/update-file-cache! state-atom (rapid/sdp-files spring-isolation-dir))))))
+    (try
+      (let [^java.io.File root spring-isolation-dir
+            pr-downloader-file (fs/pr-downloader-file engine-file)
+            _ (fs/set-executable pr-downloader-file)
+            command [(fs/canonical-path pr-downloader-file)
+                     "--filesystem-writepath" (fs/wslpath root)
+                     "--rapid-download" rapid-id]
+            runtime (Runtime/getRuntime)
+            detected-sdp-atom (atom nil)]
+        (log/info "Running '" command "'")
+        (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
+              ^"[Ljava.lang.String;" envp nil
+              ^java.lang.Process process (.exec runtime cmdarray envp root)]
+          (future
+            (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
+              (loop []
+                (if-let [line (.readLine reader)]
+                  (let [progress (try (parse-rapid-progress line)
+                                      (catch Exception e
+                                        (log/debug e "Error parsing rapid progress")))]
+                    (swap! state-atom update-in [:rapid-download rapid-id] merge
+                           {:message line}
+                           progress)
+                    (log/info "(pr-downloader" rapid-id "out)" line)
+                    (recur))
+                  (log/info "pr-downloader" rapid-id "stdout stream closed")))))
+          (future
+            (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
+              (loop []
+                (if-let [line (.readLine reader)]
+                  (do
+                    (swap! state-atom assoc-in [:rapid-download rapid-id :message] line)
+                    (log/info "(pr-downloader" rapid-id "err)" line)
+                    (when-let [[_all sdp] (re-find #" for ([0-9a-f]+)$" line)]
+                      (reset! detected-sdp-atom sdp))
+                    (recur))
+                  (log/info "pr-downloader" rapid-id "stderr stream closed")))))
+          (let [exit-code (.waitFor process)]
+            (log/info "pr-downloader exited with code" exit-code)
+            (when (not= 0 exit-code)
+              (if-let [sdp @detected-sdp-atom]
+                (let [sdp-file (rapid/sdp-file spring-isolation-dir (rapid/sdp-filename sdp))]
+                  (log/info "Non-zero pr-downloader exit, deleting corrupt sdp file" sdp-file)
+                  (raynes-fs/delete sdp-file))
+                (log/info "No sdp file detected"))
+              (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
+              (task/add-task! state-atom
+                {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
+                 :spring-root spring-isolation-dir
+                 :update-rapid-task task})))))
+      (catch Exception e
+        (log/error e "Error downloading" rapid-id)
+        (swap! state-atom assoc-in [:rapid-download rapid-id :message] (.getMessage e))
+        (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
+        (task/add-task! state-atom
+          {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
+           :spring-root spring-isolation-dir
+           :update-rapid-task task}))
+      (finally
+        (task/add-tasks! state-atom
+          [{:spring-lobby/task-type :spring-lobby/update-rapid-packages
+            :spring-isolation-dir spring-isolation-dir}
+           {:spring-lobby/task-type :spring-lobby/refresh-mods
+            :spring-root spring-isolation-dir}])
+        (swap! state-atom assoc-in [:rapid-download rapid-id :running] false)
+        (u/update-cooldown state-atom [:rapid rapid-id])
+        (apply fs/update-file-cache! state-atom (rapid/sdp-files spring-isolation-dir)))))
   (defmethod task-handler :spring-lobby/update-rapid
     [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
     (swap! state-atom assoc :rapid-update true)
@@ -763,8 +770,11 @@
   (defmethod task-handler :spring-lobby/delete-corrupt-rapid
     [{:keys [update-rapid-task spring-root]}]
     (log/info "Attempting to delete corrupt rapid dir after error, then updating rapid again")
-    (fs/delete-rapid-dir spring-root)
-    (task/add-task! state-atom update-rapid-task))
+    (try
+      (fs/delete-rapid-dir spring-root)
+      (task/add-task! state-atom update-rapid-task)
+      (catch Exception e
+        (log/error e "Error deleting corrupt rapid dir"))))
   (defmethod task-handler :spring-lobby/refresh-maps [{:keys [spring-root] :as opts}]
     (if spring-root
       (refresh-maps state-atom spring-root opts)
@@ -791,6 +801,8 @@
                       :map-name map-name
                       :tries new-tries}
           cache-key (fs/canonical-path map-file)]
+      (when-not cache-key
+        (throw (ex-info "No cache key for" {:map-name map-name :map-file map-file})))
       (try
         (if map-file
           (do
@@ -816,6 +828,8 @@
                       :error true
                       :tries 1} ; TODO inc
           cache-key (fs/canonical-path mod-file)]
+      (when-not cache-key
+        (throw (ex-info "No cache key for" {:mod-name mod-name :mod-file mod-file})))
       (try
         (if mod-file
           (do
@@ -835,21 +849,21 @@
           (swap! state-atom update :mod-details cache/miss cache-key error-data)
           (throw t)))
       (update-battle-sync-statuses state-atom)))
-  (defmethod task-handler ::delete-corrupt-map-file
+  (defmethod task-handler :spring-lobby/delete-corrupt-map-file
     [{:keys [indexed-map spring-root]}]
     (let [{:keys [file map-name]} indexed-map]
       (log/info "Attempting to delete corrupt map" map-name "at" file)
       (raynes-fs/delete file)
       (fs/update-file-cache! state-atom file)
       (task/add-task! state-atom
-        {::task-type ::refresh-maps
+        {:spring-lobby/task-type :spring-lobby/refresh-maps
          :spring-root spring-root})))
-  (defmethod task-handler ::delete-corrupt-mod-file
+  (defmethod task-handler :spring-lobby/delete-corrupt-mod-file
     [{:keys [indexed-mod spring-root]}]
     (let [{:keys [file mod-name]} indexed-mod]
       (log/info "Attempting to delete corrupt mod" mod-name "at" file)
       (raynes-fs/delete file)
       (fs/update-file-cache! state-atom file)
       (task/add-task! state-atom
-        {::task-type ::refresh-mods
+        {:spring-lobby/task-type :spring-lobby/refresh-mods
          :spring-root spring-root}))))

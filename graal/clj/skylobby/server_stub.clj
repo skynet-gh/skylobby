@@ -21,7 +21,6 @@
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
-    [skylobby.task :as task]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
@@ -82,10 +81,10 @@
 ; the default edn packer has issues in graalvm
 (deftype EdnPacker []
   interfaces/IPacker
-  (pack   [_ x] 
+  (pack   [_ x]
     (pr-str x))
-  (unpack [_ x] 
-    (edn/read-string 
+  (unpack [_ x]
+    (edn/read-string
       {:readers u/custom-readers}
       x)))
 

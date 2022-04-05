@@ -1,15 +1,15 @@
 (ns skylobby.web
-  (:require 
+  (:require
     [com.fulcrologic.fulcro.application :as app]
     [com.fulcrologic.fulcro.components :refer [defsc] :as comp]
     [com.fulcrologic.fulcro.dom :as dom]))
 
 
-(defonce app 
+(defonce app
   (app/fulcro-app))
 
 
-(defsc Root [this props]
+(defsc Root [_this _props]
   (dom/div "TODO"))
 
 

@@ -34,7 +34,7 @@
 
 ; https://stackoverflow.com/a/42917425
 (extend-protocol IPrintWithWriter
-  File 
+  File
   (-pr-writer [f w _]
     (write-all w "#spring-lobby/java.io.File " (pr-str (:path f)))))
 
@@ -691,7 +691,9 @@
           server-url (get-in by-server [server-key :client-data :server-url]) ; TODO server types
           spring-root (or (get-in servers [server-url :spring-isolation-dir])
                           spring-isolation-dir)]
-      (get by-spring-root (:path spring-root)))))
+      (assoc
+        (get by-spring-root (:path spring-root))
+        :spring-root spring-root))))
 
 (rf/reg-sub :skylobby/global-spring-resources
   (fn [db]

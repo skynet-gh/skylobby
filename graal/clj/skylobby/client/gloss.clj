@@ -52,16 +52,6 @@
 (def default-client-status-str "0")
 
 
-(def client-status-protocol
-  (gloss/compile-frame
-    (gloss/bit-map
-      :prefix 1
-      :bot 1
-      :access 1
-      :rank 3
-      :away 1
-      :ingame 1)))
-
 (def battle-status-protocol
   (gloss/compile-frame
     (gloss/bit-map

@@ -30,15 +30,15 @@
         server-key (u/params-server-key parameters)
         username (or (:username server-key)
                      (-> parameters :query :username))
-        {:keys [scripttags] :as battle} (listen [:skylobby/battle server-key])
+        {:keys [battle-id scripttags] :as battle} (listen [:skylobby/battle server-key])
         battles (listen [:skylobby/battles server-key])
         battle-details (get battles (:battle-id battle))
         users (listen [:skylobby/users server-key])
         minimap-size (or (listen [:skylobby/minimap-size]) default-minimap-size)
         minimap-px (str minimap-size "px")
         minimap-type (or (listen [:skylobby/minimap-type]) default-minimap-type)
-        {:keys [servers]} (listen [:skylobby/servers])
-        spring-running (listen [:skylobby/spring-running])]
+        spring-running (listen [:skylobby/spring-running])
+        is-spring-running (get-in spring-running [server-key battle-id])]
     [:div
      {:class "flex"
       :style {:flex-flow "column"
@@ -120,7 +120,7 @@
                      {:color color}))}
                 username]
                (let [{:keys [skill uncertainty]} user]
-                 [:td 
+                 [:td
                   {:class title-class
                    :style
                    {:width "10%"}}
@@ -156,29 +156,29 @@
                   [:span.material-icons
                    {:class "gray"}
                    "bed"])]
-               [:td 
+               [:td
                 {:class title-class}
                 (:ally battle-status)]
-               [:td 
+               [:td
                 {:class title-class}
                 (:id battle-status)]
-               [:td 
+               [:td
                 {:class title-class
                  :style {:background color}}]
                #_
-               [:td 
+               [:td
                 {:class title-class}
                 (str (not (:mode battle-status)))]
-               [:td 
+               [:td
                 {:class title-class}
                 (str (:side battle-status))]
-               [:td 
+               [:td
                 {:class title-class}
                 (str (:rank client-status))]
-               [:td 
+               [:td
                 {:class title-class}
                 (str (:country user-details))]
-               [:td 
+               [:td
                 {:class title-class}
                 (str (:handicap battle-status))]]))]]
         (let [{:keys [engines maps mods]} (listen [:skylobby/server-spring-resources server-key])
@@ -200,7 +200,7 @@
             (str (:battle-engine battle-details) " " battle-version)]
            [:div
             {:class (str "ma1 ba br1 pa1 " (status has-mod))}
-            (str battle-modname)] 
+            (str battle-modname)]
            [:div
             {:class (str "ma1 ba br1 pa1 " (status has-map))}
             (str battle-map)]
@@ -280,10 +280,14 @@
           :on-click #(rf/dispatch [:skylobby/start-battle server-key])
           :disabled (boolean
                       (or (:ingame my-client-status)
+                          is-spring-running
                           (and (not (:ingame host-client-status))
                                (not (:mode my-battle-status)))))}
-         (if (:ingame my-client-status)
-           "Game Running"
+         (if (or (:ingame my-client-status)
+                 is-spring-running)
+           (if (:ingame my-client-status)
+             "Game Running"
+             "Spring starting")
            (if (:ingame host-client-status)
              "Join Game"
              (if (:mode my-battle-status) ; playing

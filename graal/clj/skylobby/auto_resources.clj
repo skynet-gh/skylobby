@@ -169,7 +169,7 @@
                      (log/info "Refreshing engines to pick up" engine-extract-dest)
                      {:spring-lobby/task-type :spring-lobby/refresh-engines
                       :force true
-                      :priorites [engine-extract-dest]
+                      :priorities [engine-extract-dest]
                       :spring-root spring-root})
                    :else
                    (when engine-version
@@ -242,7 +242,7 @@
                      (log/info "Refreshing mods to pick up" sdp-file)
                      {:spring-lobby/task-type :spring-lobby/refresh-mods
                       :delete-invalid-sdp true
-                      :priorites [sdp-file]
+                      :priorities [sdp-file]
                       :spring-root spring-root})
                    (and rapid-id
                         (not rapid-task)

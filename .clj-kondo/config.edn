@@ -2,7 +2,10 @@
  {:unresolved-symbol
   {:exclude [(diehard.core/defratelimiter)
              (taoensso.nippy/extend-freeze)
-             (taoensso.nippy/extend-thaw)]}}
+             (taoensso.nippy/extend-thaw)]}
+  :unresolved-var
+  {:exclude [gloss.core/compile-frame
+             gloss.io/to-byte-buffer]}}
  :output
  {
   :exclude-files ["event_stub.clj"]}}

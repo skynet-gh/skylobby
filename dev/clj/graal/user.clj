@@ -116,7 +116,7 @@
 (defn init
   ([]
    (init nil))
-  ([{:keys [arguments]}]
+  ([_opts]
    (try
      [datafy pprint chime/chime-at string/split edn/read-string http/get]
      (hawk/watch! [{:paths ["graal/clj"]

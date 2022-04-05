@@ -250,14 +250,14 @@
   [state-atom
    {:keys [client-data engine-version engines engines-by-version script-txt server-key
            ^java.io.File spring-isolation-dir
-           spring-settings username users]
+           username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
         now (u/curr-millis)
         server-key (or server-key
                        (u/server-key client-data))
         battle-id (-> state :battle :battle-id)
-        {:keys [debug-spring engine-overrides refresh-replays-after-game ring-when-game-ends]}
+        {:keys [debug-spring engine-overrides refresh-replays-after-game]}
         (swap! state-atom
           (fn [state]
             (-> state
@@ -340,7 +340,7 @@
                              (.play timeline)))
                          (when (not media-player)
                            (log/info "No media player to resume")))
-                       (when ring-when-game-ends)
+                       ;(when ring-when-game-ends)
                          ; TODO ring
                          ;(sound/play-ring state))
                        (when refresh-replays-after-game
@@ -348,8 +348,8 @@
         set-ingame (fn [ingame]
                      (log/info "Setting ingame" ingame "for" server-key)
                      (if (#{:direct-client :direct-host} (u/server-type server-key))
-                       #_
-                       (fx.event/update-user-state state-atom server-key {:username username} {:client-status {:ingame ingame}})
+                       (throw (ex-info "Not implemented for direct connect" {}))
+                       ;(fx.event/update-user-state state-atom server-key {:username username} {:client-status {:ingame ingame}})
                        (message/send state-atom client-data
                          (str "MYSTATUS "
                               (cu/encode-client-status

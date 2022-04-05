@@ -231,7 +231,7 @@
                        :rgbcolor "0.0 0.3 1.0"
                        :teamleader 0}}}]
     (spit (fs/file spring-root "script.txt") (spring/script-txt script-data))
-    (spring/start-game {:engine-dir engine-dir :spring-root spring-root})
+    (spring/start-game (atom {}) {:engine-dir engine-dir :spring-root spring-root})
     (System/exit 0)))
 
 
