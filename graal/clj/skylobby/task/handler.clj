@@ -661,6 +661,7 @@
           (log/info "Initializing rapid by calling download")
           (task-handler
             {:spring-lobby/task-type :spring-lobby/rapid-download
+             :mod-name mod-name
              :rapid-id rapid-id
              :engine-file (:file engine-details)
              :spring-isolation-dir spring-isolation-dir}))
@@ -672,6 +673,7 @@
             new-files (->> rapid-repo-files
                            (map fs/file-cache-data)
                            fs/file-cache-by-path)
+            needs-rapid-delete (atom false)
             rapid-versions (->> rapid-repo-files
                                 (filter
                                   (fn [f]
@@ -688,10 +690,7 @@
                                       (catch Exception e
                                         (log/error e "Error reading rapid versions in" f
                                                    "scheduling delete of rapid folder and another rapid update")
-                                        (task/add-task! state-atom
-                                          {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
-                                           :spring-root spring-isolation-dir
-                                           :update-rapid-task task})))))
+                                        (reset! needs-rapid-delete true)))))
                                 (filter :version)
                                 (sort-by :version version/version-compare)
                                 reverse)
@@ -709,6 +708,11 @@
                                        ; prevents duplicates, uses specific version
                                        (map (juxt :version identity))
                                        (into {}))]
+        (when (and mod-name
+                   (not (get rapid-data-by-version mod-name)))
+          (log/warn "Against all odds rapid update has not found version" mod-name
+                    "delete the local repos")
+          (reset! needs-rapid-delete true))
         (swap! state-atom
           (fn [state]
             (-> state
@@ -729,13 +733,17 @@
                                                         (into {}
                                                           (map (juxt :id identity) rapid-versions))))))))))
                 (update :file-cache merge new-files))))
+        (when @needs-rapid-delete
+          (task/add-task! state-atom
+            {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
+             :spring-root spring-isolation-dir
+             :update-rapid-task task}))
         (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
       (u/update-cooldown state-atom [:update-rapid (fs/canonical-path spring-isolation-dir)])
       (task/add-tasks! state-atom
         [
-         (merge
-           {:spring-lobby/task-type :spring-lobby/update-rapid-packages
-            :spring-isolation-dir spring-isolation-dir})
+         {:spring-lobby/task-type :spring-lobby/update-rapid-packages
+          :spring-isolation-dir spring-isolation-dir}
          {:spring-lobby/task-type :spring-lobby/refresh-mods}])))
   (defmethod task-handler :spring-lobby/update-rapid-packages
     [{:keys [spring-isolation-dir]}]
