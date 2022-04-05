@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.11](https://github.com/skynet-gh/skylobby/releases/tag/0.8.11) - 2022-04-05
+
+- Add handling of rapid edge case
+- Web UI more usable
+- Rework lots of internals to prepare for native image
+
 ## [0.8.10](https://github.com/skynet-gh/skylobby/releases/tag/0.8.10) - 2022-04-04
 
 - Add context menu to chat history with Copy and Select All
