@@ -207,13 +207,7 @@
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
     org.clj-commons/byte-streams {:mvn/version "0.2.10"}
-    ;io.github.skynet-gh/byte-streams {:git/tag "0.2.10+fix-single-segment-ns"
-    ;                                  :git/sha "af8a7cd"}
-    ;io.github.skynet-gh/byte-streams {:git/tag "0.2.10+fix-single-segment-ns"
-    ;                                  :git/sha "2c811a1"}
-    primitive-math/primitive-math {:mvn/version "0.1.6"}
-    ;io.github.skynet-gh/primitive-math {:git/tag "0.1.6+fix-single-segment-nses"
-    ;                                    :git/sha "98a8ad1"}
+    org.clj-commons/primitive-math {:mvn/version "1.0.0"}
     org.clojure/clojure {:mvn/version "1.11.0"}
     org.clojure/core.async {:mvn/version "1.5.648"}
     org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
