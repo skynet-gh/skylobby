@@ -70,3 +70,11 @@
 (defn add-tasks! [state-atom new-tasks]
   (log/info "Adding tasks" (pr-str new-tasks))
   (swap! state-atom update :tasks-by-kind add-multiple-tasks new-tasks))
+
+
+(defn all-tasks [{:keys [current-tasks tasks-by-kind]}]
+  (->> tasks-by-kind
+       (mapcat second)
+       (concat (vals current-tasks))
+       (filter some?)
+       doall))

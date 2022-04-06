@@ -136,6 +136,10 @@
                                                                                        :timestamp (u/curr-millis)
                                                                                        :message-type :info})))))))
 
+(defn send-command [state-atom {:keys [client-data message]}]
+  (message/send-message state-atom client-data message))
+
+
 (defn send-message [state-atom {:keys [channel-name client-data message server-key] :as e}]
   (swap! state-atom update-in [:by-server server-key]
     (fn [server-data]

@@ -870,24 +870,24 @@
                          first)]
            (parse-mapoptions file (slurp (.getInputStream zf mapoptions-entry)) (.getName mapoptions-entry))))))))
 
+
+(defrecord SequentialOutToBaos [^ByteArrayOutputStream baos]
+  ISequentialOutStream
+  (write [_this data]
+    (log/trace "got" (count data) "bytes")
+    (.write baos data 0 (count data))
+    (count data)))
+
 (defn slurp-7z-item [^ISimpleInArchiveItem item]
   (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
-            (reify ISequentialOutStream
-              (write [_this data]
-                (log/trace "got" (count data) "bytes")
-                (.write baos data 0 (count data))
-                (count data))))
+            (SequentialOutToBaos. baos))
       (u/bytes->str (.toByteArray baos)))))
 
 (defn slurp-7z-item-bytes [^ISimpleInArchiveItem item]
   (with-open [baos (ByteArrayOutputStream.)]
     (when (.extractSlow item
-            (reify ISequentialOutStream
-              (write [_this data]
-                (log/trace "got" (count data) "bytes")
-                (.write baos data 0 (count data))
-                (count data))))
+            (SequentialOutToBaos. baos))
       (.toByteArray baos))))
 
 (defn read-7z-smf-bytes
@@ -933,6 +933,44 @@
       (string/ends-with? path-lc "mapinfo.lua")
       (string/ends-with? path-lc "mapoptions.lua"))))
 
+
+(defrecord ExtractCallback [^IInArchive archive callback-state extracted-state]
+  IArchiveExtractCallback
+  (getStream [_this index _extract-ask-mode]
+    (swap! callback-state assoc :index index)
+    (try
+      (let [path (.getProperty archive index PropID/PATH)
+            is-folder (.getProperty archive index PropID/IS_FOLDER)]
+        (when-not is-folder
+          (log/debug "Stream for index" index "path" path)
+          (let [baos (ByteArrayOutputStream.)] ; not with-open
+            (swap! callback-state assoc :stream baos :path path)
+            (SequentialOutToBaos. baos))))
+      (catch Throwable e
+        (log/error e "Error getting stream for item" index))))
+  (prepareOperation [_this extract-ask-mode]
+    (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
+    (log/trace "preparing" extract-ask-mode))
+  (setOperationResult [_this extract-operation-result]
+    (let [cs @callback-state]
+      (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
+        (try
+          (.close output-stream)
+          (let [ba (.toByteArray output-stream)]
+            (swap! extracted-state assoc (:path cs) ba))
+          (catch Exception e
+            (log/error e "Error closing output stream")
+            (throw (SevenZipException. "Error closing output stream"))))))
+    (swap! callback-state assoc :operation-result extract-operation-result)
+    (log/trace "result" extract-operation-result))
+  (setTotal [_this total]
+    (swap! callback-state assoc :total total)
+    (log/trace "total" total))
+  (setCompleted [_this complete]
+    (swap! callback-state assoc :complete complete)
+    (log/trace "completed" complete)))
+
+
 (defn read-7z-map-fast
   ([^java.io.File file]
    (read-7z-map-fast file nil))
@@ -953,43 +991,7 @@
        (.extract archive
                  (int-array ids)
                  false
-                 (reify IArchiveExtractCallback
-                   (getStream [_this index _extract-ask-mode]
-                     (swap! callback-state assoc :index index)
-                     (try
-                       (let [path (.getProperty archive index PropID/PATH)
-                             is-folder (.getProperty archive index PropID/IS_FOLDER)]
-                         (when-not is-folder
-                           (log/debug "Stream for index" index "path" path)
-                           (let [baos (ByteArrayOutputStream.)] ; not with-open
-                             (swap! callback-state assoc :stream baos :path path)
-                             (reify ISequentialOutStream
-                               (write [_this data]
-                                 (.write baos data 0 (count data))
-                                 (count data))))))
-                       (catch Throwable e
-                         (log/error e "Error getting stream for item" index))))
-                   (prepareOperation [_this extract-ask-mode]
-                     (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
-                     (log/trace "preparing" extract-ask-mode))
-                   (setOperationResult [_this extract-operation-result]
-                     (let [cs @callback-state]
-                       (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
-                         (try
-                           (.close output-stream)
-                           (let [ba (.toByteArray output-stream)]
-                             (swap! extracted-state assoc (:path cs) ba))
-                           (catch Exception e
-                             (log/error e "Error closing output stream")
-                             (throw (SevenZipException. "Error closing output stream"))))))
-                     (swap! callback-state assoc :operation-result extract-operation-result)
-                     (log/trace "result" extract-operation-result))
-                   (setTotal [_this total]
-                     (swap! callback-state assoc :total total)
-                     (log/trace "total" total))
-                   (setCompleted [_this complete]
-                     (swap! callback-state assoc :complete complete)
-                     (log/trace "completed" complete))))
+                 (ExtractCallback. archive callback-state extracted-state))
        (parse-extracted-7z-map @extracted-state opts)))))
 
 (defn read-7z-map-apache
@@ -1168,43 +1170,7 @@
        (.extract archive
                  (int-array ids)
                  false
-                 (reify IArchiveExtractCallback
-                   (getStream [_this index _extract-ask-mode]
-                     (swap! callback-state assoc :index index)
-                     (try
-                       (let [path (.getProperty archive index PropID/PATH)
-                             is-folder (.getProperty archive index PropID/IS_FOLDER)]
-                         (when-not is-folder
-                           (log/debug "Stream for index" index "path" path)
-                           (let [baos (ByteArrayOutputStream.)] ; not with-open
-                             (swap! callback-state assoc :stream baos :path path)
-                             (reify ISequentialOutStream
-                               (write [_this data]
-                                 (.write baos data 0 (count data))
-                                 (count data))))))
-                       (catch Throwable e
-                         (log/error e "Error getting stream for item" index))))
-                   (prepareOperation [_this extract-ask-mode]
-                     (swap! callback-state assoc :extract-ask-mode extract-ask-mode)
-                     (log/trace "preparing" extract-ask-mode))
-                   (setOperationResult [_this extract-operation-result]
-                     (let [cs @callback-state]
-                       (when-let [^ByteArrayOutputStream output-stream (:stream cs)]
-                         (try
-                           (.close output-stream)
-                           (let [ba (.toByteArray output-stream)]
-                             (swap! extracted-state assoc (:path cs) ba))
-                           (catch Exception e
-                             (log/error e "Error closing output stream")
-                             (throw (SevenZipException. "Error closing output stream"))))))
-                     (swap! callback-state assoc :operation-result extract-operation-result)
-                     (log/trace "result" extract-operation-result))
-                   (setTotal [_this total]
-                     (swap! callback-state assoc :total total)
-                     (log/trace "total" total))
-                   (setCompleted [_this complete]
-                     (swap! callback-state assoc :complete complete)
-                     (log/trace "completed" complete))))
+                 (ExtractCallback. archive callback-state extracted-state))
        (let [extracted @extracted-state
              try-entry-lua (fn [filename]
                              (try

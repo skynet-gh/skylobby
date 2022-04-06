@@ -69,7 +69,7 @@
   (-> (merge
         {:auto-connect false
          :encoding nil
-         :port 8200
+         :port u/default-server-port
          :ssl false}
         server-data)
       (update :port u/to-number)
@@ -84,21 +84,21 @@
   [{:fx/keys [context]
     :keys [screen-bounds]}]
   (let [
-        server-edit (fx/sub-val context :server-edit)
-        server-edit-data (second server-edit)
+        server-edit-data (fx/sub-val context :server-edit)
+        server-host (:host server-edit-data)
+        server-port (:port server-edit-data)
         server-alias (:alias server-edit-data)
         server-auto-connect (:auto-connect server-edit-data)
         server-encoding (:encoding server-edit-data)
-        server-host (:host server-edit-data)
-        server-port (:port server-edit-data)
         server-spring-root-draft (fx/sub-val context :server-spring-root-draft)
         server-ssl (:ssl server-edit-data)
         servers (fx/sub-val context :servers)
         show-servers-window (fx/sub-val context :show-servers-window)
-        url (first server-edit)
-        port (if (string/blank? (str server-port))
-               u/default-server-port (str server-port))
+        port (if (u/to-number server-port)
+               server-port
+               u/default-server-port)
         server-url (str server-host ":" port)
+        server-edit [server-url server-edit-data]
         old-server-data (get servers server-url)]
     {:fx/type :stage
      :showing (boolean show-servers-window)
@@ -133,7 +133,7 @@
                [{:fx/type :button
                  :alignment :center
                  :on-action {:event/type :spring-lobby/dissoc-in
-                             :path [:servers url]}
+                             :path [:servers server-url]}
                  :text ""
                  :graphic
                  {:fx/type font-icon/lifecycle
@@ -152,7 +152,7 @@
              :h-box/hgrow :always
              :text server-host
              :on-text-changed {:event/type :spring-lobby/assoc-in
-                               :path [:server-edit 1 :host]}}]}
+                               :path [:server-edit :host]}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -160,10 +160,13 @@
              :alignment :center
              :text " Port: "}
             {:fx/type :text-field
-             :text (str server-port)
-             :prompt-text "8200"
-             :on-text-changed {:event/type :spring-lobby/assoc-in
-                               :key [:server-edit 1 :port]}}]}
+             :prompt-text (str u/default-server-port)
+             :text-formatter
+             {:fx/type :text-formatter
+              :value-converter :integer
+              :value (some-> server-port u/to-number int)
+              :on-value-changed {:event/type :spring-lobby/assoc-in
+                                 :path [:server-edit :port]}}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -174,7 +177,7 @@
              :h-box/hgrow :always
              :text server-alias
              :on-text-changed {:event/type :spring-lobby/assoc-in
-                               :path [:server-edit 1 :alias]}}]}
+                               :path [:server-edit :alias]}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -185,7 +188,7 @@
              :h-box/hgrow :always
              :selected (boolean server-auto-connect)
              :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:server-edit 1 :auto-connect]}}]}
+                                   :path [:server-edit :auto-connect]}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children
@@ -196,7 +199,7 @@
              :h-box/hgrow :always
              :selected (boolean server-ssl)
              :on-selected-changed {:event/type :spring-lobby/assoc-in
-                                   :path [:server-edit 1 :ssl]}}]}
+                                   :path [:server-edit :ssl]}}]}
           {:fx/type :h-box
            :alignment :center-left
            :children

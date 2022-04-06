@@ -1,5 +1,6 @@
 (ns skylobby.server-stub
   (:require
+    [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.spec.alpha :as s]
@@ -19,6 +20,7 @@
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
@@ -37,7 +39,17 @@
   "Wraps `-event-msg-handler` with logging, error catching, etc."
   [{:as ev-msg :keys [id ?data event]}]
   (log/info id ?data event)
-  (-event-msg-handler ev-msg)) ; Handle event-msgs on a single thread
+  (try
+    (-event-msg-handler ev-msg) ; Handle event-msgs on a single thread
+    (catch Exception e
+      (println e)
+      (log/error "Error in event-msg-handler" (str e)))
+      ;(log/error e "Error in event-msg-handler"))
+    (catch Throwable e
+      (println e)
+      (log/error "Serious error in event-msg-handler" (str e)))))
+      ;(log/error e "Serious error in event-msg-handler"))))
+
 
 (defmethod -event-msg-handler
   :default ; Default/fallback case (no other matching handler)
@@ -61,15 +73,20 @@
                                :server-url (:server-url client-data)
                                :username (:username client-data)}))))
    :logins (:logins state)
-   :servers (:servers state)})
+   :servers (:servers state)
+   :server-url (first (:server state))})
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243
 ; the default edn packer has issues in graalvm
 (deftype EdnPacker []
   interfaces/IPacker
-  (pack   [_ x] (pr-str          x))
-  (unpack [_ x] (edn/read-string x)))
+  (pack   [_ x]
+    (pr-str x))
+  (unpack [_ x]
+    (edn/read-string
+      {:readers u/custom-readers}
+      x)))
 
 
 (defn init [state-atom]
@@ -91,6 +108,10 @@
                          (when (not= (servers-data old-state)
                                      new-servers-data)
                            (broadcast [:skylobby/servers new-servers-data])))
+                       (let [new-login-error (:login-error new-state)]
+                         (when (not= (:login-error old-state)
+                                     new-login-error)
+                           (broadcast [:skylobby/login-error new-login-error])))
                        (let [new-auto-launch (:auto-launch new-state)]
                          (when (not= (:auto-launch old-state)
                                      new-auto-launch)
@@ -99,8 +120,34 @@
                          (when (not= (:logins old-state)
                                      new-logins)
                            (broadcast [:skylobby/logins new-logins])))
+                       (let [new-spring-running (:spring-running new-state)]
+                         (when (not= (:spring-running old-state)
+                                     new-spring-running)
+                           (broadcast [:skylobby/spring-running new-spring-running])))
+                       (let [new-replays-watched (:replays-watched new-state)]
+                         (when (not= (:replays-watched old-state)
+                                     new-replays-watched)
+                           (broadcast [:skylobby/replays-watched new-replays-watched])))
+                       (let [tasks-keys [:current-tasks :tasks-by-kind]
+                             new-tasks (select-keys new-state tasks-keys)]
+                         (when (not= (select-keys old-state tasks-keys)
+                                     new-tasks)
+                           (broadcast [:skylobby/tasks new-tasks])))
                        (doseq [[server-key server-data] (:by-server new-state)]
-                         (let [{:keys [auto-unspec battle battles channels users]} server-data]
+                         (let [{:keys [auto-unspec battle battles channels client-data console-log users]} server-data
+                               {:keys [servers]} new-state
+                               server-url (:server-url client-data)
+                               spring-root (or (get-in servers [server-url :spring-isolation-dir])
+                                               (:spring-isolation-dir new-state))
+                               spring-root-path (fs/canonical-path spring-root)
+                               new-resources (get-in new-state [:by-spring-root spring-root-path])]
+                           (when (not= (get-in old-state [:by-spring-root spring-root-path])
+                                       new-resources)
+                             (broadcast [:skylobby/spring-resources {:spring-root-path spring-root-path
+                                                                     :resources new-resources}]))
+                           (when (not= console-log
+                                     (get-in old-state [:by-server server-key :console-log]))
+                             (broadcast [:skylobby/console-log {:server-key server-key :console-log console-log}]))
                            (when (not= auto-unspec
                                        (get-in old-state [:by-server server-key :auto-unspec]))
                              (broadcast [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
@@ -146,6 +193,12 @@
       (log/info "Get servers data" ?data)
       (when ?reply-fn
         (?reply-fn (servers-data @state-atom))))
+    (defmethod -event-msg-handler
+      :skylobby/get-spring-resources
+      [{:keys [?data ?reply-fn]}]
+      (log/info "Get spring resources" ?data)
+      (when ?reply-fn
+        (?reply-fn (select-keys @state-atom [:auto-get-resources :by-spring-root :spring-isolation-dir]))))
     (defmethod -event-msg-handler
       :skylobby/join-battle
       [{:keys [?data]}]
@@ -200,74 +253,107 @@
                                           :engine-overrides engine-overrides
                                           :host-ingame true
                                           :spring-isolation-dir spring-root}
-                                         (resource/spring-root-resources spring-root by-spring-root))))
-      (defmethod -event-msg-handler
-        :skylobby/send-message
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key channel-name message]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [client-data]} (get by-server server-key)]
-          (event/send-message state-atom {:channel-name channel-name
-                                          :client-data client-data
-                                          :message message
-                                          :server-key server-key})))
-      (defmethod -event-msg-handler
-        :skylobby/set-battle-mode
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key mode]} ?data
-              {:keys [by-server ready-on-unspec]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false)
-          (event/set-battle-mode state-atom {:battle-status battle-status
-                                             :client-data client-data
-                                             :mode mode
-                                             :ready-on-unspec ready-on-unspec
-                                             :server-key server-key
-                                             :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-auto-unspec
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key auto-unspec]} ?data
-              {:keys [by-server ready-on-unspec]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (event/set-auto-unspec state-atom {
-                                             :auto-unspec auto-unspec
-                                             :battle-status battle-status
-                                             :client-data client-data
-                                             :ready-on-unspec ready-on-unspec
-                                             :server-key server-key
-                                             :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-battle-ready
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key ready]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [battle client-data username]} (get by-server server-key)
-              {:keys [battle-status team-color]} (get-in battle [:users username])]
-          (event/set-battle-ready state-atom {:client-data client-data
-                                              :battle-status battle-status
-                                              :ready ready
-                                              :server-key server-key
-                                              :team-color team-color})))
-      (defmethod -event-msg-handler
-        :skylobby/set-away
-        [{:keys [?data]}]
-        (let [
-              {:keys [server-key away]} ?data
-              {:keys [by-server]} @state-atom
-              {:keys [client-data username users]} (get by-server server-key)
-              {:keys [client-status]} (get-in users [:users username])]
-          (event/set-client-status state-atom {:client-data client-data
-                                               :client-status (assoc client-status :away away)
-                                               :server-key server-key}))))
-   (sente/start-server-chsk-router! ch-recv event-msg-handler)
-   chsk-server))
+                                         (resource/spring-root-resources spring-root by-spring-root)))))
+    (defmethod -event-msg-handler
+      :skylobby/watch-replay
+      [{:keys [?data]}]
+      (let [
+            {:keys [replay-file]} ?data
+            {:keys [by-spring-root engine-overrides parsed-replays-by-path spring-isolation-dir]} @state-atom
+            {:keys [engines]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+            {:keys [replay-engine-version]} (get parsed-replays-by-path (fs/canonical-path replay-file))]
+        (async/thread
+          (spring/watch-replay state-atom (merge
+                                            {:engine-version replay-engine-version
+                                             :engines engines
+                                             :engine-overrides engine-overrides
+                                             :replay-file replay-file
+                                             :spring-isolation-dir spring-isolation-dir})))))
+    (defmethod -event-msg-handler
+      :skylobby/send-command
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key message]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data]} (get by-server server-key)]
+        (event/send-command state-atom {
+                                        :client-data client-data
+                                        :message message
+                                        :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/send-message
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key channel-name message]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data]} (get by-server server-key)]
+        (event/send-chat state-atom {:channel-name channel-name
+                                     :client-data client-data
+                                     :message message
+                                     :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/set-battle-mode
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key mode]} ?data
+            {:keys [by-server ready-on-unspec]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false)
+        (event/set-battle-mode state-atom {:battle-status battle-status
+                                           :client-data client-data
+                                           :mode mode
+                                           :ready-on-unspec ready-on-unspec
+                                           :server-key server-key
+                                           :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-auto-unspec
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key auto-unspec]} ?data
+            {:keys [by-server ready-on-unspec]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (event/set-auto-unspec state-atom {
+                                           :auto-unspec auto-unspec
+                                           :battle-status battle-status
+                                           :client-data client-data
+                                           :ready-on-unspec ready-on-unspec
+                                           :server-key server-key
+                                           :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-battle-ready
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key ready]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [battle client-data username]} (get by-server server-key)
+            {:keys [battle-status team-color]} (get-in battle [:users username])]
+        (event/set-battle-ready state-atom {:client-data client-data
+                                            :battle-status battle-status
+                                            :ready ready
+                                            :server-key server-key
+                                            :team-color team-color})))
+    (defmethod -event-msg-handler
+      :skylobby/set-away
+      [{:keys [?data]}]
+      (let [
+            {:keys [server-key away]} ?data
+            {:keys [by-server]} @state-atom
+            {:keys [client-data username users]} (get by-server server-key)
+            {:keys [client-status]} (get-in users [:users username])]
+        (event/set-client-status state-atom {:client-data client-data
+                                             :client-status (assoc client-status :away away)
+                                             :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/quit
+      [_]
+      (log/info "User requested quit")
+      (broadcast [:skylobby/quit])
+      (shutdown-agents)
+      (System/exit 0))
+    (sente/start-server-chsk-router! ch-recv event-msg-handler)
+    chsk-server))
 
 
 (defn index [_]
@@ -275,13 +361,15 @@
    :body
    (hiccup/html
      [:head
-      [:meta {:charset "utf-8"}]]
+      [:meta {:charset "utf-8"}]
+      [:title "skylobby"]]
      [:body
+      {:style {:background-color "#000"}}
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
-      [:link {:rel "stylesheet" :href "https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"}]
-      [:link {:rel "stylesheet" :href "https://fonts.googleapis.com/icon?family=Material+Icons"}]
+      [:link {:rel "stylesheet" :href "/css/tachyons.min.css"}]
+      [:link {:rel "stylesheet" :href "/iconfont/material-icons.css"}]
       [:script {:src (str "/js/main.js?v=" (u/curr-millis))}]])
    :headers {"Content-Type" "text/html"}})
 
@@ -368,8 +456,16 @@
                                            {:status 500
                                             :headers {"Content-Type" "text/html"}
                                             :body (str "Error getting minimap image for" map-name "type" minimap-type)})))}]
+         ["/favicon.ico" {:handler (fn [_request]
+                                     (ring.util.response/redirect "images/favicon.ico"))}]
          ["/js/*" (ring/create-resource-handler {:root "public/js"
-                                                 :not-found-handler index})]]
+                                                 :not-found-handler index})]
+         ["/css/*" (ring/create-resource-handler {:root "public/css"
+                                                  :not-found-handler index})]
+         ["/images/*" (ring/create-resource-handler {:root "public/images"
+                                                     :not-found-handler index})]
+         ["/iconfont/*" (ring/create-resource-handler {:root "public/iconfont"
+                                                       :not-found-handler index})]]
         {:conflicts (constantly nil)
          :data {:coercion   reitit.coercion.spec/coercion
                 :muuntaja   m/instance

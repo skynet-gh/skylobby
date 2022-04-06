@@ -160,3 +160,13 @@
         (resource/same-resource-filename?
           {:resource-filename "."}
           {:resource-filename ".."}))))
+
+
+(deftest engine-details
+  (is (= nil
+         (resource/engine-details 
+           [] nil)))
+  (is (= {:engine-version "12345"}
+         (resource/engine-details 
+           [{:engine-version "1234"} {:engine-version "12345"} {}]
+           "12345"))))

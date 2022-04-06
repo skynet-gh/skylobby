@@ -1,5 +1,6 @@
-(ns skylobby
+(ns build
   (:require
+    [clojure.java.io :as io]
     [clojure.tools.build.api :as b]))
 
 
@@ -8,7 +9,7 @@
 (def src-dirs ["graal/clj" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
-                            :aliases [:skylobby-deps]}))
+                            :aliases [:graal-deps]}))
 (def uber-file (format "target/%s.jar" (name lib)))
 
 
@@ -22,6 +23,7 @@
   (b/compile-clj {:basis basis
                   :src-dirs src-dirs
                   :class-dir class-dir})
+  (spit (io/file "resources" (str (name lib) ".version")) version)
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis basis

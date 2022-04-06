@@ -3,7 +3,6 @@
     [clojure.string :as string]
     [clojure.test :refer [deftest is]]
     clojure.walk
-    hashp.core
     [skylobby.spring.script :as spring-script]
     [spring-lobby.spring-test :refer [expected-script-data expected-script-txt]]))
 

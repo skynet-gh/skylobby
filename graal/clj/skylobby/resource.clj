@@ -239,12 +239,23 @@
     (when-let [[_all mod-prefix _git] (re-find #"(.+)\sgit:([0-9a-f]+)$" mod-name)]
       (str mod-prefix " git:"))))
 
+(defn engine-details [engines engine-version]
+  (some->> engines
+           (filter (comp #{engine-version} :engine-version))
+           first))
+
+(defn engine-download-source [engine-version]
+  (cond
+    (string/blank? engine-version) nil
+    (string/includes? engine-version "BAR") "BAR GitHub spring"
+    :else "SpringRTS buildbot"))
+
 (defn sync-status [server-data spring mod-details map-details]
   (let [battle-id (-> server-data :battle :battle-id)
         battle (-> server-data :battles (get battle-id))
         engines (:engines spring)
-        engine (:battle-version battle)
-        engine-details (->> engines (filter (comp #{engine} :engine-version)) first)
+        engine-version (:battle-version battle)
+        engine-details (engine-details engines engine-version)
 
         mod-name (:battle-modname battle)
         mod-sans-git (mod-name-sans-git mod-name)

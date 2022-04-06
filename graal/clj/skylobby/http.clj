@@ -58,6 +58,8 @@
   "https://bar-rts.com/api/replays/")
 
 
+
+
 ; https://github.com/dakrone/clj-http/pull/220/files
 
 (defn- insert-at
@@ -536,3 +538,65 @@
   [{:keys [id]}]
   (:body
     (http/get (bar-replay-download-url id) {:as :auto})))
+
+
+(defn springfiles-url [springfiles-search-result]
+  (let [{:keys [mirrors]} springfiles-search-result]
+    (rand-nth mirrors)))
+
+
+
+(def springfiles-maps-download-source
+  {:download-source-name "SpringFiles Maps"
+   :url springfiles-maps-url
+   :resources-fn (partial html-downloadables maps-only)})
+(def hakora-maps-download-source
+  {:download-source-name "Hakora Maps"
+   :url "http://www.hakora.xyz/files/springrts/maps"
+   :resources-fn (partial html-downloadables maps-only)})
+(def download-sources
+  [;springfiles-maps-download-source gone now
+   hakora-maps-download-source
+   {:download-source-name "Balanced Annihilation GitHub releases"
+    :url ba-github-releases-url
+    :browse-url "https://github.com/Balanced-Annihilation/Balanced-Annihilation/releases"
+    :resources-fn get-github-release-downloadables
+    :resource-type-fn mods-only}
+   {:download-source-name "BAR GitHub spring"
+    :url bar-spring-releases-url
+    :browse-url "https://github.com/beyond-all-reason/spring/releases"
+    :resources-fn get-github-release-engine-downloadables}
+   {:download-source-name "BAR GitHub maps"
+    :url bar-maps-github-releases-url
+    :browse-url "https://github.com/beyond-all-reason/Maps/releases"
+    :resources-fn get-bar-maps-github-release-downloadables}
+   {:download-source-name "Evolution-RTS GitHub releases"
+    :url evo-rts-github-releases-url
+    :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
+    :resources-fn get-evo-rts-github-release-downloadables
+    :resource-type-fn mods-only}
+   {:download-source-name "SpringFightClub Maps"
+    :url (str springfightclub-root "/maps")
+    :resources-fn (partial html-downloadables maps-only)}
+   {:download-source-name "SpringFightClub Games"
+    :url springfightclub-root
+    :resources-fn (partial html-downloadables mods-only)}
+   {:download-source-name "SpringLauncher"
+    :url springlauncher-root
+    :resources-fn get-springlauncher-downloadables}
+   {:download-source-name "SpringRTS buildbot"
+    :url springrts-buildbot-root
+    :resources-fn crawl-springrts-engine-downloadables}
+   {:download-source-name "TAP GitHub releases"
+    :url tap-github-releases-url
+    :browse-url "https://github.com/FluidPlay/TAPrime_v2/releases"
+    :resources-fn get-github-release-downloadables
+    :resource-type-fn mods-only}
+   {:download-source-name "TAP GitHub maps"
+    :url tap-maps-github-releases-url
+    :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
+    :resources-fn get-bar-maps-github-release-downloadables}])
+
+(def download-sources-by-name
+  (into {}
+    (map (juxt :download-source-name identity) download-sources)))

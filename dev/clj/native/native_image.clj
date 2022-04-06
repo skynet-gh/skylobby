@@ -1,8 +1,14 @@
 (ns native-image
   (:require
     [clojure.java.io :as io]
+    [clojure.pprint :refer [pprint]]
+    [clojure.tools.namespace.repl :refer [disable-unload! disable-reload!]]
     clj.native-image
     [clojure.tools.namespace.find :refer [find-namespaces-in-dir]]))
+
+
+(disable-unload!)
+(disable-reload!)
 
 
 ; adapted from https://github.com/taylorwood/clj.native-image/blob/master/src/clj/native_image.clj
@@ -19,12 +25,16 @@
       (compile (symbol ns)))
     (let [cp (clj.native-image/native-image-classpath)]
       (spit "native-image-args" (str "-cp " cp)))
-    (System/exit
-      (clj.native-image/exec-native-image
-        nat-image-path
-        (concat ["@native-image-args"] opts)
-        nil
-        main-ns))))
+    (let [args (concat
+                 ["@native-image-args"]
+                 opts)]
+      (println "Running native-image with options" (with-out-str (pprint args)))
+      (System/exit
+        (clj.native-image/exec-native-image
+          nat-image-path
+          args
+          nil
+          main-ns)))))
 
 (defn -main [main-ns & args]
   (try

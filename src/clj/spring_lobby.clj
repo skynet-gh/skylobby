@@ -13,25 +13,21 @@
     [clojure.set]
     [clojure.string :as string]
     crypto.random
-    hashp.core
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
-    [me.raynes.fs :as raynes-fs]
     [org.httpkit.server :as http-kit]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [skylobby.auto-resources :as auto-resources]
     [skylobby.battle :as battle]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
-    [skylobby.fs.smf :as fs.smf]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.color :as fx.color]
-    [skylobby.fx.download :as fx.download :refer [download-sources-by-name]]
-    [skylobby.fx.engine-sync :as fx.engine-sync]
     [skylobby.fx.event.battle :as fx.event.battle]
     [skylobby.fx.event.chat :as fx.event.chat]
     [skylobby.fx.event.direct :as fx.event.direct]
@@ -44,7 +40,9 @@
     [skylobby.server :as server]
     [skylobby.spring.script :as spring-script]
     [skylobby.task :as task]
+    [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
+    [skylobby.watch :as watch]
     [spring-lobby.client :as client]
     [spring-lobby.client.handler :as handler]
     [spring-lobby.client.message :as message]
@@ -60,7 +58,6 @@
     (java.lang ProcessBuilder)
     (java.net URL)
     (java.util List)
-    (java.util.regex Matcher)
     (javafx.application Platform)
     (javafx.event Event)
     (javafx.scene Parent)
@@ -225,23 +222,6 @@
    :nippy true})
 
 
-(def default-servers
-  {
-   "lobby.springrts.com:8200"
-   {:host "lobby.springrts.com"
-    :port 8200
-    :alias "Spring Official"}
-   "server2.beyondallreason.info:8200"
-   {:host "bar.teifion.co.uk"
-    :port 8200
-    :alias "Beyond All Reason"}
-   "server2.beyondallreason.info:8201"
-   {:host "server2.beyondallreason.info"
-    :port 8201
-    :alias "Beyond All Reason (SSL)"
-    :ssl true}})
-
-
 (defn initial-state []
   (merge
     {:auto-get-resources true
@@ -279,7 +259,7 @@
      :show-battle-preview true
      :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
-     :servers default-servers
+     :servers u/default-servers
      :use-default-ring-sound true
      :windows-as-tabs true}
     (apply
@@ -373,102 +353,6 @@
         (log/error e "Error writing config edn" filename)))))
 
 
-(defn- read-map-details [{:keys [map-name map-file]}]
-  (let [log-map-name (str "'" map-name "'")]
-    (try
-      (if map-file
-        (fs/read-map-data map-file)
-        (log/warn "No file found for map" log-map-name))
-      (catch Exception e
-        (log/error e "Error reading map data from" map-file)))))
-
-
-(defn- read-mod-data
-  ([f]
-   (read-mod-data f nil))
-  ([f {:keys [delete-invalid-sdp] :as opts}]
-   (let [filename (fs/filename f)
-         is-sdp (and (string? filename)
-                     (string/ends-with? filename ".sdp"))]
-     (try
-       (let [mod-data
-             (if (string/ends-with? (fs/filename f) ".sdp")
-               (rapid/read-sdp-mod f opts)
-               (fs/read-mod-file f opts))
-             name-and-version (u/mod-name-and-version mod-data opts)]
-         (merge mod-data name-and-version))
-       (catch Exception e
-         (log/warn e "Error reading mod details")
-         (when (and delete-invalid-sdp is-sdp)
-           (log/info "Deleting invalid sdp file" f)
-           (raynes-fs/delete f))
-         {:file f
-          :error true})))))
-
-
-(defn set-sdd-modinfo-version [modinfo-str mod-version]
-  (string/replace
-    modinfo-str
-    #"version = '[^']+'"
-    (Matcher/quoteReplacement
-      (str "version = '" mod-version "'"))))
-
-(defn- update-mod
-  ([state-atom spring-root-path file]
-   (update-mod state-atom spring-root-path file nil))
-  ([state-atom spring-root-path file {:keys [use-git-mod-version] :as opts}]
-   (when (fs/is-directory? file)
-     (try
-       (let [
-             git-commit-id (try
-                             (git/latest-id file)
-                             (catch java.io.FileNotFoundException _e
-                               (log/warn "Not a git repository at" file))
-                             (catch Exception e
-                               (log/error e "Error loading git commit id")))
-             mod-version (if use-git-mod-version
-                           (str "git:" (u/short-git-commit git-commit-id))
-                           "$VERSION")]
-         (log/info "Setting version in modinfo.lua to" mod-version)
-         (let [
-               modinfo-file (fs/file file "modinfo.lua")
-               contents (slurp modinfo-file)]
-           (spit modinfo-file (set-sdd-modinfo-version contents mod-version))))
-       (catch Exception e
-         (log/error e "Error setting modinfo version for git"))))
-   (let [path (fs/canonical-path file)
-         mod-data (try
-                    (read-mod-data file (assoc opts :modinfo-only false))
-                    (catch Exception e
-                      (log/error e "Error reading mod data for" file)
-                      {:file file
-                       :error true}))
-         mod-details (select-keys mod-data [:error :file :mod-name :mod-name-only :mod-version ::fs/source :git-commit-id])
-         mod-details (assoc mod-details
-                            :is-game
-                            (boolean
-                              (or (:engineoptions mod-data)
-                                  (:modoptions mod-data))))]
-     (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
-     (let [{:keys [mod-details use-git-mod-version]}
-           (swap! state-atom update-in [:by-spring-root spring-root-path :mods]
-                  (fn [mods]
-                    (set
-                      (cond->
-                        (remove (comp #{path} fs/canonical-path :file) mods)
-                        mod-details (conj mod-details)))))
-           cached (get mod-details path)]
-       (when (and cached
-                  (not= (:mod-version cached)
-                        (:mod-version mod-data)))
-         (task/add-task! *state
-           {::task-type ::mod-details
-            :mod-name (:mod-name mod-data)
-            :mod-file file
-            :use-git-mod-version use-git-mod-version})))
-     mod-data)))
-
-
 (defmulti event-handler :event/type)
 
 
@@ -492,34 +376,6 @@
     (log/warn "Unable to determine task kind to cancel for" task)))
 
 
-(defn- battle-map-details-relevant-keys [state]
-  (-> state
-      (select-keys [:by-server :by-spring-root :map-details :servers :spring-isolation-dir])
-      (update :by-server
-        (fn [by-server]
-          (reduce-kv
-            (fn [m k v]
-              (assoc m k
-                (-> v
-                    (select-keys [:battle :battles])
-                    (update :battles select-keys [(:battle-id (:battle v))]))))
-            {}
-            by-server)))))
-
-(defn- battle-mod-details-relevant-data [state]
-  (-> state
-      (select-keys [:by-server :by-spring-root :mod-details :servers :spring-isolation-dir])
-      (update :by-server
-        (fn [by-server]
-          (reduce-kv
-            (fn [m k v]
-              (assoc m k
-                (-> v
-                    (select-keys [:battle :battles])
-                    (update :battles select-keys [(:battle-id (:battle v))]))))
-            {}
-            by-server)))))
-
 (defn- replay-map-and-mod-details-relevant-keys [state]
   (select-keys
     state
@@ -527,460 +383,10 @@
      :selected-replay-file :selected-replay-id :servers :spring-isolation-dir]))
 
 
-(defn update-cooldown [state-atom k]
-  (swap! state-atom update-in [:cooldowns k]
-    (fn [state]
-      (-> state
-          (update :tries (fnil inc 0))
-          (assoc :updated (u/curr-millis))))))
-
-(defn check-cooldown [cooldowns k]
-  (if-let [{:keys [tries updated]} (get cooldowns k)]
-    (if (and (number? tries) (number? updated))
-      (let [cd (< (u/curr-millis)
-                  (+ updated (* 1000 (Math/pow 2 tries))))] ; exponential backoff
-        (if cd
-          (do
-            (log/info k "is on cooldown")
-            false)
-          true))
-      true)
-    true))
-
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
     state
     [:server :servers]))
-
-(defn update-battle-status-sync-relevant-data [state]
-  (-> state
-      (select-keys [:by-server :by-spring-root :mod-details :map-details :servers :spring-isolation-dir])
-      (update :by-server
-        (fn [by-server]
-          (reduce-kv
-            (fn [m k v]
-              (assoc m k
-                (-> v
-                    (select-keys [:client-data :battle :battles])
-                    (update :battles select-keys [(:battle-id (:battle v))]))))
-            {}
-            by-server)))))
-
-(defn springfiles-url [springfiles-search-result]
-  (let [{:keys [mirrors]} springfiles-search-result]
-    (rand-nth mirrors)))
-
-
-(defn import-dest-is-source? [spring-root {:keys [resource-file] :as importable}]
-  (= (fs/canonical-path resource-file)
-     (fs/canonical-path (resource/resource-dest spring-root importable))))
-
-(defn server-needs-battle-status-sync-check [server-data]
-  (and (get-in server-data [:battle :battle-id])
-       (let [username (:username server-data)
-             sync-status (get-in server-data [:battle :users username :battle-status :sync])]
-         (not= sync-status 1))))
-
-(defn auto-resources-tasks
-  [{:keys [battle-changed engine-version map-name mod-name spring-root]}
-   {:keys [by-spring-root cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path rapid-by-spring-root
-           springfiles-search-results tasks-by-kind]}]
-  (let [
-        spring-root-path (fs/canonical-path spring-root)
-        {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
-        {:keys [engines maps mods]} (get by-spring-root spring-root-path)
-        rapid-data (get rapid-data-by-version mod-name)
-        rapid-id (:id rapid-data)
-        sdp-file (rapid/sdp-file spring-root (rapid/sdp-filename (:hash rapid-data)))
-        sdp-file-exists (fs/exists? sdp-file)
-        all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))
-        tasks-by-type (group-by :spring-lobby/task-type all-tasks)
-        rapid-task (->> all-tasks
-                        (filter (comp #{::rapid-download} ::task-type))
-                        (filter (comp #{rapid-id} :rapid-id))
-                        first)
-        update-rapid-task (->> all-tasks
-                               (filter (comp #{::update-rapid ::update-rapid-packages} ::task-type))
-                               first)
-        importables (vals importables-by-path)
-        map-importable (some->> importables
-                                (filter (comp #{::map} :resource-type))
-                                (filter (partial resource/could-be-this-map? map-name))
-                                first)
-        map-import-task (->> all-tasks
-                             (filter (comp #{::import} ::task-type))
-                             (filter (comp (partial resource/same-resource-file? map-importable) :importable))
-                             (remove (partial import-dest-is-source? spring-root))
-                             first)
-        no-map (->> maps
-                    (filter (comp #{map-name} :map-name))
-                    first
-                    not)
-        downloadables (vals downloadables-by-url)
-        map-downloadable (->> downloadables
-                              (filter (comp #{::map} :resource-type))
-                              (filter (partial resource/could-be-this-map? map-name))
-                              first)
-        map-download-task (->> all-tasks
-                               (filter (comp #{::http-downloadable} ::task-type))
-                               (filter (comp (partial resource/same-resource-filename? map-downloadable) :downloadable))
-                               first)
-        search-springfiles-map-task (->> all-tasks
-                                         (filter (comp #{::search-springfiles} ::task-type))
-                                         (filter (comp #{map-name} :springname))
-                                         first)
-        download-springfiles-map-task (->> all-tasks
-                                           (filter (comp #{::download-springfiles ::http-downloadable} ::task-type))
-                                           (filter (comp #{map-name} :springname))
-                                           first)
-        engine-details (spring/engine-details engines engine-version)
-        engine-file (:file engine-details)
-        engine-importable (some->> importables
-                                   (filter (comp #{::engine} :resource-type))
-                                   (filter (partial resource/could-be-this-engine? engine-version))
-                                   (remove (partial import-dest-is-source? spring-root))
-                                   first)
-        engine-import-task (->> all-tasks
-                                (filter (comp #{::import} ::task-type))
-                                (filter (comp (partial resource/same-resource-file? engine-importable) :importable))
-                                first)
-        engine-downloadable (->> downloadables
-                                 (filter (comp #{::engine} :resource-type))
-                                 (filter (partial resource/could-be-this-engine? engine-version))
-                                 first)
-        engine-download-dest (resource/resource-dest spring-root engine-downloadable)
-        engine-extract-dest (when engine-download-dest
-                              (fs/file spring-root "engine" (fs/filename engine-download-dest)))
-        engine-download-task (->> all-tasks
-                                  (filter (comp #{::download-and-extract ::http-downloadable} ::task-type))
-                                  (filter (comp (partial resource/same-resource-filename? engine-downloadable) :downloadable))
-                                  first)
-        engine-extract-task (->> all-tasks
-                                 (filter (comp #{::extract-7z} ::task-type))
-                                 (filter (comp (partial resource/same-resource-filename? engine-downloadable) fs/filename :file))
-                                 first)
-        mod-downloadable (->> downloadables
-                              (filter (comp #{::mod} :resource-type))
-                              (filter (partial resource/could-be-this-mod? mod-name))
-                              first)
-        mod-download-task (->> all-tasks
-                               (filter (comp #{::http-downloadable} ::task-type))
-                               (filter (comp (partial resource/same-resource-filename? mod-downloadable) :downloadable))
-                               first)
-        mod-refresh-tasks (->> all-tasks
-                               (filter (comp #{::refresh-mods} ::task-type))
-                               (map (comp fs/canonical-path :spring-root))
-                               set)
-        engine-refresh-tasks (->> all-tasks
-                                  (filter (comp #{::refresh-engines} ::task-type))
-                                  (map (comp fs/canonical-path :spring-root))
-                                  set)
-        no-mod (->> mods
-                    (filter (comp #{mod-name} :mod-name))
-                    first
-                    not)
-        springfiles-search-result (get springfiles-search-results map-name)
-        springfiles-url (springfiles-url springfiles-search-result)
-        download-source-tasks (->> all-tasks
-                                   (filter (comp #{::update-downloadables}))
-                                   (map :download-source-name)
-                                   set)
-        engine-download-source-name (fx.engine-sync/engine-download-source engine-version)
-        tasks [(when
-                 (not engine-details)
-                 (cond
-                   (and engine-importable
-                        (not engine-import-task)
-                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root engine-importable))))
-                   (do
-                     (log/info "Adding task to auto import engine" engine-importable)
-                     {::task-type ::import
-                      :importable engine-importable
-                      :spring-isolation-dir spring-root})
-                   (and (not engine-importable)
-                        engine-downloadable
-                        (not engine-download-task)
-                        (not (fs/file-exists? file-cache engine-download-dest)))
-                   (do
-                     (log/info "Adding task to auto download engine" engine-downloadable)
-                     {::task-type ::download-and-extract
-                      :downloadable engine-downloadable
-                      :spring-isolation-dir spring-root})
-                   (and (not engine-importable)
-                        engine-downloadable
-                        (not engine-download-task)
-                        (fs/file-exists? file-cache engine-download-dest)
-                        (not engine-extract-task)
-                        (not (fs/file-exists? file-cache engine-extract-dest)))
-                   (do
-                     (log/info "Adding task to extract engine archive" engine-download-dest)
-                     {::task-type ::extract-7z
-                      :file engine-download-dest
-                      :dest engine-extract-dest})
-                   (and (not engine-importable)
-                        (not engine-downloadable)
-                        engine-download-source-name
-                        (check-cooldown cooldowns [:download-source engine-download-source-name])
-                        (not (contains? download-source-tasks engine-download-source-name)))
-                   (do
-                     (log/info "Adding task to update download source" engine-download-source-name "looking for" engine-version)
-                     (merge
-                       {::task-type :spring-lobby/update-downloadables
-                        :force true}
-                       (get download-sources-by-name engine-download-source-name)))
-                   (and (not (contains? engine-refresh-tasks spring-root-path))
-                        (fs/file-exists? file-cache engine-extract-dest))
-                   (do
-                     (log/info "Refreshing engines to pick up" engine-extract-dest)
-                     {::task-type ::refresh-engines
-                      :force true
-                      :priorites [engine-extract-dest]
-                      :spring-root spring-root})
-                   :else
-                   (when engine-version
-                     (log/info "Nothing to do to auto get engine" engine-version
-                       (with-out-str
-                         (pprint
-                           {:importable engine-importable
-                            :downloadable engine-downloadable
-                            :download-source-name engine-download-source-name
-                            :download-task engine-download-task
-                            :spring-root spring-root}))))))
-               (when
-                 no-map
-                 (cond
-                   (and map-importable
-                        (not map-import-task)
-                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-importable))))
-                   (do
-                     (log/info "Adding task to auto import map" map-importable)
-                     {::task-type ::import
-                      :importable map-importable
-                      :spring-isolation-dir spring-root})
-                   (and (not map-importable)
-                        map-downloadable
-                        (not map-download-task)
-                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root map-downloadable))))
-                   (do
-                     (log/info "Adding task to auto download map" map-downloadable)
-                     {::task-type ::http-downloadable
-                      :downloadable map-downloadable
-                      :spring-isolation-dir spring-root})
-                   (and map-name
-                        (not map-importable)
-                        (not map-downloadable)
-                        (not (contains? springfiles-search-results map-name))
-                        (not search-springfiles-map-task))
-                   (do
-                     (log/info "Adding task to search springfiles for map" map-name)
-                     {::task-type ::search-springfiles
-                      :springname map-name
-                      :resource-type ::map
-                      :spring-isolation-dir spring-root})
-                   (and map-name
-                        (not map-importable)
-                        (not map-downloadable)
-                        springfiles-search-result
-                        ((fnil < 0) (:tries (get http-download springfiles-url)) resource/max-tries)
-                        (not download-springfiles-map-task)
-                        (not (::refresh-maps tasks-by-type)))
-                   (do
-                     (log/info "Adding task to download map" map-name "from springfiles")
-                     {::task-type ::download-springfiles
-                      :resource-type ::map
-                      :springname map-name
-                      :search-result (get springfiles-search-results map-name)
-                      :spring-isolation-dir spring-root})
-                   :else
-                   (when map-name
-                     (log/info "Nothing to do to auto get map" map-name))))
-               (when
-                 no-mod
-                 (cond
-                   (and rapid-id
-                        (not rapid-task)
-                        (not update-rapid-task)
-                        (not (contains? mod-refresh-tasks spring-root-path))
-                        engine-file
-                        sdp-file-exists)
-                   (do
-                     (log/info "Refreshing mods to pick up" sdp-file)
-                     {::task-type ::refresh-mods
-                      :delete-invalid-sdp true
-                      :priorites [sdp-file]
-                      :spring-root spring-root})
-                   (and rapid-id
-                        (not rapid-task)
-                        (not update-rapid-task)
-                        engine-file
-                        (not sdp-file-exists)
-                        (check-cooldown cooldowns [:rapid spring-root-path rapid-id]))
-                   (do
-                     (log/info "Adding task to auto download rapid" rapid-id)
-                     {::task-type ::rapid-download
-                      :engine-file engine-file
-                      :rapid-id rapid-id
-                      :spring-isolation-dir spring-root})
-                   (and (not rapid-id)
-                        mod-downloadable
-                        (not mod-download-task)
-                        (not (fs/file-exists? file-cache (resource/resource-dest spring-root mod-downloadable))))
-                   (do
-                     (log/info "Adding task to auto download mod" mod-downloadable)
-                     {::task-type ::http-downloadable
-                      :downloadable mod-downloadable
-                      :spring-isolation-dir spring-root})
-                   (and (not rapid-id)
-                        (not rapid-task)
-                        engine-file
-                        (not update-rapid-task)
-                        (not (string/blank? mod-name))
-                        (check-cooldown cooldowns [:update-rapid spring-root-path]))
-                   (do
-                     (log/info "Adding task to update rapid looking for" mod-name)
-                     {::task-type ::update-rapid
-                      :engine-version engine-version
-                      :mod-name mod-name
-                      :spring-isolation-dir spring-root})
-                   :else
-                   (when mod-name
-                     (log/info "Nothing to do to auto get game" mod-name
-                       (with-out-str
-                         (pprint
-                           {:downloadable mod-downloadable
-                            :download-task mod-download-task
-                            :engine-file engine-file
-                            :refresh-tasks mod-refresh-tasks
-                            :rapid-data rapid-data
-                            :sdp-file sdp-file
-                            :sdp-file-exists sdp-file-exists
-                            :spring-root spring-root}))))))
-               (when
-                 (and no-mod
-                      (not rapid-id)
-                      (not rapid-task)
-                      (not update-rapid-task)
-                      battle-changed)
-                      ; ^ only do when first joining a battle
-                 (log/info "Adding task to update rapid looking for" mod-name)
-                 {::task-type ::update-rapid
-                  :engine-version engine-version
-                  :mod-name mod-name
-                  :spring-isolation-dir spring-root})]]
-    (filter some? tasks)))
-
-(defn server-auto-resources [server-key _old-state new-state old-server new-server]
-  (when (:auto-get-resources new-state)
-    (try
-      (when (server-needs-battle-status-sync-check new-server)
-        (log/info "Auto getting resources for" server-key)
-        (let [{:keys [
-                      servers spring-isolation-dir]} new-state
-              {:keys [battle battles client-data]} new-server
-              server-url (:server-url client-data)
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              {:keys [battle-map battle-modname battle-version]} (get battles (:battle-id battle))
-              battle-changed (and (-> new-server :battle :battle-id)
-                                  (not= (-> old-server :battle :battle-id) (-> new-server :battle :battle-id)))]
-          (auto-resources-tasks {
-                                 :battle-changed battle-changed
-                                 :engine-version battle-version
-                                 :map-name battle-map
-                                 :mod-name battle-modname
-                                 :spring-root spring-root}
-                                new-state)))
-      (catch Exception e
-        (log/error e "Error in :auto-get-resources state watcher for server" (first new-server))))))
-
-
-(defn battle-map-details-watcher [_k state-atom old-state new-state]
-  (when (not= (battle-map-details-relevant-keys old-state)
-              (battle-map-details-relevant-keys new-state))
-    (try
-      (doseq [[server-key new-server] (-> new-state :by-server seq)]
-        (let [old-server (-> old-state :by-server (get server-key))
-              server-url (-> new-server :client-data :server-url)
-              {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
-              spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                              spring-isolation-dir)
-              spring-root-path (fs/canonical-path spring-root)
-              old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
-              new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
-              old-battle-id (-> old-server :battle :battle-id)
-              new-battle-id (-> new-server :battle :battle-id)
-              old-map (-> old-server :battles (get old-battle-id) :battle-map)
-              new-map (-> new-server :battles (get new-battle-id) :battle-map)
-              map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-              map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
-              tries (or (:tries map-details) resource/max-tries)
-              all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
-          (when (and (or (not (resource/details? map-details))
-                         (< tries resource/max-tries))
-                     (or (and (not (string/blank? new-map))
-                              (not (resource/details? map-details))
-                              (or (not= old-battle-id new-battle-id)
-                                  (not= old-map new-map)
-                                  (and
-                                    (empty? (filter (comp #{::map-details} ::task-type) all-tasks))
-                                    map-exists)))
-                         (and
-                           (not (some (comp #{new-map} :map-name) old-maps))
-                           map-exists)))
-            (log/info "Mod details update for" server-key)
-            (task/add-task! state-atom
-              {::task-type ::map-details
-               :map-name new-map
-               :map-file (:file map-exists)
-               :source :battle-map-details-watcher
-               :tries tries}))))
-      (catch Exception e
-        (log/error e "Error in :battle-map-details state watcher")))))
-
-
-(defn battle-mod-details-watcher [_k state-atom old-state new-state]
-  (when (not= (battle-mod-details-relevant-data old-state)
-              (battle-mod-details-relevant-data new-state))
-    (try
-      (doseq [[server-key new-server] (-> new-state :by-server seq)]
-        (if-not (server-needs-battle-status-sync-check new-server)
-          (log/debug "Server" server-key "does not need battle mod details check")
-          (let [old-server (-> old-state :by-server (get server-key))
-                server-url (-> new-server :client-data :server-url)
-                {:keys [current-tasks servers spring-isolation-dir tasks-by-kind]} new-state
-                spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                                spring-isolation-dir)
-                spring-root-path (fs/canonical-path spring-root)
-                old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-                new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-                old-battle-id (-> old-server :battle :battle-id)
-                new-battle-id (-> new-server :battle :battle-id)
-                old-mod (-> old-server :battles (get old-battle-id) :battle-modname)
-                new-mod (-> new-server :battles (get new-battle-id) :battle-modname)
-                new-mod-sans-git (u/mod-name-sans-git new-mod)
-                mod-name-set (set [new-mod new-mod-sans-git])
-                filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-                mod-exists (->> new-mods (filter filter-fn) first)
-                mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-                all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
-            (when (or (and (and (not (string/blank? new-mod))
-                                (not (resource/details? mod-details)))
-                           (or (not= old-battle-id new-battle-id)
-                               (not= old-mod new-mod)
-                               (and
-                                 (empty? (filter (comp #{::mod-details} ::task-type) all-tasks))
-                                 mod-exists)))
-                      (and (not (some filter-fn old-mods))
-                           mod-exists))
-              (log/info "Mod details update for" server-key)
-              (task/add-task! state-atom
-                {::task-type ::mod-details
-                 :mod-name new-mod
-                 :mod-file (:file mod-exists)
-                 :source :battle-mod-details-watcher
-                 :use-git-mod-version (:use-git-mod-version new-state)})))))
-      (catch Exception e
-        (log/error e "Error in :battle-mod-details state watcher")))))
 
 
 (defn replay-map-and-mod-details-watcher [_k state-atom old-state new-state]
@@ -1170,25 +576,6 @@
         (log/error e "Error in :spring-isolation-dir-changed state watcher")))))
 
 
-(defn auto-get-resources-watcher [_k state-atom old-state new-state]
-  (when (and (:auto-get-resources new-state)
-             (some (comp server-needs-battle-status-sync-check second) (:by-server new-state)))
-    (try
-      (when-let [tasks (->> new-state
-                            :by-server
-                            (remove (comp keyword? first))
-                            (mapcat
-                              (fn [[server-key new-server]]
-                                (let [old-server (-> old-state :by-server (get server-key))]
-                                  (server-auto-resources server-key old-state new-state old-server new-server))))
-                            (filter some?)
-                            seq)]
-        (log/info "Adding" (count tasks) "to auto get resources")
-        (task/add-tasks! state-atom tasks))
-      (catch Exception e
-        (log/error e "Error in :auto-get-resources state watcher")))))
-
-
 (defn selected-replay-needs-auto-get
   [selected-replay {:keys [by-spring-root spring-isolation-dir]}]
   (let [{:keys [replay-engine-version replay-map-name replay-mod-name]} selected-replay
@@ -1206,11 +593,12 @@
                (selected-replay-needs-auto-get selected-replay new-state))
       (try
         (let [
-              tasks (auto-resources-tasks {:engine-version replay-engine-version
-                                           :map-name replay-map-name
-                                           :mod-name replay-mod-name
-                                           :spring-root spring-isolation-dir}
-                                          new-state)]
+              tasks (auto-resources/auto-resources-tasks
+                      {:engine-version replay-engine-version
+                       :map-name replay-map-name
+                       :mod-name replay-mod-name
+                       :spring-root spring-isolation-dir}
+                      new-state)]
           (when (seq tasks)
             (log/info "Adding" (count tasks) "to auto get replay resources")
             (task/add-tasks! state-atom tasks)))
@@ -1261,9 +649,8 @@
 
 
 (defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
-  (when #_(or (not= (update-battle-status-sync-relevant-data old-state)
-                    (update-battle-status-sync-relevant-data new-state)))
-        (some (comp server-needs-battle-status-sync-check second) (-> new-state :by-server seq))
+  (when (some (comp u/server-needs-battle-status-sync-check second)
+              (-> new-state :by-server seq))
     (try
       (log/info "Checking servers for battle sync status updates")
       (doseq [[server-key new-server] (concat
@@ -1271,7 +658,7 @@
                                         (->> new-state u/complex-servers))]
         (if (and (= (:servers old-state)
                     (:servers new-state))
-                 (not (server-needs-battle-status-sync-check new-server)))
+                 (not (u/server-needs-battle-status-sync-check new-server)))
           (log/debug "Server" server-key "does not need battle sync status check")
           (let [
                 _ (log/info "Checking battle sync status for" server-key)
@@ -1460,6 +847,9 @@
 (defmethod task-handler :default [task]
   (when task
     (log/warn "Unknown task type" task)))
+
+(task-handlers/add-handlers handle-task *state)
+; TODO not during init?
 
 
 (defn handle-task!
@@ -1691,340 +1081,6 @@
            :replay-imports-by-mod replay-mod-imports
            :replay-downloads-by-map replay-map-downloads
            :replay-imports-by-map replay-map-imports)))
-
-(defn- refresh-engines
-  "Reads engine details and updates missing engines in :engines in state."
-  ([]
-   (refresh-engines *state))
-  ([state-atom]
-   (refresh-engines state-atom nil))
-  ([state-atom spring-root]
-   (refresh-engines state-atom spring-root nil))
-  ([state-atom spring-root opts]
-   (log/info "Refreshing engines in" spring-root)
-   (apply fs/update-file-cache! state-atom (file-seq (fs/download-dir))) ; TODO move this somewhere
-   (let [before (u/curr-millis)
-         {:keys [spring-isolation-dir] :as state} @state-atom
-         spring-root (or spring-root spring-isolation-dir)
-         _ (log/info "Updating engines in" spring-root)
-         engine-dirs (fs/engine-dirs spring-root)
-         spring-root-path (fs/canonical-path spring-root)
-         known-canonical-paths (->> (-> state
-                                        :by-spring-root
-                                        (get spring-root-path))
-                                    :engines
-                                    (map (comp fs/canonical-path :file))
-                                    (filter some?)
-                                    set)
-         to-add (if (:force opts) ; refresh existing engines too
-                  engine-dirs
-                  (remove (comp known-canonical-paths fs/canonical-path) engine-dirs))
-         canonical-path-set (set (map fs/canonical-path engine-dirs))
-         missing-files (set
-                         (concat
-                           (->> known-canonical-paths
-                                (remove (comp fs/exists? io/file)))
-                           (->> known-canonical-paths
-                                (remove (comp (partial fs/descendant? spring-root) io/file)))))
-         to-remove (set
-                     (concat missing-files
-                             (remove canonical-path-set known-canonical-paths)))]
-     (apply fs/update-file-cache! state-atom known-canonical-paths)
-     (log/info "Found" (count to-add) "engines to load in" (- (u/curr-millis) before) "ms")
-     (doseq [engine-dir to-add]
-       (log/info "Detecting engine data for" engine-dir)
-       (let [engine-data (fs/engine-data engine-dir)]
-         (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
-                (fn [engines]
-                  (set
-                    (conj
-                      (remove (comp #{(fs/canonical-path engine-dir)} fs/canonical-path :file) engines)
-                      engine-data))))))
-     (log/debug "Removing" (count to-remove) "engines")
-     (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
-            (fn [engines]
-              (->> engines
-                   (filter (comp fs/canonical-path :file))
-                   (filter fs/is-current-engine-data?)
-                   (remove (comp to-remove fs/canonical-path :file))
-                   set)))
-     {:to-add-count (count to-add)
-      :to-remove-count (count to-remove)})))
-
-
-(defn- refresh-mods
-  "Reads mod details and updates missing mods in :mods in state."
-  ([state-atom]
-   (refresh-mods state-atom nil))
-  ([state-atom spring-root]
-   (refresh-mods state-atom spring-root nil))
-  ([state-atom spring-root {:keys [delete-invalid-sdp priorities]}]
-   (log/info "Refreshing mods in" spring-root)
-   (let [before (u/curr-millis)
-         {:keys [rapid-by-spring-root spring-isolation-dir use-git-mod-version] :as state} @state-atom
-         spring-root (or spring-root spring-isolation-dir)
-         _ (log/info "Updating mods in" spring-root)
-         spring-root-path (fs/canonical-path spring-root)
-         {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
-         mods (-> state :by-spring-root (get spring-root-path) :mods)
-         error-files (->> mods (filter :error) (map :file))
-         {:keys [directory]} (group-by ::fs/source mods)
-         known-paths (set (map (comp fs/canonical-path :file) mods))
-         mod-files (fs/mod-files spring-root)
-         sdp-files (rapid/sdp-files spring-root)
-         _ (log/info "Found" (count mod-files) "files and"
-                     (count sdp-files) "rapid archives to scan for mods")
-         to-add-file (set (remove (comp known-paths fs/canonical-path) mod-files))
-         to-add-rapid (remove (comp known-paths fs/canonical-path) sdp-files)
-         todo (shuffle (concat to-add-file to-add-rapid))
-         _ (log/info "Found" (count to-add-file) "mod files and" (count to-add-rapid)
-                     "rapid files to scan for mods in" (- (u/curr-millis) before) "ms")
-         battle-mods (->> state
-                          :by-server
-                          (map second)
-                          (map
-                            (fn [{:keys [battle battles]}]
-                              (let [{:keys [battle-id]} battle]
-                                (get-in battles [battle-id :battle-modname]))))
-                          (filter some?))
-         battle-rapid-data (map (partial get rapid-data-by-version) battle-mods)
-         battle-rapid-hashes (->> battle-rapid-data
-                                  (map :hash)
-                                  (filter some?)
-                                  set)
-         priorities (->> todo
-                         (filter
-                           (some-fn
-                             (comp
-                               (fn [resource]
-                                 (some
-                                   #(resource/could-be-this-mod? % resource)
-                                   battle-mods))
-                               (fn [f]
-                                 {:resource-filename (fs/filename f)}))
-                             (fn [f]
-                               (when-let [filename (fs/filename f)]
-                                 (when (string/ends-with? filename ".sdp")
-                                   (let [id (first (string/split filename #"\."))]
-                                     (contains? battle-rapid-hashes id)))))))
-                         (concat priorities))
-         _ (log/info "Prioritizing mods in battles" (pr-str priorities))
-         this-round (concat priorities
-                      (if (<= (count todo) mods-batch-size) ; add errors if there's not a full round left
-                        (do
-                          (log/info "Adding mod directories and mods with errors to scan")
-                          (concat todo
-                                  (map :file directory) ; re-scan directories just before errors
-                                  error-files))
-                        (take mods-batch-size todo)))
-         all-paths (set (filter some? (map (comp fs/canonical-path :file) mods)))
-         missing-files (set
-                         (concat
-                           (->> all-paths
-                                (remove (comp fs/exists? io/file)))
-                           (->> all-paths
-                                (remove (comp (partial fs/descendant? spring-root) io/file)))))
-         next-round
-         (->> (drop mods-batch-size todo)
-              (remove (comp all-paths fs/canonical-path))
-              seq)]
-     (apply fs/update-file-cache! state-atom all-paths)
-     (when (seq this-round)
-       (log/info "Adding" (count this-round) "mods this iteration:" (with-out-str (pprint this-round))))
-     (doseq [file this-round]
-       (log/info "Reading mod from" file)
-       (update-mod *state spring-root-path file {:delete-invalid-sdp delete-invalid-sdp :use-git-mod-version use-git-mod-version}))
-     (log/info "Removing mods with no name, and" (count missing-files) "mods with missing files")
-     (swap! state-atom
-            (fn [state]
-              (-> state
-                  (update-in [:by-spring-root spring-root-path :mods]
-                    (fn [mods]
-                      (->> mods
-                           (remove
-                             (fn [{:keys [error mod-name]}]
-                               (and (not error)
-                                    (string/blank? mod-name))))
-                           (filter (comp (partial instance? File) :file))
-                           (remove (comp missing-files fs/canonical-path :file))
-                           set)))
-                  (dissoc :update-mods))))
-     (if next-round
-       (do
-         (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
-         (task/add-task! state-atom
-           {::task-type ::refresh-mods
-            :spring-root spring-root
-            :todo (count next-round)}))
-       (log/info "Finished mod refresh"))
-     {:to-add-file-count (count to-add-file)
-      :to-add-rapid-count (count to-add-rapid)})))
-
-
-(defn- update-cached-minimaps
-  ([maps]
-   (update-cached-minimaps maps nil))
-  ([maps {:keys [priorities] :as opts}]
-   (let [to-update
-         (->> maps
-              (filter :map-name)
-              (filter
-                (fn [map-details]
-                  (let [
-                        heightmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "heightmap"}))
-                        metalmap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "metalmap"}))
-                        minimap-file (-> map-details :map-name (fs/minimap-image-cache-file {:minimap-type "minimap"}))]
-                    (or (:force opts)
-                        (not (fs/exists? heightmap-file))
-                        (not (fs/exists? metalmap-file))
-                        (not (fs/exists? minimap-file))))))
-              (sort-by :map-name)
-              (concat priorities))
-         this-round (take minimap-batch-size to-update)
-         next-round (drop minimap-batch-size to-update)]
-     (log/info (count to-update) "maps do not have cached minimap image files")
-     (doseq [map-details this-round]
-       (if-let [map-file (:file map-details)]
-         (do
-           (log/info "Caching minimap for" map-file)
-           (let [{:keys [map-name smf]} (fs/read-map-data map-file {:map-images true})
-                 {:keys [minimap-height minimap-width]} smf]
-             (when-let [minimap-image (:minimap-image smf)]
-               (let [minimap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height minimap-image)]
-                 (fs/write-image-png minimap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "minimap"}))))
-             (when-let [metalmap-image (:metalmap-image smf)]
-               (let [metalmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height metalmap-image)]
-                 (fs/write-image-png metalmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "metalmap"}))))
-             (when-let [heightmap-image (:heightmap-image smf)]
-               (let [heightmap-image-scaled (fs.smf/scale-minimap-image minimap-width minimap-height heightmap-image)]
-                 (fs/write-image-png heightmap-image-scaled (fs/minimap-image-cache-file map-name {:minimap-type "heightmap"}))))
-             (swap! *state
-               (fn [state]
-                 (-> state
-                     (assoc-in [:cached-minimap-updated (fs/canonical-path map-file)] (u/curr-millis))
-                     (assoc-in [:cached-minimap-updated map-name] (u/curr-millis)))))))
-         (log/error "Map is missing file" (:map-name map-details))))
-     (when (seq next-round)
-       (task/add-task! *state
-         {::task-type ::update-cached-minimaps
-          :priorites priorities
-          :todo (count next-round)})))))
-
-
-(defn- refresh-maps
-  "Reads map details and caches for maps missing from :maps in state."
-  ([state-atom]
-   (refresh-maps state-atom nil))
-  ([state-atom spring-root]
-   (refresh-maps state-atom spring-root nil))
-  ([state-atom spring-root {:keys [priorities]}]
-   (log/info "Refreshing maps in" spring-root)
-   (let [before (u/curr-millis)
-         {:keys [spring-isolation-dir] :as state} @state-atom
-         spring-root (or spring-root spring-isolation-dir)
-         _ (log/info "Updating maps in" spring-root)
-         spring-root-path (fs/canonical-path spring-root)
-         maps (-> state :by-spring-root (get spring-root-path) :maps)
-         map-files (fs/map-files spring-root)
-         known-files (->> maps (map :file) set)
-         error-files (->> maps (filter :error) (map :file))
-         known-paths (->> known-files (map fs/canonical-path) set)
-         todo (->> map-files
-                   (remove
-                     (fn [file]
-                       (contains? known-paths (fs/canonical-path file))))
-                   shuffle)
-         _ (log/info "Found" (count todo) "maps to load in" (- (u/curr-millis) before) "ms")
-         battle-maps (->> state
-                          :by-server
-                          (map second)
-                          (map
-                            (fn [{:keys [battle battles]}]
-                              (-> battles (get (:battle-id battle)) :battle-map)))
-                          (filter some?))
-         priorities (->> todo
-                         (filter
-                           (comp
-                             (fn [resource]
-                               (some
-                                 #(resource/could-be-this-map? % resource)
-                                 battle-maps))
-                             (fn [f]
-                               {:resource-filename (fs/filename f)})))
-                         (concat priorities))
-         _ (log/info "Prioritizing maps in battles" (pr-str priorities))
-         this-round (concat priorities
-                      (if (<= (count todo) maps-batch-size) ; add errors if there's not a full round left
-                        (do
-                          (log/info "Adding map directories and maps with errors to scan")
-                          (concat todo
-                                  (filter fs/is-directory? map-files) ; re-scan directories just before errors
-                                  error-files))
-                        (take maps-batch-size todo)))
-         next-round (drop maps-batch-size todo)
-         all-paths (set (filter some? (map (comp fs/canonical-path :file) maps)))
-         next-round (->> next-round
-                         (remove (comp all-paths fs/canonical-path))
-                         seq)
-         next-round-count (count next-round)
-         missing-paths (set
-                         (concat
-                           (->> known-files
-                                (remove fs/exists?)
-                                (map fs/canonical-path))
-                           (->> known-files
-                                (remove (partial fs/descendant? spring-root))
-                                (map fs/canonical-path))))]
-     (apply fs/update-file-cache! state-atom map-files)
-     (fs/make-dirs fs/maps-cache-root)
-     (when (seq this-round)
-       (log/info "Adding" (count this-round) "maps this iteration:" (with-out-str (pprint this-round))))
-     (let [map-file-to-name (into {}
-                              (for [map-file this-round]
-                                (do
-                                  (log/info "Reading" map-file)
-                                  (let [map-data (fs/read-map-data map-file)
-                                        relevant-map-data (select-keys map-data [:error :file :map-name])]
-                                    (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-                                           (fn [maps]
-                                             (let [valid-maps (->> maps
-                                                                   (remove (comp #{(fs/canonical-path map-file)} fs/canonical-path :file)))]
-                                               (set
-                                                 (cond-> valid-maps
-                                                   map-data
-                                                   (conj relevant-map-data))))))
-                                    [map-file (:map-name map-data)]))))
-           priority-maps (map (fn [map-file]
-                                {:map-name (get map-file-to-name map-file)
-                                 :file map-file})
-                              priorities)]
-       (log/debug "Removing maps with no name, and" (count missing-paths) "maps with missing files")
-       (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
-              (fn [maps]
-                (->> maps
-                     (filter (comp fs/canonical-path :file))
-                     (remove
-                       (fn [{:keys [error map-name]}]
-                         (and (not error)
-                              (string/blank? map-name))))
-                     (remove (comp missing-paths fs/canonical-path :file))
-                     (filter (comp (partial instance? File) :file))
-                     set)))
-       (if next-round
-         (do
-           (log/info "Scheduling map load since there are" next-round-count "maps left to load")
-           (when (seq priority-maps)
-             (task/add-task! state-atom {::task-type ::update-cached-minimaps
-                                         :maps priority-maps}))
-           (task/add-task! state-atom
-             {::task-type ::refresh-maps
-              :spring-root spring-root
-              :todo next-round-count}))
-         (do
-           (log/info "Finished map refresh")
-           (task/add-task! state-atom {::task-type ::update-cached-minimaps
-                                       :priorities priority-maps})))
-       {:todo-count next-round-count}))))
 
 
 (defmethod event-handler ::randomize-client-id
@@ -2562,154 +1618,9 @@
     (fn [] (.close chimer))))
 
 
-(defn refresh-engines-all-spring-roots []
-  (let [spring-roots (fs/spring-roots @*state)]
-    (log/info "Refreshing engines in" (pr-str spring-roots))
-    (doseq [spring-root spring-roots]
-      (refresh-engines *state spring-root))))
-
-(defmethod task-handler ::refresh-engines [{:keys [spring-root] :as opts}]
-  (if spring-root
-    (refresh-engines *state spring-root opts)
-    (refresh-engines-all-spring-roots)))
-
-
-(defn refresh-mods-all-spring-roots []
-  (let [spring-roots (fs/spring-roots @*state)]
-    (log/info "Refreshing mods in" (pr-str spring-roots))
-    (doseq [spring-root spring-roots]
-      (refresh-mods *state spring-root))))
-
-(defmethod task-handler ::refresh-mods [{:keys [spring-root] :as opts}]
-  (if spring-root
-    (refresh-mods *state spring-root opts)
-    (refresh-mods-all-spring-roots)))
-
-(defn refresh-maps-all-spring-roots []
-  (let [spring-roots (fs/spring-roots @*state)]
-    (log/info "Refreshing maps in" (pr-str spring-roots))
-    (doseq [spring-root spring-roots]
-      (refresh-maps *state spring-root))))
-
-(defmethod task-handler ::refresh-maps [{:keys [spring-root] :as opts}]
-  (if spring-root
-    (refresh-maps *state spring-root opts)
-    (refresh-maps-all-spring-roots)))
-
-
 (defmethod task-handler ::update-file-cache [{:keys [file]}]
   (fs/update-file-cache! *state file))
 
-
-(defn update-battle-sync-statuses [state-atom]
-  (let [state @state-atom]
-    (doseq [[server-key server-data] (concat
-                                       (-> state :by-server u/valid-servers)
-                                       (-> state u/complex-servers))]
-      (let [server-url (-> server-data :client-data :server-url)
-            {:keys [servers spring-isolation-dir]} state
-            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                            spring-isolation-dir)
-            spring-root-path (fs/canonical-path spring-root)
-
-            spring (-> state :by-spring-root (get spring-root-path))
-
-            new-sync-status (resource/sync-status server-data spring (:mod-details state) (:map-details state))
-
-            new-sync-number (handler/sync-number new-sync-status)
-            {:keys [battle client-data username]} server-data
-            {:keys [battle-status team-color]} (-> battle :users (get username))
-            old-sync-number (-> battle :users (get username) :battle-status :sync)]
-        (when (and (:battle-id battle)
-                   (not= old-sync-number new-sync-number))
-          (log/info "Updating battle sync status for" server-key "from" old-sync-number
-                    "to" new-sync-number)
-          (if (#{:direct-client :direct-host} (u/server-type server-key))
-            (fx.event.battle/update-player-or-bot-state
-              state-atom
-              server-key
-              {:username username}
-              {:battle-status {:sync new-sync-number}})
-            (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-              (message/send-message state-atom client-data
-                (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0))))))))))
-
-
-(defmethod task-handler ::map-details [{:keys [map-name map-file tries] :as map-data}]
-  (let [new-tries ((fnil inc 0) tries)
-        error-data {:error true
-                    :file map-file
-                    :map-name map-name
-                    :tries new-tries}
-        cache-key (fs/canonical-path map-file)]
-    (try
-      (if map-file
-        (do
-          (log/info "Updating battle map details for" map-name)
-          (let [map-details (read-map-details map-data)
-                map-details (if (or (not map-details) (:error map-details))
-                              error-data
-                              map-details)]
-            (log/info "Got map details for" map-name map-file (keys map-details))
-            (swap! *state update :map-details cache/miss cache-key map-details)))
-        (do
-          (log/info "Map not found, setting empty details for" map-name)
-          (swap! *state update :map-details cache/miss cache-key {:tries new-tries})))
-      (catch Throwable t
-        (log/error t "Error updating map details")
-        (swap! *state update :map-details cache/miss cache-key error-data)
-        (throw t)))
-    (update-battle-sync-statuses *state)))
-
-
-(defmethod task-handler ::mod-details
-  [{:keys [mod-name mod-file use-git-mod-version]}]
-  (let [error-data {:mod-name mod-name
-                    :file mod-file
-                    :error true
-                    :tries 1} ; TODO inc
-        cache-key (fs/canonical-path mod-file)]
-    (try
-      (if mod-file
-        (do
-          (log/info "Updating mod details for" mod-name)
-          (let [mod-details (or (read-mod-data mod-file {:use-git-mod-version use-git-mod-version}) error-data)]
-            (log/info "Got mod details for" mod-name mod-file (keys mod-details))
-            (let [{:keys [by-server preferred-factions]} (swap! *state update :mod-details cache/miss cache-key mod-details)
-                  preferred-faction (get preferred-factions (:mod-name-only mod-details))
-                  servers-to-update (->> by-server
-                                         (map
-                                           (fn [[server-key server-data]]
-                                             (let [{:keys [battle battles client-data username]} server-data]
-                                               {:server-key server-key
-                                                :client-data client-data
-                                                :mod-name (get-in battles [(:battle-id battle) :battle-modname])
-                                                :user-data (assoc
-                                                             (get-in battle [:users username])
-                                                             :username username)})))
-                                         (filter (comp #{mod-name} :mod-name))
-                                         (remove (comp #{preferred-faction} :side :battle-status :user-data)))]
-              (when preferred-faction
-                (doseq [{:keys [client-data server-key user-data]} servers-to-update]
-                  (log/info "Fixing faction for" server-key user-data "to" preferred-faction)
-                  (let [{:keys [battle-status team-color username]} user-data]
-                    (update-battle-status
-                      client-data
-                      {:username username
-                       :is-me true
-                       :is-bot false}
-                      (assoc battle-status :side preferred-faction) team-color)))))
-            (when (:error mod-details)
-              (task/add-task! *state
-                {::task-type ::refresh-mods}))))
-        (do
-          (log/info "Battle mod not found, setting empty details for" mod-name)
-          (swap! *state update :mod-details cache/miss cache-key {})))
-      (catch Throwable t
-        (log/error t "Error updating mod details")
-        (swap! *state update :mod-details cache/miss cache-key error-data)
-        (throw t)))
-    (update-battle-sync-statuses *state)))
 
 
 (defmethod task-handler ::replay-details [{:keys [replay-file]}]
@@ -2729,14 +1640,6 @@
         (swap! *state update :replay-details cache/miss cache-key {:error true})
         (throw t)))))
 
-
-(defmethod task-handler ::update-cached-minimaps
-  [{:keys [maps priorities]}]
-  (let [todo-maps (or maps
-                      (let [{:keys [by-spring-root]} @*state]
-                        (mapcat :maps (vals by-spring-root))))]
-    (log/info "Found" (count todo-maps) "maps to update cached minimaps for")
-    (update-cached-minimaps todo-maps {:priorities priorities})))
 
 (defmethod task-handler ::refresh-replays [_]
   (refresh-replays *state))
@@ -3154,7 +2057,7 @@
   [{:fx/keys [event]}]
   (let [[_server-url server-data] event]
     (swap! *state assoc
-           :server-edit event
+           :server-edit server-data
            :server-spring-root-draft (fs/canonical-path (:spring-isolation-dir server-data)))))
 
 (defmethod event-handler ::update-server
@@ -3421,10 +2324,10 @@
             (.exec runtime cmdarray nil nil))
           (fs/linux?)
           (let [
-                command ["dbus-send" (str "--bus=" (System/getenv "DBUS_SESSION_BUS_ADDRESS")) 
+                command ["dbus-send" (str "--bus=" (System/getenv "DBUS_SESSION_BUS_ADDRESS"))
                          "--print-reply"
                          "--dest=org.freedesktop.FileManager1"
-                         "--type=method_call" 
+                         "--type=method_call"
                          "/org/freedesktop/FileManager1"
                          "org.freedesktop.FileManager1.ShowItems"
                          (str "array:string:" (-> file .toURI .toURL str))
@@ -3636,9 +2539,7 @@
     (future
       (try
         (when-not (:mode battle-status)
-          (if (and (:server-url client-data)
-                   (or (string/starts-with? (:server-url client-data) "bar.teifion.co.uk")
-                       (string/starts-with? (:server-url client-data) "road-flag.bnr.la")))
+          (if (u/is-bar-server-url? (:server-url client-data))
             @(event-handler
                {:event/type ::send-message
                 :channel-name channel-name
@@ -3878,9 +2779,9 @@
         (update-copying dest {:status false})
         (fs/update-file-cache! *state source dest)
         (case (:resource-type importable)
-          ::map (refresh-maps-all-spring-roots)
-          ::mod (refresh-mods-all-spring-roots)
-          ::engine (refresh-engines-all-spring-roots)
+          ::map (task/add-task! *state {::task-type ::refresh-maps})
+          ::mod (task/add-task! *state {::task-type ::refresh-mods})
+          ::engine (task/add-task! *state {::task-type ::refresh-engines})
           nil)))))
 
 (defmethod task-handler ::import [e]
@@ -4488,258 +3389,9 @@
         :message (str "!fixcolors")})))
 
 
-(defmethod task-handler ::delete-corrupt-rapid
-  [{:keys [update-rapid-task spring-root]}]
-  (log/info "Attempting to delete corrupt rapid dir after error, then updating rapid again")
-  (fs/delete-rapid-dir spring-root)
-  (task/add-task! *state update-rapid-task))
-
-(defmethod task-handler ::delete-corrupt-map-file
-  [{:keys [indexed-map spring-root]}]
-  (let [{:keys [file map-name]} indexed-map]
-    (log/info "Attempting to delete corrupt map" map-name "at" file)
-    (raynes-fs/delete file)
-    (fs/update-file-cache! *state file)
-    (task/add-task! *state
-      {::task-type ::refresh-maps
-       :spring-root spring-root})))
-
-(defmethod task-handler ::delete-corrupt-mod-file
-  [{:keys [indexed-mod spring-root]}]
-  (let [{:keys [file mod-name]} indexed-mod]
-    (log/info "Attempting to delete corrupt mod" mod-name "at" file)
-    (raynes-fs/delete file)
-    (fs/update-file-cache! *state file)
-    (task/add-task! *state
-      {::task-type ::refresh-mods
-       :spring-root spring-root})))
-
-
-(defmethod task-handler ::update-rapid
-  [{:keys [engine-version mod-name rapid-id rapid-repo spring-isolation-dir] :as task}]
-  (swap! *state assoc :rapid-update true)
-  (let [before (u/curr-millis)
-        {:keys [by-spring-root file-cache] :as state} @*state ; TODO remove deref
-        engines (-> by-spring-root (get (fs/canonical-path spring-isolation-dir)) :engines)
-        engine-version (or engine-version (:engine-version state))
-        spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
-        preferred-engine-details (spring/engine-details engines engine-version)
-        engine-details (if (and preferred-engine-details (:file preferred-engine-details))
-                         preferred-engine-details
-                         (->> engines
-                              (filter (comp fs/canonical-path :file))
-                              first))
-        rapid-repo (or rapid-repo
-                       (resource/mod-repo-name mod-name))
-        rapid-id (or rapid-id
-                     (str rapid-repo ":test"))]
-    (if (and engine-details (:file engine-details))
-      (do
-        (log/info "Initializing rapid by calling download")
-        (deref
-          (event-handler
-            {:event/type ::rapid-download
-             :rapid-id rapid-id
-             :engine-file (:file engine-details)
-             :spring-isolation-dir spring-isolation-dir})))
-      (log/warn "No engine details to do rapid init"))
-    (log/info "Updating rapid versions in" spring-isolation-dir)
-    (let [rapid-repos (rapid/repos spring-isolation-dir)
-          _ (log/info "Found" (count rapid-repos) "rapid repos")
-          rapid-repo-files (map (partial rapid/version-file spring-isolation-dir) rapid-repos)
-          new-files (->> rapid-repo-files
-                         (map fs/file-cache-data)
-                         fs/file-cache-by-path)
-          rapid-versions (->> rapid-repo-files
-                              (filter
-                                (fn [f]
-                                  (let [path (fs/canonical-path f)
-                                        prev-time (or (-> file-cache (get path) :last-modified) 0)
-                                        curr-time (or (-> new-files (get path) :last-modified) Long/MAX_VALUE)]
-                                    (or
-                                      (< prev-time curr-time)
-                                      (:force task)))))
-                              (mapcat
-                                (fn [f]
-                                  (try
-                                    (rapid/rapid-versions f)
-                                    (catch Exception e
-                                      (log/error e "Error reading rapid versions in" f
-                                                 "scheduling delete of rapid folder and another rapid update")
-                                      (task/add-task! *state
-                                        {::task-type ::delete-corrupt-rapid
-                                         :spring-root spring-isolation-dir
-                                         :update-rapid-task task})))))
-                              (filter :version)
-                              (sort-by :version version/version-compare)
-                              reverse)
-          _ (log/info "Found" (count rapid-versions) "rapid versions")
-          rapid-data-by-hash (->> rapid-versions
-                                  (remove (comp #(string/ends-with? % ":test") :id))
-                                  ; prevents duplicates, uses specific version
-                                  (map (juxt :hash identity))
-                                  (into {}))
-          rapid-data-by-id (->> rapid-versions
-                                (map (juxt :id identity))
-                                (into {}))
-          rapid-data-by-version (->> rapid-versions
-                                     (remove (comp #(string/ends-with? % ":test") :id))
-                                     ; prevents duplicates, uses specific version
-                                     (map (juxt :version identity))
-                                     (into {}))]
-      (swap! *state
-        (fn [state]
-          (-> state
-              (update-in [:rapid-by-spring-root (fs/canonical-path spring-isolation-dir)]
-                (fn [rapid]
-                  (-> rapid
-                      (assoc :rapid-updated (u/curr-millis))
-                      (assoc :rapid-repos rapid-repos)
-                      (update :rapid-data-by-hash merge rapid-data-by-hash)
-                      (update :rapid-data-by-id merge rapid-data-by-id)
-                      (update :rapid-data-by-version merge rapid-data-by-version)
-                      (update :rapid-versions (fn [old-versions]
-                                                (set
-                                                  (vals
-                                                    (merge
-                                                      (into {}
-                                                        (map (juxt :id identity) old-versions))
-                                                      (into {}
-                                                        (map (juxt :id identity) rapid-versions))))))))))
-              (update :file-cache merge new-files))))
-      (log/info "Updated rapid repo data in" (- (u/curr-millis) before) "ms"))
-    (update-cooldown *state [:update-rapid (fs/canonical-path spring-isolation-dir)])
-    (task/add-tasks! *state
-      [
-       (merge
-         {::task-type ::update-rapid-packages
-          :spring-isolation-dir spring-isolation-dir})
-       {::task-type ::refresh-mods}])))
-
-(defmethod task-handler ::update-rapid-packages
-  [{:keys [spring-isolation-dir]}]
-  (swap! *state assoc :rapid-update true)
-  (let [{:keys [rapid-by-spring-root] :as state} @*state
-        spring-isolation-dir (or spring-isolation-dir (:spring-isolation-dir state))
-        spring-root-path (fs/canonical-path spring-isolation-dir)
-        {:keys [rapid-data-by-hash]} (get rapid-by-spring-root spring-root-path)
-        sdp-files (doall (rapid/sdp-files spring-isolation-dir))
-        packages (->> sdp-files
-                      (filter some?)
-                      (map
-                        (fn [f]
-                          (let [rapid-data
-                                (->> f
-                                     rapid/sdp-hash
-                                     (get rapid-data-by-hash))]
-                            {:id (->> rapid-data :id str)
-                             :filename (-> f fs/filename str)
-                             :version (->> rapid-data :version str)})))
-                      (sort-by :version version/version-compare)
-                      reverse
-                      doall)]
-    (swap! *state update-in [:rapid-by-spring-root spring-root-path]
-           assoc
-           :sdp-files sdp-files
-           :rapid-packages packages
-           :rapid-update false)
-    (task/add-task! *state
-      {::task-type ::refresh-mods
-       :spring-root spring-isolation-dir})))
-
-
 (defmethod event-handler ::rapid-repo-change
   [{:fx/keys [event]}]
   (swap! *state assoc :rapid-repo event))
-
-(defn parse-rapid-progress [line]
-  (when (string/starts-with? line "[Progress]")
-    (if-let [[_all _percent _bar current total] (re-find #"\[Progress\]\s+(\d+)%\s+\[([\s=]+)\]\s+(\d+)/(\d+)" line)]
-      {:current (Long/parseLong current)
-       :total (Long/parseLong total)}
-      (log/warn "Unable to parse rapid progress" (pr-str line)))))
-
-
-(defmethod event-handler ::rapid-download
-  [{:keys [engine-file rapid-id spring-isolation-dir] :as task}]
-  (swap! *state
-    (fn [state]
-      (-> state
-          (assoc-in [:rapid-download rapid-id] {:running true
-                                                :message "Preparing to run pr-downloader"})
-          (assoc-in [:rapid-failures rapid-id] false))))
-  (future
-    (try
-      (let [^File root spring-isolation-dir
-            pr-downloader-file (fs/pr-downloader-file engine-file)
-            _ (fs/set-executable pr-downloader-file)
-            command [(fs/canonical-path pr-downloader-file)
-                     "--filesystem-writepath" (fs/wslpath root)
-                     "--rapid-download" rapid-id]
-            runtime (Runtime/getRuntime)
-            detected-sdp-atom (atom nil)]
-        (log/info "Running '" command "'")
-        (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
-              ^"[Ljava.lang.String;" envp nil
-              ^java.lang.Process process (.exec runtime cmdarray envp root)]
-          (future
-            (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (let [progress (try (parse-rapid-progress line)
-                                      (catch Exception e
-                                        (log/debug e "Error parsing rapid progress")))]
-                    (swap! *state update-in [:rapid-download rapid-id] merge
-                           {:message line}
-                           progress)
-                    (log/info "(pr-downloader" rapid-id "out)" line)
-                    (recur))
-                  (log/info "pr-downloader" rapid-id "stdout stream closed")))))
-          (future
-            (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-              (loop []
-                (if-let [line (.readLine reader)]
-                  (do
-                    (swap! *state assoc-in [:rapid-download rapid-id :message] line)
-                    (log/info "(pr-downloader" rapid-id "err)" line)
-                    (when-let [[_all sdp] (re-find #" for ([0-9a-f]+)$" line)]
-                      (reset! detected-sdp-atom sdp))
-                    (recur))
-                  (log/info "pr-downloader" rapid-id "stderr stream closed")))))
-          (let [exit-code (.waitFor process)]
-            (log/info "pr-downloader exited with code" exit-code)
-            (when (not= 0 exit-code)
-              (if-let [sdp @detected-sdp-atom]
-                (let [sdp-file (rapid/sdp-file spring-isolation-dir (rapid/sdp-filename sdp))]
-                  (log/info "Non-zero pr-downloader exit, deleting corrupt sdp file" sdp-file)
-                  (raynes-fs/delete sdp-file))
-                (log/info "No sdp file detected"))
-              (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
-              (task/add-task! *state
-                {::task-type ::delete-corrupt-rapid
-                 :spring-root spring-isolation-dir
-                 :update-rapid-task task})))))
-      (catch Exception e
-        (log/error e "Error downloading" rapid-id)
-        (swap! *state assoc-in [:rapid-download rapid-id :message] (.getMessage e))
-        (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
-        (task/add-task! *state
-          {::task-type ::delete-corrupt-rapid
-           :spring-root spring-isolation-dir
-           :update-rapid-task task}))
-      (finally
-        (task/add-tasks! *state
-          [{::task-type ::update-rapid-packages
-            :spring-isolation-dir spring-isolation-dir}
-           {::task-type ::refresh-mods
-            :spring-root spring-isolation-dir}])
-        (swap! *state assoc-in [:rapid-download rapid-id :running] false)
-        (update-cooldown *state [:rapid rapid-id])
-        (apply fs/update-file-cache! *state (rapid/sdp-files spring-isolation-dir))))))
-
-(defmethod task-handler ::rapid-download
-  [task]
-  @(event-handler (assoc task :event/type ::rapid-download)))
 
 
 (defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
@@ -4754,9 +3406,15 @@
         (log/info "Moving temp download file" temp-dest "into place at" dest)
         (fs/move temp-dest dest))
       (case (:resource-type downloadable)
-        ::map (refresh-maps *state spring-isolation-dir {:priorities [dest]})
-        ::mod (refresh-mods *state spring-isolation-dir {:priorities [dest]})
-        ::engine (refresh-engines *state spring-isolation-dir {:priorities [dest]})
+        ::map (task/add-task! *state {::task-type ::refresh-maps
+                                      :spring-root spring-isolation-dir
+                                      :priorities [dest]})
+        ::mod (task/add-task! *state {::task-type ::refresh-mods
+                                      :spring-root spring-isolation-dir
+                                      :priorities [dest]})
+        ::engine (task/add-task! *state {::task-type ::refresh-engines
+                                         :spring-root spring-isolation-dir
+                                         :priorities [dest]})
         nil)
       (catch Exception e
         (log/error e "Error downloading")))))
@@ -4829,7 +3487,7 @@
                                                     (task-handler {::task-type ::search-springfiles
                                                                    :springname springname}))]
     (let [url (or url
-                  (springfiles-url search-result))]
+                  (http/springfiles-url search-result))]
       (task/add-task! *state
         {::task-type ::http-downloadable
          :downloadable {:download-url url
@@ -4850,7 +3508,7 @@
         (if dest
           (fs/extract-7z-fast file dest)
           (fs/extract-7z-fast file))
-        (refresh-engines-all-spring-roots)
+        (task/add-task! *state {::task-type ::refresh-engines})
         (catch Exception e
           (log/error e "Error extracting 7z" file))
         (finally
@@ -4872,9 +3530,9 @@
     (log/info "Skipping known import" importable)
     (let [resource-name (case resource-type
                           ::map (:map-name (fs/read-map-data resource-file))
-                          ::mod (:mod-name (read-mod-data resource-file))
+                          ::mod (:mod-name (task-handlers/read-mod-data resource-file))
                           ::engine (:engine-version (fs/engine-data resource-file))
-                          ::sdp (:mod-name (read-mod-data resource-file)))
+                          ::sdp (:mod-name (task-handlers/read-mod-data resource-file)))
           now (u/curr-millis)]
       (swap! *state update-in [:importables-by-path (fs/canonical-path resource-file)]
              assoc :resource-name resource-name
@@ -4934,7 +3592,7 @@
               downloadables-by-url (->> downloadables
                                         (map (juxt :download-url identity))
                                         (into {}))
-              all-download-source-names (set (keys download-sources-by-name))]
+              all-download-source-names (set (keys http/download-sources-by-name))]
           (log/info "Found downloadables from" download-source-name "at" url
                     (frequencies (map :resource-type downloadables)))
           (swap! *state update :downloadables-by-url
@@ -4948,7 +3606,7 @@
                             (filter (comp all-download-source-names :download-source-name second))
                             (into {}))
                        downloadables-by-url))))
-          (update-cooldown *state [:download-source download-source-name])
+          (u/update-cooldown *state [:download-source download-source-name])
           downloadables-by-url))
       (log/info "Too soon to check downloads from" url))))
 
@@ -5059,7 +3717,7 @@
 
 (defmethod event-handler ::update-all-downloadables
   [opts]
-  (doseq [download-source fx.download/download-sources]
+  (doseq [download-source http/download-sources]
     (task/add-task! *state
       (merge
         {::task-type ::update-downloadables
@@ -5500,10 +4158,10 @@
 
 (def state-watch-chimers
   [
-   [:auto-get-resources-watcher auto-get-resources-watcher 2]
+   [:auto-get-resources-watcher auto-resources/auto-get-resources-watcher 2]
    [:auto-get-replay-resources-watcher auto-get-replay-resources-watcher 2]
-   [:battle-map-details-watcher battle-map-details-watcher 2]
-   [:battle-mod-details-watcher battle-mod-details-watcher 2]
+   [:battle-map-details-watcher watch/battle-map-details-watcher 2]
+   [:battle-mod-details-watcher watch/battle-mod-details-watcher 2]
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
    [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
    [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]

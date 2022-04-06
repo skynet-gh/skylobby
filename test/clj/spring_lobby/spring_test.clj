@@ -87,13 +87,6 @@
           (pprint diff))))))
 
 
-(deftest engine-details
-  (is (= nil
-         (spring/engine-details [] nil)))
-  (is (= {:engine-version "12345"}
-         (spring/engine-details [{:engine-version "1234"} {:engine-version "12345"} {}] "12345"))))
-
-
 (def battle
   {:battle-modhash -1706632985
    :battle-version "104.0.1-1510-g89bb8e3 maintenance"

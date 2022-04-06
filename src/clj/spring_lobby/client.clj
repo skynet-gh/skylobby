@@ -40,13 +40,10 @@
   ; ^ found at springfightclub, was "sp u"
 
 
-(def default-port 8200)
-
-
 (defn parse-host-port [server-url]
   (if-let [[_all host port] (re-find #"(.+):(\d+)$" server-url)]
     [host (edn/read-string port)]
-    [server-url default-port]))
+    [server-url u/default-server-port]))
 
 
 ; https://springrts.com/dl/LobbyProtocol/ProtocolDescription.html
@@ -117,7 +114,7 @@
 
 
 (defmethod handler/handle :default [state-atom server-url m]
-  (log/trace "no handler for message" (str "'" m "'"))
+  (log/warn "No handler for message" (str "'" m "'"))
   (swap! state-atom assoc-in [:by-server server-url :last-failed-message] m))
 
 (defmethod handler/handle "PONG" [state-atom server-url _m]

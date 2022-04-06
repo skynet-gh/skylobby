@@ -42,15 +42,6 @@
           (remove-watch state :changes))))))
 
 
-(deftest set-sdd-modinfo-version
-  (is (= ""
-         (spring-lobby/set-sdd-modinfo-version "" "$VERSION")))
-  (is (= "version = '$VERSION'"
-         (spring-lobby/set-sdd-modinfo-version "version = 'xxxx'" "$VERSION")))
-  (is (= "version = 'git:xxxxxxx'"
-         (spring-lobby/set-sdd-modinfo-version "version = '$VERSION'" "git:xxxxxxx"))))
-
-
 (deftest available-name
   (is (= "bot"
          (spring-lobby/available-name [] "bot")))
@@ -109,17 +100,6 @@
              "nebula3                            6            968127\n"
              "=======================================================================")))))
 
-
-(deftest parse-rapid-progress
-  (is (= {:current 332922
-          :total 332922}
-         (spring-lobby/parse-rapid-progress "[Progress] 100% [==============================] 332922/332922")))
-  (is (= {:current 0
-          :total 0}
-         (spring-lobby/parse-rapid-progress "[Progress]   0% [         ] 0/0")))
-  (is (= {:current 171880
-          :total 1024954}
-         (spring-lobby/parse-rapid-progress "[Progress]  17% [=====         ] 171880/1024954"))))
 
 (deftest process-bar-replay
   (let [replays (-> (io/resource "test/bar-replays.json")

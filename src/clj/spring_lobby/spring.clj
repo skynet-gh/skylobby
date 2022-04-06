@@ -326,11 +326,6 @@
                   :singleplayer singleplayer})]
     (script-txt script)))
 
-(defn engine-details [engines engine-version]
-  (some->> engines
-           (filter (comp #{engine-version} :engine-version))
-           first))
-
 (defn hidden-directory? [path-str]
   (or (re-find #"^\." path-str)
       (re-find #"/\." path-str)

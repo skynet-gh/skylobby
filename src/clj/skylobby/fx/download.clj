@@ -24,64 +24,6 @@
 (def download-window-height 800)
 
 
-(def springfiles-maps-download-source
-  {:download-source-name "SpringFiles Maps"
-   :url http/springfiles-maps-url
-   :resources-fn (partial http/html-downloadables http/maps-only)})
-
-(def hakora-maps-download-source
-  {:download-source-name "Hakora Maps"
-   :url "http://www.hakora.xyz/files/springrts/maps"
-   :resources-fn (partial http/html-downloadables http/maps-only)})
-
-(def download-sources
-  [;springfiles-maps-download-source gone now
-   hakora-maps-download-source
-   {:download-source-name "Balanced Annihilation GitHub releases"
-    :url http/ba-github-releases-url
-    :browse-url "https://github.com/Balanced-Annihilation/Balanced-Annihilation/releases"
-    :resources-fn http/get-github-release-downloadables
-    :resource-type-fn http/mods-only}
-   {:download-source-name "BAR GitHub spring"
-    :url http/bar-spring-releases-url
-    :browse-url "https://github.com/beyond-all-reason/spring/releases"
-    :resources-fn http/get-github-release-engine-downloadables}
-   {:download-source-name "BAR GitHub maps"
-    :url http/bar-maps-github-releases-url
-    :browse-url "https://github.com/beyond-all-reason/Maps/releases"
-    :resources-fn http/get-bar-maps-github-release-downloadables}
-   {:download-source-name "Evolution-RTS GitHub releases"
-    :url http/evo-rts-github-releases-url
-    :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
-    :resources-fn http/get-evo-rts-github-release-downloadables
-    :resource-type-fn http/mods-only}
-   {:download-source-name "SpringFightClub Maps"
-    :url (str http/springfightclub-root "/maps")
-    :resources-fn (partial http/html-downloadables http/maps-only)}
-   {:download-source-name "SpringFightClub Games"
-    :url http/springfightclub-root
-    :resources-fn (partial http/html-downloadables http/mods-only)}
-   {:download-source-name "SpringLauncher"
-    :url http/springlauncher-root
-    :resources-fn http/get-springlauncher-downloadables}
-   {:download-source-name "SpringRTS buildbot"
-    :url http/springrts-buildbot-root
-    :resources-fn http/crawl-springrts-engine-downloadables}
-   {:download-source-name "TAP GitHub releases"
-    :url http/tap-github-releases-url
-    :browse-url "https://github.com/FluidPlay/TAPrime_v2/releases"
-    :resources-fn http/get-github-release-downloadables
-    :resource-type-fn http/mods-only}
-   {:download-source-name "TAP GitHub maps"
-    :url http/tap-maps-github-releases-url
-    :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
-    :resources-fn http/get-bar-maps-github-release-downloadables}])
-
-(def download-sources-by-name
-  (into {}
-    (map (juxt :download-source-name identity) download-sources)))
-
-
 (defn- download-type-cell
   [download-type]
   {:text (if download-type
@@ -101,7 +43,7 @@
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
-        download-source (->> download-sources
+        download-source (->> http/download-sources
                          (filter (comp #{download-source-name} :download-source-name))
                          first)
         downloadables (->> (or (vals downloadables-by-url) [])
@@ -137,7 +79,7 @@
            :text " Filter source: "}
           {:fx/type :combo-box
            :value download-source
-           :items (sort-by :download-source-name download-sources)
+           :items (sort-by :download-source-name http/download-sources)
            :button-cell download-source-cell
            :prompt-text " < pick a source > "
            :cell-factory

@@ -5,16 +5,16 @@ name: GraalVM Native Image Build
 on:
   release:
     types: [created]
-
+  workflow_dispatch:
 jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - uses: ilammy/msvc-dev-cmd@v1.10.0
-      - uses: microsoft/setup-msbuild@v1.1
+      - uses: microsoft/setup-msbuild@v1.1.1
         with:
-          vs-version: '16.11.10'
+          vs-version: '16.11.11'
           msbuild-architecture: x64
       # https://github.com/clojure-lsp/clojure-lsp/blob/419f58c/.github/workflows/release.yml#L300-L304
       - uses: al-cheb/configure-pagefile-action@v1.2
@@ -26,7 +26,7 @@ jobs:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3
+      - uses: actions/cache@v3.0.1
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -37,29 +37,32 @@ jobs:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.0.0
+      - uses: actions/setup-node@v3.1.0
         with:
           node-version: '14'
           cache: 'npm'
       - run: npm install
       - run: clojure -M:cljs compile frontend
         shell: powershell
-      - run: clojure -M:skylobby-deps:skylobby-native-windows
+      - run: clojure -M:graal-deps:native-windows
         shell: powershell
-      - uses: actions/upload-artifact@v3
+      # https://github.com/oracle/graal/issues/2256#issuecomment-624024965
+      - run: editbin /SUBSYSTEM:WINDOWS skylobby.exe
+        shell: powershell
+      - uses: actions/upload-artifact@v3.0.0
         with:
           name: skylobby.exe
           path: skylobby.exe
   mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3
+      - uses: actions/cache@v3.0.1
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -69,27 +72,27 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.0.0
+      - uses: actions/setup-node@v3.1.0
         with:
           node-version: '14'
           cache: 'npm'
       - run: npm install
       - run: clojure -M:cljs compile frontend
-      - run: clojure -M:skylobby-deps:skylobby-native-mac
-      - uses: actions/upload-artifact@v3
+      - run: clojure -M:graal-deps:native-mac
+      - uses: actions/upload-artifact@v3.0.0
         with:
           name: skylobby-mac
           path: skylobby
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3
+      - uses: actions/cache@v3.0.1
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -99,14 +102,14 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.0.0
+      - uses: actions/setup-node@v3.1.0
         with:
           node-version: '14'
           cache: 'npm'
       - run: npm install
       - run: clojure -M:cljs compile frontend
-      - run: clojure -M:skylobby-deps:skylobby-native-linux
-      - uses: actions/upload-artifact@v3
+      - run: clojure -M:graal-deps:native-linux
+      - uses: actions/upload-artifact@v3.0.0
         with:
           name: skylobby-linux
           path: skylobby

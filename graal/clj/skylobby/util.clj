@@ -17,7 +17,8 @@
     (java.util.jar Manifest)
     (java.util.zip CRC32)
     (org.apache.commons.codec.binary Hex)
-    (org.apache.commons.io FileUtils)))
+    (org.apache.commons.io FileUtils))
+  (:gen-class))
 
 
 (set! *warn-on-reflection* true)
@@ -39,6 +40,53 @@
    :ISO-8859-1
    :ascii])
 
+
+; https://github.com/clojure/clojure/blob/28efe345d5e995dc152a0286fb0be81443a0d9ac/src/clj/clojure/instant.clj#L274-L279
+(defn- read-file-tag [cs]
+  (io/file cs))
+(defn- read-url-tag [spec]
+  (URL. spec))
+
+; https://github.com/clojure/clojure/blob/0754746f476c4ddf6a6b699d9547830b2fdad17c/src/clj/clojure/core.clj#L7755-L7761
+(def custom-readers
+  {'spring-lobby/java.io.File skylobby.util/read-file-tag
+   'spring-lobby/java.net.URL skylobby.util/read-url-tag})
+
+; https://stackoverflow.com/a/23592006
+(defmethod print-method java.io.File [^java.io.File f ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.io.File " (pr-str (.getCanonicalPath f)))))
+(defmethod print-method URL [url ^java.io.Writer w]
+  (.write w (str "#spring-lobby/java.net.URL " (pr-str (str url)))))
+
+
+(defn server-url [{:keys [host port]}]
+  (when (and host port)
+    (str host ":" port)))
+
+(def default-servers
+  (let [springlobby {:host "lobby.springrts.com"
+                     :port default-server-port
+                     :alias "Spring Official"}
+        bar {:host "bar.teifion.co.uk"
+             :port default-server-port
+             :alias "Beyond All Reason"}
+        bar-ssl {:host "server2.beyondallreason.info"
+                 :port 8201
+                 :alias "Beyond All Reason (SSL)"
+                 :ssl true}
+        servers [springlobby bar bar-ssl]]
+    (->> servers
+         (map (juxt server-url identity))
+         (into {}))))
+
+
+(defn is-bar-server-url? [server-url]
+  (and server-url
+       (or (string/starts-with? server-url "bar.teifion.co.uk")
+           (string/starts-with? server-url "road-flag.bnr.la")
+           (string/includes? server-url "beyondallreason.info"))))
+
+
 (defn agent-string []
   (str app-name "-" app-version))
 
@@ -48,13 +96,13 @@
     (agent-string)))
 
 
-(def main-class-name "spring_lobby.main")
+(def this-class-name "skylobby.util")
 
 
 ; https://stackoverflow.com/a/16431226/984393
 (defn manifest-version []
   (try
-    (when-let [clazz (Class/forName main-class-name)]
+    (when-let [clazz (Class/forName this-class-name)]
       (log/trace "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation)]
         (log/trace "Discovered location" loc)
@@ -65,6 +113,14 @@
       (log/trace "Class not found, assuming running in dev and not as a jar"))
     (catch Exception e
       (log/trace e "Unable to read version from manifest"))))
+
+(defn version []
+  (or (try
+        (slurp (io/resource (str app-name ".version")))
+        (catch Exception e
+          (log/trace e "Error reading version from resource")))
+      (manifest-version)
+      "UNKNOWN"))
 
 
 (defn short-git-commit [git-commit-id]
@@ -466,6 +522,20 @@
         :output-fn (partial log/default-output-fn {:stacktrace-fonts {}}))}})
   (log/handle-uncaught-jvm-exceptions!))
 
+(defn log-only-to-file [log-path]
+  (log/merge-config!
+    {:min-level :info
+     :appenders
+     {:rotor
+      (assoc
+        (rotor/rotor-appender
+          {:path log-path
+           :max-size 5000000
+           :backlog 5})
+        :output-fn (partial log/default-output-fn {:stacktrace-fonts {}}))
+      :println {:enabled? false}}})
+  (log/handle-uncaught-jvm-exceptions!))
+
 
 ; https://stackoverflow.com/a/4883851/984393
 (defn is-port-open? [port]
@@ -518,7 +588,7 @@
   "Returns the file for the current running jar, or nil if it cannot be determined."
   []
   (try
-    (when-let [clazz (Class/forName main-class-name)]
+    (when-let [clazz (Class/forName this-class-name)]
       (log/debug "Discovered class" clazz)
       (when-let [loc (-> (.getProtectionDomain clazz) .getCodeSource .getLocation .toURI)]
         (io/file loc)))
@@ -579,3 +649,35 @@
     (if (= "bool" modoption-type)
       (to-number (to-bool raw-value))
       (to-number raw-value))))
+
+
+(defn server-needs-battle-status-sync-check [server-data]
+  (and (get-in server-data [:battle :battle-id])
+       (let [username (:username server-data)
+             sync-status (get-in server-data [:battle :users username :battle-status :sync])]
+         (not= sync-status 1))))
+
+
+(defn check-cooldown [cooldowns k]
+  (if-let [{:keys [tries updated]} (get cooldowns k)]
+    (if (and (number? tries) (number? updated))
+      (let [cd (< (curr-millis)
+                  (+ updated (* 1000 (Math/pow 2 tries))))] ; exponential backoff
+        (if cd
+          (do
+            (log/info k "is on cooldown")
+            false)
+          true))
+      true)
+    true))
+
+(defn update-cooldown [state-atom k]
+  (swap! state-atom update-in [:cooldowns k]
+    (fn [state]
+      (-> state
+          (update :tries (fnil inc 0))
+          (assoc :updated (curr-millis))))))
+
+
+(defn sync-number [sync-bool]
+  (if sync-bool 1 2))

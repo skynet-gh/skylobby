@@ -9,15 +9,15 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - uses: DeLaGuardo/clojure-lint-action@master
         with:
-          clj-kondo-args: --lint src/clj graal/clj src/cljs dev/clj
+          clj-kondo-args: --lint src/clj graal/clj src/cljs
           github_token: ${{ secrets.GITHUB_TOKEN }}
   warn-on-reflect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.0
       - name: Check for clj files that do not warn on reflect
         shell: bash
         run: |
