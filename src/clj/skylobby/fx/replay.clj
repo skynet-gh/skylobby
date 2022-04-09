@@ -25,8 +25,8 @@
     [skylobby.http :as http]
     [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -542,7 +542,9 @@
         db (fx/sub-val context :db)
         get-rapid-data (fn [version]
                          (if (and db use-db-for-rapid)
-                           (rapid/rapid-data-by-version db spring-root-path version)
+                           ;(rapid/rapid-data-by-version db spring-root-path version)
+                           ; SQL too slow here
+                           nil
                            (get rapid-data-by-version version)))
         rapid-download (fx/sub-val context :rapid-download)
         replays-tags (fx/sub-val context :replays-tags)
@@ -1024,6 +1026,9 @@
                           (string/includes? mod-version " git:")
                           {:fx/type :label
                            :text " Different git version, select for options"}
+                          use-db-for-rapid
+                          {:fx/type :label
+                           :text " Select replay for options"}
                           :else
                           {:fx/type :button
                            :text (if rapid-update-tasks

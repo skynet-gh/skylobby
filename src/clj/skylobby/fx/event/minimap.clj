@@ -1,6 +1,6 @@
 (ns skylobby.fx.event.minimap
   (:require
-    [spring-lobby.spring :as spring]
+    [skylobby.spring :as spring]
     [taoensso.timbre :as log]))
 
 

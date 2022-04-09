@@ -19,8 +19,8 @@
     [skylobby.fx.mod-sync :as fx.mod-sync]
     [skylobby.fx.players-table :refer [players-table]]
     [skylobby.fx.user :as fx.user]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import

@@ -3,9 +3,13 @@
     [clojure.core.async :as async]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    clojure.set
     clojure.walk
+    [com.evocomputing.colors :as colors]
+    [me.raynes.fs :as raynes-fs]
     [skylobby.client.message :as message]
     [skylobby.client.gloss :as cu]
+    [skylobby.event.user :as event.user]
     [skylobby.fs :as fs]
     [skylobby.task :as task]
     [skylobby.util :as u]
@@ -16,6 +20,80 @@
 
 
 (def ^:dynamic spring-type nil)
+
+
+(def ^:dynamic extra-pre-game nil)
+(def ^:dynamic extra-post-game nil)
+
+
+(def map-multiplier
+  "Multiplier from positions in map file into positions that Spring uses."
+  8.0)
+
+(def startpostypes
+  {0 "Fixed"
+   1 "Random"
+   2 "Choose in game"
+   3 "Choose before game"})
+
+(def startpostypes-by-name
+  (clojure.set/map-invert startpostypes))
+
+(defn startpostype-name [startpostype]
+  (when startpostype
+    (let [startpostype (int
+                         (or
+                           (if (string? startpostype)
+                             (u/to-number startpostype)
+                             startpostype)
+                           0))]
+      (get startpostypes startpostype))))
+
+(def spring-settings-paths
+  [["springsettings.cfg"]
+   ["uikeys.txt"]
+   ["LuaUI" "Config"]])
+
+(defn copy-spring-setting [source-dir dest-dir path]
+  (try
+    (let [source (apply io/file source-dir path)]
+      (if (fs/exists? source)
+        (do
+          (fs/make-dirs (fs/file dest-dir))
+          (fs/copy source (apply io/file dest-dir path))
+          :copied)
+        :does-not-exist))
+    (catch Exception e
+      (log/warn e "Error copying spring settings" path "from" source-dir "to" dest-dir)
+      :error)
+    (catch Throwable t
+      (log/warn t "Error copying spring settings" path "from" source-dir "to" dest-dir)
+      (throw t))))
+
+(defn copy-spring-settings [source-dir dest-dir]
+  (->> spring-settings-paths
+       (map (juxt identity (partial copy-spring-setting source-dir dest-dir)))
+       doall
+       (into {})))
+
+(defn delete-spring-setting [dir path]
+  (try
+    (log/info "Deleting spring setting" path "in" dir)
+    (let [f (apply io/file dir path)]
+      (if (fs/exists? f)
+        (do
+          (raynes-fs/delete f)
+          :deleted)
+        :does-not-exist))
+    (catch Exception e
+      (log/warn e "Error deleting spring settings" path "from" dir)
+      :error)))
+
+(defn delete-spring-settings [dir]
+  (log/info "Deleting spring settings in" dir)
+  (->> spring-settings-paths
+       (map (juxt identity (partial delete-spring-setting dir)))
+       (into {})))
 
 
 (defn script-txt-inner
@@ -41,6 +119,62 @@
     (merge (get battles (:battle-id battle)) battle)))
 
 
+(defn unit-rgb
+  [i]
+  (/ i 255.0))
+
+(defn format-color [team-color]
+  (when-let [decimal-color (or (when (number? team-color) team-color)
+                               (try (Integer/parseInt team-color)
+                                    (catch Exception _ nil)))]
+    (let [[r g b _a] (:rgba (colors/create-color decimal-color))]
+      (str (unit-rgb b) " " (unit-rgb g) " " (unit-rgb r))))) ; Spring lobby uses bgr
+
+(defn team-name [id]
+  (str "team" id))
+
+(defn players-and-bots
+  "Returns the non-spectating players and bots in a battle."
+  [battle]
+  (filter
+    (comp :mode :battle-status second)
+    (merge (:users battle) (:bots battle))))
+
+(defn teams [battle]
+  (map
+    (comp first second)
+    (group-by (comp :id :battle-status second)
+      (players-and-bots battle))))
+
+(defn team-keys [teams]
+  (set (map (comp team-name :id :battle-status second) teams)))
+
+(defn normalize-team
+  "Returns :team1 from either :team1 or :1."
+  [team-kw]
+  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
+    (keyword (str "team" team))))
+
+(defn map-teams [map-details]
+  (or (->> map-details :mapinfo :teams
+           (map
+             (fn [[k v]]
+               [(normalize-team k)
+                (-> v
+                    (update-in [:startpos :x] u/to-number)
+                    (update-in [:startpos :z] u/to-number))]))
+           seq)
+      (->> map-details
+           :smd
+           :map
+           (filter (comp #(string/starts-with? % "team") name first))
+           (map
+             (fn [[k {:keys [startposx startposz]}]]
+               [(normalize-team k)
+                {:startpos {:x startposx :z startposz}}]))
+           (into {}))
+      []))
+
 
 ; https://springrts.com/wiki/Script.txt
 ; https://github.com/spring/spring/blob/104.0/doc/StartScriptFormat.txt
@@ -50,7 +184,6 @@
   ([script-data]
    (apply str (map script-txt-inner (sort-by first (clojure.walk/stringify-keys script-data))))))
 
-#_
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   ([battle {:keys [is-host map-details mod-details sides singleplayer] :as opts}]
@@ -193,8 +326,7 @@
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
   [battle {:keys [is-host] :as opts}]
   (if is-host
-    (throw (ex-info "TODO host script data" {:is-host is-host :opts opts}))
-    ;(script-data-host battle opts)
+    (script-data-host battle opts)
     (script-data-client battle opts)))
 
 (defn parse-side-key [[k v]]
@@ -249,7 +381,7 @@
 (defn start-game
   [state-atom
    {:keys [client-data engine-version engines engines-by-version script-txt server-key
-           ^java.io.File spring-isolation-dir
+           ^java.io.File spring-isolation-dir spring-settings
            username users]
     :as state}]
   (let [my-client-status (-> users (get username) :client-status)
@@ -265,14 +397,14 @@
                 (assoc-in [:spring-running server-key battle-id] true))))
         spring-out-file (fs/file (fs/app-root) spring-out-filename)
         pre-game-fn (fn []
-                      #_
+                      (when extra-pre-game
+                        (extra-pre-game))
                       (when (:auto-backup spring-settings)
                         (let [auto-backup-name (str "backup-" (u/format-datetime (u/curr-millis)))
                               dest-dir (fs/file (fs/spring-settings-root) auto-backup-name)]
                           (log/info "Backing up Spring settings to" dest-dir)
                           (let [res (copy-spring-settings spring-isolation-dir dest-dir)]
                             (log/info "Copied Spring settings" res))))
-                      #_
                       (when (:game-specific spring-settings)
                         (log/info "Backing up game specific settings")
                         (if-let [game-type (-> state :battle-mod-details :mod-name-only)]
@@ -314,7 +446,6 @@
                            (when-let [{:keys [battle-status team-color]} me]
                              (message/send state-atom client-data
                                (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready false)) " " team-color)))))
-                       #_
                        (when (:game-specific spring-settings)
                          (if-let [game-type (-> state :battle-mod-details :mod-name-only)]
                            (do
@@ -324,32 +455,14 @@
                                (let [res (copy-spring-settings spring-isolation-dir dest-dir)]
                                  (log/info "Copied Spring settings" res))))
                            (log/warn "Unable to determine game type from details with keys" (pr-str (keys (:battle-mod-details state))))))
-                       #_
-                       (if (and media-player (not music-paused))
-                         (do
-                           (log/info "Resuming media player")
-                           (.play media-player)
-                           (let [{:keys [music-volume]} (swap! state-atom assoc :music-paused false)
-                                 ^"[Ljavafx.animation.KeyFrame;"
-                                 keyframes (into-array KeyFrame
-                                             [(KeyFrame.
-                                                (Duration/seconds 3)
-                                                (into-array KeyValue
-                                                  [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))])
-                                 timeline (Timeline. keyframes)]
-                             (.play timeline)))
-                         (when (not media-player)
-                           (log/info "No media player to resume")))
-                       ;(when ring-when-game-ends)
-                         ; TODO ring
-                         ;(sound/play-ring state))
                        (when refresh-replays-after-game
-                         (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays})))
+                         (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays}))
+                       (when extra-post-game
+                         (extra-post-game)))
         set-ingame (fn [ingame]
                      (log/info "Setting ingame" ingame "for" server-key)
                      (if (#{:direct-client :direct-host} (u/server-type server-key))
-                       (throw (ex-info "Not implemented for direct connect" {}))
-                       ;(fx.event/update-user-state state-atom server-key {:username username} {:client-status {:ingame ingame}})
+                       (event.user/update-user-state state-atom server-key {:username username} {:client-status {:ingame ingame}})
                        (message/send state-atom client-data
                          (str "MYSTATUS "
                               (cu/encode-client-status
@@ -441,54 +554,6 @@
                 (assoc-in [:spring-starting server-key battle-id] false)
                 (assoc-in [:spring-running server-key battle-id] false))))
         (set-ingame false)))))
-
-#_
-(defn start-game
-  [{:keys [engine-dir ^java.io.File spring-root]}]
-  (try
-    (let [
-          engine-file (io/file engine-dir (fs/spring-executable))
-          _ (log/info "Engine executable" engine-file)
-          _ (fs/set-executable engine-file)
-          script-file (io/file spring-root "script.txt")
-          script-file-param (fs/wslpath script-file)
-          isolation-dir-param (fs/wslpath engine-dir)
-          write-dir-param (fs/wslpath spring-root)
-          command [(fs/canonical-path engine-file)
-                   "--isolation-dir" isolation-dir-param
-                   "--write-dir" write-dir-param
-                   script-file-param]
-          runtime (Runtime/getRuntime)
-          _ (log/info "Running '" command "'")
-          _ (log/info "Copy paste Spring command: '" (with-out-str (println (string/join " " command))) "'")
-          ^"[Ljava.lang.String;" cmdarray (into-array String command)
-          ^"[Ljava.lang.String;" envp (into-array String [])
-          process (.exec runtime cmdarray envp spring-root)]
-      (future
-        (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
-          (loop []
-            (if-let [line (.readLine reader)]
-              (do
-                (log/info "(spring out)" line)
-                (recur))
-              (log/info "Spring stdout stream closed")))))
-      (future
-        (with-open [^java.io.BufferedReader reader (io/reader (.getErrorStream process))]
-          (loop []
-            (if-let [line (.readLine reader)]
-              (do
-                (log/info "(spring err)" line)
-                (recur))
-              (log/info "Spring stderr stream closed")))))
-      (try
-        (.waitFor process)
-        (catch Exception e
-          (log/error e "Error waiting for Spring to close"))
-        (catch Throwable t
-          (log/error t "Fatal error waiting for Spring to close")
-          (throw t))))
-    (catch Exception e
-      (log/error e "Error starting game"))))
 
 
 (defn watch-replay

@@ -2,7 +2,7 @@
   (:require
     [skylobby.resource :as resource]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
+    [skylobby.spring :as spring]
     [taoensso.encore :as encore :refer [have]]
     [taoensso.timbre :as log]))
 

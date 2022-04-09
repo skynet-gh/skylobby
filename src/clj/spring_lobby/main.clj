@@ -15,10 +15,10 @@
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     [skylobby.git :as git]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
     [skylobby.watch :as watch]
     spring-lobby
-    [spring-lobby.spring :as spring]
     [spring-lobby.replays :as replays]
     [taoensso.timbre :as log])
   (:import

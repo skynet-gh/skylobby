@@ -18,6 +18,11 @@
 (set! *warn-on-reflection* true)
 
 
+(def ^:dynamic ring-impl
+  (fn []
+    (log/warn "No ring implementation set")))
+
+
 (defmulti handle
   (fn [_state-atom _server-key m]
     (-> m
@@ -219,6 +224,22 @@
   (log/info "Ignoring unused CHANNELS command"))
 
 
+(defn handle-friend [state-atom server-key username]
+  (swap! state-atom update-in [:by-server server-key]
+    (fn [server-data]
+      (-> server-data
+          (assoc-in [:friends username] {})
+          (update :friend-requests dissoc username)))))
+
+(defmethod handle "FRIEND" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (handle-friend state-atom server-key username)))
+
+(defmethod handle "FRIENDLIST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (handle-friend state-atom server-key username)))
+
+
 (defmethod handle "FRIENDLISTBEGIN" [_state-atom _server-key _m]
   (log/info "Ignoring unused FRIENDLISTBEGIN command"))
 
@@ -230,6 +251,14 @@
 
 (defmethod handle "FRIENDREQUESTLISTEND" [_state-atom _server-key _m]
   (log/info "Ignoring unused FRIENDREQUESTLISTEND command"))
+
+(defmethod handle "FRIENDREQUESTLIST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
+
+(defmethod handle "FRIENDREQUEST" [state-atom server-key m]
+  (let [[_all username] (re-find #"[^\s]+ userName=(.*)" m)]
+    (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
 
 
 (defn parse-battleopened [m]
@@ -324,8 +353,7 @@
         (let [{:keys [ring-on-auto-unspec]} (swap! state-atom assoc-in [:by-server server-key :battle :desired-ready] desired-ready)]
           (when ring-on-auto-unspec
             (log/info "Playing ring for auto unspec")
-            #_ ; TODO
-            (sound/play-ring state)))
+            (ring-impl)))
         (message/send state-atom client-data
           (str "MYBATTLESTATUS "
                (gloss/encode-battle-status
@@ -884,8 +912,9 @@
     (if (or (and prevent-non-host-rings (not= username host-username))
             (get mute-ring server-key))
       (log/info "Ignoring ring from non-host" username)
-      (log/info "Playing ring sound from" username))))
-      ; TODO send to client (sound/play-ring state)))))
+      (do
+        (log/info "Playing ring sound from" username)
+        (ring-impl)))))
 
 (defmethod handle "OK" [state-atom server-key m]
   (let [[_all command] (re-find #"[^\s]+ cmd=(.*)" m)]

@@ -1,10 +1,10 @@
-(ns spring-lobby.spring-test
+(ns skylobby.spring-test
   (:require
     [clojure.data]
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [clojure.test :refer [deftest is testing]]
-    [spring-lobby.spring :as spring]))
+    [skylobby.spring :as spring]))
 
 
 (set! *warn-on-reflection* true)

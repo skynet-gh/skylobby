@@ -1030,7 +1030,9 @@
     (log/info "Refresh replay resources")
     (let [before (u/curr-millis)
           {:keys [db downloadables-by-url importables-by-path parsed-replays-by-path use-db-for-replays]} @state-atom
-          parsed-replays (vals parsed-replays-by-path) ;(if (and db use-db-for-replays) (replay/all-replays db) (vals parsed-replays-by-path))
+          parsed-replays (if (and db use-db-for-replays)
+                           (replay/all-replays db)
+                           (vals parsed-replays-by-path))
           engine-versions (->> parsed-replays
                                (map :replay-engine-version)
                                (filter some?)

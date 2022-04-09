@@ -206,10 +206,10 @@
       [:skylobby/get-in [:parsed-replays-by-path]]
       20000
       (fn [reply]
-        (log/debug "Replays reply" (count reply))
+        (log/trace "Replays reply" reply)
         (if (sente/cb-success? reply)
           (do
-            (log/trace "Got replays" reply)
+            (log/debug "Got replays" (count reply))
             (rf/dispatch [:skylobby/assoc :parsed-replays-by-path reply]))
           (log/error reply))))
     db))

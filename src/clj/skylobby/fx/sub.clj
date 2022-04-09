@@ -5,8 +5,8 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [version-clj.core :as version]))
 

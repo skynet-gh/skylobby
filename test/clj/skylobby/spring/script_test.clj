@@ -4,7 +4,7 @@
     [clojure.test :refer [deftest is]]
     clojure.walk
     [skylobby.spring.script :as spring-script]
-    [spring-lobby.spring-test :refer [expected-script-data expected-script-txt]]))
+    [skylobby.spring-test :refer [expected-script-data expected-script-txt]]))
 
 
 (set! *warn-on-reflection* true)

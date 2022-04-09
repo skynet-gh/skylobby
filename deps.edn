@@ -223,6 +223,7 @@
     org.clojure/core.async {:mvn/version "1.5.648"}
     org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
+    org.clojure/test.check {:mvn/version "1.1.1"}
     org.clojure/tools.cli {:mvn/version "1.0.206"}
     ;org.clojure/tools.logging {:mvn/version "1.2.4"}
     ;org.clojure/tools.namespace {:mvn/version "1.2.0"}

@@ -11,8 +11,8 @@
     [skylobby.fx.color :as fx.color]
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed]]
     [skylobby.fx.sub :as sub]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.scene.canvas Canvas)
@@ -71,19 +71,27 @@
        (map (juxt :username identity))
        (into {})))
 
+
+(defn team-str
+  "Returns \"team1\" from either :team1, :1, \"1\", or \"team1\"."
+  [team-kw]
+  (let [[_all team] (re-find #"(\d+)" (name team-kw))]
+    (str "team" team)))
+
+
 (defn minimap-starting-points
   [{:keys [teams map-details scripttags minimap-scale minimap-width minimap-height start-positions]}]
   (let [{:keys [map-width map-height]} (-> map-details :smf :header)
         team-by-key (->> teams
                          (map second)
-                         (map (juxt (comp spring/team-str spring/team-name :id :battle-status) identity))
+                         (map (juxt (comp team-str spring/team-name :id :battle-status) identity))
                          (into {}))
         map-teams (clojure.walk/stringify-keys
                     (into {}
                       (spring/map-teams map-details)))
         missing-teams (clojure.set/difference
-                        (set (map spring/team-str (spring/team-keys teams)))
-                        (set (map (comp spring/team-str first) map-teams)))
+                        (set (map team-str (spring/team-keys teams)))
+                        (set (map (comp team-str first) map-teams)))
         midx (if map-width (quot (* spring/map-multiplier map-width) 2) 0)
         midz (if map-height (quot (* spring/map-multiplier map-height) 2) 0)
         choose-before-game (= "3" (str (get-in scripttags ["game" "startpostype"])))
@@ -100,7 +108,7 @@
              (fn [[team-kw {:strs [startpos]}]]
                (let [{:strs [x z]} startpos
                      [_all team] (re-find #"(\d+)" (name team-kw))
-                     normalized (spring/team-str team-kw)
+                     normalized (team-str team-kw)
                      scriptx (when choose-before-game
                                (some-> (get-in scripttags ["game" normalized "startposx"]) u/to-number))
                      scriptz (when choose-before-game

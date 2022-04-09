@@ -189,7 +189,7 @@
                                (or (not (some filter-fn old-mods))
                                    (:single-replay-view new-state))
                                mod-exists))
-                     {::task-type ::mod-details
+                     {:spring-lobby/task-type :spring-lobby/mod-details
                       :mod-name new-mod
                       :mod-file (:file mod-exists)
                       :use-git-mod-version (:use-git-mod-version new-state)})
@@ -203,12 +203,12 @@
                                (or (not (some (comp #{new-map} :map-name) old-maps))
                                    (:single-replay-view new-state))
                                map-exists))
-                     {::task-type ::map-details
+                     {:spring-lobby/task-type :spring-lobby/map-details
                       :map-name new-map
                       :map-file (:file map-exists)})
                    (when (and (not= old-replay-path new-replay-path)
                               (not replay-details))
-                     {::task-type ::replay-details
+                     {:spring-lobby/task-type :spring-lobby/replay-details
                       :replay-file selected-replay-file})]]
         (when-let [tasks (->> tasks (filter some?) seq)]
           (log/info "Adding" (count tasks) "for replay resources")

@@ -21,6 +21,11 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle :as battle]
+    [skylobby.battle-sync :as battle-sync]
+    [skylobby.client :as client]
+    [skylobby.client.handler :as handler]
+    [skylobby.client.message :as message]
+    [skylobby.client.gloss :as cu]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
     [skylobby.download :as download]
@@ -33,22 +38,18 @@
     [skylobby.fx.event.chat :as fx.event.chat]
     [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.event.minimap :as fx.event.minimap]
-    [skylobby.fx.import :as fx.import]
     [skylobby.git :as git]
     [skylobby.http :as http]
-    [skylobby.resource :as resource]
+    [skylobby.import :as import]
     [skylobby.server :as server]
+    [skylobby.spring :as spring]
     [skylobby.spring.script :as spring-script]
     [skylobby.sql :as sql]
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
     [skylobby.watch :as watch]
-    [spring-lobby.client :as client]
-    [spring-lobby.client.handler :as handler]
-    [spring-lobby.client.message :as message]
-    [spring-lobby.client.util :as cu]
-    [spring-lobby.spring :as spring]
+    [spring-lobby.sound :as sound]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
@@ -59,8 +60,9 @@
     (java.lang ProcessBuilder)
     (java.net URL)
     (java.util List)
+    (javafx.animation KeyFrame KeyValue Timeline)
     (javafx.application Platform)
-    (javafx.event Event)
+    (javafx.event Event EventHandler)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
     (javafx.scene.control ColorPicker ScrollBar Tab)
@@ -68,6 +70,7 @@
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
     (javafx.stage DirectoryChooser FileChooser)
+    (javafx.util Duration)
     (manifold.stream SplicedStream)
     (org.fxmisc.flowless VirtualizedScrollPane))
   (:gen-class))
@@ -579,7 +582,7 @@
                      {::task-type ::refresh-maps
                       :spring-root spring-isolation-dir}
                      {::task-type ::scan-imports
-                      :sources (fx.import/import-sources extra-import-sources)}
+                      :sources (import/import-sources extra-import-sources)}
                      {::task-type ::update-rapid
                       :spring-isolation-dir spring-isolation-dir}
                      {::task-type ::refresh-replays}]))))))
@@ -658,63 +661,6 @@
           (catch Exception e
             (log/error e "Error in :fix-selected-server state watcher")))))))
 
-
-(defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
-  (when (some (comp u/server-needs-battle-status-sync-check second)
-              (-> new-state :by-server seq))
-    (try
-      (log/info "Checking servers for battle sync status updates")
-      (doseq [[server-key new-server] (concat
-                                        (->> new-state :by-server u/valid-servers)
-                                        (->> new-state u/complex-servers))]
-        (if (and (= (:servers old-state)
-                    (:servers new-state))
-                 (not (u/server-needs-battle-status-sync-check new-server)))
-          (log/debug "Server" server-key "does not need battle sync status check")
-          (let [
-                _ (log/info "Checking battle sync status for" server-key)
-                old-server (get-in old-state [:by-server server-key])
-                server-url (get-in new-server [:client-data :server-url])
-                {:keys [servers spring-isolation-dir]} new-state
-                spring-root (or (get-in servers [server-url :spring-isolation-dir])
-                                spring-isolation-dir)
-                spring-root-path (fs/canonical-path spring-root)
-
-                old-spring (get-in old-state [:by-spring-root spring-root-path])
-                new-spring (get-in new-state [:by-spring-root spring-root-path])
-
-                old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
-                new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
-
-                new-sync-number (handler/sync-number new-sync)
-                battle (:battle new-server)
-                client-data (:client-data new-server)
-                my-username (or (:username client-data)
-                                (:username new-server))
-                {:keys [battle-status team-color]} (get-in battle [:users my-username])
-                old-sync-number (get-in battle [:users my-username :battle-status :sync])
-                battle-id (:battle-id battle)
-                battle-changed (not= battle-id
-                                     (-> old-server :battle :battle-id))]
-            (when (and battle-id
-                       (or (not= old-sync new-sync)
-                           (not= old-sync-number new-sync-number)
-                           battle-changed))
-              (if battle-changed
-                (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
-                (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
-                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
-              (if (#{:direct-client :direct-host} (u/server-type server-key))
-                (fx.event.battle/update-player-or-bot-state
-                  state-atom
-                  server-key
-                  {:username my-username}
-                  {:battle-status {:sync new-sync-number}})
-                (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-                  (message/send-message *state client-data
-                    (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
-      (catch Exception e
-        (log/error e "Error in :update-battle-status-sync state watcher")))))
 
 (defn- filter-replays-relevant-keys [state]
   (select-keys
@@ -1063,7 +1009,7 @@
                         (let [{:keys [battle-status team-color]} me]
                           (when (and (:mode battle-status)
                                      (not= (:ready battle-status) desired-ready))
-                            (message/send-message *state (:client-data server-data)
+                            (message/send *state (:client-data server-data)
                               (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0))))))))))))
           {:error-handler
            (fn [e]
@@ -1084,9 +1030,9 @@
               (doseq [[server-key server-data] (u/valid-servers (:by-server state))]
                 (if (u/matchmaking? server-data)
                   (let [client-data (:client-data server-data)]
-                    (message/send-message state-atom client-data "c.matchmaking.list_all_queues")
+                    (message/send state-atom client-data "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
-                      (message/send-message state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id))))
+                      (message/send state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id))))
                   (log/info "Matchmaking not enabled for server" server-key)))))
           {:error-handler
            (fn [e]
@@ -1181,7 +1127,7 @@
                     (if (and sent-message sent-millis)
                       (when (< (+ sent-millis 3000) now)
                         (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
-                        (message/send-message state-atom (:client-data server-data) sent-message))
+                        (message/send state-atom (:client-data server-data) sent-message))
                       (log/warn "Issue with expecting response:" expected-response sent)))))))
           {:error-handler
            (fn [e]
@@ -1581,7 +1527,7 @@
         client-data (get-in by-server [server-key :client-data])]
     (future
       (try
-        (message/send-message *state client-data (str "JOIN " channel-name))
+        (message/send *state client-data (str "JOIN " channel-name))
         (catch Exception e
           (log/error e "Error joining channel" channel-name))))))
 
@@ -1597,26 +1543,26 @@
     (future
       (try
         (when-not (string/starts-with? channel-name "@")
-          (message/send-message *state client-data (str "LEAVE " channel-name)))
+          (message/send *state client-data (str "LEAVE " channel-name)))
         (catch Exception e
           (log/error e "Error leaving channel" channel-name))))))
 
 
 (defmethod event-handler ::friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "FRIENDREQUEST userName=" username)))
+  (message/send *state client-data (str "FRIENDREQUEST userName=" username)))
 
 (defmethod event-handler ::unfriend [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "UNFRIEND userName=" username))
+  (message/send *state client-data (str "UNFRIEND userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friends] dissoc username)))
 
 (defmethod event-handler ::accept-friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "ACCEPTFRIENDREQUEST userName=" username))
+  (message/send *state client-data (str "ACCEPTFRIENDREQUEST userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
 
 (defmethod event-handler ::decline-friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "DECLINEFRIENDREQUEST userName=" username))
+  (message/send *state client-data (str "DECLINEFRIENDREQUEST userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
 
@@ -1811,7 +1757,7 @@
                          :client-deferred client-deferred
                          :server-url server-url}]
         (swap! *state dissoc :password-confirm)
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "REGISTER " username " " (u/base64-md5 password) " " email))
         (loop []
           (when-let [d (s/take! client)]
@@ -1828,7 +1774,7 @@
   [{:keys [client-data server-key verification-code]}]
   (future
     (try
-      (message/send-message *state client-data (str "CONFIRMAGREEMENT " verification-code))
+      (message/send *state client-data (str "CONFIRMAGREEMENT " verification-code))
       (swap! *state update-in [:by-server server-key] dissoc :agreement :verification-code)
       (catch Exception e
         (log/error e "Error confirming agreement")))))
@@ -1843,7 +1789,7 @@
             client-data {:client client
                          :client-deferred client-deferred
                          :server-url server-url}]
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "RESETPASSWORDREQUEST " email))
         (loop []
           (when-let [d (s/take! client)]
@@ -1865,7 +1811,7 @@
             client-data {:client client
                          :client-deferred client-deferred
                          :server-url server-url}]
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "RESETPASSWORD " email " " verification-code))
         (loop []
           (when-let [d (s/take! client)]
@@ -1995,7 +1941,7 @@
          engine "Spring"}}]
   (let [password (if (string/blank? battle-password) "*" battle-password)
         host-port (int (or (u/to-number host-port) 8452))]
-    (message/send-message *state client-data
+    (message/send *state client-data
       (str "OPENBATTLE " battle-type " " nat-type " " password " " host-port " " max-players
            " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
            "\t" mod-name))))
@@ -2020,7 +1966,7 @@
                                    (u/mod-name-fix-git mod-name))]
             (open-battle client-data (assoc host-battle-state :mod-name adjusted-modname)))
           (when (seq scripttags)
-            (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+            (message/send *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
           (catch Exception e
             (log/error e "Error opening battle"))))
       (log/info "Invalid data to host battle" host-battle-state))))
@@ -2032,7 +1978,7 @@
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
-      (message/send-message *state client-data "LEAVEBATTLE")
+      (message/send *state client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key]
         (fn [server-data]
           (let [battle (:battle server-data)]
@@ -2278,7 +2224,7 @@
             map-hash -1 ; TODO
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-        (message/send-message *state client-data m))
+        (message/send *state client-data m))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -2332,7 +2278,7 @@
           :spring-lobby
           (let [
                 bot-status (cu/encode-battle-status status)]
-            (message/send-message
+            (message/send
               *state client-data
               (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)))
           (event-handler
@@ -2523,7 +2469,7 @@
               (swap! *state update-in
                      [:by-server :local :battle :scripttags "game" (str "team" team)]
                      merge team-data)
-              (message/send-message *state client-data
+              (message/send *state client-data
                 (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
         (when-let [{:keys [allyteam-id startx starty endx endy target]} (:drag-allyteam before)]
           (let [l (min startx endx)
@@ -2545,7 +2491,7 @@
                                 :startrectright right
                                 :startrectbottom bottom)))
                 (if am-host
-                  (message/send-message *state client-data
+                  (message/send *state client-data
                     (str "ADDSTARTRECT " allyteam-id " "
                          (int (* 200 left)) " "
                          (int (* 200 top)) " "
@@ -2568,7 +2514,7 @@
                   (if singleplayer
                     (swap! *state update-in [:by-server :local :battle :scripttags "game"] dissoc (str "allyteam" target))
                     (if am-host
-                      (message/send-message *state client-data (str "REMOVESTARTRECT " target))
+                      (message/send *state client-data (str "REMOVESTARTRECT " target))
                       (event-handler
                         (assoc e
                                :event/type ::send-message
@@ -2635,7 +2581,7 @@
                      (str "UPDATEBOT " player-name)
                      "MYBATTLESTATUS")]
         (if (or is-bot is-me)
-          (message/send-message *state client-data
+          (message/send *state client-data
             (str prefix
                  " "
                  (cu/encode-battle-status battle-status)
@@ -2656,7 +2602,7 @@
   (update-battle-status client-data opts battle-status team-color))
 
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
-  (message/send-message *state client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
+  (message/send *state client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
 
 (defmethod event-handler ::on-change-away [{:keys [client-status] :fx/keys [event] :as e}]
   (let [away (= "Away" event)]
@@ -2668,7 +2614,7 @@
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (if (or is-me is-bot)
     (update-battle-status client-data (assoc opts :id id) (:battle-status id) color-int)
-    (message/send-message *state client-data
+    (message/send *state client-data
       (str "FORCETEAMCOLOR " (:username id) " " color-int))))
 
 (defn- update-team [client-data id {:keys [is-me is-bot] :as opts} player-id]
@@ -2676,7 +2622,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "FORCETEAMNO " (:username id) " " player-id)))
       (catch Exception e
         (log/error e "Error updating team")))))
@@ -2686,7 +2632,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
-        (message/send-message *state client-data (str "FORCEALLYNO " (:username id) " " ally)))
+        (message/send *state client-data (str "FORCEALLYNO " (:username id) " " ally)))
       (catch Exception e
         (log/error e "Error updating ally")))))
 
@@ -2695,7 +2641,7 @@
     (try
       (if (or is-bot (not client-data))
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
-        (message/send-message *state client-data (str "HANDICAP " (:username id) " " handicap)))
+        (message/send *state client-data (str "HANDICAP " (:username id) " " handicap)))
       (catch Exception e
         (log/error e "Error updating handicap")))))
 
@@ -2710,7 +2656,7 @@
                       :id "FORCETEAMNO"
                       :ally "FORCEALLYNO"
                       :handicap "HANDICAP")]
-            (message/send-message *state client-data (str msg " " (:username id) " " v)))))
+            (message/send *state client-data (str msg " " (:username id) " " v)))))
       (catch Exception e
         (log/error e "Error applying battle status changes")))))
 
@@ -2935,7 +2881,7 @@
 (defmethod event-handler ::send-user-report
   [{:keys [battle-id client-data message username]}]
   (let [message (string/replace (str message) #"[\n\r]" "  ")]
-    (message/send-message *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
+    (message/send *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
   (swap! *state dissoc :show-report-user-window))
 
 
@@ -2945,7 +2891,7 @@
     (if am-host
       (if singleplayer
         (swap! *state assoc-in [:by-server :local :battle :scripttags "game" "startpostype"] startpostype)
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
+        (message/send *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
                :event/type ::send-message
@@ -2959,7 +2905,7 @@
         team-kws (map #(str "team" %) team-ids)
         dissoc-fn #(apply dissoc % team-kws)]
     (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc-fn)
-    (message/send-message *state
+    (message/send *state
       client-data
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
@@ -2968,7 +2914,7 @@
   (doseq [allyteam-id allyteam-ids]
     (let [allyteam-str (str "allyteam" allyteam-id)]
       (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc allyteam-str))
-    (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
+    (message/send *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
 (defn modoption-value [modoption-type raw-value]
   (if (or (= "list" modoption-type)
@@ -2984,7 +2930,7 @@
     (if singleplayer
       (swap! *state assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key-str] (str event))
       (if am-host
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
+        (message/send *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
         (event-handler
           (assoc e
                  :event/type ::send-message
@@ -3030,7 +2976,7 @@
         (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
           (broadcast-fn [:skylobby.direct/battle-scripttags scripttags])
           (log/warn "No broadcast-fn" server-key))
-        (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
+        (message/send *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
 
 
 (defmethod event-handler ::battle-ready-change
@@ -3062,7 +3008,7 @@
         (if (or is-me is-bot)
           (update-battle-status client-data data battle-status (:team-color id))
           (if mode
-            (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id)))
+            (message/send *state client-data (str "FORCESPECTATORMODE " (:username id)))
             (log/error "No method to force unspec for" (:username id))))
         (catch Exception e
           (log/error e "Error updating battle spectate"))))))
@@ -3483,7 +3429,7 @@
           (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
           :else
           (cond
-            (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
+            (re-find #"^/ingame" message) (message/send *state client-data "GETUSERINFO")
             (re-find #"^/ignore" message)
             (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
               (set-ignore server-key username true {:channel-name channel-name}))
@@ -3503,21 +3449,21 @@
              (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
                                                                                                     :timestamp (u/curr-millis)
                                                                                                     :message-type :info}
-              (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
+              (message/send *state client-data (str "RENAMEACCOUNT " new-username))))
             :else
             (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                   unified (-> client-data :compflags (contains? "u"))]
               (if-let [[_all message] (re-find #"^/me (.*)$" message)]
                 (if private-message
-                  (message/send-message *state client-data (str "SAYPRIVATEEX " username " " message))
+                  (message/send *state client-data (str "SAYPRIVATEEX " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
-                    (message/send-message *state client-data (str "SAYBATTLEEX " message))
-                    (message/send-message *state client-data (str "SAYEX " channel-name " " message))))
+                    (message/send *state client-data (str "SAYBATTLEEX " message))
+                    (message/send *state client-data (str "SAYEX " channel-name " " message))))
                 (if private-message
-                  (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
+                  (message/send *state client-data (str "SAYPRIVATE " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
-                    (message/send-message *state client-data (str "SAYBATTLE " message))
-                    (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
+                    (message/send *state client-data (str "SAYBATTLE " message))
+                    (message/send *state client-data (str "SAY " channel-name " " message))))))))
         (catch Exception e
           (log/error e "Error sending message" message "to channel" channel-name))))))
 
@@ -3624,7 +3570,7 @@
               (update :console-sent-messages conj message)
               (assoc :console-history-index default-history-index))))
       (when-not (string/blank? message)
-        (message/send-message *state client-data message))
+        (message/send *state client-data message))
       (catch Exception e
         (log/error e "Error sending message" message "to server")))))
 
@@ -3659,13 +3605,13 @@
 
 
 (defmethod event-handler ::matchmaking-list-all [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.list_all_queues"))
+  (message/send *state client-data "c.matchmaking.list_all_queues"))
 
 (defmethod event-handler ::matchmaking-list-my [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.list_my_queues"))
+  (message/send *state client-data "c.matchmaking.list_my_queues"))
 
 (defmethod event-handler ::matchmaking-leave-all [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.leave_all_queues")
+  (message/send *state client-data "c.matchmaking.leave_all_queues")
   (swap! *state update-in [:by-server (u/server-key client-data) :matchmaking-queues]
     (fn [matchmaking-queues]
       (into {}
@@ -3675,19 +3621,19 @@
           matchmaking-queues)))))
 
 (defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.join_queue " queue-id)))
+  (message/send *state client-data (str "c.matchmaking.join_queue " queue-id)))
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.leave_queue " queue-id))
-  (message/send-message *state client-data (str "c.matchmaking.get_queue_info\t" queue-id))
+  (message/send *state client-data (str "c.matchmaking.leave_queue " queue-id))
+  (message/send *state client-data (str "c.matchmaking.get_queue_info\t" queue-id))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :am-in] false))
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.ready"))
+  (message/send *state client-data (str "c.matchmaking.ready"))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 (defmethod event-handler ::matchmaking-decline [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.decline"))
+  (message/send *state client-data (str "c.matchmaking.decline"))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 
@@ -3700,7 +3646,7 @@
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
    [:replay-map-and-mod-details-watcher watch/replay-map-and-mod-details-watcher]
    [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
-   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
+   [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2]])
 
 
 (defn stop-ipc-server
@@ -3752,11 +3698,62 @@
   (sql/init-db *state {:force true}))
 
 
+(defn ring-impl []
+  (sound/play-ring @*state))
+
+(defn extra-pre-game []
+  (try
+    (let [{:keys [^MediaPlayer media-player music-paused]} @*state]
+      (if (and media-player (not music-paused))
+        (do
+          (log/info "Pausing media player")
+          (let [^"[Ljavafx.animation.KeyFrame;"
+                keyframes (into-array KeyFrame
+                            [(KeyFrame.
+                               (Duration/seconds 3)
+                               (into-array KeyValue
+                                 [(KeyValue. (.volumeProperty media-player) 0)]))])
+                timeline (Timeline.  keyframes)]
+            (.setOnFinished timeline
+              (reify EventHandler
+                (handle [_this _e]
+                  (.pause media-player)
+                  (swap! *state assoc :music-paused true))))
+            (.play timeline)))
+        (when (not media-player)
+          (log/info "No media player to pause"))))
+    (catch Exception e
+      (log/error e "Error pausing music"))))
+
+(defn extra-post-game []
+  (let [{:keys [^MediaPlayer media-player music-paused ring-when-game-ends] :as state} @*state]
+    (if (and media-player (not music-paused))
+      (do
+        (log/info "Resuming media player")
+        (.play media-player)
+        (let [{:keys [music-volume]} (swap! *state assoc :music-paused false)
+              ^"[Ljavafx.animation.KeyFrame;"
+              keyframes (into-array KeyFrame
+                          [(KeyFrame.
+                             (Duration/seconds 3)
+                             (into-array KeyValue
+                               [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))])
+              timeline (Timeline. keyframes)]
+          (.play timeline)))
+      (when (not media-player)
+        (log/info "No media player to resume")))
+    (when ring-when-game-ends
+      (sound/play-ring state))))
+
+
 (defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
+   (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
+   (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
    (task-handlers/add-handlers handle-task *state)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]

@@ -26,8 +26,8 @@
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.stage Popup)
