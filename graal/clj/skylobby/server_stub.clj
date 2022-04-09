@@ -253,7 +253,9 @@
                                           :engine-overrides engine-overrides
                                           :host-ingame true
                                           :spring-isolation-dir spring-root}
-                                         (resource/spring-root-resources spring-root by-spring-root)))))
+                                         (dissoc
+                                           (resource/spring-root-resources spring-root by-spring-root)
+                                           :engine-version :map-name :mod-name)))))
     (defmethod -event-msg-handler
       :skylobby/watch-replay
       [{:keys [?data]}]

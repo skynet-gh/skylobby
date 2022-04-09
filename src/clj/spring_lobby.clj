@@ -23,6 +23,7 @@
     [skylobby.battle :as battle]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
+    [skylobby.download :as download]
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     skylobby.fx
@@ -35,7 +36,6 @@
     [skylobby.fx.import :as fx.import]
     [skylobby.git :as git]
     [skylobby.http :as http]
-    [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.server :as server]
     [skylobby.spring.script :as spring-script]
@@ -76,7 +76,7 @@
 (set! *warn-on-reflection* true)
 
 
-(declare download-http-resource update-battle-status)
+(declare update-battle-status)
 
 
 (def wait-init-tasks-ms 20000)
@@ -271,6 +271,7 @@
    :uikeys
    :unready-after-game
    :use-db-for-downloadables
+   :use-db-for-importables
    :use-db-for-rapid
    :use-db-for-replays
    :use-default-ring-sound
@@ -1339,7 +1340,7 @@
       :else
       (do
         (log/info "Downloading app update" (:download-url downloadable) "to" dest)
-        @(download-http-resource
+        @(download/download-http-resource *state
            {:downloadable downloadable
             :dest dest})
         (if (fs/exists? dest)
@@ -2578,39 +2579,9 @@
         (log/error e "Error releasing minimap")))))
 
 
-(defn- update-copying [f copying]
-  (if f
-    (swap! *state update-in [:copying (fs/canonical-path f)] merge copying)
-    (log/warn "Attempt to update copying for nil file")))
-
 (defmethod event-handler ::add-task [{:keys [task]}]
   (task/add-task! *state task))
 
-(defn- import-resource [{:keys [importable spring-isolation-dir]}]
-  (let [{:keys [resource-file]} importable
-        source resource-file
-        dest (resource/resource-dest spring-isolation-dir importable)]
-    (update-copying source {:status true})
-    (update-copying dest {:status true})
-    (try
-      (if (string/ends-with? (fs/filename source) ".sdp")
-        (rapid/copy-package source (fs/parent-file (fs/parent-file dest)))
-        (fs/copy source dest))
-      (log/info "Finished importing" importable "from" source "to" dest)
-      (catch Exception e
-        (log/error e "Error importing" importable))
-      (finally
-        (update-copying source {:status false})
-        (update-copying dest {:status false})
-        (fs/update-file-cache! *state source dest)
-        (case (:resource-type importable)
-          ::map (task/add-task! *state {::task-type ::refresh-maps})
-          ::mod (task/add-task! *state {::task-type ::refresh-mods})
-          ::engine (task/add-task! *state {::task-type ::refresh-engines})
-          nil)))))
-
-(defmethod task-handler ::import [e]
-  (import-resource e))
 
 (defmethod task-handler ::git-mod
   [{:keys [battle-mod-git-ref file spring-root]}]
@@ -3219,259 +3190,18 @@
   (swap! *state assoc :rapid-repo event))
 
 
-(defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
-  (log/info "Request to download" downloadable)
-  (future
-    (try
-      (let [url (:download-url downloadable)
-            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))
-            temp-dest (fs/download-file (str (hash (str url)) "-" (fs/filename dest)))]
-        (log/info "Downloading to temp file" temp-dest "then moving to" dest)
-        (http/download-file *state url temp-dest)
-        (log/info "Moving temp download file" temp-dest "into place at" dest)
-        (fs/move temp-dest dest))
-      (case (:resource-type downloadable)
-        ::map (task/add-task! *state {::task-type ::refresh-maps
-                                      :spring-root spring-isolation-dir
-                                      :priorities [dest]})
-        ::mod (task/add-task! *state {::task-type ::refresh-mods
-                                      :spring-root spring-isolation-dir
-                                      :priorities [dest]})
-        ::engine (task/add-task! *state {::task-type ::refresh-engines
-                                         :spring-root spring-isolation-dir
-                                         :priorities [dest]})
-        nil)
-      (catch Exception e
-        (log/error e "Error downloading")))))
-
-(defmethod task-handler ::http-downloadable
-  [task]
-  @(download-http-resource task))
-
-(defmethod task-handler ::download-and-extract
-  [{:keys [downloadable spring-isolation-dir] :as task}]
-  @(download-http-resource task)
-  (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
-        extract-file (when download-file
-                       (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
-    @(event-handler
-       (assoc task
-              :event/type ::extract-7z
-              :file download-file
-              :dest extract-file))))
-
 (defmethod task-handler ::download-bar-replay
   [{:keys [id spring-isolation-dir]}]
   (log/info "Downloading replay id" id)
   (let [{:keys [fileName]} (http/get-bar-replay-details {:id id})]
     (log/info "Downloaded replay details for id" id ":" fileName)
     (swap! *state assoc-in [:online-bar-replays id :filename] fileName)
-    @(download-http-resource
+    @(download/download-http-resource *state
        {:downloadable {:download-url (http/bar-replay-download-url fileName)
                        :resource-filename fileName
                        :resource-type ::replay}
         :spring-isolation-dir spring-isolation-dir})
     (task/add-task! *state {::task-type ::refresh-replays})))
-
-(defn search-springfiles
-  "Search springfiles.com for the given resource name, returns a string mirror url for the resource,
-  or nil if not found."
-  [{:keys [category springname]}]
-  (log/info "Searching springfiles for" springname)
-  (let [result (->> (clj-http/get "https://springfiles.springrts.com/json.php"
-                      {:query-params
-                       (merge
-                         {:springname springname
-                          :nosensitive "on"
-                          :category (or category "**")})
-                       :as :json})
-                    :body
-                    first)]
-    (log/info "First result for" springname "search on springfiles:" result)
-    (when-let [mirrors (->> result :mirrors (filter some?) (remove #(string/includes? % "spring1.admin-box.com")) seq)]
-      {:filename (:filename result)
-       :mirrors mirrors})))
-
-(defmethod task-handler ::search-springfiles
-  [{:keys [download-if-found springname] :or {download-if-found true} :as e}]
-  (if-not (string/blank? springname)
-    (let [search-result (search-springfiles e)]
-      (log/info "Found details for" springname "on springfiles" search-result)
-      (swap! *state assoc-in [:springfiles-search-results springname] search-result)
-      (when (and search-result download-if-found)
-        (task/add-task! *state
-          (assoc e
-                 ::task-type ::download-springfiles
-                 :search-result search-result)))
-      search-result)
-    (log/warn "No springname to search springfiles" e)))
-
-(defmethod task-handler ::download-springfiles
-  [{:keys [resource-type search-result springname spring-isolation-dir url]}]
-  (if-let [{:keys [filename] :as search-result} (or search-result
-                                                    (task-handler {::task-type ::search-springfiles
-                                                                   :springname springname}))]
-    (let [url (or url
-                  (http/springfiles-url search-result))]
-      (task/add-task! *state
-        {::task-type ::http-downloadable
-         :downloadable {:download-url url
-                        :resource-filename filename
-                        :resource-type resource-type}
-         :springname springname
-         :spring-isolation-dir spring-isolation-dir}))
-    (log/info "No mirror to download" springname "on springfiles")))
-
-
-(defmethod event-handler ::extract-7z
-  [{:keys [file dest]}]
-  (let [path (fs/canonical-path file)]
-    (swap! *state assoc-in [:extracting path] true)
-    (fs/update-file-cache! *state file dest)
-    (future
-      (try
-        (if dest
-          (fs/extract-7z-fast file dest)
-          (fs/extract-7z-fast file))
-        (task/add-task! *state {::task-type ::refresh-engines})
-        (catch Exception e
-          (log/error e "Error extracting 7z" file))
-        (finally
-          (fs/update-file-cache! *state file dest)
-          (swap! *state assoc-in [:extracting path] false))))))
-
-(defmethod task-handler ::extract-7z
-  [task]
-  @(event-handler (assoc task :event/type ::extract-7z)))
-
-
-(def resource-types
-  [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
-
-(defn- update-importable
-  [{:keys [resource-file resource-name resource-type] :as importable}]
-  (log/info "Finding name for importable" importable)
-  (if resource-name
-    (log/info "Skipping known import" importable)
-    (let [resource-name (case resource-type
-                          ::map (:map-name (fs/read-map-data resource-file))
-                          ::mod (:mod-name (task-handlers/read-mod-data resource-file))
-                          ::engine (:engine-version (fs/engine-data resource-file))
-                          ::sdp (:mod-name (task-handlers/read-mod-data resource-file)))
-          now (u/curr-millis)]
-      (swap! *state update-in [:importables-by-path (fs/canonical-path resource-file)]
-             assoc :resource-name resource-name
-             :resource-updated now)
-      resource-name)))
-
-(defmethod task-handler ::update-importable [{:keys [importable]}]
-  (update-importable importable))
-
-(defn- importable-data [resource-type import-source-name now resource-file]
-  {:resource-type resource-type
-   :import-source-name import-source-name
-   :resource-file resource-file
-   :resource-filename (fs/filename resource-file)
-   :resource-updated now})
-
-(defmethod task-handler ::scan-imports
-  [{root :file import-source-name :import-source-name}]
-  (log/info "Scanning for possible imports from" root)
-  (let [map-files (fs/map-files root)
-        mod-files (fs/mod-files root)
-        engine-dirs (fs/engine-dirs root)
-        sdp-files (rapid/sdp-files root)
-        now (u/curr-millis)
-        importables (concat
-                      (map (partial importable-data ::map import-source-name now) map-files)
-                      (map (partial importable-data ::mod import-source-name now) (concat mod-files sdp-files))
-                      (map (partial importable-data ::engine import-source-name now) engine-dirs))
-        importables-by-path (->> importables
-                                 (map (juxt (comp fs/canonical-path :resource-file) identity))
-                                 (into {}))]
-    (log/info "Found imports" (frequencies (map :resource-type importables)) "from" import-source-name)
-    (swap! *state update :importables-by-path
-           (fn [old]
-             (->> old
-                  (remove (comp #{import-source-name} :import-source-name second))
-                  (into {})
-                  (merge importables-by-path))))
-    importables-by-path))
-
-
-(def downloadable-update-cooldown
-  (* 1000 60 60 24)) ; 1 day
-
-
-(defn update-download-source
-  [{:keys [resources-fn url download-source-name] :as source}]
-  (log/info "Getting resources for possible download from" download-source-name "at" url)
-  (let [now (u/curr-millis)
-        last-updated (or (-> *state deref :downloadables-last-updated (get url)) 0)] ; TODO remove deref
-    (if (or (< downloadable-update-cooldown (- now last-updated))
-            (:force source))
-      (do
-        (log/info "Updating downloadables from" url)
-        (swap! *state assoc-in [:downloadables-last-updated url] now)
-        (let [downloadables (resources-fn source)
-              downloadables-by-url (->> downloadables
-                                        (map (juxt :download-url identity))
-                                        (into {}))
-              all-download-source-names (set (keys http/download-sources-by-name))]
-          (log/info "Found downloadables from" download-source-name "at" url
-                    (frequencies (map :resource-type downloadables)))
-          (swap! *state update :downloadables-by-url
-                 (fn [old]
-                   (let [invalid-download-source (remove (comp all-download-source-names :download-source-name second) old)]
-                     (when (seq invalid-download-source)
-                       (log/warn "Deleted" (count invalid-download-source) "downloads from invalid sources"))
-                     (merge
-                       (->> old
-                            (remove (comp #{download-source-name} :download-source-name second))
-                            (filter (comp all-download-source-names :download-source-name second))
-                            (into {}))
-                       downloadables-by-url))))
-          (u/update-cooldown *state [:download-source download-source-name])
-          downloadables-by-url))
-      (log/info "Too soon to check downloads from" url))))
-
-(defmethod task-handler ::update-downloadables
-  [source]
-  (update-download-source source))
-
-
-(defmethod event-handler ::clear-map-and-mod-details
-  [{:keys [map-resource mod-resource spring-root]}]
-  (let [map-key (resource/details-cache-key map-resource)
-        mod-key (resource/details-cache-key mod-resource)
-        {:keys [use-git-mod-version]}
-        (swap! *state
-          (fn [state]
-            (cond-> state
-                    map-key
-                    (update :map-details cache/miss map-key nil)
-                    mod-key
-                    (update :mod-details cache/miss mod-key nil))))]
-    (task/add-tasks! *state
-      (concat
-        [{::task-type ::refresh-engines
-          :force true
-          :spring-root spring-root}
-         {::task-type ::refresh-mods
-          :spring-root spring-root
-          :priorities [(:file mod-resource)]}
-         {::task-type ::refresh-maps
-          :spring-root spring-root
-          :priorities [(:file map-resource)]}]
-        (when-let [mod-file (:file mod-resource)]
-          [{::task-type ::mod-details
-            :mod-name (:mod-name mod-resource)
-            :mod-file mod-file
-            :use-git-mod-version use-git-mod-version}])
-        (when-let [map-file (:file map-resource)]
-          [{::task-type ::map-details
-            :map-name (:map-name map-resource)
-            :map-file map-file}])))))
 
 
 (defmethod event-handler ::import-source-change
@@ -3525,31 +3255,9 @@
   (swap! *state assoc :chat-auto-scroll false))
 
 
-(defmethod event-handler ::scan-imports
-  [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
-  (doseq [import-source sources]
-    (task/add-task! *state
-      (merge
-        {::task-type ::scan-imports}
-        import-source))))
-
-(defmethod task-handler ::scan-all-imports [task]
-  (event-handler (assoc task :event/type ::scan-imports)))
-
-
 (defmethod event-handler ::download-source-change
   [{:fx/keys [event]}]
   (swap! *state assoc :download-source-name (:download-source-name event)))
-
-
-(defmethod event-handler ::update-all-downloadables
-  [opts]
-  (doseq [download-source http/download-sources]
-    (task/add-task! *state
-      (merge
-        {::task-type ::update-downloadables
-         :force (:force opts)}
-        download-source))))
 
 
 (defmethod event-handler ::spring-settings-refresh
@@ -4107,9 +3815,9 @@
            (async/<!! (async/timeout wait-init-tasks-ms))
            (task/add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::update-all-downloadables})
+           (task/add-task! state-atom {::task-type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::scan-imports})
+           (task/add-task! state-atom {::task-type ::scan-all-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
@@ -4146,8 +3854,8 @@
     (task/add-task! state-atom {::task-type ::refresh-engines})
     (task/add-task! state-atom {::task-type ::refresh-mods})
     (task/add-task! state-atom {::task-type ::refresh-maps})
-    (event-handler {:event/type ::update-all-downloadables})
-    (event-handler {:event/type ::scan-imports})
+    (task/add-task! state-atom {::task-type ::update-all-downloadables})
+    (task/add-task! state-atom {::task-type ::scan-all-imports})
     (log/info "Finished standalone replay init")
     {:chimers
      (concat

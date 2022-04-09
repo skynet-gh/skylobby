@@ -357,9 +357,12 @@
            [
             {:fx/type :button
              :text " Refresh resources "
-             :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                         :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
-                         :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}
+             :on-action
+             {:event/type :spring-lobby/add-task
+              :task
+              {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+               :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
+               :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}}
             {:fx/type :pane
              :pref-width 16}
             {:fx/type :check-box

@@ -117,7 +117,7 @@
 
 (defn- select-replays [state]
   (select-keys state
-    [:online-bar-replays :replays-tags :replays-watched]))
+    [:invalid-replay-paths :online-bar-replays :replays-tags :replays-watched]))
 
 
 (def state-to-edn
@@ -137,14 +137,6 @@
    {:select-fn select-replays
     :filename "replays.edn"}])
 
-(defn select-parsed-replays-keys
-  [state]
-  (select-keys state [:invalid-replay-paths :parsed-replays-by-path]))
-
-(def parsed-replays-config
-  {:select-fn select-parsed-replays-keys
-   :filename "parsed-replays.edn"
-   :nippy true})
 
 (defn initial-state []
   (register-nippy)
@@ -191,7 +183,6 @@
       merge
       (doall
         (map slurp-config-edn state-to-edn)))
-    (slurp-config-edn parsed-replays-config)
     {:tasks-by-kind {}
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      ;:minimap-type (first fx.battle/minimap-types)
@@ -201,11 +192,12 @@
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
      :console-auto-scroll true
+     :use-db-for-downloadables true
+     :use-db-for-importables true
      :use-db-for-rapid true
      :use-db-for-replays true}))
 
 
-(defmulti event-handler :event/type)
 (defmulti task-handler :spring-lobby/task-type)
 
 (def ^:dynamic handle-task task-handler) ; for overriding in dev
@@ -423,9 +415,9 @@
            (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::update-all-downloadables})
+           (add-task! state-atom {::task-type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::scan-imports})
+           (add-task! state-atom {::task-type ::scan-all-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))

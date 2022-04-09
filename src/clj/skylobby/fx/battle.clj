@@ -74,10 +74,13 @@
                ; else
                "syncing")
              " ")
-     :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                 :map-resource indexed-map
-                 :mod-resource indexed-mod
-                 :spring-root spring-root}
+     :on-action
+     {:event/type :spring-lobby/add-task
+      :task
+      {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+       :map-resource indexed-map
+       :mod-resource indexed-mod
+       :spring-root spring-root}}
      :style sync-button-style}))
 
 
@@ -353,9 +356,12 @@
                            :style sync-button-style}]}]
                        [{:fx/type :button
                          :text "Reload"
-                         :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                                     :map-resource indexed-map
-                                     :mod-resource indexed-mod}}])
+                         :on-action
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+                           :map-resource indexed-map
+                           :mod-resource indexed-mod}}}])
         server-type (u/server-type server-key)
         direct-connect (#{:direct-client :direct-host} server-type)
         buttons (concat

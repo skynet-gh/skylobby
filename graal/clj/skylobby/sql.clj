@@ -1,11 +1,15 @@
 (ns skylobby.sql
   (:require
+    [clojure.edn :as edn]
     [honey.sql :as sql]
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as result-set]
+    [skylobby.download :as download]
+    [skylobby.import :as import]
     [skylobby.fs :as fs]
     [skylobby.rapid :as rapid]
     [skylobby.replay :as replay]
+    [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 
@@ -49,14 +53,36 @@
 (defn replay-param-group [replay]
   [(:replay-id replay)
    (fs/canonical-path (:file replay))
-   (str "STRINGTOUTF8(" (pr-str replay) ")")])
+   (pr-str replay)])
 
 (def merge-replay-sql
-  "MERGE INTO replay(id, path, data) KEY(path) VALUES (?, ?, ?)")
+  "MERGE INTO replay(id, path, data) KEY(path) VALUES (?, ?, STRINGTOUTF8(?))")
+
+
+(defn download-param-group [downloadable]
+  [(:download-url downloadable)
+   (:download-source-name downloadable)
+   (pr-str downloadable)])
+
+(def merge-download-sql
+  "MERGE INTO download(url, download_source_name, data) KEY(url) VALUES (?, ?, STRINGTOUTF8(?))")
+
+
+(defn import-param-group [importable]
+  [(fs/canonical-path (:resource-file importable))
+   (:import-source-name importable)
+   (pr-str importable)])
+
+(def merge-import-sql
+  "MERGE INTO import(path, import_source_name, data) KEY(path) VALUES (?, ?, STRINGTOUTF8(?))")
 
 
 (def opts
   {:builder-fn result-set/as-unqualified-lower-maps})
+
+(defn read-edn-blob [^bytes bs]
+  (let [s (u/bytes->str bs)]
+    (edn/read-string {:readers u/custom-readers} s)))
 
 (deftype SQLDatabase [ds]
   rapid/RapidIndex
@@ -104,12 +130,55 @@
                   {:select [[:*]]
                    :from [:replay]})]
       (log/info "Running" (pr-str query))
-      (jdbc/execute! ds query opts)))
+      (mapv
+        (comp read-edn-blob :data)
+        (jdbc/execute! ds query opts))))
   (update-replays
     [_this replays]
     (with-open [conn (jdbc/get-connection ds)]
       (with-open [ps (jdbc/prepare conn [merge-replay-sql])]
-        (let [param-groups (mapv replay-param-group replays)
+        (let [param-groups (->> replays
+                                (filter :replay-id)
+                                (filter :file)
+                                (mapv replay-param-group))
+              results (jdbc/execute-batch! ps param-groups)]
+          results))))
+  download/DownloadIndex
+  (all-downloadables [_this]
+    (let [query (sql/format
+                  {:select [[:*]]
+                   :from [:download]})]
+      (log/info "Running" (pr-str query))
+      (mapv
+        (comp read-edn-blob :data)
+        (jdbc/execute! ds query opts))))
+  (update-downloadables
+    [_this downloadables]
+    (with-open [conn (jdbc/get-connection ds)]
+      (with-open [ps (jdbc/prepare conn [merge-download-sql])]
+        (let [param-groups (->> downloadables
+                                (filter :download-url)
+                                (filter :download-source-name)
+                                (mapv download-param-group))
+              results (jdbc/execute-batch! ps param-groups)]
+          results))))
+  import/ImportIndex
+  (all-importables [_this]
+    (let [query (sql/format
+                  {:select [[:*]]
+                   :from [:import]})]
+      (log/info "Running" (pr-str query))
+      (mapv
+        (comp read-edn-blob :data)
+        (jdbc/execute! ds query opts))))
+  (update-importables
+    [_this importables]
+    (with-open [conn (jdbc/get-connection ds)]
+      (with-open [ps (jdbc/prepare conn [merge-import-sql])]
+        (let [param-groups (->> importables
+                                (filter :resource-file)
+                                (filter :import-source-name)
+                                (mapv import-param-group))
               results (jdbc/execute-batch! ps param-groups)]
           results)))))
 
@@ -132,12 +201,33 @@
       [:path [:varchar 255] [:not nil]]
       [:data :varbinary]]}))
 
+(defn create-download-query []
+  (sql/format
+    {:create-table [:download :if-not-exists]
+     :with-columns
+     [[:url [:varchar 255]  [:not nil]]
+      [:download-source-name [:varchar 255] [:not nil]]
+      [:data :varbinary]]}))
+
+(defn create-import-query []
+  (sql/format
+    {:create-table [:import :if-not-exists]
+     :with-columns
+     [[:path [:varchar 255]  [:not nil]]
+      [:import-source-name [:varchar 255] [:not nil]]
+      [:data :varbinary]]}))
+
+
+(defn create-table [ds query]
+  (log/info "Running" (pr-str query))
+  (let [result (jdbc/execute! ds query)]
+    (log/info "Create result" (pr-str result))))
 
 (defn init-db
   ([state-atom]
    (init-db state-atom nil))
   ([state-atom opts]
-   (let [{:keys [db use-db-for-downloadables use-db-for-rapid use-db-for-replays]} @state-atom
+   (let [{:keys [db use-db-for-downloadables use-db-for-importables use-db-for-rapid use-db-for-replays]} @state-atom
          sql-db-enabled (or use-db-for-downloadables
                             use-db-for-rapid
                             use-db-for-replays)]
@@ -147,15 +237,11 @@
      (if (or sql-db-enabled
              (:force opts))
        (let [ds (jdbc/get-datasource db-config)
-             create-rapid-query (create-rapid-query)
-             _ (log/info "Running" (pr-str create-rapid-query))
-             create-rapid-result (jdbc/execute! ds create-rapid-query)
-             _ (log/info "Create rapid result" (pr-str create-rapid-result))
-             create-replay-query (create-replay-query)
-             _ (log/info "Running" (pr-str create-replay-query))
-             create-replay-result (jdbc/execute! ds create-replay-query)
-             _ (log/info "Create replay result" (pr-str create-replay-result))
              db (SQLDatabase. ds)]
+         (create-table ds (create-rapid-query))
+         (create-table ds (create-replay-query))
+         (create-table ds (create-download-query))
+         (create-table ds (create-import-query))
          (log/info "Initialized SQL database" db)
          (swap! state-atom assoc :db db))
        (log/info "SQL db not enabled and not force start")))))

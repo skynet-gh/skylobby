@@ -9,6 +9,7 @@
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.import :as fx.import]
     [skylobby.fx.sub :as sub]
+    [skylobby.import :as import]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
     [spring-lobby.sound :as sound]
@@ -309,6 +310,7 @@
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
         use-db-for-downloadables (fx/sub-val context :use-db-for-downloadables)
+        use-db-for-importables (fx/sub-val context :use-db-for-importables)
         use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
         use-db-for-replays (fx/sub-val context :use-db-for-replays)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
@@ -385,6 +387,16 @@
                                     :key :use-db-for-downloadables}}
              {:fx/type :label
               :text " Use database for downloads index"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-importables)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-importables}}
+             {:fx/type :label
+              :text " Use database for imports index"}]}
            {:fx/type :h-box
             :style {:-fx-font-size 18}
             :children
@@ -589,7 +601,7 @@
                       {:fx/type :label
                        :text (str " " (fs/canonical-path file))
                        :style {:-fx-font-size 14}}]}]})
-                (fx.import/import-sources extra-import-sources))}
+                (import/import-sources extra-import-sources))}
              {:fx/type :h-box
               :alignment :center-left
               :children
