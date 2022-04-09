@@ -3760,7 +3760,9 @@
 
 (defmethod event-handler ::assoc-in
   [{:fx/keys [event] :keys [path value] :or {value (if (instance? Event event) true event)}}]
-  (swap! *state assoc-in path value))
+  (if path
+    (swap! *state assoc-in path value)
+    (throw (ex-info "::assoc-in called without path" {}))))
 
 (defmethod event-handler ::dissoc
   [e]
