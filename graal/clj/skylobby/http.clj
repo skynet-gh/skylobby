@@ -45,6 +45,9 @@
 (def bar-maps-github-releases-url
   "https://api.github.com/repos/beyond-all-reason/Maps/releases")
 
+(def mf-github-releases-url
+  "https://api.github.com/repos/springraaar/metal_factions/releases")
+
 (def tap-maps-github-releases-url
   "https://api.github.com/repos/FluidPlay/TAPrime-maps/releases")
 
@@ -574,6 +577,11 @@
     :url evo-rts-github-releases-url
     :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
     :resources-fn get-evo-rts-github-release-downloadables
+    :resource-type-fn mods-only}
+   {:download-source-name "Metal Factions GitHub releases"
+    :url mf-github-releases-url
+    :browse-url "https://github.com/springraaar/metal_factions/releases"
+    :resources-fn get-github-release-downloadables
     :resource-type-fn mods-only}
    {:download-source-name "SpringFightClub Maps"
     :url (str springfightclub-root "/maps")
