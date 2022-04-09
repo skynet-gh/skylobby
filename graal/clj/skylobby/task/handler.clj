@@ -9,6 +9,7 @@
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.fs :as fs]
+    [skylobby.fs.sdfz :as replay]
     [skylobby.fs.smf :as fs.smf]
     [skylobby.git :as git]
     [skylobby.rapid :as rapid]
@@ -24,6 +25,7 @@
 (def maps-batch-size 5)
 (def mods-batch-size 5)
 (def minimap-batch-size 3)
+(def replays-batch-size 10)
 
 
 (defn update-battle-sync-statuses [state-atom]
@@ -563,6 +565,33 @@
       (log/warn "Unable to parse rapid progress" (pr-str line)))))
 
 
+(defn- old-valid-replay-fn [all-paths-set]
+  (fn [[path replay]]
+    (and
+      (contains? all-paths-set path) ; remove missing files
+      (-> replay :header :game-id) ; re-parse if no game id
+      (not (-> replay :file-size zero?)) ; remove empty files
+      (not (-> replay :game-type #{:invalid})))))
+
+(defn- valid-replay-fn [all-paths-set]
+  (fn [[path replay]]
+    (and
+      (contains? all-paths-set path) ; remove missing files
+      (:replay-id replay) ; re-parse if no replay id
+      (not (-> replay :file-size zero?)) ; remove empty files
+      (not (-> replay :game-type #{:invalid}))))) ; remove invalid
+
+(defn migrate-replay [replay]
+  (merge
+    (select-keys replay [:file :filename :file-size :source-name])
+    (replay/replay-metadata replay)))
+
+(def parsed-replays-config
+  {:select-fn #(select-keys % [:invalid-replay-paths :parsed-replays-by-path])
+   :filename "parsed-replays.edn"
+   :nippy true})
+
+
 (defn add-handlers [task-handler state-atom]
   (defmethod task-handler :spring-lobby/rapid-download
     [{:keys [engine-file rapid-id spring-isolation-dir] :as task}]
@@ -912,4 +941,154 @@
       (fs/update-file-cache! state-atom file)
       (task/add-task! state-atom
         {:spring-lobby/task-type :spring-lobby/refresh-mods
-         :spring-root spring-root}))))
+         :spring-root spring-root})))
+  (defmethod task-handler :spring-lobby/refresh-replays [_]
+    (log/info "Refreshing replays")
+    (let [before (u/curr-millis)
+          {:keys [parsed-replays-by-path replay-sources-enabled] :as state} @state-atom
+          all-files (mapcat
+                      (fn [{:keys [file recursive replay-source-name]}]
+                        (let [files (fs/replay-files file {:recursive recursive})]
+                          (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
+                          (map
+                            (juxt (constantly replay-source-name) identity)
+                            files)))
+                      (filter
+                        (fn [{:keys [file]}]
+                          (let [path (fs/canonical-path file)]
+                            (or (not (contains? replay-sources-enabled path))
+                                (get replay-sources-enabled path))))
+                        (fs/replay-sources state)))
+          all-paths (set (map (comp fs/canonical-path second) all-files))
+          old-valid-replay? (old-valid-replay-fn all-paths)
+          valid-replay? (valid-replay-fn all-paths)
+          existing-valid-paths (->> parsed-replays-by-path
+                                    (filter valid-replay?)
+                                    keys
+                                    set)
+          todo (->> all-files
+                    (remove (comp existing-valid-paths fs/canonical-path second))
+                    shuffle)
+          this-round (take replays-batch-size todo)
+          parsed-replays (->> this-round
+                              (map
+                                (fn [[source f]]
+                                  [(fs/canonical-path f)
+                                   (merge
+                                     (replay/parse-replay f)
+                                     {:source-name source})]))
+                              doall)]
+      (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
+      (let [
+            new-state (swap! state-atom
+                        (fn [state]
+                          (let [old-replays (:parsed-replays-by-path state)
+                                replays-by-path (if (map? old-replays) old-replays {})
+                                all-replays (into {} (concat replays-by-path parsed-replays))
+                                valid-replays (->> all-replays
+                                                   (filter valid-replay?)
+                                                   (into {}))
+                                migratable-replays (->> all-replays
+                                                        (remove valid-replay?)
+                                                        (filter old-valid-replay?))
+                                _ (log/info "Migrating" (count migratable-replays) "replays")
+                                migrated-replays (->> migratable-replays
+                                                      (map (fn [[path replay]] [path (migrate-replay replay)]))
+                                                      (into {}))
+                                _ (log/info "Migrated" (count migratable-replays) "replays")
+                                replays-by-path (merge valid-replays migrated-replays)
+                                valid-replay-paths (set (concat (keys replays-by-path)))
+                                invalid-replay-paths (->> all-replays
+                                                          (remove (some-fn old-valid-replay? valid-replay?))
+                                                          keys
+                                                          (concat (:invalid-replay-paths state))
+                                                          (remove valid-replay-paths)
+                                                          set)]
+                            (assoc state
+                                   :parsed-replays-by-path replays-by-path
+                                   :invalid-replay-paths invalid-replay-paths))))
+            invalid-replay-paths (set (:invalid-replay-paths new-state))
+            valid-next-round (remove
+                               (comp invalid-replay-paths fs/canonical-path second)
+                               todo)]
+        (if (seq valid-next-round)
+          (task/add-task! state-atom
+            {:spring-lobby/task-type :spring-lobby/refresh-replays
+             :todo (count todo)})
+          (do
+            (log/info "No valid replays left to parse")
+            (fs/spit-app-edn
+              ((:select-fn parsed-replays-config) new-state)
+              (:filename parsed-replays-config)
+              parsed-replays-config)
+            (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replay-resources}))))))
+  (defmethod task-handler :spring-lobby/refresh-replay-resources [_]
+    [state-atom]
+    (log/info "Refresh replay resources")
+    (let [before (u/curr-millis)
+          {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
+          parsed-replays (vals parsed-replays-by-path)
+          engine-versions (->> parsed-replays
+                               (map :replay-engine-version)
+                               (filter some?)
+                               set)
+          mod-names (->> parsed-replays
+                         (map :replay-mod-name)
+                         set)
+          map-names (->> parsed-replays
+                         (map :replay-map-name)
+                         set)
+          downloads (vals downloadables-by-url)
+          imports (vals importables-by-path)
+          engine-downloads (filter (comp #{::engine} :resource-type) downloads)
+          replay-engine-downloads (->> engine-versions
+                                       (map
+                                         (fn [engine-version]
+                                           (when-let [imp (->> engine-downloads
+                                                               (filter (partial resource/could-be-this-engine? engine-version))
+                                                               first)]
+                                             [engine-version imp])))
+                                       (into {}))
+          mod-imports (filter (comp #{::mod} :resource-type) imports)
+          replay-mod-imports (->> mod-names
+                                  (map
+                                    (fn [mod-name]
+                                      (when-let [imp (->> mod-imports
+                                                          (filter (partial resource/could-be-this-mod? mod-name))
+                                                          first)]
+                                        [mod-name imp])))
+                                  (into {}))
+          mod-downloads (filter (comp #{::mod} :resource-type) downloads)
+          replay-mod-downloads (->> mod-names
+                                    (map
+                                      (fn [mod-name]
+                                        (when-let [dl (->> mod-downloads
+                                                           (filter (partial resource/could-be-this-mod? mod-name))
+                                                           first)]
+                                          [mod-name dl])))
+                                    (into {}))
+          map-imports (filter (comp #{::map} :resource-type) imports)
+          replay-map-imports (->> map-names
+                                  (map
+                                    (fn [map-name]
+                                      (when-let [imp (->> map-imports
+                                                          (filter (partial resource/could-be-this-map? map-name))
+                                                          first)]
+                                        [map-name imp])))
+                                  (into {}))
+          map-downloads (filter (comp #{::map} :resource-type) downloads)
+          replay-map-downloads (->> map-names
+                                    (map
+                                      (fn [map-name]
+                                        (when-let [dl (->> map-downloads
+                                                           (filter (partial resource/could-be-this-map? map-name))
+                                                           first)]
+                                          [map-name dl])))
+                                    (into {}))]
+      (log/info "Refreshed replay resources in" (- (u/curr-millis) before) "ms")
+      (swap! state-atom assoc
+             :replay-downloads-by-engine replay-engine-downloads
+             :replay-downloads-by-mod replay-mod-downloads
+             :replay-imports-by-mod replay-mod-imports
+             :replay-downloads-by-map replay-map-downloads
+             :replay-imports-by-map replay-map-imports))))

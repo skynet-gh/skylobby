@@ -1,6 +1,8 @@
 (ns skylobby.fs
   (:require
+    [clojure.edn :as edn]
     [clojure.java.io :as io]
+    [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     [me.raynes.fs :as raynes-fs]
     [skylobby.fs.smf :as smf]
@@ -8,6 +10,7 @@
     [skylobby.lua :as lua]
     [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
+    [taoensso.nippy :as nippy]
     [taoensso.timbre :as log])
   (:import
     (java.io ByteArrayOutputStream File FileOutputStream OutputStream RandomAccessFile)
@@ -1324,3 +1327,39 @@
         (log/info "Deleting corrupt rapid dir:" rapid-dir)
         (FileUtils/deleteDirectory rapid-dir))
       (log/error "Not a valid directory:" rapid-dir))))
+
+
+(defn nippy-filename [edn-filename]
+  (when edn-filename
+    (string/replace edn-filename #"\.edn$" ".bin")))
+
+
+(defn spit-app-edn
+  "Writes the given data as edn to the given file in the application directory."
+  ([data filename]
+   (spit-app-edn data filename nil))
+  ([data filename {:keys [nippy pretty]}]
+   (let [file (config-file filename)]
+     (make-parent-dirs file))
+   (if nippy
+     (let [file (config-file (nippy-filename filename))]
+       (log/info "Saving nippy data to" file)
+       (try
+         (nippy/freeze-to-file file data)
+         (catch Exception e
+           (log/error e "Error saving nippy to" file))))
+     (let [output (if pretty
+                    (with-out-str (pprint (if (map? data)
+                                            (into (sorted-map) data)
+                                            data)))
+                    (pr-str data))
+           parsable (try
+                      (edn/read-string {:readers u/custom-readers} output)
+                      true
+                      (catch Exception e
+                        (log/error e "Config EDN for" filename "does not parse, keeping old file")))
+           file (config-file (if parsable
+                               filename
+                               (str filename ".bad")))]
+       (log/info "Spitting edn to" file)
+       (spit file output)))))
