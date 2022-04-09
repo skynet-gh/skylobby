@@ -479,103 +479,10 @@
     (log/warn "Unable to determine task kind to cancel for" task)))
 
 
-(defn- replay-map-and-mod-details-relevant-keys [state]
-  (select-keys
-    state
-    [:by-spring-root :map-details :mod-details :online-bar-replays :parsed-replays-by-path
-     :selected-replay-file :selected-replay-id :servers :spring-isolation-dir]))
-
-
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
     state
     [:server :servers]))
-
-
-(defn replay-map-and-mod-details-watcher [_k state-atom old-state new-state]
-  (when (or (not= (replay-map-and-mod-details-relevant-keys old-state)
-                  (replay-map-and-mod-details-relevant-keys new-state))
-            (:single-replay-view new-state))
-    (try
-      (let [old-selected-replay-file (:selected-replay-file old-state)
-            old-replay-id (:selected-replay-id old-state)
-            {:keys [online-bar-replays parsed-replays-by-path replay-details selected-replay-file
-                    selected-replay-id spring-isolation-dir]} new-state
-
-            old-replay-path (fs/canonical-path old-selected-replay-file)
-            new-replay-path (fs/canonical-path selected-replay-file)
-
-            old-replay (or (get parsed-replays-by-path old-replay-path)
-                           (get online-bar-replays old-replay-id))
-            new-replay (or (get parsed-replays-by-path new-replay-path)
-                           (get online-bar-replays selected-replay-id))
-
-            old-mod (:replay-mod-name old-replay)
-            old-map (:replay-map-name old-replay)
-
-            new-mod (:replay-mod-name new-replay)
-            new-map (:replay-map-name new-replay)
-
-            spring-root-path (fs/canonical-path spring-isolation-dir)
-
-            old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
-            new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
-
-            old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-            new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-
-            new-mod-sans-git (u/mod-name-sans-git new-mod)
-            mod-name-set (set [new-mod new-mod-sans-git])
-            filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-
-            map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-            mod-exists (->> new-mods (filter filter-fn) first)
-
-            map-details (resource/cached-details (:map-details new-state) map-exists)
-            mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-
-            map-changed (not= new-map (:map-name map-details))
-            mod-changed (not= new-mod (:mod-name mod-details))
-
-            replay-details (get replay-details new-replay-path)
-
-            tasks [
-                   (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-mod new-mod)
-                                      (:single-replay-view new-state))
-                                  (and (not (string/blank? new-mod))
-                                       (or (not (resource/details? mod-details))
-                                           mod-changed)))
-                             (and
-                               (or (not (some filter-fn old-mods))
-                                   (:single-replay-view new-state))
-                               mod-exists))
-                     {::task-type ::mod-details
-                      :mod-name new-mod
-                      :mod-file (:file mod-exists)
-                      :use-git-mod-version (:use-git-mod-version new-state)})
-                   (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-map new-map)
-                                      (:single-replay-view new-state))
-                                  (and (not (string/blank? new-map))
-                                       (or (not (resource/details? map-details))
-                                           map-changed)))
-                             (and
-                               (or (not (some (comp #{new-map} :map-name) old-maps))
-                                   (:single-replay-view new-state))
-                               map-exists))
-                     {::task-type ::map-details
-                      :map-name new-map
-                      :map-file (:file map-exists)})
-                   (when (and (not= old-replay-path new-replay-path)
-                              (not replay-details))
-                     {::task-type ::replay-details
-                      :replay-file selected-replay-file})]]
-        (when-let [tasks (->> tasks (filter some?) seq)]
-          (log/info "Adding" (count tasks) "for replay resources")
-          (task/add-tasks! state-atom tasks)))
-      (catch Exception e
-        (log/error e "Error in :replay-map-and-mod-details state watcher")))))
 
 
 (defn- fix-resource-relevant-keys [state]
@@ -4083,7 +3990,7 @@
    [:battle-map-details-watcher watch/battle-map-details-watcher 2]
    [:battle-mod-details-watcher watch/battle-mod-details-watcher 2]
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
-   [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:replay-map-and-mod-details-watcher watch/replay-map-and-mod-details-watcher]
    [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
    [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
 

@@ -1154,16 +1154,15 @@
         replays-window-dedupe (fx/sub-val context :replays-window-dedupe)
         selected-replay-file (fx/sub-val context :selected-replay-file)
         selected-replay-id (fx/sub-val context :selected-replay-id)
-        local-filenames (->> parsed-replays-by-path
-                             vals
+        parsed-replays (vals parsed-replays-by-path)
+        local-filenames (->> parsed-replays
                              (map :filename)
                              (filter some?)
                              set)
         online-only-replays (->> online-bar-replays
                                  vals
                                  (remove (comp local-filenames :filename)))
-        all-replays (->> parsed-replays-by-path
-                         vals
+        all-replays (->> parsed-replays
                          (concat online-only-replays)
                          doall)
         replay-types (set (map :game-type all-replays))

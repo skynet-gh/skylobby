@@ -16,6 +16,7 @@
     [skylobby.fx.root :as fx.root]
     [skylobby.git :as git]
     [skylobby.util :as u]
+    [skylobby.watch :as watch]
     spring-lobby
     [spring-lobby.spring :as spring]
     [spring-lobby.replays :as replays]
@@ -207,7 +208,7 @@
                                :selected-replay-file replay-file
                                :single-replay-view true)
                         (update :replay-details cache/miss replay-path replay-details))))
-                (spring-lobby/replay-map-and-mod-details-watcher nil spring-lobby/*state nil @spring-lobby/*state)
+                (watch/replay-map-and-mod-details-watcher nil spring-lobby/*state nil @spring-lobby/*state)
                 (let [r (fx/create-renderer
                           :middleware (comp
                                         fx/wrap-context-desc

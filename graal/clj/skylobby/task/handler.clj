@@ -9,10 +9,11 @@
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.fs :as fs]
-    [skylobby.fs.sdfz :as replay]
+    [skylobby.fs.sdfz :as fs.sdfz]
     [skylobby.fs.smf :as fs.smf]
     [skylobby.git :as git]
     [skylobby.rapid :as rapid]
+    [skylobby.replay :as replay]
     [skylobby.resource :as resource]
     [skylobby.task :as task]
     [skylobby.util :as u]
@@ -584,7 +585,7 @@
 (defn migrate-replay [replay]
   (merge
     (select-keys replay [:file :filename :file-size :source-name])
-    (replay/replay-metadata replay)))
+    (fs.sdfz/replay-metadata replay)))
 
 (def parsed-replays-config
   {:select-fn #(select-keys % [:invalid-replay-paths :parsed-replays-by-path])
@@ -945,7 +946,7 @@
   (defmethod task-handler :spring-lobby/refresh-replays [_]
     (log/info "Refreshing replays")
     (let [before (u/curr-millis)
-          {:keys [parsed-replays-by-path replay-sources-enabled] :as state} @state-atom
+          {:keys [db parsed-replays-by-path replay-sources-enabled use-db-for-replays] :as state} @state-atom
           all-files (mapcat
                       (fn [{:keys [file recursive replay-source-name]}]
                         (let [files (fs/replay-files file {:recursive recursive})]
@@ -975,10 +976,12 @@
                                 (fn [[source f]]
                                   [(fs/canonical-path f)
                                    (merge
-                                     (replay/parse-replay f)
+                                     (fs.sdfz/parse-replay f)
                                      {:source-name source})]))
                               doall)]
       (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
+      (when (and db use-db-for-replays)
+        (replay/update-replays db parsed-replays))
       (let [
             new-state (swap! state-atom
                         (fn [state]
@@ -1026,8 +1029,8 @@
     [state-atom]
     (log/info "Refresh replay resources")
     (let [before (u/curr-millis)
-          {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
-          parsed-replays (vals parsed-replays-by-path)
+          {:keys [db downloadables-by-url importables-by-path parsed-replays-by-path use-db-for-replays]} @state-atom
+          parsed-replays (vals parsed-replays-by-path) ;(if (and db use-db-for-replays) (replay/all-replays db) (vals parsed-replays-by-path))
           engine-versions (->> parsed-replays
                                (map :replay-engine-version)
                                (filter some?)

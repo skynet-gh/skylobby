@@ -5,6 +5,7 @@
 
 
 (defprotocol ReplayIndex
+  (all-replays [this])
   (replay-by-id [this replay-id])
   (replay-by-path [this path])
   (update-replay [this replay])

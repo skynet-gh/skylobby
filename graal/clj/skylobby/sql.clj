@@ -3,7 +3,9 @@
     [honey.sql :as sql]
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as result-set]
+    [skylobby.fs :as fs]
     [skylobby.rapid :as rapid]
+    [skylobby.replay :as replay]
     [taoensso.timbre :as log]))
 
 
@@ -42,6 +44,15 @@
    (::rapid/version rapid-data)
    (::rapid/detail rapid-data)
    (::rapid/spring-root rapid-data)])
+
+
+(defn replay-param-group [replay]
+  [(:replay-id replay)
+   (fs/canonical-path (:file replay))
+   (str "STRINGTOUTF8(" (pr-str replay) ")")])
+
+(def merge-replay-sql
+  "MERGE INTO replay(id, path, data) KEY(path) VALUES (?, ?, ?)")
 
 
 (def opts
@@ -86,6 +97,20 @@
                              (comp rapid-data-param-group #(assoc % ::rapid/spring-root spring-root))
                              rapid-data)
               results (jdbc/execute-batch! ps param-groups)]
+          results))))
+  replay/ReplayIndex
+  (all-replays [_this]
+    (let [query (sql/format
+                  {:select [[:*]]
+                   :from [:replay]})]
+      (log/info "Running" (pr-str query))
+      (jdbc/execute! ds query opts)))
+  (update-replays
+    [_this replays]
+    (with-open [conn (jdbc/get-connection ds)]
+      (with-open [ps (jdbc/prepare conn [merge-replay-sql])]
+        (let [param-groups (mapv replay-param-group replays)
+              results (jdbc/execute-batch! ps param-groups)]
           results)))))
 
 
@@ -97,7 +122,15 @@
       [:hash [:varchar 255] [:not nil]]
       [:version [:varchar 255] [:not nil]]
       [:detail [:varchar 255]]
-      [:spring-root [:varchar 255]]]}))
+      [:spring-root [:varchar 255] [:not nil]]]}))
+
+(defn create-replay-query []
+  (sql/format
+    {:create-table [:replay :if-not-exists]
+     :with-columns
+     [[:id [:varchar 255]  [:not nil]]
+      [:path [:varchar 255] [:not nil]]
+      [:data :varbinary]]}))
 
 
 (defn init-db
@@ -118,6 +151,10 @@
              _ (log/info "Running" (pr-str create-rapid-query))
              create-rapid-result (jdbc/execute! ds create-rapid-query)
              _ (log/info "Create rapid result" (pr-str create-rapid-result))
+             create-replay-query (create-replay-query)
+             _ (log/info "Running" (pr-str create-replay-query))
+             create-replay-result (jdbc/execute! ds create-replay-query)
+             _ (log/info "Create replay result" (pr-str create-replay-result))
              db (SQLDatabase. ds)]
          (log/info "Initialized SQL database" db)
          (swap! state-atom assoc :db db))

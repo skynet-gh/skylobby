@@ -201,7 +201,8 @@
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
      :console-auto-scroll true
-     :use-db-for-rapid true}))
+     :use-db-for-rapid true
+     :use-db-for-replays true}))
 
 
 (defmulti event-handler :event/type)
@@ -378,7 +379,7 @@
    [:battle-map-details-watcher watch/battle-map-details-watcher 2000]
    [:battle-mod-details-watcher watch/battle-mod-details-watcher 2000]
    ;[:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10000]
-   ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:replay-map-and-mod-details-watcher watch/replay-map-and-mod-details-watcher]
    ;[:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10000]
    [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2000]])
 

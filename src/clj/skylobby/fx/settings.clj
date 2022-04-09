@@ -308,7 +308,9 @@
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
+        use-db-for-downloadables (fx/sub-val context :use-db-for-downloadables)
         use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        use-db-for-replays (fx/sub-val context :use-db-for-replays)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -378,11 +380,31 @@
             :children
             [
              {:fx/type :check-box
+              :selected (boolean use-db-for-downloadables)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-downloadables}}
+             {:fx/type :label
+              :text " Use database for downloads index"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
               :selected (boolean use-db-for-rapid)
               :on-selected-changed {:event/type :spring-lobby/assoc
                                     :key :use-db-for-rapid}}
              {:fx/type :label
-              :text " Use on-disk database for rapid index"}]}]}
+              :text " Use database for rapid index"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-replays)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-replays}}
+             {:fx/type :label
+              :text " Use database for replays index"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Spring"
