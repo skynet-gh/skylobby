@@ -87,12 +87,12 @@
 
 
 (def config-keys
-  [:auto-get-resources 
+  [:auto-get-resources
    :auto-get-replay-resources
    :auto-launch
    :auto-rejoin-battle
    :auto-refresh-replays
-   :battle-as-tab 
+   :battle-as-tab
    :battle-layout
    :battle-password
    :battle-players-color-type
@@ -107,7 +107,7 @@
    :chat-auto-complete
    :chat-auto-scroll
    :chat-color-username
-   :chat-font-size 
+   :chat-font-size
    :chat-highlight-username
    :chat-highlight-words
    :client-id-override
@@ -293,8 +293,8 @@
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
      :console-auto-scroll true
-     :use-db-for-downloadables true
-     :use-db-for-importables true
+     ;:use-db-for-downloadables false
+     ;:use-db-for-importables false
      :use-db-for-rapid true
      :use-db-for-replays true}))
 

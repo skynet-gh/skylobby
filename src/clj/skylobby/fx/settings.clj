@@ -382,6 +382,7 @@
           :children
           [{:fx/type :label
             :text "Experimental! Use database for certain indexes to lower memory usage"}
+           #_
            {:fx/type :h-box
             :style {:-fx-font-size 18}
             :children
@@ -392,6 +393,7 @@
                                     :key :use-db-for-downloadables}}
              {:fx/type :label
               :text " Use database for downloads index"}]}
+           #_
            {:fx/type :h-box
             :style {:-fx-font-size 18}
             :children
