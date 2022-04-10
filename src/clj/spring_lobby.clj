@@ -2984,7 +2984,7 @@
   (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean event))
   (future
     (try
-      (update-battle-status client-data {:id id} (assoc battle-status :ready event) team-color)
+      (update-battle-status client-data {:id id :is-me true} (assoc battle-status :ready event) team-color)
       (catch Exception e
         (log/error e "Error updating battle ready")))))
 
