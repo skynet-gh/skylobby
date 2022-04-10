@@ -150,7 +150,11 @@
                              (cond
                                (string/starts-with? text "You are now in the join-queue")
                                true
+                               (string/starts-with? text "You were already in the join-queue at position")
+                               true
                                (string/starts-with? text "You have been removed from the join queue")
+                               false
+                               (string/ends-with? text "You were at the front of the queue, you are now a player.")
                                false
                                :else
                                am-in-queue))

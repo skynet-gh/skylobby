@@ -3014,10 +3014,20 @@
           (log/error e "Error updating battle spectate"))))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
-  (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
-  (event-handler (assoc e
-                        :event/type ::battle-spectate-change
-                        :value (= "Playing" event))))
+  (let [{:keys [by-server]} (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
+        {:keys [battle client-data]} (get by-server server-key)
+        battle-channel-name (u/battle-channel-name battle)
+        value (= "Playing" event)]
+    (event-handler (assoc e
+                          :event/type ::battle-spectate-change
+                          :value value))
+    (when-not value
+      (event-handler
+        {:event/type :skylobby.fx.event.chat/send
+         :channel-name battle-channel-name
+         :client-data client-data
+         :message "$%leaveq"
+         :server-key server-key}))))
 
 (defmethod event-handler ::auto-unspec [{:keys [server-key] :fx/keys [event] :as e}]
   (if event
