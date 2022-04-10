@@ -229,6 +229,7 @@
   ([state-atom opts]
    (let [{:keys [db use-db-for-downloadables use-db-for-importables use-db-for-rapid use-db-for-replays]} @state-atom
          sql-db-enabled (or use-db-for-downloadables
+                            use-db-for-importables
                             use-db-for-rapid
                             use-db-for-replays)]
      (when-let [ds (:ds db)]

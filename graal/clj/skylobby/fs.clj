@@ -60,14 +60,18 @@
       (catch Exception e
         (log/trace e "Error getting canonical path for" f)))))
 
-(defn ^File file [^File f & args]
+(defn file
+  ^File
+  [^File f & args]
   (when f
     (try
       (apply io/file f args)
       (catch Exception e
         (log/warn e "Error creating file from" f "and" args)))))
 
-(defn ^String join [& args]
+(defn join
+  ^String
+  [& args]
   (string/join File/separator args))
 
 (defn filename ^String [^File f]
