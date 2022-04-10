@@ -567,6 +567,23 @@
   "name":"java.security.interfaces.RSAPublicKey"
 },
 {
+  "name":"java.sql.SQLException",
+  "queryAllPublicMethods":true,
+  "methods":[
+    {"name":"getErrorCode","parameterTypes":[] }, 
+    {"name":"getNextException","parameterTypes":[] }, 
+    {"name":"getSQLState","parameterTypes":[] }
+  ]
+},
+{
+  "name":"java.sql.SQLTimeoutException",
+  "queryAllPublicMethods":true
+},
+{
+  "name":"java.sql.SQLTransientException",
+  "queryAllPublicMethods":true
+},
+{
   "name":"java.time.Duration"
 },
 {
@@ -697,6 +714,15 @@
 },
 {
   "name":"org.h2.Driver"
+},
+{
+  "name":"org.h2.jdbc.JdbcSQLTimeoutException",
+  "queryAllPublicMethods":true,
+  "methods":[
+    {"name":"getMessage","parameterTypes":[] }, 
+    {"name":"getOriginalMessage","parameterTypes":[] }, 
+    {"name":"getSQL","parameterTypes":[] }
+  ]
 },
 {
   "name":"org.h2.mvstore.db.LobStorageMap$BlobMeta$Type",
