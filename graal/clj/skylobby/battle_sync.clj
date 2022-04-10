@@ -8,6 +8,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
   (when (some (comp u/server-needs-battle-status-sync-check second)
               (-> new-state :by-server seq))

@@ -11,6 +11,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn import-dest-is-source? [spring-root {:keys [resource-file] :as importable}]
   (= (fs/canonical-path resource-file)
      (fs/canonical-path (resource/resource-dest spring-root importable))))

@@ -8,6 +8,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn- battle-map-details-relevant-keys [state]
   (-> state
       (select-keys [:by-server :by-spring-root :map-details :servers :spring-isolation-dir])

@@ -4,6 +4,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn update-user-state
   [state-atom server-key {:keys [username] :as id} user-state]
   ; TODO bots

@@ -13,6 +13,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def db-config
   {:dbtype "h2"
    :dbname "skylobby"})

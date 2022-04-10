@@ -25,6 +25,10 @@
   (:import
    (java.util.regex Matcher)))
 
+
+(set! *warn-on-reflection* true)
+
+
 (def maps-batch-size 5)
 (def mods-batch-size 5)
 (def minimap-batch-size 3)
