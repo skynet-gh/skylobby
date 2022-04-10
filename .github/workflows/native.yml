@@ -32,7 +32,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@4.0
+      - uses: DeLaGuardo/setup-clojure@5.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -68,7 +68,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@4.0
+      - uses: DeLaGuardo/setup-clojure@5.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -98,7 +98,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@4.0
+      - uses: DeLaGuardo/setup-clojure@5.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
