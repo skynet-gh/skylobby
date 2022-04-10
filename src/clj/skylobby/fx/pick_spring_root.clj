@@ -6,18 +6,32 @@
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
-    [skylobby.fx.sync :refer [ok-severity]])
+    [skylobby.fx.sync :refer [ok-severity warn-severity]])
   (:import
+    (java.nio.charset StandardCharsets)
     (javafx.scene.input Clipboard ClipboardContent)))
 
 
 (set! *warn-on-reflection* true)
 
 
+(def ascii-encoder
+  (.newEncoder StandardCharsets/US_ASCII))
+
+(def ok-style
+  (dissoc ok-severity :-fx-background-color))
+(def warn-style
+  (dissoc warn-severity :-fx-background-color))
+
 (defn pick-spring-root-view
   [{:fx/keys [context]}]
   (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-isolation-dir)
+        non-ascii (some->> spring-root-path
+                           (re-seq #"([^\p{ASCII}]+)")
+                           (map first)
+                           set)
+        is-pure-ascii (empty? non-ascii)
         {:keys [engines maps mods]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         default-spring-root (fs/default-spring-root)
         wanted-spring-roots [
@@ -55,7 +69,7 @@
              {:fx/type :pane
               :pref-height 16}
              {:fx/type :h-box
-              :alignment :center-left 
+              :alignment :center-left
               :children
               [
                {:fx/type :label
@@ -86,10 +100,22 @@
                             :file spring-isolation-dir}}]}
              {:fx/type :label
               :style {:-fx-font-size 18}
-              :text (str spring-root-path)}
-             {:fx/type :pane
-              :pref-height 16}
-             {:fx/type :h-box
+              :text (str spring-root-path)}]
+            (when-not is-pure-ascii
+              [{:fx/type :pane
+                :pref-height 16}
+               {:fx/type :label
+                :style {:-fx-font-size 26
+                        :-fx-text-fill :gold}
+                :text "Spring downloader has issues with non-ascii paths"}
+               {:fx/type :label
+                :style {:-fx-font-size 22
+                        :-fx-text-fill :gold}
+                :text (str "Path has these non-ascii characters: "
+                           (apply str non-ascii))}
+               {:fx/type :pane
+                :pref-height 16}])
+            [{:fx/type :h-box
               :style {:-fx-font-size 18}
               :children
               [
@@ -97,7 +123,9 @@
                 :on-action {:event/type :spring-lobby/assoc
                             :key :show-spring-picker
                             :value false}
-                :style (dissoc ok-severity :-fx-background-color)
+                :style (if is-pure-ascii
+                         ok-style
+                         (assoc warn-style :-fx-font-size 15))
                 :text "Use this Spring directory"}
                {:fx/type :pane
                 :pref-width 16}
@@ -107,6 +135,9 @@
                 :on-action {:event/type :spring-lobby/assoc
                             :key :spring-isolation-dir
                             :value default-spring-root}
+                :style (if is-pure-ascii
+                         {}
+                         (assoc ok-style :-fx-font-size 20))
                 :text "Reset to default"}]}
              {:fx/type :pane
               :pref-height 16}
