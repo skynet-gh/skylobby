@@ -7,6 +7,9 @@
     (io.netty.handler.ssl.util InsecureTrustManagerFactory)))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn upgrade-pipeline [^ChannelPipeline pipeline]
   (if pipeline
     (let [; https://github.com/clj-commons/aleph/blob/master/src/aleph/netty.clj#L721-L724

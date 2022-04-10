@@ -13,8 +13,8 @@
     [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import

@@ -1,8 +1,8 @@
-(ns spring-lobby.client.handler.tei-test
+(ns skylobby.client.handler.tei-test
   (:require
     [clojure.test :refer [deftest is testing]]
-    [spring-lobby.client.handler :as handler]
-    spring-lobby.client.handler.tei))
+    [skylobby.client.handler :as handler]
+    skylobby.client.tei))
 
 
 (set! *warn-on-reflection* true)

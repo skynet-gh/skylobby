@@ -1,8 +1,8 @@
 (ns skylobby.fx.event.chat
   (:require
     [clojure.string :as string]
+    [skylobby.client.message :as message]
     [skylobby.util :as u]
-    [spring-lobby.client.message :as message]
     [taoensso.timbre :as log]))
 
 
@@ -58,7 +58,7 @@
             (cond
               (re-find #"^/ingame" message)
               (when (= :spring-lobby server-type)
-                (message/send-message state-atom client-data "GETUSERINFO"))
+                (message/send state-atom client-data "GETUSERINFO"))
               (re-find #"^/ignore" message)
               (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
                 (set-ignore state-atom server-key username true {:channel-name channel-name}))
@@ -79,7 +79,7 @@
                   (swap! state-atom update-in messages-path conj {:text (str "Renaming to" new-username)
                                                                   :timestamp now
                                                                   :message-type :info}
-                   (message/send-message state-atom client-data (str "RENAMEACCOUNT " new-username)))))
+                   (message/send state-atom client-data (str "RENAMEACCOUNT " new-username)))))
               :else
               (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                     unified (-> client-data :compflags (contains? "u"))
@@ -107,14 +107,14 @@
                   :spring-lobby
                   (if is-ex
                     (if private-message
-                      (message/send-message state-atom client-data (str "SAYPRIVATEEX " username " " message))
+                      (message/send state-atom client-data (str "SAYPRIVATEEX " username " " message))
                       (if legacy-springlobby-battle
-                        (message/send-message state-atom client-data (str "SAYBATTLEEX " message))
-                        (message/send-message state-atom client-data (str "SAYEX " channel-name " " message))))
+                        (message/send state-atom client-data (str "SAYBATTLEEX " message))
+                        (message/send state-atom client-data (str "SAYEX " channel-name " " message))))
                     (if private-message
-                      (message/send-message state-atom client-data (str "SAYPRIVATE " username " " message))
+                      (message/send state-atom client-data (str "SAYPRIVATE " username " " message))
                       (if legacy-springlobby-battle
-                        (message/send-message state-atom client-data (str "SAYBATTLE " message))
-                        (message/send-message state-atom client-data (str "SAY " channel-name " " message)))))))))
+                        (message/send state-atom client-data (str "SAYBATTLE " message))
+                        (message/send state-atom client-data (str "SAY " channel-name " " message)))))))))
           (catch Exception e
             (log/error e "Error sending message" message "to channel" channel-name)))))))

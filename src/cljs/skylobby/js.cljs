@@ -81,7 +81,10 @@
   [{:keys [?data]}]
   (let [[_old-state-map new-state-map] (have vector? ?data)]
     (if (:first-open? new-state-map)
-      (log/info "Channel socket successfully established!: %s" new-state-map)
+      (do
+        (log/info "Channel socket successfully established!: %s" new-state-map)
+        (log/info "Sending request for initial state")
+        (chsk-send! [:skylobby/get-initial-state]))
       (log/info "Channel socket state change: %s"              new-state-map))))
 
 (defmethod -event-msg-handler :chsk/recv
@@ -206,10 +209,10 @@
       [:skylobby/get-in [:parsed-replays-by-path]]
       20000
       (fn [reply]
-        (log/debug "Replays reply" (count reply))
+        (log/trace "Replays reply" reply)
         (if (sente/cb-success? reply)
           (do
-            (log/trace "Got replays" reply)
+            (log/debug "Got replays" (count reply))
             (rf/dispatch [:skylobby/assoc :parsed-replays-by-path reply]))
           (log/error reply))))
     db))
@@ -373,7 +376,6 @@
   (fn [db [_t server-key]]
     (log/info "Getting battle chat for" server-key)
     (when-let [battle-id (get-in db [:by-server server-key :battle :battle-id])]
-      (println battle-id)
       (let [channel-name (u/battle-channel-name
                            (get-in db [:by-server server-key :battles battle-id]))]
         (rf/dispatch [:skylobby/get-chat server-key channel-name])))
@@ -721,8 +723,7 @@
    {
     :controllers
     [{:start (fn [_]
-               (log/info "Start root")
-               (rf/dispatch [:skylobby/get-servers]))}
+               (log/info "Start root"))}
      {:stop (fn [_]
               (log/info "Stop root"))}]}
    [""
@@ -796,8 +797,8 @@
        :start (fn [params]
                 (let [server-key (edn/read-string (get-in params [:path :server-key]))]
                   (log/info "Entering direct connect battle" (pr-str server-key))
-                  (rf/dispatch [:skylobby/get-battles server-key])
-                  (rf/dispatch [:skylobby/get-users server-key])
+                  ;(rf/dispatch [:skylobby/get-battles server-key])
+                  ;(rf/dispatch [:skylobby/get-users server-key])
                   (rf/dispatch [:skylobby/get-battle server-key])
                   (rf/dispatch [:skylobby/get-auto-launch server-key])
                   (rf/dispatch [:skylobby/get-auto-unspec server-key])
@@ -816,14 +817,13 @@
                     :query [:username]}
        :start (fn [params]
                 (let [server-url (get-in params [:path :server-url])
-                      username (get-in params [:query :username])
-                      server-key (get-server-key server-url username)]
-                  (log/info "Entering page server" server-url "as user" username)
-                  (rf/dispatch [:skylobby/get-battles server-key])
-                  (rf/dispatch [:skylobby/get-users server-key])
-                  (rf/dispatch [:skylobby/get-battle server-key])
-                  (rf/dispatch [:skylobby/get-auto-launch server-key])
-                  (rf/dispatch [:skylobby/get-auto-unspec server-key])))
+                      username (get-in params [:query :username])]
+                  (log/info "Entering page server" server-url "as user" username)))
+                  ;(rf/dispatch [:skylobby/get-battles server-key])
+                  ;(rf/dispatch [:skylobby/get-users server-key])
+                  ;(rf/dispatch [:skylobby/get-battle server-key])
+                  ;(rf/dispatch [:skylobby/get-auto-launch server-key])
+                  ;(rf/dispatch [:skylobby/get-auto-unspec server-key])))
                   ;(rf/dispatch [:skylobby/poll :poll-battles [:skylobby/get-battles server-key]])
                   ;(rf/dispatch [:skylobby/poll :poll-battle [:skylobby/get-battle server-key]])
                   ;(rf/dispatch [:skylobby/poll :poll-users [:skylobby/get-users server-key]])))

@@ -11,6 +11,9 @@
     [taoensso.timbre :as log]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (defn import-dest-is-source? [spring-root {:keys [resource-file] :as importable}]
   (= (fs/canonical-path resource-file)
      (fs/canonical-path (resource/resource-dest spring-root importable))))
@@ -18,13 +21,16 @@
 
 (defn auto-resources-tasks
   [{:keys [battle-changed engine-version map-name mod-name spring-root]}
-   {:keys [by-spring-root cooldowns current-tasks downloadables-by-url file-cache http-download importables-by-path rapid-by-spring-root
-           springfiles-search-results tasks-by-kind]}]
+   {:keys [by-spring-root cooldowns current-tasks db downloadables-by-url file-cache http-download
+           importables-by-path rapid-by-spring-root
+           springfiles-search-results tasks-by-kind use-db-for-rapid]}]
   (let [
         spring-root-path (fs/canonical-path spring-root)
         {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
         {:keys [engines maps mods]} (get by-spring-root spring-root-path)
-        rapid-data (get rapid-data-by-version mod-name)
+        rapid-data (if (and db use-db-for-rapid)
+                     (rapid/rapid-data-by-version db spring-root-path mod-name)
+                     (get rapid-data-by-version mod-name))
         rapid-id (:id rapid-data)
         sdp-file (rapid/sdp-file spring-root (rapid/sdp-filename (:hash rapid-data)))
         sdp-file-exists (fs/exists? sdp-file)

@@ -3,8 +3,9 @@
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
-    [clojure.pprint :refer [pprint]]
+    clojure.set
     [clojure.spec.alpha :as s]
+    [clojure.test.check.generators :as gen]
     [hiccup.core :as hiccup]
     [muuntaja.core :as m]
     org.httpkit.server
@@ -21,6 +22,7 @@
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
@@ -39,7 +41,17 @@
   "Wraps `-event-msg-handler` with logging, error catching, etc."
   [{:as ev-msg :keys [id ?data event]}]
   (log/info id ?data event)
-  (-event-msg-handler ev-msg)) ; Handle event-msgs on a single thread
+  (try
+    (-event-msg-handler ev-msg) ; Handle event-msgs on a single thread
+    (catch Exception e
+      (println e)
+      (log/error "Error in event-msg-handler" (str e)))
+      ;(log/error e "Error in event-msg-handler"))
+    (catch Throwable e
+      (println e)
+      (log/error "Serious error in event-msg-handler" (str e)))))
+      ;(log/error e "Serious error in event-msg-handler"))))
+
 
 (defmethod -event-msg-handler
   :default ; Default/fallback case (no other matching handler)
@@ -71,8 +83,77 @@
 ; the default edn packer has issues in graalvm
 (deftype EdnPacker []
   interfaces/IPacker
-  (pack   [_ x] (pr-str          x))
-  (unpack [_ x] (edn/read-string x)))
+  (pack   [_ x]
+    (pr-str x))
+  (unpack [_ x]
+    (edn/read-string
+      {:readers u/custom-readers}
+      x)))
+
+
+(defn broadcast-state-changes [broadcast uids old-state new-state]
+  (let [new-servers-data (servers-data new-state)]
+    (when (not= (servers-data old-state)
+                new-servers-data)
+      (broadcast uids [:skylobby/servers new-servers-data])))
+  (let [new-login-error (:login-error new-state)]
+    (when (not= (:login-error old-state)
+                new-login-error)
+      (broadcast uids [:skylobby/login-error new-login-error])))
+  (let [new-auto-launch (:auto-launch new-state)]
+    (when (not= (:auto-launch old-state)
+                new-auto-launch)
+      (broadcast uids [:skylobby/auto-launch new-auto-launch])))
+  (let [new-logins (:logins new-state)]
+    (when (not= (:logins old-state)
+                new-logins)
+      (broadcast uids [:skylobby/logins new-logins])))
+  (let [new-spring-running (:spring-running new-state)]
+    (when (not= (:spring-running old-state)
+                new-spring-running)
+      (broadcast uids [:skylobby/spring-running new-spring-running])))
+  (let [new-replays-watched (:replays-watched new-state)]
+    (when (not= (:replays-watched old-state)
+                new-replays-watched)
+      (broadcast uids [:skylobby/replays-watched new-replays-watched])))
+  (let [tasks-keys [:current-tasks :tasks-by-kind]
+        new-tasks (select-keys new-state tasks-keys)]
+    (when (not= (select-keys old-state tasks-keys)
+                new-tasks)
+      (broadcast uids [:skylobby/tasks new-tasks])))
+  (doseq [[server-key server-data] (:by-server new-state)]
+    (let [{:keys [auto-unspec battle battles channels client-data console-log users]} server-data
+          {:keys [servers]} new-state
+          server-url (:server-url client-data)
+          spring-root (or (get-in servers [server-url :spring-isolation-dir])
+                          (:spring-isolation-dir new-state))
+          spring-root-path (fs/canonical-path spring-root)
+          new-resources (get-in new-state [:by-spring-root spring-root-path])]
+      (when (not= (get-in old-state [:by-spring-root spring-root-path])
+                  new-resources)
+        (broadcast uids
+          [:skylobby/spring-resources
+           {:spring-root-path spring-root-path
+            :resources new-resources}]))
+      (when (not= console-log
+                (get-in old-state [:by-server server-key :console-log]))
+        (broadcast uids [:skylobby/console-log {:server-key server-key :console-log console-log}]))
+      (when (not= auto-unspec
+                  (get-in old-state [:by-server server-key :auto-unspec]))
+        (broadcast uids [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
+      (when (not= battle
+                  (get-in old-state [:by-server server-key :battle]))
+        (broadcast uids [:skylobby/battle {:server-key server-key :battle battle}]))
+      (when (not= battles
+                  (get-in old-state [:by-server server-key :battles]))
+        (broadcast uids [:skylobby/battles {:server-key server-key :battles battles}]))
+      (when (not= users
+                  (get-in old-state [:by-server server-key :users]))
+        (broadcast uids [:skylobby/users {:server-key server-key :users users}]))
+      (doseq [[channel-name channel-data] channels]
+        (when (not= channel-data
+                    (get-in old-state [:by-server server-key :channels channel-name]))
+          (broadcast uids [:skylobby/chat {:server-key server-key :channel-name channel-name :channel-data channel-data}]))))))
 
 
 (defn init [state-atom]
@@ -82,65 +163,36 @@
                       {:authorized?-fn nil
                        :csrf-token-fn nil ; TODO
                        :packer packer
+                       :user-id-fn (fn [_] (first (gen/sample-seq gen/uuid)))
                        :wrap-recv-evs? false})
         {:keys [ch-recv send-fn connected-uids]} chsk-server
         broadcast (fn [uids message]
-                    (log/debug "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
-                    (doseq [uid uids]
-                      (send-fn uid message)))
+                    (when (seq uids)
+                      (log/info "Broadcasting message" (first message) "to" (count uids) "clients:" (pr-str uids))
+                      (doseq [uid uids]
+                        (send-fn uid message))))
         push-channel (async/chan (async/sliding-buffer 1))
         _ (future
-            (loop []
-              (when-let [[old-state new-state] (async/<!! push-channel)]
+            (loop [old-state nil]
+              (when-let [new-state (async/<!! push-channel)]
                 (let [uids (:any @connected-uids)]
-                  (when-not (empty? uids)
-                    (let [new-servers-data (servers-data new-state)]
-                      (when (not= (servers-data old-state)
-                                  new-servers-data)
-                        (broadcast uids [:skylobby/servers new-servers-data])))
-                    (let [new-login-error (:login-error new-state)]
-                      (when (not= (:login-error old-state)
-                                  new-login-error)
-                        (broadcast uids [:skylobby/login-error new-login-error])))
-                    (let [new-auto-launch (:auto-launch new-state)]
-                      (when (not= (:auto-launch old-state)
-                                  new-auto-launch)
-                        (broadcast uids [:skylobby/auto-launch new-auto-launch])))
-                    (let [new-logins (:logins new-state)]
-                      (when (not= (:logins old-state)
-                                  new-logins)
-                        (broadcast uids [:skylobby/logins new-logins])))
-                    (doseq [[server-key server-data] (:by-server new-state)]
-                      (let [{:keys [auto-unspec battle battles channels console-log users]} server-data]
-                        (when (not= console-log
-                                    (get-in old-state [:by-server server-key :console-log]))
-                          (broadcast uids [:skylobby/console-log {:server-key server-key :console-log console-log}]))
-                        (when (not= auto-unspec
-                                    (get-in old-state [:by-server server-key :auto-unspec]))
-                          (broadcast uids [:skylobby/auto-unspec {:server-key server-key :auto-unspec auto-unspec}]))
-                        (when (not= battle
-                                    (get-in old-state [:by-server server-key :battle]))
-                          (broadcast uids [:skylobby/battle {:server-key server-key :battle battle}]))
-                        (when (not= battles
-                                    (get-in old-state [:by-server server-key :battles]))
-                          (broadcast uids [:skylobby/battles {:server-key server-key :battles battles}]))
-                        (when (not= users
-                                    (get-in old-state [:by-server server-key :users]))
-                          (broadcast uids [:skylobby/users {:server-key server-key :users users}]))
-                        (doseq [[channel-name channel-data] channels]
-                          (when (not= channel-data
-                                      (get-in old-state [:by-server server-key :channels channel-name]))
-                            (broadcast uids [:skylobby/chat {:server-key server-key :channel-name channel-name :channel-data channel-data}])))))))
-                (recur))))
-        push-watcher (fn [_ref _k old-state new-state]
-                       (async/>!! push-channel [old-state new-state]))]
-    (remove-watch state-atom :push-watcher)
+                  (broadcast-state-changes broadcast uids old-state new-state))
+                (recur new-state))))
+        push-watcher (fn [_ref _k _old-state new-state]
+                       (async/>!! push-channel new-state))]
     (add-watch state-atom :push-watcher push-watcher)
-    (remove-watch connected-uids :connected-uids)
     (add-watch connected-uids :connected-uids
       (fn [_ _ old-ids new-ids]
         (when (not= old-ids new-ids)
           (log/infof "Connected uids change: %s" new-ids))))
+          ;(let [added (clojure.set/difference (set (:any new-ids)) (set (:any old-ids)))]
+          ;  (log/info "Sending state to new clients" added)
+          ;  (broadcast-state-changes broadcast added nil @state-atom)))))
+    (defmethod -event-msg-handler
+      :skylobby/get-initial-state
+      [{:keys [uid]}]
+      (log/info "Get initial state" uid)
+      (broadcast-state-changes broadcast [uid] nil @state-atom))
     (defmethod -event-msg-handler
       :skylobby/get
       [{:keys [?data ?reply-fn]}]
@@ -165,6 +217,12 @@
       (log/info "Get servers data" ?data)
       (when ?reply-fn
         (?reply-fn (servers-data @state-atom))))
+    (defmethod -event-msg-handler
+      :skylobby/get-spring-resources
+      [{:keys [?data ?reply-fn]}]
+      (log/info "Get spring resources" ?data)
+      (when ?reply-fn
+        (?reply-fn (select-keys @state-atom [:auto-get-resources :by-spring-root :spring-isolation-dir]))))
     (defmethod -event-msg-handler
       :skylobby/join-battle
       [{:keys [?data]}]
@@ -223,6 +281,21 @@
                                            (resource/spring-root-resources spring-root by-spring-root)
                                            :engine-version :map-name :mod-name)))))
     (defmethod -event-msg-handler
+      :skylobby/watch-replay
+      [{:keys [?data]}]
+      (let [
+            {:keys [replay-file]} ?data
+            {:keys [by-spring-root engine-overrides parsed-replays-by-path spring-isolation-dir]} @state-atom
+            {:keys [engines]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+            {:keys [replay-engine-version]} (get parsed-replays-by-path (fs/canonical-path replay-file))]
+        (async/thread
+          (spring/watch-replay state-atom (merge
+                                            {:engine-version replay-engine-version
+                                             :engines engines
+                                             :engine-overrides engine-overrides
+                                             :replay-file replay-file
+                                             :spring-isolation-dir spring-isolation-dir})))))
+    (defmethod -event-msg-handler
       :skylobby/send-command
       [{:keys [?data]}]
       (let [
@@ -240,10 +313,10 @@
             {:keys [server-key channel-name message]} ?data
             {:keys [by-server]} @state-atom
             {:keys [client-data]} (get by-server server-key)]
-        (event/send-message state-atom {:channel-name channel-name
-                                        :client-data client-data
-                                        :message message
-                                        :server-key server-key})))
+        (event/send-chat state-atom {:channel-name channel-name
+                                     :client-data client-data
+                                     :message message
+                                     :server-key server-key})))
     (defmethod -event-msg-handler
       :skylobby/set-battle-mode
       [{:keys [?data]}]
@@ -298,6 +371,13 @@
         (event/set-client-status state-atom {:client-data client-data
                                              :client-status (assoc client-status :away away)
                                              :server-key server-key})))
+    (defmethod -event-msg-handler
+      :skylobby/quit
+      [_]
+      (log/info "User requested quit")
+      (broadcast @connected-uids [:skylobby/quit])
+      (shutdown-agents)
+      (System/exit 0))
     (sente/start-server-chsk-router! ch-recv event-msg-handler)
     chsk-server))
 
@@ -358,40 +438,6 @@
     {:content        (.getInputStream resource)
      :content-length (connection-content-length resource)
      :last-modified  (connection-last-modified resource)}))
-
-
-(defmulti handle-direct-connect (fn [_state-atom request] (get-in request [:body-params :command])))
-
-(defmethod handle-direct-connect :default [_state-atom request]
-  (log/info "No method to handle direct connect request" (with-out-str (pprint request))))
-
-(defmethod handle-direct-connect :join [state-atom request]
-  (let [{:keys [direct-connect-password direct-connect-username]} (get-in request [:body-params :opts])
-        [old-state new-state] (swap-vals! state-atom update-in [:by-server :direct]
-                                (fn [direct]
-                                  (cond-> direct
-                                          (= direct-connect-password (:password direct))
-                                          (update-in [:battle :users]
-                                            (fn [users]
-                                              (if (contains? users direct-connect-username)
-                                                users
-                                                (assoc users direct-connect-username {})))))))]
-    (if (= old-state new-state)
-      {:deny (if (not= direct-connect-password (get-in old-state [:by-server :direct :password]))
-               :wrong-password
-               :username-taken)}
-      {:ok :joined
-       :state (get-in new-state [:by-server :direct])})))
-
-
-(defn direct-connect-handler-fn [state-atom]
-  (fn [request]
-    (let [debug (dissoc request :reitit.core/match)
-          response (or (handle-direct-connect state-atom request)
-                       {:state (get-in @state-atom [:by-server :direct])})]
-      (log/info (with-out-str (pprint debug)))
-      {:status 200
-       :body response})))
 
 (defn handler [state-atom]
   (let [{:keys [ajax-post-fn ajax-get-or-ws-handshake-fn]} (init state-atom)]

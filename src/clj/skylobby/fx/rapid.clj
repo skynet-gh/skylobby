@@ -24,18 +24,19 @@
 (defn rapid-download-root
   [{:fx/keys [context]}]
   (let [
-        engine-version (fx/sub-val context :engine-version)
         rapid-download (fx/sub-val context :rapid-download)
         rapid-filter (fx/sub-val context :rapid-filter)
         rapid-repo (fx/sub-val context :rapid-repo)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
-        spring-root (fx/sub-val context :rapid-spring-root)
+        spring-root (or (fx/sub-val context :rapid-spring-root)
+                        spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-root)
         rapid-repos (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-repos])
         rapid-versions (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-versions])
         rapid-packages (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-packages])
         sdp-files (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :sdp-files])
-        engines (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-isolation-dir) :engines])
+        engine-version (fx/sub-val context get-in [:by-spring-root spring-root-path :engine-version])
+        engines (fx/sub-val context get-in [:by-spring-root spring-root-path :engines])
         servers (fx/sub-val context :servers)
         spring-roots (fs/spring-roots {:servers servers :spring-isolation-dir spring-isolation-dir})
         spring-roots-paths (mapv fs/canonical-path spring-roots)
@@ -242,7 +243,7 @@
                                  {:spring-lobby/task-type :spring-lobby/rapid-download
                                   :engine-file engine-file
                                   :rapid-id (:id i)
-                                  :spring-isolation-dir spring-isolation-dir}}
+                                  :spring-isolation-dir spring-root}}
                      :graphic
                      {:fx/type font-icon/lifecycle
                       :icon-literal "mdi-download:16:white"}}}))))}}]}}
@@ -261,7 +262,7 @@
          :desc
          {:fx/type :button
           :on-action {:event/type :spring-lobby/desktop-browse-dir
-                      :file (io/file spring-isolation-dir "packages")}
+                      :file (io/file spring-root "packages")}
           :graphic
           {:fx/type font-icon/lifecycle
            :icon-literal "mdi-folder:16:white"}}}]}

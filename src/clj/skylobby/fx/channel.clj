@@ -74,7 +74,7 @@
                         (map string/trim)
                         (remove string/blank?))
          builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
-     (doseq [message messages]
+     (doseq [message (filter :timestamp messages)]
        (let [{:keys [message-type text timestamp username]} message]
          (.addParagraph builder
            ^java.util.List

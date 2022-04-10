@@ -7,8 +7,8 @@
     [skylobby.fx.bottom-bar :refer [app-update-button]]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
-    [skylobby.fx.import :as fx.import]
     [skylobby.fx.sub :as sub]
+    [skylobby.import :as import]
     [skylobby.spads :as spads]
     [skylobby.util :as u]
     [spring-lobby.sound :as sound]
@@ -308,6 +308,10 @@
         ring-volume (fx/sub-val context :ring-volume)
         settings-search (fx/sub-val context :settings-search)
         show-battle-preview (fx/sub-val context :show-battle-preview)
+        ;use-db-for-downloadables (fx/sub-val context :use-db-for-downloadables)
+        ;use-db-for-importables (fx/sub-val context :use-db-for-importables)
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        use-db-for-replays (fx/sub-val context :use-db-for-replays)
         use-default-ring-sound (fx/sub-val context :use-default-ring-sound)
         use-git-mod-version (fx/sub-val context :use-git-mod-version)
         user-agent-override (fx/sub-val context :user-agent-override)
@@ -372,6 +376,54 @@
             {:fx/type :check-box
              :selected (boolean use-git-mod-version)
              :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}]}
+         {:fx/type filterable-section
+          :search settings-search
+          :title "Database (experimental)"
+          :children
+          [{:fx/type :label
+            :text "Experimental! Use database for certain indexes to lower memory usage"}
+           #_
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-downloadables)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-downloadables}}
+             {:fx/type :label
+              :text " Use database for downloads index"}]}
+           #_
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-importables)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-importables}}
+             {:fx/type :label
+              :text " Use database for imports index"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-rapid)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-rapid}}
+             {:fx/type :label
+              :text " Use database for rapid index"}]}
+           {:fx/type :h-box
+            :style {:-fx-font-size 18}
+            :children
+            [
+             {:fx/type :check-box
+              :selected (boolean use-db-for-replays)
+              :on-selected-changed {:event/type :spring-lobby/assoc
+                                    :key :use-db-for-replays}}
+             {:fx/type :label
+              :text " Use database for replays index"}]}]}
          {:fx/type filterable-section
           :search settings-search
           :title "Spring"
@@ -556,7 +608,7 @@
                       {:fx/type :label
                        :text (str " " (fs/canonical-path file))
                        :style {:-fx-font-size 14}}]}]})
-                (fx.import/import-sources extra-import-sources))}
+                (import/import-sources extra-import-sources))}
              {:fx/type :h-box
               :alignment :center-left
               :children

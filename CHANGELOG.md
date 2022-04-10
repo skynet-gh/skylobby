@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.12](https://github.com/skynet-gh/skylobby/releases/tag/0.8.12) - 2022-04-10
+
+- Fix join queue playing detection
+- Leave join queue on manual spec
+- Show join queue status messages in battle chat
+- Add metal factions github releases http source
+- Add warning when spring dir has non-ascii path
+- Add database for rapid and reply data as memory saving alternative
+
 ## [0.8.11](https://github.com/skynet-gh/skylobby/releases/tag/0.8.11) - 2022-04-05
 
 - Add handling of rapid edge case

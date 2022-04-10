@@ -8,6 +8,7 @@
     [skylobby.fx.ext :refer [ext-table-column-auto-size]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.import :as import]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
@@ -19,19 +20,6 @@
 (def import-window-width 1600)
 (def import-window-height 800)
 
-
-(defn import-sources [extra-import-sources]
-  (concat
-    [{:import-source-name "Spring"
-      :file (fs/spring-root)
-      :builtin true}
-     {:import-source-name "Beyond All Reason"
-      :file (fs/bar-root)
-      :builtin true}
-     {:import-source-name "Zero-K"
-      :file (fs/zerok-root)
-      :builtin true}]
-    extra-import-sources))
 
 (defn- import-type-cell
   [import-type]
@@ -56,7 +44,7 @@
         importables-by-path (fx/sub-val context :importables-by-path)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
-        import-sources (import-sources extra-import-sources)
+        import-sources (import/import-sources extra-import-sources)
         import-source (->> import-sources
                            (filter (comp #{import-source-name} :import-source-name))
                            first)

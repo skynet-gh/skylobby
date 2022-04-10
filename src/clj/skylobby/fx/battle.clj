@@ -26,8 +26,8 @@
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.stage Popup)
@@ -74,10 +74,13 @@
                ; else
                "syncing")
              " ")
-     :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                 :map-resource indexed-map
-                 :mod-resource indexed-mod
-                 :spring-root spring-root}
+     :on-action
+     {:event/type :spring-lobby/add-task
+      :task
+      {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+       :map-resource indexed-map
+       :mod-resource indexed-mod
+       :spring-root spring-root}}
      :style sync-button-style}))
 
 
@@ -147,7 +150,11 @@
                              (cond
                                (string/starts-with? text "You are now in the join-queue")
                                true
+                               (string/starts-with? text "You were already in the join-queue at position")
+                               true
                                (string/starts-with? text "You have been removed from the join queue")
+                               false
+                               (string/ends-with? text "You were at the front of the queue, you are now a player.")
                                false
                                :else
                                am-in-queue))
@@ -353,9 +360,12 @@
                            :style sync-button-style}]}]
                        [{:fx/type :button
                          :text "Reload"
-                         :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                                     :map-resource indexed-map
-                                     :mod-resource indexed-mod}}])
+                         :on-action
+                         {:event/type :spring-lobby/add-task
+                          :task
+                          {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+                           :map-resource indexed-map
+                           :mod-resource indexed-mod}}}])
         server-type (u/server-type server-key)
         direct-connect (#{:direct-client :direct-host} server-type)
         buttons (concat

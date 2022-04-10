@@ -77,9 +77,9 @@
 
 (defn client-handler [state-atom server-url message]
   (try
-    (require 'spring-lobby.client)
-    (require 'spring-lobby.client.handler)
-    (let [new-handler (var-get (find-var 'spring-lobby.client.handler/handle))]
+    (require 'skylobby.client)
+    (require 'skylobby.client.handler)
+    (let [new-handler (var-get (find-var 'skylobby.client.handler/handle))]
       (when new-handler
         (alter-var-root #'old-client-handler (constantly new-handler))))
     (catch Throwable e
@@ -103,8 +103,8 @@
       (if-not renderer
         (create-renderer)
         (println "Renderer already exists")))
-    (require 'spring-lobby.client)
-    (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+    (require 'skylobby.client)
+    (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
     (try
       (let [init-fn (var-get (find-var 'spring-lobby/init))]
         (reset! init-state (init-fn *state {:skip-tasks true})))
@@ -201,10 +201,10 @@
                                   (or (:css initial-state)
                                       (var-get (find-var 'skylobby.fx/default-style-data))))))
      ; just use spring-lobby/*state for initial state, on refresh copy user/*state var back
-     (require 'spring-lobby.client)
-     (require 'spring-lobby.client.handler)
-     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'spring-lobby.client/handler))))
-     (alter-var-root (find-var 'spring-lobby.client/handler) (constantly client-handler))
+     (require 'skylobby.client)
+     (require 'skylobby.client.handler)
+     (alter-var-root #'old-client-handler (constantly (var-get (find-var 'skylobby.client/handler))))
+     (alter-var-root (find-var 'skylobby.client/handler) (constantly client-handler))
      (require 'spring-lobby)
      (let [init-fn (var-get (find-var 'spring-lobby/init))]
        (reset! init-state (init-fn *state))

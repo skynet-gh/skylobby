@@ -127,8 +127,10 @@
                 {:spring-lobby/task-type :spring-lobby/update-downloadables
                  :force true}
                 download-source)}
-             {:event/type :spring-lobby/update-all-downloadables
-              :force true})
+             {:event/type :spring-lobby/add-task
+              :task
+              {:spring-lobby/task-type :spring-lobby/update-all-downloadables
+               :force true}})
            :graphic
            {:fx/type font-icon/lifecycle
             :icon-literal "mdi-refresh:16:white"}}])}

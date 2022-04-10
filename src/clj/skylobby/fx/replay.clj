@@ -24,8 +24,8 @@
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.http :as http]
     [skylobby.resource :as resource]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
@@ -356,9 +356,12 @@
            [
             {:fx/type :button
              :text " Refresh resources "
-             :on-action {:event/type :spring-lobby/clear-map-and-mod-details
-                         :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
-                         :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}
+             :on-action
+             {:event/type :spring-lobby/add-task
+              :task
+              {:spring-lobby/task-type :spring-lobby/clear-map-and-mod-details
+               :map-resource (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
+               :mod-resource (fx/sub-ctx context sub/indexed-mod spring-isolation-dir mod-name)}}}
             {:fx/type :pane
              :pref-width 16}
             {:fx/type :check-box
@@ -512,7 +515,7 @@
   (.toZoneId (TimeZone/getDefault)))
 
 
-(defn replays-table
+(defn replays-table-impl
   [{:fx/keys [context]}]
   (let [replay-downloads-by-engine (fx/sub-val context :replay-downloads-by-engine)
         replay-downloads-by-map (fx/sub-val context :replay-downloads-by-map)
@@ -534,6 +537,14 @@
         http-download (fx/sub-val context :http-download)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
+        use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
+        db (fx/sub-val context :db)
+        get-rapid-data (fn [version]
+                         (if (and db use-db-for-rapid)
+                           ;(rapid/rapid-data-by-version db spring-root-path version)
+                           ; SQL too slow here
+                           nil
+                           (get rapid-data-by-version version)))
         rapid-download (fx/sub-val context :rapid-download)
         replays-tags (fx/sub-val context :replays-tags)
         replays-watched (fx/sub-val context :replays-watched)
@@ -818,7 +829,7 @@
                           matching-mod (get mods-by-name mod-version)
                           mod-downloadable (get replay-downloads-by-mod mod-version)
                           mod-importable (get replay-imports-by-mod mod-version)
-                          mod-rapid (get rapid-data-by-version mod-version)
+                          mod-rapid (get-rapid-data mod-version)
                           map-name (:replay-map-name i)
                           matching-map (get maps-by-name map-name)
                           map-downloadable (get replay-downloads-by-map map-name)
@@ -1014,6 +1025,9 @@
                           (string/includes? mod-version " git:")
                           {:fx/type :label
                            :text " Different git version, select for options"}
+                          use-db-for-rapid
+                          {:fx/type :label
+                           :text " Select replay for options"}
                           :else
                           {:fx/type :button
                            :text (if rapid-update-tasks
@@ -1032,6 +1046,13 @@
                         (not matching-map)
                         {:fx/type :label
                          :text " No map, select replay for more options"}))])}})}}])}}}}))
+
+(defn replays-table [state]
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/ui}
+    (tufte/p :replays-table
+      (replays-table-impl state))))
+
 
 
 (defn download-replays-window [{:fx/keys [context]}]
@@ -1140,16 +1161,15 @@
         replays-window-dedupe (fx/sub-val context :replays-window-dedupe)
         selected-replay-file (fx/sub-val context :selected-replay-file)
         selected-replay-id (fx/sub-val context :selected-replay-id)
-        local-filenames (->> parsed-replays-by-path
-                             vals
+        parsed-replays (vals parsed-replays-by-path)
+        local-filenames (->> parsed-replays
                              (map :filename)
                              (filter some?)
                              set)
         online-only-replays (->> online-bar-replays
                                  vals
                                  (remove (comp local-filenames :filename)))
-        all-replays (->> parsed-replays-by-path
-                         vals
+        all-replays (->> parsed-replays
                          (concat online-only-replays)
                          doall)
         replay-types (set (map :game-type all-replays))

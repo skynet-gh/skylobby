@@ -1,11 +1,11 @@
 (ns skylobby.fx.event.battle
   (:require
     clojure.set
+    [skylobby.client.message :as message]
     [skylobby.fs :as fs]
     [skylobby.fx.color :as fx.color]
+    [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [spring-lobby.client.message :as message]
-    [spring-lobby.spring :as spring]
     [taoensso.timbre :as log])
   (:import
     (javafx.scene.control ColorPicker)))
@@ -168,8 +168,8 @@
                            (update-in [:by-server server-key :battle :users] dissoc username)))))
             :spring-lobby
             (if bot-name
-              (message/send-message state-atom client-data (str "REMOVEBOT " bot-name))
-              (message/send-message state-atom client-data (str "KICKFROMBATTLE " username))))
+              (message/send state-atom client-data (str "REMOVEBOT " bot-name))
+              (message/send state-atom client-data (str "KICKFROMBATTLE " username))))
           (catch Exception e
             (log/error e "Error kicking from battle"))))))
   (defmethod multifn ::ally-changed
@@ -287,7 +287,7 @@
                 (broadcast-fn [:skylobby.direct/battle-scripttags scripttags]))
               (log/warn "No broadcast-fn" server-key))))
         (if am-host
-          (message/send-message state-atom client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
+          (message/send state-atom client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
           (multifn
             (assoc e
                    :event/type :skylobby.fx.event.chat/send

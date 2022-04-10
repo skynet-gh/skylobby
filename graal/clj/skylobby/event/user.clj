@@ -1,10 +1,10 @@
-(ns skylobby.fx.event
+(ns skylobby.event.user
   (:require
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 
-(set! *warn-on-reflection* false)
+(set! *warn-on-reflection* true)
 
 
 (defn update-user-state

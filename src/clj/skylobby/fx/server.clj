@@ -207,11 +207,12 @@
              :alignment :center
              :text " Encoding: "}
             {:fx/type :combo-box
-             :value (or server-encoding u/default-client-encoding)
+             :value (or server-encoding
+                        u/default-client-encoding)
              :items u/client-encodings
              :button-cell encoding-cell
-             :on-value-changed {:event/type :spring-lobby/assoc
-                                :key :server-encoding}
+             :on-value-changed {:event/type :spring-lobby/assoc-in
+                                :path [:server-edit :encoding]}
              :cell-factory
              {:fx/cell-type :list-cell
               :describe encoding-cell}}]}

@@ -12,8 +12,10 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle-sync :as battle-sync]
+    [skylobby.cli.util :as cu]
     [skylobby.fs :as fs]
-    [skylobby.server-stub :as server]
+    [skylobby.server :as server]
+    [skylobby.sql :as sql]
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
@@ -25,6 +27,9 @@
     (java.io File)
     (java.net URL)
     (java.time Duration)))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def ^:dynamic *state (atom {}))
@@ -85,14 +90,115 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
-   :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+  [:auto-get-resources
+   :auto-get-replay-resources
+   :auto-launch
+   :auto-rejoin-battle
+   :auto-refresh-replays
+   :battle-as-tab
+   :battle-layout
+   :battle-password
+   :battle-players-color-type
+   :battle-players-display-type
+   :battle-port
+   :battle-resource-details
+   :battle-title
+   :battles-layout
+   :battles-table-images
+   :bot-name
+   :bot-version
+   :chat-auto-complete
+   :chat-auto-scroll
+   :chat-color-username
+   :chat-font-size
+   :chat-highlight-username
+   :chat-highlight-words
+   :client-id-override
+   :client-id-type
+   :console-auto-scroll
+   :console-ignore-message-types
+   :css
+   :debug-spring
+   :direct-connect-chat-commands
+   :direct-connect-ip
+   :direct-connect-password
+   :direct-connect-port
+   :direct-connect-protocol
+   :direct-connect-username
+   :disable-tasks
+   :disable-tasks-while-in-game
+   :divider-positions
+   :engine-overrides
+   :extra-import-sources
+   :extra-replay-sources
+   :filter-replay
+   :filter-replay-type
+   :filter-replay-max-players
+   :filter-replay-min-players
+   :filter-users
+   :focus-chat-on-message
+   :friend-users
+   :hide-barmanager-messages
+   :hide-empty-battles
+   :hide-joinas-spec
+   :hide-locked-battles
+   :hide-passworded-battles
+   :hide-spads-messages
+   :hide-vote-messages
+   :highlight-tabs-with-new-battle-messages
+   :highlight-tabs-with-new-chat-messages
+   :ignore-users
+   :increment-ids
+   :interleave-ally-player-ids
+   :ipc-server-enabled
+   :ipc-server-port
+   :join-battle-as-player
+   :leave-battle-on-close-window
+   :logins
+   :minimap-size
+   :music-dir
+   :music-stopped
+   :music-volume
+   :mute
+   :mute-ring
+   :my-channels
+   :password
+   :players-table-columns
+   :pop-out-battle
+   :preferred-color
+   :preferred-factions
+   :prevent-non-host-rings
+   :rapid-repo
+   :rapid-spring-root
+   :ready-on-unspec
+   :refresh-replays-after-game
+   :replay-source-enabled
+   :replays-window-dedupe
+   :replays-window-details
+   :ring-on-auto-unspec
+   :ring-sound-file
+   :ring-volume
+   :scenarios-engine-version
+   :scenarios-spring-root
+   :server
+   :servers
+   :show-accolades
+   :show-battle-preview
+   :show-closed-battles
+   :show-hidden-modoptions
+   :show-spring-picker
+   :show-team-skills
+   :show-vote-log
+   :spring-isolation-dir
+   :spring-settings
+   :uikeys
+   :unready-after-game
+   :use-default-ring-sound
+   :use-git-mod-version
+   :user-agent-override
+   :username
+   :windows-as-tabs
+   :window-states])
 
 
 (defn- select-config [state]
@@ -115,7 +221,7 @@
 
 (defn- select-replays [state]
   (select-keys state
-    [:online-bar-replays :replays-tags :replays-watched]))
+    [:invalid-replay-paths :online-bar-replays :replays-tags :replays-watched]))
 
 
 (def state-to-edn
@@ -128,20 +234,13 @@
     :filename "importables.edn"}
    {:select-fn select-downloadables
     :filename "downloadables.edn"}
+   #_ ; disable rapid data load, use sql now
    {:select-fn select-rapid
     :filename "rapid.edn"
     :nippy true}
    {:select-fn select-replays
     :filename "replays.edn"}])
 
-(defn select-parsed-replays-keys 
-  [state]
-  (select-keys state [:invalid-replay-paths :parsed-replays-by-path]))
-
-(def parsed-replays-config
-  {:select-fn select-parsed-replays-keys
-   :filename "parsed-replays.edn"
-   :nippy true})
 
 (defn initial-state []
   (register-nippy)
@@ -178,17 +277,16 @@
                              :bonus true}
      :ready-on-unspec true
      :refresh-replays-after-game true
+     :servers u/default-servers
      :show-battle-preview true
      :show-spring-picker true
      :spring-isolation-dir (fs/default-spring-root)
-     :servers u/default-servers
      :use-default-ring-sound true
      :windows-as-tabs true}
     (apply
       merge
       (doall
         (map slurp-config-edn state-to-edn)))
-    (slurp-config-edn parsed-replays-config)
     {:tasks-by-kind {}
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      ;:minimap-type (first fx.battle/minimap-types)
@@ -197,9 +295,13 @@
      :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
      :chat-auto-scroll true
-     :console-auto-scroll true}))
+     :console-auto-scroll true
+     ;:use-db-for-downloadables false
+     ;:use-db-for-importables false
+     :use-db-for-rapid true
+     :use-db-for-replays true}))
 
-(defmulti event-handler :event/type)
+
 (defmulti task-handler :spring-lobby/task-type)
 
 (def ^:dynamic handle-task task-handler) ; for overriding in dev
@@ -362,7 +464,9 @@
                        {:port port
                         :ip "127.0.0.1"})]
           (swap! *state assoc :ipc-server server)))
-      (log/warn "IPC port unavailable" port))))
+      (do
+        (log/warn "IPC port unavailable" port)
+        (cu/print-and-exit -1 (str "Server port unavailable: " port))))))
 
 
 (def state-watch-chimers
@@ -371,7 +475,7 @@
    [:battle-map-details-watcher watch/battle-map-details-watcher 2000]
    [:battle-mod-details-watcher watch/battle-mod-details-watcher 2000]
    ;[:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10000]
-   ;[:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:replay-map-and-mod-details-watcher watch/replay-map-and-mod-details-watcher]
    ;[:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10000]
    [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2000]])
 
@@ -415,14 +519,15 @@
            (async/<!! (async/timeout wait-init-tasks-ms))
            (add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::update-all-downloadables})
+           (add-task! state-atom {::task-type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::scan-imports})
+           (add-task! state-atom {::task-type ::scan-all-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server)
+     (sql/init-db state-atom {:force true})
      {:chimers
       (concat
         task-chimers

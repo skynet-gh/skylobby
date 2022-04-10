@@ -21,8 +21,14 @@
     [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle :as battle]
+    [skylobby.battle-sync :as battle-sync]
+    [skylobby.client :as client]
+    [skylobby.client.handler :as handler]
+    [skylobby.client.message :as message]
+    [skylobby.client.gloss :as cu]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
+    [skylobby.download :as download]
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as replay]
     skylobby.fx
@@ -32,22 +38,18 @@
     [skylobby.fx.event.chat :as fx.event.chat]
     [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.event.minimap :as fx.event.minimap]
-    [skylobby.fx.import :as fx.import]
     [skylobby.git :as git]
     [skylobby.http :as http]
-    [skylobby.rapid :as rapid]
-    [skylobby.resource :as resource]
+    [skylobby.import :as import]
     [skylobby.server :as server]
+    [skylobby.spring :as spring]
     [skylobby.spring.script :as spring-script]
+    [skylobby.sql :as sql]
     [skylobby.task :as task]
     [skylobby.task.handler :as task-handlers]
     [skylobby.util :as u]
     [skylobby.watch :as watch]
-    [spring-lobby.client :as client]
-    [spring-lobby.client.handler :as handler]
-    [spring-lobby.client.message :as message]
-    [spring-lobby.client.util :as cu]
-    [spring-lobby.spring :as spring]
+    [spring-lobby.sound :as sound]
     [taoensso.nippy :as nippy]
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte]
@@ -58,8 +60,9 @@
     (java.lang ProcessBuilder)
     (java.net URL)
     (java.util List)
+    (javafx.animation KeyFrame KeyValue Timeline)
     (javafx.application Platform)
-    (javafx.event Event)
+    (javafx.event Event EventHandler)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
     (javafx.scene.control ColorPicker ScrollBar Tab)
@@ -67,6 +70,7 @@
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
     (javafx.stage DirectoryChooser FileChooser)
+    (javafx.util Duration)
     (manifold.stream SplicedStream)
     (org.fxmisc.flowless VirtualizedScrollPane))
   (:gen-class))
@@ -75,7 +79,7 @@
 (set! *warn-on-reflection* true)
 
 
-(declare download-http-resource update-battle-status)
+(declare update-battle-status)
 
 
 (def wait-init-tasks-ms 20000)
@@ -168,14 +172,117 @@
 
 
 (def config-keys
-  [:auto-get-resources :auto-get-replay-resources :auto-launch :auto-rejoin-battle :auto-refresh-replays :battle-as-tab :battle-layout :battle-password :battle-players-color-type :battle-players-display-type :battle-port :battle-resource-details :battle-title :battles-layout :battles-table-images :bot-name :bot-version :chat-auto-complete :chat-auto-scroll :chat-color-username :chat-font-size :chat-highlight-username :chat-highlight-words :client-id-override :client-id-type
-   :console-auto-scroll :console-ignore-message-types :css :debug-spring :direct-connect-chat-commands :direct-connect-ip :direct-connect-password :direct-connect-port :direct-connect-protocol :direct-connect-username :disable-tasks :disable-tasks-while-in-game :divider-positions :engine-overrides :extra-import-sources
-   :extra-replay-sources :filter-replay
-   :filter-replay-type :filter-replay-max-players :filter-replay-min-players :filter-users :focus-chat-on-message
-   :friend-users :hide-barmanager-messages :hide-empty-battles :hide-joinas-spec :hide-locked-battles :hide-passworded-battles :hide-spads-messages :hide-vote-messages :highlight-tabs-with-new-battle-messages :highlight-tabs-with-new-chat-messages :ignore-users :increment-ids :interleave-ally-player-ids :ipc-server-enabled :ipc-server-port :join-battle-as-player :leave-battle-on-close-window :logins :minimap-size
-   :music-dir :music-stopped :music-volume :mute :mute-ring :my-channels :password :players-table-columns :pop-out-battle :preferred-color :preferred-factions :prevent-non-host-rings :rapid-repo :rapid-spring-root :ready-on-unspec :refresh-replays-after-game :replay-source-enabled
-   :replays-window-dedupe :replays-window-details :ring-on-auto-unspec :ring-sound-file :ring-volume :scenarios-engine-version :scenarios-spring-root :server :servers :show-accolades :show-battle-preview :show-closed-battles :show-hidden-modoptions :show-spring-picker :show-team-skills :show-vote-log :spring-isolation-dir
-   :spring-settings :uikeys :unready-after-game :use-default-ring-sound :use-git-mod-version :user-agent-override :username :windows-as-tabs :window-states])
+  [:auto-get-resources
+   :auto-get-replay-resources
+   :auto-launch
+   :auto-rejoin-battle
+   :auto-refresh-replays
+   :battle-as-tab
+   :battle-layout
+   :battle-password
+   :battle-players-color-type
+   :battle-players-display-type
+   :battle-port
+   :battle-resource-details
+   :battle-title
+   :battles-layout
+   :battles-table-images
+   :bot-name
+   :bot-version
+   :chat-auto-complete
+   :chat-auto-scroll
+   :chat-color-username
+   :chat-font-size
+   :chat-highlight-username
+   :chat-highlight-words
+   :client-id-override
+   :client-id-type
+   :console-auto-scroll
+   :console-ignore-message-types
+   :css
+   :debug-spring
+   :direct-connect-chat-commands
+   :direct-connect-ip :direct-connect-password
+   :direct-connect-port
+   :direct-connect-protocol
+   :direct-connect-username
+   :disable-tasks
+   :disable-tasks-while-in-game
+   :divider-positions
+   :engine-overrides
+   :extra-import-sources
+   :extra-replay-sources
+   :filter-replay
+   :filter-replay-type
+   :filter-replay-max-players
+   :filter-replay-min-players
+   :filter-users
+   :focus-chat-on-message
+   :friend-users
+   :hide-barmanager-messages
+   :hide-empty-battles
+   :hide-joinas-spec
+   :hide-locked-battles
+   :hide-passworded-battles
+   :hide-spads-messages
+   :hide-vote-messages
+   :highlight-tabs-with-new-battle-messages
+   :highlight-tabs-with-new-chat-messages
+   :ignore-users
+   :increment-ids
+   :interleave-ally-player-ids
+   :ipc-server-enabled
+   :ipc-server-port
+   :join-battle-as-player
+   :leave-battle-on-close-window
+   :logins :minimap-size
+   :music-dir
+   :music-stopped
+   :music-volume
+   :mute
+   :mute-ring
+   :my-channels
+   :password
+   :players-table-columns
+   :pop-out-battle
+   :preferred-color
+   :preferred-factions
+   :prevent-non-host-rings
+   :rapid-repo
+   :rapid-spring-root
+   :ready-on-unspec
+   :refresh-replays-after-game
+   :replay-source-enabled
+   :replays-window-dedupe
+   :replays-window-details
+   :ring-on-auto-unspec
+   :ring-sound-file
+   :ring-volume
+   :scenarios-engine-version
+   :scenarios-spring-root
+   :server
+   :servers
+   :show-accolades
+   :show-battle-preview
+   :show-closed-battles
+   :show-hidden-modoptions
+   :show-spring-picker
+   :show-team-skills
+   :show-vote-log
+   :spring-isolation-dir
+   :spring-settings
+   :uikeys
+   :unready-after-game
+   :use-db-for-downloadables
+   :use-db-for-importables
+   :use-db-for-rapid
+   :use-db-for-replays
+   :use-default-ring-sound
+   :use-git-mod-version
+   :user-agent-override
+   :username
+   :windows-as-tabs
+   :window-states])
 
 
 (defn- select-config [state]
@@ -376,103 +483,10 @@
     (log/warn "Unable to determine task kind to cancel for" task)))
 
 
-(defn- replay-map-and-mod-details-relevant-keys [state]
-  (select-keys
-    state
-    [:by-spring-root :map-details :mod-details :online-bar-replays :parsed-replays-by-path
-     :selected-replay-file :selected-replay-id :servers :spring-isolation-dir]))
-
-
 (defn- fix-selected-server-relevant-keys [state]
   (select-keys
     state
     [:server :servers]))
-
-
-(defn replay-map-and-mod-details-watcher [_k state-atom old-state new-state]
-  (when (or (not= (replay-map-and-mod-details-relevant-keys old-state)
-                  (replay-map-and-mod-details-relevant-keys new-state))
-            (:single-replay-view new-state))
-    (try
-      (let [old-selected-replay-file (:selected-replay-file old-state)
-            old-replay-id (:selected-replay-id old-state)
-            {:keys [online-bar-replays parsed-replays-by-path replay-details selected-replay-file
-                    selected-replay-id spring-isolation-dir]} new-state
-
-            old-replay-path (fs/canonical-path old-selected-replay-file)
-            new-replay-path (fs/canonical-path selected-replay-file)
-
-            old-replay (or (get parsed-replays-by-path old-replay-path)
-                           (get online-bar-replays old-replay-id))
-            new-replay (or (get parsed-replays-by-path new-replay-path)
-                           (get online-bar-replays selected-replay-id))
-
-            old-mod (:replay-mod-name old-replay)
-            old-map (:replay-map-name old-replay)
-
-            new-mod (:replay-mod-name new-replay)
-            new-map (:replay-map-name new-replay)
-
-            spring-root-path (fs/canonical-path spring-isolation-dir)
-
-            old-maps (-> old-state :by-spring-root (get spring-root-path) :maps)
-            new-maps (-> new-state :by-spring-root (get spring-root-path) :maps)
-
-            old-mods (-> old-state :by-spring-root (get spring-root-path) :mods)
-            new-mods (-> new-state :by-spring-root (get spring-root-path) :mods)
-
-            new-mod-sans-git (u/mod-name-sans-git new-mod)
-            mod-name-set (set [new-mod new-mod-sans-git])
-            filter-fn (comp mod-name-set u/mod-name-sans-git :mod-name)
-
-            map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-            mod-exists (->> new-mods (filter filter-fn) first)
-
-            map-details (resource/cached-details (:map-details new-state) map-exists)
-            mod-details (resource/cached-details (:mod-details new-state) mod-exists)
-
-            map-changed (not= new-map (:map-name map-details))
-            mod-changed (not= new-mod (:mod-name mod-details))
-
-            replay-details (get replay-details new-replay-path)
-
-            tasks [
-                   (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-mod new-mod)
-                                      (:single-replay-view new-state))
-                                  (and (not (string/blank? new-mod))
-                                       (or (not (resource/details? mod-details))
-                                           mod-changed)))
-                             (and
-                               (or (not (some filter-fn old-mods))
-                                   (:single-replay-view new-state))
-                               mod-exists))
-                     {::task-type ::mod-details
-                      :mod-name new-mod
-                      :mod-file (:file mod-exists)
-                      :use-git-mod-version (:use-git-mod-version new-state)})
-                   (when (or (and (or (not= old-replay-path new-replay-path)
-                                      (not= old-map new-map)
-                                      (:single-replay-view new-state))
-                                  (and (not (string/blank? new-map))
-                                       (or (not (resource/details? map-details))
-                                           map-changed)))
-                             (and
-                               (or (not (some (comp #{new-map} :map-name) old-maps))
-                                   (:single-replay-view new-state))
-                               map-exists))
-                     {::task-type ::map-details
-                      :map-name new-map
-                      :map-file (:file map-exists)})
-                   (when (and (not= old-replay-path new-replay-path)
-                              (not replay-details))
-                     {::task-type ::replay-details
-                      :replay-file selected-replay-file})]]
-        (when-let [tasks (->> tasks (filter some?) seq)]
-          (log/info "Adding" (count tasks) "for replay resources")
-          (task/add-tasks! state-atom tasks)))
-      (catch Exception e
-        (log/error e "Error in :replay-map-and-mod-details state watcher")))))
 
 
 (defn- fix-resource-relevant-keys [state]
@@ -568,7 +582,7 @@
                      {::task-type ::refresh-maps
                       :spring-root spring-isolation-dir}
                      {::task-type ::scan-imports
-                      :sources (fx.import/import-sources extra-import-sources)}
+                      :sources (import/import-sources extra-import-sources)}
                      {::task-type ::update-rapid
                       :spring-isolation-dir spring-isolation-dir}
                      {::task-type ::refresh-replays}]))))))
@@ -647,63 +661,6 @@
           (catch Exception e
             (log/error e "Error in :fix-selected-server state watcher")))))))
 
-
-(defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
-  (when (some (comp u/server-needs-battle-status-sync-check second)
-              (-> new-state :by-server seq))
-    (try
-      (log/info "Checking servers for battle sync status updates")
-      (doseq [[server-key new-server] (concat
-                                        (->> new-state :by-server u/valid-servers)
-                                        (->> new-state u/complex-servers))]
-        (if (and (= (:servers old-state)
-                    (:servers new-state))
-                 (not (u/server-needs-battle-status-sync-check new-server)))
-          (log/debug "Server" server-key "does not need battle sync status check")
-          (let [
-                _ (log/info "Checking battle sync status for" server-key)
-                old-server (get-in old-state [:by-server server-key])
-                server-url (get-in new-server [:client-data :server-url])
-                {:keys [servers spring-isolation-dir]} new-state
-                spring-root (or (get-in servers [server-url :spring-isolation-dir])
-                                spring-isolation-dir)
-                spring-root-path (fs/canonical-path spring-root)
-
-                old-spring (get-in old-state [:by-spring-root spring-root-path])
-                new-spring (get-in new-state [:by-spring-root spring-root-path])
-
-                old-sync (resource/sync-status old-server old-spring (:mod-details old-state) (:map-details old-state))
-                new-sync (resource/sync-status new-server new-spring (:mod-details new-state) (:map-details new-state))
-
-                new-sync-number (handler/sync-number new-sync)
-                battle (:battle new-server)
-                client-data (:client-data new-server)
-                my-username (or (:username client-data)
-                                (:username new-server))
-                {:keys [battle-status team-color]} (get-in battle [:users my-username])
-                old-sync-number (get-in battle [:users my-username :battle-status :sync])
-                battle-id (:battle-id battle)
-                battle-changed (not= battle-id
-                                     (-> old-server :battle :battle-id))]
-            (when (and battle-id
-                       (or (not= old-sync new-sync)
-                           (not= old-sync-number new-sync-number)
-                           battle-changed))
-              (if battle-changed
-                (log/info "Setting battle sync status for" server-key "in battle" battle-id "to" new-sync "(" new-sync-number ")")
-                (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
-                          "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
-              (if (#{:direct-client :direct-host} (u/server-type server-key))
-                (fx.event.battle/update-player-or-bot-state
-                  state-atom
-                  server-key
-                  {:username my-username}
-                  {:battle-status {:sync new-sync-number}})
-                (let [new-battle-status (assoc battle-status :sync new-sync-number)]
-                  (message/send-message *state client-data
-                    (str "MYBATTLESTATUS " (cu/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
-      (catch Exception e
-        (log/error e "Error in :update-battle-status-sync state watcher")))))
 
 (defn- filter-replays-relevant-keys [state]
   (select-keys
@@ -848,9 +805,6 @@
   (when task
     (log/warn "Unknown task type" task)))
 
-(task-handlers/add-handlers handle-task *state)
-; TODO not during init?
-
 
 (defn handle-task!
   ([state-atom task-kind]
@@ -906,181 +860,6 @@
               (log/error e "Error handling task of kind" task-kind)
               true)})]
      (fn [] (.close chimer)))))
-
-
-(defn- old-valid-replay-fn [all-paths-set]
-  (fn [[path replay]]
-    (and
-      (contains? all-paths-set path) ; remove missing files
-      (-> replay :header :game-id) ; re-parse if no game id
-      (not (-> replay :file-size zero?)) ; remove empty files
-      (not (-> replay :game-type #{:invalid}))))) ; remove invalid
-
-(defn- valid-replay-fn [all-paths-set]
-  (fn [[path replay]]
-    (and
-      (contains? all-paths-set path) ; remove missing files
-      (:replay-id replay) ; re-parse if no replay id
-      (not (-> replay :file-size zero?)) ; remove empty files
-      (not (-> replay :game-type #{:invalid}))))) ; remove invalid
-
-(defn migrate-replay [replay]
-  (merge
-    (select-keys replay [:file :filename :file-size :source-name])
-    (replay/replay-metadata replay)))
-
-(defn- refresh-replays
-  [state-atom]
-  (log/info "Refreshing replays")
-  (let [before (u/curr-millis)
-        {:keys [parsed-replays-by-path replay-sources-enabled] :as state} @state-atom
-        all-files (mapcat
-                    (fn [{:keys [file recursive replay-source-name]}]
-                      (let [files (fs/replay-files file {:recursive recursive})]
-                        (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
-                        (map
-                          (juxt (constantly replay-source-name) identity)
-                          files)))
-                    (filter
-                      (fn [{:keys [file]}]
-                        (let [path (fs/canonical-path file)]
-                          (or (not (contains? replay-sources-enabled path))
-                              (get replay-sources-enabled path))))
-                      (fs/replay-sources state)))
-        all-paths (set (map (comp fs/canonical-path second) all-files))
-        old-valid-replay? (old-valid-replay-fn all-paths)
-        valid-replay? (valid-replay-fn all-paths)
-        existing-valid-paths (->> parsed-replays-by-path
-                                  (filter valid-replay?)
-                                  keys
-                                  set)
-        todo (->> all-files
-                  (remove (comp existing-valid-paths fs/canonical-path second))
-                  shuffle)
-        this-round (take replays-batch-size todo)
-        parsed-replays (->> this-round
-                            (map
-                              (fn [[source f]]
-                                [(fs/canonical-path f)
-                                 (merge
-                                   (replay/parse-replay f)
-                                   {:source-name source})]))
-                            doall)]
-    (log/info "Parsed" (count this-round) "of" (count todo) "new replays in" (- (u/curr-millis) before) "ms")
-    (let [
-          new-state (swap! state-atom
-                      (fn [state]
-                        (let [old-replays (:parsed-replays-by-path state)
-                              replays-by-path (if (map? old-replays) old-replays {})
-                              all-replays (into {} (concat replays-by-path parsed-replays))
-                              valid-replays (->> all-replays
-                                                 (filter valid-replay?)
-                                                 (into {}))
-                              migratable-replays (->> all-replays
-                                                      (remove valid-replay?)
-                                                      (filter old-valid-replay?))
-                              _ (log/info "Migrating" (count migratable-replays) "replays")
-                              migrated-replays (->> migratable-replays
-                                                    (map (fn [[path replay]] [path (migrate-replay replay)]))
-                                                    (into {}))
-                              _ (log/info "Migrated" (count migratable-replays) "replays")
-                              replays-by-path (merge valid-replays migrated-replays)
-                              valid-replay-paths (set (concat (keys replays-by-path)))
-                              invalid-replay-paths (->> all-replays
-                                                        (remove (some-fn old-valid-replay? valid-replay?))
-                                                        keys
-                                                        (concat (:invalid-replay-paths state))
-                                                        (remove valid-replay-paths)
-                                                        set)]
-                          (assoc state
-                                 :parsed-replays-by-path replays-by-path
-                                 :invalid-replay-paths invalid-replay-paths))))
-          invalid-replay-paths (set (:invalid-replay-paths new-state))
-          valid-next-round (remove
-                             (comp invalid-replay-paths fs/canonical-path second)
-                             todo)]
-      (if (seq valid-next-round)
-        (task/add-task! state-atom
-          {::task-type ::refresh-replays
-           :todo (count todo)})
-        (do
-          (log/info "No valid replays left to parse")
-          (spit-app-edn
-            ((:select-fn parsed-replays-config) new-state)
-            (:filename parsed-replays-config)
-            parsed-replays-config)
-          (task/add-task! state-atom {::task-type ::refresh-replay-resources}))))))
-
-(defn- refresh-replay-resources
-  [state-atom]
-  (log/info "Refresh replay resources")
-  (let [before (u/curr-millis)
-        {:keys [downloadables-by-url importables-by-path parsed-replays-by-path]} @state-atom
-        parsed-replays (vals parsed-replays-by-path)
-        engine-versions (->> parsed-replays
-                             (map :replay-engine-version)
-                             (filter some?)
-                             set)
-        mod-names (->> parsed-replays
-                       (map :replay-mod-name)
-                       set)
-        map-names (->> parsed-replays
-                       (map :replay-map-name)
-                       set)
-        downloads (vals downloadables-by-url)
-        imports (vals importables-by-path)
-        engine-downloads (filter (comp #{::engine} :resource-type) downloads)
-        replay-engine-downloads (->> engine-versions
-                                     (map
-                                       (fn [engine-version]
-                                         (when-let [imp (->> engine-downloads
-                                                             (filter (partial resource/could-be-this-engine? engine-version))
-                                                             first)]
-                                           [engine-version imp])))
-                                     (into {}))
-        mod-imports (filter (comp #{::mod} :resource-type) imports)
-        replay-mod-imports (->> mod-names
-                                (map
-                                  (fn [mod-name]
-                                    (when-let [imp (->> mod-imports
-                                                        (filter (partial resource/could-be-this-mod? mod-name))
-                                                        first)]
-                                      [mod-name imp])))
-                                (into {}))
-        mod-downloads (filter (comp #{::mod} :resource-type) downloads)
-        replay-mod-downloads (->> mod-names
-                                  (map
-                                    (fn [mod-name]
-                                      (when-let [dl (->> mod-downloads
-                                                         (filter (partial resource/could-be-this-mod? mod-name))
-                                                         first)]
-                                        [mod-name dl])))
-                                  (into {}))
-        map-imports (filter (comp #{::map} :resource-type) imports)
-        replay-map-imports (->> map-names
-                                (map
-                                  (fn [map-name]
-                                    (when-let [imp (->> map-imports
-                                                        (filter (partial resource/could-be-this-map? map-name))
-                                                        first)]
-                                      [map-name imp])))
-                                (into {}))
-        map-downloads (filter (comp #{::map} :resource-type) downloads)
-        replay-map-downloads (->> map-names
-                                  (map
-                                    (fn [map-name]
-                                      (when-let [dl (->> map-downloads
-                                                         (filter (partial resource/could-be-this-map? map-name))
-                                                         first)]
-                                        [map-name dl])))
-                                  (into {}))]
-    (log/info "Refreshed replay resources in" (- (u/curr-millis) before) "ms")
-    (swap! state-atom assoc
-           :replay-downloads-by-engine replay-engine-downloads
-           :replay-downloads-by-mod replay-mod-downloads
-           :replay-imports-by-mod replay-mod-imports
-           :replay-downloads-by-map replay-map-downloads
-           :replay-imports-by-map replay-map-imports)))
 
 
 (defmethod event-handler ::randomize-client-id
@@ -1230,7 +1009,7 @@
                         (let [{:keys [battle-status team-color]} me]
                           (when (and (:mode battle-status)
                                      (not= (:ready battle-status) desired-ready))
-                            (message/send-message *state (:client-data server-data)
+                            (message/send *state (:client-data server-data)
                               (str "MYBATTLESTATUS " (cu/encode-battle-status (assoc battle-status :ready desired-ready)) " " (or team-color 0))))))))))))
           {:error-handler
            (fn [e]
@@ -1251,9 +1030,9 @@
               (doseq [[server-key server-data] (u/valid-servers (:by-server state))]
                 (if (u/matchmaking? server-data)
                   (let [client-data (:client-data server-data)]
-                    (message/send-message state-atom client-data "c.matchmaking.list_all_queues")
+                    (message/send state-atom client-data "c.matchmaking.list_all_queues")
                     (doseq [[queue-id _queue-data] (:matchmaking-queues server-data)]
-                      (message/send-message state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id))))
+                      (message/send state-atom client-data (str "c.matchmaking.get_queue_info\t" queue-id))))
                   (log/info "Matchmaking not enabled for server" server-key)))))
           {:error-handler
            (fn [e]
@@ -1348,7 +1127,7 @@
                     (if (and sent-message sent-millis)
                       (when (< (+ sent-millis 3000) now)
                         (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
-                        (message/send-message state-atom (:client-data server-data) sent-message))
+                        (message/send state-atom (:client-data server-data) sent-message))
                       (log/warn "Issue with expecting response:" expected-response sent)))))))
           {:error-handler
            (fn [e]
@@ -1507,7 +1286,7 @@
       :else
       (do
         (log/info "Downloading app update" (:download-url downloadable) "to" dest)
-        @(download-http-resource
+        @(download/download-http-resource *state
            {:downloadable downloadable
             :dest dest})
         (if (fs/exists? dest)
@@ -1641,13 +1420,6 @@
         (throw t)))))
 
 
-(defmethod task-handler ::refresh-replays [_]
-  (refresh-replays *state))
-
-(defmethod task-handler ::refresh-replay-resources [_]
-  (refresh-replay-resources *state))
-
-
 (defn parse-battle-status-message [battle-status-message]
   (if (string/includes? battle-status-message "Battle lobby is empty")
     []
@@ -1755,7 +1527,7 @@
         client-data (get-in by-server [server-key :client-data])]
     (future
       (try
-        (message/send-message *state client-data (str "JOIN " channel-name))
+        (message/send *state client-data (str "JOIN " channel-name))
         (catch Exception e
           (log/error e "Error joining channel" channel-name))))))
 
@@ -1771,26 +1543,26 @@
     (future
       (try
         (when-not (string/starts-with? channel-name "@")
-          (message/send-message *state client-data (str "LEAVE " channel-name)))
+          (message/send *state client-data (str "LEAVE " channel-name)))
         (catch Exception e
           (log/error e "Error leaving channel" channel-name))))))
 
 
 (defmethod event-handler ::friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "FRIENDREQUEST userName=" username)))
+  (message/send *state client-data (str "FRIENDREQUEST userName=" username)))
 
 (defmethod event-handler ::unfriend [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "UNFRIEND userName=" username))
+  (message/send *state client-data (str "UNFRIEND userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friends] dissoc username)))
 
 (defmethod event-handler ::accept-friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "ACCEPTFRIENDREQUEST userName=" username))
+  (message/send *state client-data (str "ACCEPTFRIENDREQUEST userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
 
 (defmethod event-handler ::decline-friend-request [{:keys [client-data username]}]
-  (message/send-message *state client-data (str "DECLINEFRIENDREQUEST userName=" username))
+  (message/send *state client-data (str "DECLINEFRIENDREQUEST userName=" username))
   (let [server-key (u/server-key client-data)]
     (swap! *state update-in [:by-server server-key :friend-requests] dissoc username)))
 
@@ -1985,7 +1757,7 @@
                          :client-deferred client-deferred
                          :server-url server-url}]
         (swap! *state dissoc :password-confirm)
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "REGISTER " username " " (u/base64-md5 password) " " email))
         (loop []
           (when-let [d (s/take! client)]
@@ -2002,7 +1774,7 @@
   [{:keys [client-data server-key verification-code]}]
   (future
     (try
-      (message/send-message *state client-data (str "CONFIRMAGREEMENT " verification-code))
+      (message/send *state client-data (str "CONFIRMAGREEMENT " verification-code))
       (swap! *state update-in [:by-server server-key] dissoc :agreement :verification-code)
       (catch Exception e
         (log/error e "Error confirming agreement")))))
@@ -2017,7 +1789,7 @@
             client-data {:client client
                          :client-deferred client-deferred
                          :server-url server-url}]
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "RESETPASSWORDREQUEST " email))
         (loop []
           (when-let [d (s/take! client)]
@@ -2039,7 +1811,7 @@
             client-data {:client client
                          :client-deferred client-deferred
                          :server-url server-url}]
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "RESETPASSWORD " email " " verification-code))
         (loop []
           (when-let [d (s/take! client)]
@@ -2169,7 +1941,7 @@
          engine "Spring"}}]
   (let [password (if (string/blank? battle-password) "*" battle-password)
         host-port (int (or (u/to-number host-port) 8452))]
-    (message/send-message *state client-data
+    (message/send *state client-data
       (str "OPENBATTLE " battle-type " " nat-type " " password " " host-port " " max-players
            " " mod-hash " " rank " " map-hash " " engine "\t" engine-version "\t" map-name "\t" title
            "\t" mod-name))))
@@ -2194,7 +1966,7 @@
                                    (u/mod-name-fix-git mod-name))]
             (open-battle client-data (assoc host-battle-state :mod-name adjusted-modname)))
           (when (seq scripttags)
-            (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
+            (message/send *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
           (catch Exception e
             (log/error e "Error opening battle"))))
       (log/info "Invalid data to host battle" host-battle-state))))
@@ -2206,7 +1978,7 @@
   (future
     (try
       (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
-      (message/send-message *state client-data "LEAVEBATTLE")
+      (message/send *state client-data "LEAVEBATTLE")
       (swap! *state update-in [:by-server server-key]
         (fn [server-data]
           (let [battle (:battle server-data)]
@@ -2452,7 +2224,7 @@
             map-hash -1 ; TODO
             map-name (or map-name event)
             m (str "UPDATEBATTLEINFO " spectator-count " " locked " " map-hash " " map-name)]
-        (message/send-message *state client-data m))
+        (message/send *state client-data m))
       (catch Exception e
         (log/error e "Error changing battle map")))))
 
@@ -2506,7 +2278,7 @@
           :spring-lobby
           (let [
                 bot-status (cu/encode-battle-status status)]
-            (message/send-message
+            (message/send
               *state client-data
               (str "ADDBOT " bot-username " " bot-status " " bot-color " " bot-name "|" bot-version)))
           (event-handler
@@ -2697,7 +2469,7 @@
               (swap! *state update-in
                      [:by-server :local :battle :scripttags "game" (str "team" team)]
                      merge team-data)
-              (message/send-message *state client-data
+              (message/send *state client-data
                 (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))))
         (when-let [{:keys [allyteam-id startx starty endx endy target]} (:drag-allyteam before)]
           (let [l (min startx endx)
@@ -2719,7 +2491,7 @@
                                 :startrectright right
                                 :startrectbottom bottom)))
                 (if am-host
-                  (message/send-message *state client-data
+                  (message/send *state client-data
                     (str "ADDSTARTRECT " allyteam-id " "
                          (int (* 200 left)) " "
                          (int (* 200 top)) " "
@@ -2742,7 +2514,7 @@
                   (if singleplayer
                     (swap! *state update-in [:by-server :local :battle :scripttags "game"] dissoc (str "allyteam" target))
                     (if am-host
-                      (message/send-message *state client-data (str "REMOVESTARTRECT " target))
+                      (message/send *state client-data (str "REMOVESTARTRECT " target))
                       (event-handler
                         (assoc e
                                :event/type ::send-message
@@ -2753,39 +2525,9 @@
         (log/error e "Error releasing minimap")))))
 
 
-(defn- update-copying [f copying]
-  (if f
-    (swap! *state update-in [:copying (fs/canonical-path f)] merge copying)
-    (log/warn "Attempt to update copying for nil file")))
-
 (defmethod event-handler ::add-task [{:keys [task]}]
   (task/add-task! *state task))
 
-(defn- import-resource [{:keys [importable spring-isolation-dir]}]
-  (let [{:keys [resource-file]} importable
-        source resource-file
-        dest (resource/resource-dest spring-isolation-dir importable)]
-    (update-copying source {:status true})
-    (update-copying dest {:status true})
-    (try
-      (if (string/ends-with? (fs/filename source) ".sdp")
-        (rapid/copy-package source (fs/parent-file (fs/parent-file dest)))
-        (fs/copy source dest))
-      (log/info "Finished importing" importable "from" source "to" dest)
-      (catch Exception e
-        (log/error e "Error importing" importable))
-      (finally
-        (update-copying source {:status false})
-        (update-copying dest {:status false})
-        (fs/update-file-cache! *state source dest)
-        (case (:resource-type importable)
-          ::map (task/add-task! *state {::task-type ::refresh-maps})
-          ::mod (task/add-task! *state {::task-type ::refresh-mods})
-          ::engine (task/add-task! *state {::task-type ::refresh-engines})
-          nil)))))
-
-(defmethod task-handler ::import [e]
-  (import-resource e))
 
 (defmethod task-handler ::git-mod
   [{:keys [battle-mod-git-ref file spring-root]}]
@@ -2839,7 +2581,7 @@
                      (str "UPDATEBOT " player-name)
                      "MYBATTLESTATUS")]
         (if (or is-bot is-me)
-          (message/send-message *state client-data
+          (message/send *state client-data
             (str prefix
                  " "
                  (cu/encode-battle-status battle-status)
@@ -2860,7 +2602,7 @@
   (update-battle-status client-data opts battle-status team-color))
 
 (defmethod event-handler ::update-client-status [{:keys [client-data client-status]}]
-  (message/send-message *state client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
+  (message/send *state client-data (str "MYSTATUS " (cu/encode-client-status client-status))))
 
 (defmethod event-handler ::on-change-away [{:keys [client-status] :fx/keys [event] :as e}]
   (let [away (= "Away" event)]
@@ -2872,7 +2614,7 @@
 (defn- update-color [client-data id {:keys [is-me is-bot] :as opts} color-int]
   (if (or is-me is-bot)
     (update-battle-status client-data (assoc opts :id id) (:battle-status id) color-int)
-    (message/send-message *state client-data
+    (message/send *state client-data
       (str "FORCETEAMCOLOR " (:username id) " " color-int))))
 
 (defn- update-team [client-data id {:keys [is-me is-bot] :as opts} player-id]
@@ -2880,7 +2622,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :id player-id) (:team-color id))
-        (message/send-message *state client-data
+        (message/send *state client-data
           (str "FORCETEAMNO " (:username id) " " player-id)))
       (catch Exception e
         (log/error e "Error updating team")))))
@@ -2890,7 +2632,7 @@
     (try
       (if (or is-me is-bot)
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :ally ally) (:team-color id))
-        (message/send-message *state client-data (str "FORCEALLYNO " (:username id) " " ally)))
+        (message/send *state client-data (str "FORCEALLYNO " (:username id) " " ally)))
       (catch Exception e
         (log/error e "Error updating ally")))))
 
@@ -2899,7 +2641,7 @@
     (try
       (if (or is-bot (not client-data))
         (update-battle-status client-data (assoc opts :id id) (assoc (:battle-status id) :handicap handicap) (:team-color id))
-        (message/send-message *state client-data (str "HANDICAP " (:username id) " " handicap)))
+        (message/send *state client-data (str "HANDICAP " (:username id) " " handicap)))
       (catch Exception e
         (log/error e "Error updating handicap")))))
 
@@ -2914,7 +2656,7 @@
                       :id "FORCETEAMNO"
                       :ally "FORCEALLYNO"
                       :handicap "HANDICAP")]
-            (message/send-message *state client-data (str msg " " (:username id) " " v)))))
+            (message/send *state client-data (str msg " " (:username id) " " v)))))
       (catch Exception e
         (log/error e "Error applying battle status changes")))))
 
@@ -3139,7 +2881,7 @@
 (defmethod event-handler ::send-user-report
   [{:keys [battle-id client-data message username]}]
   (let [message (string/replace (str message) #"[\n\r]" "  ")]
-    (message/send-message *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
+    (message/send *state client-data (str "c.moderation.report_user " username "\tbattle\t" battle-id "\t" message)))
   (swap! *state dissoc :show-report-user-window))
 
 
@@ -3149,7 +2891,7 @@
     (if am-host
       (if singleplayer
         (swap! *state assoc-in [:by-server :local :battle :scripttags "game" "startpostype"] startpostype)
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
+        (message/send *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
                :event/type ::send-message
@@ -3163,7 +2905,7 @@
         team-kws (map #(str "team" %) team-ids)
         dissoc-fn #(apply dissoc % team-kws)]
     (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc-fn)
-    (message/send-message *state
+    (message/send *state
       client-data
       (str "REMOVESCRIPTTAGS " (string/join " " scripttag-keys)))))
 
@@ -3172,7 +2914,7 @@
   (doseq [allyteam-id allyteam-ids]
     (let [allyteam-str (str "allyteam" allyteam-id)]
       (swap! *state update-in [:by-server server-key :battle :scripttags "game"] dissoc allyteam-str))
-    (message/send-message *state client-data (str "REMOVESTARTRECT " allyteam-id))))
+    (message/send *state client-data (str "REMOVESTARTRECT " allyteam-id))))
 
 (defn modoption-value [modoption-type raw-value]
   (if (or (= "list" modoption-type)
@@ -3188,7 +2930,7 @@
     (if singleplayer
       (swap! *state assoc-in [:by-server :local :battle :scripttags "game" option-key modoption-key-str] (str event))
       (if am-host
-        (message/send-message *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
+        (message/send *state client-data (str "SETSCRIPTTAGS game/" option-key "/" modoption-key-str "=" value))
         (event-handler
           (assoc e
                  :event/type ::send-message
@@ -3234,7 +2976,7 @@
         (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
           (broadcast-fn [:skylobby.direct/battle-scripttags scripttags])
           (log/warn "No broadcast-fn" server-key))
-        (message/send-message *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
+        (message/send *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags)))))))
 
 
 (defmethod event-handler ::battle-ready-change
@@ -3242,7 +2984,7 @@
   (swap! *state assoc-in [:by-server (u/server-key client-data) :battle :desired-ready] (boolean event))
   (future
     (try
-      (update-battle-status client-data {:id id} (assoc battle-status :ready event) team-color)
+      (update-battle-status client-data {:id id :is-me true} (assoc battle-status :ready event) team-color)
       (catch Exception e
         (log/error e "Error updating battle ready")))))
 
@@ -3266,16 +3008,26 @@
         (if (or is-me is-bot)
           (update-battle-status client-data data battle-status (:team-color id))
           (if mode
-            (message/send-message *state client-data (str "FORCESPECTATORMODE " (:username id)))
+            (message/send *state client-data (str "FORCESPECTATORMODE " (:username id)))
             (log/error "No method to force unspec for" (:username id))))
         (catch Exception e
           (log/error e "Error updating battle spectate"))))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
-  (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
-  (event-handler (assoc e
-                        :event/type ::battle-spectate-change
-                        :value (= "Playing" event))))
+  (let [{:keys [by-server]} (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
+        {:keys [battle client-data]} (get by-server server-key)
+        battle-channel-name (u/battle-channel-name battle)
+        value (= "Playing" event)]
+    (event-handler (assoc e
+                          :event/type ::battle-spectate-change
+                          :value value))
+    (when-not value
+      (event-handler
+        {:event/type :skylobby.fx.event.chat/send
+         :channel-name battle-channel-name
+         :client-data client-data
+         :message "$%leaveq"
+         :server-key server-key}))))
 
 (defmethod event-handler ::auto-unspec [{:keys [server-key] :fx/keys [event] :as e}]
   (if event
@@ -3394,259 +3146,18 @@
   (swap! *state assoc :rapid-repo event))
 
 
-(defn- download-http-resource [{:keys [dest downloadable spring-isolation-dir]}]
-  (log/info "Request to download" downloadable)
-  (future
-    (try
-      (let [url (:download-url downloadable)
-            dest (or dest (resource/resource-dest spring-isolation-dir downloadable))
-            temp-dest (fs/download-file (str (hash (str url)) "-" (fs/filename dest)))]
-        (log/info "Downloading to temp file" temp-dest "then moving to" dest)
-        (http/download-file *state url temp-dest)
-        (log/info "Moving temp download file" temp-dest "into place at" dest)
-        (fs/move temp-dest dest))
-      (case (:resource-type downloadable)
-        ::map (task/add-task! *state {::task-type ::refresh-maps
-                                      :spring-root spring-isolation-dir
-                                      :priorities [dest]})
-        ::mod (task/add-task! *state {::task-type ::refresh-mods
-                                      :spring-root spring-isolation-dir
-                                      :priorities [dest]})
-        ::engine (task/add-task! *state {::task-type ::refresh-engines
-                                         :spring-root spring-isolation-dir
-                                         :priorities [dest]})
-        nil)
-      (catch Exception e
-        (log/error e "Error downloading")))))
-
-(defmethod task-handler ::http-downloadable
-  [task]
-  @(download-http-resource task))
-
-(defmethod task-handler ::download-and-extract
-  [{:keys [downloadable spring-isolation-dir] :as task}]
-  @(download-http-resource task)
-  (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
-        extract-file (when download-file
-                       (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
-    @(event-handler
-       (assoc task
-              :event/type ::extract-7z
-              :file download-file
-              :dest extract-file))))
-
 (defmethod task-handler ::download-bar-replay
   [{:keys [id spring-isolation-dir]}]
   (log/info "Downloading replay id" id)
   (let [{:keys [fileName]} (http/get-bar-replay-details {:id id})]
     (log/info "Downloaded replay details for id" id ":" fileName)
     (swap! *state assoc-in [:online-bar-replays id :filename] fileName)
-    @(download-http-resource
+    @(download/download-http-resource *state
        {:downloadable {:download-url (http/bar-replay-download-url fileName)
                        :resource-filename fileName
                        :resource-type ::replay}
         :spring-isolation-dir spring-isolation-dir})
     (task/add-task! *state {::task-type ::refresh-replays})))
-
-(defn search-springfiles
-  "Search springfiles.com for the given resource name, returns a string mirror url for the resource,
-  or nil if not found."
-  [{:keys [category springname]}]
-  (log/info "Searching springfiles for" springname)
-  (let [result (->> (clj-http/get "https://springfiles.springrts.com/json.php"
-                      {:query-params
-                       (merge
-                         {:springname springname
-                          :nosensitive "on"
-                          :category (or category "**")})
-                       :as :json})
-                    :body
-                    first)]
-    (log/info "First result for" springname "search on springfiles:" result)
-    (when-let [mirrors (->> result :mirrors (filter some?) (remove #(string/includes? % "spring1.admin-box.com")) seq)]
-      {:filename (:filename result)
-       :mirrors mirrors})))
-
-(defmethod task-handler ::search-springfiles
-  [{:keys [download-if-found springname] :or {download-if-found true} :as e}]
-  (if-not (string/blank? springname)
-    (let [search-result (search-springfiles e)]
-      (log/info "Found details for" springname "on springfiles" search-result)
-      (swap! *state assoc-in [:springfiles-search-results springname] search-result)
-      (when (and search-result download-if-found)
-        (task/add-task! *state
-          (assoc e
-                 ::task-type ::download-springfiles
-                 :search-result search-result)))
-      search-result)
-    (log/warn "No springname to search springfiles" e)))
-
-(defmethod task-handler ::download-springfiles
-  [{:keys [resource-type search-result springname spring-isolation-dir url]}]
-  (if-let [{:keys [filename] :as search-result} (or search-result
-                                                    (task-handler {::task-type ::search-springfiles
-                                                                   :springname springname}))]
-    (let [url (or url
-                  (http/springfiles-url search-result))]
-      (task/add-task! *state
-        {::task-type ::http-downloadable
-         :downloadable {:download-url url
-                        :resource-filename filename
-                        :resource-type resource-type}
-         :springname springname
-         :spring-isolation-dir spring-isolation-dir}))
-    (log/info "No mirror to download" springname "on springfiles")))
-
-
-(defmethod event-handler ::extract-7z
-  [{:keys [file dest]}]
-  (let [path (fs/canonical-path file)]
-    (swap! *state assoc-in [:extracting path] true)
-    (fs/update-file-cache! *state file dest)
-    (future
-      (try
-        (if dest
-          (fs/extract-7z-fast file dest)
-          (fs/extract-7z-fast file))
-        (task/add-task! *state {::task-type ::refresh-engines})
-        (catch Exception e
-          (log/error e "Error extracting 7z" file))
-        (finally
-          (fs/update-file-cache! *state file dest)
-          (swap! *state assoc-in [:extracting path] false))))))
-
-(defmethod task-handler ::extract-7z
-  [task]
-  @(event-handler (assoc task :event/type ::extract-7z)))
-
-
-(def resource-types
-  [::engine ::map ::mod ::sdp]) ; TODO split out packaging type from resource type...
-
-(defn- update-importable
-  [{:keys [resource-file resource-name resource-type] :as importable}]
-  (log/info "Finding name for importable" importable)
-  (if resource-name
-    (log/info "Skipping known import" importable)
-    (let [resource-name (case resource-type
-                          ::map (:map-name (fs/read-map-data resource-file))
-                          ::mod (:mod-name (task-handlers/read-mod-data resource-file))
-                          ::engine (:engine-version (fs/engine-data resource-file))
-                          ::sdp (:mod-name (task-handlers/read-mod-data resource-file)))
-          now (u/curr-millis)]
-      (swap! *state update-in [:importables-by-path (fs/canonical-path resource-file)]
-             assoc :resource-name resource-name
-             :resource-updated now)
-      resource-name)))
-
-(defmethod task-handler ::update-importable [{:keys [importable]}]
-  (update-importable importable))
-
-(defn- importable-data [resource-type import-source-name now resource-file]
-  {:resource-type resource-type
-   :import-source-name import-source-name
-   :resource-file resource-file
-   :resource-filename (fs/filename resource-file)
-   :resource-updated now})
-
-(defmethod task-handler ::scan-imports
-  [{root :file import-source-name :import-source-name}]
-  (log/info "Scanning for possible imports from" root)
-  (let [map-files (fs/map-files root)
-        mod-files (fs/mod-files root)
-        engine-dirs (fs/engine-dirs root)
-        sdp-files (rapid/sdp-files root)
-        now (u/curr-millis)
-        importables (concat
-                      (map (partial importable-data ::map import-source-name now) map-files)
-                      (map (partial importable-data ::mod import-source-name now) (concat mod-files sdp-files))
-                      (map (partial importable-data ::engine import-source-name now) engine-dirs))
-        importables-by-path (->> importables
-                                 (map (juxt (comp fs/canonical-path :resource-file) identity))
-                                 (into {}))]
-    (log/info "Found imports" (frequencies (map :resource-type importables)) "from" import-source-name)
-    (swap! *state update :importables-by-path
-           (fn [old]
-             (->> old
-                  (remove (comp #{import-source-name} :import-source-name second))
-                  (into {})
-                  (merge importables-by-path))))
-    importables-by-path))
-
-
-(def downloadable-update-cooldown
-  (* 1000 60 60 24)) ; 1 day
-
-
-(defn update-download-source
-  [{:keys [resources-fn url download-source-name] :as source}]
-  (log/info "Getting resources for possible download from" download-source-name "at" url)
-  (let [now (u/curr-millis)
-        last-updated (or (-> *state deref :downloadables-last-updated (get url)) 0)] ; TODO remove deref
-    (if (or (< downloadable-update-cooldown (- now last-updated))
-            (:force source))
-      (do
-        (log/info "Updating downloadables from" url)
-        (swap! *state assoc-in [:downloadables-last-updated url] now)
-        (let [downloadables (resources-fn source)
-              downloadables-by-url (->> downloadables
-                                        (map (juxt :download-url identity))
-                                        (into {}))
-              all-download-source-names (set (keys http/download-sources-by-name))]
-          (log/info "Found downloadables from" download-source-name "at" url
-                    (frequencies (map :resource-type downloadables)))
-          (swap! *state update :downloadables-by-url
-                 (fn [old]
-                   (let [invalid-download-source (remove (comp all-download-source-names :download-source-name second) old)]
-                     (when (seq invalid-download-source)
-                       (log/warn "Deleted" (count invalid-download-source) "downloads from invalid sources"))
-                     (merge
-                       (->> old
-                            (remove (comp #{download-source-name} :download-source-name second))
-                            (filter (comp all-download-source-names :download-source-name second))
-                            (into {}))
-                       downloadables-by-url))))
-          (u/update-cooldown *state [:download-source download-source-name])
-          downloadables-by-url))
-      (log/info "Too soon to check downloads from" url))))
-
-(defmethod task-handler ::update-downloadables
-  [source]
-  (update-download-source source))
-
-
-(defmethod event-handler ::clear-map-and-mod-details
-  [{:keys [map-resource mod-resource spring-root]}]
-  (let [map-key (resource/details-cache-key map-resource)
-        mod-key (resource/details-cache-key mod-resource)
-        {:keys [use-git-mod-version]}
-        (swap! *state
-          (fn [state]
-            (cond-> state
-                    map-key
-                    (update :map-details cache/miss map-key nil)
-                    mod-key
-                    (update :mod-details cache/miss mod-key nil))))]
-    (task/add-tasks! *state
-      (concat
-        [{::task-type ::refresh-engines
-          :force true
-          :spring-root spring-root}
-         {::task-type ::refresh-mods
-          :spring-root spring-root
-          :priorities [(:file mod-resource)]}
-         {::task-type ::refresh-maps
-          :spring-root spring-root
-          :priorities [(:file map-resource)]}]
-        (when-let [mod-file (:file mod-resource)]
-          [{::task-type ::mod-details
-            :mod-name (:mod-name mod-resource)
-            :mod-file mod-file
-            :use-git-mod-version use-git-mod-version}])
-        (when-let [map-file (:file map-resource)]
-          [{::task-type ::map-details
-            :map-name (:map-name map-resource)
-            :map-file map-file}])))))
 
 
 (defmethod event-handler ::import-source-change
@@ -3660,7 +3171,9 @@
 
 (defmethod event-handler ::assoc-in
   [{:fx/keys [event] :keys [path value] :or {value (if (instance? Event event) true event)}}]
-  (swap! *state assoc-in path value))
+  (if path
+    (swap! *state assoc-in path value)
+    (throw (ex-info "::assoc-in called without path" {}))))
 
 (defmethod event-handler ::dissoc
   [e]
@@ -3698,31 +3211,9 @@
   (swap! *state assoc :chat-auto-scroll false))
 
 
-(defmethod event-handler ::scan-imports
-  [{:keys [sources] :or {sources (fx.import/import-sources (:extra-import-sources @*state))}}]
-  (doseq [import-source sources]
-    (task/add-task! *state
-      (merge
-        {::task-type ::scan-imports}
-        import-source))))
-
-(defmethod task-handler ::scan-all-imports [task]
-  (event-handler (assoc task :event/type ::scan-imports)))
-
-
 (defmethod event-handler ::download-source-change
   [{:fx/keys [event]}]
   (swap! *state assoc :download-source-name (:download-source-name event)))
-
-
-(defmethod event-handler ::update-all-downloadables
-  [opts]
-  (doseq [download-source http/download-sources]
-    (task/add-task! *state
-      (merge
-        {::task-type ::update-downloadables
-         :force (:force opts)}
-        download-source))))
 
 
 (defmethod event-handler ::spring-settings-refresh
@@ -3948,7 +3439,7 @@
           (log/info "Skipping empty message" (pr-str message) "to" (pr-str channel-name))
           :else
           (cond
-            (re-find #"^/ingame" message) (message/send-message *state client-data "GETUSERINFO")
+            (re-find #"^/ingame" message) (message/send *state client-data "GETUSERINFO")
             (re-find #"^/ignore" message)
             (let [[_all username] (re-find #"^/ignore\s+([^\s]+)\s*" message)]
               (set-ignore server-key username true {:channel-name channel-name}))
@@ -3968,21 +3459,21 @@
              (swap! *state update-in [:by-server server-key :channels channel-name :messages] conj {:text (str "Renaming to" new-username)
                                                                                                     :timestamp (u/curr-millis)
                                                                                                     :message-type :info}
-              (message/send-message *state client-data (str "RENAMEACCOUNT " new-username))))
+              (message/send *state client-data (str "RENAMEACCOUNT " new-username))))
             :else
             (let [[private-message username] (re-find #"^@(.*)$" channel-name)
                   unified (-> client-data :compflags (contains? "u"))]
               (if-let [[_all message] (re-find #"^/me (.*)$" message)]
                 (if private-message
-                  (message/send-message *state client-data (str "SAYPRIVATEEX " username " " message))
+                  (message/send *state client-data (str "SAYPRIVATEEX " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
-                    (message/send-message *state client-data (str "SAYBATTLEEX " message))
-                    (message/send-message *state client-data (str "SAYEX " channel-name " " message))))
+                    (message/send *state client-data (str "SAYBATTLEEX " message))
+                    (message/send *state client-data (str "SAYEX " channel-name " " message))))
                 (if private-message
-                  (message/send-message *state client-data (str "SAYPRIVATE " username " " message))
+                  (message/send *state client-data (str "SAYPRIVATE " username " " message))
                   (if (and (not unified) (u/battle-channel-name? channel-name))
-                    (message/send-message *state client-data (str "SAYBATTLE " message))
-                    (message/send-message *state client-data (str "SAY " channel-name " " message))))))))
+                    (message/send *state client-data (str "SAYBATTLE " message))
+                    (message/send *state client-data (str "SAY " channel-name " " message))))))))
         (catch Exception e
           (log/error e "Error sending message" message "to channel" channel-name))))))
 
@@ -4089,7 +3580,7 @@
               (update :console-sent-messages conj message)
               (assoc :console-history-index default-history-index))))
       (when-not (string/blank? message)
-        (message/send-message *state client-data message))
+        (message/send *state client-data message))
       (catch Exception e
         (log/error e "Error sending message" message "to server")))))
 
@@ -4124,13 +3615,13 @@
 
 
 (defmethod event-handler ::matchmaking-list-all [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.list_all_queues"))
+  (message/send *state client-data "c.matchmaking.list_all_queues"))
 
 (defmethod event-handler ::matchmaking-list-my [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.list_my_queues"))
+  (message/send *state client-data "c.matchmaking.list_my_queues"))
 
 (defmethod event-handler ::matchmaking-leave-all [{:keys [client-data]}]
-  (message/send-message *state client-data "c.matchmaking.leave_all_queues")
+  (message/send *state client-data "c.matchmaking.leave_all_queues")
   (swap! *state update-in [:by-server (u/server-key client-data) :matchmaking-queues]
     (fn [matchmaking-queues]
       (into {}
@@ -4140,19 +3631,19 @@
           matchmaking-queues)))))
 
 (defmethod event-handler ::matchmaking-join [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.join_queue " queue-id)))
+  (message/send *state client-data (str "c.matchmaking.join_queue " queue-id)))
 
 (defmethod event-handler ::matchmaking-leave [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.leave_queue " queue-id))
-  (message/send-message *state client-data (str "c.matchmaking.get_queue_info\t" queue-id))
+  (message/send *state client-data (str "c.matchmaking.leave_queue " queue-id))
+  (message/send *state client-data (str "c.matchmaking.get_queue_info\t" queue-id))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :am-in] false))
 
 (defmethod event-handler ::matchmaking-ready [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.ready"))
+  (message/send *state client-data (str "c.matchmaking.ready"))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 (defmethod event-handler ::matchmaking-decline [{:keys [client-data queue-id]}]
-  (message/send-message *state client-data (str "c.matchmaking.decline"))
+  (message/send *state client-data (str "c.matchmaking.decline"))
   (swap! *state assoc-in [:by-server (u/server-key client-data) :matchmaking-queues queue-id :ready-check] false))
 
 
@@ -4163,9 +3654,9 @@
    [:battle-map-details-watcher watch/battle-map-details-watcher 2]
    [:battle-mod-details-watcher watch/battle-mod-details-watcher 2]
    [:fix-spring-isolation-dir-watcher fix-spring-isolation-dir-watcher 10]
-   [:replay-map-and-mod-details-watcher replay-map-and-mod-details-watcher]
+   [:replay-map-and-mod-details-watcher watch/replay-map-and-mod-details-watcher]
    [:spring-isolation-dir-changed-watcher spring-isolation-dir-changed-watcher 10]
-   [:update-battle-status-sync-watcher update-battle-status-sync-watcher 2]])
+   [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2]])
 
 
 (defn stop-ipc-server
@@ -4213,11 +3704,67 @@
   (start-ipc-server *state {:force true}))
 
 
+(defmethod task-handler ::init-sql-db [_]
+  (sql/init-db *state {:force true}))
+
+
+(defn ring-impl []
+  (sound/play-ring @*state))
+
+(defn extra-pre-game []
+  (try
+    (let [{:keys [^MediaPlayer media-player music-paused]} @*state]
+      (if (and media-player (not music-paused))
+        (do
+          (log/info "Pausing media player")
+          (let [^"[Ljavafx.animation.KeyFrame;"
+                keyframes (into-array KeyFrame
+                            [(KeyFrame.
+                               (Duration/seconds 3)
+                               (into-array KeyValue
+                                 [(KeyValue. (.volumeProperty media-player) 0)]))])
+                timeline (Timeline.  keyframes)]
+            (.setOnFinished timeline
+              (reify EventHandler
+                (handle [_this _e]
+                  (.pause media-player)
+                  (swap! *state assoc :music-paused true))))
+            (.play timeline)))
+        (when (not media-player)
+          (log/info "No media player to pause"))))
+    (catch Exception e
+      (log/error e "Error pausing music"))))
+
+(defn extra-post-game []
+  (let [{:keys [^MediaPlayer media-player music-paused ring-when-game-ends] :as state} @*state]
+    (if (and media-player (not music-paused))
+      (do
+        (log/info "Resuming media player")
+        (.play media-player)
+        (let [{:keys [music-volume]} (swap! *state assoc :music-paused false)
+              ^"[Ljavafx.animation.KeyFrame;"
+              keyframes (into-array KeyFrame
+                          [(KeyFrame.
+                             (Duration/seconds 3)
+                             (into-array KeyValue
+                               [(KeyValue. (.volumeProperty media-player) (or (u/to-number music-volume) 1.0))]))])
+              timeline (Timeline. keyframes)]
+          (.play timeline)))
+      (when (not media-player)
+        (log/info "No media player to resume")))
+    (when ring-when-game-ends
+      (sound/play-ring state))))
+
+
 (defn init
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
+   (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
+   (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
+   (task-handlers/add-handlers handle-task *state)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)
@@ -4275,14 +3822,15 @@
            (async/<!! (async/timeout wait-init-tasks-ms))
            (task/add-task! state-atom {::task-type ::refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::update-all-downloadables})
+           (task/add-task! state-atom {::task-type ::update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (event-handler {:event/type ::scan-imports})
+           (task/add-task! state-atom {::task-type ::scan-all-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
      (start-ipc-server state-atom)
+     (sql/init-db state-atom)
      {:chimers
       (concat
         task-chimers
@@ -4313,8 +3861,8 @@
     (task/add-task! state-atom {::task-type ::refresh-engines})
     (task/add-task! state-atom {::task-type ::refresh-mods})
     (task/add-task! state-atom {::task-type ::refresh-maps})
-    (event-handler {:event/type ::update-all-downloadables})
-    (event-handler {:event/type ::scan-imports})
+    (task/add-task! state-atom {::task-type ::update-all-downloadables})
+    (task/add-task! state-atom {::task-type ::scan-all-imports})
     (log/info "Finished standalone replay init")
     {:chimers
      (concat

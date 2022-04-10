@@ -21,7 +21,7 @@ jobs:
       - name: Check for clj files that do not warn on reflect
         shell: bash
         run: |
-          if [ -z "$(grep -rL '*warn-on-reflection*' src/clj)" ]
+          if [ -z "$(grep -rL '*warn-on-reflection*' src/clj graal/clj)" ]
           then
             exit 0
           else
