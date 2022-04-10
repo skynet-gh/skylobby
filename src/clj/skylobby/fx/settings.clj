@@ -7,7 +7,6 @@
     [skylobby.fx.bottom-bar :refer [app-update-button]]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
-    [skylobby.fx.import :as fx.import]
     [skylobby.fx.sub :as sub]
     [skylobby.import :as import]
     [skylobby.spads :as spads]
@@ -376,7 +375,13 @@
             :check-box
             {:fx/type :check-box
              :selected (boolean use-git-mod-version)
-             :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}
+             :on-selected-changed {:event/type :spring-lobby/on-change-git-version}}}]}
+         {:fx/type filterable-section
+          :search settings-search
+          :title "Database (experimental)"
+          :children
+          [{:fx/type :label
+            :text "Experimental! Use database for certain indexes to lower memory usage"}
            {:fx/type :h-box
             :style {:-fx-font-size 18}
             :children

@@ -23,7 +23,6 @@
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.http :as http]
-    [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
     [skylobby.util :as u]

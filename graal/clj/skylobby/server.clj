@@ -3,7 +3,7 @@
     [clojure.core.async :as async]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
-    [clojure.set :refer [difference]]
+    clojure.set
     [clojure.spec.alpha :as s]
     [clojure.test.check.generators :as gen]
     [hiccup.core :as hiccup]
@@ -184,10 +184,15 @@
     (add-watch connected-uids :connected-uids
       (fn [_ _ old-ids new-ids]
         (when (not= old-ids new-ids)
-          (log/infof "Connected uids change: %s" new-ids)
-          (let [added (difference (set (:any new-ids)) (set (:any old-ids)))]
-            (log/info "Sending state to new clients" added)
-            (broadcast-state-changes broadcast added nil @state-atom)))))
+          (log/infof "Connected uids change: %s" new-ids))))
+          ;(let [added (clojure.set/difference (set (:any new-ids)) (set (:any old-ids)))]
+          ;  (log/info "Sending state to new clients" added)
+          ;  (broadcast-state-changes broadcast added nil @state-atom)))))
+    (defmethod -event-msg-handler
+      :skylobby/get-initial-state
+      [{:keys [uid]}]
+      (log/info "Get initial state" uid)
+      (broadcast-state-changes broadcast [uid] nil @state-atom))
     (defmethod -event-msg-handler
       :skylobby/get
       [{:keys [?data ?reply-fn]}]
