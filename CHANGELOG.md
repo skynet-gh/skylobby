@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.13](https://github.com/skynet-gh/skylobby/releases/tag/0.8.13) - 2022-04-11
+
+- Fix direct connect sync
+- Fix issues with engine download and extract
+
 ## [0.8.12](https://github.com/skynet-gh/skylobby/releases/tag/0.8.12) - 2022-04-10
 
 - Fix join queue playing detection

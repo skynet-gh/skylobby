@@ -2,6 +2,7 @@
   (:require
     clojure.set
     [skylobby.client.message :as message]
+    [skylobby.event.battle :as event.battle]
     [skylobby.fs :as fs]
     [skylobby.fx.color :as fx.color]
     [skylobby.spring :as spring]
@@ -13,27 +14,6 @@
 
 (set! *warn-on-reflection* false)
 
-
-(defn update-player-or-bot-state
-  [state-atom server-key {:keys [bot-name username] :as id} state-change]
-  (let [is-bot (boolean bot-name)
-        battle-kw (if is-bot :bots :users)
-        message-type (if is-bot :skylobby.direct/battle-bots :skylobby.direct/battle-users)]
-    (log/info "Updating" battle-kw "battle state for" id "with" state-change)
-    (case (u/server-type server-key)
-      :direct-host
-      (let [state (swap! state-atom update-in [:by-server server-key :battle battle-kw (or bot-name username)] u/deep-merge state-change)]
-        (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
-          (let [users-or-bots (get-in state [:by-server server-key :battle battle-kw])]
-            (broadcast-fn [message-type users-or-bots]))
-          (log/warn "No broadcast-fn" server-key)))
-      :direct-client
-      (if-let [send-fn (get-in @state-atom [:by-server server-key :client :send-fn])]
-        (send-fn [(if is-bot
-                    :skylobby.direct.client/bot-state
-                    :skylobby.direct.client/player-state)
-                  (assoc state-change :bot-name bot-name)])
-        (log/warn "No send-fn" server-key)))))
 
 (defn update-bot-state
   [state-atom server-key {:keys [bot-name] :as id} bot-state]
@@ -179,7 +159,7 @@
         (when-let [ally (try (Integer/parseInt event) (catch Exception _e))]
           (let [old-ally (-> id :battle-status :ally u/to-number)]
             (if (not= ally old-ally)
-              (update-player-or-bot-state state-atom server-key id {:battle-status {:ally ally}})
+              (event.battle/update-player-or-bot-state state-atom server-key id {:battle-status {:ally ally}})
               (log/debug "No change for ally"))))
         (catch Exception e
           (log/error e "Error updating battle ally")))))
@@ -190,7 +170,7 @@
         (when-let [player-id (try (Integer/parseInt event) (catch Exception _e))]
           (let [old-id (-> id :battle-status :id u/to-number)]
             (if (not= player-id old-id)
-              (update-player-or-bot-state state-atom server-key id {:battle-status {:id player-id}})
+              (event.battle/update-player-or-bot-state state-atom server-key id {:battle-status {:id player-id}})
               (log/debug "No change for team"))))
         (catch Exception e
           (log/error e "Error updating battle team")))))
@@ -203,7 +183,7 @@
           (if (not= side (-> id :battle-status :side))
             (let [old-side (-> id :battle-status :side)]
               (log/info "Updating side for" id "from" old-side "(" (get sides old-side) ") to" side "(" event ")")
-              (update-player-or-bot-state state-atom server-key id {:battle-status {:side side}}))
+              (event.battle/update-player-or-bot-state state-atom server-key id {:battle-status {:side side}}))
             (log/debug "No change for side")))
         (catch Exception e
           (log/error e "Error updating battle side")))))
@@ -217,7 +197,7 @@
                           {:mode mode
                            :ready desired-ready}
                           {:mode mode})]
-      (update-player-or-bot-state state-atom server-key id {:battle-status battle-status})))
+      (event.battle/update-player-or-bot-state state-atom server-key id {:battle-status battle-status})))
   (defmethod multifn ::on-change-spectate
     [{:fx/keys [event] :as e}]
     (multifn (assoc e
@@ -228,7 +208,7 @@
     (let [^ColorPicker source (.getSource event)
           javafx-color (.getValue source)
           color-int (fx.color/javafx-color-to-spring javafx-color)]
-      (update-player-or-bot-state state-atom server-key id {:team-color color-int})))
+      (event.battle/update-player-or-bot-state state-atom server-key id {:team-color color-int})))
   (defmethod multifn ::handicap-changed
     [{:keys [id server-key] :fx/keys [event]}]
     (when-let [handicap (max 0
@@ -237,12 +217,12 @@
       (if (not= handicap (-> id :battle-status :handicap))
         (do
           (log/info "Updating handicap for" id "from" (-> id :battle-status :ally) "to" handicap)
-          (update-player-or-bot-state state-atom server-key id {:battle-status {:handicap handicap}}))
+          (event.battle/update-player-or-bot-state state-atom server-key id {:battle-status {:handicap handicap}}))
         (log/debug "No change for handicap"))))
   (defmethod multifn ::ready-changed
     [{:keys [server-key username] :fx/keys [event]}]
     (let [ready (boolean event)]
-      (update-player-or-bot-state state-atom server-key {:username username} {:battle-status {:ready ready}})))
+      (event.battle/update-player-or-bot-state state-atom server-key {:username username} {:battle-status {:ready ready}})))
   (defmethod multifn ::away-changed
     [{:keys [server-key username] :fx/keys [event]}]
     (let [away (= "Away" event)]

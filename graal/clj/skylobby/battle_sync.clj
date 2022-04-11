@@ -3,6 +3,7 @@
     [skylobby.fs :as fs]
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
+    [skylobby.event.battle :as event.battle]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
@@ -57,9 +58,7 @@
                 (log/info "Updating battle sync status for" server-key "in battle" battle-id "from" old-sync
                           "(" old-sync-number ") to" new-sync "(" new-sync-number ")"))
               (if (#{:direct-client :direct-host} (u/server-type server-key))
-                (throw (ex-info "TODO direct connect" {}))
-                #_
-                (fx.event.battle/update-player-or-bot-state
+                (event.battle/update-player-or-bot-state
                   state-atom
                   server-key
                   {:username my-username}

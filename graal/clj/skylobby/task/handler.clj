@@ -317,7 +317,11 @@
          missing-files (set
                         (concat
                          (->> known-canonical-paths
-                              (remove (comp fs/exists? io/file)))
+                              (remove
+                                (comp (every-pred
+                                        fs/exists?
+                                        fs/is-directory?)
+                                      io/file)))
                          (->> known-canonical-paths
                               (remove (comp (partial fs/descendant? spring-root) io/file)))))
          to-remove (set
@@ -685,12 +689,12 @@
       (if (and engine-details (:file engine-details))
         (do
           (log/info "Initializing rapid by calling download")
-          (task-handler
-           {:spring-lobby/task-type :spring-lobby/rapid-download
-            :mod-name mod-name
-            :rapid-id rapid-id
-            :engine-file (:file engine-details)
-            :spring-isolation-dir spring-isolation-dir}))
+          (task/add-task! state-atom
+            {:spring-lobby/task-type :spring-lobby/rapid-download
+             :mod-name mod-name
+             :rapid-id rapid-id
+             :engine-file (:file engine-details)
+             :spring-isolation-dir spring-isolation-dir}))
         (log/warn "No engine details to do rapid init"))
       (log/info "Updating rapid versions in" spring-isolation-dir)
       (let [rapid-repos (rapid/repos spring-isolation-dir)
@@ -1109,20 +1113,11 @@
     (import/scan-imports state-atom task))
   (defmethod task-handler :spring-lobby/extract-7z
     [{:keys [file dest]}]
-    (let [path (fs/canonical-path file)]
-      (swap! state-atom assoc-in [:extracting path] true)
-      (fs/update-file-cache! state-atom file dest)
-      (future
-        (try
-          (if dest
-            (fs/extract-7z-fast file dest)
-            (fs/extract-7z-fast file))
-          (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-engines})
-          (catch Exception e
-            (log/error e "Error extracting 7z" file))
-          (finally
-            (fs/update-file-cache! state-atom file dest)
-            (swap! state-atom assoc-in [:extracting path] false))))))
+    (fs/update-file-cache! state-atom file dest)
+    (if dest
+      (fs/extract-7z-fast file dest)
+      (fs/extract-7z-fast file))
+    (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-engines}))
   (defmethod task-handler :spring-lobby/search-springfiles
     [{:keys [download-if-found springname] :or {download-if-found true} :as e}]
     (if-not (string/blank? springname)
@@ -1139,8 +1134,11 @@
   (defmethod task-handler :spring-lobby/download-springfiles
     [{:keys [resource-type search-result springname spring-isolation-dir url]}]
     (if-let [{:keys [filename] :as search-result} (or search-result
-                                                      (task-handler {:spring-lobby/task-type :spring-lobby/search-springfiles
-                                                                     :springname springname}))]
+                                                      (do
+                                                        (task/add-task! state-atom
+                                                          {:spring-lobby/task-type :spring-lobby/search-springfiles
+                                                           :springname springname})
+                                                        nil))]
       (let [url (or url
                     (http/springfiles-url search-result))]
         (task/add-task! state-atom
@@ -1157,14 +1155,10 @@
   (defmethod task-handler :spring-lobby/download-and-extract
     [{:keys [downloadable spring-isolation-dir] :as task}]
     @(download/download-http-resource state-atom task)
-    (let [download-file (resource/resource-dest spring-isolation-dir downloadable)
+    (let [download-file (fs/file (fs/download-dir) "engine" (:resource-filename downloadable))
           extract-file (when download-file
                          (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
-      @(task-handler
-         (assoc task
-                :event/type :spring-lobby/extract-7z
-                :file download-file
-                :dest extract-file))))
+      (fs/extract-7z-fast download-file extract-file)))
   (defmethod task-handler :spring-lobby/import [e]
     (import/import-resource state-atom e))
   (defmethod task-handler :spring-lobby/scan-all-imports
