@@ -158,8 +158,8 @@
   {:replace-deps
    {
     ;aleph/aleph {:mvn/version "0.4.7"}
-    io.github.skynet-gh/aleph {:git/tag "0.4.7+update-byte-streams"
-                               :git/sha "f60c671"}
+    io.github.skynet-gh/aleph {:git/tag "0.4.7+clj-commons+deps"
+                               :git/sha "72bc553"}
     clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
@@ -193,9 +193,7 @@
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
     ;gloss/gloss {:mvn/version "0.2.6"}
-    ;io.github.casselc/gloss {:git/tag "0.0.0-SNAPSHOT" :git/sha "37a9f46"}
-    ;gloss/gloss {:local/root "../gloss"}
-    io.github.skynet-gh/gloss {:git/tag "0.2.6+update-byte-streams"
+    io.github.skynet-gh/gloss {:git/tag "0.2.6+clj-commons-pr"
                                :git/sha "7024e89"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
@@ -217,7 +215,7 @@
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.21"}
-    org.clj-commons/byte-streams {:mvn/version "0.3.0"}
+    ;org.clj-commons/byte-streams {:mvn/version "0.3.0"}
     org.clj-commons/primitive-math {:mvn/version "1.0.0"}
     org.clojure/clojure {:mvn/version "1.11.1"}
     org.clojure/core.async {:mvn/version "1.5.648"}
