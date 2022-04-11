@@ -373,7 +373,6 @@
                "--report-unsupported-elements-at-runtime"
 
                "-J-Xmx6g"
-               "-H:+StaticExecutableWithDynamicLibC"
                "-H:+ReportExceptionStackTraces"
 
                ; build time
