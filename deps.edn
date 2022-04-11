@@ -356,7 +356,7 @@
                "--initialize-at-run-time=org.apache.http.impl.auth.NTLMEngineImpl"]
    :jvm-opts ["-Dclojure.compiler.direct-linking=true"
               "-Dclojure.spec.skip-macros=true"]}
-  :skylobby-native-mac
+  :native-mac
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
    :extra-deps
    {
