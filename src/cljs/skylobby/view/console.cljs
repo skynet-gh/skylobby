@@ -1,7 +1,6 @@
 (ns skylobby.view.console
   (:require
     [clojure.string :as string]
-    ["moment" :as moment]
     [re-frame.core :as rf]
     [reagent.dom :as rdom]
     [skylobby.view.server-nav :as server-nav]
@@ -33,7 +32,7 @@
        ^{:key i}
        [:div
         [:span {:style {:color "grey"}}
-         (str "[" (u/format-hours (.local (moment/utc timestamp))) "] ")]
+         (str "[" (u/format-hours timestamp) "] ")]
         [:span
          {:style
           {:color (case source

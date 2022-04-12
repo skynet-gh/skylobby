@@ -60,6 +60,9 @@
   (when ?reply-fn
     (?reply-fn {:umatched-event-as-echoed-from-server event})))
 
+(defmethod -event-msg-handler :chsk/uidport-close [_] nil)
+(defmethod -event-msg-handler :chsk/ws-ping [_] nil)
+
 
 (defn servers-data [state]
   {:active-servers (->> state
@@ -163,7 +166,10 @@
                       {:authorized?-fn nil
                        :csrf-token-fn nil ; TODO
                        :packer packer
-                       :user-id-fn (fn [_] (first (gen/sample-seq gen/uuid)))
+                       :user-id-fn (fn [{:keys [client-id]}]
+                                     (if client-id
+                                       (java.util.UUID/fromString client-id)
+                                       (first (gen/sample-seq gen/uuid))))
                        :wrap-recv-evs? false})
         {:keys [ch-recv send-fn connected-uids]} chsk-server
         broadcast (fn [uids message]
