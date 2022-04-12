@@ -1,7 +1,6 @@
 (ns skylobby.view.chat
-  (:require 
+  (:require
     [clojure.string :as string]
-    ["moment" :as moment]
     [re-frame.core :as rf]
     [reagent.dom :as rdom]
     [skylobby.css :as css]
@@ -34,7 +33,7 @@
        ^{:key i}
        [:div
         [:span {:style {:color "grey"}}
-         (str "[" (u/format-hours (.local (moment/utc timestamp))) "] ")]
+         (str "[" (u/format-hours timestamp) "] ")]
         [:span
          {:style
           {:color (case message-type
@@ -111,7 +110,7 @@
                      "gray"))
           :href (u/href :skylobby/chat {:server-url server-url :channel-name channel-name} {:username username})}
          channel-name]])
-     [:div.f3 
+     [:div.f3
       "No channels"])])
 
 (defn chat-page [_]

@@ -2,7 +2,12 @@
   (:require
     [clojure.edn :as edn]
     [clojure.string :as string]
+    ["dayjs" :as dayjs]
+    ["dayjs/plugin/utc" :as utc]
     [reitit.frontend.easy :as rfe]))
+
+
+(.extend dayjs utc)
 
 
 (defn get-server-key [server-url username]
@@ -27,8 +32,19 @@
    (rfe/href k params query)))
 
 
-(defn format-hours [moment]
-  (.format moment "HH:mm:ss"))
+(defn time-diff
+  ([start]
+   (time-diff start (dayjs)))
+  ([start end]
+   (dayjs/utc
+     (.diff
+       (dayjs end)
+       (dayjs start)
+       "milliseconds"))))
+
+(defn format-hours
+  [timestamp]
+  (.format (dayjs timestamp) "HH:mm:ss"))
 
 
 (defn spring-color-to-web [spring-color]
