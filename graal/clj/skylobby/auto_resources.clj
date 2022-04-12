@@ -76,6 +76,8 @@
                                            first)
         engine-details (resource/engine-details engines engine-version)
         engine-file (:file engine-details)
+        engine-dir-exists (and (fs/exists? engine-file)
+                               (fs/is-directory? engine-file))
         engine-importable (some->> importables
                                    (filter (comp #{:spring-lobby/engine} :resource-type))
                                    (filter (partial resource/could-be-this-engine? engine-version))
@@ -141,7 +143,7 @@
                    (and (not engine-importable)
                         engine-downloadable
                         (not engine-download-task)
-                        (not (fs/file-exists? file-cache engine-download-dest)))
+                        (not (fs/exists? engine-download-dest)))
                    (do
                      (log/info "Adding task to auto download engine" engine-downloadable)
                      {:spring-lobby/task-type :spring-lobby/download-and-extract
@@ -150,9 +152,11 @@
                    (and (not engine-importable)
                         engine-downloadable
                         (not engine-download-task)
-                        (fs/file-exists? file-cache engine-download-dest)
+                        (fs/exists? engine-download-dest)
                         (not engine-extract-task)
-                        (not (fs/file-exists? file-cache engine-extract-dest)))
+                        (or
+                          (not (fs/exists? engine-extract-dest))
+                          (fs/is-file? engine-extract-dest)))
                    (do
                      (log/info "Adding task to extract engine archive" engine-download-dest)
                      {:spring-lobby/task-type :spring-lobby/extract-7z
@@ -170,7 +174,8 @@
                         :force true}
                        (get http/download-sources-by-name engine-download-source-name)))
                    (and (not (contains? engine-refresh-tasks spring-root-path))
-                        (fs/file-exists? file-cache engine-extract-dest))
+                        (fs/file-exists? file-cache engine-extract-dest)
+                        (fs/is-directory? engine-extract-dest))
                    (do
                      (log/info "Refreshing engines to pick up" engine-extract-dest)
                      {:spring-lobby/task-type :spring-lobby/refresh-engines
@@ -243,6 +248,7 @@
                         (not update-rapid-task)
                         (not (contains? mod-refresh-tasks spring-root-path))
                         engine-file
+                        engine-dir-exists
                         sdp-file-exists)
                    (do
                      (log/info "Refreshing mods to pick up" sdp-file)
@@ -254,12 +260,14 @@
                         (not rapid-task)
                         (not update-rapid-task)
                         engine-file
+                        engine-dir-exists
                         (not sdp-file-exists)
                         (u/check-cooldown cooldowns [:rapid spring-root-path rapid-id]))
                    (do
                      (log/info "Adding task to auto download rapid" rapid-id)
                      {:spring-lobby/task-type :spring-lobby/rapid-download
                       :engine-file engine-file
+                      :engine-dir-exists engine-dir-exists
                       :rapid-id rapid-id
                       :spring-isolation-dir spring-root})
                    (and (not rapid-id)
@@ -274,6 +282,7 @@
                    (and (not rapid-id)
                         (not rapid-task)
                         engine-file
+                        engine-dir-exists
                         (not update-rapid-task)
                         (not (string/blank? mod-name))
                         (u/check-cooldown cooldowns [:update-rapid spring-root-path]))
@@ -291,6 +300,7 @@
                            {:downloadable mod-downloadable
                             :download-task mod-download-task
                             :engine-file engine-file
+                            :engine-dir-exists engine-dir-exists
                             :refresh-tasks mod-refresh-tasks
                             :rapid-data rapid-data
                             :sdp-file sdp-file

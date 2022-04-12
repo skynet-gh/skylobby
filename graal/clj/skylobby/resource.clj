@@ -39,7 +39,6 @@
         (and resource-file (fs/exists? resource-file) (fs/is-directory? resource-file))
         (io/file (fs/engines-dir root) filename)
         filename (io/file (fs/download-dir) "engine" filename)
-        ;resource-name (http/engine-download-file resource-name)
         :else nil)
       :spring-lobby/mod
       (when filename

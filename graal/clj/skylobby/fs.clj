@@ -521,9 +521,17 @@
   ([^File f ^File dest]
    (when-not @is-7z-initialized
      (init-7z!))
-   (let [before (u/curr-millis)]
+   (let [before (u/curr-millis)
+         dest (try
+                (FileUtils/forceMkdir dest)
+                (catch java.io.IOException e
+                  (log/error e "Extract dest exists as file" dest "using path without extension")
+                  (let [new-dest (file (parent-file dest) (without-extension (filename dest)))]
+                    (when (exists? new-dest)
+                      (log/warn "Deleting existing extract dest" new-dest)
+                      (raynes-fs/delete new-dest))
+                    new-dest)))]
      (log/info "Extracting" f "to" dest)
-     (FileUtils/forceMkdir dest)
      (with-open [raf (new RandomAccessFile f "r")
                  rafis (new RandomAccessFileInStream raf)
                  archive (SevenZip/openInArchive ArchiveFormat/SEVEN_ZIP rafis)]
@@ -735,8 +743,20 @@
 
 (defn move
   "Move a file from source to dest."
-  [source dest]
-  (FileUtils/moveFile source dest))
+  ([source dest]
+   (move source dest nil))
+  ([source dest {:keys [copy-options]
+                 :or {copy-options
+                      [StandardCopyOption/COPY_ATTRIBUTES
+                       StandardCopyOption/REPLACE_EXISTING]}}]
+   (if (exists? source)
+     (let [^"[Ljava.nio.file.CopyOption;" options (into-array ^CopyOption copy-options)]
+       (log/info "Moving" source "to" dest "options" copy-options)
+       (when (exists? dest)
+         (log/warn "Deleting existing dest" dest)
+         (raynes-fs/delete dest))
+       (FileUtils/moveFile source dest options))
+     (log/warn "Source for move does not exist" source))))
 
 (defn copy-missing [source-dir dest-dir]
   (let [source-path (to-path source-dir)]
