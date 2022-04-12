@@ -26,18 +26,18 @@ jobs:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3.0.1
+      - uses: actions/cache@v3.0.2
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.0
+      - uses: DeLaGuardo/setup-clojure@5.1
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.1.0
+      - uses: actions/setup-node@v3.1.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -62,17 +62,17 @@ jobs:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3.0.1
+      - uses: actions/cache@v3.0.2
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.0
+      - uses: DeLaGuardo/setup-clojure@5.1
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.1.0
+      - uses: actions/setup-node@v3.1.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -92,17 +92,17 @@ jobs:
           java-version: 11
           graalvm-version: 22.0.0.2
           native-image: true
-      - uses: actions/cache@v3.0.1
+      - uses: actions/cache@v3.0.2
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.0
+      - uses: DeLaGuardo/setup-clojure@5.1
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.1.0
+      - uses: actions/setup-node@v3.1.1
         with:
           node-version: '14'
           cache: 'npm'
