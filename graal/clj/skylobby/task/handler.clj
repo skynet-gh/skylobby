@@ -1114,9 +1114,10 @@
   (defmethod task-handler :spring-lobby/extract-7z
     [{:keys [file dest]}]
     (fs/update-file-cache! state-atom file dest)
-    (if dest
-      (fs/extract-7z-fast file dest)
-      (fs/extract-7z-fast file))
+    (let [dest (if dest
+                 (fs/extract-7z-fast file dest)
+                 (fs/extract-7z-fast file))]
+      (fs/update-file-cache! state-atom file dest))
     (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-engines}))
   (defmethod task-handler :spring-lobby/search-springfiles
     [{:keys [download-if-found springname] :or {download-if-found true} :as e}]

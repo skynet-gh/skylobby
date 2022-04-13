@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.14](https://github.com/skynet-gh/skylobby/releases/tag/0.8.14) - 2022-04-13
+
+- Fix another issue with engine extract
+
 ## [0.8.13](https://github.com/skynet-gh/skylobby/releases/tag/0.8.13) - 2022-04-11
 
 - Fix direct connect sync
