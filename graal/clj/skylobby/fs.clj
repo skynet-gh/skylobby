@@ -524,13 +524,20 @@
    (let [before (u/curr-millis)
          dest (try
                 (FileUtils/forceMkdir dest)
+                dest
                 (catch java.io.IOException e
                   (log/error e "Extract dest exists as file" dest "using path without extension")
                   (let [new-dest (file (parent-file dest) (without-extension (filename dest)))]
                     (when (exists? new-dest)
                       (log/warn "Deleting existing extract dest" new-dest)
                       (raynes-fs/delete new-dest))
-                    new-dest)))]
+                    new-dest)))
+         source-dest {:source f
+                      :dest dest}]
+     (when-not f
+       (throw (ex-info "No source dir to extract!" source-dest)))
+     (when-not dest
+       (throw (ex-info "No dest dir to extract!" source-dest)))
      (log/info "Extracting" f "to" dest)
      (with-open [raf (new RandomAccessFile f "r")
                  rafis (new RandomAccessFileInStream raf)
@@ -545,7 +552,8 @@
                    ; http://sevenzipjbind.sourceforge.net/javadoc/net/sf/sevenzipjbinding/IArchiveExtractCallback.html
                    ; https://gist.github.com/borisbrodski/6120309
                    (->ExtractToDiskCallback archive callback-state dest))))
-     (log/info "Finished extracting" f "to" dest "in" (- (u/curr-millis) before) "ms"))))
+     (log/info "Finished extracting" f "to" dest "in" (- (u/curr-millis) before) "ms")
+     dest)))
 
 
 (defn extract-7z-apache
