@@ -968,6 +968,7 @@
                     (remove (comp existing-valid-paths fs/canonical-path second))
                     shuffle)
           this-round (take replays-batch-size todo)
+          _ (log/info "Parsing replays" (with-out-str (pprint this-round)))
           parsed-replays-by-path (->> this-round
                                       (map
                                        (fn [[source f]]
@@ -1158,8 +1159,10 @@
     @(download/download-http-resource state-atom task)
     (let [download-file (fs/file (fs/download-dir) "engine" (:resource-filename downloadable))
           extract-file (when download-file
-                         (io/file spring-isolation-dir "engine" (fs/filename download-file)))]
-      (fs/extract-7z-fast download-file extract-file)))
+                         (io/file spring-isolation-dir "engine" (fs/filename download-file)))
+          _ (fs/update-file-cache! state-atom download-file extract-file)
+          dest (fs/extract-7z-fast download-file extract-file)]
+      (fs/update-file-cache! state-atom download-file dest)))
   (defmethod task-handler :spring-lobby/import [e]
     (import/import-resource state-atom e))
   (defmethod task-handler :spring-lobby/scan-all-imports
