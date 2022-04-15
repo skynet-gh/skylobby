@@ -159,11 +159,11 @@
                                :else
                                am-in-queue))
                            false))]
-    (if am-in-queue
-      {:fx/type :h-box
-       :alignment :center-left
-       :children
-       [
+    {:fx/type :h-box
+     :alignment :center-left
+     :children
+     [
+      (if am-in-queue
         {:fx/type :button
          :text "Leave Queue"
          :disable (not am-spec)
@@ -171,23 +171,29 @@
                      :channel-name channel-name
                      :client-data client-data
                      :message "$%leaveq"
+                     :no-clear-draft true
+                     :no-history true
                      :server-key server-key}}
         {:fx/type :button
-         :text "Queue Status"
+         :text "Join Queue"
          :disable (not am-spec)
          :on-action {:event/type :skylobby.fx.event.chat/send
                      :channel-name channel-name
                      :client-data client-data
-                     :message "$%status"
-                     :server-key server-key}}]}
+                     :message "$%joinq"
+                     :no-clear-draft true
+                     :no-history true
+                     :server-key server-key}})
       {:fx/type :button
-       :text "Join Queue"
+       :text "Queue Status"
        :disable (not am-spec)
        :on-action {:event/type :skylobby.fx.event.chat/send
                    :channel-name channel-name
                    :client-data client-data
-                   :message "$%joinq"
-                   :server-key server-key}})))
+                   :message "$%status"
+                   :no-clear-draft true
+                   :no-history true
+                   :server-key server-key}}]}))
 
 (defn battle-accolades
   [{:fx/keys [context]
