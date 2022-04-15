@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.15](https://github.com/skynet-gh/skylobby/releases/tag/0.8.15) - 2022-04-14
+
+- Fix minimap images not being cached
+- Show queue status button even if not in queue
+- Fix indexing old downloads when multiple pages of github releases
+- Fix issue with map details update in battle
+- Fix file cache issue with engine extract
+
 ## [0.8.14](https://github.com/skynet-gh/skylobby/releases/tag/0.8.14) - 2022-04-13
 
 - Fix another issue with engine extract
