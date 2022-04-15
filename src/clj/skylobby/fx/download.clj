@@ -43,6 +43,10 @@
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        download-update-tasks-by-source (->> (get tasks-by-type :spring-lobby/update-downloadables)
+                                             (group-by :download-source-name))
+        download-update-tasks-by-source (assoc download-update-tasks-by-source nil (get tasks-by-type :spring-lobby/update-all-downloadables))
         download-source (->> http/download-sources
                          (filter (comp #{download-source-name} :download-source-name))
                          first)
@@ -119,6 +123,11 @@
                :icon-literal "mdi-web:16:white"}}}])
          [{:fx/type :button
            :text " Refresh "
+           :disable (->> download-source
+                         :download-source-name
+                         (get download-update-tasks-by-source)
+                         seq
+                         boolean)
            :on-action
            (if download-source
              {:event/type :spring-lobby/add-task

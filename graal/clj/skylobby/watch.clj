@@ -56,22 +56,21 @@
               new-battle-id (-> new-server :battle :battle-id)
               old-map (-> old-server :battles (get old-battle-id) :battle-map)
               new-map (-> new-server :battles (get new-battle-id) :battle-map)
-              map-exists (->> new-maps (filter (comp #{new-map} :map-name)) first)
-              map-details (-> new-state :map-details (get (fs/canonical-path (:file map-exists))))
+              filter-fn (comp #{new-map} :map-name)
+              map-exists (->> new-maps (filter filter-fn) first)
+              map-details (get-in new-state [:map-details (fs/canonical-path (:file map-exists))])
               tries (or (:tries map-details) resource/max-tries)
               all-tasks (concat (mapcat second tasks-by-kind) (vals current-tasks))]
-          (when (and (or (not (resource/details? map-details))
-                         (< tries resource/max-tries))
-                     (or (and (not (string/blank? new-map))
-                              (not (resource/details? map-details))
-                              (or (not= old-battle-id new-battle-id)
-                                  (not= old-map new-map)
-                                  (and
-                                    (empty? (filter (comp #{:spring-lobby/map-details} :spring-lobby/task-type) all-tasks))
-                                    map-exists)))
-                         (and
-                           (not (some (comp #{new-map} :map-name) old-maps))
-                           map-exists)))
+          (when (or (and (and (not (string/blank? new-map))
+                              (not (resource/details? map-details)))
+                         (or (not= old-battle-id new-battle-id)
+                             (not= old-map new-map)
+                             (and
+                               (empty? (filter (comp #{:spring-lobby/map-details} :spring-lobby/task-type) all-tasks))
+                               map-exists)))
+                    (and
+                      (not (some filter-fn old-maps))
+                      map-exists))
             (log/info "Mod details update for" server-key)
             (task/add-task! state-atom
               {:spring-lobby/task-type :spring-lobby/map-details

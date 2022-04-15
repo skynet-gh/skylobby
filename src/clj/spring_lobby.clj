@@ -803,7 +803,7 @@
 
 (defmethod task-handler :default [task]
   (when task
-    (log/warn "Unknown task type" task)))
+    (log/warn "Unknown task type" task (::task-type task))))
 
 
 (defn handle-task!

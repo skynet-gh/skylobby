@@ -89,7 +89,10 @@
                    resource-filename (:resource-filename downloadable)
                    extract-target (when (and spring-isolation-dir resource-filename)
                                     (fs/file spring-isolation-dir "engine" resource-filename))
-                   extract-exists (fs/file-exists? file-cache extract-target)]
+                   extract-target2 (when (and spring-isolation-dir resource-filename)
+                                     (fs/file spring-isolation-dir "engine" (fs/without-extension resource-filename)))
+                   extract-exists (or (fs/file-exists? file-cache extract-target)
+                                      (fs/file-exists? file-cache extract-target2))]
                (concat
                  (when (or (not engine-details)
                            (and
