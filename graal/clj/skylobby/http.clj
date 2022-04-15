@@ -181,6 +181,7 @@
   (when (and url (spring-resource? url))
     :spring-lobby/mod))
 
+
 (defn- by-tag [element tag]
   (->> element
        :content
@@ -245,6 +246,11 @@
         (re-find bar-engine-re filename)
         (re-find bar-105-engine-re filename)))))
 
+(defn engines-only [filename]
+  (when (bar-engine-filename? filename)
+    :spring-lobby/engine))
+
+
 (def bar-platforms
   {"linux64" "linux-64"
    "win32" "windows-64"
@@ -264,79 +270,36 @@
 
 
 (defn get-github-release-downloadables
-  [{:keys [download-source-name resource-type-fn url]}]
-  (let [now (u/curr-millis)]
-    (->> (http/get url {:as :auto})
-         :body
-         (mapcat
-           (fn [{:keys [assets html_url]}]
-             (map
-               (fn [{:keys [browser_download_url created_at]}]
-                 {:release-url html_url
-                  :asset-url browser_download_url
-                  :created-at created_at})
-               assets)))
-         (map
-           (fn [{:keys [asset-url created-at]}]
-             (let [decoded-url (u/decode asset-url)
-                   filename (filename decoded-url)]
-               {:download-url asset-url
-                :resource-filename filename
-                :resource-type (when (and filename resource-type-fn)
-                                 (resource-type-fn filename))
-                :resource-date created-at
-                :download-source-name download-source-name
-                :resource-updated now}))))))
+  [{:keys [download-source-name resource-type-fn url] :as source}]
+  (when-not resource-type-fn
+    (throw (ex-info "Resource type fn not defined" source)))
+  (let [now (u/curr-millis)
+        result (http/get url {:as :auto})]
+    (concat
+      (->> result
+           :body
+           (mapcat
+             (fn [{:keys [assets html_url]}]
+               (map
+                 (fn [{:keys [browser_download_url created_at]}]
+                   {:release-url html_url
+                    :asset-url browser_download_url
+                    :created-at created_at})
+                 assets)))
+           (map
+             (fn [{:keys [asset-url created-at]}]
+               (let [decoded-url (u/decode asset-url)
+                     filename (filename decoded-url)]
+                 {:download-url asset-url
+                  :resource-filename filename
+                  :resource-type (when (and filename resource-type-fn)
+                                   (resource-type-fn filename))
+                  :resource-date created-at
+                  :download-source-name download-source-name
+                  :resource-updated now}))))
+      (when-let [next-url (get-in result [:links :next :href])]
+        (get-github-release-downloadables (assoc source :url next-url))))))
 
-(defn get-github-release-engine-downloadables
-  [{:keys [download-source-name url]}]
-  (let [now (u/curr-millis)]
-    (->> (http/get url {:as :auto})
-         :body
-         (mapcat
-           (fn [{:keys [assets html_url]}]
-             (map
-               (fn [{:keys [browser_download_url created_at]}]
-                 {:release-url html_url
-                  :asset-url browser_download_url
-                  :created-at created_at})
-               assets)))
-         (map
-           (fn [{:keys [asset-url created-at]}]
-             (let [decoded-url (u/decode asset-url)
-                   filename (filename decoded-url)]
-               {:download-url asset-url
-                :resource-filename filename
-                :resource-type (when (bar-engine-filename? filename)
-                                 :spring-lobby/engine)
-                :resource-date created-at
-                :download-source-name download-source-name
-                :resource-updated now}))))))
-
-(defn get-bar-maps-github-release-downloadables
-  [{:keys [download-source-name url]}]
-  (let [now (u/curr-millis)]
-    (->> (http/get url {:as :auto})
-         :body
-         (mapcat
-           (fn [{:keys [assets html_url]}]
-             (map
-               (fn [{:keys [browser_download_url created_at]}]
-                 {:release-url html_url
-                  :asset-url browser_download_url
-                  :created-at created_at})
-               assets)))
-         (map
-           (fn [{:keys [asset-url created-at]}]
-             (let [decoded-url (u/decode asset-url)
-                   filename (filename decoded-url)]
-               {:download-url asset-url
-                :resource-filename filename
-                :resource-type (when (fs/spring-archive? filename)
-                                 :spring-lobby/map)
-                :resource-date created-at
-                :download-source-name download-source-name
-                :resource-updated now}))))))
 
 (def evo-rts-re
   #"^Evolution-RTS\-?v([0-9a-z\.]+)\.sdz$")
@@ -558,7 +521,7 @@
    :url "http://www.hakora.xyz/files/springrts/maps"
    :resources-fn (partial html-downloadables maps-only)})
 (def download-sources
-  [;springfiles-maps-download-source gone now
+  [
    hakora-maps-download-source
    {:download-source-name "Balanced Annihilation GitHub releases"
     :url ba-github-releases-url
@@ -568,11 +531,13 @@
    {:download-source-name "BAR GitHub spring"
     :url bar-spring-releases-url
     :browse-url "https://github.com/beyond-all-reason/spring/releases"
-    :resources-fn get-github-release-engine-downloadables}
+    :resources-fn get-github-release-downloadables
+    :resource-type-fn engines-only}
    {:download-source-name "BAR GitHub maps"
     :url bar-maps-github-releases-url
     :browse-url "https://github.com/beyond-all-reason/Maps/releases"
-    :resources-fn get-bar-maps-github-release-downloadables}
+    :resources-fn get-github-release-downloadables
+    :resource-type-fn maps-only}
    {:download-source-name "Evolution-RTS GitHub releases"
     :url evo-rts-github-releases-url
     :browse-url "https://github.com/EvolutionRTS/Evolution-RTS/releases"
@@ -603,7 +568,8 @@
    {:download-source-name "TAP GitHub maps"
     :url tap-maps-github-releases-url
     :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
-    :resources-fn get-bar-maps-github-release-downloadables}])
+    :resources-fn get-github-release-downloadables
+    :resource-type-fn maps-only}])
 
 (def download-sources-by-name
   (into {}
