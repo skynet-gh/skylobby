@@ -67,10 +67,11 @@
   (let [springlobby {:host "lobby.springrts.com"
                      :port default-server-port
                      :alias "Spring Official"}
-        bar {:host "bar.teifion.co.uk"
+        bar-host "server2.beyondallreason.info"
+        bar {:host bar-host
              :port default-server-port
              :alias "Beyond All Reason"}
-        bar-ssl {:host "server2.beyondallreason.info"
+        bar-ssl {:host bar-host
                  :port 8201
                  :alias "Beyond All Reason (SSL)"
                  :ssl true}
