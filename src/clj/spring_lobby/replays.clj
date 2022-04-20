@@ -36,7 +36,8 @@
      :screen-bounds screen-bounds
      :settings-button true
      :title (str "skyreplays " u/app-version)}
-    {:fx/type fx.settings/settings-window}]})
+    {:fx/type fx.settings/settings-window
+     :screen-bounds screen-bounds}]})
 
 
 (defn create-renderer []

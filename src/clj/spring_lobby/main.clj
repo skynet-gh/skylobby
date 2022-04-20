@@ -191,13 +191,10 @@
               (do
                 (log/info "Starting skyreplays")
                 (swap! spring-lobby/*state assoc :show-replays true :standalone true)
-                (fs/init-7z!)
                 (replays/create-renderer)
                 (spring-lobby/init-async spring-lobby/*state))
               opening-replay?
-              (let [
-                    _ (fs/init-7z!)
-                    replay-details (sdfz/parse-replay replay-file {:details true :parse-stream true})
+              (let [replay-details (sdfz/parse-replay replay-file {:details true :parse-stream true})
                     replay-path (fs/canonical-path replay-file)]
                 (log/info "Opening replay view")
                 (swap! spring-lobby/*state
@@ -225,19 +222,12 @@
                 (log/info "Starting headless")
                 (future
                   (spring-lobby/auto-connect-servers spring-lobby/*state))
-                (future
-                  (log/info "Start 7Zip init, async")
-                  (fs/init-7z!)
-                  (log/info "Finished 7Zip init"))
                 (spring-lobby/init spring-lobby/*state)
                 (spring-lobby/browse-url (str "http://localhost:" (or (:port options)
                                                                       u/default-ipc-port))))
               (= "direct" (first arguments))
               (do
                 (log/info "Starting headless direct connect server")
-                (log/info "Start 7Zip init")
-                (fs/init-7z!)
-                (log/info "Finished 7Zip init")
                 (spring-lobby/init spring-lobby/*state)
                 (fx.event.direct/host-direct-connect spring-lobby/*state (assoc options :spectate true)))
               :else
@@ -257,10 +247,6 @@
                   (fs/delete-skylobby-update-jars))
                 (future
                   (spring-lobby/auto-connect-servers spring-lobby/*state))
-                (future
-                  (log/info "Start 7Zip init, async")
-                  (fs/init-7z!)
-                  (log/info "Finished 7Zip init"))
                 (log/info "Main finished in" (- (u/curr-millis) before) "ms"))))
           (catch Throwable t
             (let [st (with-out-str (.printStackTrace t))]
