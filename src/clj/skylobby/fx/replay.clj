@@ -1434,7 +1434,8 @@
         show (boolean
                (and
                  (fx/sub-val context :show-replays)
-                 (not (fx/sub-val context :windows-as-tabs))))]
+                 (or (not (fx/sub-val context :windows-as-tabs))
+                     (fx/sub-val context :standalone))))]
     {:fx/type :stage
      :showing show
      :title (or title (str u/app-name " Replays"))

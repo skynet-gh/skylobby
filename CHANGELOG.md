@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.16](https://github.com/skynet-gh/skylobby/releases/tag/0.8.16) - 2022-04-19
+
+- Sort friends to top of users list
+- Fix skyreplays standalone
+
 ## [0.8.15](https://github.com/skynet-gh/skylobby/releases/tag/0.8.15) - 2022-04-14
 
 - Fix minimap images not being cached

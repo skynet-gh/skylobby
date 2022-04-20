@@ -33,15 +33,17 @@
                               (into {}))
         battle-password (fx/sub-val context :battle-password)
         battles (fx/sub-val context get-in [:by-server server-key :battles])
-        now (or (fx/sub-val context :now) (u/curr-millis))]
+        now (or (fx/sub-val context :now) (u/curr-millis))
+        users-by-username users
+        users (->> users-by-username
+                   vals
+                   (filter :username)
+                   (map (fn [{:keys [username] :as user}]
+                          (assoc-in user [:client-status :friend] (contains? friends username)))))
+        sorted-users (->> users
+                          (sort-by (juxt (comp not :friend :client-status) (comp string/lower-case :username))))]
     {:fx/type ext-table-column-auto-size
-     :items (->> users
-                 vals
-                 (filter :username)
-                 (sort-by :username String/CASE_INSENSITIVE_ORDER)
-                 (map (fn [{:keys [username] :as user}]
-                        (assoc-in user [:client-status :friend] (contains? friends username))))
-                 vec)
+     :items sorted-users
      :desc
      {:fx/type :table-view
       :style {:-fx-font-size 15}
