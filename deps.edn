@@ -106,6 +106,9 @@
               "--add-opens=java.base/java.nio=ALL-UNNAMED"
               "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
    :main-opts ["--main" "repl"]}
+  :springlobby-main
+  {:extra-paths ["src/clj" "graal/clj" "graal/cljc"]
+   :main-opts ["-m" "spring-lobby.main"]}
   :skyreplays
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc"]
    :main-opts ["-m" "spring-lobby.main" "skyreplays"]}
