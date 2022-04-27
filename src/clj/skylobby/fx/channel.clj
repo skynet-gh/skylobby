@@ -10,6 +10,7 @@
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.util :as u]
+    [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.scene.input Clipboard ClipboardContent)
@@ -143,7 +144,8 @@
                             (filter second)
                             (map first)
                             set)
-        area-id (str "channel-text-area") ; channel-name "-" server-key)
+        area-id (str "channel-text-area" channel-name "-" server-key)
+        area-id (string/replace area-id #"[^_a-zA-Z0-9-]" "")
         area-id-css (str "#" area-id)]
     {:fx/type ext-recreate-on-key-changed
      :key {:ignore ignore-users-set
@@ -165,6 +167,7 @@
                                  :on-action
                                  (fn [event]
                                    (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                     (log/info "Copying chat" channel-name "to clipboard")
                                      (let [clipboard (Clipboard/getSystemClipboard)
                                            content (ClipboardContent.)]
                                        (.putString content (.getSelectedText area))
@@ -174,6 +177,7 @@
                                  :on-action
                                  (fn [event]
                                    (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                     (log/info "Selecting all chat" channel-name)
                                      (.selectAll area)))}]}}
         :desc
         {:fx/type fx.rich-text/lifecycle-fast
