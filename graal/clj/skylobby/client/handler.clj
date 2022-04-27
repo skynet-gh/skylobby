@@ -630,7 +630,10 @@
                (spec-because-unready-message? message))
         (do
           (log/info "Disabling auto unspec because specced for being unready")
-          (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false))
+          (swap! state-atom update-in [:by-server server-key]
+            assoc
+            :auto-unspec false
+            :desired-ready true))
         (when (and (-> me :battle-status :mode not)
                    (teamsize-changed-message? message))
           (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))))
