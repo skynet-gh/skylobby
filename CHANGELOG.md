@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.17](https://github.com/skynet-gh/skylobby/releases/tag/0.8.17) - 2022-04-26
+
+- Add setting to play ring sound when your spec/play changes
+- Fix replays windows showing even for tab view
+- Fix players grouped view tooltips
+- Fix chat context menu
+
 ## [0.8.16](https://github.com/skynet-gh/skylobby/releases/tag/0.8.16) - 2022-04-19
 
 - Sort friends to top of users list
