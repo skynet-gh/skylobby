@@ -320,7 +320,8 @@
          "Unknown sync")
        "\n"
        (if (u/to-bool (:mode battle-status)) "Playing" "Spectating")
-       (when (= host-username username)
+       (when (and host-username username
+                  (= host-username username))
          "\nHost")
        (when (u/to-bool (:mode battle-status))
          (str "\n" (if (:ready battle-status) "Ready" "Unready")))
@@ -444,13 +445,14 @@
             :text "Country: "}
            {:fx/type flag-icon/flag-icon
             :country-code country}]}])
-      (let [{:keys [battle-status client-status user]} player]
+      (let [{:keys [battle-status client-status user username]} player]
         [
          {:fx/type player-status-tooltip-label
           :battle-status battle-status
           :client-status client-status
           :server-key server-key
-          :user user}]))}})
+          :user user
+          :username username}]))}})
 
 (defn add-players-colors [players]
   (let [
@@ -1165,7 +1167,8 @@
                   :props
                   {:tooltip
                    {:fx/type player-name-tooltip
-                    :player player}}
+                    :player player
+                    :server-key server-key}}
                   :desc
                   {:fx/type :text
                    :text (str (u/nickname player))

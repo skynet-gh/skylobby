@@ -383,6 +383,12 @@
                   (log/warn "Ignoring CLIENTBATTLESTATUS message while not in a battle:" (str "'" m "'"))
                   server))))
           {:keys [auto-unspec battle client-data] :as server-data} (get-in prev [:by-server server-key])]
+      (when (:ring-on-spec-change curr)
+        (when (= username (:username server-data))
+          (when (not= (get-in battle [:users username :battle-status :mode])
+                      (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
+            (log/info "Ringing since my spec state changed")
+            (ring-impl))))
       (if-not auto-unspec
         (log/debug "Short circuiting CLIENTBATTLESTATUS handler since not auto unspeccing")
         (if-not (get-in battle [:users username :battle-status :mode])
@@ -630,7 +636,10 @@
                (spec-because-unready-message? message))
         (do
           (log/info "Disabling auto unspec because specced for being unready")
-          (swap! state-atom assoc-in [:by-server server-key :auto-unspec] false))
+          (swap! state-atom update-in [:by-server server-key]
+            assoc
+            :auto-unspec false
+            :desired-ready true))
         (when (and (-> me :battle-status :mode not)
                    (teamsize-changed-message? message))
           (do-auto-unspec state-atom client-data (assoc me :ready-on-unspec (:ready-on-unspec state) :server-key server-key)))))))

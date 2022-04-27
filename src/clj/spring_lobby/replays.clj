@@ -35,6 +35,7 @@
      :on-close-request replays-on-close-request
      :screen-bounds screen-bounds
      :settings-button true
+     :show true
      :title (str "skyreplays " u/app-version)}
     {:fx/type fx.settings/settings-window
      :screen-bounds screen-bounds}]})
