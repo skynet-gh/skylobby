@@ -256,6 +256,7 @@
    :replays-window-dedupe
    :replays-window-details
    :ring-on-auto-unspec
+   :ring-on-spec-change
    :ring-sound-file
    :ring-volume
    :scenarios-engine-version

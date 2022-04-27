@@ -108,6 +108,7 @@
         leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
+        ring-on-spec-change (fx/sub-val context :ring-on-spec-change)
         ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
         show-accolades (fx/sub-val context :show-accolades)
         show-closed-battles (fx/sub-val context :show-closed-battles)
@@ -250,6 +251,14 @@
         :selected (boolean ring-when-game-ends)
         :on-selected-changed {:event/type :spring-lobby/assoc
                               :key :ring-when-game-ends}}}
+      {:fx/type filterable-checkbox-setting
+       :title " Ring when spec state changes"
+       :search settings-search
+       :check-box
+       {:fx/type :check-box
+        :selected (boolean ring-on-spec-change)
+        :on-selected-changed {:event/type :spring-lobby/assoc
+                              :key :ring-on-spec-change}}}
       {:fx/type filterable-checkbox-setting
        :title " Ring on auto unspec"
        :search settings-search

@@ -396,7 +396,7 @@
       [:meta {:charset "utf-8"}]
       [:title "skylobby"]]
      [:body
-      {:style {:background-color "#000"}}
+      {:style "background-color: \"#000\""}
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]
