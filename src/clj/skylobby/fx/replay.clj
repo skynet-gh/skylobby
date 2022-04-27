@@ -1428,14 +1428,14 @@
 
 (defn replays-window-impl
   [{:fx/keys [context]
-    :keys [on-close-request screen-bounds title]}]
+    :keys [show on-close-request screen-bounds title]}]
   (let [
         window-states (fx/sub-val context :window-states)
         show (boolean
-               (and
-                 (fx/sub-val context :show-replays)
-                 (or (not (fx/sub-val context :windows-as-tabs))
-                     (fx/sub-val context :standalone))))]
+               (or show
+                   (and
+                     (fx/sub-val context :show-replays)
+                     (not (fx/sub-val context :windows-as-tabs)))))]
     {:fx/type :stage
      :showing show
      :title (or title (str u/app-name " Replays"))
