@@ -386,7 +386,7 @@
       (when (:ring-on-spec-change curr)
         (when (= username (:username server-data))
           (when (not= (get-in battle [:users username :battle-status :mode])
-                      (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
+                      (get-in curr [:by-server server-key :battle :users username :battle-status :mode]))
             (log/info "Ringing since my spec state changed")
             (ring-impl))))
       (if-not auto-unspec
