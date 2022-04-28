@@ -964,6 +964,7 @@
       (swap! state-atom
         (fn [state]
           (let [channel-name (u/visible-channel state server-key)]
+            (log/info "Marking ingame time in" channel-name "in" server-key)
             (update-in state [:by-server server-key :channels channel-name :messages] conj {:text (str message)
                                                                                             :timestamp (u/curr-millis)
                                                                                             :message-type :info})))))))
