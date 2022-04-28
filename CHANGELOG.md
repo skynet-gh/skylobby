@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.18](https://github.com/skynet-gh/skylobby/releases/tag/0.8.18) - 2022-04-28
+
+- Fix issue with ring on spec change
+- Fix issue with /ingame chat command
+
 ## [0.8.17](https://github.com/skynet-gh/skylobby/releases/tag/0.8.17) - 2022-04-26
 
 - Add setting to play ring sound when your spec/play changes

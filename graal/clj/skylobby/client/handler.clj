@@ -386,7 +386,7 @@
       (when (:ring-on-spec-change curr)
         (when (= username (:username server-data))
           (when (not= (get-in battle [:users username :battle-status :mode])
-                      (not (get-in curr [:by-server server-key :battle :users username :battle-status :mode])))
+                      (get-in curr [:by-server server-key :battle :users username :battle-status :mode]))
             (log/info "Ringing since my spec state changed")
             (ring-impl))))
       (if-not auto-unspec
@@ -964,6 +964,7 @@
       (swap! state-atom
         (fn [state]
           (let [channel-name (u/visible-channel state server-key)]
+            (log/info "Marking ingame time in" channel-name "in" server-key)
             (update-in state [:by-server server-key :channels channel-name :messages] conj {:text (str message)
                                                                                             :timestamp (u/curr-millis)
                                                                                             :message-type :info})))))))

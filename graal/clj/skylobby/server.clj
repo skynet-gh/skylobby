@@ -6,7 +6,7 @@
     clojure.set
     [clojure.spec.alpha :as s]
     [clojure.test.check.generators :as gen]
-    [hiccup.core :as hiccup]
+    [hiccup.page :as hiccup]
     [muuntaja.core :as m]
     org.httpkit.server
     [reitit.ring :as ring]
@@ -391,12 +391,12 @@
 (defn index [_]
   {:status 200
    :body
-   (hiccup/html
+   (hiccup/html5
      [:head
       [:meta {:charset "utf-8"}]
       [:title "skylobby"]]
      [:body
-      {:style "background-color: \"#000\""}
+      {:style "background-color: #000"}
       [:div#root
        (let [csrf-token (force anti-forgery/*anti-forgery-token*)]
          [:div#sente-csrf-token {:data-csrf-token csrf-token}])]

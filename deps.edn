@@ -16,7 +16,7 @@
   clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
   com.evocomputing/colors {:mvn/version "1.0.6"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-  com.github.seancorfield/honeysql {:mvn/version "2.2.868"}
+  com.github.seancorfield/honeysql {:mvn/version "2.2.891"}
   com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
   com.h2database/h2 {:mvn/version "2.1.212"}
   com.taoensso/encore {:mvn/version "3.21.0"}
@@ -43,7 +43,7 @@
   io.netty/netty-transport {:mvn/version "4.1.76.Final"}
   io.netty/netty-transport-native-epoll {:mvn/version "4.1.76.Final"}
   hiccup/hiccup {:mvn/version "1.0.5"}
-  instaparse/instaparse {:mvn/version "1.4.10"}
+  instaparse/instaparse {:mvn/version "1.4.11"}
   jarohen/chime {:mvn/version "0.3.3"}
   manifold/manifold {:mvn/version "0.2.3"}
   me.raynes/fs {:mvn/version "1.4.6"}
@@ -116,7 +116,7 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
-    com.fulcrologic/fulcro {:mvn/version "3.5.18"}
+    com.fulcrologic/fulcro {:mvn/version "3.5.19"}
     com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.2.1"}
     hashp/hashp {:mvn/version "0.2.1"}
@@ -146,7 +146,7 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
-    lambdaisland/kaocha {:mvn/version "1.65.1029"}}
+    lambdaisland/kaocha {:mvn/version "1.66.1034"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :build
   {:deps
@@ -187,7 +187,7 @@
     {:git/url   "https://github.com/clj-easy/graal-config"
      :git/sha   "0dc2862e1b1c9871eef4c306ef77da3610a2bd93"
      :deps/root "config/com.taoensso/nippy"}
-    com.github.seancorfield/honeysql {:mvn/version "2.2.868"}
+    com.github.seancorfield/honeysql {:mvn/version "2.2.891"}
     com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
     com.h2database/h2 {:mvn/version "2.1.212"}
     com.taoensso/encore {:mvn/version "3.21.0"}
@@ -203,7 +203,7 @@
                                :git/sha "7024e89"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
-    instaparse/instaparse {:mvn/version "1.4.10"}
+    instaparse/instaparse {:mvn/version "1.4.11"}
     io.aviso/pretty {:mvn/version "1.1.1"}
     io.netty/netty-codec {:mvn/version "4.1.76.Final"}
     io.netty/netty-codec-http {:mvn/version "4.1.76.Final"}
@@ -431,7 +431,7 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.1.1"}
-    lambdaisland/kaocha {:mvn/version "1.65.1029"}}
+    lambdaisland/kaocha {:mvn/version "1.66.1034"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "test/clj"]}

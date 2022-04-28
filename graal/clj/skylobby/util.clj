@@ -209,9 +209,11 @@
 (defn battle-id-channel-name [battle-id]
   (str "__battle__" battle-id))
 
-(defn battle-channel-name [{:keys [battle-id channel-name]}]
-  (or channel-name
-      (battle-id-channel-name battle-id)))
+(defn battle-channel-name [{:keys [battle-id channel-name] :as d}]
+  (if-not (or battle-id channel-name)
+    (throw (ex-info "Battle channel name for" d))
+    (or channel-name
+        (battle-id-channel-name battle-id))))
 
 (defn battle-channel-name? [channel-name]
   (and channel-name
@@ -234,8 +236,8 @@
 (defn visible-channel [{:keys [by-server selected-tab-channel selected-tab-main]} server-key]
   (let [main-tab (get selected-tab-main server-key)]
     (if (= "battle" main-tab)
-      (when-let [battle-id (get-in by-server [server-key :battle :battle-id])]
-        (battle-channel-name battle-id))
+      (when-let [battle (get-in by-server [server-key :battle])]
+        (battle-channel-name battle))
       (get selected-tab-channel server-key))))
 
 (defn to-number
