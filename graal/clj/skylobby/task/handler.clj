@@ -720,8 +720,9 @@
                                      (catch Exception e
                                        (log/error e "Error reading rapid versions in" f
                                                   "scheduling delete of rapid folder and another rapid update")
-                                       (reset! needs-rapid-delete true)))))
-                                (filter :version)
+                                       (reset! needs-rapid-delete true)
+                                       nil))))
+                                (filter (comp string? :version))
                                 (sort-by :version version/version-compare)
                                 reverse)
             _ (log/info "Found" (count rapid-versions) "rapid versions")]
