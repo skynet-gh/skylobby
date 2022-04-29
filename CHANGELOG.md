@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.19](https://github.com/skynet-gh/skylobby/releases/tag/0.8.19) - 2022-04-28
+
+- Fix error in rapid update
+
 ## [0.8.18](https://github.com/skynet-gh/skylobby/releases/tag/0.8.18) - 2022-04-28
 
 - Fix issue with ring on spec change
