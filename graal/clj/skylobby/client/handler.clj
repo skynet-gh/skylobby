@@ -547,7 +547,8 @@
              now (u/curr-millis)
              capture (<= now (or (get-in state [:by-server server-key :channels channel-name :capture-until]) 0))
              parsed-coordinator (parse-coordinator-message (assoc message-data :timestamp now))
-             battle-channel-name (u/battle-channel-name (get-in state [:by-server server-key :battle]))]
+             battle-channel-name (when-let [battle (get-in state [:by-server server-key :battle])]
+                                   (u/battle-channel-name battle))]
          (cond-> (update-in state [:by-server server-key]
                    (fn [state]
                      (cond-> (update-in state [:channels channel-name :messages] update-messages-fn)

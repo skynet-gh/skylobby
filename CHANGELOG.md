@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.20](https://github.com/skynet-gh/skylobby/releases/tag/0.8.20) - 2022-04-30
+
+- Fix display of modoptions with long names
+- Make resource refresh buttons clear details
+
 ## [0.8.19](https://github.com/skynet-gh/skylobby/releases/tag/0.8.19) - 2022-04-28
 
 - Fix error in rapid update

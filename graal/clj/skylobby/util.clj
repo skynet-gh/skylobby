@@ -210,10 +210,10 @@
   (str "__battle__" battle-id))
 
 (defn battle-channel-name [{:keys [battle-id channel-name] :as d}]
-  (if-not (or battle-id channel-name)
-    (throw (ex-info "Battle channel name for" d))
+  (if (or battle-id channel-name)
     (or channel-name
-        (battle-id-channel-name battle-id))))
+        (battle-id-channel-name battle-id))
+    (throw (ex-info "Cannot get battle channel name from" {:data d}))))
 
 (defn battle-channel-name? [channel-name]
   (and channel-name

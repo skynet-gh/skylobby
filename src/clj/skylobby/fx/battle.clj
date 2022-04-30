@@ -1071,6 +1071,7 @@
         :alignment :top-left
         :children
         [{:fx/type fx.spring-options/modoptions-view
+          :max-width minimap-size
           :modoptions (:modoptions battle-mod-details)
           :server-key server-key
           :singleplayer singleplayer}]}}
@@ -1083,6 +1084,7 @@
         :alignment :top-left
         :children
         [{:fx/type fx.spring-options/modoptions-view
+          :max-width minimap-size
           :modoptions (:mapoptions battle-map-details)
           :option-key "mapoptions"
           :server-key server-key

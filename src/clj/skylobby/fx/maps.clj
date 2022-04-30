@@ -43,7 +43,8 @@
         map-input-prefix (fx/sub-val context :map-input-prefix)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
         {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
-        selected-map-file (:file (get maps-by-name map-name))
+        selected-map (:file (get maps-by-name map-name))
+        selected-map-file (:file selected-map)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
                               :path [:by-spring-root (fs/canonical-path spring-isolation-dir) :map-name]})]
@@ -161,12 +162,15 @@
            :desc
            {:fx/type :button
             :disable (boolean
-                       (seq
-                         (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-maps)))
+                       (or
+                         (seq
+                           (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-maps))
+                         (seq
+                           (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/clear-map-details))))
             :on-action {:event/type :spring-lobby/add-task
-                        :task {:spring-lobby/task-type :spring-lobby/refresh-maps
+                        :task {:spring-lobby/task-type :spring-lobby/clear-map-details
                                :spring-root spring-isolation-dir
-                               :priorities [selected-map-file]}}
+                               :map-resource selected-map}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}]
