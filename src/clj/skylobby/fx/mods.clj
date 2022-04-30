@@ -45,7 +45,8 @@
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
                               :path [:by-spring-root spring-root-path :mod-name]})
-        selected-mod-file (:file (get mods-by-name mod-name))]
+        selected-mod (get mods-by-name mod-name)
+        selected-mod-file (:file selected-mod)]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -156,12 +157,15 @@
            :desc
            {:fx/type :button
             :disable (boolean
-                       (seq
-                         (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)))
+                       (or
+                         (seq
+                           (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods))
+                         (seq
+                           (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/clear-mod-details))))
             :on-action {:event/type :spring-lobby/add-task
-                        :task {:spring-lobby/task-type :spring-lobby/refresh-mods
+                        :task {:spring-lobby/task-type :spring-lobby/clear-mod-details
                                :spring-root spring-isolation-dir
-                               :priorities [selected-mod-file]}}
+                               :mod-resource selected-mod}}
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh:16:white"}}}])})))

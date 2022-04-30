@@ -1212,4 +1212,43 @@
           (when-let [map-file (:file map-resource)]
             [{:spring-lobby/task-type :spring-lobby/map-details
               :map-name (:map-name map-resource)
-              :map-file map-file}]))))))
+              :map-file map-file}])))))
+  (defmethod task-handler :spring-lobby/clear-map-details
+    [{:keys [map-resource spring-root]}]
+    (let [map-key (resource/details-cache-key map-resource)]
+      (swap! state-atom
+        (fn [state]
+          (cond-> state
+                  map-key
+                  (update :map-details cache/miss map-key nil))))
+      (task/add-tasks! state-atom
+        (concat
+          [
+           {:spring-lobby/task-type :spring-lobby/refresh-maps
+            :spring-root spring-root
+            :priorities [(:file map-resource)]}]
+          (when-let [map-file (:file map-resource)]
+            [{:spring-lobby/task-type :spring-lobby/map-details
+              :map-name (:map-name map-resource)
+              :map-file map-file}])))))
+  (defmethod task-handler :spring-lobby/clear-mod-details
+    [{:keys [mod-resource spring-root]}]
+    (let [
+          mod-key (resource/details-cache-key mod-resource)
+          {:keys [use-git-mod-version]}
+          (swap! state-atom
+            (fn [state]
+              (cond-> state
+                      mod-key
+                      (update :mod-details cache/miss mod-key nil))))]
+      (task/add-tasks! state-atom
+        (concat
+          [
+           {:spring-lobby/task-type :spring-lobby/refresh-mods
+            :spring-root spring-root
+            :priorities [(:file mod-resource)]}]
+          (when-let [mod-file (:file mod-resource)]
+            [{:spring-lobby/task-type :spring-lobby/mod-details
+              :mod-name (:mod-name mod-resource)
+              :mod-file mod-file
+              :use-git-mod-version use-git-mod-version}]))))))
