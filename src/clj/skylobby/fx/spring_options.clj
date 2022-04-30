@@ -28,9 +28,11 @@
             (cons (concat skip xs)
                   (split-by pred ys))))))))
 
+(def value-width 120)
+
 (defn modoptions-table
   [{:fx/keys [context]
-    :keys [current-options event-data modoptions option-key singleplayer server-key]}]
+    :keys [current-options event-data max-width modoptions option-key singleplayer server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -57,7 +59,8 @@
                    (remove (comp #{"section"} :type)) ; remove sections in middle
                    (map #(update % :key (comp keyword string/lower-case))))
         event-data (or event-data
-                       {:event/type :skylobby.fx.event.battle/modoption-change})]
+                       {:event/type :skylobby.fx.event.battle/modoption-change})
+        max-width (or max-width 256)]
     {:fx/type :v-box
      :children
      [{:fx/type :label
@@ -73,33 +76,38 @@
        :columns
        [{:fx/type :table-column
          :text "Name"
+         :pref-width (- max-width value-width)
+         :max-width (- max-width value-width)
+         :resizable false
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
           :describe
           (fn [i]
-            {:text ""
+            {
+             :text ""
+             :tooltip
+             {:fx/type tooltip-nofocus/lifecycle
+              :style {:-fx-font-size 16}
+              :show-delay skylobby.fx/tooltip-show-delay
+              :text (str (when-let [k (:key i)]
+                           (name k))
+                         "\n\n"
+                         (:desc i))}
              :graphic
-             {:fx/type fx.ext.node/with-tooltip-props
-              :props
-              {:tooltip
-               {:fx/type tooltip-nofocus/lifecycle
-                :style {:-fx-font-size 16}
-                :show-delay skylobby.fx/tooltip-show-delay
-                :text (str (when-let [k (:key i)]
-                             (name k))
-                           "\n\n"
-                           (:desc i))}}
-              :desc
-              (merge
-                {:fx/type :label
-                 :text (or (some-> i :name name str)
-                           "")}
-                (when-let [v (get current-options (some-> i :key name str))]
-                  (when (not (spring-script/tag= i v))
-                    {:style {:-fx-font-weight :bold}})))}})}}
+             (merge
+               {:fx/type :text
+                :style-class ["skylobby-chat-message"]
+                :wrapping-width (- max-width value-width)
+                :text (or (some-> i :name name str)
+                          "")}
+               (when-let [v (get current-options (some-> i :key name str))]
+                 (when (not (spring-script/tag= i v))
+                   {:style {:-fx-font-weight :bold}})))})}}
         {:fx/type :table-column
          :text "Value"
+         :pref-width value-width
+         :resizable false
          :cell-value-factory identity
          :cell-factory
          {:fx/cell-type :table-cell
@@ -224,7 +232,7 @@
 
 (defn modoptions-view
   [{:fx/keys [context]
-    :keys [current-options event-data modoptions option-key server-key singleplayer]}]
+    :keys [current-options event-data max-width modoptions option-key server-key singleplayer]}]
   (let [sorted (sort-by (comp u/to-number first) modoptions)
         by-section (split-by (comp #{"section"} :type second) sorted)
         filter-modoptions (fx/sub-val context :filter-modoptions)
@@ -302,6 +310,7 @@
                   {:fx/type modoptions-table
                    :current-options current-options
                    :event-data event-data
+                   :max-width max-width
                    :modoptions section
                    :option-key option-key
                    :server-key server-key
