@@ -1150,6 +1150,18 @@
               spads/message-types)}]}
          {:fx/type filterable-section
           :search settings-search
+          :title " Chat Commands"
+          :children
+          [{:fx/type filterable-checkbox-setting
+            :title " Allow chat commands as direct connect host"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :direct-connect-chat-commands))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :direct-connect-chat-commands}}}]}
+         {:fx/type filterable-section
+          :search settings-search
           :title " Update"
           :children
           [

@@ -1,8 +1,10 @@
 (ns skylobby.direct.client
   (:require
+    [clojure.string :as string]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [skylobby.spring :as spring]
+    [spring-lobby.sound :as sound]
     [taoensso.encore :as encore :refer [have]]
     [taoensso.timbre :as log]))
 
@@ -106,12 +108,32 @@
   (log/info "Updating battle details with" ?data)
   (swap! state-atom update-in [:by-server server-key :battles :direct] merge ?data))
 
+(defmulti chat-msg-handler
+  (fn [_state-atom _server-key message]
+    (-> (or (:text message) "")
+        (string/split #"\s+")
+        first
+        string/lower-case)))
+
+(defmethod chat-msg-handler :default
+  [_state-atom _server-key message]
+  (log/info "No handler for message" message))
+
+(defmethod chat-msg-handler "!wakeup"
+  [state-atom _server-key message]
+  (log/info "Wakeup" message)
+  (let [[_all _options] (re-find #"\w+ (.+)" (:text message))]
+    (sound/play-ring @state-atom)))
+
 (defmethod -event-msg-handler :skylobby.direct/chat
   [state-atom server-key {:keys [?data]}]
   (log/info "Adding chat" ?data)
   (let [{:keys [channel-name]} ?data
-        messages-path [:by-server server-key :channels channel-name :messages]]
-    (swap! state-atom update-in messages-path conj ?data)))
+        messages-path [:by-server server-key :channels channel-name :messages]
+        {:keys [direct-connect-chat-commands]} (swap! state-atom update-in messages-path conj ?data)]
+    (if direct-connect-chat-commands
+      (chat-msg-handler state-atom server-key ?data)
+      (log/info "Direct connect chat commands disabled"))))
 
 (defmethod -event-msg-handler :skylobby.direct/battle-users
   [state-atom server-key {:keys [?data]}]
