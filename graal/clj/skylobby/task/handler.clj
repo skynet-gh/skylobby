@@ -1163,7 +1163,8 @@
                          (io/file spring-isolation-dir "engine" (fs/filename download-file)))
           _ (fs/update-file-cache! state-atom download-file extract-file)
           dest (fs/extract-7z-fast download-file extract-file)]
-      (fs/update-file-cache! state-atom download-file dest)))
+      (fs/update-file-cache! state-atom download-file dest)
+      (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-engines})))
   (defmethod task-handler :spring-lobby/import [e]
     (import/import-resource state-atom e))
   (defmethod task-handler :spring-lobby/scan-all-imports
