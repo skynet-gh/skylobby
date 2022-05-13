@@ -819,34 +819,30 @@
     (message/send state-atom client-data (str "JOINBATTLEACCEPT " user-name))))
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (future
-    (try
-      (log/info "Handling REQUESTBATTLESTATUS async")
-      (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
-            {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
-            spring-root (or (-> servers (get server-url) :spring-isolation-dir)
-                            spring-isolation-dir)
-            spring-root-path (fs/canonical-path spring-root)
-            spring (-> state :by-spring-root (get spring-root-path))
-            my-username (:username client-data)
-            {:keys [battle-status]} (-> battle :users (get my-username))
-            battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
-            battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
-            new-battle-status (assoc (or battle-status gloss/default-battle-status)
-                                :id (battle/available-team-id battle)
-                                :ally 0
-                                :side (or (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
-                                          0)
-                                :sync (u/sync-number
-                                        (resource/sync-status server-data spring mod-details map-details)))
-            new-battle-status (if join-battle-as-player
-                                (assoc new-battle-status :mode true)
-                                new-battle-status)
-            color (or preferred-color (u/random-color))
-            msg (str "MYBATTLESTATUS " (gloss/encode-battle-status new-battle-status) " " (or color 0))]
-        (message/send state-atom client-data msg))
-      (catch Exception e
-        (log/error e "Error handling REQUESTBATTLESTATUS")))))
+  (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
+        {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
+        spring-root (or (-> servers (get server-url) :spring-isolation-dir)
+                        spring-isolation-dir)
+        spring-root-path (fs/canonical-path spring-root)
+        spring (-> state :by-spring-root (get spring-root-path))
+        my-username (:username client-data)
+        {:keys [battle-status]} (-> battle :users (get my-username))
+        battle-mod (-> battles (get (:battle-id battle)) :battle-modname)
+        battle-mod-index (->> spring :mods (filter (comp #{battle-mod} :mod-name)) first)
+        preferred-side (u/to-number (get preferred-factions (:mod-name-only battle-mod-index)))
+        _ (log/info "Preferred side for" (:mod-name-only battle-mod-index) "is" preferred-side)
+        new-battle-status (assoc (or battle-status gloss/default-battle-status)
+                            :id (battle/available-team-id battle)
+                            :ally 0
+                            :side (or preferred-side 0)
+                            :sync (u/sync-number
+                                    (resource/sync-status server-data spring mod-details map-details)))
+        new-battle-status (if join-battle-as-player
+                            (assoc new-battle-status :mode true)
+                            new-battle-status)
+        color (or preferred-color (u/random-color))
+        msg (str "MYBATTLESTATUS " (gloss/encode-battle-status new-battle-status) " " (or color 0))]
+    (message/send state-atom client-data msg)))
 
 
 (defmethod handle "BATTLECLOSED" [state-atom server-url m]
