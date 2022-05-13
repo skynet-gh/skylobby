@@ -6,6 +6,8 @@ on:
   release:
     types: [created]
   workflow_dispatch:
+env:
+  graal_version: 22.1.0
 jobs:
   windows:
     runs-on: windows-latest
@@ -24,7 +26,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 22.0.0.2
+          graalvm-version: ${{ env.graal_version }}
           native-image: true
       - uses: actions/cache@v3.0.2
         with:
@@ -60,7 +62,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 22.0.0.2
+          graalvm-version: ${{ env.graal_version }}
           native-image: true
       - uses: actions/cache@v3.0.2
         with:
@@ -90,7 +92,7 @@ jobs:
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
-          graalvm-version: 22.0.0.2
+          graalvm-version: ${{ env.graal_version }}
           native-image: true
       - uses: actions/cache@v3.0.2
         with:

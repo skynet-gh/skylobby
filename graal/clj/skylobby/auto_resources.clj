@@ -70,9 +70,17 @@
                                          (filter (comp #{:spring-lobby/search-springfiles} :spring-lobby/task-type))
                                          (filter (comp #{map-name} :springname))
                                          first)
+        search-springfiles-mod-task (->> all-tasks
+                                         (filter (comp #{:spring-lobby/search-springfiles} :spring-lobby/task-type))
+                                         (filter (comp #{mod-name} :springname))
+                                         first)
         download-springfiles-map-task (->> all-tasks
                                            (filter (comp #{:spring-lobby/download-springfiles :spring-lobby/http-downloadable} :spring-lobby/task-type))
                                            (filter (comp #{map-name} :springname))
+                                           first)
+        download-springfiles-mod-task (->> all-tasks
+                                           (filter (comp #{:spring-lobby/download-springfiles :spring-lobby/http-downloadable} :spring-lobby/task-type))
+                                           (filter (comp #{mod-name} :springname))
                                            first)
         engine-details (resource/engine-details engines engine-version)
         engine-file (:file engine-details)
@@ -122,8 +130,10 @@
                     (filter (comp #{mod-name} :mod-name))
                     first
                     not)
-        springfiles-search-result (get springfiles-search-results map-name)
-        springfiles-url (http/springfiles-url springfiles-search-result)
+        map-springfiles-search-result (get springfiles-search-results map-name)
+        mod-springfiles-search-result (get springfiles-search-results mod-name)
+        map-springfiles-url (http/springfiles-url map-springfiles-search-result)
+        mod-springfiles-url (http/springfiles-url mod-springfiles-search-result)
         download-source-tasks (->> all-tasks
                                    (filter (comp #{:spring-lobby/update-downloadables}))
                                    (map :download-source-name)
@@ -226,8 +236,8 @@
                    (and map-name
                         (not map-importable)
                         (not map-downloadable)
-                        springfiles-search-result
-                        ((fnil < 0) (:tries (get http-download springfiles-url)) resource/max-tries)
+                        map-springfiles-search-result
+                        ((fnil < 0) (:tries (get http-download map-springfiles-url)) resource/max-tries)
                         (not download-springfiles-map-task)
                         (not (:spring-lobby/refresh-maps tasks-by-type)))
                    (do
@@ -278,6 +288,31 @@
                      (log/info "Adding task to auto download mod" mod-downloadable)
                      {:spring-lobby/task-type :spring-lobby/http-downloadable
                       :downloadable mod-downloadable
+                      :spring-isolation-dir spring-root})
+                   (and mod-name
+                        (not rapid-id)
+                        (not rapid-task)
+                        (not (contains? springfiles-search-results mod-name))
+                        (not search-springfiles-mod-task))
+                   (do
+                     (log/info "Adding task to search springfiles for mod" mod-name)
+                     {:spring-lobby/task-type :spring-lobby/search-springfiles
+                      :springname mod-name
+                      :resource-type :spring-lobby/mod
+                      :spring-isolation-dir spring-root})
+                   (and mod-name
+                        (not rapid-id)
+                        (not rapid-task)
+                        mod-springfiles-search-result
+                        ((fnil < 0) (:tries (get http-download mod-springfiles-url)) resource/max-tries)
+                        (not download-springfiles-mod-task)
+                        (not (:spring-lobby/refresh-mods tasks-by-type)))
+                   (do
+                     (log/info "Adding task to download mod" mod-name "from springfiles")
+                     {:spring-lobby/task-type :spring-lobby/download-springfiles
+                      :resource-type :spring-lobby/mod
+                      :springname mod-name
+                      :search-result (get springfiles-search-results mod-name)
                       :spring-isolation-dir spring-root})
                    (and (not rapid-id)
                         (not rapid-task)

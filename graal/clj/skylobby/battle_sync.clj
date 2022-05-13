@@ -64,6 +64,10 @@
                   {:username my-username}
                   {:battle-status {:sync new-sync-number}})
                 (let [new-battle-status (assoc battle-status :sync new-sync-number)]
+                  (when (and (= old-sync new-sync)
+                             (not= old-sync-number new-sync-number))
+                    ; teiserver bug workaround)
+                    (swap! state-atom assoc-in [:by-server server-key :battle :users my-username :battle-status :sync] new-sync-number))
                   (message/send state-atom client-data
                     (str "MYBATTLESTATUS " (gloss/encode-battle-status new-battle-status) " " (or team-color 0)))))))))
       (catch Exception e

@@ -271,6 +271,20 @@
                        :client-data client-data
                        :channel-name (u/user-channel-name host-username)
                        :message (str "!whois " username)
+                       :server-key server-key}}
+          {:fx/type :menu-item
+           :text "!boss"
+           :on-action {:event/type :spring-lobby/send-message
+                       :client-data client-data
+                       :channel-name (u/user-channel-name host-username)
+                       :message (str "!boss " username)
+                       :server-key server-key}}
+          {:fx/type :menu-item
+           :text "!spec"
+           :on-action {:event/type :spring-lobby/send-message
+                       :client-data client-data
+                       :channel-name (u/user-channel-name host-username)
+                       :message (str "!spec " username)
                        :server-key server-key}}])
        [
         {:fx/type :menu-item

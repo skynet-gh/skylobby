@@ -133,21 +133,8 @@
                    {:keys [download-source-name download-url]} downloadable
                    dest (resource/resource-dest spring-isolation-dir downloadable)
                    dest-path (fs/canonical-path dest)
-                   dest-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))
-                   springname mod-name
-                   springfiles-searched (contains? springfiles-search-results springname)
-                   springfiles-search-result (get springfiles-search-results springname)
-                   springfiles-mirror-set (set (:mirrors springfiles-search-result))
-                   springfiles-download (->> http-download
-                                             (filter (comp springfiles-mirror-set first))
-                                             first
-                                             second)
-                   springfiles-in-progress (or (:running springfiles-download)
-                                               (->> download-tasks-by-url
-                                                    keys
-                                                    (filter springfiles-mirror-set)
-                                                    seq))]
-               (if (or downloadable possible-source-name)
+                   dest-exists (fs/file-exists? file-cache (resource/resource-dest spring-isolation-dir downloadable))]
+               (when (or downloadable possible-source-name)
                  [{:severity (if dest-exists -1 2)
                    :text "download"
                    :human-text (if in-progress
@@ -186,37 +173,52 @@
                         (merge
                           {:spring-lobby/task-type :spring-lobby/update-downloadables
                            :force true}
-                          (get http/download-sources-by-name possible-source-name))}))}]
-                 (when (and springname (not (some #(re-find % springname) no-springfiles)))
-                   [{:severity 2
-                     :text "springfiles"
-                     :human-text (if springfiles-in-progress
-                                   (str "Downloading " (u/download-progress springfiles-download))
-                                   (if springfiles-searched
-                                     (if springfiles-search-result
-                                       "Download from springfiles"
-                                       "Not found on springfiles")
-                                     "Search springfiles and download"))
-                     :in-progress springfiles-in-progress
-                     :action
-                     (when (or (not springfiles-searched) springfiles-search-result)
-                       {:event/type :spring-lobby/add-task
-                        :task
-                        (if springfiles-searched
-                          {:spring-lobby/task-type :spring-lobby/download-springfiles
-                           :resource-type :spring-lobby/mod
-                           :search-result springfiles-search-result
-                           :springname springname
-                           :spring-isolation-dir spring-isolation-dir}
-                          {:spring-lobby/task-type :spring-lobby/search-springfiles
-                           :springname springname
-                           :resource-type :spring-lobby/mod
-                           :spring-isolation-dir spring-isolation-dir})})}])))
+                          (get http/download-sources-by-name possible-source-name))}))}]))
+             (let [
+                   springname mod-name
+                   springfiles-searched (contains? springfiles-search-results springname)
+                   springfiles-search-result (get springfiles-search-results springname)
+                   springfiles-mirror-set (set (:mirrors springfiles-search-result))
+                   springfiles-download (->> http-download
+                                             (filter (comp springfiles-mirror-set first))
+                                             first
+                                             second)
+                   springfiles-in-progress (or (:running springfiles-download)
+                                               (->> download-tasks-by-url
+                                                    keys
+                                                    (filter springfiles-mirror-set)
+                                                    seq))]
+               (when (and springname (not (some #(re-find % springname) no-springfiles)))
+                 [{:severity 2
+                   :text "springfiles"
+                   :human-text (if springfiles-in-progress
+                                 (str "Downloading " (u/download-progress springfiles-download))
+                                 (if springfiles-searched
+                                   (if springfiles-search-result
+                                     "Download from springfiles"
+                                     "Not found on springfiles")
+                                   "Search springfiles and download"))
+                   :in-progress springfiles-in-progress
+                   :action
+                   (when (or (not springfiles-searched) springfiles-search-result)
+                     {:event/type :spring-lobby/add-task
+                      :task
+                      (if springfiles-searched
+                        {:spring-lobby/task-type :spring-lobby/download-springfiles
+                         :resource-type :spring-lobby/mod
+                         :search-result springfiles-search-result
+                         :springname springname
+                         :spring-isolation-dir spring-isolation-dir}
+                        {:spring-lobby/task-type :spring-lobby/search-springfiles
+                         :springname springname
+                         :resource-type :spring-lobby/mod
+                         :spring-isolation-dir spring-isolation-dir})})}]))
              (when (and mod-name
                         (not is-unversioned)
                         (not (some #(re-find % mod-name) no-rapid)))
                (let [rapid-data (get-rapid-data-by-version mod-name)
-                     rapid-id (:id rapid-data)
+                     default-rapid-id (str (resource/mod-repo-name mod-name) ":test")
+                     rapid-id (or (:id rapid-data) default-rapid-id)
                      rapid-download (get rapid-downloads-by-id rapid-id)
                      running (some? (get rapid-tasks-by-id rapid-id))
                      sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))

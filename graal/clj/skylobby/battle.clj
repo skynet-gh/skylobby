@@ -22,8 +22,9 @@
 (defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [battle]
-  (->> (mapcat battle [:users :bots])
-       (mapv second)))
+  (when battle
+    (->> (mapcat battle [:users :bots])
+         (mapv second))))
 
 
 (defn- first-avail [n-set]
