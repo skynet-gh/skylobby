@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.21](https://github.com/skynet-gh/skylobby/releases/tag/0.8.21) - 2022-05-12
+
+- Add chat logs for some server messages
+- Auto search springfiles as fallback for mod
+- Fix resource pane not showing springfiles search for mod
+- Fix leaveq on unsupported servers
+- Fix issues with battle preview and join battle
+- Fix missing engine refresh after download and extract
+- Attempt to use `:test` version for rapid progress on update
+- Workaround for teiserver mybattlestatus bug
+- Add context menu to boss or spec a player
+
 ## [0.8.20](https://github.com/skynet-gh/skylobby/releases/tag/0.8.20) - 2022-04-30
 
 - Fix display of modoptions with long names
