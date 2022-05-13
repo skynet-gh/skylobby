@@ -1998,6 +1998,7 @@
         (let [server-key (u/server-key client-data)]
           (if (:battle-id battle)
             (do
+              (log/info "Leaving battle" (with-out-str (pprint battle)))
               (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
                                                                                 :battle-password battle-password
                                                                                 :battle-passworded battle-passworded})
@@ -3022,7 +3023,8 @@
     (event-handler (assoc e
                           :event/type ::battle-spectate-change
                           :value value))
-    (when-not value
+    (when (and (not value)
+               (contains? (:compflags client-data) "teiserver"))
       (event-handler
         {:event/type :skylobby.fx.event.chat/send
          :channel-name battle-channel-name

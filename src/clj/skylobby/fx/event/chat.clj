@@ -76,7 +76,7 @@
               (re-find #"^/rename" message)
               (let [[_all new-username] (re-find #"^/rename\s+([^\s]+)" message)]
                 (when (= :spring-lobby server-type)
-                  (swap! state-atom update-in messages-path conj {:text (str "Renaming to" new-username)
+                  (swap! state-atom update-in messages-path conj {:text (str "Renaming to " new-username)
                                                                   :timestamp now
                                                                   :message-type :info}
                    (message/send state-atom client-data (str "RENAMEACCOUNT " new-username)))))
