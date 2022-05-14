@@ -1572,7 +1572,8 @@
   ([state-atom server-key]
    (update-disconnected! state-atom server-key nil))
   ([state-atom server-key {:keys [error-message user-requested]}]
-   (log/info "Disconnecting from" (pr-str server-key))
+   (log/info (ex-info "stacktrace" {})
+     "Disconnecting from" (pr-str server-key))
    (let [[old-state _new-state] (swap-vals! state-atom
                                   (fn [state]
                                     (let [normal-logout (get-in state [:normal-logout server-key])]
