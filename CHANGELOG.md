@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.22](https://github.com/skynet-gh/skylobby/releases/tag/0.8.22) - 2022-05-14
+
+- Disable teiserver matchmaking due to server bug
+
 ## [0.8.21](https://github.com/skynet-gh/skylobby/releases/tag/0.8.21) - 2022-05-12
 
 - Add chat logs for some server messages
