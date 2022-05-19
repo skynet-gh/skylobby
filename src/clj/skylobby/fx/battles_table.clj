@@ -341,7 +341,7 @@
     (Image. url battles-map-size battles-map-size true false true)))
 
 (def minimap-image-memoized
-  (clojure.core.memoize/lru minimap-image))
+  (clojure.core.memoize/lru minimap-image :lru/threshold 128))
 
 
 (defn battles-table-with-images-impl
