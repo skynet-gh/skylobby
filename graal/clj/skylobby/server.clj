@@ -460,7 +460,7 @@
                                         {:status 200
                                          :body   {:total (+ x y)}})}}]]
          ["/ipc"
-          ["/replay" {:get {:parameters {:query {:path string?}}}
+          ["/replay" {:post {:parameters {:query {:path string?}}}
                       :responses {200 {:body {:path string?}}}
                       :handler (fn [{{{:keys [path]} :query} :parameters}]
                                  (if-let [file (fs/file path)]
@@ -471,7 +471,8 @@
                                          (-> state
                                              (assoc :show-replays true
                                                     :selected-replay parsed-replay
-                                                    :selected-replay-file file)
+                                                    :selected-replay-file file
+                                                    :selected-server-tab "replays")
                                              (assoc-in [:parsed-replays-by-path (fs/canonical-path file)] parsed-replay)))))
                                    (log/warn "Unable to coerce to file" path)))}]]
          ["/minimap-image" {:get {:parameters {:query (s/keys :req-un [::map-name]
