@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.23](https://github.com/skynet-gh/skylobby/releases/tag/0.8.23) - 2022-05-18
+
+- Make replay tags sortable
+- Update TAP naming
+- Fix replay file association
+- Improve rapid package update messages
+- Fix maps window loading full size images
+
 ## [0.8.22](https://github.com/skynet-gh/skylobby/releases/tag/0.8.22) - 2022-05-14
 
 - Disable teiserver matchmaking due to server bug
