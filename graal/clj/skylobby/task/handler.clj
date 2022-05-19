@@ -683,7 +683,7 @@
                                 (filter (comp fs/canonical-path :file))
                                 first))
           rapid-repo (or rapid-repo
-                         (resource/mod-repo-name mod-name))
+                         (resource/update-mod-repo-name mod-name))
           rapid-id (or rapid-id
                        (str rapid-repo ":test"))]
       (if (and engine-details (:file engine-details))

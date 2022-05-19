@@ -217,7 +217,8 @@
                         (not is-unversioned)
                         (not (some #(re-find % mod-name) no-rapid)))
                (let [rapid-data (get-rapid-data-by-version mod-name)
-                     default-rapid-id (str (resource/mod-repo-name mod-name) ":test")
+                     rapid-repo (resource/mod-repo-name mod-name)
+                     default-rapid-id (when rapid-repo (str rapid-repo ":test"))
                      rapid-id (or (:id rapid-data) default-rapid-id)
                      rapid-download (get rapid-downloads-by-id rapid-id)
                      running (some? (get rapid-tasks-by-id rapid-id))
@@ -231,7 +232,6 @@
                                              (mapcat second)
                                              (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
                                              seq)
-                     rapid-repo (resource/mod-repo-name mod-name)
                      rapid-update-id (when rapid-repo (str rapid-repo ":test"))
                      rapid-update-download (get rapid-downloads-by-id rapid-update-id)
                      in-progress (or running

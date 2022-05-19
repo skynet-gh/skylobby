@@ -22,10 +22,16 @@
     nil))
 
 (defn mod-repo-name [mod-name]
-  (or (when mod-name
-        (cond
-          (string/includes? mod-name "Beyond All Reason") "byar"
-          :else nil))
+  (when mod-name
+    (cond
+      (string/includes? mod-name "Beyond All Reason") "byar"
+      (string/includes? mod-name "Balanced Annihilation") "ba"
+      (string/includes? mod-name "Metal Factions") "mf"
+      (string/includes? mod-name "Tech Annihilation") "techa"
+      :else nil)))
+
+(defn update-mod-repo-name [mod-name]
+  (or (mod-repo-name mod-name)
       "i18n"))
 
 
