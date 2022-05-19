@@ -1383,7 +1383,8 @@
            :h-box/hgrow :sometimes}
           {:fx/type :button
            :text "Settings"
-           :on-action {:event/type :spring-lobby/toggle
+           :on-action {:event/type :spring-lobby/toggle-window
+                       :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                        :key :show-settings-window}
            :graphic
            {:fx/type font-icon/lifecycle

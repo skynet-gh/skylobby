@@ -25,7 +25,8 @@
 (set! *warn-on-reflection* true)
 
 
-(def ip-validator (InetAddressValidator/getInstance))
+(def ^InetAddressValidator ip-validator
+  (InetAddressValidator/getInstance))
 
 
 (defn protocol-cell
@@ -230,7 +231,7 @@
                  :style-class ["button" "skylobby-normal"]
                  :text "Join"
                  :disable (or (string/blank? direct-connect-username)
-                              (not (.isValidInet4Address ip-validator direct-connect-ip))
+                              (not (.isValidInet4Address ip-validator (str direct-connect-ip)))
                               (contains? server-keys client-server-key))
                  :on-action {:event/type :skylobby.fx.event.direct/join
                              :direct-connect-ip direct-connect-ip
