@@ -155,6 +155,7 @@
 (def mod-aliases
   [["total_atomization_prime" "taprime"]
    ["total_atomization_prime" "tap"]
+   ["total_atomic_power" "tap"]
    ["evolution_rts" "evo_rts"]
    ["evolution_rts" "evo"]
    ["tech_annihilation" "techa"]
