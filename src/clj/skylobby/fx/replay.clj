@@ -748,24 +748,22 @@
                  {:text (str formatted)}))}}
            {:fx/type :table-column
             :text "Tag"
-            :sortable false
             :resizable false
             :pref-width 140
-            :cell-value-factory identity
+            :cell-value-factory (juxt #(->> % :replay-id (get replays-tags)) :replay-id)
             :cell-factory
             {:fx/cell-type :table-cell
              :describe
-             (fn [replay]
-               (let [id (:replay-id replay)]
-                 {:text ""
-                  :graphic
-                  {:fx/type ext-recreate-on-key-changed
-                   :key (str id)
-                   :desc
-                   {:fx/type :text-field
-                    :text (str (get replays-tags id))
-                    :on-text-changed {:event/type :spring-lobby/assoc-in
-                                      :path [:replays-tags id]}}}}))}}
+             (fn [[tags id]]
+               {:text ""
+                :graphic
+                {:fx/type ext-recreate-on-key-changed
+                 :key (str id)
+                 :desc
+                 {:fx/type :text-field
+                  :text (str tags)
+                  :on-text-changed {:event/type :spring-lobby/assoc-in
+                                    :path [:replays-tags id]}}}})}}
            {:fx/type :table-column
             :text "Watched"
             :sortable false
@@ -1385,7 +1383,8 @@
            :h-box/hgrow :sometimes}
           {:fx/type :button
            :text "Settings"
-           :on-action {:event/type :spring-lobby/toggle
+           :on-action {:event/type :spring-lobby/toggle-window
+                       :windows-as-tabs (fx/sub-val context :windows-as-tabs)
                        :key :show-settings-window}
            :graphic
            {:fx/type font-icon/lifecycle

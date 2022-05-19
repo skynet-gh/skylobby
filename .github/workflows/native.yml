@@ -39,7 +39,7 @@ jobs:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.1.1
+      - uses: actions/setup-node@v3.2.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -51,10 +51,12 @@ jobs:
       # https://github.com/oracle/graal/issues/2256#issuecomment-624024965
       - run: editbin /SUBSYSTEM:WINDOWS skylobby.exe
         shell: powershell
+      - run: compress-archive -path ".\*.dll","skylobby.exe" "skylobby-windows.zip" -compressionlevel optimal
+        shell: powershell
       - uses: actions/upload-artifact@v3.0.0
         with:
-          name: skylobby.exe
-          path: skylobby.exe
+          name: skylobby-windows.zip
+          path: skylobby-windows.zip
   mac:
     runs-on: macos-latest
     steps:
@@ -74,7 +76,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.1.1
+      - uses: actions/setup-node@v3.2.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -104,7 +106,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.1.1
+      - uses: actions/setup-node@v3.2.0
         with:
           node-version: '14'
           cache: 'npm'

@@ -53,7 +53,7 @@
   (let [
         my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         sync-button-style (dissoc
-                            (case my-sync-status
+                            (case (int (or my-sync-status -1))
                               1 ok-severity
                               2 error-severity
                               ; else
@@ -68,7 +68,7 @@
     {:fx/type :button
      :text (str
              " "
-             (case my-sync-status
+             (case (int (or my-sync-status -1))
                1 "synced"
                2 "unsynced"
                ; else
@@ -340,7 +340,7 @@
         discord-promote-cooldown (boolean (and discord-promoted-diff
                                                (< discord-promoted-diff discord/cooldown)))
         sync-button-style (dissoc
-                            (case my-sync-status
+                            (case (int (or my-sync-status -1))
                               1 ok-severity
                               2 error-severity
                               ; else

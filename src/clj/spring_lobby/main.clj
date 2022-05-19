@@ -99,7 +99,10 @@
         (println "Error parsing arguments:\n\n"
                  (string/join \newline errors))
         (System/exit -1))
-      (let [replay-file (parse-replay-file arguments)
+      (let [replay-file (try
+                          (parse-replay-file arguments)
+                          (catch Exception e
+                            (log/error e "Error parsing replay file from" (pr-str arguments))))
             opening-replay? (some? replay-file)]
         (try
           (when-let [dest (fs/file (:update-copy-jar options))]
@@ -268,7 +271,7 @@
         (do
           (log/info "Sending IPC to existing skylobby instance on port" port)
           (clj-http/post
-            (str "http://localhost:" port "/replay")
+            (str "http://localhost:" port "/ipc/replay")
             {:query-params {:path (fs/canonical-path replay-file)}})
           (System/exit 0))
         (apply -ui-main args))

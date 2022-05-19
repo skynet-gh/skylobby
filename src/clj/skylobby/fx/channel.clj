@@ -121,6 +121,17 @@
      (when (seq messages)
        (.build builder)))))
 
+(defn- get-text-area
+  ^org.fxmisc.richtext.StyleClassedTextArea
+  [^javafx.event.Event event area-id-css]
+  (let [
+        ^javafx.scene.control.MenuItem menu-item (.getTarget event)
+        ^javafx.scene.control.ContextMenu context-menu (.getParentPopup menu-item)
+        ^javafx.scene.Node node (.getOwnerNode context-menu)
+        ^javafx.scene.Scene scene (.getScene node)
+        ^javafx.scene.Parent root (.getRoot scene)]
+    (first (.lookupAll root area-id-css))))
+
 (defn channel-view-history-impl
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
@@ -166,7 +177,7 @@
                                  :text "Copy"
                                  :on-action
                                  (fn [event]
-                                   (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                   (when-let [area (get-text-area event area-id-css)]
                                      (log/info "Copying chat" channel-name "to clipboard")
                                      (let [clipboard (Clipboard/getSystemClipboard)
                                            content (ClipboardContent.)]
@@ -176,7 +187,7 @@
                                  :text "Select All"
                                  :on-action
                                  (fn [event]
-                                   (when-let [^org.fxmisc.richtext.StyleClassedTextArea area (some-> event .getTarget .getParentPopup .getOwnerNode .getScene .getRoot (.lookupAll area-id-css) first)]
+                                   (when-let [area (get-text-area event area-id-css)]
                                      (log/info "Selecting all chat" channel-name)
                                      (.selectAll area)))}]}}
         :desc

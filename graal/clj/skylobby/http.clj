@@ -49,13 +49,13 @@
   "https://api.github.com/repos/springraaar/metal_factions/releases")
 
 (def tap-maps-github-releases-url
-  "https://api.github.com/repos/FluidPlay/TAPrime-maps/releases")
+  "https://api.github.com/repos/FluidPlay/TAP-maps/releases")
 
 (def evo-rts-github-releases-url
   "https://api.github.com/repos/EvolutionRTS/Evolution-RTS/releases")
 
 (def tap-github-releases-url
-  "https://api.github.com/repos/FluidPlay/TAPrime_v2/releases")
+  "https://api.github.com/repos/FluidPlay/TAP/releases")
 
 (def bar-replays-api-url
   "https://bar-rts.com/api/replays/")
@@ -562,12 +562,12 @@
     :resources-fn crawl-springrts-engine-downloadables}
    {:download-source-name "TAP GitHub releases"
     :url tap-github-releases-url
-    :browse-url "https://github.com/FluidPlay/TAPrime_v2/releases"
+    :browse-url "https://github.com/FluidPlay/TAP/releases"
     :resources-fn get-github-release-downloadables
     :resource-type-fn mods-only}
    {:download-source-name "TAP GitHub maps"
     :url tap-maps-github-releases-url
-    :browse-url "https://github.com/FluidPlay/TAPrime-maps/releases"
+    :browse-url "https://github.com/FluidPlay/TAP/releases"
     :resources-fn get-github-release-downloadables
     :resource-type-fn maps-only}])
 

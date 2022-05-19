@@ -235,7 +235,7 @@
                             use-db-for-importables
                             use-db-for-rapid
                             use-db-for-replays)]
-     (when-let [ds (:ds db)]
+     (when-let [^java.io.Closeable ds (:ds db)]
        (log/info "Stopping sql db" db "datasource" ds)
        (.close ds))
      (if (or sql-db-enabled

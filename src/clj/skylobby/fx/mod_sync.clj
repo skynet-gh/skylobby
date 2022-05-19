@@ -19,10 +19,12 @@
 (def no-springfiles
   [#"Beyond All Reason"
    #"Total Atomization Prime"
+   #"Total Atomic Power"
    #"Tech Annihilation"])
 
 (def no-rapid
   [#"Total Atomization Prime"
+   #"Total Atomic Power"
    #"Evolution RTS Music Addon"])
 
 
@@ -30,6 +32,7 @@
   (cond
     (string/blank? mod-name) nil
     (string/includes? mod-name "Total Atomization Prime") "TAP GitHub releases"
+    (string/includes? mod-name "Total Atomic Power") "TAP GitHub releases"
     (string/includes? mod-name "Evolution RTS") "Evolution-RTS GitHub releases"
     (string/includes? mod-name "Balanced Annihilation") "Balanced Annihilation GitHub releases"
     :else nil))
@@ -217,7 +220,8 @@
                         (not is-unversioned)
                         (not (some #(re-find % mod-name) no-rapid)))
                (let [rapid-data (get-rapid-data-by-version mod-name)
-                     default-rapid-id (str (resource/mod-repo-name mod-name) ":test")
+                     rapid-repo (resource/mod-repo-name mod-name)
+                     default-rapid-id (when rapid-repo (str rapid-repo ":test"))
                      rapid-id (or (:id rapid-data) default-rapid-id)
                      rapid-download (get rapid-downloads-by-id rapid-id)
                      running (some? (get rapid-tasks-by-id rapid-id))
@@ -231,7 +235,6 @@
                                              (mapcat second)
                                              (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
                                              seq)
-                     rapid-repo (resource/mod-repo-name mod-name)
                      rapid-update-id (when rapid-repo (str rapid-repo ":test"))
                      rapid-update-download (get rapid-downloads-by-id rapid-update-id)
                      in-progress (or running
