@@ -293,7 +293,10 @@
                       :v-box/vgrow :always}
                      {:fx/type :image-view
                       :image {:url (-> map-name fs/minimap-image-cache-file io/as-url str)
-                              :background-loading true}
+                              :background-loading true
+                              :preserve-ratio true
+                              :requested-width map-browse-image-size
+                              :requested-height map-browse-image-size}
                       :fit-width map-browse-image-size
                       :fit-height map-browse-image-size
                       :preserve-ratio true}
