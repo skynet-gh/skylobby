@@ -242,51 +242,54 @@
                                      (contains? rapid-tasks rapid-id)
                                      (and package-exists
                                           (seq mod-update-tasks)))]
-                 [{:severity 2
-                   :text "rapid"
-                   :human-text
-                               (if engine-file
-                                 (if rapid-update-tasks
-                                   (if rapid-update-download
-                                     (str "Downloading " (u/download-progress rapid-update-download))
-                                     "Updating rapid packages...")
-                                   (if rapid-id
-                                     (if in-progress
-                                       (str "Downloading " (u/download-progress rapid-download))
-                                       (str "Download rapid " rapid-id))
-                                     "No rapid download found, update packages"))
-                                 "Needs engine first to download with rapid")
-                   :tooltip (if rapid-id
-                              (if engine-file
-                                (if package-exists
-                                  (str sdp-file)
-                                  (str "Use rapid downloader to get resource id " rapid-id
-                                       " using engine " (:engine-version engine-details)))
-                                "Rapid requires an engine to work, get engine first")
-                              (str "No rapid download found for " mod-name))
-                   :in-progress in-progress
-                   :action
-                   (cond
-                     (not engine-file) nil
-                     (and rapid-id engine-file)
-                     {:event/type :spring-lobby/add-task
-                      :task
-                      {:spring-lobby/task-type :spring-lobby/rapid-download
-                       :rapid-id rapid-id
-                       :engine-file engine-file
-                       :spring-isolation-dir spring-isolation-dir}}
-                     package-exists
-                     {:event/type :spring-lobby/add-task
-                      :task
-                      {:spring-lobby/task-type :spring-lobby/update-file-cache
-                       :file sdp-file}}
-                     :else
-                     {:event/type :spring-lobby/add-task
-                      :task {:spring-lobby/task-type :spring-lobby/update-rapid
-                             :engine-version (:engine-version engine-details)
-                             :force true
-                             :mod-name mod-name
-                             :spring-isolation-dir spring-isolation-dir}})}]))
+                 (mapv
+                   (fn [id]
+                     {:severity 2
+                      :text "rapid"
+                      :human-text
+                                  (if engine-file
+                                    (if rapid-update-tasks
+                                      (if rapid-update-download
+                                        (str "Downloading " (u/download-progress rapid-update-download))
+                                        "Updating rapid packages...")
+                                      (if id
+                                        (if in-progress
+                                          (str "Downloading " (u/download-progress rapid-download))
+                                          (str "Download rapid " id))
+                                        "No rapid download found, update packages"))
+                                    "Needs engine first to download with rapid")
+                      :tooltip (if id
+                                 (if engine-file
+                                   (if package-exists
+                                     (str sdp-file)
+                                     (str "Use rapid downloader to get resource id " id
+                                          " using engine " (:engine-version engine-details)))
+                                   "Rapid requires an engine to work, get engine first")
+                                 (str "No rapid download found for " mod-name))
+                      :in-progress in-progress
+                      :action
+                      (cond
+                        (not engine-file) nil
+                        (and id engine-file)
+                        {:event/type :spring-lobby/add-task
+                         :task
+                         {:spring-lobby/task-type :spring-lobby/rapid-download
+                          :rapid-id id
+                          :engine-file engine-file
+                          :spring-isolation-dir spring-isolation-dir}}
+                        package-exists
+                        {:event/type :spring-lobby/add-task
+                         :task
+                         {:spring-lobby/task-type :spring-lobby/update-file-cache
+                          :file sdp-file}}
+                        :else
+                        {:event/type :spring-lobby/add-task
+                         :task {:spring-lobby/task-type :spring-lobby/update-rapid
+                                :engine-version (:engine-version engine-details)
+                                :force true
+                                :mod-name mod-name
+                                :spring-isolation-dir spring-isolation-dir}})})
+                   [rapid-id mod-name])))
              (let [importable (some->> importables-by-path
                                        vals
                                        (filter (comp #{:spring-lobby/mod} :resource-type))

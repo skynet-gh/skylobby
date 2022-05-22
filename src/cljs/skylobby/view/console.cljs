@@ -22,9 +22,9 @@
                       reverse
                       (map-indexed vector))]
     [:div
-     {;:class "flex-column"
+     {;:class "vh-100"
       :style {
-              ;:flex "1 1 auto"
+              :flex "1 1 auto"
               :font-family "Monospace"
               :font-size 18
               :overflow-y "auto"}}
@@ -91,9 +91,9 @@
         username (-> parameters :query :username)
         server-key (u/get-server-key server-url username)]
     [:div
-     {:class "flex"
-      :style {:flex-flow "column"
-              :height "100%"}}
+     {:class "flex vh-100"
+      :style {:flex-flow "column"}}
+              ;:height "100%"}}
      [servers-nav/servers-nav]
      [server-nav/server-nav]
      [:div
@@ -101,6 +101,7 @@
        :style {
                :flex "1 1 auto"
                :flex-flow "column"
-               :overflow-y "auto"}}
+               :overflow-y "auto"
+               :overflow-wrap "anywhere"}}
       [auto-scroll-console-history {:server-key server-key}]]
      [console-input {:server-key server-key}]]))

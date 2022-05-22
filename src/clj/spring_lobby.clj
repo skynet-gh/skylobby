@@ -2155,8 +2155,18 @@
     (let [^Node node (.getTarget event)
           window (.getWindow (.getScene node))
           chooser (doto (DirectoryChooser.)
-                    (.setTitle "Select Spring Directory")
-                    (.setInitialDirectory initial-dir))]
+                    (.setTitle "Select Spring Directory"))
+          initial-dir (or (if (fs/is-directory? initial-dir)
+                            initial-dir
+                            (fs/first-existing-parent initial-dir))
+                          (if (fs/is-directory? (fs/default-spring-root))
+                            (fs/default-spring-root)
+                            (fs/first-existing-parent (fs/default-spring-root)))
+                          (if (fs/is-directory? (fs/app-root))
+                            (fs/app-root)
+                            (fs/first-existing-parent (fs/app-root))))]
+      (when (fs/is-directory? initial-dir)
+        (.setInitialDirectory chooser initial-dir))
       (when-let [file (.showDialog chooser window)]
         (log/info "Setting spring isolation dir at" path "to" file)
         (let [v (if as-path
@@ -3765,6 +3775,20 @@
   ([state-atom]
    (init state-atom nil))
   ([state-atom {:keys [skip-tasks]}]
+   (let [app-root (fs/app-root)
+         spring-root (or (:spring-isolation-dir @state-atom)
+                         (fs/default-spring-root))]
+     (try
+       (log/info "Creating" app-root)
+       (fs/make-dirs app-root)
+       (catch Exception e
+         (log/error e "Error creating app root" app-root)))
+     (try
+       (log/info "Creating" spring-root)
+       (fs/make-dirs spring-root)
+       (catch Exception e
+         (log/error e "Error creating spring root" spring-root))))
+   (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
    (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))

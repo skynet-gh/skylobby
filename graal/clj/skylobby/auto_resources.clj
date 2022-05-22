@@ -316,6 +316,19 @@
                       :spring-isolation-dir spring-root})
                    (and (not rapid-id)
                         (not rapid-task)
+                        (not update-rapid-task)
+                        engine-file
+                        engine-dir-exists
+                        (u/check-cooldown cooldowns [:rapid spring-root-path mod-name]))
+                   (do
+                     (log/info "Adding task to auto download rapid blind for" (str "'" mod-name "'"))
+                     {:spring-lobby/task-type :spring-lobby/rapid-download
+                      :engine-file engine-file
+                      :engine-dir-exists engine-dir-exists
+                      :rapid-id mod-name
+                      :spring-isolation-dir spring-root})
+                   (and (not rapid-id)
+                        (not rapid-task)
                         engine-file
                         engine-dir-exists
                         (not update-rapid-task)
