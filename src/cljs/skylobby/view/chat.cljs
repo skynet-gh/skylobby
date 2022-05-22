@@ -121,9 +121,9 @@
         username (-> parameters :query :username)
         server-key (u/get-server-key server-url username)]
     [:div
-     {:class "flex"
-      :style {:flex-flow "column"
-              :height "100%"}}
+     {:class "flex vh-100"
+      :style {:flex-flow "column"}}
+              ;:height "100%"}}
      [servers-nav/servers-nav]
      [server-nav/server-nav]
      [:div {:class "flex justify-center"}

@@ -40,9 +40,8 @@
         spring-running (listen [:skylobby/spring-running])
         is-spring-running (get-in spring-running [server-key battle-id])]
     [:div
-     {:class "flex"
-      :style {:flex-flow "column"
-              :height "100%"}}
+     {:class "flex vh-100"
+      :style {:flex-flow "column"}}
      [servers-nav/servers-nav]
      (when-not (cu/is-direct? server-key)
        [server-nav/server-nav])
