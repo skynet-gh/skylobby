@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.24](https://github.com/skynet-gh/skylobby/releases/tag/0.8.24) - 2022-05-22
+
+- Fix file picker when starting folder does not exist
+- Add auto download and button for rapid by full game name without index
+
 ## [0.8.23](https://github.com/skynet-gh/skylobby/releases/tag/0.8.23) - 2022-05-18
 
 - Make replay tags sortable
