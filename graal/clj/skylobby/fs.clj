@@ -117,7 +117,7 @@
 
 (defn first-existing-parent [f]
   (when f
-    (let [parent (parent-file f)]
+    (when-let [parent (parent-file f)]
       (if (exists? parent)
         parent
         (first-existing-parent parent)))))
