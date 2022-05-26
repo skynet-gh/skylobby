@@ -1243,6 +1243,10 @@
 (def app-update-browseurl "https://github.com/skynet-gh/skylobby/releases")
 
 
+(defn exit [exit-code]
+  (Platform/exit)
+  (System/exit exit-code))
+
 (defn restart-process [old-jar new-jar]
   (when new-jar
     (log/info "Adding shutdown hook to run new jar")
@@ -1277,7 +1281,7 @@
                 (.inheritIO proc)
                 (.start proc)))))))
     (log/info "Exiting for update")
-    (System/exit 0)))
+    (exit 0)))
 
 (defmethod task-handler ::download-app-update-and-restart [{:keys [downloadable]}]
   (let [jar-file (u/jar-file)
@@ -3419,9 +3423,7 @@
 (defmethod event-handler ::main-window-on-close-request [{:keys [standalone] :as e}]
   (log/debug "Main window close request" e)
   (if standalone
-    (do
-      (Platform/exit)
-      (System/exit 0))
+    (exit 0)
     (log/info "Ignoring main window close since in dev mode")))
 
 (defmethod event-handler ::my-channels-tab-action [e]
@@ -3792,7 +3794,7 @@
    (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
    (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
-   (task-handlers/add-handlers handle-task *state)
+   (task-handlers/add-handlers handle-task state-atom)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]
        (when-not (fs/exists? custom-css-file)
@@ -3878,6 +3880,7 @@
 
 
 (defn standalone-replay-init [state-atom]
+  (task-handlers/add-handlers handle-task state-atom)
   (let [task-chimers (->> task/task-kinds
                           (map (partial tasks-chimer-fn state-atom))
                           doall)

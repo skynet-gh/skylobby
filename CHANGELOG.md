@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.25](https://github.com/skynet-gh/skylobby/releases/tag/0.8.25) - 2022-05-25
+
+- Fix standalone replay viewer resources
+
 ## [0.8.24](https://github.com/skynet-gh/skylobby/releases/tag/0.8.24) - 2022-05-22
 
 - Fix file picker when starting folder does not exist
