@@ -224,12 +224,10 @@
                      default-rapid-id (when rapid-repo (str rapid-repo ":test"))
                      rapid-id (or (:id rapid-data) default-rapid-id)
                      rapid-download (get rapid-downloads-by-id rapid-id)
-                     running (some? (get rapid-tasks-by-id rapid-id))
+                     running (some? (or (get rapid-tasks-by-id rapid-id)
+                                        (get rapid-tasks-by-id mod-name)))
                      sdp-file (rapid/sdp-file spring-isolation-dir (str (:hash rapid-data) ".sdp"))
                      package-exists (fs/file-exists? file-cache sdp-file)
-                     rapid-tasks (->> (get tasks-by-type :spring-lobby/rapid-download)
-                                      (map :rapid-id)
-                                      set)
                      rapid-update-tasks (->> tasks-by-type
                                              (filter (comp #{:spring-lobby/update-rapid-packages :spring-lobby/update-rapid} first))
                                              (mapcat second)
@@ -239,7 +237,6 @@
                      rapid-update-download (get rapid-downloads-by-id rapid-update-id)
                      in-progress (or running
                                      rapid-update-tasks
-                                     (contains? rapid-tasks rapid-id)
                                      (and package-exists
                                           (seq mod-update-tasks)))]
                  (mapv

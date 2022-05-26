@@ -222,7 +222,7 @@
 
 
 (defn replay-view
-  [{:fx/keys [context] :keys [show-sync show-sync-left]}]
+  [{:fx/keys [context] :keys [show-sync show-sync-left standalone]}]
   (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-running (fx/sub-val context get-in [:spring-running :replay :replay])
         replay-minimap-type (fx/sub-val context :replay-minimap-type)
@@ -426,10 +426,14 @@
                    :h-box/hgrow :always}
                   {:fx/type :button
                    :style {:-fx-font-size 24}
-                   :on-action {:event/type :spring-lobby/dissoc
-                               :key (if (fx/sub-val context :selected-replay-file)
-                                      :selected-replay-file
-                                      :selected-replay-id)}
+                   :on-action
+                   (if standalone
+                     {:event/type :spring-lobby/main-window-on-close-request
+                      :standalone true}
+                     {:event/type :spring-lobby/dissoc
+                      :key (if (fx/sub-val context :selected-replay-file)
+                             :selected-replay-file
+                             :selected-replay-id)})
                    :text "Close"
                    :graphic
                    {:fx/type font-icon/lifecycle
@@ -1485,4 +1489,5 @@
      {:fx/type :scene
       :stylesheets (fx/sub-ctx context skylobby.fx/stylesheet-urls-sub)
       :root {:fx/type replay-view
-             :show-sync true}}}))
+             :show-sync true
+             :standalone true}}}))
