@@ -259,6 +259,8 @@
    :ring-on-spec-change
    :ring-sound-file
    :ring-volume
+   :ring-when-game-starts
+   :ring-when-game-ends
    :scenarios-engine-version
    :scenarios-spring-root
    :server
@@ -3734,7 +3736,7 @@
 
 (defn extra-pre-game []
   (try
-    (let [{:keys [^MediaPlayer media-player music-paused]} @*state]
+    (let [{:keys [^MediaPlayer media-player music-paused ring-when-game-starts] :as state} @*state]
       (if (and media-player (not music-paused))
         (do
           (log/info "Pausing media player")
@@ -3752,7 +3754,9 @@
                   (swap! *state assoc :music-paused true))))
             (.play timeline)))
         (when (not media-player)
-          (log/info "No media player to pause"))))
+          (log/info "No media player to pause")))
+      (when ring-when-game-starts
+        (sound/play-ring state)))
     (catch Exception e
       (log/error e "Error pausing music"))))
 
@@ -3795,7 +3799,6 @@
        (fs/make-dirs spring-root)
        (catch Exception e
          (log/error e "Error creating spring root" spring-root))))
-   (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
    (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
