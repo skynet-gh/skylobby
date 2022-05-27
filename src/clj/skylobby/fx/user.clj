@@ -19,6 +19,7 @@
   [{:fx/keys [context]
     :keys [users server-key]}]
   (let [ignore-users (fx/sub-val context :ignore-users)
+        hide-users-bots (fx/sub-val context :hide-users-bots)
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         friends (fx/sub-val context get-in [:by-server server-key :friends])
@@ -38,6 +39,11 @@
         users (->> users-by-username
                    vals
                    (filter :username)
+                   (filter
+                     (fn [{:keys [client-status]}]
+                       (if hide-users-bots
+                         (not (:bot client-status))
+                         true)))
                    (map (fn [{:keys [username] :as user}]
                           (assoc-in user [:client-status :friend] (contains? friends username)))))
         sorted-users (->> users
@@ -225,6 +231,7 @@
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [filter-users (fx/sub-val context :filter-users)
+        hide-users-bots (fx/sub-val context :hide-users-bots)
         users (fx/sub-val context get-in [:by-server server-key :users])
         bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
         bot-count (count (get bot-or-human true))
@@ -269,6 +276,17 @@
              :graphic
              {:fx/type font-icon/lifecycle
               :icon-literal "mdi-close:16:white"}}]))}
+      {:fx/type :h-box
+       :alignment :center-left
+       :children
+       (concat
+         [
+          {:fx/type :check-box
+           :selected (boolean hide-users-bots)
+           :on-selected-changed {:event/type :spring-lobby/assoc
+                                 :key :hide-users-bots}}
+          {:fx/type :label
+           :text (str " Hide Bots")}])}
       {:fx/type users-table
        :v-box/vgrow :always
        :server-key server-key

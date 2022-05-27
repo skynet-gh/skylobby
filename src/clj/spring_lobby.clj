@@ -226,6 +226,7 @@
    :hide-passworded-battles
    :hide-spads-messages
    :hide-vote-messages
+   :hide-users-bots
    :highlight-tabs-with-new-battle-messages
    :highlight-tabs-with-new-chat-messages
    :ignore-users
