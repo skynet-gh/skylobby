@@ -21,8 +21,6 @@
 (def settings-window-width 1200)
 (def settings-window-height 1200)
 
-(def user-agent-placeholder (u/agent-string))
-
 (def default-client-id-type "random")
 (def client-id-types
   ["random"
@@ -1074,7 +1072,7 @@
           [
            {:fx/type :text-field
             :text (str user-agent-override)
-            :prompt-text (str user-agent-placeholder)
+            :prompt-text (str (u/agent-string))
             :style {:-fx-max-width 480}
             :on-text-changed {:event/type :spring-lobby/assoc
                               :key :user-agent-override}}]}
