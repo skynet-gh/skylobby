@@ -20,6 +20,9 @@
 (set! *warn-on-reflection* true)
 
 
+(def max-history 1000)
+
+
 (def known-spads-commands
   [
    "!map"
@@ -69,12 +72,21 @@
 (defn channel-document
   ([messages]
    (channel-document messages nil))
-  ([messages {:keys [color-my-username highlight my-username]}]
-   (let [highlight (->> highlight
+  ([all-messages {:keys [color-my-username highlight my-username]}]
+   (let [
+         messages (take-last max-history all-messages)
+         highlight (->> highlight
                         (filter some?)
                         (map string/trim)
                         (remove string/blank?))
          builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+     (when-not (= (count all-messages)
+                  (count messages))
+       (.addParagraph builder
+         ^java.util.List
+         (vec [(segment (str "< " (- (count all-messages) (count messages)) " previous messages >") ["text" "skylobby-chat-message"])])
+         ^java.util.List
+         []))
      (doseq [message (filter :timestamp messages)]
        (let [{:keys [message-type text timestamp username]} message]
          (.addParagraph builder
@@ -118,8 +130,13 @@
                    (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
            ^java.util.List
            [])))
-     (when (seq messages)
-       (.build builder)))))
+     (when-not (seq messages)
+       (.addParagraph builder
+         ^java.util.List
+         (vec [(segment "< no messages >" ["text" "skylobby-chat-message"])])
+         ^java.util.List
+         []))
+     (.build builder))))
 
 (defn- get-text-area
   ^org.fxmisc.richtext.StyleClassedTextArea
@@ -157,7 +174,21 @@
                             set)
         area-id (str "channel-text-area" channel-name "-" server-key)
         area-id (string/replace area-id #"[^_a-zA-Z0-9-]" "")
-        area-id-css (str "#" area-id)]
+        area-id-css (str "#" area-id)
+        messages (->> messages
+                      (remove (comp ignore-users-set :username))
+                      (remove (comp ignore-users-set :on-behalf-of :relay))
+                      (remove (comp hide-spads-set :spads-message-type :spads))
+                      (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
+                      (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
+                      (remove
+                        (fn [{:keys [message-type text]}]
+                          (if hide-barmanager-messages
+                            (and (= :ex message-type)
+                                 text
+                                 (string/starts-with? text "* BarManager|"))
+                            false)))
+                      reverse)]
     {:fx/type ext-recreate-on-key-changed
      :key {:ignore ignore-users-set
            :joinas-spec hide-joinas-spec
@@ -198,20 +229,7 @@
          :wrap-text true
          :document
          [
-          (->> messages
-               (remove (comp ignore-users-set :username))
-               (remove (comp ignore-users-set :on-behalf-of :relay))
-               (remove (comp hide-spads-set :spads-message-type :spads))
-               (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
-               (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
-               (remove
-                 (fn [{:keys [message-type text]}]
-                   (if hide-barmanager-messages
-                     (and (= :ex message-type)
-                          text
-                          (string/starts-with? text "* BarManager|"))
-                     false)))
-               reverse)
+          messages
           (fn [lines]
             (channel-document
               lines
