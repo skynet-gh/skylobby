@@ -54,7 +54,9 @@
       (update-in state [:tasks-by-kind task-kind]
         (fn [tasks]
           (set (conj tasks task)))))
-    (log/warn "Attempt to add nil task" task)))
+    (do
+      (log/warn "Attempt to add nil task" task)
+      state)))
 
 (defn add-task! [state-atom task]
   (swap! state-atom add-task-state task))
