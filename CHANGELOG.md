@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.27](https://github.com/skynet-gh/skylobby/releases/tag/0.8.27) - 2022-05-28
+
+- Fix issue with adding nil task
+
 ## [0.8.26](https://github.com/skynet-gh/skylobby/releases/tag/0.8.26) - 2022-05-27
 
 - Add max length for chat and console history display (performance)
