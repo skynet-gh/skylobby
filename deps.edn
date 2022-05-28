@@ -4,7 +4,7 @@
   "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
  {
-  aleph/aleph {:mvn/version "0.4.7"}
+  aleph/aleph {:mvn/version "0.5.0-rc2"}
   cheshire/cheshire {:mvn/version  "5.11.0"}
   clj-jgit/clj-jgit {:mvn/version "1.0.2"}
   clj-http/clj-http {:mvn/version "3.12.3"}
@@ -31,8 +31,7 @@
   commons-validator/commons-validator {:mvn/version "1.7"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
-  gloss/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
-               :git/sha "452468489f38aee262b21db755e7d9e10a4b6d8d"}
+  gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   http-kit/http-kit {:mvn/version "2.5.3"}
   io.aviso/pretty {:mvn/version "1.1.1"}
