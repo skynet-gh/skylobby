@@ -391,6 +391,16 @@
               :players players-and-bots
               :read-only true
               :sides sides}}
+            {:fx/type :button
+             :text "Scroll to replay in table"
+             :on-action (fn [event]
+                          (let [
+                                ^javafx.scene.Node node (.getTarget event)
+                                ^javafx.scene.Scene scene (.getScene node)
+                                ^javafx.scene.Parent root (.getRoot scene)
+                                ^javafx.scene.control.TableView
+                                table (first (.lookupAll root "#replays-table"))]
+                            (.scrollTo table selected-replay)))}
             {:fx/type :h-box
              :alignment :center-left
              :children
@@ -594,6 +604,7 @@
        :items sorted-replays
        :desc
        {:fx/type :table-view
+        :id "replays-table"
         :column-resize-policy :constrained
         :columns
         (concat

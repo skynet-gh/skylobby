@@ -271,6 +271,7 @@
                         {:event/type :spring-lobby/add-task
                          :task
                          {:spring-lobby/task-type :spring-lobby/rapid-download
+                          :mod-name mod-name
                           :rapid-id id
                           :engine-file engine-file
                           :spring-isolation-dir spring-isolation-dir}}

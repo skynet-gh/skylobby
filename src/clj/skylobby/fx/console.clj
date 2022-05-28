@@ -17,37 +17,55 @@
 (def default-font-size 18)
 
 
+(def max-history 1000)
+
+
 (defn segment
   [text style]
   (StyledSegment. text style))
 
-(defn console-document [console-log]
+(defn console-document [all-console-log]
   (let [
+        console-log (take-last max-history all-console-log)
         builder (ReadOnlyStyledDocumentBuilder. (SegmentOps/styledTextOps) "")]
+    (when-not (= (count all-console-log)
+                 (count console-log))
+      (.addParagraph builder
+        ^java.util.List
+        (vec [(segment (str "< " (- (count all-console-log) (count console-log)) " previous messages >") ["text" "skylobby-console-message"])])
+        ^java.util.List
+        []))
     (doseq [log console-log]
       (let [{:keys [message source timestamp]} log]
         (.addParagraph builder
           ^java.util.List
           (vec
             (concat
-              [
-               (segment
-                 (str "[" (u/format-hours timestamp) "]")
-                 ["text" "skylobby-console-time"])
-               (segment
-                 (str
-                   (case source
-                     :server " < "
-                     :client " > "
-                     " "))
-                 ["text" (str "skylobby-console-source-" (name source))])
-               (segment
+              (when timestamp
+                [
+                 (segment
+                   (str "[" (u/format-hours timestamp) "]")
+                   ["text" "skylobby-console-time"])])
+              (when source
+                [(segment
+                   (str
+                     (case source
+                       :server " < "
+                       :client " > "
+                       " "))
+                   ["text" (str "skylobby-console-source-" (name source))])])
+              [(segment
                  (str message)
                  ["text" "skylobby-console-message"])]))
           ^java.util.List
           [])))
-    (when (seq console-log)
-      (.build builder))))
+    (when-not (seq console-log)
+      (.addParagraph builder
+        ^java.util.List
+        (vec [(segment "< no messages >" ["text" "skylobby-console-message"])])
+        ^java.util.List
+        []))
+    (.build builder)))
 
 (defn console-view-impl
   [{:fx/keys [context]

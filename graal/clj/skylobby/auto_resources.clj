@@ -278,6 +278,7 @@
                      {:spring-lobby/task-type :spring-lobby/rapid-download
                       :engine-file engine-file
                       :engine-dir-exists engine-dir-exists
+                      :mod-name mod-name
                       :rapid-id rapid-id
                       :spring-isolation-dir spring-root})
                    (and (not rapid-id)
@@ -325,6 +326,7 @@
                      {:spring-lobby/task-type :spring-lobby/rapid-download
                       :engine-file engine-file
                       :engine-dir-exists engine-dir-exists
+                      :mod-name mod-name
                       :rapid-id mod-name
                       :spring-isolation-dir spring-root})
                    (and (not rapid-id)

@@ -36,6 +36,15 @@
        (map-indexed vector)
        (into {})))
 
+; https://github.com/beyond-all-reason/Beyond-All-Reason/blob/13457a9/luaui/Widgets/gui_advplayerslist.lua#L1197-L1204
+(defn uncertainty-color [uncertainty]
+  (case (int (or (when (number? uncertainty) uncertainty)
+                 3))
+    0 "#fafafa"
+    1 "#c3c3c3"
+    2 "#8c8c8c"
+    "#be8282"))
+
 
 (def sort-playing (comp u/to-number not u/to-bool :mode :battle-status))
 (def sort-bot (comp u/to-number :bot :client-status :user))
@@ -321,8 +330,9 @@
 
 (defn player-status-tooltip-label
   [{:fx/keys [context]
-    :keys [battle-status client-status server-key user username]}]
+    :keys [battle-status server-key user username]}]
   (let [
+        client-status (:client-status user)
         host-username (fx/sub-ctx context sub/host-username server-key)
         now (or (fx/sub-val context :now) (u/curr-millis))]
     {:fx/type :label
@@ -370,7 +380,6 @@
       :graphic
       {:fx/type player-status-tooltip-label
        :battle-status battle-status
-       :client-status client-status
        :server-key server-key
        :user user
        :username username}}
@@ -445,6 +454,7 @@
             :text (str "Bonus: +" bonus "%")}]))
       (when-not (-> player :user :client-status :bot)
         [{:fx/type :label
+          :style {:-fx-text-fill (uncertainty-color (:skilluncertainty player))}
           :text
           (str "Skill: "
                (str (:skill player)
@@ -459,11 +469,10 @@
             :text "Country: "}
            {:fx/type flag-icon/flag-icon
             :country-code country}]}])
-      (let [{:keys [battle-status client-status user username]} player]
+      (let [{:keys [battle-status user username]} player]
         [
          {:fx/type player-status-tooltip-label
           :battle-status battle-status
-          :client-status client-status
           :server-key server-key
           :user user
           :username username}]))}})
@@ -672,6 +681,7 @@
                                 :id :skylobby/player-table}
                   (tufte/p :skill
                     {:alignment :center-left
+                     :style {:-fx-text-fill (uncertainty-color skilluncertainty)}
                      :text
                      (str skill
                           " "
@@ -1144,7 +1154,8 @@
                              :alignment :center-left
                              :style {:-fx-min-width player-skill-width
                                      :-fx-pref-width player-skill-width
-                                     :-fx-max-width player-skill-width}
+                                     :-fx-max-width player-skill-width
+                                     :-fx-text-fill (uncertainty-color (:skilluncertainty player))}
                              :text
                              (str (:skill player)
                                   " "

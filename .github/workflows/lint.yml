@@ -14,16 +14,3 @@ jobs:
         with:
           clj-kondo-args: --lint src/clj graal/clj src/cljs
           github_token: ${{ secrets.GITHUB_TOKEN }}
-  warn-on-reflect:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3.0.2
-      - name: Check for clj files that do not warn on reflect
-        shell: bash
-        run: |
-          if [ -z "$(grep -rL '*warn-on-reflection*' src/clj graal/clj)" ]
-          then
-            exit 0
-          else
-            exit 1
-          fi

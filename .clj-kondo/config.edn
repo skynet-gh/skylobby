@@ -5,7 +5,10 @@
              (taoensso.nippy/extend-thaw)]}
   :unresolved-var
   {:exclude [gloss.core/compile-frame
-             gloss.io/to-byte-buffer]}}
+             gloss.io/to-byte-buffer]}
+  :warn-on-reflection
+  {:level :warn
+   :warn-only-on-interop false}}
  :output
  {
   :exclude-files ["event_stub.clj"]}}

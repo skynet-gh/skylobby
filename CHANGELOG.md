@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.26](https://github.com/skynet-gh/skylobby/releases/tag/0.8.26) - 2022-05-27
+
+- Add max length for chat and console history display (performance)
+- Color skill similar to in game
+- Add ring when game starts setting
+- Fix ring when game ends not saved in config
+- Add option to hide bots in users list
+- Add button to scroll to selected replay in table
+- Fix infinite loop in rapid download on error
+
 ## [0.8.25](https://github.com/skynet-gh/skylobby/releases/tag/0.8.25) - 2022-05-25
 
 - Fix standalone replay viewer resources
