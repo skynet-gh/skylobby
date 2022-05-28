@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.28](https://github.com/skynet-gh/skylobby/releases/tag/0.8.28) - 2022-05-28
+
+- Roll back a library version to fix random dc
+- Add handler to prevent issue fixed in 0.8.27 from happening in general
+
 ## [0.8.27](https://github.com/skynet-gh/skylobby/releases/tag/0.8.27) - 2022-05-28
 
 - Fix issue with adding nil task

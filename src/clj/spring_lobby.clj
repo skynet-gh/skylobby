@@ -395,7 +395,9 @@
     (factory data :threshold threshold)))
 
 
-(def ^:dynamic *state (atom {}))
+(def ^:dynamic *state
+  (atom {} :validator map?))
+
 (def ^:dynamic *ui-state
   (atom
     (fx/create-context
