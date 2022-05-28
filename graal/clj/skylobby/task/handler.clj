@@ -594,7 +594,7 @@
 
 (defn add-handlers [task-handler state-atom]
   (defmethod task-handler :spring-lobby/rapid-download
-    [{:keys [engine-file rapid-id spring-isolation-dir] :as task}]
+    [{:keys [engine-file rapid-id spring-isolation-dir]}]
     (swap! state-atom
            (fn [state]
              (-> state
@@ -649,16 +649,16 @@
               (log/info "Non-zero pr-downloader exit, deleting corrupt packages dir")
               (task/add-task! state-atom
                               {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
-                               :spring-root spring-isolation-dir
-                               :update-rapid-task task})))))
+                               :spring-root spring-isolation-dir})))))
+                               ;:update-rapid-task task})))))
       (catch Exception e
         (log/error e "Error downloading" rapid-id)
         (swap! state-atom assoc-in [:rapid-download rapid-id :message] (.getMessage e))
         (log/info "Scheduling delete of corrupt rapid dir in" spring-isolation-dir)
         (task/add-task! state-atom
                         {:spring-lobby/task-type :spring-lobby/delete-corrupt-rapid
-                         :spring-root spring-isolation-dir
-                         :update-rapid-task task}))
+                         :spring-root spring-isolation-dir}))
+                         ;:update-rapid-task task}))
       (finally
         (task/add-tasks! state-atom
                          [{:spring-lobby/task-type :spring-lobby/update-rapid-packages
