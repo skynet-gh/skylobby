@@ -46,6 +46,7 @@
         rapid-id (if (and db use-db-for-rapid)
                    (rapid/rapid-id-by-hash db spring-root-path rapid-hash)
                    (:id (get rapid-data-by-hash rapid-hash)))
+        rapid-id (or rapid-id latest-rapid-id)
         rapid-version (:version rapid-data)
         {:keys [engines engines-by-version mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         latest-local-bar (->> mods-by-name
@@ -117,7 +118,7 @@
            :value (str engine-version)
            :items (or (seq sorted-engine-versions)
                       [])
-           :on-value-changed {:event/type :spring-lobby/assoc-in
+           :on-value-changed {:event/type :spring-lobby/assoc
                               :key :scenarios-engine-version}}]}
         {:fx/type :label
          :text (str " Latest version is " rapid-version)}]
