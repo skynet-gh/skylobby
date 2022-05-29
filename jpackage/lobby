@@ -14,3 +14,4 @@
 --add-launcher skylobby-console="resources/skylobby-console.properties"
 --add-launcher skylobby-web="resources/skylobby-web.properties"
 --add-launcher skylobby-web-console="resources/skylobby-web-console.properties"
+--add-launcher skylobby-zgc="resources/skylobby-zgc.properties"
