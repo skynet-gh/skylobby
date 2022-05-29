@@ -398,13 +398,16 @@
 (def ^:dynamic *state
   (atom {} :validator map?))
 
+
+(def ui-cache-size 128)
+
 (def ^:dynamic *ui-state
   (atom
     (fx/create-context
       {}
       (cache-factory-with-threshold
         cache/lru-cache-factory
-        1024))))
+        ui-cache-size))))
 
 (def main-stage-atom (atom nil))
 
