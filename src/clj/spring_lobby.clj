@@ -398,13 +398,16 @@
 (def ^:dynamic *state
   (atom {} :validator map?))
 
+
+(def ui-cache-size 128)
+
 (def ^:dynamic *ui-state
   (atom
     (fx/create-context
       {}
       (cache-factory-with-threshold
         cache/lru-cache-factory
-        1024))))
+        ui-cache-size))))
 
 (def main-stage-atom (atom nil))
 
@@ -2362,12 +2365,11 @@
 
 
 (defmethod event-handler ::play-scenario
-  [{:keys [difficulties mod-name scenario-options script-template script-params] :as state}]
+  [{:keys [mod-name scenario-options script-template script-params] :as state}]
   (future
     (try
-      (let [difficulties-by-name (into {}
-                                   (map (juxt :name identity) difficulties))
-            {:keys [enemyhandicap playerhandicap]} (get difficulties-by-name (:difficulty script-params))
+      (let [
+            {:keys [enemyhandicap playerhandicap]} (:difficulty script-params)
             restrictions (get script-params :restricted-units {})
             script-txt (-> script-template
                            (string/replace #"__PLAYERSIDE__" (:side script-params))
@@ -2387,7 +2389,7 @@
                            (string/replace #"__MAPNAME__" (get script-params :map-name))
                            (string/replace #"__BARVERSION__" mod-name)
                            (string/replace #"__PLAYERNAME__" (get script-params :player-name)))]
-       (spring/start-game *state (assoc state :script-txt script-txt)))
+        (spring/start-game *state (assoc state :script-txt script-txt)))
       (catch Exception e
         (log/error e "Error starting scenario")))))
 
@@ -3201,7 +3203,9 @@
   [{:fx/keys [event] :keys [path value] :or {value (if (instance? Event event) true event)}}]
   (if path
     (swap! *state assoc-in path value)
-    (throw (ex-info "::assoc-in called without path" {}))))
+    (let [e (ex-info "::assoc-in called without path" {})]
+      (log/error e)
+      (throw e))))
 
 (defmethod event-handler ::dissoc
   [e]

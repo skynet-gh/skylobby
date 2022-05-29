@@ -527,7 +527,8 @@
               :content
               (merge
                 {:fx/type multi-server-tab}
-                (select-keys state [:map-details :mod-details]))}]))}}]}))
+                (select-keys state [:map-details :mod-details]))}]))}}
+      {:fx/type fx.bottom-bar/bottom-bar}]}))
 
 (defn main-window [state]
   (tufte/profile {:dynamic? true

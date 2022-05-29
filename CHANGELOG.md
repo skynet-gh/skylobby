@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.29](https://github.com/skynet-gh/skylobby/releases/tag/0.8.28) - 2022-05-29
+
+- Add launcher `skylobby-zgc` for testing ZGC garbage collection for smaller memory usage and less
+  gc pauses
+- Fix difficulty in scenarios
+- Lower ui cache size to improve memory performance
+- Make bottom bar appear on every tab
+- Fix issues with picking enginge for rapid
+
 ## [0.8.28](https://github.com/skynet-gh/skylobby/releases/tag/0.8.28) - 2022-05-28
 
 - Roll back a library version to fix random dc

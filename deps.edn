@@ -102,7 +102,7 @@
    :jvm-opts [
               "-server"
               "-Xms32m" "-Xmx2g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
-              "-XX:+UseStringDeduplication"
+              "-XX:+UseZGC"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
               "--add-opens=java.base/java.nio=ALL-UNNAMED"

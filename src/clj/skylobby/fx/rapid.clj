@@ -107,8 +107,8 @@
          :value (str engine-version)
          :items (or (seq sorted-engine-versions)
                     [])
-         :on-value-changed {:event/type :spring-lobby/assoc
-                            :key :engine-version}}
+         :on-value-changed {:event/type :spring-lobby/assoc-in
+                            :path [:by-spring-root spring-root-path :engine-version]}}
         {:fx/type :button
          :text (if rapid-updating " Refreshing..." " Refresh ")
          :disable (boolean rapid-updating)

@@ -3,7 +3,6 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     skylobby.fx
-    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.server :as fx.server]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
@@ -390,8 +389,7 @@
       {:fx/type :pane
        :h-box/hgrow :always}]}
     {:fx/type :pane
-     :v-box/vgrow :always}
-    {:fx/type fx.bottom-bar/bottom-bar}]})
+     :v-box/vgrow :always}]})
 
 (defn welcome-view [state]
   (tufte/profile {:dynamic? true

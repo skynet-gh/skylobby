@@ -393,7 +393,7 @@
               :sides sides}}
             {:fx/type :button
              :text "Scroll to replay in table"
-             :on-action (fn [event]
+             :on-action (fn [^javafx.event.Event event]
                           (let [
                                 ^javafx.scene.Node node (.getTarget event)
                                 ^javafx.scene.Scene scene (.getScene node)
