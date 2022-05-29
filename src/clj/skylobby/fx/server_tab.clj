@@ -3,7 +3,6 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
-    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.main-tabs :as fx.main-tabs]
     [taoensso.tufte :as tufte]))
 
@@ -48,8 +47,7 @@
                [{:fx/type :label
                  :style {:-fx-font-size 20}
                  :text "Waiting for battle details from server..."}]}]})]}
-        tabs)
-      {:fx/type fx.bottom-bar/bottom-bar}]}))
+        tabs)]}))
 
 (defn server-tab [state]
   (tufte/profile {:dynamic? true

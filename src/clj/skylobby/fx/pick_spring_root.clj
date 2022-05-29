@@ -3,7 +3,6 @@
     [cljfx.api :as fx]
     skylobby.fx
     [skylobby.fs :as fs]
-    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity]])
@@ -201,5 +200,4 @@
         {:fx/type :pane
          :h-box/hgrow :always}]}
       {:fx/type :pane
-       :v-box/vgrow :always}
-      {:fx/type fx.bottom-bar/bottom-bar}]}))
+       :v-box/vgrow :always}]}))
