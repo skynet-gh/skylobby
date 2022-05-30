@@ -1473,31 +1473,67 @@
                                              :mode (boolean (and id ally))}
                         :skilluncertainty 0))))))))
 
+(defn supports-jsonrpc? [server-data]
+  (contains?
+    (get-in server-data [:client-data :compflags])
+    "teiserver"))
+  ; TODO other SPADS might support JSONRPC too
+
 (defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
   (let [battle-id (:battle-id event)
-        state (swap! *state assoc-in [:by-server server-key :selected-battle] battle-id)
+        wait-time 1000
+        state (swap! *state update-in [:by-server server-key]
+                (fn [{:keys [users] :as server-data}]
+                  (let [
+                        {:keys [host-username]} (get-in server-data [:battles battle-id])]
+                    (cond-> (assoc server-data :selected-battle battle-id)
+                            (and
+                              (get-in users [host-username :client-status :bot])
+                              (not (supports-jsonrpc? server-data)))
+                            (assoc-in [:channels (u/user-channel-name host-username) :capture-until] (+ (u/curr-millis) wait-time))))))
         {:keys [users] :as server-data} (get-in state [:by-server server-key])
         {:keys [host-username]} (get-in server-data [:battles battle-id])
         is-bot (get-in users [host-username :client-status :bot])
         channel-name (u/user-channel-name host-username)]
     (future
-      (try
-        (when (and is-bot (:show-battle-preview state))
-          @(event-handler
-             {:event/type ::send-message
-              :channel-name channel-name
-              :message (str
-                         "!#JSONRPC "
-                         (json/generate-string
-                           {:jsonrpc "2.0"
-                            :method "status"
-                            :params ["battle"]
-                            :id battle-id}))
-              :no-clear-draft true
-              :no-history true
-              :server-key server-key}))
-        (catch Exception e
-          (log/error e "Error requesting battle status preview"))))))
+      (if (supports-jsonrpc? server-data)
+        (try
+          (when (and is-bot (:show-battle-preview state))
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :message (str
+                           "!#JSONRPC "
+                           (json/generate-string
+                             {:jsonrpc "2.0"
+                              :method "status"
+                              :params ["battle"]
+                              :id battle-id}))
+                :no-clear-draft true
+                :no-history true
+                :server-key server-key}))
+          (catch Exception e
+            (log/error e "Error requesting battle status preview")))
+        (try
+          (when (and is-bot (:show-battle-preview state))
+            (log/info "Capturing chat from" channel-name)
+            @(event-handler
+               {:event/type ::send-message
+                :channel-name channel-name
+                :message (str "!status battle")
+                :no-clear-draft true
+                :no-history true
+                :server-key server-key})
+            (async/<!! (async/timeout wait-time))
+            (let [path [:by-server server-key :channels channel-name :capture]
+                  [old-state _new-state] (swap-vals! *state assoc-in path nil)
+                  captured (get-in old-state path)
+                  parsed (when captured (parse-battle-status-message captured))]
+              (log/info "Captured chat from" channel-name ":" captured)
+              (swap! *state assoc-in [:by-server server-key :battles battle-id :user-details]
+                (into {} (map (juxt :username identity) parsed)))))
+          (catch Exception e
+            (log/error e "Error parsing battle status response")))))))
 
 
 (defmethod event-handler ::select-scenario [{:fx/keys [event]}]
