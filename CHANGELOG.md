@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.31](https://github.com/skynet-gh/skylobby/releases/tag/0.8.31) - 2022-05-30
+
+- Fix `skylobby-zgc` launcher console
+
 ## [0.8.30](https://github.com/skynet-gh/skylobby/releases/tag/0.8.30) - 2022-05-29
 
 - Fix issue with sync status after rehost
