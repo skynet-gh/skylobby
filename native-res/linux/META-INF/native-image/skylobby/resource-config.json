@@ -8,7 +8,13 @@
       "pattern":"\\QLinux-amd64/sevenzipjbinding-lib.properties\\E"
     }, 
     {
+      "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
+    }, 
+    {
       "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/h2/util/data.zip\\E"
     }, 
     {
       "pattern":"\\Qpublic/css/tachyons.min.css\\E"
