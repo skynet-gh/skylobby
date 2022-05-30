@@ -219,7 +219,7 @@
   (let [{:keys [owner username user]} player
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
-        ignore-users (fx/sub-val context :ignore-users)
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
         host-username (fx/sub-ctx context sub/host-username server-key)]
     {:fx/type :context-menu
      :style {:-fx-font-size 16
@@ -307,7 +307,7 @@
                             color (fx.color/spring-color-to-javafx team-color)]
                         (.putString content (str color))
                         (.setContent clipboard content)))}
-        (if (-> ignore-users (get server-key) (get username))
+        (if (get ignore-users username)
           {:fx/type :menu-item
            :text "Unignore"
            :on-action {:event/type :spring-lobby/unignore-user
@@ -534,7 +534,8 @@
                            (not server-key) "replay"
                            singleplayer "singleplayer"
                            :else "multiplayer")
-        server-type (u/server-type server-key)]
+        server-type (u/server-type server-key)
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
     {:fx/type ext-recreate-on-key-changed
      :key (pr-str [server-key selected-tab-main battle-id players-table-columns])
      :desc
@@ -662,6 +663,7 @@
                                      :spread 1}
                             :text nickname
                             :fill text-color-css
+                            :strikethrough (boolean (get ignore-users (:username id)))
                             :style
                             (merge
                               {:-fx-font-smoothing-type :gray}
@@ -1038,7 +1040,8 @@
         host-is-bot (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])]
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
     {:fx/type :scroll-pane
      :min-height 160
      :fit-to-width true
@@ -1137,6 +1140,7 @@
                               :fill text-color-css
                               :style {:-fx-font-smoothing :gray
                                       :-fx-font-weight "bold"}
+                              :strikethrough (boolean (get ignore-users (:username player)))
                               :effect {:fx/type :drop-shadow
                                        :color (if (color/dark? text-color-javafx)
                                                 "#d5d5d5"
@@ -1198,6 +1202,7 @@
                   {:fx/type :text
                    :text (str (u/nickname player))
                    :fill "#ffffff"
+                   :strikethrough (boolean (get ignore-users (:username player)))
                    :style-class ["text" (str "skylobby-players-" css-class-suffix "-nickname")]}}})
               spectators)}]}])}}))
 
