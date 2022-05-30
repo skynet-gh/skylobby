@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.33](https://github.com/skynet-gh/skylobby/releases/tag/0.8.33) - 2022-05-30
+
+- Fix chat notifications when muted
+
 ## [0.8.32](https://github.com/skynet-gh/skylobby/releases/tag/0.8.32) - 2022-05-30
 
 - Add settings for notifications on incoming messages
