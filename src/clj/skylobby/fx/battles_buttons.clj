@@ -26,7 +26,8 @@
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        battle (fx/sub-val context get-in [:by-server server-key :battle])]
+        battle (fx/sub-val context get-in [:by-server server-key :battle])
+        joining-battle (fx/sub-val context get-in [:by-server server-key :joining-battle])]
     {:fx/type :v-box
      :alignment :top-left
      :children
@@ -40,8 +41,13 @@
            (let [needs-password (= "1" (:battle-passworded selected-battle-details))]
              (concat
                [{:fx/type :button
-                 :text "Join Battle"
-                 :disable (boolean (and needs-password (string/blank? battle-password)))
+                 :text (if joining-battle
+                         (str "Joining Battle " joining-battle)
+                         "Join Battle")
+                 :disable (boolean
+                            (or
+                              (and needs-password (string/blank? battle-password))
+                              joining-battle))
                  :on-action {:event/type :spring-lobby/join-battle
                              :battle battle
                              :battle-password battle-password

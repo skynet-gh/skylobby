@@ -1973,7 +1973,7 @@
         {:keys [battle]} (get by-server server-key)
         {:keys [engine-version map-name mod-name]} host-battle-state]
     (when battle
-      @(event-handler (merge e {:event/type ::leave-battle}))
+      (event-handler (merge e {:event/type ::leave-battle}))
       (async/<!! (async/timeout 500)))
     (if-not (or (string/blank? engine-version)
                 (string/blank? mod-name)
@@ -1994,37 +1994,29 @@
 (defmethod event-handler ::leave-battle [{:keys [client-data consume server-key] :fx/keys [^Event event]}]
   (when consume
     (.consume event))
-  (future
-    (try
-      (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
-      (message/send *state client-data "LEAVEBATTLE")
-      (swap! *state update-in [:by-server server-key]
-        (fn [server-data]
-          (let [battle (:battle server-data)]
-            (-> server-data
-                (assoc-in [:old-battles (:battle-id battle)] battle)
-                (dissoc :auto-unspec :battle)))))
-      (catch Exception e
-        (log/error e "Error leaving battle")))))
+  (swap! *state assoc-in [:last-battle server-key :should-rejoin] false)
+  (message/send *state client-data "LEAVEBATTLE")
+  (swap! *state update-in [:by-server server-key]
+    (fn [server-data]
+      (let [battle (:battle server-data)]
+        (-> server-data
+            (assoc-in [:old-battles (:battle-id battle)] battle)
+            (dissoc :auto-unspec :battle))))))
 
 
 (defmethod event-handler ::join-battle
   [{:keys [battle battle-password battle-passworded client-data selected-battle] :as e}]
-  (future
-    (try
-      (if selected-battle
-        (let [server-key (u/server-key client-data)]
-          (if (:battle-id battle)
-            (do
-              (log/info "Leaving battle" (with-out-str (pprint battle)))
-              (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
-                                                                                :battle-password battle-password
-                                                                                :battle-passworded battle-passworded})
-              (event-handler (merge e {:event/type ::leave-battle})))
-            (handler/join-battle *state server-key client-data selected-battle e)))
-        (log/warn "No battle to join" e))
-      (catch Exception e
-        (log/error e "Error joining battle")))))
+  (if selected-battle
+    (let [server-key (u/server-key client-data)]
+      (if (:battle-id battle)
+        (do
+          (log/info "Leaving battle" (with-out-str (pprint battle)))
+          (swap! *state assoc-in [:by-server server-key :join-after-leave] {:battle-id selected-battle
+                                                                            :battle-password battle-password
+                                                                            :battle-passworded battle-passworded})
+          (event-handler (merge e {:event/type ::leave-battle})))
+        (handler/join-battle *state server-key client-data selected-battle e)))
+    (log/warn "No battle to join" e)))
 
 (defmethod event-handler ::start-singleplayer-battle
   [_e]

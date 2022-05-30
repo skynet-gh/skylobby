@@ -8,7 +8,6 @@
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.fs :as fs]
-    [skylobby.resource :as resource]
     [skylobby.spring :as spring]
     [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
@@ -48,6 +47,8 @@
                 (assoc :rtt (- now last-ping)))))))
 
 
+(def login-command-cooldown 3000)
+
 (defmethod handle "LOGININFOEND" [state-atom server-key _m]
   (let [state @state-atom
         server-data (-> state :by-server (get server-key))
@@ -56,17 +57,17 @@
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
     (log/info "End of login info, sending initial commands")
-    (async/<!! (async/timeout 1000))
+    (async/<!! (async/timeout login-command-cooldown))
     (message/send state-atom client-data "PING")
-    (async/<!! (async/timeout 1000))
+    (async/<!! (async/timeout login-command-cooldown))
     (message/send state-atom client-data "CHANNELS")
-    (async/<!! (async/timeout 1000))
+    (async/<!! (async/timeout login-command-cooldown))
     (message/send state-atom client-data "FRIENDLIST")
-    (async/<!! (async/timeout 1000))
+    (async/<!! (async/timeout login-command-cooldown))
     (message/send state-atom client-data "FRIENDREQUESTLIST")
-    (async/<!! (async/timeout 1000))
+    (async/<!! (async/timeout login-command-cooldown))
     (when (u/matchmaking? server-data)
-      (async/<!! (async/timeout 1000))
+      (async/<!! (async/timeout login-command-cooldown))
       (message/send state-atom client-data "c.matchmaking.list_all_queues"))
     (doseq [channel my-channels]
       (let [[channel-name _] channel]
@@ -74,7 +75,7 @@
                  (not (u/battle-channel-name? channel-name))
                  (not (u/user-channel-name? channel-name)))
           (do
-            (async/<!! (async/timeout 1000))
+            (async/<!! (async/timeout login-command-cooldown))
             (message/send state-atom client-data (str "JOIN " channel-name)))
           (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))))
 
@@ -261,6 +262,26 @@
     (swap! state-atom assoc-in [:by-server server-key :friend-requests username] {})))
 
 
+(defn join-battle [state-atom server-key client-data battle-id {:keys [battle-password battle-passworded]}]
+  (let [[old-state new-state]
+        (swap-vals! state-atom
+          (fn [state]
+            (if (get-in state [:by-server server-key :joining-battle])
+              state
+              (-> state
+                  (assoc-in [:by-server server-key :joining-battle] battle-id)
+                  (update-in [:by-server server-key] dissoc :selected-battle)
+                  (assoc-in [:selected-tab-main server-key] "battle")))))]
+    (if (not= (get-in old-state [:by-server server-key :joining-battle])
+              (get-in new-state [:by-server server-key :joining-battle]))
+      (message/send state-atom client-data
+        (str "JOINBATTLE " battle-id
+             (if battle-passworded
+               (str " " battle-password)
+               (str " *"))
+             " " (crypto.random/hex 6)))
+      (log/info "Already joining battle" (get-in new-state [:by-server server-key :joining-battle]) "ignoring new join"))))
+
 (defn parse-battleopened [m]
   (re-find #"[^\s]+ ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+) ([^\s]+)\s+([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)(\t([^\t]+))?" m))
 
@@ -290,12 +311,8 @@
                  (not= host-username username)
                  (= host-username (:host-username last-battle))
                  (:should-rejoin last-battle))
-        (message/send state-atom client-data
-          (str "JOINBATTLE " battle-id
-               (if battle-passworded
-                 (str " " (:battle-password state))
-                 (str " *"))
-               " " (crypto.random/hex 6)))))
+        (join-battle state-atom server-key client-data battle-id {:battle-password (:battle-password state)
+                                                                  :battle-passworded battle-passworded})))
     (log/warn "Unable to parse BATTLEOPENED" (pr-str m))))
 
 (defn parse-updatebattleinfo [m]
@@ -319,20 +336,6 @@
                     :battle-map battle-map)
                   (and my-battle map-changed)
                   (assoc-in [:battle :users username :battle-status :sync] 0)))))))
-
-(defn join-battle [state-atom server-key client-data battle-id {:keys [battle-password battle-passworded]}]
-  (swap! state-atom
-    (fn [state]
-      (-> state
-          (assoc-in [:by-server server-key :battle] {})
-          (update-in [:by-server server-key] dissoc :selected-battle)
-          (assoc-in [:selected-tab-main server-key] "battle"))))
-  (message/send state-atom client-data
-    (str "JOINBATTLE " battle-id
-         (if battle-passworded
-           (str " " battle-password)
-           (str " *"))
-         " " (crypto.random/hex 6))))
 
 
 (def last-auto-unspec-atom (atom 0))
@@ -808,6 +811,7 @@
                                :scripttags default-scripttags}
                       :battle-map-details nil
                       :battle-mod-details nil)
+              (update-in [:by-server server-key] dissoc :joining-battle)
               (assoc-in [:last-battle server-key]
                 {:host-username (:host-username (get (:battles server-data) battle-id))
                  :should-rejoin true})))))))
@@ -819,8 +823,8 @@
     (message/send state-atom client-data (str "JOINBATTLEACCEPT " user-name))))
 
 (defmethod handle "REQUESTBATTLESTATUS" [state-atom server-url _m]
-  (let [{:keys [join-battle-as-player map-details mod-details preferred-factions servers spring-isolation-dir] :as state} @state-atom
-        {:keys [battle battles client-data preferred-color] :as server-data} (-> state :by-server (get server-url))
+  (let [{:keys [join-battle-as-player preferred-factions servers spring-isolation-dir] :as state} @state-atom
+        {:keys [battle battles client-data preferred-color]} (-> state :by-server (get server-url))
         spring-root (or (-> servers (get server-url) :spring-isolation-dir)
                         spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-root)
@@ -835,8 +839,7 @@
                             :id (battle/available-team-id battle)
                             :ally 0
                             :side (or preferred-side 0)
-                            :sync (u/sync-number
-                                    (resource/sync-status server-data spring mod-details map-details)))
+                            :sync 0)
         new-battle-status (if join-battle-as-player
                             (assoc new-battle-status :mode true)
                             new-battle-status)
