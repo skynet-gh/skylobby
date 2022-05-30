@@ -316,6 +316,8 @@
         media-player (fx/sub-val context :media-player)
         music-dir (fx/sub-val context :music-dir)
         music-volume (fx/sub-val context :music-volume)
+        notify-on-incoming-direct-message (fx/sub-val context :notify-on-incoming-direct-message)
+        notify-on-incoming-battle-message (fx/sub-val context :notify-on-incoming-battle-message)
         players-table-columns (fx/sub-val context :players-table-columns)
         prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
         replay-source-enabled (fx/sub-val context :replay-source-enabled)
@@ -517,62 +519,78 @@
           :title " Chat"
           :children
           [
-             {:fx/type filterable-checkbox-setting
-              :title " Auto complete suggestions"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean chat-auto-complete)
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :chat-auto-complete}}}
-             {:fx/type filterable-checkbox-setting
-              :title " Focus chat on incoming message"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean focus-chat-on-message)
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :focus-chat-on-message}}}
-             {:fx/type filterable-checkbox-setting
-              :title " Highlight tabs with new chat messages"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean highlight-tabs-with-new-chat-messages)
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :highlight-tabs-with-new-chat-messages}}}
-             {:fx/type filterable-checkbox-setting
-              :title " Highlight tabs with new battle messages"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean highlight-tabs-with-new-battle-messages)
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :highlight-tabs-with-new-battle-messages}}}
-             {:fx/type filterable-checkbox-setting
-              :title " Color my username"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean (fx/sub-val context :chat-color-username))
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :chat-color-username}}}
-             {:fx/type filterable-checkbox-setting
-              :title " Highlight my username in messages"
-              :search settings-search
-              :check-box
-              {:fx/type :check-box
-               :selected (boolean (fx/sub-val context :chat-highlight-username))
-               :on-selected-changed {:event/type :spring-lobby/assoc
-                                     :key :chat-highlight-username}}}
-             {:fx/type :label
-              :text "Highlight words (comma or space separated): "}
-             {:fx/type :text-field
-              :text (str (fx/sub-val context :chat-highlight-words))
-              :style {
-                      :-fx-max-width 480}
-              :on-text-changed {:event/type :spring-lobby/assoc
-                                :key :chat-highlight-words}}]}
+           {:fx/type filterable-checkbox-setting
+            :title " Notification for incoming direct chat message"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean notify-on-incoming-direct-message)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :notify-on-incoming-direct-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Notification for battle chat message"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean notify-on-incoming-battle-message)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :notify-on-incoming-battle-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Auto complete suggestions"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean chat-auto-complete)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :chat-auto-complete}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Focus chat on incoming message"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean focus-chat-on-message)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :focus-chat-on-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Highlight tabs with new chat messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean highlight-tabs-with-new-chat-messages)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :highlight-tabs-with-new-chat-messages}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Highlight tabs with new battle messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean highlight-tabs-with-new-battle-messages)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :highlight-tabs-with-new-battle-messages}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Color my username"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :chat-color-username))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :chat-color-username}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Highlight my username in messages"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean (fx/sub-val context :chat-highlight-username))
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :chat-highlight-username}}}
+           {:fx/type :label
+            :text "Highlight words (comma or space separated): "}
+           {:fx/type :text-field
+            :text (str (fx/sub-val context :chat-highlight-words))
+            :style {
+                    :-fx-max-width 480}
+            :on-text-changed {:event/type :spring-lobby/assoc
+                              :key :chat-highlight-words}}]}
          {:fx/type battle-settings
           :settings-search settings-search}
          {:fx/type filterable-section

@@ -72,6 +72,7 @@
     (javafx.stage DirectoryChooser FileChooser)
     (javafx.util Duration)
     (manifold.stream SplicedStream)
+    (org.controlsfx.control Notifications)
     (org.fxmisc.flowless VirtualizedScrollPane))
   (:gen-class))
 
@@ -243,6 +244,8 @@
    :mute
    :mute-ring
    :my-channels
+   :notify-on-incoming-direct-message
+   :notify-on-incoming-battle-message
    :password
    :players-table-columns
    :pop-out-battle
@@ -356,6 +359,7 @@
      :ipc-server-enabled false
      :ipc-server-port u/default-ipc-port
      :leave-battle-on-close-window true
+     :notify-on-incoming-direct-message true
      :players-table-columns {:skill true
                              :ally true
                              :team true
@@ -3723,6 +3727,26 @@
 (defn ring-impl []
   (sound/play-ring @*state))
 
+(defn notify-impl [{:keys [hide-after text title]}]
+  (Platform/runLater
+    (fn []
+      (let [handler (reify EventHandler
+                      (handle [_this e]
+                        (log/info "Notification clicked" e)))]
+        (doto (Notifications/create)
+          (.darkStyle)
+          (.title (str "skylobby " title))
+          (.text text)
+          (.hideAfter (Duration. (or hide-after 10000)))
+          (.onAction handler)
+          (.threshold 3
+            (doto (Notifications/create)
+              (.darkStyle)
+              (.title "skylobby New Messages")
+              (.onAction handler)
+              (.hideAfter (Duration. (or hide-after 10000)))))
+          (.show))))))
+
 (defn extra-pre-game []
   (try
     (let [{:keys [^MediaPlayer media-player music-paused ring-when-game-starts] :as state} @*state]
@@ -3791,6 +3815,7 @@
    (alter-var-root #'skylobby.spring/extra-pre-game (constantly extra-pre-game))
    (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
    (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
+   (alter-var-root #'skylobby.client.handler/notify-impl (constantly notify-impl))
    (task-handlers/add-handlers handle-task state-atom)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]

@@ -23,6 +23,10 @@
   (fn []
     (log/warn "No ring implementation set")))
 
+(def ^:dynamic notify-impl
+  (fn [_]
+    (log/warn "No notify implementation set")))
+
 
 (defmulti handle
   (fn [_state-atom _server-key m]
@@ -564,7 +568,27 @@
                                             (->> battles
                                                  (filter (comp #{username} :host-username second))
                                                  first
-                                                 first))]
+                                                 first))
+             needs-focus (and (not focus-chat)
+                              (not capture)
+                              (not json-from-host-for-battle-id)
+                              (not (and (= server-key (:selected-server-tab state))
+                                        (= main-tab (get-in state [:selected-tab-main server-key]))
+                                        (if-not battle-channel?
+                                          (= channel-tab selected-tab-channel)
+                                          true))))]
+         (when (and (u/user-channel-name? channel-name)
+                    (:notify-on-incoming-direct-message state)
+                    needs-focus)
+           (notify-impl
+             {:title "Direct Message"
+              :text (str username ": " message)}))
+         (when (and battle-channel?
+                    (:notify-on-incoming-battle-message state)
+                    needs-focus)
+           (notify-impl
+             {:title "Battle Message"
+              :text (str username ": " message)}))
          (cond-> (update-in state [:by-server server-key]
                    (fn [state]
                      (cond-> (update-in state [:channels channel-name :messages] update-messages-fn)
@@ -572,14 +596,7 @@
                              (assoc-in [:my-channels channel-name] {})
                              capture
                              (update-in [:channels channel-name :capture] #(str % "\n" message)))))
-                 (and (not focus-chat)
-                      (not capture)
-                      (not json-from-host-for-battle-id)
-                      (not (and (= server-key (:selected-server-tab state))
-                                (= main-tab (get-in state [:selected-tab-main server-key]))
-                                (if-not battle-channel?
-                                  (= channel-tab selected-tab-channel)
-                                  true))))
+                 needs-focus
                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)
                  (and (not battle-channel?) focus-chat)
                  (assoc-in [:selected-tab-main server-key] main-tab)
