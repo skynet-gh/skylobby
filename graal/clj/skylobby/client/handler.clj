@@ -579,13 +579,15 @@
                                           true))))]
          (when (and (u/user-channel-name? channel-name)
                     (:notify-on-incoming-direct-message state)
-                    needs-focus)
+                    needs-focus
+                    (not (get-in state [:mute server-key channel-tab])))
            (notify-impl
              {:title "Direct Message"
               :text (str username ": " message)}))
          (when (and battle-channel?
                     (:notify-on-incoming-battle-message state)
-                    needs-focus)
+                    needs-focus
+                    (not (get-in state [:mute server-key channel-tab])))
            (notify-impl
              {:title "Battle Message"
               :text (str username ": " message)}))
