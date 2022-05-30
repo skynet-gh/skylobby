@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.34](https://github.com/skynet-gh/skylobby/releases/tag/0.8.34) - 2022-05-30
+
+- Add visual indication for ignored users
+- Fix notify in battle chat for legacy
+- Fix double bottom bar in singleplayer
+- Fix vote buttons clearing chat draft
+
 ## [0.8.33](https://github.com/skynet-gh/skylobby/releases/tag/0.8.33) - 2022-05-30
 
 - Fix chat notifications when muted
