@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.32](https://github.com/skynet-gh/skylobby/releases/tag/0.8.32) - 2022-05-30
+
+- Add settings for notifications on incoming messages
+- Switch to jsonrpc for getting battle status from auto hosts
+- Fix joining battle not cleared on fail
+
 ## [0.8.31](https://github.com/skynet-gh/skylobby/releases/tag/0.8.31) - 2022-05-30
 
 - Fix `skylobby-zgc` launcher console
