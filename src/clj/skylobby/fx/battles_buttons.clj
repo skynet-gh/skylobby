@@ -37,7 +37,8 @@
        :style {:-fx-font-size 16}
        :children
        (concat
-         (when (and selected-battle selected-battle-details)
+         (when (or (and selected-battle selected-battle-details)
+                   joining-battle)
            (let [needs-password (= "1" (:battle-passworded selected-battle-details))]
              (concat
                [{:fx/type :button

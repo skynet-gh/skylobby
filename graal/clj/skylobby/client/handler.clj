@@ -1,7 +1,9 @@
 (ns skylobby.client.handler
   (:require
+    [cheshire.core :as json]
     [clojure.core.async :as async]
     [clojure.pprint :refer [pprint]]
+    [clojure.set :refer [rename-keys]]
     [clojure.string :as string]
     crypto.random
     [skylobby.battle :as battle]
@@ -20,6 +22,10 @@
 (def ^:dynamic ring-impl
   (fn []
     (log/warn "No ring implementation set")))
+
+(def ^:dynamic notify-impl
+  (fn [_]
+    (log/warn "No notify implementation set")))
 
 
 (defmulti handle
@@ -541,23 +547,48 @@
 (defn- update-incoming-chat
   ([state-atom server-key channel-name update-messages-fn]
    (update-incoming-chat state-atom server-key channel-name update-messages-fn nil))
-  ([state-atom server-key channel-name update-messages-fn {:keys [message] :as message-data}]
+  ([state-atom server-key channel-name update-messages-fn {:keys [message username] :as message-data}]
    (swap! state-atom
      (fn [state]
        (let [focus-chat (:focus-chat-on-message state)
              selected-tab-channel (get-in state [:selected-tab-channel server-key])
-             my-channels (get-in state [:by-server server-key :my-channels])
+             {:keys [battle battles my-channels users] :as server-data} (get-in state [:by-server server-key])
              needs-selected-tab-channel-fix (or (not selected-tab-channel)
                                                 (not (contains? my-channels selected-tab-channel)))
              battle-channel? (u/battle-channel-name? channel-name)
              main-tab (if battle-channel? "battle" "chat")
              channel-tab (if battle-channel? :battle channel-name)
              now (u/curr-millis)
-             capture (<= now (or (get-in state [:by-server server-key :channels channel-name :capture-until]) 0))
+             capture (<= now (or (get-in server-data [:channels channel-name :capture-until]) 0))
              parsed-coordinator (parse-coordinator-message (assoc message-data :timestamp now))
-             battle-channel-name (when-let [battle (get-in state [:by-server server-key :battle])]
-                                   (when (:battle-id battle)
-                                     (u/battle-channel-name battle)))]
+             battle-channel-name (when (:battle-id battle)
+                                   (u/battle-channel-name battle))
+             json-from-host-for-battle-id (when (and (get-in users [username :client-status :bot])
+                                                     (string/starts-with? message "!#JSONRPC "))
+                                            (->> battles
+                                                 (filter (comp #{username} :host-username second))
+                                                 first
+                                                 first))
+             needs-focus (and (not focus-chat)
+                              (not capture)
+                              (not json-from-host-for-battle-id)
+                              (not (and (= server-key (:selected-server-tab state))
+                                        (= main-tab (get-in state [:selected-tab-main server-key]))
+                                        (if-not battle-channel?
+                                          (= channel-tab selected-tab-channel)
+                                          true))))]
+         (when (and (u/user-channel-name? channel-name)
+                    (:notify-on-incoming-direct-message state)
+                    needs-focus)
+           (notify-impl
+             {:title "Direct Message"
+              :text (str username ": " message)}))
+         (when (and battle-channel?
+                    (:notify-on-incoming-battle-message state)
+                    needs-focus)
+           (notify-impl
+             {:title "Battle Message"
+              :text (str username ": " message)}))
          (cond-> (update-in state [:by-server server-key]
                    (fn [state]
                      (cond-> (update-in state [:channels channel-name :messages] update-messages-fn)
@@ -565,20 +596,41 @@
                              (assoc-in [:my-channels channel-name] {})
                              capture
                              (update-in [:channels channel-name :capture] #(str % "\n" message)))))
-                 (and (not focus-chat)
-                      (not capture)
-                      (not (and (= server-key (:selected-server-tab state))
-                                (= main-tab (get-in state [:selected-tab-main server-key]))
-                                (if-not battle-channel?
-                                  (= channel-tab selected-tab-channel)
-                                  true))))
+                 needs-focus
                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)
                  (and (not battle-channel?) focus-chat)
                  (assoc-in [:selected-tab-main server-key] main-tab)
                  (and (not battle-channel?) (or focus-chat needs-selected-tab-channel-fix))
                  (assoc-in [:selected-tab-channel server-key] channel-name)
                  parsed-coordinator
-                 (update-in [:by-server server-key :channels battle-channel-name :messages] conj parsed-coordinator)))))))
+                 (update-in [:by-server server-key :channels battle-channel-name :messages] conj parsed-coordinator)
+                 json-from-host-for-battle-id
+                 (assoc-in [:by-server server-key :battles json-from-host-for-battle-id :user-details]
+                   (try
+                     (let [[_all json] (re-find #"[^\s+]\s+(.*)" message)]
+                       (->> (json/parse-string json true)
+                            :result
+                            :battleLobby
+                            :clients
+                            (map
+                              (fn [{:keys [Id Team] :as client}]
+                                (-> client
+                                    (rename-keys {:Name :username
+                                                  :Rank :rank
+                                                  :Skill :skill
+                                                  :Ready :ready
+                                                  :Clan :clan})
+                                    (assoc :battle-status {:id Id
+                                                           :ally Team
+                                                           :mode (and Id Team)})
+                                    (assoc :skilluncertainty 0))))
+                            (map (juxt :username identity))
+                            (into {})))
+                     (catch Exception e
+                       (log/error e "Error parsing jsonrpc response"
+                         (with-out-str (pprint {:message message
+                                                :username username
+                                                :json-from-host-for-battle-id json-from-host-for-battle-id}))))))))))))
 
 
 (defmethod handle "SAID" [state-atom server-key m]
@@ -894,13 +946,13 @@
       (log/error e "Error parsing failed message")
       (swap! state-atom assoc-in [:by-server server-url :last-failed-message] m))))
 
-(defmethod handle "JOINBATTLEFAILED" [state-atom server-url m]
-  (let [state (swap! state-atom update-in [:by-server server-url]
-                     (fn [state]
-                       (-> state
-                           (dissoc :battle)
+(defmethod handle "JOINBATTLEFAILED" [state-atom server-key m]
+  (let [state (swap! state-atom update-in [:by-server server-key]
+                     (fn [server-data]
+                       (-> server-data
+                           (dissoc :battle :joining-battle)
                            (assoc :last-failed-message m))))
-        client-data (-> state :by-server (get server-url) :client-data)]
+        client-data (get-in state [:by-server server-key :client-data])]
     (when (= m "JOINBATTLEFAILED You are already in a battle")
       (message/send state-atom client-data "LEAVEBATTLE"))))
 

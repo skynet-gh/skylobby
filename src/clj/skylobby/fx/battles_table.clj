@@ -220,7 +220,9 @@
                                                 :client-data client-data
                                                 :channel-name (u/user-channel-name host-username)
                                                 :message "!status game"
-                                                :server-key server-key}}]))))}}))}
+                                                :server-key server-key}}])))
+                            [{:fx/type :menu-item
+                              :text (str "Battle ID: " battle-id)}])}}))}
          :columns
          [
           {:fx/type :table-column
@@ -539,7 +541,9 @@
                                      :client-data client-data
                                      :channel-name (u/user-channel-name host-username)
                                      :message "!status game"
-                                     :server-key server-key}}]))))}}))}
+                                     :server-key server-key}}])))
+                 [{:fx/type :menu-item
+                   :text (str "Battle ID: " battle-id)}])}}))}
         :columns
         [{:fx/type :table-column
           :text "Minimap"
