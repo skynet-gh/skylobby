@@ -1361,6 +1361,7 @@
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote y"
+                             :no-clear-draft true
                              :server-key server-key}}
                 {:fx/type :pane
                  :h-box/hgrow :always}
@@ -1372,6 +1373,7 @@
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote n"
+                             :no-clear-draft true
                              :server-key server-key}}
                 {:fx/type :pane
                  :h-box/hgrow :always}
@@ -1382,6 +1384,7 @@
                              :channel-name channel-name
                              :client-data client-data
                              :message "!vote b"
+                             :no-clear-draft true
                              :server-key server-key}}]}]}]))
        [{:fx/type :h-box
          :children

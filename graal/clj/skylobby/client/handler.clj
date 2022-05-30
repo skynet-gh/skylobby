@@ -668,29 +668,37 @@
 
 ; legacy battle chat
 
-(defn update-saidbattle [state-atom server-key update-messages-fn]
+(defn update-saidbattle
+  [state-atom server-key update-messages-fn {:keys [message username]}]
   (swap! state-atom
     (fn [state]
       (if-let [battle-id (-> state :by-server (get server-key) :battle :battle-id)]
-        (let [channel-name (str "__battle__" battle-id)]
-          (cond-> state
-                  true
-                  (update-in [:by-server server-key]
+        (let [channel-name (str "__battle__" battle-id)
+              needs-focus (not (and (= server-key (:selected-server-tab state))
+                                    (= "battle" (get-in state [:selected-tab-main server-key]))))
+              channel-tab :battle]
+          (when (and (:notify-on-incoming-battle-message state)
+                     needs-focus
+                     (not (get-in state [:mute server-key channel-tab])))
+            (notify-impl
+              {:title "Battle Message"
+               :text (str username ": " message)}))
+          (cond->
+                  (update-in state [:by-server server-key]
                     (fn [server]
                       (-> server
                           (update-in [:channels channel-name :messages] update-messages-fn))))
-                  (not (and (= server-key (:selected-server-tab state))
-                            (= "battle" (get-in state [:selected-tab-main server-key]))))
-                  (assoc-in [:needs-focus server-key "battle" :battle] true)))
+                  needs-focus
+                  (assoc-in [:needs-focus server-key "battle" channel-tab] true)))
         state))))
 
 (defmethod handle "SAIDBATTLE" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
-    (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message))))
+    (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message) {:message message :username username})))
 
 (defmethod handle "SAIDBATTLEEX" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        state (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message true))
+        state (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message true) {:message message :username username})
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
         me (-> battle :users (get my-username))

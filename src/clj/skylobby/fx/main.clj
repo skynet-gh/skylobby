@@ -434,13 +434,9 @@
               :on-close-request {:event/type :spring-lobby/dissoc-in
                                  :path [:by-server :local]}
               :content
-              {:fx/type :v-box
-               :children
-               [
-                {:fx/type fx.battle/battle-view
-                 :v-box/vgrow :always
-                 :server-key :local}
-                {:fx/type fx.bottom-bar/bottom-bar}]}}])
+              {:fx/type fx.battle/battle-view
+               :v-box/vgrow :always
+               :server-key :local}}])
           (when show-direct-connect
             [{:fx/type :tab
               :id "direct"

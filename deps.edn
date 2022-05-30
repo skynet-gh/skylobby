@@ -14,8 +14,7 @@
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
-  clojure.java-time/clojure.java-time {:git/url "https://github.com/dm3/clojure.java-time.git"
-                                       :git/sha "693dffad2343cd9722482a5f200efe75dfbfbd31"}
+  clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
   com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                            :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
