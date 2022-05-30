@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.8.29](https://github.com/skynet-gh/skylobby/releases/tag/0.8.28) - 2022-05-29
+## [0.8.30](https://github.com/skynet-gh/skylobby/releases/tag/0.8.30) - 2022-05-29
+
+- Fix issue with sync status after rehost
+- Fix joining battle during login rejoin
+
+## [0.8.29](https://github.com/skynet-gh/skylobby/releases/tag/0.8.29) - 2022-05-29
 
 - Add launcher `skylobby-zgc` for testing ZGC garbage collection for smaller memory usage and less
   gc pauses
