@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.35](https://github.com/skynet-gh/skylobby/releases/tag/0.8.35) - 2022-06-04
+
+- Fix coop (aka comshare) in singleplayer and direct connect
+- Add fuzzy string matching for direct connect resources
+- Add direct connect hosting into native binary
+- Rename players table Team to ID
+
 ## [0.8.34](https://github.com/skynet-gh/skylobby/releases/tag/0.8.34) - 2022-05-30
 
 - Add visual indication for ignored users
