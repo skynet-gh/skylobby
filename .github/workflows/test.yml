@@ -23,7 +23,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.2
+      - uses: actions/cache@v3.0.3
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}

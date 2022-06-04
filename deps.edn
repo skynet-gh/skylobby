@@ -117,7 +117,7 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
-    com.fulcrologic/fulcro {:mvn/version "3.5.20"}
+    com.fulcrologic/fulcro {:mvn/version "3.5.21"}
     com.taoensso/sente {:mvn/version "1.16.2"}
     com.taoensso/timbre {:mvn/version "5.2.1"}
     hashp/hashp {:mvn/version "0.2.1"}
@@ -128,7 +128,7 @@
                                :git/sha "9562ae11422243e0648a12c39e7c990ef3f94260"}
     re-frame/re-frame {:mvn/version "1.2.0"}
     reagent/reagent {:mvn/version "1.1.1"}
-    thheller/shadow-cljs {:mvn/version "2.19.0"}}
+    thheller/shadow-cljs {:mvn/version "2.19.1"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar"]
@@ -197,8 +197,7 @@
     commons-io/commons-io {:mvn/version "2.11.0"}
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
-    gloss/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
-                 :git/sha "452468489f38aee262b21db755e7d9e10a4b6d8d"}
+    org.clj-commons/gloss {:mvn/version "0.3.0"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.12"}

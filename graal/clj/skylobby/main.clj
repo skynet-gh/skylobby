@@ -40,18 +40,23 @@
 
 
 (defn browse-url [url]
-  (if-let [desktop (when (Desktop/isDesktopSupported)
-                     (let [desktop (Desktop/getDesktop)]
-                       (when (.isSupported desktop Desktop$Action/BROWSE)
-                         desktop)))]
-    (.browse desktop (java.net.URI. url))
-    (let [runtime (Runtime/getRuntime)
-          ; https://stackoverflow.com/a/5116553
-          command (if (fs/windows?)
-                    ["explorer.exe" url]
-                    ["xdg-open" url])
-          ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-      (.exec runtime cmdarray nil nil))))
+  (try
+    (if-let [^java.awt.Desktop
+             desktop (when (Desktop/isDesktopSupported)
+                       (let [^java.awt.Desktop
+                             desktop (Desktop/getDesktop)]
+                         (when (.isSupported desktop Desktop$Action/BROWSE)
+                           desktop)))]
+      (.browse desktop (java.net.URI. url))
+      (let [runtime (Runtime/getRuntime)
+            ; https://stackoverflow.com/a/5116553
+            command (if (fs/windows?)
+                      ["explorer.exe" url]
+                      ["xdg-open" url])
+            ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+        (.exec runtime cmdarray nil nil)))
+    (catch Exception e
+      (log/error e "Error browsing url" url))))
 
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
