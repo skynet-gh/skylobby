@@ -6,6 +6,7 @@
     [cljfx.ext.table-view :as fx.ext.table-view]
     clojure.core.memoize
     java-time
+    skylobby.data
     [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
@@ -32,6 +33,7 @@
         hide-empty-battles (fx/sub-val context :hide-empty-battles)
         hide-locked-battles (fx/sub-val context :hide-locked-battles)
         hide-passworded-battles (fx/sub-val context :hide-passworded-battles)
+        hide-running-battles (fx/sub-val context :hide-running-battles)
         battle (fx/sub-val context get-in [:by-server server-key :battle])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -40,37 +42,14 @@
         {:keys [engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-root)
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         users (fx/sub-val context get-in [:by-server server-key :users])
-        filter-lc (when-not (string/blank? filter-battles)
-                    (string/lower-case filter-battles))
         now (fx/sub-val context :now)
-        filtered-battles (->> battles
-                              vals
-                              (filter :battle-title)
-                              (filter
-                                (fn [{:keys [battle-map battle-modname battle-title]}]
-                                  (if filter-lc
-                                    (or (and battle-map (string/includes? (string/lower-case battle-map) filter-lc))
-                                        (and battle-modname (string/includes? (string/lower-case battle-modname) filter-lc))
-                                        (string/includes? (string/lower-case battle-title) filter-lc))
-                                    true)))
-                              (remove
-                                (fn [{:keys [battle-passworded]}]
-                                  (if hide-passworded-battles
-                                    (= "1" battle-passworded)
-                                    false)))
-                              (remove
-                                (fn [{:keys [battle-locked]}]
-                                  (if hide-locked-battles
-                                    (= "1" battle-locked)
-                                    false)))
-                              (remove
-                                (fn [{:keys [users]}]
-                                  (if hide-empty-battles
-                                    (boolean (<= (count users) 1)) ; TODO bot vs human hosts
-                                    false)))
-                              (sort-by (juxt (comp count :users) :battle-spectators))
-                              reverse
-                              doall)
+        filtered-battles (skylobby.data/filter-battles battles
+                           {:filter-battles filter-battles
+                            :hide-empty-battles hide-empty-battles
+                            :hide-locked-battles hide-locked-battles
+                            :hide-passworded-battles hide-passworded-battles
+                            :hide-running-battles hide-running-battles
+                            :users users})
         battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
     {:fx/type :v-box
      :style {:-fx-font-size 16
@@ -103,6 +82,12 @@
                                  :key :hide-empty-battles}}
           {:fx/type :label
            :text (str " Hide empty ")}
+          {:fx/type :check-box
+           :selected (boolean hide-running-battles)
+           :on-selected-changed {:event/type :spring-lobby/assoc
+                                 :key :hide-running-battles}}
+          {:fx/type :label
+           :text (str " Hide running ")}
           {:fx/type :pane
            :h-box/hgrow :always}
           {:fx/type :label
@@ -353,6 +338,7 @@
         hide-empty-battles (fx/sub-val context :hide-empty-battles)
         hide-locked-battles (fx/sub-val context :hide-locked-battles)
         hide-passworded-battles (fx/sub-val context :hide-passworded-battles)
+        hide-running-battles (fx/sub-val context :hide-running-battles)
         battle (fx/sub-val context get-in [:by-server server-key :battle])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
@@ -362,38 +348,15 @@
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         users (fx/sub-val context get-in [:by-server server-key :users])
         all-users users
-        filter-lc (when-not (string/blank? filter-battles)
-                    (string/lower-case filter-battles))
         now (fx/sub-val context :now)
         cached-minimap-updated (fx/sub-val context :cached-minimap-updated)
-        filtered-battles (->> battles
-                              vals
-                              (filter :battle-title)
-                              (filter
-                                (fn [{:keys [battle-map battle-modname battle-title]}]
-                                  (if filter-lc
-                                    (or (and battle-map (string/includes? (string/lower-case battle-map) filter-lc))
-                                        (and battle-modname (string/includes? (string/lower-case battle-modname) filter-lc))
-                                        (and battle-title (string/includes? (string/lower-case battle-title) filter-lc)))
-                                    true)))
-                              (remove
-                                (fn [{:keys [battle-passworded]}]
-                                  (if hide-passworded-battles
-                                    (= "1" battle-passworded)
-                                    false)))
-                              (remove
-                                (fn [{:keys [battle-locked]}]
-                                  (if hide-locked-battles
-                                    (= "1" battle-locked)
-                                    false)))
-                              (remove
-                                (fn [{:keys [users]}]
-                                  (if hide-empty-battles
-                                    (boolean (<= (count users) 1)) ; TODO bot vs human hosts
-                                    false)))
-                              (sort-by (juxt (comp count :users) :battle-spectators))
-                              reverse
-                              doall)
+        filtered-battles (skylobby.data/filter-battles battles
+                           {:filter-battles filter-battles
+                            :hide-empty-battles hide-empty-battles
+                            :hide-locked-battles hide-locked-battles
+                            :hide-passworded-battles hide-passworded-battles
+                            :hide-running-battles hide-running-battles
+                            :users users})
         battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
     {:fx/type :v-box
      :style {:-fx-font-size 16
@@ -426,6 +389,12 @@
                                  :key :hide-empty-battles}}
           {:fx/type :label
            :text (str " Hide empty ")}
+          {:fx/type :check-box
+           :selected (boolean hide-running-battles)
+           :on-selected-changed {:event/type :spring-lobby/assoc
+                                 :key :hide-running-battles}}
+          {:fx/type :label
+           :text (str " Hide running ")}
           {:fx/type :pane
            :h-box/hgrow :always}
           {:fx/type :label

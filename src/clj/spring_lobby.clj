@@ -226,6 +226,7 @@
    :hide-joinas-spec
    :hide-locked-battles
    :hide-passworded-battles
+   :hide-running-battles
    :hide-spads-messages
    :hide-vote-messages
    :hide-users-bots
