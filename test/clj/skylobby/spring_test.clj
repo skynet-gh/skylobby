@@ -10,8 +10,15 @@
 (set! *warn-on-reflection* true)
 
 
-(declare battle battle-players expected-script-data expected-script-data-players
-         expected-script-txt expected-script-txt-players)
+(declare
+  battle
+  battle-comshare
+  battle-players
+  expected-script-data
+  expected-script-data-players
+  expected-script-data-comshare
+  expected-script-txt
+  expected-script-txt-players)
 
 
 (deftest startpostype-name
@@ -60,6 +67,13 @@
              battle-players
              {:is-host true
               :game {"myplayername" "me"}
+              :sides {0 "ARM" 1 "CORE"}}))))
+  (testing "comshare"
+    (is (= expected-script-data-comshare
+           (spring/script-data
+             battle-comshare
+             {:is-host true
+              :game {"myplayername" "skynet1"}
               :sides {0 "ARM" 1 "CORE"}}))))
   (testing "fix git game name"
     (is (= (assoc-in expected-script-data ["game" "gametype"] "Beyond All Reason git:f0cf2cb")
@@ -140,6 +154,37 @@
       :mode 1
       :side 1}}}})
 
+(def battle-comshare
+  {
+   ;:battle-modhash -1
+   ;:battle-version "103.0"
+   ;:battle-map "Dworld Duo"
+   ;:battle-title "deth"
+   ;:battle-modname "Balanced Annihilation V10.24"
+   ;:battle-maphash -1
+   ;:battle-port 8452
+   ;:battle-ip nil ;"192.168.1.6"
+   :users
+   {"skynet1"
+    {:battle-status
+     {:id 0
+      :ally 1
+      :team-color 0
+      :handicap 0
+      :mode 1
+      :side 0}
+     :team-color 0}
+    "skynet2"
+    {
+     :battle-status
+     {:id 0
+      :ally 2
+      :team-color 1
+      :handicap 1
+      :mode 1
+      :side 1}
+     :team-color 1}}})
+
 (def expected-script-data-players
   {"game"
    {"gametype" "Balanced Annihilation V10.24"
@@ -163,7 +208,7 @@
      "side" "CORE"},
     "allyteam1" {"numallies" 0}
     "allyteam0" {"numallies" 0}
-    "ai1"
+    "ai0"
     {"name" "kekbot1"
      "shortname" "KAIK"
      "version" "0.13"
@@ -177,6 +222,21 @@
      "isfromdemo" 0,
      "countrycode" nil
      "spectator" 0}}})
+
+(def expected-script-data-comshare
+  {"game" {"allyteam1" {"numallies" 0},
+           "allyteam2" {"numallies" 0},
+           "hostip" "0.0.0.0",
+           "ishost" 1,
+           "modoptions" {},
+           "myplayername" "skynet1",
+           "player0" {"countrycode" nil, "isfromdemo" 0, "name" "skynet1", "spectator" 0, "team" 0},
+           "player1" {"countrycode" nil, "isfromdemo" 0, "name" "skynet2", "spectator" 0, "team" 0},
+           "team0" {"allyteam" 1,
+                    "handicap" 0,
+                    "rgbcolor" "0.0 0.0 0.0",
+                    "side" "ARM",
+                    "teamleader" 0}}})
 
 (def expected-script-txt
   "[game]
@@ -198,7 +258,7 @@
 (def expected-script-txt-players
   "[game]
 {
-\t[ai1]
+\t[ai0]
 \t{
 \t\thost = 0;
 \t\tisfromdemo = 0;

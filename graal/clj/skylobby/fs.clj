@@ -35,6 +35,8 @@
 (def ^:dynamic app-root-override nil)
 (def ^:dynamic replay-sources-override nil)
 
+(def ^:dynamic is-wsl-override nil)
+
 
 (def is-7z-initialized (atom false))
 
@@ -191,14 +193,16 @@
   ([]
    (wsl? (get-sys-data)))
   ([sys-data]
-   (let [{:keys [os-name os-version]} sys-data]
-     (and
-       os-name
-       (string/includes? os-name "Linux")
-       os-version
-       (or
-         (string/includes? os-version "Microsoft") ; WSL
-         (string/includes? os-version "microsoft"))))))
+   (if (some? is-wsl-override)
+     is-wsl-override
+     (let [{:keys [os-name os-version]} sys-data]
+       (and
+         os-name
+         (string/includes? os-name "Linux")
+         os-version
+         (or
+           (string/includes? os-version "Microsoft") ; WSL
+           (string/includes? os-version "microsoft")))))))
 
 (defn wsl-or-windows? []
   (or (windows?) (wsl?)))

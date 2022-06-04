@@ -3,7 +3,6 @@
     clojure.set
     [skylobby.client.message :as message]
     [skylobby.event.battle :as event.battle]
-    [skylobby.fs :as fs]
     [skylobby.fx.color :as fx.color]
     [skylobby.spring :as spring]
     [skylobby.util :as u]

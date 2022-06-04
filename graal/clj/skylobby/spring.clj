@@ -266,11 +266,11 @@
             (when-let [mapname (:battle-map battle)]
               {"mapname" mapname}))
           (concat
-            (map
-              (fn [[player {:keys [battle-status user]}]]
+            (map-indexed
+              (fn [i [player {:keys [battle-status user]}]]
                 (let [team (-> battle-status :id actual-team-id)
                       spectator (if (:mode battle-status) 0 1)]
-                  [(str "player" team)
+                  [(str "player" i)
                    {"name" player
                     "team" team
                     "isfromdemo" 0  ; TODO replays
@@ -291,11 +291,11 @@
                       "rgbcolor" (format-color team-color)
                       "side" (get sides side side)}]))
               teams)
-            (map
-              (fn [[bot-name {:keys [ai-name ai-version battle-status owner]}]]
+            (map-indexed
+              (fn [i [bot-name {:keys [ai-name ai-version battle-status owner]}]]
                 (let [team (-> battle-status :id actual-team-id)
                       host (-> battle :users (get owner) :battle-status :id actual-team-id)]
-                  [(str "ai" team)
+                  [(str "ai" i)
                    {"name" bot-name
                     "shortname" ai-name
                     "version" ai-version

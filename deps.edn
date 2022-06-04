@@ -46,6 +46,7 @@
   instaparse/instaparse {:mvn/version "1.4.12"}
   jarohen/chime {:mvn/version "0.3.3"}
   manifold/manifold {:mvn/version "0.2.4"}
+  me.xdrop/fuzzywuzzy {:mvn/version "1.4.0"}
   me.raynes/fs {:mvn/version "1.4.6"}
   metosin/reitit {:mvn/version "0.5.18"}
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
@@ -215,6 +216,7 @@
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.2.4"}
     me.raynes/fs {:mvn/version "1.4.6"}
+    me.xdrop/fuzzywuzzy {:mvn/version "1.4.0"}
     metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}

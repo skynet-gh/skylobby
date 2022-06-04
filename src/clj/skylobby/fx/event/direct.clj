@@ -1,9 +1,8 @@
 (ns skylobby.fx.event.direct
   (:require
+    [clojure.set :refer [rename-keys]]
     [skylobby.direct :as direct]
     [skylobby.direct.client :as direct.client]
-    [skylobby.fs :as fs]
-    [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.timbre :as log]))
 
@@ -18,7 +17,9 @@
     (swap! state-atom assoc-in [:login-error :direct-host] nil)
     (future
       (try
-        (direct/host-direct-connect state-atom params)
+        (direct/host-direct-connect state-atom (rename-keys params {:direct-connect-password :password
+                                                                    :direct-connect-port :port
+                                                                    :direct-connect-username :username}))
         (catch Exception e
           (log/error e "Error starting direct connect server")))))
   (defmethod multifn ::join

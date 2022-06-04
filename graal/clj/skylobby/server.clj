@@ -8,7 +8,7 @@
     [clojure.test.check.generators :as gen]
     [hiccup.page :as hiccup]
     [muuntaja.core :as m]
-    org.httpkit.server
+    [org.httpkit.server :as http-kit]
     [reitit.ring :as ring]
     reitit.coercion.spec
     [reitit.ring.coercion :as rrc]
@@ -17,6 +17,8 @@
     [reitit.ring.middleware.parameters :as parameters]
     [ring.middleware.anti-forgery :as anti-forgery]
     [ring.middleware.content-type :as content-type]
+    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
+    [ring.middleware.params :refer [wrap-params]]
     ring.util.response
     [skylobby.event :as event]
     [skylobby.fs :as fs]
@@ -518,3 +520,41 @@
         {:not-found (fn [r] (assoc (index r) :status 404))
          :method-not-allowed (fn [r] (assoc (index r) :status 405))
          :not-acceptable (fn [r] (assoc (index r) :status 406))}))))
+
+
+(defn stop-ipc-server
+  [state-atom]
+  (let [{:keys [ipc-server]} @state-atom]
+    (when (fn? ipc-server)
+      (log/info "Stopping IPC server")
+      (ipc-server)
+      (swap! state-atom dissoc :ipc-server))))
+
+(defn start-ipc-server
+  "Starts an HTTP server so that replays and battles can be loaded into running instance."
+  ([state-atom]
+   (start-ipc-server state-atom nil))
+  ([state-atom opts]
+   (let [{:keys [ipc-server-port ipc-server-enabled]} @state-atom
+         port (or ipc-server-port u/default-ipc-port)]
+     (stop-ipc-server state-atom)
+     (cond
+       (and (not ipc-server-enabled)
+            (not (:force opts)))
+       (log/info "IPC server disabled")
+       (not (u/is-port-open? port))
+       (log/warn "IPC port unavailable" port)
+       :else
+       (try
+         (log/info "Starting IPC server on port" port)
+         (let [handler (handler state-atom)
+               server (http-kit/run-server
+                        (-> handler
+                            wrap-keyword-params
+                            wrap-params)
+                        {:port port
+                         :ip "127.0.0.1"})]
+           (swap! state-atom assoc :ipc-server server))
+         (catch Exception e
+           (log/error e "Error starting IPC server")
+           (swap! state-atom assoc :ipc-server-error e)))))))
