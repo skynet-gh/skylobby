@@ -120,7 +120,7 @@
                    :text "Protocol: "}
                   {:fx/type :combo-box
                    :value direct-connect-protocol
-                   :items [:http :https]
+                   :items [:http]
                    :on-value-changed {:event/type :spring-lobby/assoc
                                       :key :direct-connect-protocol}
                    :button-cell protocol-cell
@@ -247,8 +247,7 @@
           {:fx/type :pane
            :v-box/vgrow :always}]}
         {:fx/type :pane
-         :h-box/hgrow :always}]}
-      {:fx/type fx.bottom-bar/bottom-bar}]}))
+         :h-box/hgrow :always}]}]}))
 
 
 (defn main-window-impl
