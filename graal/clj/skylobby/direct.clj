@@ -3,6 +3,7 @@
     [cheshire.core :as json]
     [clojure.edn :as edn]
     [clojure.string :as string]
+    [clojure.tools.cli :as cli]
     [hiccup.core :as hiccup]
     [muuntaja.core :as m]
     [org.httpkit.server :as http-kit]
@@ -15,14 +16,18 @@
     [ring.middleware.content-type :as content-type]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
-    [skylobby.fx.event.battle :as fx.event.battle]
+    [skylobby.cli.util :as cu]
+    skylobby.core
+    [skylobby.event.battle :as event.battle]
+    [skylobby.fs :as fs]
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
     [skylobby.util :as u]
     [taoensso.sente :as sente]
     [taoensso.sente.interfaces :as interfaces]
     [taoensso.sente.server-adapters.http-kit :refer (get-sch-adapter)]
-    [taoensso.timbre :as log]))
+    [taoensso.timbre :as log])
+  (:gen-class))
 
 
 (set! *warn-on-reflection* false)
@@ -207,30 +212,30 @@
   ; TODO check if chat commands are allowed
   (let [[_all engine-version] (re-find #"\w+ (.+)" (:text message))
         engine-version (string/trim engine-version)]
-    (fx.event.battle/engine-changed state-atom {
-                                                :battle-id :direct
-                                                :engine-version engine-version
-                                                :server-key server-key})))
+    (event.battle/engine-changed state-atom {
+                                             :battle-id :direct
+                                             :engine-version engine-version
+                                             :server-key server-key})))
 
 (defmethod chat-msg-handler "!map"
   [state-atom server-key message]
   (log/info "Request to set map" message)
   (let [[_all map-name] (re-find #"\w+ (.+)" (:text message))
         map-name (string/trim map-name)]
-    (fx.event.battle/map-changed state-atom {
-                                             :battle-id :direct
-                                             :map-name map-name
-                                             :server-key server-key})))
+    (event.battle/map-changed state-atom {
+                                          :battle-id :direct
+                                          :map-name map-name
+                                          :server-key server-key})))
 
 (defmethod chat-msg-handler "!mod"
   [state-atom server-key message]
   (log/info "Request to set mod" message)
   (let [[_all mod-name] (re-find #"\w+ (.+)" (:text message))
         mod-name (string/trim mod-name)]
-    (fx.event.battle/mod-changed state-atom {
-                                             :battle-id :direct
-                                             :mod-name mod-name
-                                             :server-key server-key})))
+    (event.battle/mod-changed state-atom {
+                                          :battle-id :direct
+                                          :mod-name mod-name
+                                          :server-key server-key})))
 
 (defmethod chat-msg-handler "!bset"
   [state-atom server-key message]
@@ -380,3 +385,67 @@
               (log/warn "No broadcast-fn to send close message"))
             (server))))
       (log/warn "Direct connect server port unavailable" port))))
+
+
+(defn host-direct-connect
+  [state-atom
+   {:keys [direct-connect-password direct-connect-port direct-connect-username spectate]}]
+  (let [direct-connect-port (or direct-connect-port u/default-server-port)
+        server-key {:server-type :direct
+                    :protocol :skylobby
+                    :host true
+                    :hostname "localhost"
+                    :port direct-connect-port
+                    :username direct-connect-username}
+        server-close-fn (start-direct-connect state-atom server-key {:direct-connect-port direct-connect-port})
+        {:keys [by-spring-root spring-isolation-dir]} @state-atom
+        {:keys [engine-version map-name mod-name]} (get by-spring-root (fs/canonical-path spring-isolation-dir))
+        server-data {:battle {:battle-id :direct
+                              :scripttags {"game" {"startpostype" 1}}
+                              :users {direct-connect-username
+                                      {:battle-status
+                                       {:ally 0
+                                        :id 0
+                                        :mode (not spectate)
+                                        :ready true
+                                        :side 0}
+                                       :team-color (u/random-color)}}}
+                     :battles {:direct
+                               {:host-username direct-connect-username
+                                :battle-map map-name
+                                :battle-modname mod-name
+                                :battle-version engine-version}}
+                     :password direct-connect-password
+                     :server-close-fn server-close-fn
+                     :username direct-connect-username}]
+    (if server-close-fn
+      (swap! state-atom
+        (fn [state]
+          (-> state
+              (update-in [:by-server server-key] merge server-data)
+              (assoc :selected-server-tab (str server-key)))))
+      (do
+        (log/warn "")
+        (swap! state-atom update :by-server dissoc server-key)))))
+
+
+(def cli-options
+  [[nil "--port PORT" "Port to use for direct connect server / client"]
+   [nil "--password PASSWORD" "Password to use for direct connect server / client"]
+   [nil "--username USERNAME" "Username to use for direct connect server / client"]
+   [nil "--protocol PROTOCOL" "Protocol to use for direct connect server (http or https)"]
+   [nil "--cert CERT_FILE" "Cert file to use for direct connect server https"]])
+
+
+(defn -main [& args]
+  (let [{:keys [errors options]} (cli/parse-opts args cli-options :in-order true)]
+    (cond
+      errors
+      (apply cu/print-and-exit -1
+        "Error parsing arguments:\n"
+        errors)
+      :else
+      (do
+        (log/info "Starting headless direct connect server")
+        (skylobby.core/init skylobby.core/*state)
+        (host-direct-connect skylobby.core/*state (assoc options :spectate true))))))

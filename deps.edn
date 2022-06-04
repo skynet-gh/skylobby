@@ -166,7 +166,9 @@
                                    :git/sha "ba1a2bf"}}
    :ns-default build}
   :graal-deps
-  {:replace-deps
+  {
+   :extra-paths ["graal/clj" "graal/cljc"]
+   :replace-deps
    {
     aleph/aleph {:git/url "https://github.com/skynet-gh/aleph.git"
                  :git/sha "7cb0385e9c0615c1819256a96bde5b9fe1f1f4cc"}

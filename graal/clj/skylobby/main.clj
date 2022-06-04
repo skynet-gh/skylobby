@@ -5,6 +5,7 @@
     skylobby.core
     [skylobby.cli :as cli-demo]
     [skylobby.cli.util :as cu]
+    [skylobby.direct :as direct]
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
@@ -34,6 +35,7 @@
         ""
         "Actions:"
         "  cli       Demo CLI interface"
+        "  direct    Direct connect server"
         "  <none>    Start client service with web UI"
         ""]
        (string/join \newline)))
@@ -77,6 +79,8 @@
       (cu/print-and-exit 0 (str u/app-name " " version))
       (= "cli" command)
       (apply cli-demo/-main (rest arguments))
+      (= "direct" (first arguments))
+      (apply direct/-main (rest arguments))
       (seq arguments)
       (cu/print-and-exit -1 "Unknown action: " (pr-str arguments))
       :else

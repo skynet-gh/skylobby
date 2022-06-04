@@ -8,10 +8,10 @@
     [clojure.java.io :as io]
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
+    [skylobby.direct :as direct]
     [skylobby.fs :as fs]
     [skylobby.fs.sdfz :as sdfz]
     skylobby.fx
-    [skylobby.fx.event.direct :as fx.event.direct]
     [skylobby.fx.replay :as fx.replay]
     [skylobby.fx.root :as fx.root]
     [skylobby.git :as git]
@@ -35,9 +35,6 @@
                 (update m k conj v))]
    [nil "--css-file CSS_FILE" "Use the given file for CSS style"]
    [nil "--css-preset CSS_PRESET_NAME" "Use the given CSS preset"]
-   [nil "--direct-connect-port PORT" "Port to use for direct connect server / client"]
-   [nil "--direct-connect-password PASSWORD" "Password to use for direct connect server / client"]
-   [nil "--direct-connect-username USERNAME" "Username to use for direct connect server / client"]
    [nil "--filter-battles FILTER_BATTLES" "Set the initial battles filter string"]
    [nil "--filter-users FILTER_USERS" "Set the initial users filter string"]
    [nil "--music-dir MUSIC_DIR" "Set the music-dir config to the given directory"]
@@ -93,7 +90,7 @@
 
 
 (defn -ui-main [& args]
-  (let [{:keys [arguments errors options]} (cli/parse-opts args cli-options)]
+  (let [{:keys [arguments errors options]} (cli/parse-opts args cli-options :in-order true)]
     (if errors
       (do
         (println "Error parsing arguments:\n\n"
@@ -229,10 +226,7 @@
                 (spring-lobby/browse-url (str "http://localhost:" (or (:port options)
                                                                       u/default-ipc-port))))
               (= "direct" (first arguments))
-              (do
-                (log/info "Starting headless direct connect server")
-                (spring-lobby/init spring-lobby/*state)
-                (fx.event.direct/host-direct-connect spring-lobby/*state (assoc options :spectate true)))
+              (apply direct/-main (rest arguments))
               :else
               (do
                 (log/info "Creating renderer")
