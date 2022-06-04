@@ -1025,10 +1025,15 @@
             valid-next-round (remove
                               (comp invalid-replay-paths fs/canonical-path second)
                               todo)]
-        (if (seq valid-next-round)
+        (cond
+          (= (set todo)
+             (set valid-next-round))
+          (log/warn "Infinite loop detected, aborting replay refresh")
+          (seq valid-next-round)
           (task/add-task! state-atom
                           {:spring-lobby/task-type :spring-lobby/refresh-replays
                            :todo (count todo)})
+          :else
           (do
             (log/info "No valid replays left to parse")
             (fs/spit-app-edn

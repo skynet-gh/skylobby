@@ -492,7 +492,8 @@
                        :direct-connect-chat-commands true
                        :disable-tasks false
                        :disable-tasks-while-in-game false
-                       :ipc-server-enabled false})]
+                       :ipc-server-enabled false
+                       :refresh-replays-after-game false})]
           (reset! skylobby.core/*state state))
         (skylobby.core/init skylobby.core/*state)
         (if (host-direct-connect skylobby.core/*state (assoc options :spectate true))
