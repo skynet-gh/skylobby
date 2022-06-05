@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.37](https://github.com/skynet-gh/skylobby/releases/tag/0.8.37) - 2022-06-05
+
+- Fix `host` and `teamleader` in start script
+- Fix boss and spec context menu dm instead of battle chat
+- Fix kick in players grouped view
+
 ## [0.8.36](https://github.com/skynet-gh/skylobby/releases/tag/0.8.36) - 2022-06-05
 
 - Add battle split boxes buttons, and chat commands for direct hosting

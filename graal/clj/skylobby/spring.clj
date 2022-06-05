@@ -219,7 +219,13 @@
                         (if (= "1" startpostype)
                           (shuffle team-ids)
                           team-ids))
-         actual-team-id (fn [id] (get shuffled-ids id id))]
+         actual-team-id (fn [id] (get shuffled-ids id id))
+         username-to-player-id (->> battle
+                                    :users
+                                    (map-indexed
+                                      (fn [i [player]]
+                                        [player i]))
+                                    (into {}))]
      (u/deep-merge
        (when (= "3" startpostype)
          default-map-teams)
@@ -278,11 +284,11 @@
                     "countrycode" (:country user)}]))
               (:users battle))
             (map
-              (fn [[_player {:keys [battle-status team-color owner]}]]
-                (let [team-id (-> battle-status :id actual-team-id)
-                      team-leader (if owner
-                                    (-> battle :users (get owner) :battle-status :id actual-team-id)
-                                    team-id)
+              (fn [[player {:keys [battle-status team-color owner]}]]
+                (let [
+                      team-id (-> battle-status :id actual-team-id)
+                      team-leader (get username-to-player-id
+                                    (if owner owner player))
                       side (:side battle-status)]
                     [(team-name team-id)
                      {"teamleader" team-leader
@@ -293,13 +299,12 @@
               teams)
             (map-indexed
               (fn [i [bot-name {:keys [ai-name ai-version battle-status owner]}]]
-                (let [team (-> battle-status :id actual-team-id)
-                      host (-> battle :users (get owner) :battle-status :id actual-team-id)]
+                (let [team (-> battle-status :id actual-team-id)]
                   [(str "ai" i)
                    {"name" bot-name
                     "shortname" ai-name
                     "version" ai-version
-                    "host" host
+                    "host" (get username-to-player-id owner)
                     "isfromdemo" 0  ; TODO replays
                     "team" team
                     "options" (get-in bots-scripttags [bot-name "options"] {})}]))
@@ -535,7 +540,7 @@
                         (recur))
                       (log/info "Spring stderr stream closed")))))
               (try
-                (wait-for-spring process state-atom spring-log-state {:infolog-des infolog-dest})
+                (wait-for-spring process state-atom spring-log-state {:infolog-dest infolog-dest})
                 (try
                   (post-game-fn)
                   (catch Exception e
