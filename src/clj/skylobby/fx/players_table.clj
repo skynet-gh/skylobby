@@ -596,7 +596,12 @@
                                                 ; else
                                                 nil))
                                             Color/WHITE)
-                        text-color-css (-> text-color-javafx str u/hex-color-to-css)]
+                        text-color-css (-> text-color-javafx str u/hex-color-to-css)
+                        can-kick (and (not read-only)
+                                      username
+                                      (not= username (:username id))
+                                      (or am-host
+                                          (= owner username)))]
                     {:text ""
                      :tooltip
                      {:fx/type tooltip-nofocus/lifecycle
@@ -623,13 +628,14 @@
                       :alignment :center
                       :children
                       (concat
-                        (when (and (not read-only)
-                                   username
-                                   (not= username (:username id))
-                                   (or am-host
-                                       (= owner username)))
+                        (when can-kick
                           [
                            {:fx/type :button
+                            :tooltip
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :style {:-fx-font-size 16}
+                             :show-delay skylobby.fx/tooltip-show-delay
+                             :text "Kick"}
                             :on-action
                             (merge
                               {:event/type :skylobby.fx.event.battle/kick
@@ -639,8 +645,14 @@
                               (select-keys id [:bot-name :username]))
                             :graphic
                             {:fx/type font-icon/lifecycle
-                             :icon-literal "mdi-account-remove:16:white"}}
-                           {:fx/type :button
+                             :icon-literal "mdi-account-remove:16:white"}}])
+                        (when (and can-kick bot-name)
+                          [{:fx/type :button
+                            :tooltip
+                            {:fx/type tooltip-nofocus/lifecycle
+                             :style {:-fx-font-size 16}
+                             :show-delay skylobby.fx/tooltip-show-delay
+                             :text "AI Settings"}
                             :on-action
                             {:event/type :spring-lobby/show-ai-options-window
                              :bot-name ai-name
@@ -1083,7 +1095,12 @@
                      (let [text-color-javafx (or
                                                (-> player :team-color fx.color/spring-color-to-javafx)
                                                Color/WHITE)
-                           text-color-css (-> text-color-javafx str u/hex-color-to-css)]
+                           text-color-css (-> text-color-javafx str u/hex-color-to-css)
+                           can-kick (and (not read-only)
+                                         username
+                                         (not= username (:username player))
+                                         (or am-host
+                                             (= (:owner player) username)))]
                        {:fx/type ext-with-context-menu
                         :props {:context-menu
                                 {:fx/type player-context-menu
@@ -1098,13 +1115,14 @@
                          :alignment :center-left
                          :children
                          (concat
-                           (when (and (not read-only)
-                                      username
-                                      (not= username (:username player))
-                                      (or am-host
-                                          (= (:owner player) username)))
+                           (when can-kick
                              [
                               {:fx/type :button
+                               :tooltip
+                               {:fx/type tooltip-nofocus/lifecycle
+                                :style {:-fx-font-size 16}
+                                :show-delay skylobby.fx/tooltip-show-delay
+                                :text "Kick"}
                                :on-action
                                (merge
                                  {:event/type :spring-lobby/kick-battle
@@ -1114,8 +1132,14 @@
                                  (select-keys player [:bot-name :username]))
                                :graphic
                                {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-account-remove:16:white"}}
-                              {:fx/type :button
+                                :icon-literal "mdi-account-remove:16:white"}}])
+                           (when (and can-kick (:bot-name player))
+                             [{:fx/type :button
+                               :tooltip
+                               {:fx/type tooltip-nofocus/lifecycle
+                                :style {:-fx-font-size 16}
+                                :show-delay skylobby.fx/tooltip-show-delay
+                                :text "AI Settings"}
                                :on-action
                                {:event/type :spring-lobby/show-ai-options-window
                                 :bot-name (:ai-name player)
