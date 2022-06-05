@@ -237,7 +237,8 @@
            (fn [{:keys [text desc n]}]
              {:fx/type :button
               :text (str text)
-              :tooltip {:fx/type :tooltip
+              :tooltip {:fx/type tooltip-nofocus/lifecycle
+                        :show-delay skylobby.fx/tooltip-show-delay
                         :text (str desc)}
               :on-action {:event/type :skylobby.fx.event.chat/send
                           :channel-name channel-name
@@ -474,7 +475,8 @@
                                             :props (when (= (fx/sub-val context :show-add-bot)
                                                             server-key)
                                                      {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
-                                            :desc {:fx/type :tooltip
+                                            :desc {:fx/type tooltip-nofocus/lifecycle
+                                                   :show-delay skylobby.fx/tooltip-show-delay
                                                    :anchor-location :window-bottom-left
                                                    :auto-hide true
                                                    :auto-fix true
@@ -1032,7 +1034,8 @@
                       :am-host am-host
                       :channel-name channel-name
                       :client-data client-data
-                      :singleplayer singleplayer})}]
+                      :singleplayer singleplayer
+                      :server-key server-key})}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
@@ -1041,18 +1044,66 @@
                                  :client-data client-data
                                  :server-key server-key}}])
                  (when (= "Choose in game" startpostype)
-                   [{:fx/type :button
-                     :text "Clear boxes"
-                     :disable (and (not singleplayer) am-spec)
-                     :on-action {:event/type :spring-lobby/clear-start-boxes
-                                 :allyteam-ids (->> (get scripttags "game")
-                                                    (filter (comp #(string/starts-with? % "allyteam") name first))
-                                                    (map
-                                                      (fn [[teamid _team]]
-                                                        (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
-                                                          id))))
-                                 :client-data client-data
-                                 :server-key server-key}}]))}]
+                   (let [percent (int (or (u/to-number (fx/sub-val context :split-percent))
+                                          20))]
+                     [
+                      {:fx/type :button
+                       :text "Clear boxes"
+                       :disable (and (not singleplayer) am-spec)
+                       :on-action {:event/type :spring-lobby/clear-start-boxes
+                                   :allyteam-ids (->> (get scripttags "game")
+                                                      (filter (comp #(string/starts-with? % "allyteam") name first))
+                                                      (map
+                                                        (fn [[teamid _team]]
+                                                          (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
+                                                            id))))
+                                   :client-data client-data
+                                   :server-key server-key}}
+                      {:fx/type :flow-pane
+                       :children
+                       (concat
+                         [
+                          {:fx/type :label
+                           :text " Split: "}]
+                         (mapv
+                           (fn [{:keys [split-type tooltip]}]
+                             {:fx/type :button
+                              :text (str " " (string/upper-case split-type) " ")
+                              :on-action {:event/type :skylobby.fx.event.battle/split-boxes
+                                          :am-host am-host
+                                          :channel-name channel-name
+                                          :client-data client-data
+                                          :split-type split-type
+                                          :split-percent percent
+                                          :server-key server-key}
+                              :tooltip
+                              {:fx/type tooltip-nofocus/lifecycle
+                               :style {:-fx-font-size 16}
+                               :show-delay skylobby.fx/tooltip-show-delay
+                               :text (str tooltip)}})
+                           [{:split-type "v"
+                             :tooltip "Vertical"}
+                            {:split-type "h"
+                             :tooltip "Horizontal"}
+                            {:split-type "c"
+                             :tooltip "All Corners"}
+                            {:split-type "c1"
+                             :tooltip "NW and SE Corners"}
+                            {:split-type "c2"
+                             :tooltip "SW and NE Corners"}])
+                         [{:fx/type :label
+                           :text " %: "}
+                          {:fx/type :text-field
+                           :pref-width 50
+                           :tooltip
+                           {:fx/type tooltip-nofocus/lifecycle
+                            :show-delay skylobby.fx/tooltip-show-delay
+                            :text "Percent to split by"}
+                           :text-formatter
+                           {:fx/type :text-formatter
+                            :value-converter :integer
+                            :value percent
+                            :on-value-changed {:event/type :spring-lobby/battle-split-percent-change}}}])}])))}]
              (when (and (not am-host)
                         (-> users (get host-username) :client-status :bot))
                [{:fx/type :button

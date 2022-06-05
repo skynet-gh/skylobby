@@ -2947,7 +2947,7 @@
         (message/send *state client-data (str "SETSCRIPTTAGS game/startpostype=" startpostype)))
       (event-handler
         (assoc e
-               :event/type ::send-message
+               :event/type :skylobby.fx.event.chat/send
                :no-clear-draft true
                :message (str "!bSet startpostype " startpostype))))))
 
@@ -3148,6 +3148,14 @@
           (log/debug "No change for handicap")))
       (catch Exception e
         (log/error e "Error updating battle handicap")))))
+
+(defmethod event-handler ::battle-split-percent-change
+  [{:fx/keys [event]}]
+  (let [percent (max 1
+                  (min 50
+                    event))]
+    (swap! *state assoc :split-percent percent)))
+
 
 (defmethod event-handler ::battle-color-action
   [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]

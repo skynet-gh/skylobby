@@ -264,7 +264,10 @@
   [state-atom server-key message]
   (log/info "Battle setting" message)
   (let [[_all k v] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
-        state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" "modoptions" k] v) ; TODO map options, validate
+        path (if (#{"startpostype"} k) ; TODO map options, validate
+               [:by-server server-key :battle :scripttags "game" k]
+               [:by-server server-key :battle :scripttags "game" "modoptions" k])
+        state (swap! state-atom assoc-in path v)
         {:keys [by-server]} state
         {:keys [battle server]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
@@ -309,6 +312,15 @@
               :engine-version :map-name :mod-name)))
         (catch Exception e
           (log/error e "Error starting game"))))))
+
+(defmethod chat-msg-handler "!split"
+  [state-atom server-key message]
+  (log/info "Request to split boxes" message)
+  (let [[_all split-type percent-str] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
+        percent (int (u/to-number percent-str))]
+    (event.battle/split-boxes state-atom {:server-key server-key
+                                          :split-percent percent
+                                          :split-type split-type})))
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243

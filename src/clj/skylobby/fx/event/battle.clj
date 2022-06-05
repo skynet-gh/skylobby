@@ -218,4 +218,17 @@
             (assoc e
                    :event/type :skylobby.fx.event.chat/send
                    :no-clear-draft true
-                   :message (str "!bSet " modoption-key-str " " value))))))))
+                   :message (str "!bSet " modoption-key-str " " value)))))))
+  (defmethod multifn ::split-boxes
+    [{:keys [am-host split-percent split-type server-key] :as e}]
+    (let [
+          server-type (u/server-type server-key)]
+      (if (#{:singleplayer :direct-host} server-type)
+        (event.battle/split-boxes state-atom e)
+        (if am-host
+          (throw (ex-info "TODO implement split for host" {:server-key server-key}))
+          (multifn
+            (assoc e
+                   :event/type :skylobby.fx.event.chat/send
+                   :no-clear-draft true
+                   :message (str "!split " split-type " " split-percent))))))))
