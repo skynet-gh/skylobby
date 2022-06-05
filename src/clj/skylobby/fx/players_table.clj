@@ -1138,7 +1138,7 @@
                                 :text "Kick"}
                                :on-action
                                (merge
-                                 {:event/type :spring-lobby/kick-battle
+                                 {:event/type :skylobby.fx.event.battle/kick
                                   :client-data client-data
                                   :singleplayer singleplayer
                                   :server-key server-key}
