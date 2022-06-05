@@ -94,9 +94,7 @@
             (broadcast-fn [::battle-bots (:bots battle)]))
           (log/warn "No broadcast-fn found for server" server-key))))))
 
-(defmethod -event-msg-handler
-  :skylobby.direct.client/close
-  [state-atom server-key {:keys [send-fn uid]}]
+(defn handle-close [state-atom server-key {:keys [send-fn uid]}]
   (let [[old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key]
                                           (fn [server-data]
                                             (if-let [username (get-in server-data [:client-username uid])]
@@ -107,9 +105,22 @@
         {:keys [broadcast-fn]} server
         username (get-in old-state [:by-server server-key :client-username uid])]
     (if username
-      (send-fn uid [::close {:reason "completed"}])
+      (do
+        (log/info "Handling close for user" username)
+        (when send-fn
+          (send-fn uid [::close {:reason "completed"}])))
       (log/warn "No client-id found for client" uid))
     (broadcast-fn [::battle-users (:users battle)])))
+
+(defmethod -event-msg-handler
+  :skylobby.direct.client/close
+  [state-atom server-key message-data]
+  (handle-close state-atom server-key message-data))
+
+(defmethod -event-msg-handler
+  :chsk/uidport-close
+  [state-atom server-key message-data]
+  (handle-close state-atom server-key message-data))
 
 
 (defmethod -event-msg-handler
