@@ -1058,8 +1058,9 @@
                [{:fx/type :button
                  :text "List Maps"
                  :on-action {:event/type :skylobby.fx.event.chat/send
-                             :channel-name channel-name
+                             :channel-name (u/user-channel-name host-username)
                              :client-data client-data
+                             :focus true
                              :message "!listmaps"
                              :server-key server-key}}]))}]}}}
       {:fx/type :tab
