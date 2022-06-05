@@ -6,6 +6,7 @@
 - Add fuzzy string matching for direct connect resources
 - Add direct connect hosting into native binary
 - Rename players table Team to ID
+- Fix jar build paths
 
 ## [0.8.34](https://github.com/skynet-gh/skylobby/releases/tag/0.8.34) - 2022-05-30
 

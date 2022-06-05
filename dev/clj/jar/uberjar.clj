@@ -9,7 +9,7 @@
 
 (def lib 'skylobby/skylobby)
 (def version (git/tag-or-latest-id (io/file ".")))
-(def src-dirs ["src/clj" "graal/clj" "resources"])
+(def src-dirs ["src/clj" "graal/clj" "graal/cljc" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"
                             :aliases [:headless]}))
