@@ -26,8 +26,7 @@
     :keys [engine-version flow on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
   (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
-        engine-filter (fx/sub-val context :engine-filter)
-        {:keys [engines engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        {:keys [engines]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
@@ -77,12 +76,8 @@
                      known-engine-versions))
                 [{:fx/type :label
                   :text " No engines "}])
-              (let [filter-lc (if engine-filter (string/lower-case engine-filter) "")
-                    filtered-engines (->> engines-by-version
-                                          keys
-                                          (filter some?)
-                                          (filter #(string/includes? (string/lower-case %) filter-lc))
-                                          sort)]
+              (let [
+                    filtered-engines (fx/sub-ctx context sub/filtered-engines spring-isolation-dir)]
                 [{:fx/type ext-recreate-on-key-changed
                   :key (str engine-version)
                   :desc

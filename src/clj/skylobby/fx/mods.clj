@@ -34,13 +34,9 @@
   [{:fx/keys [context]
     :keys [engine-file flow mod-name on-value-changed spring-isolation-dir suggest]
     :or {flow true}}]
-  (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
-        http-download (fx/sub-val context :http-download)
-        rapid-download (fx/sub-val context :rapid-download)
-        {:keys [mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
-        http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
-        rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
-        games (fx/sub-ctx context sub/games spring-isolation-dir)
+  (let [
+        {:keys [mods mods-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        games (filterv :is-game mods)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
@@ -59,8 +55,12 @@
            (if suggest
              [{:fx/type :flow-pane
                :children
-               (let [downloadables (vals downloadables-by-url)]
-                 (map
+               (let [downloadables (vals (fx/sub-val context :downloadables-by-url))
+                     http-download (fx/sub-val context :http-download)
+                     rapid-download (fx/sub-val context :rapid-download)
+                     http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
+                     rapid-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)]
+                 (mapv
                    (fn [{:keys [mod-name source version]}]
                      (let [downloadable (case source
                                           :rapid (:id (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-id version]))

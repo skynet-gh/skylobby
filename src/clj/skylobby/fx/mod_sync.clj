@@ -42,10 +42,8 @@
   [{:fx/keys [context]
     :keys [dependency engine-version index-only mod-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
-        downloadables-by-url (fx/sub-val context :downloadables-by-url)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
-        importables-by-path (fx/sub-val context :importables-by-path)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
         use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
@@ -119,7 +117,9 @@
            :text "mismatch"
            :human-text (str "Cannot match version, using " (:mod-name indexed-mod))}])
        (when (and no-mod-details (not indexed-mod))
-         (let [downloadable (->> downloadables-by-url
+         (let [
+               downloadables-by-url (fx/sub-val context :downloadables-by-url)
+               downloadable (->> downloadables-by-url
                                  vals
                                  (filter (comp #{:spring-lobby/mod} :resource-type))
                                  (filter (partial resource/could-be-this-mod? mod-name))
@@ -288,7 +288,9 @@
                                 :mod-name mod-name
                                 :spring-isolation-dir spring-isolation-dir}})})
                    [rapid-id mod-name])))
-             (let [importable (some->> importables-by-path
+             (let [
+                   importables-by-path (fx/sub-val context :importables-by-path)
+                   importable (some->> importables-by-path
                                        vals
                                        (filter (comp #{:spring-lobby/mod} :resource-type))
                                        (filter (partial resource/could-be-this-mod? mod-name))

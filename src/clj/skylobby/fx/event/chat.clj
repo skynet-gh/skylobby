@@ -30,7 +30,7 @@
 
 (defn add-methods
   [multifn state-atom] ; TODO need to move event handler out of spring-lobby ns
-  (defmethod multifn ::send [{:keys [channel-name message no-clear-draft no-history server-key] :as e}]
+  (defmethod multifn ::send [{:keys [channel-name focus message no-clear-draft no-history server-key] :as e}]
     (let [
           {:keys [by-server]} (swap! state-atom
                                 (fn [state]
@@ -42,7 +42,11 @@
                                                       (not no-history)
                                                       (assoc-in [:channels channel-name :history-index] default-history-index))))
                                           (not no-clear-draft)
-                                          (update-in [:message-drafts server-key] dissoc channel-name))))
+                                          (update-in [:message-drafts server-key] dissoc channel-name)
+                                          focus
+                                          (assoc-in [:selected-tab-main server-key] "chat")
+                                          focus
+                                          (assoc-in [:selected-tab-channel server-key] channel-name))))
           {:keys [client-data client server] :as server-data} (get by-server server-key)
           server-type (u/server-type server-key)
           now (u/curr-millis)

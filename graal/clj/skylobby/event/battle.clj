@@ -188,3 +188,67 @@
       (if-let [broadcast-fn (:broadcast-fn server)]
         (broadcast-fn [:skylobby.direct/battle-details {:battle-modname direct-connect-mod}])
         (log/warn "No broadcast-fn found for server" server)))))
+
+
+(defn split-boxes [state-atom {:keys [split-percent split-type server-key]}]
+  (let [server-type (u/server-type server-key)
+        low (with-precision 9 (/ split-percent 100))
+        high (- 1.0 low)
+        nw {:startrectleft 0
+            :startrecttop 0
+            :startrectright low
+            :startrectbottom low}
+        sw {:startrectleft 0
+            :startrecttop high
+            :startrectright low
+            :startrectbottom 1}
+        ne {:startrectleft high
+            :startrecttop 0
+            :startrectright 1
+            :startrectbottom low}
+        se {:startrectleft high
+            :startrecttop high
+            :startrectright 1
+            :startrectbottom 1}
+        allyteams (case split-type
+                    "v"
+                    {"allyteam0" {:startrectleft 0
+                                  :startrecttop 0
+                                  :startrectright low
+                                  :startrectbottom 1}
+                     "allyteam1" {:startrectleft high
+                                  :startrecttop 0
+                                  :startrectright 1
+                                  :startrectbottom 1}}
+                    "h"
+                    {"allyteam0" {:startrectleft 0
+                                  :startrecttop 0
+                                  :startrectright 1
+                                  :startrectbottom low}
+                     "allyteam1" {:startrectleft 0
+                                  :startrecttop high
+                                  :startrectright 1
+                                  :startrectbottom 1}}
+                    "c"
+                    {"allyteam0" nw
+                     "allyteam1" se
+                     "allyteam2" sw
+                     "allyteam3" ne}
+                    "c1"
+                    {"allyteam0" nw
+                     "allyteam1" se}
+                    "c2"
+                    {"allyteam0" sw
+                     "allyteam1" ne})
+        state (swap! state-atom update-in [:by-server server-key :battle :scripttags "game"]
+                (fn [game]
+                  (->> game
+                       (remove (fn [[k _]]
+                                 (string/starts-with? (name k) "allyteam")))
+                       (into {})
+                       (merge allyteams))))]
+    (when (#{:direct-host} server-type)
+      (if-let [broadcast-fn (get-in state [:by-server server-key :server :broadcast-fn])]
+        (let [scripttags (get-in state [:by-server server-key :battle :scripttags])]
+          (broadcast-fn [:skylobby.direct/battle-scripttags scripttags]))
+        (log/warn "No broadcast-fn" server-key)))))

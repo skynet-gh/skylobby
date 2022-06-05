@@ -237,7 +237,8 @@
            (fn [{:keys [text desc n]}]
              {:fx/type :button
               :text (str text)
-              :tooltip {:fx/type :tooltip
+              :tooltip {:fx/type tooltip-nofocus/lifecycle
+                        :show-delay skylobby.fx/tooltip-show-delay
                         :text (str desc)}
               :on-action {:event/type :skylobby.fx.event.chat/send
                           :channel-name channel-name
@@ -474,7 +475,8 @@
                                             :props (when (= (fx/sub-val context :show-add-bot)
                                                             server-key)
                                                      {:shown-on {:fx/type fx/ext-get-ref :ref ::add-bot-button}})
-                                            :desc {:fx/type :tooltip
+                                            :desc {:fx/type tooltip-nofocus/lifecycle
+                                                   :show-delay skylobby.fx/tooltip-show-delay
                                                    :anchor-location :window-bottom-left
                                                    :auto-hide true
                                                    :auto-fix true
@@ -1032,7 +1034,8 @@
                       :am-host am-host
                       :channel-name channel-name
                       :client-data client-data
-                      :singleplayer singleplayer})}]
+                      :singleplayer singleplayer
+                      :server-key server-key})}]
                  (when (= "Choose before game" startpostype)
                    [{:fx/type :button
                      :text "Reset"
@@ -1041,25 +1044,74 @@
                                  :client-data client-data
                                  :server-key server-key}}])
                  (when (= "Choose in game" startpostype)
-                   [{:fx/type :button
-                     :text "Clear boxes"
-                     :disable (and (not singleplayer) am-spec)
-                     :on-action {:event/type :spring-lobby/clear-start-boxes
-                                 :allyteam-ids (->> (get scripttags "game")
-                                                    (filter (comp #(string/starts-with? % "allyteam") name first))
-                                                    (map
-                                                      (fn [[teamid _team]]
-                                                        (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
-                                                          id))))
-                                 :client-data client-data
-                                 :server-key server-key}}]))}]
+                   (let [percent (int (or (u/to-number (fx/sub-val context :split-percent))
+                                          20))]
+                     [
+                      {:fx/type :button
+                       :text "Clear boxes"
+                       :disable (and (not singleplayer) am-spec)
+                       :on-action {:event/type :spring-lobby/clear-start-boxes
+                                   :allyteam-ids (->> (get scripttags "game")
+                                                      (filter (comp #(string/starts-with? % "allyteam") name first))
+                                                      (map
+                                                        (fn [[teamid _team]]
+                                                          (let [[_all id] (re-find #"allyteam(\d+)" (name teamid))]
+                                                            id))))
+                                   :client-data client-data
+                                   :server-key server-key}}
+                      {:fx/type :flow-pane
+                       :children
+                       (concat
+                         [
+                          {:fx/type :label
+                           :text " Split: "}]
+                         (mapv
+                           (fn [{:keys [split-type tooltip]}]
+                             {:fx/type :button
+                              :text (str " " (string/upper-case split-type) " ")
+                              :on-action {:event/type :skylobby.fx.event.battle/split-boxes
+                                          :am-host am-host
+                                          :channel-name channel-name
+                                          :client-data client-data
+                                          :split-type split-type
+                                          :split-percent percent
+                                          :server-key server-key}
+                              :tooltip
+                              {:fx/type tooltip-nofocus/lifecycle
+                               :style {:-fx-font-size 16}
+                               :show-delay skylobby.fx/tooltip-show-delay
+                               :text (str tooltip)}})
+                           [{:split-type "v"
+                             :tooltip "Vertical"}
+                            {:split-type "h"
+                             :tooltip "Horizontal"}
+                            {:split-type "c"
+                             :tooltip "All Corners"}
+                            {:split-type "c1"
+                             :tooltip "NW and SE Corners"}
+                            {:split-type "c2"
+                             :tooltip "SW and NE Corners"}])
+                         [{:fx/type :label
+                           :text " %: "}
+                          {:fx/type :text-field
+                           :pref-width 50
+                           :tooltip
+                           {:fx/type tooltip-nofocus/lifecycle
+                            :show-delay skylobby.fx/tooltip-show-delay
+                            :text "Percent to split by"}
+                           :text-formatter
+                           {:fx/type :text-formatter
+                            :value-converter :integer
+                            :value percent
+                            :on-value-changed {:event/type :spring-lobby/battle-split-percent-change}}}])}])))}]
              (when (and (not am-host)
                         (-> users (get host-username) :client-status :bot))
                [{:fx/type :button
                  :text "List Maps"
                  :on-action {:event/type :skylobby.fx.event.chat/send
-                             :channel-name channel-name
+                             :channel-name (u/user-channel-name host-username)
                              :client-data client-data
+                             :focus true
                              :message "!listmaps"
                              :server-key server-key}}]))}]}}}
       {:fx/type :tab
@@ -1454,6 +1506,147 @@
       (battle-votes-impl state))))
 
 
+(defn battle-resources
+  [{
+    :fx/keys [context]
+    :keys [battle-id server-key]}]
+  (let [
+        server-type (u/server-type server-key)
+        singleplayer (= :local server-key)
+        direct-connect-server (= :direct-host server-type)
+
+        engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
+
+        server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
+        spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
+        {:keys [engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-root)
+        engine-details (get engines-by-version engine-version)
+        engine-file (:file engine-details)
+
+        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
+
+        resources-buttons {:fx/type :h-box
+                           :style {:-fx-font-size 16}
+                           :alignment :center-left
+                           :children
+                           [
+                            {:fx/type :label
+                             :text " Resources: "}
+                            {:fx/type :button
+                             :text "Import"
+                             :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                                         :key :show-importer}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal (str "mdi-file-import:16:white")}}
+                            {:fx/type :button
+                             :text "HTTP"
+                             :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                                         :key :show-downloader}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal (str "mdi-download:16:white")}}
+                            {:fx/type :button
+                             :text "Rapid"
+                             :on-action {:event/type :spring-lobby/toggle-window
+                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
+                                         :key :show-rapid-downloader}
+                             :graphic
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal (str "mdi-download:16:white")}}]}]
+    (if (or singleplayer
+            direct-connect-server)
+      {:fx/type :v-box
+       :style (if singleplayer
+                {:-fx-font-size 20}
+                {:-fx-font-size 18
+                 :-fx-pref-width 800})
+       :children
+       (concat
+         [
+          {:fx/type engines-view
+           :engine-version engine-version
+           :on-value-changed
+           {:event/type :skylobby.fx.event.battle/engine-changed
+            :battle-id battle-id
+            :server-key server-key
+            :spring-root spring-root}
+           :spring-isolation-dir spring-root}
+          (if (seq engine-details)
+            {:fx/type mods-view
+             :engine-file engine-file
+             :mod-name mod-name
+             :on-value-changed
+             {:event/type :skylobby.fx.event.battle/mod-changed
+              :battle-id battle-id
+              :server-key server-key
+              :spring-root spring-root}
+             :spring-isolation-dir spring-root}
+            {:fx/type :label
+             :text " Game: Get an engine first"})
+          {:fx/type maps-view
+           :map-name map-name
+           :on-value-changed
+           {:event/type :skylobby.fx.event.battle/map-changed
+            :battle-id battle-id
+            :server-key server-key
+            :spring-root spring-root}
+           :spring-isolation-dir spring-root}
+          {:fx/type :pane
+           :style {:-fx-pref-height 8}}
+          resources-buttons]
+         (when (= :direct-host server-type)
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :check-box
+               :selected (boolean (fx/sub-val context :direct-connect-chat-commands))
+               :on-selected-changed {:event/type :spring-lobby/assoc
+                                     :key :direct-connect-chat-commands}}
+              {:fx/type :label
+               :text " Allow chat commands from clients"}]}]))}
+      {:fx/type :scroll-pane
+       :fit-to-width true
+       :hbar-policy :never
+       :content
+       {:fx/type :flow-pane
+        :vgap 5
+        :hgap 5
+        :padding 5
+        :children
+        [
+         {:fx/type engine-sync-pane
+          :engine-version engine-version
+          :spring-isolation-dir spring-root}
+         {:fx/type fx.mod-sync/mod-and-deps-sync-pane
+          :engine-version engine-version
+          :mod-name mod-name
+          :spring-isolation-dir spring-root}
+         {:fx/type map-sync-pane
+          :map-name map-name
+          :spring-isolation-dir spring-root}
+         resources-buttons
+         {:fx/type :h-box
+          :alignment :center-left
+          :children
+          [{:fx/type :check-box
+            :selected (boolean (fx/sub-val context :auto-get-resources))
+            :on-selected-changed {:event/type :spring-lobby/assoc
+                                  :key :auto-get-resources}}
+           {:fx/type :label
+            :text " Auto import or download resources"}]}
+         {:fx/type :h-box
+          :alignment :center-left
+          :children
+          [{:fx/type :label
+            :text "Force sync check: "}
+           {:fx/type sync-button
+            :server-key server-key}]}]}})))
+
+
 (defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [{:keys [battle users]}]
@@ -1476,19 +1669,11 @@
         battle-layout (fx/sub-val context :battle-layout)
         divider-positions (fx/sub-val context :divider-positions)
         pop-out-chat (fx/sub-val context :pop-out-chat)
-        server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
         battle-id (or battle-id
                       (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
         scripttags (or (:scripttags old-battle)
                        (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
-        engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
-        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
-        map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
-        spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
-        {:keys [engines-by-version]} (fx/sub-ctx context sub/spring-resources spring-root)
-        engine-details (get engines-by-version engine-version)
-        engine-file (:file engine-details)
         battle-users (or (:users old-battle)
                          (fx/sub-val context get-in [:by-server server-key :battle :users]))
         battle-bots (or (:bots old-battle)
@@ -1572,155 +1757,11 @@
                :server-key server-key}
               {:fx/type battle-votes
                :server-key server-key}]}))
-        resources-buttons {:fx/type :h-box
-                           :style {:-fx-font-size 16}
-                           :alignment :center-left
-                           :children
-                           [
-                            {:fx/type :label
-                             :text " Resources: "}
-                            {:fx/type :button
-                             :text "Import"
-                             :on-action {:event/type :spring-lobby/toggle-window
-                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                                         :key :show-importer}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal (str "mdi-file-import:16:white")}}
-                            {:fx/type :button
-                             :text "HTTP"
-                             :on-action {:event/type :spring-lobby/toggle-window
-                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                                         :key :show-downloader}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal (str "mdi-download:16:white")}}
-                            {:fx/type :button
-                             :text "Rapid"
-                             :on-action {:event/type :spring-lobby/toggle-window
-                                         :windows-as-tabs (fx/sub-val context :windows-as-tabs)
-                                         :key :show-rapid-downloader}
-                             :graphic
-                             {:fx/type font-icon/lifecycle
-                              :icon-literal (str "mdi-download:16:white")}}]}
         singleplayer (= :local server-key)
-        server-type (u/server-type server-key)
-        direct-connect-server (= :direct-host server-type)
-        resources-pane (if (or singleplayer
-                               direct-connect-server)
-                         {:fx/type :v-box
-                          :style (if singleplayer
-                                   {:-fx-font-size 20}
-                                   {:-fx-font-size 18
-                                    :-fx-pref-width 800})
-                          :children
-                          (concat
-                            [
-                             {:fx/type engines-view
-                              :engine-version engine-version
-                              :on-value-changed
-                              {:event/type :skylobby.fx.event.battle/engine-changed
-                               :battle-id battle-id
-                               :server-key server-key
-                               :spring-root spring-root}
-                              :spring-isolation-dir spring-root}
-                             (if (seq engine-details)
-                               {:fx/type mods-view
-                                :engine-file engine-file
-                                :mod-name mod-name
-                                :on-value-changed
-                                {:event/type :skylobby.fx.event.battle/mod-changed
-                                 :battle-id battle-id
-                                 :server-key server-key
-                                 :spring-root spring-root}
-                                :spring-isolation-dir spring-root}
-                               {:fx/type :label
-                                :text " Game: Get an engine first"})
-                             {:fx/type maps-view
-                              :map-name map-name
-                              :on-value-changed
-                              {:event/type :skylobby.fx.event.battle/map-changed
-                               :battle-id battle-id
-                               :server-key server-key
-                               :spring-root spring-root}
-                              :spring-isolation-dir spring-root}
-                             {:fx/type :pane
-                              :style {:-fx-pref-height 8}}
-                             resources-buttons]
-                            (when (= :direct-host server-type)
-                              [{:fx/type :h-box
-                                :alignment :center-left
-                                :children
-                                [{:fx/type :check-box
-                                  :selected (boolean (fx/sub-val context :direct-connect-chat-commands))
-                                  :on-selected-changed {:event/type :spring-lobby/assoc
-                                                        :key :direct-connect-chat-commands}}
-                                 {:fx/type :label
-                                  :text " Allow chat commands from clients"}]}]))}
-                         {:fx/type :scroll-pane
-                          :fit-to-width true
-                          :hbar-policy :never
-                          :content
-                          {:fx/type :flow-pane
-                           :vgap 5
-                           :hgap 5
-                           :padding 5
-                           :children
-                           (if singleplayer
-                             [{:fx/type :h-box
-                               :alignment :center-left
-                               :children
-                               [{:fx/type engines-view
-                                 :engine-version engine-version
-                                 :spring-isolation-dir spring-root
-                                 :suggest true
-                                 :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                    :path [:by-server :local :battles :singleplayer :battle-version]}}]}
-                              {:fx/type mods-view
-                               :mod-name mod-name
-                               :spring-isolation-dir spring-root
-                               :suggest true
-                               :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                  :path [:by-server :local :battles :singleplayer :battle-modname]}}
-                              {:fx/type :h-box
-                               :alignment :center-left
-                               :children
-                               [{:fx/type maps-view
-                                 :map-name map-name
-                                 :spring-isolation-dir spring-root
-                                 :suggest true
-                                 :on-value-changed {:event/type :spring-lobby/assoc-in
-                                                    :path [:by-server :local :battles :singleplayer :battle-map]}}]}]
-                             [
-                              {:fx/type engine-sync-pane
-                               :engine-version engine-version
-                               :spring-isolation-dir spring-root}
-                              {:fx/type fx.mod-sync/mod-and-deps-sync-pane
-                               :engine-version engine-version
-                               :mod-name mod-name
-                               :spring-isolation-dir spring-root}
-                              {:fx/type map-sync-pane
-                               :map-name map-name
-                               :spring-isolation-dir spring-root}
-                              resources-buttons
-                              {:fx/type :h-box
-                               :alignment :center-left
-                               :children
-                               [{:fx/type :check-box
-                                 :selected (boolean (fx/sub-val context :auto-get-resources))
-                                 :on-selected-changed {:event/type :spring-lobby/assoc
-                                                       :key :auto-get-resources}}
-                                {:fx/type :label
-                                 :text " Auto import or download resources"}]}
-                              {:fx/type :h-box
-                               :alignment :center-left
-                               :children
-                               [{:fx/type :label
-                                 :text "Force sync check: "}
-                                {:fx/type sync-button
-                                 :server-key server-key}]}])}})
         resources-pane (if-not old-battle
-                         resources-pane
+                         {:fx/type battle-resources
+                          :battle-id battle-id
+                          :server-key server-key}
                          {:fx/type :pane})
         direct-connect (#{:direct-client :direct-host} (u/server-type server-key))]
     {:fx/type :v-box

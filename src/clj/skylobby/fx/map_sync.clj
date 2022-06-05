@@ -18,10 +18,8 @@
   [{:fx/keys [context]
     :keys [battle-map index-only map-name spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
-        downloadables-by-url (fx/sub-val context :downloadables-by-url)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
-        importables-by-path (fx/sub-val context :importables-by-path)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
         imports (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
@@ -77,7 +75,9 @@
              :map-file (:file indexed-map)
              :tries 0}}}])
        (when (and no-map-details (not indexed-map))
-         (let [downloadables (->> downloadables-by-url
+         (let [
+               downloadables-by-url (fx/sub-val context :downloadables-by-url)
+               downloadables (->> downloadables-by-url
                                   vals
                                   (filter (comp #{:spring-lobby/map} :resource-type))
                                   (filter (partial resource/could-be-this-map? map-name)))
@@ -176,7 +176,9 @@
                          :springname springname
                          :resource-type :spring-lobby/map
                          :spring-isolation-dir spring-isolation-dir})})}]))
-             (let [importable (some->> importables-by-path
+             (let [
+                   importables-by-path (fx/sub-val context :importables-by-path)
+                   importable (some->> importables-by-path
                                        vals
                                        (filter (comp #{:spring-lobby/map} :resource-type))
                                        (filter (partial resource/could-be-this-map? map-name))

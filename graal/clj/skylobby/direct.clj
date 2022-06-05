@@ -94,9 +94,7 @@
             (broadcast-fn [::battle-bots (:bots battle)]))
           (log/warn "No broadcast-fn found for server" server-key))))))
 
-(defmethod -event-msg-handler
-  :skylobby.direct.client/close
-  [state-atom server-key {:keys [send-fn uid]}]
+(defn handle-close [state-atom server-key {:keys [send-fn uid]}]
   (let [[old-state {:keys [by-server]}] (swap-vals! state-atom update-in [:by-server server-key]
                                           (fn [server-data]
                                             (if-let [username (get-in server-data [:client-username uid])]
@@ -107,9 +105,22 @@
         {:keys [broadcast-fn]} server
         username (get-in old-state [:by-server server-key :client-username uid])]
     (if username
-      (send-fn uid [::close {:reason "completed"}])
+      (do
+        (log/info "Handling close for user" username)
+        (when send-fn
+          (send-fn uid [::close {:reason "completed"}])))
       (log/warn "No client-id found for client" uid))
     (broadcast-fn [::battle-users (:users battle)])))
+
+(defmethod -event-msg-handler
+  :skylobby.direct.client/close
+  [state-atom server-key message-data]
+  (handle-close state-atom server-key message-data))
+
+(defmethod -event-msg-handler
+  :chsk/uidport-close
+  [state-atom server-key message-data]
+  (handle-close state-atom server-key message-data))
 
 
 (defmethod -event-msg-handler
@@ -253,7 +264,10 @@
   [state-atom server-key message]
   (log/info "Battle setting" message)
   (let [[_all k v] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
-        state (swap! state-atom assoc-in [:by-server server-key :battle :scripttags "game" "modoptions" k] v) ; TODO map options, validate
+        path (if (#{"startpostype"} k) ; TODO map options, validate
+               [:by-server server-key :battle :scripttags "game" k]
+               [:by-server server-key :battle :scripttags "game" "modoptions" k])
+        state (swap! state-atom assoc-in path v)
         {:keys [by-server]} state
         {:keys [battle server]} (get by-server server-key)
         {:keys [broadcast-fn]} server]
@@ -298,6 +312,15 @@
               :engine-version :map-name :mod-name)))
         (catch Exception e
           (log/error e "Error starting game"))))))
+
+(defmethod chat-msg-handler "!split"
+  [state-atom server-key message]
+  (log/info "Request to split boxes" message)
+  (let [[_all split-type percent-str] (re-find #"\w+ ([^\s]+)\s+([^\s]+)" (:text message))
+        percent (int (u/to-number percent-str))]
+    (event.battle/split-boxes state-atom {:server-key server-key
+                                          :split-percent percent
+                                          :split-type split-type})))
 
 
 ; https://github.com/ptaoussanis/sente/blob/master/src/taoensso/sente.cljc#L240-L243
@@ -400,7 +423,9 @@
               (broadcast-fn [::close])
               (log/warn "No broadcast-fn to send close message"))
             (server))))
-      (log/warn "Direct connect server port unavailable" port))))
+      (do
+        (swap! state-atom assoc-in [:login-error :direct-host] (str "Port " port " unavailable"))
+        (log/warn "Direct connect server port unavailable" port)))))
 
 
 (defn host-direct-connect

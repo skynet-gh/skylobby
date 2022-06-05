@@ -301,19 +301,24 @@
                                   (map (juxt (comp string/trim str :username) :team-color))
                                   (into {}))
         players-and-bots (or (seq players-and-bots)
-                             (concat
-                               (mapcat
-                                 (fn [[i players]]
-                                   (map
-                                     (fn [player]
-                                       {:username player
-                                        :battle-status
-                                        {:mode true
-                                         :ally i}})
-                                     players))
-                                 (map-indexed vector (:replay-allyteam-player-names selected-replay)))
-                               (map (fn [spec] {:username spec :battle-status {:mode false}})
-                                    (:replay-spec-names selected-replay))))
+                             (let [allyteam-player-names (:replay-allyteam-player-names selected-replay)
+                                   player-names-set (set (mapcat identity allyteam-player-names))]
+                               (concat
+                                 (mapcat
+                                   (fn [[i players]]
+                                     (map
+                                       (fn [player]
+                                         {:username player
+                                          :battle-status
+                                          {:mode true
+                                           :ally i}})
+                                       players))
+                                   (map-indexed vector allyteam-player-names))
+                                 (->> selected-replay
+                                      :replay-spec-names
+                                      (remove player-names-set)
+                                      (mapv
+                                        (fn [spec] {:username spec :battle-status {:mode false}}))))))
         indexed-map (get maps-by-name map-name)
         replay-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         replay-id-downloads (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-bar-replay)

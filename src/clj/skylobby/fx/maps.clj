@@ -34,20 +34,23 @@
    "Red Comet Remake 1.8"])
 
 
+(def dice-options
+  (take 6 (iterate inc 0)))
+
+
 (defn maps-view-impl
   [{:fx/keys [context]
     :keys [action-disable-rotate disable flow map-name on-value-changed spring-isolation-dir suggest text-only]
     :or {flow true}}]
-  (let [downloadables-by-url (fx/sub-val context :downloadables-by-url)
-        http-download (fx/sub-val context :http-download)
-        map-input-prefix (fx/sub-val context :map-input-prefix)
-        http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
+  (let [
         {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         selected-map (:file (get maps-by-name map-name))
         selected-map-file (:file selected-map)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
-                              :path [:by-spring-root (fs/canonical-path spring-isolation-dir) :map-name]})]
+                              :path [:by-spring-root (fs/canonical-path spring-isolation-dir) :map-name]})
+        now (or (fx/sub-val context :now) 0)
+        dice-icon (str "mdi-dice-" (inc (nth dice-options (mod now (count dice-options)))) ":16:white")]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})
@@ -58,7 +61,9 @@
            :text " Map: "}]
          (if (empty? maps)
            (if suggest
-             (let [downloadables (vals downloadables-by-url)]
+             (let [downloadables (vals (fx/sub-val context :downloadables-by-url))
+                   http-download (fx/sub-val context :http-download)
+                   http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)]
                [{:fx/type :flow-pane
                  :children
                  (mapv
@@ -85,13 +90,8 @@
                    known-maps)}])
              [{:fx/type :label
                :text " No maps"}])
-           (let [filter-lc (if map-input-prefix (string/lower-case map-input-prefix) "")
-                 filtered-map-names
-                 (->> maps
-                      (map :map-name)
-                      (filter string?)
-                      (filter #(string/includes? (string/lower-case %) filter-lc))
-                      (sort String/CASE_INSENSITIVE_ORDER))]
+           (let [
+                 filtered-map-names (fx/sub-ctx context sub/filtered-maps spring-isolation-dir)]
              [
               {:fx/type ext-recreate-on-key-changed
                :key (str [map-name text-only])
@@ -152,7 +152,7 @@
                           :on-value-changed on-value-changed}
               :graphic
               {:fx/type font-icon/lifecycle
-               :icon-literal (str "mdi-dice-" (inc (rand-nth (take 6 (iterate inc 0)))) ":16:white")}}}])
+               :icon-literal dice-icon}}}])
          [{:fx/type fx.ext.node/with-tooltip-props
            :props
            {:tooltip
@@ -220,8 +220,7 @@
               filter-maps-name (fx/sub-val context :filter-maps-name)
               on-change-map (fx/sub-val context :on-change-map)
               server-key (fx/sub-ctx context skylobby.fx/selected-tab-server-key-sub)
-              spring-root (fx/sub-ctx context sub/spring-root server-key)
-              maps (fx/sub-val context get-in [:by-spring-root (fs/canonical-path spring-root) :maps])]
+              spring-root (fx/sub-ctx context sub/spring-root server-key)]
           {:fx/type :v-box
            :children
            [{:fx/type :h-box
@@ -259,7 +258,7 @@
               :padding 5
               :children
               (mapv
-                (fn [{:keys [map-name]}]
+                (fn [map-name]
                   {:fx/type :button
                    :style
                    {:-fx-min-width map-browse-image-size
@@ -306,12 +305,7 @@
                       :style {:-fx-font-size 16}
                       :text (str " " map-name)
                       :wrap-text true}]}})
-                (let [filter-lc ((fnil string/lower-case "") filter-maps-name)]
-                  (->> maps
-                       (filter (fn [{:keys [map-name]}]
-                                 (and map-name
-                                      (string/includes? (string/lower-case map-name) filter-lc))))
-                       (sort-by :map-name))))}}]})
+                (fx/sub-ctx context sub/filtered-maps spring-root filter-maps-name))}}]})
         {:fx/type :pane
          :pref-width maps-window-width
          :pref-height maps-window-height})}}))
