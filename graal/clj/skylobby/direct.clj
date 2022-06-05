@@ -411,7 +411,9 @@
               (broadcast-fn [::close])
               (log/warn "No broadcast-fn to send close message"))
             (server))))
-      (log/warn "Direct connect server port unavailable" port))))
+      (do
+        (swap! state-atom assoc-in [:login-error :direct-host] (str "Port " port " unavailable"))
+        (log/warn "Direct connect server port unavailable" port)))))
 
 
 (defn host-direct-connect
