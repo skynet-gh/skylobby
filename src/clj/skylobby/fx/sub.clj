@@ -7,8 +7,7 @@
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [taoensso.timbre :as log]
-    [version-clj.core :as version]))
+    [taoensso.timbre :as log]))
 
 
 (set! *warn-on-reflection* true)
@@ -106,20 +105,41 @@
           (-> servers (get server-url) :spring-isolation-dir)))
       (fx/sub-val context :spring-isolation-dir)))
 
-(defn games [context spring-root]
-  (let [{:keys [mods]} (fx/sub-ctx context spring-resources spring-root)]
-    (filter :is-game mods)))
-
 (defn filtered-games [context spring-root]
   (let [
-        games (fx/sub-ctx context games spring-root)
+        {:keys [mods]} (fx/sub-ctx context spring-resources spring-root)
         mod-filter (fx/sub-val context :mod-filter)
         filter-lc (if mod-filter (string/lower-case mod-filter) "")]
-    (->> games
+    (->> mods
+         (filter :is-game)
          (map :mod-name)
          (filter string?)
          (filter #(string/includes? (string/lower-case %) filter-lc))
-         (sort version/version-compare))))
+         sort)))
+
+(defn filtered-engines [context spring-root]
+  (let [
+        {:keys [engines]} (fx/sub-ctx context spring-resources spring-root)
+        engine-filter (fx/sub-val context :engine-filter)
+        filter-lc (if engine-filter (string/lower-case engine-filter) "")]
+    (->> engines
+         (map :engine-version)
+         (filter some?)
+         (filter #(string/includes? (string/lower-case %) filter-lc))
+         sort)))
+
+(defn filtered-maps
+  ([context spring-root]
+   (filtered-maps context spring-root (fx/sub-val context :map-input-prefix)))
+  ([context spring-root maps-filter]
+   (let [
+         {:keys [maps]} (fx/sub-ctx context spring-resources spring-root)
+         filter-lc (if maps-filter (string/lower-case maps-filter) "")]
+     (->> maps
+          (map :map-name)
+          (filter string?)
+          (filter #(string/includes? (string/lower-case %) filter-lc))
+          (sort String/CASE_INSENSITIVE_ORDER)))))
 
 (defn parsed-selected-server-tab [context]
   (let [selected-server-tab (fx/sub-val context :selected-server-tab)]
