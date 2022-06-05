@@ -5,6 +5,7 @@
     skylobby.core
     [skylobby.cli :as cli-demo]
     [skylobby.cli.util :as cu]
+    [skylobby.direct :as direct]
     [skylobby.fs :as fs]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
@@ -34,24 +35,30 @@
         ""
         "Actions:"
         "  cli       Demo CLI interface"
+        "  direct    Direct connect server"
         "  <none>    Start client service with web UI"
         ""]
        (string/join \newline)))
 
 
 (defn browse-url [url]
-  (if-let [desktop (when (Desktop/isDesktopSupported)
-                     (let [desktop (Desktop/getDesktop)]
-                       (when (.isSupported desktop Desktop$Action/BROWSE)
-                         desktop)))]
-    (.browse desktop (java.net.URI. url))
-    (let [runtime (Runtime/getRuntime)
-          ; https://stackoverflow.com/a/5116553
-          command (if (fs/windows?)
-                    ["explorer.exe" url]
-                    ["xdg-open" url])
-          ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-      (.exec runtime cmdarray nil nil))))
+  (try
+    (if-let [^java.awt.Desktop
+             desktop (when (Desktop/isDesktopSupported)
+                       (let [^java.awt.Desktop
+                             desktop (Desktop/getDesktop)]
+                         (when (.isSupported desktop Desktop$Action/BROWSE)
+                           desktop)))]
+      (.browse desktop (java.net.URI. url))
+      (let [runtime (Runtime/getRuntime)
+            ; https://stackoverflow.com/a/5116553
+            command (if (fs/windows?)
+                      ["explorer.exe" url]
+                      ["xdg-open" url])
+            ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+        (.exec runtime cmdarray nil nil)))
+    (catch Exception e
+      (log/error e "Error browsing url" url))))
 
 (defn -main [& args]
   (let [{:keys [arguments errors options summary]} (cli/parse-opts args cli-options :in-order true)
@@ -72,6 +79,8 @@
       (cu/print-and-exit 0 (str u/app-name " " version))
       (= "cli" command)
       (apply cli-demo/-main (rest arguments))
+      (= "direct" (first arguments))
+      (apply direct/-main (rest arguments))
       (seq arguments)
       (cu/print-and-exit -1 "Unknown action: " (pr-str arguments))
       :else

@@ -9,6 +9,7 @@
    [skylobby.client.gloss :as gloss]
    [skylobby.client.message :as message]
    [skylobby.download :as download]
+   [skylobby.event.battle :as event.battle]
    [skylobby.http :as http]
    [skylobby.import :as import]
    [skylobby.fs :as fs]
@@ -58,12 +59,11 @@
           (log/info "Updating battle sync status for" server-key "from" old-sync-number
                     "to" new-sync-number)
           (if (#{:direct-client :direct-host} (u/server-type server-key))
-            (throw (ex-info "TODO direct connect" {}))
-            #_(fx.event.battle/update-player-or-bot-state
-               state-atom
-               server-key
-               {:username username}
-               {:battle-status {:sync new-sync-number}})
+            (event.battle/update-player-or-bot-state
+             state-atom
+             server-key
+             {:username username}
+             {:battle-status {:sync new-sync-number}})
             (let [new-battle-status (assoc battle-status :sync new-sync-number)]
               (message/send state-atom client-data
                             (str "MYBATTLESTATUS " (gloss/encode-battle-status new-battle-status) " " (or team-color 0))))))))))
@@ -985,8 +985,9 @@
             (if (and db use-db-for-replays)
               (let [all-replays (replay/all-replays db)
                     invalid-replay-paths (->> all-replays
+                                              (map (juxt (comp fs/canonical-path :file) identity))
                                               (remove valid-replay?)
-                                              (map (comp fs/canonical-path :file))
+                                              (map first)
                                               set)]
                 (swap! state-atom
                   (fn [state]
@@ -1024,10 +1025,15 @@
             valid-next-round (remove
                               (comp invalid-replay-paths fs/canonical-path second)
                               todo)]
-        (if (seq valid-next-round)
+        (cond
+          (= (set todo)
+             (set valid-next-round))
+          (log/warn "Infinite loop detected, aborting replay refresh")
+          (seq valid-next-round)
           (task/add-task! state-atom
                           {:spring-lobby/task-type :spring-lobby/refresh-replays
                            :todo (count todo)})
+          :else
           (do
             (log/info "No valid replays left to parse")
             (fs/spit-app-edn

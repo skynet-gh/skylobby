@@ -16,9 +16,6 @@
     java-time
     [manifold.deferred :as deferred]
     [manifold.stream :as s]
-    [org.httpkit.server :as http-kit]
-    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-    [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle :as battle]
     [skylobby.battle-sync :as battle-sync]
@@ -203,7 +200,11 @@
    :css
    :debug-spring
    :direct-connect-chat-commands
-   :direct-connect-ip :direct-connect-password
+   :direct-connect-engine
+   :direct-connect-ip
+   :direct-connect-map
+   :direct-connect-mod
+   :direct-connect-password
    :direct-connect-port
    :direct-connect-protocol
    :direct-connect-username
@@ -225,6 +226,7 @@
    :hide-joinas-spec
    :hide-locked-battles
    :hide-passworded-battles
+   :hide-running-battles
    :hide-spads-messages
    :hide-vote-messages
    :hide-users-bots
@@ -3711,49 +3713,12 @@
    [:update-battle-status-sync-watcher battle-sync/update-battle-status-sync-watcher 2]])
 
 
-(defn stop-ipc-server
-  [state-atom]
-  (let [{:keys [ipc-server]} @state-atom]
-    (when (fn? ipc-server)
-      (log/info "Stopping IPC server")
-      (ipc-server)
-      (swap! state-atom dissoc :ipc-server))))
-
 (defmethod task-handler ::stop-ipc-server [_]
-  (stop-ipc-server *state))
-
-(defn start-ipc-server
-  "Starts an HTTP server so that replays and battles can be loaded into running instance."
-  ([state-atom]
-   (start-ipc-server state-atom nil))
-  ([state-atom opts]
-   (let [{:keys [ipc-server-port ipc-server-enabled]} @state-atom
-         port (or ipc-server-port u/default-ipc-port)]
-     (stop-ipc-server state-atom)
-     (cond
-       (and (not ipc-server-enabled)
-            (not (:force opts)))
-       (log/info "IPC server disabled")
-       (not (u/is-port-open? port))
-       (log/warn "IPC port unavailable" port)
-       :else
-       (try
-         (log/info "Starting IPC server on port" port)
-         (let [handler (server/handler *state)
-               server (http-kit/run-server
-                        (-> handler
-                            wrap-keyword-params
-                            wrap-params)
-                        {:port port
-                         :ip "127.0.0.1"})]
-           (swap! *state assoc :ipc-server server))
-         (catch Exception e
-           (log/error e "Error starting IPC server")
-           (swap! *state assoc :ipc-server-error e)))))))
+  (server/stop-ipc-server *state))
 
 
 (defmethod task-handler ::start-ipc-server [_]
-  (start-ipc-server *state {:force true}))
+  (server/start-ipc-server *state {:force true}))
 
 
 (defmethod task-handler ::init-sql-db [_]
@@ -3917,7 +3882,7 @@
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
-     (start-ipc-server state-atom)
+     (server/start-ipc-server state-atom)
      (sql/init-db state-atom)
      {:chimers
       (concat

@@ -707,6 +707,54 @@
                      {:fx/type player-status
                       :player player
                       :server-key server-key}})))}}])
+         (when (:team players-table-columns)
+           [{:fx/type :table-column
+             :text "ID"
+             :resizable false
+             :pref-width 86
+             :cell-value-factory (juxt
+                                   sort-playing
+                                   sort-id
+                                   sort-skill
+                                   u/nickname
+                                   identity)
+             :cell-factory
+             {:fx/cell-type :table-cell
+              :describe
+              (fn [[_play id _skill _username i]]
+                (tufte/profile {:dynamic? true
+                                :id :skylobby/player-table}
+                  (tufte/p :team
+                    (let [items (map str (take 16 (iterate inc 0)))
+                          value (str id)
+                          disable (or read-only
+                                      (not username)
+                                      (not (or am-host
+                                               (= (:username i) username)
+                                               (= (:owner i) username))))]
+                      {:text ""
+                       :graphic
+                       {:fx/type ext-recreate-on-key-changed
+                        :key [battle-id (u/nickname i) increment-ids]
+                        :desc
+                        (merge
+                          {:fx/type :combo-box
+                           :value value
+                           :items items
+                           :button-cell incrementing-cell
+                           :cell-factory {:fx/cell-type :list-cell
+                                          :describe incrementing-cell}
+                           :disable (boolean disable)}
+                          (when-not disable
+                            {:on-value-changed
+                             {:event/type (if (#{:direct-host :direct-client} server-type)
+                                            :skylobby.fx.event.battle/team-changed
+                                            :spring-lobby/battle-team-changed)
+                              :client-data (when-not singleplayer client-data)
+                              :is-me (= (:username i) username)
+                              :is-bot (-> i :user :client-status :bot)
+                              :id i
+                              :server-key server-key}}))}}))))}}])
          (when (:ally players-table-columns)
            [{:fx/type :table-column
              :text "Ally"
@@ -749,54 +797,6 @@
                              {:event/type (if (#{:direct-host :direct-client} server-type)
                                             :skylobby.fx.event.battle/ally-changed
                                             :spring-lobby/battle-ally-changed)
-                              :client-data (when-not singleplayer client-data)
-                              :is-me (= (:username i) username)
-                              :is-bot (-> i :user :client-status :bot)
-                              :id i
-                              :server-key server-key}}))}}))))}}])
-         (when (:team players-table-columns)
-           [{:fx/type :table-column
-             :text "Team"
-             :resizable false
-             :pref-width 86
-             :cell-value-factory (juxt
-                                   sort-playing
-                                   sort-id
-                                   sort-skill
-                                   u/nickname
-                                   identity)
-             :cell-factory
-             {:fx/cell-type :table-cell
-              :describe
-              (fn [[_play id _skill _username i]]
-                (tufte/profile {:dynamic? true
-                                :id :skylobby/player-table}
-                  (tufte/p :team
-                    (let [items (map str (take 16 (iterate inc 0)))
-                          value (str id)
-                          disable (or read-only
-                                      (not username)
-                                      (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))]
-                      {:text ""
-                       :graphic
-                       {:fx/type ext-recreate-on-key-changed
-                        :key [battle-id (u/nickname i) increment-ids]
-                        :desc
-                        (merge
-                          {:fx/type :combo-box
-                           :value value
-                           :items items
-                           :button-cell incrementing-cell
-                           :cell-factory {:fx/cell-type :list-cell
-                                          :describe incrementing-cell}
-                           :disable (boolean disable)}
-                          (when-not disable
-                            {:on-value-changed
-                             {:event/type (if (#{:direct-host :direct-client} server-type)
-                                            :skylobby.fx.event.battle/team-changed
-                                            :spring-lobby/battle-team-changed)
                               :client-data (when-not singleplayer client-data)
                               :is-me (= (:username i) username)
                               :is-bot (-> i :user :client-status :bot)

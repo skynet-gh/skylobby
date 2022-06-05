@@ -58,14 +58,17 @@
 (def cli-options [])
 
 (defn browse-url [url]
-  (let [desktop (Desktop/getDesktop)]
-    (println "Browsing" url)
-    (if (.isSupported desktop Desktop$Action/BROWSE)
-      (.browse desktop (java.net.URI. url))
-      (let [runtime (Runtime/getRuntime)
-            command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
-            ^"[Ljava.lang.String;" cmdarray (into-array String command)]
-        (.exec runtime cmdarray nil nil)))))
+  (try
+    (let [desktop (Desktop/getDesktop)]
+      (println "Browsing" url)
+      (if (.isSupported desktop Desktop$Action/BROWSE)
+        (.browse desktop (java.net.URI. url))
+        (let [runtime (Runtime/getRuntime)
+              command ["xdg-open" url] ; https://stackoverflow.com/a/5116553
+              ^"[Ljava.lang.String;" cmdarray (into-array String command)]
+          (.exec runtime cmdarray nil nil))))
+    (catch Exception e
+      (println "Error browsing url" url e))))
 
 
 (defn -main [& args]

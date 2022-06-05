@@ -4,7 +4,12 @@
 
 
 (defn filter-battles
-  [battles {:keys [filter-battles hide-empty-battles hide-locked-battles hide-passworded-battles]}]
+  [battles {:keys [filter-battles
+                   hide-empty-battles
+                   hide-locked-battles
+                   hide-passworded-battles
+                   hide-running-battles
+                   users]}]
   (let [
         filter-battles (when (string? filter-battles)
                          filter-battles)
@@ -34,6 +39,11 @@
            (fn [{:keys [users]}]
              (if hide-empty-battles
                (boolean (<= (count users) 1)) ; TODO bot vs human hosts
+               false)))
+         (remove
+           (fn [{:keys [host-username]}]
+             (if hide-running-battles
+               (boolean (get-in users [host-username :client-status :ingame]))
                false)))
          (sort-by (juxt (comp count :users) :battle-spectators))
          reverse

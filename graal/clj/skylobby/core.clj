@@ -5,14 +5,11 @@
     [clojure.core.cache :as cache]
     [clojure.edn :as edn]
     [clojure.java.io :as io]
+    [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
     java-time
-    [org.httpkit.server :as http-kit]
-    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-    [ring.middleware.params :refer [wrap-params]]
     [skylobby.auto-resources :as auto-resources]
     [skylobby.battle-sync :as battle-sync]
-    [skylobby.cli.util :as cu]
     [skylobby.fs :as fs]
     [skylobby.server :as server]
     [skylobby.sql :as sql]
@@ -120,7 +117,10 @@
    :css
    :debug-spring
    :direct-connect-chat-commands
+   :direct-connect-engine
    :direct-connect-ip
+   :direct-connect-map
+   :direct-connect-mod
    :direct-connect-password
    :direct-connect-port
    :direct-connect-protocol
@@ -150,7 +150,6 @@
    :ignore-users
    :increment-ids
    :interleave-ally-player-ids
-   :ipc-server-enabled
    :ipc-server-port
    :join-battle-as-player
    :leave-battle-on-close-window
@@ -263,7 +262,6 @@
      :increment-ids true
      :interleave-ally-player-ids true
      :is-java (u/is-java? (u/process-command))
-     :ipc-server-enabled false
      :ipc-server-port u/default-ipc-port
      :leave-battle-on-close-window true
      :players-table-columns {:skill true
@@ -291,6 +289,7 @@
      :current-tasks (->> task/task-kinds (map (juxt identity (constantly nil))) (into {}))
      ;:minimap-type (first fx.battle/minimap-types)
      ;:replay-minimap-type (first fx.battle/minimap-types)
+     :ipc-server-enabled true
      :map-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
@@ -432,6 +431,68 @@
              true)})]
     (fn [] (.close chimer))))
 
+(defn spit-app-edn
+  "Writes the given data as edn to the given file in the application directory."
+  ([data filename]
+   (spit-app-edn data filename nil))
+  ([data filename {:keys [nippy pretty]}]
+   (let [file (fs/config-file filename)]
+     (fs/make-parent-dirs file))
+   (if nippy
+     (let [file (fs/config-file (nippy-filename filename))]
+       (log/info "Saving nippy data to" file)
+       (try
+         (nippy/freeze-to-file file data)
+         (catch Exception e
+           (log/error e "Error saving nippy to" file))))
+     (let [output (if pretty
+                    (with-out-str (pprint (if (map? data)
+                                            (into (sorted-map) data)
+                                            data)))
+                    (pr-str data))
+           parsable (try
+                      (edn/read-string {:readers u/custom-readers} output)
+                      true
+                      (catch Exception e
+                        (log/error e "Config EDN for" filename "does not parse, keeping old file")))
+           file (fs/config-file (if parsable
+                                  filename
+                                  (str filename ".bad")))]
+       (log/info "Spitting edn to" file)
+       (spit file output)))))
+
+(defn- spit-state-config-to-edn [old-state new-state]
+  (doseq [{:keys [select-fn filename] :as opts} state-to-edn]
+    (try
+      (let [old-data (select-fn old-state)
+            new-data (select-fn new-state)]
+        (when (not= old-data new-data)
+          (try
+            (spit-app-edn new-data filename opts)
+            (catch Exception e
+              (log/error e "Exception writing" filename)))))
+      (catch Exception e
+        (log/error e "Error writing config edn" filename)))))
+
+(defn- spit-app-config-chimer-fn [state-atom]
+  (log/info "Starting app config spit chimer")
+  (let [old-state-atom (atom @state-atom)
+        chimer
+        (chime/chime-at
+          (chime/periodic-seq
+            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
+            (java-time/duration 3 :seconds))
+          (fn [_chimestamp]
+            (let [old-state @old-state-atom
+                  new-state @state-atom]
+              (spit-state-config-to-edn old-state new-state)
+              (reset! old-state-atom new-state)))
+          {:error-handler
+           (fn [e]
+             (log/error e "Error spitting app config edn")
+             true)})]
+    (fn [] (.close chimer))))
+
 
 (defn- add-watchers
   "Adds all *state watchers."
@@ -444,29 +505,6 @@
   ;(add-watch state-atom :filter-replays filter-replays-watcher)
   ;(add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
   ;(add-watch state-atom :fix-selected-server fix-selected-server-watcher))
-
-
-(defn start-ipc-server
-  "Starts an HTTP server so that replays and battles can be loaded into running instance."
-  []
-  (let [port u/default-ipc-port]
-    (when-let [{:keys [ipc-server]} @*state]
-      (when (fn? ipc-server)
-        (ipc-server)))
-    (if (u/is-port-open? port)
-      (do
-        (log/info "Starting IPC server on port" port)
-        (let [handler (server/handler *state)
-              server (http-kit/run-server
-                       (-> handler
-                           wrap-keyword-params
-                           wrap-params)
-                       {:port port
-                        :ip "127.0.0.1"})]
-          (swap! *state assoc :ipc-server server)))
-      (do
-        (log/warn "IPC port unavailable" port)
-        (cu/print-and-exit -1 (str "Server port unavailable: " port))))))
 
 
 (def state-watch-chimers
@@ -496,8 +534,8 @@
                                    (state-change-chimer-fn state-atom k watcher-fn duration)))
                             doall)
          ;check-app-update-chimer (check-app-update-chimer-fn state-atom)
-         profile-print-chimer (profile-print-chimer-fn state-atom)]
-         ;spit-app-config-chimer (spit-app-config-chimer-fn state-atom)
+         profile-print-chimer (profile-print-chimer-fn state-atom)
+         spit-app-config-chimer (spit-app-config-chimer-fn state-atom)]
          ;fix-battle-ready-chimer (fix-battle-ready-chimer-fn state-atom)
          ;update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          ;update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
@@ -511,22 +549,22 @@
          (try
            (async/<!! (async/timeout wait-init-tasks-ms))
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-engines})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-engines})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-mods})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-mods})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-maps})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-maps})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::refresh-replays})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replays})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::update-all-downloadables})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/update-all-downloadables})
            (async/<!! (async/timeout wait-init-tasks-ms))
-           (add-task! state-atom {::task-type ::scan-all-imports})
+           (add-task! state-atom {:spring-lobby/task-type :spring-lobby/scan-all-imports})
            (catch Exception e
              (log/error e "Error adding initial tasks"))))
        (log/info "Skipped initial tasks"))
      (log/info "Finished periodic jobs init")
-     (start-ipc-server)
+     (server/start-ipc-server state-atom)
      (sql/init-db state-atom {:force true})
      {:chimers
       (concat
@@ -534,8 +572,8 @@
         state-chimers
         [
          ;check-app-update-chimer
-         profile-print-chimer])})))
-         ;spit-app-config-chimer
+         profile-print-chimer
+         spit-app-config-chimer])})))
          ;fix-battle-ready-chimer
          ;update-matchmaking-chimer
          ;update-music-queue-chimer
