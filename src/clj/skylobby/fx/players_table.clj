@@ -298,14 +298,14 @@
            :text "!boss"
            :on-action {:event/type :skylobby.fx.event.chat/send
                        :client-data client-data
-                       :channel-name (u/user-channel-name host-username)
+                       :channel-name channel-name
                        :message (str "!boss " username)
                        :server-key server-key}}
           {:fx/type :menu-item
            :text "!spec"
            :on-action {:event/type :skylobby.fx.event.chat/send
                        :client-data client-data
-                       :channel-name (u/user-channel-name host-username)
+                       :channel-name channel-name
                        :message (str "!spec " username)
                        :server-key server-key}}])
        [
