@@ -18,7 +18,6 @@
   [{:fx/keys [context]
     :keys [engine-version spring-isolation-dir]}]
   (let [copying (fx/sub-val context :copying)
-        downloadables-by-url (fx/sub-val context :downloadables-by-url)
         indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
         spring-root-path (fs/canonical-path spring-isolation-dir)
         engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
@@ -27,7 +26,6 @@
         engine-file (:file engine-details)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :file-cache)
-        importables-by-path (fx/sub-val context :importables-by-path)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         engine-update-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
         download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
@@ -161,11 +159,11 @@
                            :file dest
                            :dest extract-target}}}]))))))
            (or
-             (->> downloadables-by-url
-               vals
-               (filter (comp #{:spring-lobby/engine} :resource-type))
-               (filter (partial resource/could-be-this-engine? engine-version))
-               seq)
+             (->> (fx/sub-val context :downloadables-by-url)
+                  vals
+                  (filter (comp #{:spring-lobby/engine} :resource-type))
+                  (filter (partial resource/could-be-this-engine? engine-version))
+                  seq)
              [nil])))
        (when (and engine-version
                   refresh-in-progress)
@@ -213,7 +211,9 @@
                    :springname springname})})}]))
        (when (and engine-version
                   (not engine-details))
-         (let [importable (some->> importables-by-path
+         (let [
+               importables-by-path (fx/sub-val context :importables-by-path)
+               importable (some->> importables-by-path
                                    vals
                                    (filter (comp #{:spring-lobby/engine} :resource-type))
                                    (filter (partial resource/could-be-this-engine? engine-version))
