@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.36](https://github.com/skynet-gh/skylobby/releases/tag/0.8.36) - 2022-06-05
+
+- Add battle split boxes buttons, and chat commands for direct hosting
+- Fix performance issues in singleplayer and direct host battles
+- Add tab focus for many chat whispers to bot hosts
+- Fix direct connect unexpected disconnect client removal
+- Show direct connect Join default first
+- Fix players showing up as spectators before replay loads
+- Fix direct host error message when port unavailable
+
 ## [0.8.35](https://github.com/skynet-gh/skylobby/releases/tag/0.8.35) - 2022-06-04
 
 - Fix coop (aka comshare) in singleplayer and direct connect
