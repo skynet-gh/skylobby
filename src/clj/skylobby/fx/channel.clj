@@ -120,19 +120,31 @@
                                    (when (and color-my-username (= username my-username))
                                      "-me"))))])]
                (when-not message-type
+                 (->> text
+                      (re-seq #"(\s+|[^\s]+)")
+                      (mapv
+                        (fn [[_all text-segment]]
+                          (let [is-url (try
+                                         (java.net.URL. text-segment)
+                                         true
+                                         (catch Exception _e
+                                           false))]
+                            (segment
+                              (str text-segment)
+                              ["text"
+                               (if is-url
+                                 "skylobby-chat-message-url"
+                                 (if (and (seq highlight)
+                                          (some (fn [substr]
+                                                  (and text-segment substr
+                                                       (string/includes? (string/lower-case text-segment)
+                                                                         (string/lower-case substr))))
+                                                highlight))
+                                   "skylobby-chat-message-highlight"
+                                   "skylobby-chat-message"))])))))
+                 #_ ; TODO IRC colors
                  (map
-                   (fn [[_all _ _irc-color-code text-segment]]
-                     (segment
-                       (str text-segment)
-                       ["text"
-                        (if (and (seq highlight)
-                                 (some (fn [substr]
-                                         (and text-segment substr
-                                              (string/includes? (string/lower-case text-segment)
-                                                                (string/lower-case substr))))
-                                       highlight))
-                          "skylobby-chat-message-highlight"
-                          "skylobby-chat-message")]))
+                   (fn [[_all _ _irc-color-code text-segment]])
                    (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
            ^java.util.List
            [])))

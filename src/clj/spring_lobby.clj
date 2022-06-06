@@ -3663,13 +3663,22 @@
 
 
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
-  (when (= ScrollEvent/SCROLL (.getEventType event))
-    (let [^ScrollEvent scroll-event event
-          ^Parent source (.getSource scroll-event)
-          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-      (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
+  (let [event-type (.getEventType event)]
+    (if (= ScrollEvent/SCROLL event-type)
+      (let [^ScrollEvent scroll-event event
+            ^Parent source (.getSource scroll-event)
+            needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                                (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                                  (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
+        (swap! *state assoc :chat-auto-scroll needs-auto-scroll))
+      (when (= MouseEvent/MOUSE_CLICKED event-type)
+        (let [target (.getTarget event)]
+          (when (instance? org.fxmisc.richtext.TextExt target)
+            (let [^org.fxmisc.richtext.TextExt text-ext target
+                  text (.getText text-ext)]
+              (when (u/is-url? text)
+                (event-handler {:event/type ::desktop-browse-url
+                                :url text})))))))))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
   (when (= ScrollEvent/SCROLL (.getEventType event))
