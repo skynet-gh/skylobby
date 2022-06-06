@@ -34,8 +34,13 @@
   [_state-atom _server-key {:keys [event]}]
   (log/debugf "WebSocket ping: %s" event))
 
-(defn disconnect [state-atom server-key]
-  (let [[old-state _new-state] (swap-vals! state-atom update :by-server dissoc server-key)
+(defn disconnect [state-atom server-key reason]
+  (let [[old-state _new-state] (swap-vals! state-atom
+                                 (fn [state]
+                                   (-> state
+                                       (update :by-server dissoc server-key)
+                                       (assoc-in [:login-error :direct-client] reason)
+                                       (assoc :selected-server-tab "direct"))))
         {:keys [client-close-fn]} (get-in old-state [:by-server server-key])]
     (when (fn? client-close-fn)
       (log/info "Closing client for" server-key)
@@ -53,17 +58,16 @@
           (fn [reply]
             (when (cb-success? reply)
               (log/info "Server reply to join" reply)
-              (swap! state-atom
-                (fn [state]
-                  (-> state
-                      (assoc-in [:login-error :direct-client] (:reason reply))
-                      (assoc :selected-server-tab "direct"))))
-              (disconnect state-atom server-key)))))
+              (disconnect state-atom server-key (:reason reply))))))
       (do
-        (log/info "Channel socket state change: %s"              new-state-map)
+        (log/infof "Channel socket state change: %s" new-state-map)
         (when-not (:open? new-state-map)
           (log/info "Disconnecting")
-          (disconnect state-atom server-key))))))
+          (let [last-ex (get-in new-state-map [:last-ws-error :ex])
+                reason (if last-ex
+                         (.getMessage last-ex)
+                         "disconnected")]
+            (disconnect state-atom server-key reason)))))))
 
 (defmethod -event-msg-handler :chsk/recv
   [_state-atom _server-key {:keys [?data]}]
@@ -83,7 +87,7 @@
       (-> state
           (assoc-in [:login-error :direct-client] (:reason ?data))
           (assoc :selected-server-tab "direct"))))
-  (disconnect state-atom server-key))
+  (disconnect state-atom server-key "server closed"))
 
 
 (defmethod -event-msg-handler :skylobby.direct/set-engine

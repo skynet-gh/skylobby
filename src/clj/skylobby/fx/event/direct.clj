@@ -35,7 +35,7 @@
                           :username direct-connect-username}
               ;; Serializtion format, must use same val for client + server:
               packer :edn
-              {:keys [ch-recv send-fn] :as client}
+              {:keys [ch-recv] :as client}
               (sente/make-channel-socket-client!
                 "/chsk"
                 nil ; ?csrf-token
@@ -49,7 +49,7 @@
               msg-handler (direct.client/event-msg-handler state-atom server-key)
               client-close-fn (sente/start-client-chsk-router! ch-recv msg-handler)
               client-close-fn (fn []
-                                (send-fn [::direct.client/close])
+                                ;(send-fn [::direct.client/close])
                                 (client-close-fn))
               data {:battle {:battle-id :direct
                              :users {}}

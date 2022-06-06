@@ -207,6 +207,8 @@
    :direct-connect-password
    :direct-connect-port
    :direct-connect-protocol
+   :direct-connect-host-username
+   :direct-connect-join-username
    :direct-connect-username
    :disable-tasks
    :disable-tasks-while-in-game

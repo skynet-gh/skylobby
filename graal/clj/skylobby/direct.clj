@@ -110,7 +110,9 @@
         (when send-fn
           (send-fn uid [::close {:reason "completed"}])))
       (log/warn "No client-id found for client" uid))
-    (broadcast-fn [::battle-users (:users battle)])))
+    (if broadcast-fn
+      (broadcast-fn [::battle-users (:users battle)])
+      (log/warn "No broadcast fn to send close"))))
 
 (defmethod -event-msg-handler
   :skylobby.direct.client/close
@@ -351,8 +353,10 @@
       (fn [_ _ old-ids new-ids]
         (when (not= old-ids new-ids)
           (log/infof "Connected uids change: %s" new-ids))))
-   (sente/start-server-chsk-router! ch-recv msg-handler)
-   (assoc chsk-server :broadcast-fn broadcast-fn)))
+   (let [stop-fn (sente/start-server-chsk-router! ch-recv msg-handler)]
+     (assoc chsk-server
+            :broadcast-fn broadcast-fn
+            :stop-fn stop-fn))))
 
 (defn login-handler
   "Here's where you'll add your server-side login/auth procedure (Friend, etc.).
@@ -419,9 +423,9 @@
                            wrap-params)
                        {:port port})]
           (fn []
-            (if-let [broadcast-fn (:broadcast-fn chsk-server)]
-              (broadcast-fn [::close])
-              (log/warn "No broadcast-fn to send close message"))
+            (if-let [stop-fn (:stop-fn chsk-server)]
+              (stop-fn)
+              (log/warn "No stop-fn to stop server"))
             (server))))
       (do
         (swap! state-atom assoc-in [:login-error :direct-host] (str "Port " port " unavailable"))
