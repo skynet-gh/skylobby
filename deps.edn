@@ -200,7 +200,8 @@
     commons-io/commons-io {:mvn/version "2.11.0"}
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
-    org.clj-commons/gloss {:mvn/version "0.3.0"}
+    org.clj-commons/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
+                           :git/sha "172f97d98930297f7b28609f78f433134bded860"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
     http-kit/http-kit {:mvn/version "2.5.3"}
     instaparse/instaparse {:mvn/version "1.4.12"}
