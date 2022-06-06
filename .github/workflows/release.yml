@@ -24,7 +24,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -97,7 +97,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -141,7 +141,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'

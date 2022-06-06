@@ -39,7 +39,7 @@ jobs:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -76,7 +76,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -106,7 +106,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.2.0
+      - uses: actions/setup-node@v3.3.0
         with:
           node-version: '14'
           cache: 'npm'
