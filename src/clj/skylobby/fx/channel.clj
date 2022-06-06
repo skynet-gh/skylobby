@@ -3,7 +3,12 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word ext-with-context-menu]]
+    [skylobby.fx.ext :refer [
+                             ext-focused-by-default
+                             ext-recreate-on-key-changed
+                             ext-scroll-on-create
+                             ext-with-auto-complete-word
+                             ext-with-context-menu]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.sub :as sub]
@@ -13,6 +18,7 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.control TextField)
     (javafx.scene.input Clipboard ClipboardContent)
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
@@ -253,20 +259,30 @@
 
 (defn channel-view-text [{:fx/keys [context] :keys [channel-name disable server-key]}]
   (let [
-        message-draft (fx/sub-val context get-in [:message-drafts server-key channel-name])]
-    {:fx/type :text-field
-     :disable (boolean disable)
-     :id "channel-text-field"
-     :text (str message-draft)
-     :on-text-changed {:event/type :spring-lobby/assoc-in
-                       :path [:message-drafts server-key channel-name]}
-     :on-action {:event/type :skylobby.fx.event.chat/send
-                 :channel-name channel-name
-                 :message message-draft
-                 :server-key server-key}
-     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                      :channel-name channel-name
-                      :server-key server-key}}))
+        message-draft (fx/sub-val context get-in [:message-drafts server-key channel-name])
+        history-index (fx/sub-val context get-in [:by-server server-key :channels channel-name :history-index])]
+    {:fx/type ext-recreate-on-key-changed
+     :key (str history-index)
+     :desc
+     {:fx/type ext-focused-by-default
+      :desc
+      {:fx/type fx/ext-on-instance-lifecycle
+       :on-created (fn [^TextField text-field]
+                     (.positionCaret text-field (count message-draft)))
+       :desc
+       {:fx/type :text-field
+        :disable (boolean disable)
+        :id "channel-text-field"
+        :text (str message-draft)
+        :on-text-changed {:event/type :spring-lobby/assoc-in
+                          :path [:message-drafts server-key channel-name]}
+        :on-action {:event/type :skylobby.fx.event.chat/send
+                    :channel-name channel-name
+                    :message message-draft
+                    :server-key server-key}
+        :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                         :channel-name channel-name
+                         :server-key server-key}}}}}))
 
 (defn channel-send-button
   [{:fx/keys [context]
