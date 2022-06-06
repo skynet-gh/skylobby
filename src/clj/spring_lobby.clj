@@ -62,7 +62,7 @@
     (javafx.event Event EventHandler)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
-    (javafx.scene.control ColorPicker ScrollBar Tab)
+    (javafx.scene.control ColorPicker ScrollBar Tab TextField)
     (javafx.scene.input KeyCode KeyCodeCombination KeyCombination KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
@@ -238,6 +238,7 @@
    :ipc-server-enabled
    :ipc-server-port
    :join-battle-as-player
+   :last-split-type
    :leave-battle-on-close-window
    :logins :minimap-size
    :music-dir
@@ -3156,6 +3157,20 @@
                     event))]
     (swap! *state assoc :split-percent percent)))
 
+(defmethod event-handler ::battle-split-percent-action
+  [{:fx/keys [^Event event] :as e}]
+  (let [^TextField target (.getTarget event)
+        formatter (.getTextFormatter target)
+        v (.getValue formatter)]
+    (when-let [last-split-type (:last-split-type
+                                 (event-handler {:event/type ::battle-split-percent-change
+                                                 :fx/event v}))]
+      (log/info "Splitting on enter using last type" last-split-type v)
+      (event-handler
+        (assoc e
+               :event/type :skylobby.fx.event.battle/split-boxes
+               :split-type last-split-type
+               :split-percent v)))))
 
 (defmethod event-handler ::battle-color-action
   [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]

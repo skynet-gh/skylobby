@@ -1094,6 +1094,12 @@
                          [{:fx/type :label
                            :text " %: "}
                           {:fx/type :text-field
+                           :on-action {:event/type :spring-lobby/battle-split-percent-action
+                                       :am-host am-host
+                                       :channel-name channel-name
+                                       :client-data client-data
+                                       :split-percent percent
+                                       :server-key server-key}
                            :pref-width 50
                            :tooltip
                            {:fx/type tooltip-nofocus/lifecycle

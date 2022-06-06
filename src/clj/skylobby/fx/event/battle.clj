@@ -221,6 +221,7 @@
                    :message (str "!bSet " modoption-key-str " " value)))))))
   (defmethod multifn ::split-boxes
     [{:keys [am-host split-percent split-type server-key] :as e}]
+    (swap! state-atom assoc :last-split-type split-type)
     (let [
           server-type (u/server-type server-key)]
       (if (#{:singleplayer :direct-host} server-type)
