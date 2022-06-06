@@ -182,6 +182,11 @@
      {:-fx-fill "grey"}
      "-message"
      {:-fx-fill "white"}
+     "-message-url"
+     {; https://stackoverflow.com/a/4774037
+      :-fx-fill "#0000EE"
+      :-fx-cursor "hand"
+      :-fx-underline true}
      "-message-highlight"
      {:-fx-fill "red"}
      "-input"

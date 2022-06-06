@@ -11,10 +11,22 @@
       "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
     }, 
     {
+      "pattern":"\\Qmozilla/public-suffix-list.txt\\E"
+    }, 
+    {
       "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
     }, 
     {
+      "pattern":"\\Qorg/apache/http/client/version.properties\\E"
+    }, 
+    {
       "pattern":"\\Qorg/h2/util/data.zip\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/jsoup/nodes/entities-base.properties\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/jsoup/nodes/entities-full.properties\\E"
     }, 
     {
       "pattern":"\\Qpublic/css/tachyons.min.css\\E"
@@ -66,6 +78,12 @@
     }, 
     {
       "pattern":"\\Qskylobby.version\\E"
+    }, 
+    {
+      "pattern":"\\Qskylobby/util.clj\\E"
+    }, 
+    {
+      "pattern":"\\Qskylobby/util__init.class\\E"
     }
   ]},
   "bundles":[]

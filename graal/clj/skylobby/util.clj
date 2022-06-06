@@ -686,3 +686,11 @@
 
 (defn sync-number [sync-bool]
   (if sync-bool 1 2))
+
+
+(defn is-url? [s]
+  (try
+    (java.net.URL. s)
+    true
+    (catch Exception _e
+      false)))

@@ -62,7 +62,7 @@
     (javafx.event Event EventHandler)
     (javafx.scene Parent)
     (javafx.scene.canvas Canvas)
-    (javafx.scene.control ColorPicker ScrollBar Tab)
+    (javafx.scene.control ColorPicker ScrollBar Tab TextField)
     (javafx.scene.input KeyCode KeyCodeCombination KeyCombination KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
@@ -207,6 +207,8 @@
    :direct-connect-password
    :direct-connect-port
    :direct-connect-protocol
+   :direct-connect-host-username
+   :direct-connect-join-username
    :direct-connect-username
    :disable-tasks
    :disable-tasks-while-in-game
@@ -238,6 +240,7 @@
    :ipc-server-enabled
    :ipc-server-port
    :join-battle-as-player
+   :last-split-type
    :leave-battle-on-close-window
    :logins :minimap-size
    :music-dir
@@ -3156,6 +3159,20 @@
                     event))]
     (swap! *state assoc :split-percent percent)))
 
+(defmethod event-handler ::battle-split-percent-action
+  [{:fx/keys [^Event event] :as e}]
+  (let [^TextField target (.getTarget event)
+        formatter (.getTextFormatter target)
+        v (.getValue formatter)]
+    (when-let [last-split-type (:last-split-type
+                                 (event-handler {:event/type ::battle-split-percent-change
+                                                 :fx/event v}))]
+      (log/info "Splitting on enter using last type" last-split-type v)
+      (event-handler
+        (assoc e
+               :event/type :skylobby.fx.event.battle/split-boxes
+               :split-type last-split-type
+               :split-percent v)))))
 
 (defmethod event-handler ::battle-color-action
   [{:keys [client-data id is-me] :fx/keys [^Event event] :as opts}]
@@ -3648,13 +3665,22 @@
 
 
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
-  (when (= ScrollEvent/SCROLL (.getEventType event))
-    (let [^ScrollEvent scroll-event event
-          ^Parent source (.getSource scroll-event)
-          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-      (swap! *state assoc :chat-auto-scroll needs-auto-scroll))))
+  (let [event-type (.getEventType event)]
+    (if (= ScrollEvent/SCROLL event-type)
+      (let [^ScrollEvent scroll-event event
+            ^Parent source (.getSource scroll-event)
+            needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                                (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                                  (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
+        (swap! *state assoc :chat-auto-scroll needs-auto-scroll))
+      (when (= MouseEvent/MOUSE_CLICKED event-type)
+        (let [target (.getTarget event)]
+          (when (instance? org.fxmisc.richtext.TextExt target)
+            (let [^org.fxmisc.richtext.TextExt text-ext target
+                  text (.getText text-ext)]
+              (when (u/is-url? text)
+                (event-handler {:event/type ::desktop-browse-url
+                                :url text})))))))))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
   (when (= ScrollEvent/SCROLL (.getEventType event))

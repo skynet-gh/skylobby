@@ -41,6 +41,10 @@
         direct-connect-port (int (or (when integer? direct-connect-port) direct-connect-port
                                       u/default-server-port))
         direct-connect-username (fx/sub-val context :direct-connect-username)
+        direct-connect-host-username (or (fx/sub-val context :direct-connect-host-username)
+                                         direct-connect-username)
+        direct-connect-join-username (or (fx/sub-val context :direct-connect-join-username)
+                                         direct-connect-username)
         direct-connect-password (fx/sub-val context :direct-connect-password)
         direct-connect-protocol (or (fx/sub-val context :direct-connect-protocol) :http)
         direct-connect-public-ip (fx/sub-val context :direct-connect-public-ip)
@@ -49,7 +53,7 @@
                     :protocol :skylobby
                     :hostname direct-connect-ip
                     :port direct-connect-port
-                    :username direct-connect-username}
+                    :username direct-connect-host-username}
         host-server-key (assoc server-key :host true :hostname "localhost")
         client-server-key (assoc server-key :host false)
         login-error (fx/sub-val context :login-error)]
@@ -86,9 +90,9 @@
                   {:fx/type :pane
                    :h-box/hgrow :always}
                   {:fx/type :text-field
-                   :text (str direct-connect-username)
+                   :text (str direct-connect-join-username)
                    :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :direct-connect-username}}]}
+                                     :key :direct-connect-join-username}}]}
                 #_
                 {:fx/type :h-box
                  :alignment :center-left
@@ -144,7 +148,7 @@
                 {:fx/type :button
                  :style-class ["button" "skylobby-normal"]
                  :text "Join"
-                 :disable (or (string/blank? direct-connect-username)
+                 :disable (or (string/blank? direct-connect-join-username)
                               (not (.isValidInet4Address ip-validator (str direct-connect-ip)))
                               (contains? server-keys client-server-key))
                  :on-action {:event/type :skylobby.fx.event.direct/join
@@ -152,7 +156,7 @@
                              :direct-connect-password direct-connect-password
                              :direct-connect-port direct-connect-port
                              :direct-connect-protocol direct-connect-protocol
-                             :direct-connect-username direct-connect-username}}
+                             :direct-connect-username direct-connect-join-username}}
                 {:fx/type :label
                  :style {:-fx-text-fill "red"}
                  :text (str
@@ -174,9 +178,9 @@
                   {:fx/type :pane
                    :h-box/hgrow :always}
                   {:fx/type :text-field
-                   :text (str direct-connect-username)
+                   :text (str direct-connect-host-username)
                    :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :direct-connect-username}}]}
+                                     :key :direct-connect-host-username}}]}
                 #_
                 {:fx/type :h-box
                  :alignment :center-left
@@ -220,13 +224,13 @@
                 {:fx/type :button
                  :style-class ["button" "skylobby-normal"]
                  :text "Host"
-                 :disable (or (string/blank? direct-connect-username)
+                 :disable (or (string/blank? direct-connect-host-username)
                               (contains? server-keys host-server-key))
                  :on-action {:event/type :skylobby.fx.event.direct/host
                              :direct-connect-password direct-connect-password
                              :direct-connect-port direct-connect-port
                              :direct-connect-protocol direct-connect-protocol
-                             :direct-connect-username direct-connect-username}}
+                             :direct-connect-username direct-connect-host-username}}
                 {:fx/type :label
                  :style {:-fx-text-fill "red"}
                  :text (str

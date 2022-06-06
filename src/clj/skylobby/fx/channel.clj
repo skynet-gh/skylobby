@@ -3,7 +3,12 @@
     [cljfx.api :as fx]
     [clojure.string :as string]
     [skylobby.fx :refer [monospace-font-family]]
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create ext-with-auto-complete-word ext-with-context-menu]]
+    [skylobby.fx.ext :refer [
+                             ext-focused-by-default
+                             ext-recreate-on-key-changed
+                             ext-scroll-on-create
+                             ext-with-auto-complete-word
+                             ext-with-context-menu]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.sub :as sub]
@@ -13,6 +18,7 @@
     [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.control TextField)
     (javafx.scene.input Clipboard ClipboardContent)
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
@@ -114,19 +120,31 @@
                                    (when (and color-my-username (= username my-username))
                                      "-me"))))])]
                (when-not message-type
+                 (->> text
+                      (re-seq #"(\s+|[^\s]+)")
+                      (mapv
+                        (fn [[_all text-segment]]
+                          (let [is-url (try
+                                         (java.net.URL. text-segment)
+                                         true
+                                         (catch Exception _e
+                                           false))]
+                            (segment
+                              (str text-segment)
+                              ["text"
+                               (if is-url
+                                 "skylobby-chat-message-url"
+                                 (if (and (seq highlight)
+                                          (some (fn [substr]
+                                                  (and text-segment substr
+                                                       (string/includes? (string/lower-case text-segment)
+                                                                         (string/lower-case substr))))
+                                                highlight))
+                                   "skylobby-chat-message-highlight"
+                                   "skylobby-chat-message"))])))))
+                 #_ ; TODO IRC colors
                  (map
-                   (fn [[_all _ _irc-color-code text-segment]]
-                     (segment
-                       (str text-segment)
-                       ["text"
-                        (if (and (seq highlight)
-                                 (some (fn [substr]
-                                         (and text-segment substr
-                                              (string/includes? (string/lower-case text-segment)
-                                                                (string/lower-case substr))))
-                                       highlight))
-                          "skylobby-chat-message-highlight"
-                          "skylobby-chat-message")]))
+                   (fn [[_all _ _irc-color-code text-segment]])
                    (re-seq #"([\u0003](\d\d))?([^\u0003]+)" text)))))
            ^java.util.List
            [])))
@@ -253,20 +271,30 @@
 
 (defn channel-view-text [{:fx/keys [context] :keys [channel-name disable server-key]}]
   (let [
-        message-draft (fx/sub-val context get-in [:message-drafts server-key channel-name])]
-    {:fx/type :text-field
-     :disable (boolean disable)
-     :id "channel-text-field"
-     :text (str message-draft)
-     :on-text-changed {:event/type :spring-lobby/assoc-in
-                       :path [:message-drafts server-key channel-name]}
-     :on-action {:event/type :skylobby.fx.event.chat/send
-                 :channel-name channel-name
-                 :message message-draft
-                 :server-key server-key}
-     :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
-                      :channel-name channel-name
-                      :server-key server-key}}))
+        message-draft (fx/sub-val context get-in [:message-drafts server-key channel-name])
+        history-index (fx/sub-val context get-in [:by-server server-key :channels channel-name :history-index])]
+    {:fx/type ext-recreate-on-key-changed
+     :key (str history-index)
+     :desc
+     {:fx/type ext-focused-by-default
+      :desc
+      {:fx/type fx/ext-on-instance-lifecycle
+       :on-created (fn [^TextField text-field]
+                     (.positionCaret text-field (count message-draft)))
+       :desc
+       {:fx/type :text-field
+        :disable (boolean disable)
+        :id "channel-text-field"
+        :text (str message-draft)
+        :on-text-changed {:event/type :spring-lobby/assoc-in
+                          :path [:message-drafts server-key channel-name]}
+        :on-action {:event/type :skylobby.fx.event.chat/send
+                    :channel-name channel-name
+                    :message message-draft
+                    :server-key server-key}
+        :on-key-pressed {:event/type :spring-lobby/on-channel-key-pressed
+                         :channel-name channel-name
+                         :server-key server-key}}}}}))
 
 (defn channel-send-button
   [{:fx/keys [context]

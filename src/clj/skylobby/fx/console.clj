@@ -2,12 +2,16 @@
   (:require
     [cljfx.api :as fx]
     skylobby.fx
-    [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-scroll-on-create]]
+    [skylobby.fx.ext :refer [
+                             ext-focused-by-default
+                             ext-recreate-on-key-changed
+                             ext-scroll-on-create]]
     [skylobby.fx.rich-text :as fx.rich-text]
     [skylobby.fx.virtualized-scroll-pane :as fx.virtualized-scroll-pane]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
+    (javafx.scene.control TextField)
     (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
 
 
@@ -80,6 +84,7 @@
              console-auto-scroll (fx/sub-val context :console-auto-scroll)
              console-log (fx/sub-val context get-in [:by-server server-key :console-log])
              console-message-draft (fx/sub-val context get-in [:by-server server-key :console-message-draft])
+             console-history-index (fx/sub-val context get-in [:by-server server-key :console-history-index])
              console-ignore-message-types (or (fx/sub-val context :console-ignore-message-types)
                                               {})
              message-types (->> console-log
@@ -120,18 +125,27 @@
                            :client-data client-data
                            :message console-message-draft
                            :server-key server-key}}
-              {:fx/type :text-field
+              {:fx/type ext-recreate-on-key-changed
                :h-box/hgrow :always
-               :id "console-text-field"
-               :text (str console-message-draft)
-               :on-text-changed {:event/type :spring-lobby/assoc-in
-                                 :path [:by-server server-key :console-message-draft]}
-               :on-action {:event/type :spring-lobby/send-console
-                           :client-data client-data
-                           :message console-message-draft
-                           :server-key server-key}
-               :on-key-pressed {:event/type :spring-lobby/on-console-key-pressed
-                                :server-key server-key}}]}]}
+               :key (str console-history-index)
+               :desc
+               {:fx/type ext-focused-by-default
+                :desc
+                {:fx/type fx/ext-on-instance-lifecycle
+                 :on-created (fn [^TextField text-field]
+                               (.positionCaret text-field (count console-message-draft)))
+                 :desc
+                 {:fx/type :text-field
+                  :id "console-text-field"
+                  :text (str console-message-draft)
+                  :on-text-changed {:event/type :spring-lobby/assoc-in
+                                    :path [:by-server server-key :console-message-draft]}
+                  :on-action {:event/type :spring-lobby/send-console
+                              :client-data client-data
+                              :message console-message-draft
+                              :server-key server-key}
+                  :on-key-pressed {:event/type :spring-lobby/on-console-key-pressed
+                                   :server-key server-key}}}}}]}]}
           {:fx/type :v-box
            :children
            [{:fx/type :label
