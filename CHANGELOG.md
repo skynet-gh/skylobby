@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.38](https://github.com/skynet-gh/skylobby/releases/tag/0.8.38) - 2022-06-06
+
+- Add URL highlighting and clicking in chat
+- Add split boxes on enter in split percent text field
+- Fix split boxes using fractions sometimes
+- Set caret to end when changing chat/console history
+- Fix some issues with direct connect disconnect
+
 ## [0.8.37](https://github.com/skynet-gh/skylobby/releases/tag/0.8.37) - 2022-06-05
 
 - Fix `host` and `teamleader` in start script
