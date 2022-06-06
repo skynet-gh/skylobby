@@ -192,8 +192,8 @@
 
 (defn split-boxes [state-atom {:keys [split-percent split-type server-key]}]
   (let [server-type (u/server-type server-key)
-        low (with-precision 9 (/ split-percent 100))
-        high (- 1.0 low)
+        low (double (/ split-percent 100))
+        high (double (- 1.0 low))
         nw {:startrectleft 0
             :startrecttop 0
             :startrectright low
