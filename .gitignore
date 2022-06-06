@@ -1,4 +1,5 @@
 *.orig
+*.swp
 /*.bin
 /*.db
 /*.dll

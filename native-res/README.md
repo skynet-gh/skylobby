@@ -32,6 +32,8 @@ Replace the versions with the ones on your system.
 
 ## Linux
 
+**For some reason you need GraalVM 21.3.0 for Linux**
+
 First build the jar with
 
 ```
@@ -47,6 +49,12 @@ and the GraalVM native-image-agent. Run with:
 
 Now use the program in order to reach areas you need to configure. Repeat this process for 
 different arguments if needed.
+
+To build the native image, you will need these installed (or equivalent for your OS):
+
+```
+sudo apt install -y build-essential gcc zlib1g-dev
+```
 
 You should now see the GraalVM config files populated in `native-res`. You can now build the native 
 image:

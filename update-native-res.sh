@@ -14,4 +14,4 @@ config="native-res/linux/META-INF/native-image/skylobby"
 "$GRAALVM_HOME/bin/java" \
   -javaagent:clojure-native-image-agent.jar=initialize-class=skylobby.main,output-dir=$config,ignore-file=agent-ignore.txt \
   -agentlib:native-image-agent=config-merge-dir=$config,config-write-period-secs=5 \
-  -jar $jar
+  -jar $jar "$@"

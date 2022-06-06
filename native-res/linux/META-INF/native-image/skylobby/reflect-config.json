@@ -57,6 +57,26 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]}
 ,
 {
+  "name":"com.sun.crypto.provider.TlsKeyMaterialGenerator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"com.sun.crypto.provider.TlsMasterSecretGenerator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"com.sun.crypto.provider.TlsPrfGenerator$V12",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"com.sun.org.apache.xerces.internal.jaxp.SAXParserImpl",
+  "queryAllPublicMethods":true}
+,
+{
   "name":"com.sun.org.apache.xerces.internal.jaxp.datatype.DatatypeFactoryImpl",
   "methods":[{"name":"<init>","parameterTypes":[] }]}
 ,
@@ -221,6 +241,16 @@
   "methods":[{"name":"getName","parameterTypes":[] }]}
 ,
 {
+  "name":"java.net.URISyntaxException",
+  "queryAllPublicMethods":true,
+  "methods":[
+    {"name":"getIndex","parameterTypes":[] }, 
+    {"name":"getInput","parameterTypes":[] }, 
+    {"name":"getMessage","parameterTypes":[] }, 
+    {"name":"getReason","parameterTypes":[] }
+  ]}
+,
+{
   "name":"java.nio.ByteBuffer",
   "methods":[
     {"name":"limit","parameterTypes":["int"] }, 
@@ -258,6 +288,10 @@
 {
   "name":"javax.security.auth.x500.X500Principal",
   "methods":[{"name":"<init>","parameterTypes":["sun.security.x509.X500Name"] }]}
+,
+{
+  "name":"javax.xml.parsers.SAXParser",
+  "methods":[{"name":"parse","parameterTypes":["java.io.InputStream","org.xml.sax.helpers.DefaultHandler"] }]}
 ,
 {
   "name":"net.jpountz.lz4.LZ4HCJNICompressor",
@@ -378,6 +412,12 @@
   ]}
 ,
 {
+  "name":"skylobby.util"}
+,
+{
+  "name":"skylobby.util__init"}
+,
+{
   "name":"sun.awt.X11.XToolkit",
   "methods":[{"name":"<init>","parameterTypes":[] }]}
 ,
@@ -410,6 +450,10 @@
 ,
 {
   "name":"sun.security.provider.DSA$SHA256withDSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"sun.security.provider.JavaKeyStore$DualFormatJKS",
   "methods":[{"name":"<init>","parameterTypes":[] }]}
 ,
 {
@@ -470,6 +514,18 @@
 ,
 {
   "name":"sun.security.rsa.RSASignature$SHA256withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"sun.security.rsa.RSASignature$SHA384withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"sun.security.ssl.KeyManagerFactoryImpl$SunX509",
+  "methods":[{"name":"<init>","parameterTypes":[] }]}
+,
+{
+  "name":"sun.security.ssl.SSLContextImpl$DefaultSSLContext",
   "methods":[{"name":"<init>","parameterTypes":[] }]}
 ,
 {
