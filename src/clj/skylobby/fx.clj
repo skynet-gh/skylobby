@@ -182,6 +182,8 @@
      {:-fx-fill "grey"}
      "-message"
      {:-fx-fill "white"}
+     "-message-ex"
+     {:-fx-fill "cyan"}
      "-message-url"
      {; https://stackoverflow.com/a/4774037
       :-fx-fill "#0000EE"

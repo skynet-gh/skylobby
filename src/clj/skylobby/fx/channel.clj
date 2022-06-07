@@ -21,7 +21,8 @@
   (:import
     (javafx.scene.control TextField)
     (javafx.scene.input Clipboard ClipboardContent)
-    (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)))
+    (org.fxmisc.richtext.model ReadOnlyStyledDocumentBuilder SegmentOps StyledSegment)
+    (org.nibor.autolink LinkExtractor LinkSpan LinkType)))
 
 
 (set! *warn-on-reflection* true)
@@ -67,6 +68,13 @@
    "14" "rgb(127,127,127)"
    "15" "rgb(210,210,210)"})
 
+(def
+  ^LinkExtractor
+  link-extractor
+  (-> (LinkExtractor/builder)
+      (.linkTypes #{LinkType/URL LinkType/WWW})
+      (.build)))
+
 (defn text-style [font-size]
   {:-fx-font-family monospace-font-family
    :-fx-font-size (font-size-or-default font-size)})
@@ -107,7 +115,7 @@
                 (segment
                   (str
                     (case message-type
-                      :ex (str "* " username " " text)
+                      :ex (str "* " username " ")
                       :join (str username " has joined")
                       :leave (str username " has left")
                       :info (str "* " text)
@@ -120,16 +128,33 @@
                                    (str "-" (name message-type))
                                    (when (and color-my-username (= username my-username))
                                      "-me"))))])]
-               (when-not message-type
-                 (->> text
-                      (re-seq #"(\s+|[^\s]+)")
-                      (mapv
-                        (fn [[_all text-segment]]
-                          (let [is-url (try
-                                         (java.net.URL. text-segment)
-                                         true
-                                         (catch Exception _e
-                                           false))]
+               (when (or (not message-type)
+                         (= :ex message-type))
+                 (let [links (seq (.extractLinks link-extractor text))
+                       segments (if links
+                                  (:segs
+                                    (reduce
+                                      (fn [{:keys [i segs]} ^LinkSpan link]
+                                        (let [begin (if link (.getBeginIndex link) (count text))
+                                              end (when link (.getEndIndex link))]
+                                          {:i end
+                                           :segs
+                                           (concat
+                                             segs
+                                             (when (and i begin (not= i begin))
+                                               [{:text-segment (subs text i begin)
+                                                 :is-url false}])
+                                             (when link
+                                               [{:text-segment (subs text begin end)
+                                                 :is-url true}]))}))
+                                      {:i 0
+                                       :segs []}
+                                      (concat links [nil])))
+                                  [{:text-segment text
+                                    :is-url false}])]
+                   (->> segments
+                        (mapv
+                          (fn [{:keys [is-url text-segment]}]
                             (segment
                               (str text-segment)
                               ["text"
@@ -142,7 +167,9 @@
                                                                          (string/lower-case substr))))
                                                 highlight))
                                    "skylobby-chat-message-highlight"
-                                   "skylobby-chat-message"))])))))
+                                   (str "skylobby-chat-message"
+                                        (when message-type
+                                          (str "-" (name message-type))))))])))))
                  #_ ; TODO IRC colors
                  (map
                    (fn [[_all _ _irc-color-code text-segment]])
