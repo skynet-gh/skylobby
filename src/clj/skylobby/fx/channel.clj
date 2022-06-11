@@ -2,6 +2,7 @@
   (:require
     [cljfx.api :as fx]
     [clojure.string :as string]
+    [skylobby.chat :as chat]
     [skylobby.fx :refer [monospace-font-family]]
     [skylobby.fx.ext :refer [
                              ext-focused-by-default
@@ -181,7 +182,7 @@
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
         hide-spads-messages (fx/sub-val context :hide-spads-messages)
         hide-vote-messages (fx/sub-val context :hide-vote-messages)
-        ignore-users (fx/sub-val context :ignore-users)
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
         ignore-users-set (->> (get ignore-users server-key)
                               (filter second)
                               (map first)
@@ -193,19 +194,15 @@
         area-id (str "channel-text-area" channel-name "-" server-key)
         area-id (string/replace area-id #"[^_a-zA-Z0-9-]" "")
         area-id-css (str "#" area-id)
+        filter-fn (partial chat/visible-message?
+                    {
+                     :hide-barmanager-messages hide-barmanager-messages
+                     :hide-joinas-spec hide-joinas-spec
+                     :hide-spads-set hide-spads-set
+                     :hide-vote-messages hide-vote-messages
+                     :ignore-users-set ignore-users-set})
         messages (->> messages
-                      (remove (comp ignore-users-set :username))
-                      (remove (comp ignore-users-set :on-behalf-of :relay))
-                      (remove (comp hide-spads-set :spads-message-type :spads))
-                      (remove (if hide-vote-messages (comp :vote :vote) (constantly false)))
-                      (remove (if hide-joinas-spec (comp #{"joinas spec"} :command :vote) (constantly false)))
-                      (remove
-                        (fn [{:keys [message-type text]}]
-                          (if hide-barmanager-messages
-                            (and (= :ex message-type)
-                                 text
-                                 (string/starts-with? text "* BarManager|"))
-                            false)))
+                      (filter filter-fn)
                       reverse)]
     {:fx/type ext-recreate-on-key-changed
      :key {:ignore ignore-users-set

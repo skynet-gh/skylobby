@@ -66,7 +66,7 @@
     (javafx.scene.input KeyCode KeyCodeCombination KeyCombination KeyEvent MouseEvent ScrollEvent)
     (javafx.scene.media Media MediaPlayer)
     (javafx.scene Node)
-    (javafx.stage DirectoryChooser FileChooser)
+    (javafx.stage DirectoryChooser FileChooser Stage)
     (javafx.util Duration)
     (manifold.stream SplicedStream)
     (org.controlsfx.control Notifications)
@@ -222,6 +222,8 @@
    :filter-replay-min-players
    :filter-users
    :focus-chat-on-message
+   :focus-on-incoming-direct-message
+   :focus-on-incoming-battle-message
    :friend-users
    :hide-barmanager-messages
    :hide-empty-battles
@@ -355,6 +357,7 @@
      :chat-color-username true
      :chat-highlight-username true
      :disable-tasks-while-in-game true
+     :focus-on-incoming-direct-message true
      :hide-barmanager-messages true
      :highlight-tabs-with-new-battle-messages true
      :highlight-tabs-with-new-chat-messages true
@@ -417,6 +420,9 @@
       (cache-factory-with-threshold
         cache/lru-cache-factory
         ui-cache-size))))
+
+(def ^Stage ^:dynamic javafx-root-stage nil)
+
 
 (def main-stage-atom (atom nil))
 
@@ -3762,25 +3768,39 @@
 (defn ring-impl []
   (sound/play-ring @*state))
 
+(defn focus-impl [message-data]
+  (log/info "Requesting main window focus due to chat message" message-data)
+  (Platform/runLater
+    (fn []
+      (when javafx-root-stage
+        (.requestFocus javafx-root-stage)
+        (.toFront javafx-root-stage)))))
+
+
+(def notification-action-handler
+  (reify EventHandler
+    (handle [_this e]
+      (log/info "Notification clicked" e))))
+
 (defn notify-impl [{:keys [hide-after text title]}]
   (Platform/runLater
     (fn []
-      (let [handler (reify EventHandler
-                      (handle [_this e]
-                        (log/info "Notification clicked" e)))]
+      (if (or (not javafx-root-stage)
+              (not (.isFocused javafx-root-stage)))
         (doto (Notifications/create)
           (.darkStyle)
           (.title (str "skylobby " title))
           (.text text)
           (.hideAfter (Duration. (or hide-after 10000)))
-          (.onAction handler)
+          (.onAction notification-action-handler)
           (.threshold 3
             (doto (Notifications/create)
               (.darkStyle)
               (.title "skylobby New Messages")
-              (.onAction handler)
+              (.onAction notification-action-handler)
               (.hideAfter (Duration. (or hide-after 10000)))))
-          (.show))))))
+          (.show))
+        (log/info "Skipping notifications, main window already in focus")))))
 
 (defn extra-pre-game []
   (try
@@ -3851,6 +3871,7 @@
    (alter-var-root #'skylobby.spring/extra-post-game (constantly extra-post-game))
    (alter-var-root #'skylobby.client.handler/ring-impl (constantly ring-impl))
    (alter-var-root #'skylobby.client.handler/notify-impl (constantly notify-impl))
+   (alter-var-root #'skylobby.client.handler/focus-impl (constantly focus-impl))
    (task-handlers/add-handlers handle-task state-atom)
    (try
      (let [custom-css-file (fs/file (fs/app-root) "custom-css.edn")]

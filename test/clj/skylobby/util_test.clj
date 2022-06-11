@@ -43,36 +43,36 @@
            @state-atom))))
 
 
-(deftest update-chat-messages-fn
+(deftest chat-message-data
   (let [now 12345]
-    (is (= [{:text "m"
-             :timestamp now
-             :username "me"
-             :message-type :ex
-             :spads nil
-             :vote nil
-             :relay nil}]
+    (is (= {:text "m"
+            :timestamp now
+            :username "me"
+            :message-type :ex
+            :spads nil
+            :vote nil
+            :relay nil}
            (with-redefs [u/curr-millis (constantly now)]
-             ((u/update-chat-messages-fn "me" "m" true) []))))
-    (is (= [{:text "!y"
-             :timestamp now
-             :username "me"
-             :message-type nil
-             :spads nil
-             :vote {:command "y"
-                    :vote :y}
-             :relay nil}]
+             (u/chat-message-data "me" "m" true))))
+    (is (= {:text "!y"
+            :timestamp now
+            :username "me"
+            :message-type nil
+            :spads nil
+            :vote {:command "y"
+                   :vote :y}
+            :relay nil}
            (with-redefs [u/curr-millis (constantly now)]
-             ((u/update-chat-messages-fn "me" "!y" false) []))))
-    (is (= [{:text "<you> blah"
-             :timestamp now
-             :username "me"
-             :message-type nil
-             :spads nil
-             :vote nil
-             :relay {:on-behalf-of "you"}}]
+             (u/chat-message-data "me" "!y" false))))
+    (is (= {:text "<you> blah"
+            :timestamp now
+            :username "me"
+            :message-type nil
+            :spads nil
+            :vote nil
+            :relay {:on-behalf-of "you"}}
            (with-redefs [u/curr-millis (constantly now)]
-             ((u/update-chat-messages-fn "me" "<you> blah" false) []))))))
+             (u/chat-message-data "me" "<you> blah" false))))))
 
 
 (deftest parse-skill

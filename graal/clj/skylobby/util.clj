@@ -431,18 +431,17 @@
             :else y))
     ms))
 
-(defn update-chat-messages-fn
+(defn chat-message-data
   ([username message]
-   (update-chat-messages-fn username message false))
+   (chat-message-data username message false))
   ([username message ex]
-   (fn [messages]
-     (conj messages {:text message
-                     :timestamp (curr-millis)
-                     :username username
-                     :message-type (when ex :ex)
-                     :spads (when ex (spads/parse-spads-message message))
-                     :vote (when-not ex (spads/parse-command-message message))
-                     :relay (when-not ex (spads/parse-relay-message message))}))))
+   {:text message
+    :timestamp (curr-millis)
+    :username username
+    :message-type (when ex :ex)
+    :spads (when ex (spads/parse-spads-message message))
+    :vote (when-not ex (spads/parse-command-message message))
+    :relay (when-not ex (spads/parse-relay-message message))}))
 
 
 (defn random-color

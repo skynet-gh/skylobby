@@ -7,6 +7,7 @@
     [clojure.string :as string]
     crypto.random
     [skylobby.battle :as battle]
+    [skylobby.chat :as chat]
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.fs :as fs]
@@ -22,6 +23,10 @@
 (def ^:dynamic ring-impl
   (fn []
     (log/warn "No ring implementation set")))
+
+(def ^:dynamic focus-impl
+  (fn [_]
+    (log/warn "No focus implementation set")))
 
 (def ^:dynamic notify-impl
   (fn [_]
@@ -545,9 +550,7 @@
        :username username})))
 
 (defn- update-incoming-chat
-  ([state-atom server-key channel-name update-messages-fn]
-   (update-incoming-chat state-atom server-key channel-name update-messages-fn nil))
-  ([state-atom server-key channel-name update-messages-fn {:keys [message username] :as message-data}]
+  ([state-atom server-key channel-name {:keys [text username] :as message-data}]
    (swap! state-atom
      (fn [state]
        (let [focus-chat (:focus-chat-on-message state)
@@ -564,11 +567,20 @@
              battle-channel-name (when (:battle-id battle)
                                    (u/battle-channel-name battle))
              json-from-host-for-battle-id (when (and (get-in users [username :client-status :bot])
-                                                     (string/starts-with? message "!#JSONRPC "))
+                                                     (string/starts-with? text "!#JSONRPC "))
                                             (->> battles
                                                  (filter (comp #{username} :host-username second))
                                                  first
                                                  first))
+             {:keys [hide-spads-messages ignore-users]} state
+             ignore-users (get ignore-users server-key)
+             message-visible (chat/visible-message?
+                               (assoc (select-keys state [:hide-barmanager-messages
+                                                          :hide-joinas-spec
+                                                          :hide-vote-messages])
+                                      :hide-spads-set (chat/hide-spads-set hide-spads-messages)
+                                      :ignore-users-set (chat/ignore-users-set ignore-users))
+                               message-data)
              needs-focus (and (not focus-chat)
                               (not capture)
                               (not json-from-host-for-battle-id)
@@ -577,27 +589,29 @@
                                         (if-not battle-channel?
                                           (= channel-tab selected-tab-channel)
                                           true))))]
-         (when (and (u/user-channel-name? channel-name)
-                    (:notify-on-incoming-direct-message state)
-                    needs-focus
+         (when (and message-visible
                     (not (get-in state [:mute server-key channel-tab])))
-           (notify-impl
-             {:title "Direct Message"
-              :text (str username ": " message)}))
-         (when (and battle-channel?
-                    (:notify-on-incoming-battle-message state)
-                    needs-focus
-                    (not (get-in state [:mute server-key channel-tab])))
-           (notify-impl
-             {:title "Battle Message"
-              :text (str username ": " message)}))
+           (when (u/user-channel-name? channel-name)
+             (when (:notify-on-incoming-direct-message state)
+               (notify-impl
+                 {:title "Direct Message"
+                  :text (str username ": " text)}))
+             (when (:focus-on-incoming-direct-message state)
+               (focus-impl message-data)))
+           (when battle-channel?
+             (when (:notify-on-incoming-battle-message state)
+               (notify-impl
+                 {:title "Battle Message"
+                  :text (str username ": " text)}))
+             (when (:focus-on-incoming-battle-message state)
+               (focus-impl message-data))))
          (cond-> (update-in state [:by-server server-key]
                    (fn [state]
-                     (cond-> (update-in state [:channels channel-name :messages] update-messages-fn)
+                     (cond-> (update-in state [:channels channel-name :messages] conj message-data)
                              (not capture)
                              (assoc-in [:my-channels channel-name] {})
                              capture
-                             (update-in [:channels channel-name :capture] #(str % "\n" message)))))
+                             (update-in [:channels channel-name :capture] #(str % "\n" text)))))
                  needs-focus
                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)
                  (and (not battle-channel?) focus-chat)
@@ -609,7 +623,7 @@
                  json-from-host-for-battle-id
                  (assoc-in [:by-server server-key :battles json-from-host-for-battle-id :user-details]
                    (try
-                     (let [[_all json] (re-find #"[^\s+]\s+(.*)" message)]
+                     (let [[_all json] (re-find #"[^\s+]\s+(.*)" text)]
                        (->> (json/parse-string json true)
                             :result
                             :battleLobby
@@ -630,14 +644,14 @@
                             (into {})))
                      (catch Exception e
                        (log/error e "Error parsing jsonrpc response"
-                         (with-out-str (pprint {:message message
+                         (with-out-str (pprint {:message text
                                                 :username username
                                                 :json-from-host-for-battle-id json-from-host-for-battle-id}))))))))))))
 
 
 (defmethod handle "SAID" [state-atom server-key m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message) {:message message :username username})))
+    (update-incoming-chat state-atom server-key channel-name (u/chat-message-data username message))))
 
 (defn spec-because-unready-message? [message]
   (boolean
@@ -649,7 +663,7 @@
 
 (defmethod handle "SAIDEX" [state-atom server-key m]
   (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
-        state (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true) {:message message :username username})
+        state (update-incoming-chat state-atom server-key channel-name (u/chat-message-data username message true))
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
         me (-> battle :users (get my-username))]
@@ -661,44 +675,57 @@
 
 
 (defmethod handle "SAIDFROM" [state-atom server-url m]
-  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)]
-    (swap! state-atom update-in [:by-server server-url :channels channel-name :messages]
-      (u/update-chat-messages-fn username message))))
+  (let [[_all channel-name username message] (re-find #"\w+ ([^\s]+) ([^\s]+) (.*)" m)
+        message-data (u/chat-message-data username message)]
+    (swap! state-atom update-in [:by-server server-url :channels channel-name :messages] conj message-data)))
 
 
 ; legacy battle chat
 
 (defn update-saidbattle
-  [state-atom server-key update-messages-fn {:keys [message username]}]
+  [state-atom server-key {:keys [text username] :as message-data}]
   (swap! state-atom
     (fn [state]
       (if-let [battle-id (-> state :by-server (get server-key) :battle :battle-id)]
         (let [channel-name (str "__battle__" battle-id)
               needs-focus (not (and (= server-key (:selected-server-tab state))
                                     (= "battle" (get-in state [:selected-tab-main server-key]))))
-              channel-tab :battle]
-          (when (and (:notify-on-incoming-battle-message state)
-                     needs-focus
+              channel-tab :battle
+              {:keys [hide-spads-messages ignore-users]} state
+              ignore-users (get ignore-users server-key)
+              message-visible (chat/visible-message?
+                                (assoc (select-keys state [:hide-barmanager-messages
+                                                           :hide-joinas-spec
+                                                           :hide-vote-messages])
+                                       :hide-spads-set (chat/hide-spads-set hide-spads-messages)
+                                       :ignore-users-set (chat/ignore-users-set ignore-users))
+                                message-data)]
+          (when (and message-visible
                      (not (get-in state [:mute server-key channel-tab])))
-            (notify-impl
-              {:title "Battle Message"
-               :text (str username ": " message)}))
+            (when (:focus-on-incoming-battle-message state)
+              (focus-impl message-data))
+            (when (:notify-on-incoming-battle-message state)
+              (notify-impl
+                {:title "Battle Message"
+                 :text (str username ": " text)})))
           (cond->
                   (update-in state [:by-server server-key]
                     (fn [server]
                       (-> server
-                          (update-in [:channels channel-name :messages] update-messages-fn))))
+                          (update-in [:channels channel-name :messages] conj message-data))))
                   needs-focus
                   (assoc-in [:needs-focus server-key "battle" channel-tab] true)))
         state))))
 
 (defmethod handle "SAIDBATTLE" [state-atom server-key m]
-  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
-    (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message) {:message message :username username})))
+  (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
+        message-data (u/chat-message-data username message)]
+    (update-saidbattle state-atom server-key message-data)))
 
 (defmethod handle "SAIDBATTLEEX" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
-        state (update-saidbattle state-atom server-key (u/update-chat-messages-fn username message true) {:message message :username username})
+        message-data (u/chat-message-data username message true)
+        state (update-saidbattle state-atom server-key message-data)
         {:keys [auto-unspec battle client-data] :as server-data} (-> state :by-server (get server-key))
         my-username (:username server-data)
         me (-> battle :users (get my-username))
@@ -719,28 +746,28 @@
 (defmethod handle "SAYPRIVATE" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
-        (-> state
-            (update-in [:channels (u/user-channel-name username) :messages]
-              (u/update-chat-messages-fn (:username state) message)))))))
+      (fn [server-data]
+        (let [message-data (u/chat-message-data (:username server-data) message)]
+          (-> server-data
+              (update-in [:channels (u/user-channel-name username) :messages] conj message-data)))))))
 
 (defmethod handle "SAIDPRIVATE" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel-name username)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message) {:message message :username username})))
+    (update-incoming-chat state-atom server-key channel-name (u/chat-message-data username message))))
 
 (defmethod handle "SAYPRIVATEEX" [state-atom server-url m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)]
     (swap! state-atom update-in [:by-server server-url]
-      (fn [state]
-        (-> state
-            (update-in [:channels (u/user-channel-name username) :messages]
-              (u/update-chat-messages-fn (:username state) message true)))))))
+      (fn [server-data]
+        (let [message-data (u/chat-message-data (:username server-data) message true)]
+          (-> server-data
+              (update-in [:channels (u/user-channel-name username) :messages] conj message-data)))))))
 
 (defmethod handle "SAIDPRIVATEEX" [state-atom server-key m]
   (let [[_all username message] (re-find #"\w+ ([^\s]+) (.*)" m)
         channel-name (u/user-channel-name username)]
-    (update-incoming-chat state-atom server-key channel-name (u/update-chat-messages-fn username message true) {:message message :username username})))
+    (update-incoming-chat state-atom server-key channel-name (u/chat-message-data username message true))))
 
 (defmethod handle "JOINEDBATTLE" [state-atom server-url m]
   (let [[_all battle-id username _ script-password] (re-find #"\w+ (\w+) ([^\s]+)( (.+))?" m)]

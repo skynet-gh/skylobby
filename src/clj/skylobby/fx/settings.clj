@@ -175,7 +175,7 @@
          :text " Players display type: "}
         {:fx/type :combo-box
          :value (or (fx/sub-val context :battle-players-display-type)
-                    "group")
+                    "table")
          :items ["group" "table"]
          :on-value-changed {:event/type :spring-lobby/assoc
                             :key :battle-players-display-type}}]}
@@ -304,6 +304,8 @@
         extra-replay-path (fx/sub-val context :extra-replay-path)
         extra-replay-recursive (fx/sub-val context :extra-replay-recursive)
         focus-chat-on-message (fx/sub-val context :focus-chat-on-message)
+        focus-on-incoming-direct-message (fx/sub-val context :focus-on-incoming-direct-message)
+        focus-on-incoming-battle-message (fx/sub-val context :focus-on-incoming-battle-message)
         hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
         hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
         hide-spads-messages (fx/sub-val context :hide-spads-messages)
@@ -535,6 +537,22 @@
              :selected (boolean notify-on-incoming-battle-message)
              :on-selected-changed {:event/type :spring-lobby/assoc
                                    :key :notify-on-incoming-battle-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Focus main window for incoming direct chat message"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean focus-on-incoming-direct-message)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :focus-on-incoming-direct-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Focus main window for battle chat message"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean focus-on-incoming-battle-message)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :focus-on-incoming-battle-message}}}
            {:fx/type filterable-checkbox-setting
             :title " Auto complete suggestions"
             :search settings-search
