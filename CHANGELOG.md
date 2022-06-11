@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.0](https://github.com/skynet-gh/skylobby/releases/tag/0.9.0) - 2022-06-11
+
+- Use Java 17 and ZGC to improve memory usage
+
 ## [0.8.38](https://github.com/skynet-gh/skylobby/releases/tag/0.8.38) - 2022-06-06
 
 - Add URL highlighting and clicking in chat
