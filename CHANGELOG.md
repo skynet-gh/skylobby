@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/skynet-gh/skylobby/releases/tag/0.9.1) - 2022-06-11
+
+- Add setting to focus window on new chat messages
+- Fix notifications for ignored chat messages
+- Add replay chat filter text input
+- Fix chat link parsing for www. type links
+
 ## [0.9.0](https://github.com/skynet-gh/skylobby/releases/tag/0.9.0) - 2022-06-11
 
 - Use Java 17 and ZGC to improve memory usage
