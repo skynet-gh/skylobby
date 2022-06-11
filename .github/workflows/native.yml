@@ -28,13 +28,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.3
+      - uses: actions/cache@v3.0.4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.1
+      - uses: DeLaGuardo/setup-clojure@6.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -66,13 +66,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.3
+      - uses: actions/cache@v3.0.4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.1
+      - uses: DeLaGuardo/setup-clojure@6.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -96,13 +96,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.3
+      - uses: actions/cache@v3.0.4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@5.1
+      - uses: DeLaGuardo/setup-clojure@6.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
