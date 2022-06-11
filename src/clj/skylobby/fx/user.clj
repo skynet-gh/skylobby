@@ -157,7 +157,7 @@
         :sortable false
         :text "Status"
         :resizable false
-        :pref-width 56
+        :pref-width 64
         :cell-value-factory #(select-keys (:client-status %) [:bot :access :away :ingame :friend])
         :cell-factory
         {:fx/cell-type :table-cell
@@ -192,7 +192,7 @@
        {:fx/type :table-column
         :text "Country"
         :resizable false
-        :pref-width 64
+        :pref-width 72
         :cell-value-factory :country
         :cell-factory
         {:fx/cell-type :table-cell
