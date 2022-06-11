@@ -418,26 +418,27 @@
                :items u/player-name-color-types
                :on-value-changed {:event/type :spring-lobby/assoc
                                   :key :battle-players-color-type}}]}]
-           (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-             (let [watch-button {:fx/type :button
-                                 :style {:-fx-font-size 24}
-                                 :text (if spring-running
-                                         " Watching a replay"
-                                         " Watch")
-                                 :disable (boolean spring-running)
-                                 :on-action
-                                 {:event/type :spring-lobby/watch-replay
-                                  :engines engines
-                                  :engine-version selected-engine-version
-                                  :replay selected-replay
-                                  :spring-isolation-dir spring-isolation-dir}
-                                 :graphic
-                                 {:fx/type font-icon/lifecycle
-                                  :icon-literal "mdi-movie:24:white"}}]
-               [{:fx/type :h-box
-                 :children
-                 [watch-button
-                  {:fx/type :pane
+           (let [watch-button {:fx/type :button
+                               :style {:-fx-font-size 24}
+                               :text (if spring-running
+                                       " Watching a replay"
+                                       " Watch")
+                               :disable (boolean spring-running)
+                               :on-action
+                               {:event/type :spring-lobby/watch-replay
+                                :engines engines
+                                :engine-version selected-engine-version
+                                :replay selected-replay
+                                :spring-isolation-dir spring-isolation-dir}
+                               :graphic
+                               {:fx/type font-icon/lifecycle
+                                :icon-literal "mdi-movie:24:white"}}]
+             [{:fx/type :h-box
+               :children
+               (concat
+                 (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+                   [watch-button])
+                 [{:fx/type :pane
                    :h-box/hgrow :always}
                   {:fx/type :button
                    :style {:-fx-font-size 24}
@@ -454,8 +455,9 @@
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-close:24:white"}}
                   {:fx/type :pane
-                   :h-box/hgrow :always}
-                  watch-button]}])))}
+                   :h-box/hgrow :always}]
+                 (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+                   [watch-button]))}]))}
         {:fx/type :v-box
          :children
          (concat
