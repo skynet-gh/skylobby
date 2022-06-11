@@ -70,6 +70,7 @@
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.1"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.1"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"}
+  org.nibor.autolink/autolink {:mvn/version "0.10.0"}
   org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.36"}
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.36"}
@@ -100,8 +101,7 @@
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
    :jvm-opts [
-              "-server"
-              "-Xms32m" "-Xmx2g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+              "-Xmx4g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseZGC"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"

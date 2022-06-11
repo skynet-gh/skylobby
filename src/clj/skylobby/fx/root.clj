@@ -24,7 +24,9 @@
     [skylobby.fx.tasks :as fx.tasks]
     [skylobby.util :as u]
     spring-lobby
-    [taoensso.tufte :as tufte]))
+    [taoensso.tufte :as tufte])
+  (:import
+    (javafx.stage Stage)))
 
 
 (set! *warn-on-reflection* true)
@@ -93,7 +95,9 @@
     {:fx/type fx/ext-many
      :desc
      [{:fx/type fx/ext-on-instance-lifecycle
-       :on-created (partial skylobby.fx/add-maximized-listener :main)
+       :on-created (fn [^Stage stage]
+                     (skylobby.fx/add-maximized-listener :main stage)
+                     (alter-var-root #'spring-lobby/javafx-root-stage (constantly stage)))
        :desc
        {:fx/type :stage
         :showing true

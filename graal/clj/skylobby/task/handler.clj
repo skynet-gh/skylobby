@@ -1026,21 +1026,21 @@
                               (comp invalid-replay-paths fs/canonical-path second)
                               todo)]
         (cond
-          (= (set todo)
-             (set valid-next-round))
-          (log/warn "Infinite loop detected, aborting replay refresh")
-          (seq valid-next-round)
-          (task/add-task! state-atom
-                          {:spring-lobby/task-type :spring-lobby/refresh-replays
-                           :todo (count todo)})
-          :else
+          (empty? valid-next-round)
           (do
             (log/info "No valid replays left to parse")
             (fs/spit-app-edn
              ((:select-fn parsed-replays-config) new-state)
              (:filename parsed-replays-config)
              parsed-replays-config)
-            (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replay-resources}))))))
+            (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replay-resources}))
+          (= (set todo)
+             (set valid-next-round))
+          (log/warn "Infinite loop detected, aborting replay refresh")
+          :else
+          (task/add-task! state-atom
+                          {:spring-lobby/task-type :spring-lobby/refresh-replays
+                           :todo (count todo)})))))
   (defmethod task-handler :spring-lobby/refresh-replay-resources [_]
     [state-atom]
     (log/info "Refresh replay resources")
