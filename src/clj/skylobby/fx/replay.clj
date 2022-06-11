@@ -462,22 +462,59 @@
            (when show-sync-left
              [sync-pane])
            (if full-replay-details
-             (let [{:keys [chat-log player-num-to-name]} (-> full-replay-details :body :demo-stream)]
-               [{:fx/type :label
-                 :text "Chat log"
-                 :style {:-fx-font-size 20}}
-                {:fx/type fx.virtualized-scroll-pane/lifecycle
+             (let [{:keys [chat-log player-num-to-name]} (-> full-replay-details :body :demo-stream)
+                   filter-replay-chat (fx/sub-val context :filter-replay-chat)
+                   filter-terms (->> (string/split (or filter-replay-chat "") #"\s+")
+                                     (remove string/blank?)
+                                     (map string/lower-case))
+                   chat-log (->> chat-log
+                                 (filter
+                                   (fn [{:keys [command from message]}]
+                                     (if (string/blank? filter-replay-chat)
+                                       true
+                                       (and (= 7 command)
+                                         (or
+                                           (when message
+                                             (let [message-lc (string/lower-case message)]
+                                               (some
+                                                 (fn [term]
+                                                   (string/includes? message-lc term))
+                                                 filter-terms)))
+                                           (when-let [player (get player-num-to-name from)]
+                                             (let [player-lc (string/lower-case player)]
+                                               (some
+                                                 (fn [term]
+                                                   (string/includes? player-lc term))
+                                                 filter-terms)))))))))]
+               [{:fx/type :h-box
+                 :alignment :center-left
+                 :children
+                 [
+                  {:fx/type :label
+                   :text "Chat log "
+                   :style {:-fx-font-size 20}}
+                  {:fx/type :label
+                   :text " filter: "
+                   :style {:-fx-font-size 16}}
+                  {:fx/type :text-field
+                   :text (str filter-replay-chat)
+                   :on-text-changed {:event/type :spring-lobby/assoc
+                                     :key :filter-replay-chat}}]}
+                {:fx/type ext-recreate-on-key-changed
                  :v-box/vgrow :always
-                 :content
-                 {:fx/type fx.rich-text/lifecycle-inline
-                  :editable false
-                  :style {:-fx-font-family skylobby.fx/monospace-font-family
-                          :-fx-font-size 18}
-                  :wrap-text true
-                  :document (chat-log-document
-                              chat-log
-                              {:player-name-to-color player-name-to-color
-                               :player-num-to-name player-num-to-name})}}])
+                 :key filter-replay-chat
+                 :desc
+                 {:fx/type fx.virtualized-scroll-pane/lifecycle
+                  :content
+                  {:fx/type fx.rich-text/lifecycle-inline
+                   :editable false
+                   :style {:-fx-font-family skylobby.fx/monospace-font-family
+                           :-fx-font-size 18}
+                   :wrap-text true
+                   :document (chat-log-document
+                               chat-log
+                               {:player-name-to-color player-name-to-color
+                                :player-num-to-name player-num-to-name})}}}])
              [{:fx/type :label
                :text "Loading replay stream..."}]))}]}
       {:fx/type :v-box
