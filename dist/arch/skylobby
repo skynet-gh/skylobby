@@ -1,10 +1,12 @@
 #!/bin/sh
-exec /usr/bin/java \
+exec /usr/lib/jvm/java-17-openjdk/bin/java \
   -Dglass.gtk.uiScale=1.1 \
-  -server \
+  -XX:+UseZGC \
   -Xmx2g \
   -XX:+ExitOnOutOfMemoryError \
   -XX:+DoEscapeAnalysis \
   -XX:+UseCompressedOops \
+  --add-opens=java.base/java.nio=ALL-UNNAMED \
+  --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
   -jar '/usr/share/java/skylobby/skylobby.jar' \
   "$@"
