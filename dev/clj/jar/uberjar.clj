@@ -2,9 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.tools.build.api :as b]
-    [skylobby.git :as git])
-  (:import
-    (javafx.application Platform)))
+    [skylobby.git :as git]))
 
 
 (def lib 'skylobby/skylobby)
@@ -33,7 +31,11 @@
   (b/compile-clj {:basis basis
                   :src-dirs src-dirs
                   :class-dir class-dir
-                  :java-opts ["-Dtestfx.robot=glass" "-Dglass.platform=Monocle" "-Dmonocle.platform=Headless" "-Dprism.order=sw"]})
+                  :java-opts [
+                              "-Dtestfx.robot=glass"
+                              "-Dglass.platform=Monocle"
+                              "-Dmonocle.platform=Headless"
+                              "-Dprism.order=sw"]})
   (println "\nBuilding uberjar\n")
   (b/uber {:class-dir class-dir
            :uber-file uber-file
@@ -43,5 +45,4 @@
   (println "\nDeleting classes dir\n")
   (b/delete {:path "target/classes"})
   (println "\nExiting\n")
-  (Platform/exit)
   (System/exit 0))
