@@ -770,9 +770,9 @@
                             :extra-replay-recursive extra-replay-recursive}
                 :text (cond
                         (string/blank? extra-replay-path)
-                        "Set replay sourcce path"
+                        "Set replay source path"
                         (string/blank? extra-replay-name)
-                        "Set replay sourcce name"
+                        "Set replay source name"
                         :else
                         "Add replay source")
                 :graphic
