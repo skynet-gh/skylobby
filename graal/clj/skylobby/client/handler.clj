@@ -535,17 +535,18 @@
                     (mapcat (fn [client] [client {:bridge bridge}]) clients))))))
 
 (defn parse-coordinator-message
-  [{:keys [username message timestamp]}]
-  (when (= "Coordinator" username)
-    (when (or (re-find #"You are position \d+ in the queue" message)
-              (re-find #"Join queue: .*" message)
-              (re-find #"is moving to a new lobby" message)
-              (re-find #"If you want to follow someone else then say" message)
-              (re-find #"The split will take place in" message)
-              (re-find #"You can change your mind at any time" message)
-              (re-find #"Thank you for submitting your report" message))
+  [{:keys [username text timestamp]}]
+  (when (and text
+             (= "Coordinator" username))
+    (when (or (re-find #"You are position \d+ in the queue" text)
+              (re-find #"Join queue: .*" text)
+              (re-find #"is moving to a new lobby" text)
+              (re-find #"If you want to follow someone else then say" text)
+              (re-find #"The split will take place in" text)
+              (re-find #"You can change your mind at any time" text)
+              (re-find #"Thank you for submitting your report" text))
       {:message-type :info
-       :text message
+       :text text
        :timestamp timestamp
        :username username})))
 
