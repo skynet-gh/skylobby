@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.2](https://github.com/skynet-gh/skylobby/releases/tag/0.9.2) - 2022-06-13
+
+- Fix direct message parsing
+- Add setting to disable notifications while in game
+- Add setting to disable notifications when chat tab is selected
+
 ## [0.9.1](https://github.com/skynet-gh/skylobby/releases/tag/0.9.1) - 2022-06-11
 
 - Add setting to focus window on new chat messages
