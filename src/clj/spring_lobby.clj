@@ -253,6 +253,8 @@
    :my-channels
    :notify-on-incoming-direct-message
    :notify-on-incoming-battle-message
+   :notify-when-in-game
+   :notify-when-tab-selected
    :password
    :players-table-columns
    :pop-out-battle
@@ -368,6 +370,7 @@
      :ipc-server-port u/default-ipc-port
      :leave-battle-on-close-window true
      :notify-on-incoming-direct-message true
+     :notify-when-tab-selected true
      :players-table-columns {:skill true
                              :ally true
                              :team true
