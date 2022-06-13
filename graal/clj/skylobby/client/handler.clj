@@ -557,6 +557,7 @@
        (let [focus-chat (:focus-chat-on-message state)
              selected-tab-channel (get-in state [:selected-tab-channel server-key])
              {:keys [battle battles my-channels users] :as server-data} (get-in state [:by-server server-key])
+             am-i-ingame (get-in users [(:username server-data) :client-status :ingame])
              needs-selected-tab-channel-fix (or (not selected-tab-channel)
                                                 (not (contains? my-channels selected-tab-channel)))
              battle-channel? (u/battle-channel-name? channel-name)
@@ -573,7 +574,16 @@
                                                  (filter (comp #{username} :host-username second))
                                                  first
                                                  first))
-             {:keys [hide-spads-messages ignore-users]} state
+             {:keys [hide-spads-messages ignore-users notify-on-incoming-battle-message notify-on-incoming-direct-message notify-when-in-game notify-when-tab-selected]} state
+             tab-selected (and (= server-key (:selected-server-tab state))
+                               (= main-tab (get-in state [:selected-tab-main server-key]))
+                               (if-not battle-channel?
+                                 (= channel-tab selected-tab-channel)
+                                 true))
+             should-notify (not (and (or (not am-i-ingame)
+                                         notify-when-in-game)
+                                     (or notify-when-tab-selected
+                                         (not tab-selected))))
              ignore-users (get ignore-users server-key)
              message-visible (chat/visible-message?
                                (assoc (select-keys state [:hide-barmanager-messages
@@ -585,22 +595,18 @@
              needs-focus (and (not focus-chat)
                               (not capture)
                               (not json-from-host-for-battle-id)
-                              (not (and (= server-key (:selected-server-tab state))
-                                        (= main-tab (get-in state [:selected-tab-main server-key]))
-                                        (if-not battle-channel?
-                                          (= channel-tab selected-tab-channel)
-                                          true))))]
+                              (not tab-selected))]
          (when (and message-visible
                     (not (get-in state [:mute server-key channel-tab])))
            (when (u/user-channel-name? channel-name)
-             (when (:notify-on-incoming-direct-message state)
+             (when (and notify-on-incoming-direct-message should-notify)
                (notify-impl
                  {:title "Direct Message"
                   :text (str username ": " text)}))
              (when (:focus-on-incoming-direct-message state)
                (focus-impl message-data)))
            (when battle-channel?
-             (when (:notify-on-incoming-battle-message state)
+             (when (and notify-on-incoming-battle-message should-notify)
                (notify-impl
                  {:title "Battle Message"
                   :text (str username ": " text)}))
@@ -692,7 +698,15 @@
               needs-focus (not (and (= server-key (:selected-server-tab state))
                                     (= "battle" (get-in state [:selected-tab-main server-key]))))
               channel-tab :battle
-              {:keys [hide-spads-messages ignore-users]} state
+              {:keys [hide-spads-messages ignore-users notify-on-incoming-battle-message notify-when-in-game notify-when-tab-selected]} state
+              {:keys [users] :as server-data} (get-in state [:by-server server-key])
+              am-i-ingame (get-in users [(:username server-data) :client-status :ingame])
+              tab-selected (and (= server-key (:selected-server-tab state))
+                                (= "battle" (get-in state [:selected-tab-main server-key])))
+              should-notify (not (and (or (not am-i-ingame)
+                                          notify-when-in-game)
+                                      (or notify-when-tab-selected
+                                          (not tab-selected))))
               ignore-users (get ignore-users server-key)
               message-visible (chat/visible-message?
                                 (assoc (select-keys state [:hide-barmanager-messages
@@ -705,7 +719,7 @@
                      (not (get-in state [:mute server-key channel-tab])))
             (when (:focus-on-incoming-battle-message state)
               (focus-impl message-data))
-            (when (:notify-on-incoming-battle-message state)
+            (when (and notify-on-incoming-battle-message should-notify)
               (notify-impl
                 {:title "Battle Message"
                  :text (str username ": " text)})))

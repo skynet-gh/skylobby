@@ -320,6 +320,8 @@
         music-volume (fx/sub-val context :music-volume)
         notify-on-incoming-direct-message (fx/sub-val context :notify-on-incoming-direct-message)
         notify-on-incoming-battle-message (fx/sub-val context :notify-on-incoming-battle-message)
+        notify-when-in-game (fx/sub-val context :notify-when-in-game)
+        notify-when-tab-selected (fx/sub-val context :notify-when-tab-selected)
         players-table-columns (fx/sub-val context :players-table-columns)
         prevent-non-host-rings (fx/sub-val context :prevent-non-host-rings)
         replay-source-enabled (fx/sub-val context :replay-source-enabled)
@@ -537,6 +539,22 @@
              :selected (boolean notify-on-incoming-battle-message)
              :on-selected-changed {:event/type :spring-lobby/assoc
                                    :key :notify-on-incoming-battle-message}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Notifications when in game"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean notify-when-in-game)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :notify-when-in-game}}}
+           {:fx/type filterable-checkbox-setting
+            :title " Notifications when chat tab is selected"
+            :search settings-search
+            :check-box
+            {:fx/type :check-box
+             :selected (boolean notify-when-tab-selected)
+             :on-selected-changed {:event/type :spring-lobby/assoc
+                                   :key :notify-when-tab-selected}}}
            {:fx/type filterable-checkbox-setting
             :title " Focus main window for incoming direct chat message"
             :search settings-search
