@@ -32,7 +32,7 @@
   crypto-random/crypto-random {:mvn/version "1.2.1"}
   gloss/gloss {:mvn/version "0.2.6"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
-  http-kit/http-kit {:mvn/version "2.6.0-RC1"}
+  http-kit/http-kit {:mvn/version "2.6.0"}
   io.aviso/pretty {:mvn/version "1.1.1"}
   io.netty/netty-codec {:mvn/version "4.1.77.Final"}
   io.netty/netty-codec-http {:mvn/version "4.1.77.Final"}
@@ -65,7 +65,7 @@
   org.clojure/tools.logging {:mvn/version "1.2.4"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.1"}
-  org.fxmisc.flowless/flowless {:mvn/version "0.6.9"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.6.10"}
   org.fxmisc.richtext/richtextfx {:mvn/version "0.10.9"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.1"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.1"}
@@ -125,8 +125,7 @@
     io.aviso/pretty {:mvn/version "1.1.1"}
     metosin/reitit {:mvn/version "0.5.18"}
     org.clojure/core.async {:mvn/version "1.5.648"}
-    org.clojure/clojurescript {:git/url "https://github.com/clojure/clojurescript.git"
-                               :git/sha "9562ae11422243e0648a12c39e7c990ef3f94260"}
+    org.clojure/clojurescript {:mvn/version "1.11.57"}
     re-frame/re-frame {:mvn/version "1.2.0"}
     reagent/reagent {:mvn/version "1.1.1"}
     thheller/shadow-cljs {:mvn/version "2.19.3"}}
@@ -203,7 +202,7 @@
     org.clj-commons/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
                            :git/sha "172f97d98930297f7b28609f78f433134bded860"}
     gr.zdimensions/jsquish {:mvn/version "1.0"}
-    http-kit/http-kit {:mvn/version "2.6.0-RC1"}
+    http-kit/http-kit {:mvn/version "2.6.0"}
     instaparse/instaparse {:mvn/version "1.4.12"}
     io.aviso/pretty {:mvn/version "1.1.1"}
     io.netty/netty-codec {:mvn/version "4.1.77.Final"}
