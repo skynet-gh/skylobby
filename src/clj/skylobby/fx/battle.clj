@@ -1069,6 +1069,7 @@
                            (fn [{:keys [split-type tooltip]}]
                              {:fx/type :button
                               :text (str " " (string/upper-case split-type) " ")
+                              :disable (and (not singleplayer) am-spec)
                               :on-action {:event/type :skylobby.fx.event.battle/split-boxes
                                           :am-host am-host
                                           :channel-name channel-name
@@ -1094,6 +1095,7 @@
                          [{:fx/type :label
                            :text " %: "}
                           {:fx/type :text-field
+                           :disable (and (not singleplayer) am-spec)
                            :on-action {:event/type :spring-lobby/battle-split-percent-action
                                        :am-host am-host
                                        :channel-name channel-name
