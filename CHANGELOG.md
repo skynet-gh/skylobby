@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.3](https://github.com/skynet-gh/skylobby/releases/tag/0.9.3) - 2022-06-15
+
+- Fix logic for notifications when in game or tab selected
+- Focus incoming chat tab when clicking notification
+- Fix initial login commands blocking other handlers
+- Fix clicking of www. links
+- Disable split buttons when spec
+- Fix some performance issues in UI
+
 ## [0.9.2](https://github.com/skynet-gh/skylobby/releases/tag/0.9.2) - 2022-06-13
 
 - Fix direct message parsing
