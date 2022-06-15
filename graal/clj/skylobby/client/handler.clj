@@ -603,14 +603,20 @@
              (when (and notify-on-incoming-direct-message should-notify)
                (notify-impl
                  {:title "Direct Message"
-                  :text (str username ": " text)}))
+                  :text (str username ": " text)
+                  :server-key server-key
+                  :main-tab main-tab
+                  :channel-tab channel-tab}))
              (when (:focus-on-incoming-direct-message state)
                (focus-impl message-data)))
            (when battle-channel?
              (when (and notify-on-incoming-battle-message should-notify)
                (notify-impl
                  {:title "Battle Message"
-                  :text (str username ": " text)}))
+                  :text (str username ": " text)
+                  :server-key server-key
+                  :main-tab main-tab
+                  :channel-tab channel-tab}))
              (when (:focus-on-incoming-battle-message state)
                (focus-impl message-data))))
          (cond-> (update-in state [:by-server server-key]
@@ -698,6 +704,7 @@
         (let [channel-name (str "__battle__" battle-id)
               needs-focus (not (and (= server-key (:selected-server-tab state))
                                     (= "battle" (get-in state [:selected-tab-main server-key]))))
+              main-tab "battle"
               channel-tab :battle
               {:keys [hide-spads-messages ignore-users notify-on-incoming-battle-message notify-when-in-game notify-when-tab-selected]} state
               {:keys [users] :as server-data} (get-in state [:by-server server-key])
@@ -726,14 +733,17 @@
             (when (and notify-on-incoming-battle-message should-notify)
               (notify-impl
                 {:title "Battle Message"
-                 :text (str username ": " text)})))
+                 :text (str username ": " text)
+                 :server-key server-key
+                 :main-tab main-tab
+                 :channel-tab channel-tab})))
           (cond->
                   (update-in state [:by-server server-key]
                     (fn [server]
                       (-> server
                           (update-in [:channels channel-name :messages] conj message-data))))
                   needs-focus
-                  (assoc-in [:needs-focus server-key "battle" channel-tab] true)))
+                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)))
         state))))
 
 (defmethod handle "SAIDBATTLE" [state-atom server-key m]
