@@ -580,10 +580,11 @@
                                (if-not battle-channel?
                                  (= channel-tab selected-tab-channel)
                                  true))
-             should-notify (not (and (or (not am-i-ingame)
-                                         notify-when-in-game)
-                                     (or notify-when-tab-selected
-                                         (not tab-selected))))
+             should-notify (and (or (not am-i-ingame)
+                                    notify-when-in-game)
+                                (or notify-when-tab-selected
+                                    (not tab-selected))
+                                (not json-from-host-for-battle-id))
              ignore-users (get ignore-users server-key)
              message-visible (chat/visible-message?
                                (assoc (select-keys state [:hide-barmanager-messages
@@ -703,10 +704,13 @@
               am-i-ingame (get-in users [(:username server-data) :client-status :ingame])
               tab-selected (and (= server-key (:selected-server-tab state))
                                 (= "battle" (get-in state [:selected-tab-main server-key])))
-              should-notify (not (and (or (not am-i-ingame)
-                                          notify-when-in-game)
-                                      (or notify-when-tab-selected
-                                          (not tab-selected))))
+              json-from-host-for-battle-id (and text
+                                                (string/starts-with? text "!#JSONRPC "))
+              should-notify (and (or (not am-i-ingame)
+                                     notify-when-in-game)
+                                 (or notify-when-tab-selected
+                                     (not tab-selected))
+                                 (not json-from-host-for-battle-id))
               ignore-users (get ignore-users server-key)
               message-visible (chat/visible-message?
                                 (assoc (select-keys state [:hide-barmanager-messages
