@@ -689,7 +689,8 @@
 
 (defn is-url? [s]
   (try
-    (java.net.URL. s)
+    (or (string/starts-with? s "www.")
+        (java.net.URL. s))
     true
     (catch Exception _e
       false)))
