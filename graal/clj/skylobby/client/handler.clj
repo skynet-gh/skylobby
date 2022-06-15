@@ -67,28 +67,32 @@
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
-    (log/info "End of login info, sending initial commands")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "PING")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "CHANNELS")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "FRIENDLIST")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "FRIENDREQUESTLIST")
-    (async/<!! (async/timeout login-command-cooldown))
-    (when (u/matchmaking? server-data)
-      (async/<!! (async/timeout login-command-cooldown))
-      (message/send state-atom client-data "c.matchmaking.list_all_queues"))
-    (doseq [channel my-channels]
-      (let [[channel-name _] channel]
-        (if (and channel-name
-                 (not (u/battle-channel-name? channel-name))
-                 (not (u/user-channel-name? channel-name)))
-          (do
-            (async/<!! (async/timeout login-command-cooldown))
-            (message/send state-atom client-data (str "JOIN " channel-name)))
-          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))))
+    (log/info "End of login info, sending initial commands async")
+    (future
+      (try
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "PING")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "CHANNELS")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "FRIENDLIST")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "FRIENDREQUESTLIST")
+        (async/<!! (async/timeout login-command-cooldown))
+        (when (u/matchmaking? server-data)
+          (async/<!! (async/timeout login-command-cooldown))
+          (message/send state-atom client-data "c.matchmaking.list_all_queues"))
+        (doseq [channel my-channels]
+          (let [[channel-name _] channel]
+            (if (and channel-name
+                     (not (u/battle-channel-name? channel-name))
+                     (not (u/user-channel-name? channel-name)))
+              (do
+                (async/<!! (async/timeout login-command-cooldown))
+                (message/send state-atom client-data (str "JOIN " channel-name)))
+              (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))
+        (catch Exception e
+          (log/error e "Error in initial login messages"))))))
 
 
 (defmethod handle "SETSCRIPTTAGS" [state-atom server-key m]
