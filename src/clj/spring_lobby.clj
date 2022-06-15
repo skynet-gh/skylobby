@@ -1713,6 +1713,7 @@
       nil)))
 
 (defmethod event-handler ::connect [{:keys [no-focus server server-key password username] :as state}]
+  (swap! *state assoc-in [:by-server server-key :client-data :connecting] true)
   (future
     (try
       (let [[server-url server-opts] server
@@ -1736,7 +1737,8 @@
                          (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))
       (catch Exception e
-        (log/error e "Error connecting")))))
+        (log/error e "Error connecting")
+        (swap! *state assoc-in [:login-error server-key] (.getMessage e))))))
 
 (defmethod event-handler ::cancel-connect [{:keys [client client-deferred server-key]}]
   (future
@@ -3780,29 +3782,39 @@
         (.toFront javafx-root-stage)))))
 
 
-(def notification-action-handler
+(defn notification-action-handler
+  [{:keys [server-key main-tab channel-tab] :as data}]
   (reify EventHandler
     (handle [_this e]
-      (log/info "Notification clicked" e))))
+      (log/info "Notification clicked" e)
+      (when (and server-key main-tab channel-tab)
+        (swap! *state
+          (fn [state]
+            (-> state
+                (assoc :selected-server-tab (str server-key))
+                (assoc-in [:selected-tab-main server-key] main-tab)
+                (assoc-in [:selected-tab-channel server-key] channel-tab))))
+        (focus-impl data)))))
 
-(defn notify-impl [{:keys [hide-after text title]}]
+(defn notify-impl [{:keys [hide-after text title] :as data}]
   (Platform/runLater
     (fn []
       (if (or (not javafx-root-stage)
               (not (.isFocused javafx-root-stage)))
-        (doto (Notifications/create)
-          (.darkStyle)
-          (.title (str "skylobby " title))
-          (.text text)
-          (.hideAfter (Duration. (or hide-after 10000)))
-          (.onAction notification-action-handler)
-          (.threshold 3
-            (doto (Notifications/create)
-              (.darkStyle)
-              (.title "skylobby New Messages")
-              (.onAction notification-action-handler)
-              (.hideAfter (Duration. (or hide-after 10000)))))
-          (.show))
+        (let [handler (notification-action-handler data)]
+          (doto (Notifications/create)
+            (.darkStyle)
+            (.title (str "skylobby " title))
+            (.text text)
+            (.hideAfter (Duration. (or hide-after 10000)))
+            (.onAction handler)
+            (.threshold 3
+              (doto (Notifications/create)
+                (.darkStyle)
+                (.title "skylobby New Messages")
+                (.onAction handler)
+                (.hideAfter (Duration. (or hide-after 10000)))))
+            (.show)))
         (log/info "Skipping notifications, main window already in focus")))))
 
 (defn extra-pre-game []

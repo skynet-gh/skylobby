@@ -67,28 +67,32 @@
         my-channels (concat
                       (-> state :my-channels (get server-key))
                       (:global-chat-channels state))]
-    (log/info "End of login info, sending initial commands")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "PING")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "CHANNELS")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "FRIENDLIST")
-    (async/<!! (async/timeout login-command-cooldown))
-    (message/send state-atom client-data "FRIENDREQUESTLIST")
-    (async/<!! (async/timeout login-command-cooldown))
-    (when (u/matchmaking? server-data)
-      (async/<!! (async/timeout login-command-cooldown))
-      (message/send state-atom client-data "c.matchmaking.list_all_queues"))
-    (doseq [channel my-channels]
-      (let [[channel-name _] channel]
-        (if (and channel-name
-                 (not (u/battle-channel-name? channel-name))
-                 (not (u/user-channel-name? channel-name)))
-          (do
-            (async/<!! (async/timeout login-command-cooldown))
-            (message/send state-atom client-data (str "JOIN " channel-name)))
-          (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))))
+    (log/info "End of login info, sending initial commands async")
+    (future
+      (try
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "PING")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "CHANNELS")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "FRIENDLIST")
+        (async/<!! (async/timeout login-command-cooldown))
+        (message/send state-atom client-data "FRIENDREQUESTLIST")
+        (async/<!! (async/timeout login-command-cooldown))
+        (when (u/matchmaking? server-data)
+          (async/<!! (async/timeout login-command-cooldown))
+          (message/send state-atom client-data "c.matchmaking.list_all_queues"))
+        (doseq [channel my-channels]
+          (let [[channel-name _] channel]
+            (if (and channel-name
+                     (not (u/battle-channel-name? channel-name))
+                     (not (u/user-channel-name? channel-name)))
+              (do
+                (async/<!! (async/timeout login-command-cooldown))
+                (message/send state-atom client-data (str "JOIN " channel-name)))
+              (swap! state-atom update-in [:my-channels server-key] dissoc channel-name))))
+        (catch Exception e
+          (log/error e "Error in initial login messages"))))))
 
 
 (defmethod handle "SETSCRIPTTAGS" [state-atom server-key m]
@@ -580,10 +584,11 @@
                                (if-not battle-channel?
                                  (= channel-tab selected-tab-channel)
                                  true))
-             should-notify (not (and (or (not am-i-ingame)
-                                         notify-when-in-game)
-                                     (or notify-when-tab-selected
-                                         (not tab-selected))))
+             should-notify (and (or (not am-i-ingame)
+                                    notify-when-in-game)
+                                (or notify-when-tab-selected
+                                    (not tab-selected))
+                                (not json-from-host-for-battle-id))
              ignore-users (get ignore-users server-key)
              message-visible (chat/visible-message?
                                (assoc (select-keys state [:hide-barmanager-messages
@@ -602,14 +607,20 @@
              (when (and notify-on-incoming-direct-message should-notify)
                (notify-impl
                  {:title "Direct Message"
-                  :text (str username ": " text)}))
+                  :text (str username ": " text)
+                  :server-key server-key
+                  :main-tab main-tab
+                  :channel-tab channel-tab}))
              (when (:focus-on-incoming-direct-message state)
                (focus-impl message-data)))
            (when battle-channel?
              (when (and notify-on-incoming-battle-message should-notify)
                (notify-impl
                  {:title "Battle Message"
-                  :text (str username ": " text)}))
+                  :text (str username ": " text)
+                  :server-key server-key
+                  :main-tab main-tab
+                  :channel-tab channel-tab}))
              (when (:focus-on-incoming-battle-message state)
                (focus-impl message-data))))
          (cond-> (update-in state [:by-server server-key]
@@ -697,16 +708,20 @@
         (let [channel-name (str "__battle__" battle-id)
               needs-focus (not (and (= server-key (:selected-server-tab state))
                                     (= "battle" (get-in state [:selected-tab-main server-key]))))
+              main-tab "battle"
               channel-tab :battle
               {:keys [hide-spads-messages ignore-users notify-on-incoming-battle-message notify-when-in-game notify-when-tab-selected]} state
               {:keys [users] :as server-data} (get-in state [:by-server server-key])
               am-i-ingame (get-in users [(:username server-data) :client-status :ingame])
               tab-selected (and (= server-key (:selected-server-tab state))
                                 (= "battle" (get-in state [:selected-tab-main server-key])))
-              should-notify (not (and (or (not am-i-ingame)
-                                          notify-when-in-game)
-                                      (or notify-when-tab-selected
-                                          (not tab-selected))))
+              json-from-host-for-battle-id (and text
+                                                (string/starts-with? text "!#JSONRPC "))
+              should-notify (and (or (not am-i-ingame)
+                                     notify-when-in-game)
+                                 (or notify-when-tab-selected
+                                     (not tab-selected))
+                                 (not json-from-host-for-battle-id))
               ignore-users (get ignore-users server-key)
               message-visible (chat/visible-message?
                                 (assoc (select-keys state [:hide-barmanager-messages
@@ -722,14 +737,17 @@
             (when (and notify-on-incoming-battle-message should-notify)
               (notify-impl
                 {:title "Battle Message"
-                 :text (str username ": " text)})))
+                 :text (str username ": " text)
+                 :server-key server-key
+                 :main-tab main-tab
+                 :channel-tab channel-tab})))
           (cond->
                   (update-in state [:by-server server-key]
                     (fn [server]
                       (-> server
                           (update-in [:channels channel-name :messages] conj message-data))))
                   needs-focus
-                  (assoc-in [:needs-focus server-key "battle" channel-tab] true)))
+                  (assoc-in [:needs-focus server-key main-tab channel-tab] true)))
         state))))
 
 (defmethod handle "SAIDBATTLE" [state-atom server-key m]

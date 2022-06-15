@@ -118,12 +118,7 @@
            :human-text (str "Cannot match version, using " (:mod-name indexed-mod))}])
        (when (and no-mod-details (not indexed-mod))
          (let [
-               downloadables-by-url (fx/sub-val context :downloadables-by-url)
-               downloadable (->> downloadables-by-url
-                                 vals
-                                 (filter (comp #{:spring-lobby/mod} :resource-type))
-                                 (filter (partial resource/could-be-this-mod? mod-name))
-                                 first)]
+               downloadable (fx/sub-ctx context sub/could-be-this-mod-download mod-name)]
            (concat
              (let [
                    download-url (:download-url downloadable)
@@ -289,12 +284,7 @@
                                 :spring-isolation-dir spring-isolation-dir}})})
                    [rapid-id mod-name])))
              (let [
-                   importables-by-path (fx/sub-val context :importables-by-path)
-                   importable (some->> importables-by-path
-                                       vals
-                                       (filter (comp #{:spring-lobby/mod} :resource-type))
-                                       (filter (partial resource/could-be-this-mod? mod-name))
-                                       first)
+                   importable (fx/sub-ctx context sub/could-be-this-mod-import mod-name)
                    resource-file (:resource-file importable)
                    dest (resource/resource-dest spring-isolation-dir importable)
                    dest-exists (fs/file-exists? file-cache dest)]
