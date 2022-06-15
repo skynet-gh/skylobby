@@ -1713,6 +1713,7 @@
       nil)))
 
 (defmethod event-handler ::connect [{:keys [no-focus server server-key password username] :as state}]
+  (swap! *state assoc-in [:by-server server-key :client-data :connecting] true)
   (future
     (try
       (let [[server-url server-opts] server
@@ -1736,7 +1737,8 @@
                          (assoc :selected-server-tab server-key))))
         (connect *state (assoc state :client-data client-data)))
       (catch Exception e
-        (log/error e "Error connecting")))))
+        (log/error e "Error connecting")
+        (swap! *state assoc-in [:login-error server-key] (.getMessage e))))))
 
 (defmethod event-handler ::cancel-connect [{:keys [client client-deferred server-key]}]
   (future

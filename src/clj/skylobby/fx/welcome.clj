@@ -18,7 +18,7 @@
 
 (defn connect-button [{:fx/keys [context]}]
   (let [{:keys [accepted client-data]} (fx/sub-ctx context skylobby.fx/selected-server-data-sub)
-        {:keys [client client-deferred]} client-data
+        {:keys [client client-deferred connecting]} client-data
         password (fx/sub-val context :password)
         username (fx/sub-val context :username)
         server (fx/sub-val context :server)
@@ -32,7 +32,7 @@
                  (if accepted
                    "Disconnect"
                    "Logging in...")
-                 (if client-deferred
+                 (if (or connecting client-deferred)
                    "Connecting..."
                    "Connect"))
          :disable (boolean
@@ -41,7 +41,8 @@
                       (and
                         server
                         (not client)
-                        client-deferred)
+                        (or connecting
+                            client-deferred))
                       (string/blank? username)
                       (string/blank? password)))
          :on-action (if client
