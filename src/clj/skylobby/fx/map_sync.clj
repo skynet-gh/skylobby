@@ -76,11 +76,7 @@
              :tries 0}}}])
        (when (and no-map-details (not indexed-map))
          (let [
-               downloadables-by-url (fx/sub-val context :downloadables-by-url)
-               downloadables (->> downloadables-by-url
-                                  vals
-                                  (filter (comp #{:spring-lobby/map} :resource-type))
-                                  (filter (partial resource/could-be-this-map? map-name)))
+               downloadables (fx/sub-ctx context sub/could-be-this-map-downloads map-name)
                http-download-tasks (->> (get tasks-by-type :spring-lobby/http-downloadable)
                                         (map (comp :download-url :downloadable))
                                         set)]
@@ -177,12 +173,7 @@
                          :resource-type :spring-lobby/map
                          :spring-isolation-dir spring-isolation-dir})})}]))
              (let [
-                   importables-by-path (fx/sub-val context :importables-by-path)
-                   importable (some->> importables-by-path
-                                       vals
-                                       (filter (comp #{:spring-lobby/map} :resource-type))
-                                       (filter (partial resource/could-be-this-map? map-name))
-                                       first)
+                   importable (fx/sub-ctx context sub/could-be-this-map-import map-name)
                    resource-file (:resource-file importable)
                    resource-path (fs/canonical-path resource-file)
                    in-progress (boolean

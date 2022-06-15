@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     [clojure.edn :as edn]
     [clojure.string :as string]
+    [skylobby.data :as data]
     [skylobby.fs :as fs]
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
@@ -158,3 +159,84 @@
       {:extra-replay-sources extra-replay-sources
        :servers servers
        :spring-isolation-dir spring-isolation-dir})))
+
+(defn filtered-battles [context server-key filter-data]
+  (let [
+        battles (fx/sub-val context get-in [:by-server server-key :battles])]
+    (skylobby.data/filter-battles battles filter-data)))
+
+(defn battles-by-id [context server-key]
+  (let [
+        battles (fx/sub-val context get-in [:by-server server-key :battles])]
+    (into {} (map (juxt :battle-id identity) battles))))
+
+
+(defn engine-details [context spring-isolation-dir engine-version]
+  (let [
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
+        indexed-engines (fx/sub-ctx context indexed-engines spring-isolation-dir engine-version)]
+    (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
+        (fx/sub-ctx context indexed-engine spring-isolation-dir engine-version))))
+
+(defn could-be-this-engine-downloads [context engine-version]
+  (->> (fx/sub-ctx context :downloadables-by-url)
+       vals
+       (filter (comp #{:spring-lobby/engine} :resource-type))
+       (filter (partial resource/could-be-this-engine? engine-version))
+       seq
+       doall))
+
+(defn could-be-this-engine-import [context engine-version]
+  (let [
+        importables-by-path (fx/sub-ctx context :importables-by-path)]
+    (some->> importables-by-path
+             vals
+             (filter (comp #{:spring-lobby/engine} :resource-type))
+             (filter (partial resource/could-be-this-engine? engine-version))
+             first)))
+
+(defn could-be-this-mod-download [context mod-name]
+  (let [
+        downloadables-by-url (fx/sub-val context :downloadables-by-url)]
+    (->> downloadables-by-url
+         vals
+         (filter (comp #{:spring-lobby/mod} :resource-type))
+         (filter (partial resource/could-be-this-mod? mod-name))
+         first)))
+
+(defn could-be-this-mod-import [context mod-name]
+  (let [
+        importables-by-path (fx/sub-val context :importables-by-path)]
+    (some->> importables-by-path
+             vals
+             (filter (comp #{:spring-lobby/mod} :resource-type))
+             (filter (partial resource/could-be-this-mod? mod-name))
+             first)))
+
+(defn could-be-this-map-downloads [context map-name]
+  (let [
+        downloadables-by-url (fx/sub-val context :downloadables-by-url)]
+    (->> downloadables-by-url
+         vals
+         (filter (comp #{:spring-lobby/map} :resource-type))
+         (filter (partial resource/could-be-this-map? map-name))
+         doall)))
+
+(defn could-be-this-map-import [context map-name]
+  (let [
+        importables-by-path (fx/sub-val context :importables-by-path)]
+    (some->> importables-by-path
+             vals
+             (filter (comp #{:spring-lobby/map} :resource-type))
+             (filter (partial resource/could-be-this-map? map-name))
+             first)))
+
+
+(defn sorted-replays [context]
+  (let [
+        replays (fx/sub-val context :filtered-replays)]
+    (->> replays
+         (sort-by :replay-unix-time-str)
+         reverse
+         doall)))

@@ -43,14 +43,14 @@
         selected-battle (fx/sub-val context get-in [:by-server server-key :selected-battle])
         users (fx/sub-val context get-in [:by-server server-key :users])
         now (fx/sub-val context :now)
-        filtered-battles (skylobby.data/filter-battles battles
-                           {:filter-battles filter-battles
-                            :hide-empty-battles hide-empty-battles
-                            :hide-locked-battles hide-locked-battles
-                            :hide-passworded-battles hide-passworded-battles
-                            :hide-running-battles hide-running-battles
-                            :users users})
-        battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
+        filter-data {:filter-battles filter-battles
+                     :hide-empty-battles hide-empty-battles
+                     :hide-locked-battles hide-locked-battles
+                     :hide-passworded-battles hide-passworded-battles
+                     :hide-running-battles hide-running-battles
+                     :users users}
+        filtered-battles (fx/sub-ctx context sub/filtered-battles server-key filter-data)
+        battles-by-id (fx/sub-ctx context sub/battles-by-id server-key)]
     {:fx/type :v-box
      :style {:-fx-font-size 16
              :-fx-min-height 128}
@@ -350,14 +350,14 @@
         all-users users
         now (fx/sub-val context :now)
         cached-minimap-updated (fx/sub-val context :cached-minimap-updated)
-        filtered-battles (skylobby.data/filter-battles battles
-                           {:filter-battles filter-battles
-                            :hide-empty-battles hide-empty-battles
-                            :hide-locked-battles hide-locked-battles
-                            :hide-passworded-battles hide-passworded-battles
-                            :hide-running-battles hide-running-battles
-                            :users users})
-        battles-by-id (into {} (map (juxt :battle-id identity) filtered-battles))]
+        filter-data {:filter-battles filter-battles
+                     :hide-empty-battles hide-empty-battles
+                     :hide-locked-battles hide-locked-battles
+                     :hide-passworded-battles hide-passworded-battles
+                     :hide-running-battles hide-running-battles
+                     :users users}
+        filtered-battles (fx/sub-ctx context sub/filtered-battles server-key filter-data)
+        battles-by-id (fx/sub-ctx context sub/battles-by-id server-key)]
     {:fx/type :v-box
      :style {:-fx-font-size 16
              :-fx-min-height 128}

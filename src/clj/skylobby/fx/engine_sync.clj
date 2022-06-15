@@ -20,9 +20,7 @@
   (let [copying (fx/sub-val context :copying)
         indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
         spring-root-path (fs/canonical-path spring-isolation-dir)
-        engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
-        engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
-                           (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version))
+        engine-details (fx/sub-ctx context sub/engine-details spring-isolation-dir engine-version)
         engine-file (:file engine-details)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :file-cache)
@@ -159,11 +157,7 @@
                            :file dest
                            :dest extract-target}}}]))))))
            (or
-             (->> (fx/sub-val context :downloadables-by-url)
-                  vals
-                  (filter (comp #{:spring-lobby/engine} :resource-type))
-                  (filter (partial resource/could-be-this-engine? engine-version))
-                  seq)
+             (fx/sub-ctx context sub/could-be-this-engine-downloads engine-version)
              [nil])))
        (when (and engine-version
                   refresh-in-progress)
@@ -212,12 +206,7 @@
        (when (and engine-version
                   (not engine-details))
          (let [
-               importables-by-path (fx/sub-val context :importables-by-path)
-               importable (some->> importables-by-path
-                                   vals
-                                   (filter (comp #{:spring-lobby/engine} :resource-type))
-                                   (filter (partial resource/could-be-this-engine? engine-version))
-                                   first)
+               importable (fx/sub-ctx context sub/could-be-this-engine-import engine-version)
                {:keys [import-source-name resource-file]} importable
                resource-path (fs/canonical-path resource-file)
                dest (resource/resource-dest spring-isolation-dir importable)
