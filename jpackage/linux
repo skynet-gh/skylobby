@@ -1,2 +1,3 @@
 --linux-shortcut
 --icon "resources/icon128.png"
+--resource-dir "dist/linux"
