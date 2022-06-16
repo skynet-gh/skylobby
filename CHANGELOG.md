@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.4](https://github.com/skynet-gh/skylobby/releases/tag/0.9.4) - 2022-06-16
+
+- Fix chat ignore
+- Clean up Linux packaging
+
 ## [0.9.3](https://github.com/skynet-gh/skylobby/releases/tag/0.9.3) - 2022-06-15
 
 - Fix logic for notifications when in game or tab selected
