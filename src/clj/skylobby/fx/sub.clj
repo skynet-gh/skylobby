@@ -240,3 +240,20 @@
          (sort-by :replay-unix-time-str)
          reverse
          doall)))
+
+
+(defn ignore-users-set [context server-key]
+  (let [
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
+    (->> ignore-users
+         (filter second)
+         (map first)
+         set)))
+
+(defn hide-spads-set [context]
+  (let [
+        hide-spads-messages (fx/sub-val context :hide-spads-messages)]
+    (->> hide-spads-messages
+         (filter second)
+         (map first)
+         set)))
