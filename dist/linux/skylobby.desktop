@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=skylobby
-Exec=skylobby
-Icon=skylobby
+Exec=/opt/skylobby/bin/skylobby
+Icon=/opt/skylobby/lib/skylobby.png
 Comment=Spring RTS games lobby client
 Terminal=false
 Categories=Game;StrategyGame;
 Keywords=real-time;strategy;lobby;network;multiplayer;spring;game;
+MimeType=

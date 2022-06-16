@@ -2,6 +2,7 @@
 *.swp
 /*.bin
 /*.db
+/*.deb
 /*.dll
 /*.exe
 /*.jar
