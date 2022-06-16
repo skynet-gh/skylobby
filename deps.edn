@@ -98,6 +98,7 @@
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "0.9.0"}
     org.clojure/tools.namespace {:mvn/version "1.3.0"}
+    org.openjfx/javafx-base {:mvn/version "17.0.2"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
    :jvm-opts [
