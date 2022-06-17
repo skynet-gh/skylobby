@@ -177,6 +177,21 @@ jobs:
           asset_path: ./${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}.msi
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-windows.msi
           asset_content_type: application/x-msi
+      # chocolatey
+      # TODO set nuspec version
+      - run: |
+          $con = Get-Content .\skylobby.nuspec
+          $con | % { $_.Replace("SKYLOBBY_RELEASE_VERSION", "${{ env.CI_REF_NAME }}") } | Set-Content .\skylobby.nuspec
+        shell: powershell
+      - uses: crazy-max/ghaction-chocolatey@v2.0.0
+        with:
+          args: pack
+      - uses: crazy-max/ghaction-chocolatey@v2.0.0
+        with:
+          args: apikey --key ${{ secrets.CHOCOLATEY_KEY }} --source https://push.chocolatey.org/
+      - uses: crazy-max/ghaction-chocolatey@v2.0.0
+        with:
+          args: push ${{ env.CI_REPOSITORY_NAME }}.${{ env.CI_REF_NAME }}.nupkg -s https://push.chocolatey.org/
   mark-latest-release:
     needs: [build-linux, build-windows, build-mac]
     runs-on: ubuntu-latest
