@@ -7,6 +7,7 @@
 /*.exe
 /*.jar
 /*.log*
+/*.nupkg
 /*.rpm
 /.calva/
 /.classpath
@@ -22,6 +23,7 @@
 /pom.xml
 /skylobby-*.msi
 /skylobby
+!/skylobby/
 /target/
 /trace.edn
 /*.build_artifacts.txt
