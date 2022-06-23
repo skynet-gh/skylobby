@@ -1058,7 +1058,10 @@
                              (group-by (comp :ally :battle-status)))
         increment-ids (fx/sub-val context :increment-ids)
         spectators (->> players-with-skill
-                        (filter (comp not :mode :battle-status)))
+                        (filter (comp not :mode :battle-status))
+                        (sort-by
+                          #(or (:username %) (:bot-name %) "")
+                          skylobby.fx/case-insensitive-natural-comparator))
         username (fx/sub-val context get-in [:by-server server-key :username])
         am-host (fx/sub-ctx context sub/am-host server-key)
         host-username (fx/sub-ctx context sub/host-username server-key)
