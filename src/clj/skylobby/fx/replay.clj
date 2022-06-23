@@ -640,7 +640,7 @@
        :desc
        {:fx/type :table-view
         :id "replays-table"
-        :column-resize-policy :constrained
+        ;:column-resize-policy :constrained
         :columns
         (concat
           (when replays-window-details
@@ -655,7 +655,8 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [id]
-                 {:text (str id)})}}
+                 {:alignment :center-left
+                  :text (str id)})}}
              {:fx/type :table-column
               :text "Source"
               :resizable true
@@ -665,7 +666,8 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [source]
-                 {:text (str source)})}}
+                 {:alignment :center-left
+                  :text (str source)})}}
              {:fx/type :table-column
               :text "Filename"
               :resizable true
@@ -675,7 +677,8 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [filename]
-                 {:text (str filename)})}}])
+                 {:alignment :center-left
+                  :text (str filename)})}}])
           [
            {:fx/type :table-column
             :text "Map"
@@ -686,7 +689,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [map-name]
-               {:text (str map-name)})}}
+               {:alignment :center-left
+                :text (str map-name)})}}
            {:fx/type :table-column
             :text "Game"
             :resizable true
@@ -696,7 +700,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [mod-name]
-               {:text (str mod-name)})}}
+               {:alignment :center-left
+                :text (str mod-name)})}}
            {:fx/type :table-column
             :text "Timestamp"
             :resizable false
@@ -711,7 +716,8 @@
                             (LocalDateTime/ofInstant
                               (java-time/instant unix-time)
                               time-zone-id)))]
-                 {:text (str ts)}))}}
+                 {:alignment :center-left
+                  :text (str ts)}))}}
            {:fx/type :table-column
             :text "Type"
             :resizable false
@@ -721,7 +727,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [game-type]
-               {:text (str game-type)})}}
+               {:alignment :center-left
+                :text (str game-type)})}}
            {:fx/type :table-column
             :text "Player Counts"
             :resizable true
@@ -731,7 +738,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [player-counts]
-               {:text (->> player-counts (string/join "v"))})}}
+               {:alignment :center-left
+                :text (->> player-counts (string/join "v"))})}}
            {:fx/type :table-column
             :text "Skill Min"
             :resizable false
@@ -741,7 +749,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [min-skill]
-               {:text (str min-skill)})}}
+               {:alignment :center-left
+                :text (str min-skill)})}}
            {:fx/type :table-column
             :text "Skill Avg"
             :resizable false
@@ -751,7 +760,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [avg-skill]
-               {:text (str avg-skill)})}}
+               {:alignment :center-left
+                :text (str avg-skill)})}}
            {:fx/type :table-column
             :text "Skill Max"
             :resizable false
@@ -761,7 +771,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [max-skill]
-               {:text (str max-skill)})}}]
+               {:alignment :center-left
+                :text (str max-skill)})}}]
           (when replays-window-details
             [{:fx/type :table-column
               :text "Engine"
@@ -772,7 +783,8 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [engine-version]
-                 {:text (str engine-version)})}}
+                 {:alignment :center-left
+                  :text (str engine-version)})}}
              {:fx/type :table-column
               :text "Size"
               :resizable false
@@ -782,7 +794,8 @@
               {:fx/cell-type :table-cell
                :describe
                (fn [file-size]
-                 {:text (u/format-bytes file-size)})}}])
+                 {:alignment :center-left
+                  :text (u/format-bytes file-size)})}}])
           [{:fx/type :table-column
             :text "Duration"
             :resizable false
@@ -795,7 +808,8 @@
                (let [duration (when game-time (java-time/duration game-time :seconds))
                      ; https://stackoverflow.com/a/44343699/984393
                      formatted (u/format-duration duration)]
-                 {:text (str formatted)}))}}
+                 {:alignment :center-left
+                  :text (str formatted)}))}}
            {:fx/type :table-column
             :text "Tag"
             :resizable false
@@ -805,7 +819,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [[tags id]]
-               {:text ""
+               {:alignment :center-left
+                :text ""
                 :graphic
                 {:fx/type ext-recreate-on-key-changed
                  :key (str id)
@@ -825,7 +840,8 @@
              :describe
              (fn [{:keys [file]}]
                (let [path (fs/canonical-path file)]
-                 {:text ""
+                 {:alignment :center-left
+                  :text ""
                   :graphic
                   {:fx/type ext-recreate-on-key-changed
                    :key (str path)
@@ -845,7 +861,8 @@
             {:fx/cell-type :table-cell
              :describe
              (fn [i]
-               {:text ""
+               {:alignment :center-left
+                :text ""
                 :graphic
                 {:fx/type :h-box
                  :alignment :center-left
