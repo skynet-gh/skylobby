@@ -226,6 +226,8 @@
   (let [spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
         spring-running (fx/sub-val context get-in [:spring-running :replay :replay])
         replay-minimap-type (fx/sub-val context :replay-minimap-type)
+        divider-positions (fx/sub-val context :divider-positions)
+        divider-key :replay-divider
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
         full-replay-details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))
@@ -379,146 +381,152 @@
      :style {:-fx-font-size 16}
      :alignment :center-left
      :children
-     [{:fx/type :split-pane
+     [
+      {:fx/type fx/ext-on-instance-lifecycle
        :h-box/hgrow :always
-       :divider-positions [0.60]
-       :items
-       [
-        {:fx/type :v-box
-         :children
-         (concat
-           [{:fx/type ext-recreate-on-key-changed
-             :v-box/vgrow :always
-             :key (str (not= selected-replay selected-replay-details))
-             :desc
-             {:fx/type fx.players-table/players-table
-              :mod-name mod-name
-              :players players-and-bots
-              :read-only true
-              :sides sides}}
-            {:fx/type :button
-             :text "Scroll to replay in table"
-             :on-action (fn [^javafx.event.Event event]
-                          (let [
-                                ^javafx.scene.Node node (.getTarget event)
-                                ^javafx.scene.Scene scene (.getScene node)
-                                ^javafx.scene.Parent root (.getRoot scene)
-                                ^javafx.scene.control.TableView
-                                table (first (.lookupAll root "#replays-table"))]
-                            (.scrollTo table selected-replay)))}
-            {:fx/type :h-box
-             :alignment :center-left
-             :children
-             [
-              {:fx/type :label
-               :text " Color player name: "}
-              {:fx/type :combo-box
-               :value (or (fx/sub-val context :battle-players-color-type)
-                          (first u/player-name-color-types))
-               :items u/player-name-color-types
-               :on-value-changed {:event/type :spring-lobby/assoc
-                                  :key :battle-players-color-type}}]}]
-           (let [watch-button {:fx/type :button
-                               :style {:-fx-font-size 24}
-                               :text (if spring-running
-                                       " Watching a replay"
-                                       " Watch")
-                               :disable (boolean spring-running)
-                               :on-action
-                               {:event/type :spring-lobby/watch-replay
-                                :engines engines
-                                :engine-version selected-engine-version
-                                :replay selected-replay
-                                :spring-isolation-dir spring-isolation-dir}
-                               :graphic
-                               {:fx/type font-icon/lifecycle
-                                :icon-literal "mdi-movie:24:white"}}]
-             [{:fx/type :h-box
-               :children
-               (concat
-                 (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-                   [watch-button])
-                 [{:fx/type :pane
-                   :h-box/hgrow :always}
-                  {:fx/type :button
-                   :style {:-fx-font-size 24}
-                   :on-action
-                   (if standalone
-                     {:event/type :spring-lobby/main-window-on-close-request
-                      :standalone true}
-                     {:event/type :spring-lobby/dissoc
-                      :key (if (fx/sub-val context :selected-replay-file)
-                             :selected-replay-file
-                             :selected-replay-id)})
-                   :text "Close"
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-close:24:white"}}
-                  {:fx/type :pane
-                   :h-box/hgrow :always}]
-                 (when (and selected-matching-engine selected-matching-mod selected-matching-map)
-                   [watch-button]))}]))}
-        {:fx/type :v-box
-         :children
-         (concat
-           (when show-sync-left
-             [sync-pane])
-           (if full-replay-details
-             (let [{:keys [chat-log player-num-to-name]} (-> full-replay-details :body :demo-stream)
-                   filter-replay-chat (fx/sub-val context :filter-replay-chat)
-                   filter-terms (->> (string/split (or filter-replay-chat "") #"\s+")
-                                     (remove string/blank?)
-                                     (map string/lower-case))
-                   chat-log (->> chat-log
-                                 (filter
-                                   (fn [{:keys [command from message]}]
-                                     (if (string/blank? filter-replay-chat)
-                                       true
-                                       (and (= 7 command)
-                                         (or
-                                           (when message
-                                             (let [message-lc (string/lower-case message)]
-                                               (some
-                                                 (fn [term]
-                                                   (string/includes? message-lc term))
-                                                 filter-terms)))
-                                           (when-let [player (get player-num-to-name from)]
-                                             (let [player-lc (string/lower-case player)]
-                                               (some
-                                                 (fn [term]
-                                                   (string/includes? player-lc term))
-                                                 filter-terms)))))))))]
-               [{:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type :label
-                   :text "Chat log "
-                   :style {:-fx-font-size 20}}
-                  {:fx/type :label
-                   :text " filter: "
-                   :style {:-fx-font-size 16}}
-                  {:fx/type :text-field
-                   :text (str filter-replay-chat)
-                   :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :filter-replay-chat}}]}
-                {:fx/type ext-recreate-on-key-changed
-                 :v-box/vgrow :always
-                 :key filter-replay-chat
-                 :desc
-                 {:fx/type fx.virtualized-scroll-pane/lifecycle
-                  :content
-                  {:fx/type fx.rich-text/lifecycle-inline
-                   :editable false
-                   :style {:-fx-font-family skylobby.fx/monospace-font-family
-                           :-fx-font-size 18}
-                   :wrap-text true
-                   :document (chat-log-document
-                               chat-log
-                               {:player-name-to-color player-name-to-color
-                                :player-num-to-name player-num-to-name})}}}])
-             [{:fx/type :label
-               :text "Loading replay stream..."}]))}]}
+       :on-created (fn [^javafx.scene.control.SplitPane node]
+                     (skylobby.fx/add-divider-listener node divider-key))
+       :desc
+       {:fx/type :split-pane
+        :divider-positions [(or (get divider-positions divider-key)
+                                0.60)]
+        :items
+        [
+         {:fx/type :v-box
+          :children
+          (concat
+            [{:fx/type ext-recreate-on-key-changed
+              :v-box/vgrow :always
+              :key (str (not= selected-replay selected-replay-details))
+              :desc
+              {:fx/type fx.players-table/players-table
+               :mod-name mod-name
+               :players players-and-bots
+               :read-only true
+               :sides sides}}
+             {:fx/type :button
+              :text "Scroll to replay in table"
+              :on-action (fn [^javafx.event.Event event]
+                           (let [
+                                 ^javafx.scene.Node node (.getTarget event)
+                                 ^javafx.scene.Scene scene (.getScene node)
+                                 ^javafx.scene.Parent root (.getRoot scene)
+                                 ^javafx.scene.control.TableView
+                                 table (first (.lookupAll root "#replays-table"))]
+                             (.scrollTo table selected-replay)))}
+             {:fx/type :h-box
+              :alignment :center-left
+              :children
+              [
+               {:fx/type :label
+                :text " Color player name: "}
+               {:fx/type :combo-box
+                :value (or (fx/sub-val context :battle-players-color-type)
+                           (first u/player-name-color-types))
+                :items u/player-name-color-types
+                :on-value-changed {:event/type :spring-lobby/assoc
+                                   :key :battle-players-color-type}}]}]
+            (let [watch-button {:fx/type :button
+                                :style {:-fx-font-size 24}
+                                :text (if spring-running
+                                        " Watching a replay"
+                                        " Watch")
+                                :disable (boolean spring-running)
+                                :on-action
+                                {:event/type :spring-lobby/watch-replay
+                                 :engines engines
+                                 :engine-version selected-engine-version
+                                 :replay selected-replay
+                                 :spring-isolation-dir spring-isolation-dir}
+                                :graphic
+                                {:fx/type font-icon/lifecycle
+                                 :icon-literal "mdi-movie:24:white"}}]
+              [{:fx/type :h-box
+                :children
+                (concat
+                  (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+                    [watch-button])
+                  [{:fx/type :pane
+                    :h-box/hgrow :always}
+                   {:fx/type :button
+                    :style {:-fx-font-size 24}
+                    :on-action
+                    (if standalone
+                      {:event/type :spring-lobby/main-window-on-close-request
+                       :standalone true}
+                      {:event/type :spring-lobby/dissoc
+                       :key (if (fx/sub-val context :selected-replay-file)
+                              :selected-replay-file
+                              :selected-replay-id)})
+                    :text "Close"
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-close:24:white"}}
+                   {:fx/type :pane
+                    :h-box/hgrow :always}]
+                  (when (and selected-matching-engine selected-matching-mod selected-matching-map)
+                    [watch-button]))}]))}
+         {:fx/type :v-box
+          :children
+          (concat
+            (when show-sync-left
+              [sync-pane])
+            (if full-replay-details
+              (let [{:keys [chat-log player-num-to-name]} (-> full-replay-details :body :demo-stream)
+                    filter-replay-chat (fx/sub-val context :filter-replay-chat)
+                    filter-terms (->> (string/split (or filter-replay-chat "") #"\s+")
+                                      (remove string/blank?)
+                                      (map string/lower-case))
+                    chat-log (->> chat-log
+                                  (filter
+                                    (fn [{:keys [command from message]}]
+                                      (if (string/blank? filter-replay-chat)
+                                        true
+                                        (and (= 7 command)
+                                          (or
+                                            (when message
+                                              (let [message-lc (string/lower-case message)]
+                                                (some
+                                                  (fn [term]
+                                                    (string/includes? message-lc term))
+                                                  filter-terms)))
+                                            (when-let [player (get player-num-to-name from)]
+                                              (let [player-lc (string/lower-case player)]
+                                                (some
+                                                  (fn [term]
+                                                    (string/includes? player-lc term))
+                                                  filter-terms)))))))))]
+                [{:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [
+                   {:fx/type :label
+                    :text "Chat log "
+                    :style {:-fx-font-size 20}}
+                   {:fx/type :label
+                    :text " filter: "
+                    :style {:-fx-font-size 16}}
+                   {:fx/type :text-field
+                    :text (str filter-replay-chat)
+                    :on-text-changed {:event/type :spring-lobby/assoc
+                                      :key :filter-replay-chat}}]}
+                 {:fx/type ext-recreate-on-key-changed
+                  :v-box/vgrow :always
+                  :key filter-replay-chat
+                  :desc
+                  {:fx/type fx.virtualized-scroll-pane/lifecycle
+                   :content
+                   {:fx/type fx.rich-text/lifecycle-inline
+                    :editable false
+                    :style {:-fx-font-family skylobby.fx/monospace-font-family
+                            :-fx-font-size 18}
+                    :wrap-text true
+                    :document (chat-log-document
+                                chat-log
+                                {:player-name-to-color player-name-to-color
+                                 :player-num-to-name player-num-to-name})}}}])
+              [{:fx/type :label
+                :text "Loading replay stream..."}]))}]}}
       {:fx/type :v-box
        :children
        (concat

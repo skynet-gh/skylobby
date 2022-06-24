@@ -1125,48 +1125,6 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn resend-no-response-messages-chimer-fn [state-atom]
-  (log/info "Starting chimer to resend messages that did not receive the expected response in time")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
-            (java-time/duration 3 :seconds))
-          (fn [_chimestamp]
-            (log/debug "Resending messages that did not receive the expected response in time")
-            (let [now (u/curr-millis)
-                  [{:keys [by-server]} _new-state]
-                  (swap-vals! state-atom update :by-server
-                    (fn [by-server]
-                      (reduce-kv
-                        (fn [m k v]
-                          (assoc m k
-                            (update v :expecting-responses
-                              (fn [expecting-responses]
-                                (reduce-kv
-                                  (fn [m k v]
-                                    (if (and (:sent-millis v)
-                                             (< now (+ (:sent-millis v) 3000)))
-                                      (assoc m k v)
-                                      m))
-                                  {}
-                                  expecting-responses)))))
-                        {}
-                        by-server)))]
-              (doseq [[_server-key server-data] by-server]
-                (doseq [[expected-response sent] (:expecting-responses server-data)]
-                  (let [{:keys [sent-message sent-millis]} sent]
-                    (if (and sent-message sent-millis)
-                      (when (< (+ sent-millis 3000) now)
-                        (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
-                        (message/send state-atom (:client-data server-data) sent-message))
-                      (log/warn "Issue with expecting response:" expected-response sent)))))))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error updating now")
-             true)})]
-    (fn [] (.close chimer))))
-
 (defn- update-replays-chimer-fn [state-atom]
   (log/info "Starting update replays chimer")
   (let [chimer
@@ -1247,27 +1205,15 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn- update-window-and-divider-positions-chimer-fn [state-atom]
-  (log/info "Starting window and divider positions chimer")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
-            (java-time/duration 1 :minutes))
-          (fn [_chimestamp]
-            (log/debug "Updating window and divider positions")
-            (let [divider-positions @skylobby.fx/divider-positions
-                  window-states @skylobby.fx/window-states]
-              (swap! state-atom
-                (fn [state]
-                  (-> state
-                      (update :divider-positions merge divider-positions)
-                      (update :window-states u/deep-merge window-states))))))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error updating window and divider positions")
-             true)})]
-    (fn [] (.close chimer))))
+(defn save-window-and-divider-positions [state-atom]
+  (log/debug "Saving window and divider positions")
+  (let [divider-positions @skylobby.fx/divider-positions
+        window-states @skylobby.fx/window-states]
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update :divider-positions merge divider-positions)
+            (update :window-states u/deep-merge window-states))))))
 
 
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
@@ -1367,6 +1313,13 @@
     (fn [] (.close chimer))))
 
 
+(defn with-window-data [state]
+  (let [divider-positions @skylobby.fx/divider-positions
+        window-states @skylobby.fx/window-states]
+    (-> state
+        (update :divider-positions merge divider-positions)
+        (update :window-states u/deep-merge window-states))))
+
 (defn- spit-app-config-chimer-fn [state-atom]
   (log/info "Starting app config spit chimer")
   (let [old-state-atom (atom @state-atom)
@@ -1376,8 +1329,8 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
-            (let [old-state @old-state-atom
-                  new-state @state-atom]
+            (let [old-state (with-window-data @old-state-atom)
+                  new-state (with-window-data @state-atom)]
               (spit-state-config-to-edn old-state new-state)
               (reset! old-state-atom new-state)))
           {:error-handler
@@ -3922,9 +3875,7 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
-         ;resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
-         update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (if-not skip-tasks
@@ -3966,9 +3917,7 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
-         ;resend-no-response-messages-chimer
          update-replays-chimer
-         update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))
 
 

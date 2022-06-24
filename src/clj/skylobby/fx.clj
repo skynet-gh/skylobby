@@ -44,6 +44,13 @@
         (changed [_this _observable _old-value new-value]
           (window-changed window-key :maximized new-value))))))
 
+(defn add-divider-listener [^javafx.scene.control.SplitPane node divider-key]
+  (let [dividers (.getDividers node)]
+    (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
+      (.addListener (.positionProperty divider)
+        (reify javafx.beans.value.ChangeListener
+          (changed [_this _observable _old-value new-value]
+            (swap! divider-positions assoc divider-key new-value)))))))
 
 (def monospace-font-family
   (if (fs/windows?)

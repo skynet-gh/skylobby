@@ -118,6 +118,11 @@
 (defn refresh-rerender []
   (println "Refreshing")
   (future
+    (try
+      (let [save-window-and-divider-positions (var-get (find-var 'spring-lobby/save-window-and-divider-positions))]
+        (save-window-and-divider-positions *state))
+      (catch Throwable e
+        (println "error saving window positions" e)))
     (when renderer
       (try
         (println "Unmounting")

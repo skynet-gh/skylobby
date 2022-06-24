@@ -1748,15 +1748,20 @@
           {:fx/type battle-tabs
            :server-key server-key}
           (if show-vote-log
-            {:fx/type :split-pane
-             :orientation :vertical
-             :divider-positions [0.9]
-             :items
-             [
-              {:fx/type battle-tabs
-               :server-key server-key}
-              {:fx/type battle-votes
-               :server-key server-key}]}
+            {:fx/type fx/ext-on-instance-lifecycle
+             :on-created (fn [^javafx.scene.control.SplitPane node]
+                           (skylobby.fx/add-divider-listener node :battle-votes))
+             :desc
+             {:fx/type :split-pane
+              :orientation :vertical
+              :divider-positions [(or (get divider-positions :battle-votes)
+                                      0.9)]
+              :items
+              [
+               {:fx/type battle-tabs
+                :server-key server-key}
+               {:fx/type battle-votes
+                :server-key server-key}]}}
             {:fx/type :v-box
              :children
              [
@@ -1850,12 +1855,7 @@
              :desc
              {:fx/type fx/ext-on-instance-lifecycle
               :on-created (fn [^javafx.scene.control.SplitPane node]
-                            (let [dividers (.getDividers node)]
-                              (when-let [^javafx.scene.control.SplitPane$Divider divider (first dividers)]
-                                (.addListener (.positionProperty divider)
-                                  (reify javafx.beans.value.ChangeListener
-                                    (changed [_this _observable _old-value new-value]
-                                      (swap! skylobby.fx/divider-positions assoc battle-layout-key new-value)))))))
+                            (skylobby.fx/add-divider-listener node battle-layout-key))
               :desc
               {:fx/type :split-pane
                :orientation (if (= "vertical" battle-layout) :horizontal :vertical)
