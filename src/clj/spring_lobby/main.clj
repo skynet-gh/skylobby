@@ -59,7 +59,7 @@
 (defn get-app-version []
   (or (u/manifest-version)
       (try
-        (str "git:" (u/short-git-commit (git/tag-or-latest-id (io/file "."))))
+        (str "git:" (u/short-git-commit (git/latest-id (io/file "."))))
         (catch Exception e
           (log/debug e "Error getting git version")))
       (try
