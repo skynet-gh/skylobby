@@ -3,6 +3,9 @@ exec /usr/lib/jvm/java-17-openjdk/bin/java \
   -Dglass.gtk.uiScale=1.1 \
   -XX:+UseZGC \
   -Xmx2g \
+  -XX:SoftMaxHeapSize=500m \
+  -XX:ZCollectionInterval=30 \
+  -XX:ZUncommitDelay=60 \
   -XX:+ExitOnOutOfMemoryError \
   -XX:+DoEscapeAnalysis \
   -XX:+UseCompressedOops \

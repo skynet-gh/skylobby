@@ -30,7 +30,8 @@
   commons-validator/commons-validator {:mvn/version "1.7"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
-  gloss/gloss {:mvn/version "0.2.6"}
+  ;gloss/gloss {:mvn/version "0.2.6"}
+  org.clj-commons/gloss {:local/root "../../alt/gloss"}
   gr.zdimensions/jsquish {:mvn/version "1.0"}
   http-kit/http-kit {:mvn/version "2.6.0"}
   io.aviso/pretty {:mvn/version "1.1.1"}
@@ -103,6 +104,8 @@
    :jvm-opts [
               "-Xmx4g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseZGC"
+              "-XX:SoftMaxHeapSize=500m"
+              "-XX:ZCollectionInterval=30" "-XX:ZUncommitDelay=60"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
               "--add-opens=java.base/java.nio=ALL-UNNAMED"
@@ -256,6 +259,8 @@
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
    :jvm-opts ["-server" "-Xms128m" "-Xmx8g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+              "-XX:SoftMaxHeapSize=500m"
+              "-XX:ZCollectionInterval=30" "-XX:ZUncommitDelay=60"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"]
    :main-opts ["--main" "repl"]}
