@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.5](https://github.com/skynet-gh/skylobby/releases/tag/0.9.5) - 2022-06-23
+
+- Fix chat and console auto scroll when dragging scroll bar
+- Sort engines in reverse to make finding latest easier
+- Sort spectators in players grouped by team view
+- Center replays table text, make columns unconstrained
+- Improve window and dividers position save and restore
+
 ## [0.9.4](https://github.com/skynet-gh/skylobby/releases/tag/0.9.4) - 2022-06-16
 
 - Fix chat ignore
