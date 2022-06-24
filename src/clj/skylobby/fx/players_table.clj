@@ -1037,7 +1037,7 @@
                                :server-key server-key}}))}}}))))}}]))}}}))
 
 (def player-width 340)
-(def player-skill-width 80)
+(def player-skill-width 84)
 
 (defn players-not-a-table
   [{:fx/keys [context]
