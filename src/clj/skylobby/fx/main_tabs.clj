@@ -267,7 +267,9 @@
         selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
         show-battle-preview (fx/sub-val context :show-battle-preview)
-        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])]
+        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
+        divider-positions (fx/sub-val context :divider-positions)
+        divider-key (if vertical :battles-vertical :battles-horizontal)]
     {:fx/type fx.ext.tab-pane/with-selection-props
      :props {:on-selected-item-changed {:event/type :spring-lobby/selected-item-changed-main-tabs
                                         :server-key server-key
@@ -323,27 +325,33 @@
            :children
            (concat
              [
-              {:fx/type :split-pane
-               :orientation (if vertical
-                              :vertical
-                              :horizontal)
+
+              {:fx/type fx/ext-on-instance-lifecycle
                :v-box/vgrow :always
-               :divider-positions [(if vertical 0.75 0.99)]
-               :items
-               [
-                {:fx/type fx.battles-table/battles-table
-                 :v-box/vgrow :always
-                 :server-key server-key}
-                {:fx/type :h-box
-                 :children
-                 (concat
-                   (when (and vertical
-                              selected-battle-details
-                              show-battle-preview)
-                     [{:fx/type battle-details
-                       :server-key server-key
-                       :h-box/hgrow :always}])
-                   [(assoc users-view :h-box/hgrow :always)])}]}
+               :on-created (fn [^javafx.scene.control.SplitPane node]
+                             (skylobby.fx/add-divider-listener node divider-key))
+               :desc
+               {:fx/type :split-pane
+                :orientation (if vertical
+                               :vertical
+                               :horizontal)
+                :divider-positions [(or (get divider-positions divider-key)
+                                        (if vertical 0.75 0.99))]
+                :items
+                [
+                 {:fx/type fx.battles-table/battles-table
+                  :v-box/vgrow :always
+                  :server-key server-key}
+                 {:fx/type :h-box
+                  :children
+                  (concat
+                    (when (and vertical
+                               selected-battle-details
+                               show-battle-preview)
+                      [{:fx/type battle-details
+                        :server-key server-key
+                        :h-box/hgrow :always}])
+                    [(assoc users-view :h-box/hgrow :always)])}]}}
               {:fx/type fx.battles-buttons/battles-buttons-view
                :server-key server-key}]
              (when (and (not vertical)
@@ -372,80 +380,85 @@
                                                         (keys (get-in needs-focus [server-key "chat"]))))
                                          ["skylobby-tab-focus"]))
           :content
-          {:fx/type :split-pane
-           :divider-positions [0.90]
-           :items
-           [{:fx/type my-channels-view
-             :server-key server-key}
-            {:fx/type :v-box
-             :children
-             [users-view
-              {:fx/type :v-box
-               :children
-               (concat
-                 [{:fx/type :label
-                   :text (str "Friend Requests (" (count friend-requests) ")")}]
-                 (when (seq friend-requests)
-                   [{:fx/type :table-view
-                     :items (or (keys friend-requests) [])
-                     :columns
-                     [{:fx/type :table-column
-                       :text "Username"
-                       :pref-width 300
-                       :cell-value-factory identity
-                       :cell-factory
-                       {:fx/cell-type :table-cell
-                        :describe (fn [i] {:text (str i)})}}
-                      {:fx/type :table-column
-                       :text "Actions"
-                       :resizable false
-                       :pref-width 180
-                       :cell-value-factory identity
-                       :cell-factory
-                       {:fx/cell-type :table-cell
-                        :describe
-                        (fn [i]
-                          {:text ""
-                           :graphic
-                           {:fx/type :h-box
-                            :children
-                            [{:fx/type :button
-                              :text "Accept"
-                              :on-action {:event/type :spring-lobby/accept-friend-request
-                                          :client-data client-data
-                                          :username i}}
-                             {:fx/type :button
-                              :text "Decline"
-                              :on-action {:event/type :spring-lobby/decline-friend-request
-                                          :client-data client-data
-                                          :username i}}]}})}}]}]))}
-              {:fx/type :v-box
-               :children
-               [{:fx/type :label
-                 :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
-                {:fx/type fx.channels/channels-table
-                 :v-box/vgrow :always
-                 :server-key server-key}
-                {:fx/type :h-box
-                 :alignment :center-left
-                 :children
-                 [
-                  {:fx/type :button
-                   :text ""
-                   :on-action {:event/type :spring-lobby/join-channel
-                               :channel-name join-channel-name
-                               :server-key server-key}
-                   :graphic
-                   {:fx/type font-icon/lifecycle
-                    :icon-literal "mdi-plus:20:white"}}
-                  {:fx/type :text-field
-                   :text join-channel-name
-                   :prompt-text "New Channel"
-                   :on-text-changed {:event/type :spring-lobby/assoc-in
-                                     :path [:by-server server-key :join-channel-name]}
-                   :on-action {:event/type :spring-lobby/join-channel
-                               :channel-name join-channel-name
-                               :server-key server-key}}]}]}]}]}}
+          {:fx/type fx/ext-on-instance-lifecycle
+           :on-created (fn [^javafx.scene.control.SplitPane node]
+                         (skylobby.fx/add-divider-listener node :chat-tab))
+           :desc
+           {:fx/type :split-pane
+            :divider-positions [(or (get divider-positions :chat-tab)
+                                    0.90)]
+            :items
+            [{:fx/type my-channels-view
+              :server-key server-key}
+             {:fx/type :v-box
+              :children
+              [users-view
+               {:fx/type :v-box
+                :children
+                (concat
+                  [{:fx/type :label
+                    :text (str "Friend Requests (" (count friend-requests) ")")}]
+                  (when (seq friend-requests)
+                    [{:fx/type :table-view
+                      :items (or (keys friend-requests) [])
+                      :columns
+                      [{:fx/type :table-column
+                        :text "Username"
+                        :pref-width 300
+                        :cell-value-factory identity
+                        :cell-factory
+                        {:fx/cell-type :table-cell
+                         :describe (fn [i] {:text (str i)})}}
+                       {:fx/type :table-column
+                        :text "Actions"
+                        :resizable false
+                        :pref-width 180
+                        :cell-value-factory identity
+                        :cell-factory
+                        {:fx/cell-type :table-cell
+                         :describe
+                         (fn [i]
+                           {:text ""
+                            :graphic
+                            {:fx/type :h-box
+                             :children
+                             [{:fx/type :button
+                               :text "Accept"
+                               :on-action {:event/type :spring-lobby/accept-friend-request
+                                           :client-data client-data
+                                           :username i}}
+                              {:fx/type :button
+                               :text "Decline"
+                               :on-action {:event/type :spring-lobby/decline-friend-request
+                                           :client-data client-data
+                                           :username i}}]}})}}]}]))}
+               {:fx/type :v-box
+                :children
+                [{:fx/type :label
+                  :text (str "Channels (" (->> channels vals u/non-battle-channels count) ")")}
+                 {:fx/type fx.channels/channels-table
+                  :v-box/vgrow :always
+                  :server-key server-key}
+                 {:fx/type :h-box
+                  :alignment :center-left
+                  :children
+                  [
+                   {:fx/type :button
+                    :text ""
+                    :on-action {:event/type :spring-lobby/join-channel
+                                :channel-name join-channel-name
+                                :server-key server-key}
+                    :graphic
+                    {:fx/type font-icon/lifecycle
+                     :icon-literal "mdi-plus:20:white"}}
+                   {:fx/type :text-field
+                    :text join-channel-name
+                    :prompt-text "New Channel"
+                    :on-text-changed {:event/type :spring-lobby/assoc-in
+                                      :path [:by-server server-key :join-channel-name]}
+                    :on-action {:event/type :spring-lobby/join-channel
+                                :channel-name join-channel-name
+                                :server-key server-key}}]}]}]}]}}}
          {:fx/type :tab
           :graphic {:fx/type :label
                     :text "Console"}

@@ -84,7 +84,7 @@
                   {:fx/type :combo-box
                    :prompt-text " < pick an engine > "
                    :value engine-version
-                   :items filtered-engines
+                   :items (reverse filtered-engines)
                    :on-value-changed on-value-changed
                    :cell-factory
                    {:fx/cell-type :list-cell

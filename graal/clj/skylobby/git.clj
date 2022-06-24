@@ -1,6 +1,7 @@
 (ns skylobby.git
   "Utils for working with git resources."
   (:require
+    [clojure.string :as string]
     [clj-jgit.porcelain :as git])
   (:import
     (java.io File)
@@ -59,3 +60,7 @@
                                  (into {}))]
         (or (get tag-names-by-id latest-id)
             latest-id)))))
+
+(defn short-git-commit [git-commit-id]
+  (when-not (string/blank? git-commit-id)
+    (subs git-commit-id 0 (min 7 (count git-commit-id)))))

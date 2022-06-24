@@ -5,8 +5,17 @@
     [skylobby.git :as git]))
 
 
+(set! *warn-on-reflection* true)
+
+
 (def lib 'skylobby/skylobby)
-(def version (git/tag-or-latest-id (io/file ".")))
+(def here (io/file "."))
+(def latest-git-id (git/latest-id here))
+(def git-tag (git/tag-or-latest-id here))
+(def version
+  (if (= latest-git-id git-tag)
+    (str "git:" (git/short-git-commit latest-git-id))
+    git-tag))
 (def src-dirs ["src/clj" "graal/clj" "graal/cljc" "resources"])
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"

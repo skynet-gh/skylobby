@@ -1125,48 +1125,6 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn resend-no-response-messages-chimer-fn [state-atom]
-  (log/info "Starting chimer to resend messages that did not receive the expected response in time")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 30 :seconds))
-            (java-time/duration 3 :seconds))
-          (fn [_chimestamp]
-            (log/debug "Resending messages that did not receive the expected response in time")
-            (let [now (u/curr-millis)
-                  [{:keys [by-server]} _new-state]
-                  (swap-vals! state-atom update :by-server
-                    (fn [by-server]
-                      (reduce-kv
-                        (fn [m k v]
-                          (assoc m k
-                            (update v :expecting-responses
-                              (fn [expecting-responses]
-                                (reduce-kv
-                                  (fn [m k v]
-                                    (if (and (:sent-millis v)
-                                             (< now (+ (:sent-millis v) 3000)))
-                                      (assoc m k v)
-                                      m))
-                                  {}
-                                  expecting-responses)))))
-                        {}
-                        by-server)))]
-              (doseq [[_server-key server-data] by-server]
-                (doseq [[expected-response sent] (:expecting-responses server-data)]
-                  (let [{:keys [sent-message sent-millis]} sent]
-                    (if (and sent-message sent-millis)
-                      (when (< (+ sent-millis 3000) now)
-                        (log/info "Resending message that did not receive response" expected-response ":" (pr-str sent-message))
-                        (message/send state-atom (:client-data server-data) sent-message))
-                      (log/warn "Issue with expecting response:" expected-response sent)))))))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error updating now")
-             true)})]
-    (fn [] (.close chimer))))
-
 (defn- update-replays-chimer-fn [state-atom]
   (log/info "Starting update replays chimer")
   (let [chimer
@@ -1247,27 +1205,15 @@
              true)})]
     (fn [] (.close chimer))))
 
-(defn- update-window-and-divider-positions-chimer-fn [state-atom]
-  (log/info "Starting window and divider positions chimer")
-  (let [chimer
-        (chime/chime-at
-          (chime/periodic-seq
-            (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
-            (java-time/duration 1 :minutes))
-          (fn [_chimestamp]
-            (log/debug "Updating window and divider positions")
-            (let [divider-positions @skylobby.fx/divider-positions
-                  window-states @skylobby.fx/window-states]
-              (swap! state-atom
-                (fn [state]
-                  (-> state
-                      (update :divider-positions merge divider-positions)
-                      (update :window-states u/deep-merge window-states))))))
-          {:error-handler
-           (fn [e]
-             (log/error e "Error updating window and divider positions")
-             true)})]
-    (fn [] (.close chimer))))
+(defn save-window-and-divider-positions [state-atom]
+  (log/debug "Saving window and divider positions")
+  (let [divider-positions @skylobby.fx/divider-positions
+        window-states @skylobby.fx/window-states]
+    (swap! state-atom
+      (fn [state]
+        (-> state
+            (update :divider-positions merge divider-positions)
+            (update :window-states u/deep-merge window-states))))))
 
 
 (def app-update-url "https://api.github.com/repos/skynet-gh/skylobby/releases")
@@ -1367,6 +1313,13 @@
     (fn [] (.close chimer))))
 
 
+(defn with-window-data [state]
+  (let [divider-positions @skylobby.fx/divider-positions
+        window-states @skylobby.fx/window-states]
+    (-> state
+        (update :divider-positions merge divider-positions)
+        (update :window-states u/deep-merge window-states))))
+
 (defn- spit-app-config-chimer-fn [state-atom]
   (log/info "Starting app config spit chimer")
   (let [old-state-atom (atom @state-atom)
@@ -1376,8 +1329,8 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
-            (let [old-state @old-state-atom
-                  new-state @state-atom]
+            (let [old-state (with-window-data @old-state-atom)
+                  new-state (with-window-data @state-atom)]
               (spit-state-config-to-edn old-state new-state)
               (reset! old-state-atom new-state)))
           {:error-handler
@@ -3675,32 +3628,57 @@
         (log/error e "Error sending message" message "to server")))))
 
 
+(defn set-auto-scroll-if-at-bottom [^Event event k]
+  (let [
+        ^Parent source (.getSource event)
+        delta-y (if (instance? ScrollEvent event)
+                  (let [^ScrollEvent scroll-event event]
+                    (.getDeltaY scroll-event))
+                  0.0)
+        needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                            (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (if (.isVisible ybar)
+                                (< (- (.getMax ybar) (- (.getValue ybar) delta-y))
+                                   80)
+                                true)))]
+    (log/info "Setting" k "to" needs-auto-scroll)
+    (swap! *state assoc k needs-auto-scroll)))
+
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
   (let [event-type (.getEventType event)]
-    (if (= ScrollEvent/SCROLL event-type)
-      (let [^ScrollEvent scroll-event event
-            ^Parent source (.getSource scroll-event)
-            needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                                (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                  (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-        (swap! *state assoc :chat-auto-scroll needs-auto-scroll))
-      (when (= MouseEvent/MOUSE_CLICKED event-type)
-        (let [target (.getTarget event)]
-          (when (instance? org.fxmisc.richtext.TextExt target)
-            (let [^org.fxmisc.richtext.TextExt text-ext target
-                  text (.getText text-ext)]
-              (when (u/is-url? text)
-                (event-handler {:event/type ::desktop-browse-url
-                                :url text})))))))))
+    (cond
+      (= MouseEvent/MOUSE_PRESSED event-type)
+      (do
+        (log/info "Disabling chat auto scroll")
+        (swap! *state assoc :chat-auto-scroll false)
+        nil)
+      (or (= MouseEvent/MOUSE_RELEASED event-type)
+          (= ScrollEvent/SCROLL event-type))
+      (set-auto-scroll-if-at-bottom event :chat-auto-scroll)
+      (= MouseEvent/MOUSE_CLICKED event-type)
+      (let [target (.getTarget event)]
+        (when (instance? org.fxmisc.richtext.TextExt target)
+          (let [^org.fxmisc.richtext.TextExt text-ext target
+                text (.getText text-ext)]
+            (when (u/is-url? text)
+              (event-handler {:event/type ::desktop-browse-url
+                              :url text})))))
+      :else
+      nil)))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
-  (when (= ScrollEvent/SCROLL (.getEventType event))
-    (let [^ScrollEvent scroll-event event
-          ^Parent source (.getSource scroll-event)
-          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-      (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
+  (let [event-type (.getEventType event)]
+    (cond
+      (= event-type MouseEvent/MOUSE_PRESSED)
+      (do
+        (log/info "Disabling console auto scroll")
+        (swap! *state assoc :console-auto-scroll false)
+        nil)
+      (or (= MouseEvent/MOUSE_RELEASED event-type)
+          (= ScrollEvent/SCROLL event-type))
+      (set-auto-scroll-if-at-bottom event :console-auto-scroll)
+      :else
+      nil)))
 
 
 (defmethod event-handler ::selected-item-changed-server-tabs
@@ -3922,9 +3900,7 @@
          update-matchmaking-chimer (update-matchmaking-chimer-fn state-atom)
          update-music-queue-chimer (update-music-queue-chimer-fn state-atom)
          update-now-chimer (update-now-chimer-fn state-atom)
-         ;resend-no-response-messages-chimer (resend-no-response-messages-chimer-fn state-atom)
          update-replays-chimer (update-replays-chimer-fn state-atom)
-         update-window-and-divider-positions-chimer (update-window-and-divider-positions-chimer-fn state-atom)
          write-chat-logs-chimer (write-chat-logs-chimer-fn state-atom)]
      (add-watchers state-atom)
      (if-not skip-tasks
@@ -3966,9 +3942,7 @@
          update-matchmaking-chimer
          update-music-queue-chimer
          update-now-chimer
-         ;resend-no-response-messages-chimer
          update-replays-chimer
-         update-window-and-divider-positions-chimer
          write-chat-logs-chimer])})))
 
 
