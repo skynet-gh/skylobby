@@ -3628,32 +3628,57 @@
         (log/error e "Error sending message" message "to server")))))
 
 
+(defn set-auto-scroll-if-at-bottom [^Event event k]
+  (let [
+        ^Parent source (.getSource event)
+        delta-y (if (instance? ScrollEvent event)
+                  (let [^ScrollEvent scroll-event event]
+                    (.getDeltaY scroll-event))
+                  0.0)
+        needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
+                            (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
+                              (if (.isVisible ybar)
+                                (< (- (.getMax ybar) (- (.getValue ybar) delta-y))
+                                   80)
+                                true)))]
+    (log/info "Setting" k "to" needs-auto-scroll)
+    (swap! *state assoc k needs-auto-scroll)))
+
 (defmethod event-handler ::filter-channel-scroll [{:fx/keys [^Event event]}]
   (let [event-type (.getEventType event)]
-    (if (= ScrollEvent/SCROLL event-type)
-      (let [^ScrollEvent scroll-event event
-            ^Parent source (.getSource scroll-event)
-            needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                                (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                  (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-        (swap! *state assoc :chat-auto-scroll needs-auto-scroll))
-      (when (= MouseEvent/MOUSE_CLICKED event-type)
-        (let [target (.getTarget event)]
-          (when (instance? org.fxmisc.richtext.TextExt target)
-            (let [^org.fxmisc.richtext.TextExt text-ext target
-                  text (.getText text-ext)]
-              (when (u/is-url? text)
-                (event-handler {:event/type ::desktop-browse-url
-                                :url text})))))))))
+    (cond
+      (= MouseEvent/MOUSE_PRESSED event-type)
+      (do
+        (log/info "Disabling chat auto scroll")
+        (swap! *state assoc :chat-auto-scroll false)
+        nil)
+      (or (= MouseEvent/MOUSE_RELEASED event-type)
+          (= ScrollEvent/SCROLL event-type))
+      (set-auto-scroll-if-at-bottom event :chat-auto-scroll)
+      (= MouseEvent/MOUSE_CLICKED event-type)
+      (let [target (.getTarget event)]
+        (when (instance? org.fxmisc.richtext.TextExt target)
+          (let [^org.fxmisc.richtext.TextExt text-ext target
+                text (.getText text-ext)]
+            (when (u/is-url? text)
+              (event-handler {:event/type ::desktop-browse-url
+                              :url text})))))
+      :else
+      nil)))
 
 (defmethod event-handler ::filter-console-scroll [{:fx/keys [^Event event]}]
-  (when (= ScrollEvent/SCROLL (.getEventType event))
-    (let [^ScrollEvent scroll-event event
-          ^Parent source (.getSource scroll-event)
-          needs-auto-scroll (when (and source (instance? VirtualizedScrollPane source))
-                              (let [[_ _ ^ScrollBar ybar] (vec (.getChildrenUnmodifiable source))]
-                                (< (- (.getMax ybar) (- (.getValue ybar) (.getDeltaY scroll-event))) 80)))]
-      (swap! *state assoc :console-auto-scroll needs-auto-scroll))))
+  (let [event-type (.getEventType event)]
+    (cond
+      (= event-type MouseEvent/MOUSE_PRESSED)
+      (do
+        (log/info "Disabling console auto scroll")
+        (swap! *state assoc :console-auto-scroll false)
+        nil)
+      (or (= MouseEvent/MOUSE_RELEASED event-type)
+          (= ScrollEvent/SCROLL event-type))
+      (set-auto-scroll-if-at-bottom event :console-auto-scroll)
+      :else
+      nil)))
 
 
 (defmethod event-handler ::selected-item-changed-server-tabs
