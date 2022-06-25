@@ -851,7 +851,15 @@
                                        (assoc-in [:current-tasks task-kind] task))))))
            task (-> after :current-tasks (get task-kind))]
        (try
-         (let [thread (Thread. (fn [] (handle-task task)))]
+         (let [
+               runnable (fn []
+                          (try
+                            (handle-task task)
+                            (catch Exception e
+                              (log/error e "Error running task"))
+                            (catch Throwable t
+                              (log/error t "Critical error running task"))))
+               thread (Thread. runnable (str "skylobby-task-" (name task-kind)))]
            (swap! *state assoc-in [:task-threads task-kind] thread)
            (.start thread)
            (.join thread))
