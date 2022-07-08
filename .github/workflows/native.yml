@@ -28,18 +28,18 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.4
+      - uses: actions/cache@v3.0.5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@7.0
+      - uses: DeLaGuardo/setup-clojure@9.3
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.3.0
+      - uses: actions/setup-node@v3.4.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -66,17 +66,17 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.4
+      - uses: actions/cache@v3.0.5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@7.0
+      - uses: DeLaGuardo/setup-clojure@9.3
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.3.0
+      - uses: actions/setup-node@v3.4.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -96,17 +96,17 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.4
+      - uses: actions/cache@v3.0.5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@7.0
+      - uses: DeLaGuardo/setup-clojure@9.3
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.3.0
+      - uses: actions/setup-node@v3.4.1
         with:
           node-version: '14'
           cache: 'npm'
