@@ -19,7 +19,7 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'adopt'
-      - uses: DeLaGuardo/setup-clojure@7.0
+      - uses: DeLaGuardo/setup-clojure@8.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -44,7 +44,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'adopt'
-      - uses: DeLaGuardo/setup-clojure@7.0
+      - uses: DeLaGuardo/setup-clojure@8.0
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
