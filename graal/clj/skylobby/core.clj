@@ -293,8 +293,6 @@
      :map-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :mod-details (cache/lru-cache-factory (sorted-map) :threshold 8)
      :replay-details (cache/lru-cache-factory (sorted-map) :threshold 4)
-     :chat-auto-scroll true
-     :console-auto-scroll true
      ;:use-db-for-downloadables false
      ;:use-db-for-importables false
      :use-db-for-rapid true
