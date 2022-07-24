@@ -1575,6 +1575,7 @@
     (if (or singleplayer
             direct-connect-server)
       {:fx/type :v-box
+       :min-width 580
        :style (if singleplayer
                 {:-fx-font-size 20}
                 {:-fx-font-size 18
@@ -1626,6 +1627,7 @@
       {:fx/type :scroll-pane
        :fit-to-width true
        :hbar-policy :never
+       :min-width 400
        :content
        {:fx/type :flow-pane
         :vgap 5
