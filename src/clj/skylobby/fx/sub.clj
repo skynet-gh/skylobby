@@ -246,6 +246,7 @@
   (let [
         ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
     (->> ignore-users
+         (filter first)
          (filter second)
          (map first)
          set)))

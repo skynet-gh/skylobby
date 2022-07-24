@@ -27,8 +27,12 @@
            ignore-users-set]}
    {:keys [message-type relay spads text username vote]}]
   (not
-    (or (contains? ignore-users-set username)
-        (contains? ignore-users-set (:on-behalf-of relay))
+    (or (and
+          username
+          (contains? ignore-users-set username))
+        (and
+          (:on-behalf-of relay)
+          (contains? ignore-users-set (:on-behalf-of relay)))
         (contains? hide-spads-set (:spads-message-type spads))
         (and hide-vote-messages
              (:vote vote))
