@@ -27,7 +27,7 @@
          (with-redefs [fs/get-sys-data (constantly {:os-name "Linux"
                                                     :os-version ""})]
            (http/engine-archive "104.0.1-2141-gfb2f9d5 develop"))))
-  (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_win32-minimal-portable.7z"
+  (is (= "spring_{develop}104.0.1-2141-gfb2f9d5_win64-minimal-portable.7z"
          (with-redefs [fs/get-sys-data (constantly {:os-name "Windows"})]
            (http/engine-archive "104.0.1-2141-gfb2f9d5 develop")))))
 

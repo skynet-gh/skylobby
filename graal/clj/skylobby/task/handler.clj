@@ -332,6 +332,8 @@
      (doseq [engine-dir to-add]
        (log/info "Detecting engine data for" engine-dir)
        (let [engine-data (fs/engine-data engine-dir)]
+         (when (:error engine-data)
+           (log/warn "Error getting engine data for" (:file engine-data)))
          (swap! state-atom update-in [:by-spring-root spring-root-path :engines]
                 (fn [engines]
                   (set
