@@ -91,24 +91,29 @@
 
 
 (defmethod -event-msg-handler :skylobby.direct/set-engine
-  [state-atom server-key {:keys [?data]}]
+  [state-atom server-key {:keys [?data send-fn]}]
   (log/info "Setting engine to" ?data)
-  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-version] ?data))
+  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-version] ?data)
+  (send-fn [:skylobby.direct.client/player-state {:battle-status {:sync 0}}]))
+
 
 (defmethod -event-msg-handler :skylobby.direct/set-mod
-  [state-atom server-key {:keys [?data]}]
+  [state-atom server-key {:keys [?data send-fn]}]
   (log/info "Setting mod to" ?data)
-  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-modname] ?data))
+  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-modname] ?data)
+  (send-fn [:skylobby.direct.client/player-state {:battle-status {:sync 0}}]))
 
 (defmethod -event-msg-handler :skylobby.direct/set-map
-  [state-atom server-key {:keys [?data]}]
+  [state-atom server-key {:keys [?data send-fn]}]
   (log/info "Setting map to" ?data)
-  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-map] ?data))
+  (swap! state-atom assoc-in [:by-server server-key :battles :direct :battle-map] ?data)
+  (send-fn [:skylobby.direct.client/player-state {:battle-status {:sync 0}}]))
 
 (defmethod -event-msg-handler :skylobby.direct/battle-details
-  [state-atom server-key {:keys [?data]}]
+  [state-atom server-key {:keys [?data send-fn]}]
   (log/info "Updating battle details with" ?data)
-  (swap! state-atom update-in [:by-server server-key :battles :direct] merge ?data))
+  (swap! state-atom update-in [:by-server server-key :battles :direct] merge ?data)
+  (send-fn [:skylobby.direct.client/player-state {:battle-status {:sync 0}}]))
 
 (defmethod -event-msg-handler :skylobby.direct/chat
   [state-atom server-key {:keys [?data]}]
