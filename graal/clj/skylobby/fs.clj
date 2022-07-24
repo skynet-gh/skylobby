@@ -219,7 +219,7 @@
             (not (wsl?)))
        "linux64"
        :else
-       "win32"))))
+       "win64"))))
 
 (defn platform64
   ([]
@@ -242,12 +242,18 @@
    (when os-name
      (cond
        (mac? sys-data)
-       ["mac32" "mac64"]
+       [
+        "mac64"
+        "mac32"]
        (and (linux? sys-data)
             (not (wsl?)))
-       ["linux32" "linux64"]
+       [
+        "linux64"
+        "linux32"]
        :else
-       ["win32" "win64"]))))
+       [
+        "win64"
+        "win32"]))))
 
 (defn wslpath
   "Returns the host path if in WSL, otherwise returns the original path."
@@ -1338,12 +1344,21 @@
      [])))
 
 (defn engine-data [^File engine-dir]
-  (let [sync-version (sync-version engine-dir)]
-    {:file engine-dir
-     :sync-version sync-version
-     :engine-version (sync-version-to-engine-version sync-version)
-     :engine-bots (engine-bots engine-dir)
-     :engine-data-version engine-data-version}))
+  (merge
+    {:file engine-dir}
+    (try
+      (if-let [sync-version (sync-version engine-dir)]
+        {
+         :sync-version sync-version
+         :engine-version (sync-version-to-engine-version sync-version)
+         :engine-bots (engine-bots engine-dir)
+         :engine-data-version engine-data-version}
+        {
+         :error true})
+      (catch Exception e
+        (log/error e "Error reading engine data for" engine-dir)
+        {
+         :error true}))))
 
 
 (defn delete-skylobby-update-jars []

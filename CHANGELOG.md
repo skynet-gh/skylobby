@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.6](https://github.com/skynet-gh/skylobby/releases/tag/0.9.6) - 2022-07-24
+
+- Fix rare ignore list causing all chat to be hidden
+- Improve handling of corrupt resources
+
 ## [0.9.5](https://github.com/skynet-gh/skylobby/releases/tag/0.9.5) - 2022-06-23
 
 - Fix chat and console auto scroll when dragging scroll bar

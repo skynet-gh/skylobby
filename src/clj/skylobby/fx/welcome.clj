@@ -204,8 +204,8 @@
            {:fx/type font-icon/lifecycle
             :icon-literal
             (if server
-              "mdi-wrench:30"
-              "mdi-plus:30")}}]}]
+              "mdi-wrench:24"
+              "mdi-plus:24")}}]}]
        (when (= "server2.beyondallreason.info:8201" (first server))
          [{:fx/type :h-box
            :alignment :center-left

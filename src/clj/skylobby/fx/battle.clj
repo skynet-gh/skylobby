@@ -356,15 +356,22 @@
                          [{:fx/type sync-button
                            :server-key server-key}
                           {:fx/type :button
-                           :text ""
-                           :graphic {:fx/type font-icon/lifecycle
-                                     :icon-literal (if battle-resource-details
-                                                     (str "mdi-window-maximize:" (+ 5 font-icon-size) ":white")
-                                                     (str "mdi-open-in-new:" (+ 5 font-icon-size) ":white"))}
+                           :text " "
                            :on-action {:event/type :spring-lobby/assoc
                                        :key :battle-resource-details
                                        :value (not (boolean battle-resource-details))}
-                           :style sync-button-style}]}]
+                           :style sync-button-style
+                           :graphic
+                           {:fx/type :h-box
+                            :alignment :center-left
+                            :children
+                            [
+                             {:fx/type :label
+                              :text " "}
+                             {:fx/type font-icon/lifecycle
+                              :icon-literal (if battle-resource-details
+                                              (str "mdi-window-maximize:" font-icon-size ":white")
+                                              (str "mdi-open-in-new:" font-icon-size ":white"))}]}}]}]
                        [{:fx/type :button
                          :text "Reload"
                          :on-action
@@ -1568,6 +1575,7 @@
     (if (or singleplayer
             direct-connect-server)
       {:fx/type :v-box
+       :min-width 580
        :style (if singleplayer
                 {:-fx-font-size 20}
                 {:-fx-font-size 18
@@ -1619,6 +1627,7 @@
       {:fx/type :scroll-pane
        :fit-to-width true
        :hbar-policy :never
+       :min-width 400
        :content
        {:fx/type :flow-pane
         :vgap 5

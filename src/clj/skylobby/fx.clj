@@ -15,7 +15,8 @@
 (set! *warn-on-reflection* true)
 
 
-(def tooltip-show-delay [100 :ms])
+(def tooltip-show-delay [200 :ms])
+(def tooltip-show-delay-slow [500 :ms]) ; some things are jarring otherwise
 
 
 (def case-insensitive-natural-comparator

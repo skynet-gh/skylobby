@@ -24,6 +24,9 @@
 (def downloadable-update-cooldown
   (* 1000 60 60 24)) ; 1 day
 
+(def blacklisted-urls
+  "Known bad resources"
+  #{"https://springrts.com/dl/buildbot/default/master/105.0/linux32/spring_105.0_minimal-portable-linux32-static.7z"})
 
 (defn update-download-source
   [state-atom {:keys [resources-fn url download-source-name] :as source}]
@@ -34,7 +37,9 @@
             (:force source))
       (let [{:keys [db use-db-for-downloadables]} (swap! state-atom assoc-in [:downloadables-last-updated url] now)
             _ (log/info "Updating downloadables from" url)
-            downloadables (resources-fn source)
+            downloadables (->> source
+                               resources-fn
+                               (remove (comp blacklisted-urls :download-url)))
             downloadables-by-url (->> downloadables
                                       (map (juxt :download-url identity))
                                       (into {}))

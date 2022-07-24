@@ -61,6 +61,7 @@
         map-downloadable (->> downloadables
                               (filter (comp #{:spring-lobby/map} :resource-type))
                               (filter (partial resource/could-be-this-map? map-name))
+                              shuffle
                               first)
         map-download-task (->> all-tasks
                                (filter (comp #{:spring-lobby/http-downloadable} :spring-lobby/task-type))
@@ -98,6 +99,7 @@
         engine-downloadable (->> downloadables
                                  (filter (comp #{:spring-lobby/engine} :resource-type))
                                  (filter (partial resource/could-be-this-engine? engine-version))
+                                 shuffle
                                  first)
         engine-download-dest (resource/resource-dest spring-root engine-downloadable)
         engine-extract-dest (when engine-download-dest
@@ -113,6 +115,7 @@
         mod-downloadable (->> downloadables
                               (filter (comp #{:spring-lobby/mod} :resource-type))
                               (filter (partial resource/could-be-this-mod? mod-name))
+                              shuffle
                               first)
         mod-download-task (->> all-tasks
                                (filter (comp #{:spring-lobby/http-downloadable} :spring-lobby/task-type))
@@ -185,7 +188,11 @@
                        (get http/download-sources-by-name engine-download-source-name)))
                    (and (not (contains? engine-refresh-tasks spring-root-path))
                         (fs/file-exists? file-cache engine-extract-dest)
-                        (fs/is-directory? engine-extract-dest))
+                        (fs/is-directory? engine-extract-dest)
+                        (not
+                          (some
+                            (comp #{engine-extract-dest} :file)
+                            engines)))
                    (do
                      (log/info "Refreshing engines to pick up" engine-extract-dest)
                      {:spring-lobby/task-type :spring-lobby/refresh-engines

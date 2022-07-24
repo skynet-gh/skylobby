@@ -71,7 +71,7 @@
               (when tooltip
                 {:tooltip
                  {:fx/type tooltip-nofocus/lifecycle
-                  :show-delay skylobby.fx/tooltip-show-delay
+                  :show-delay skylobby.fx/tooltip-show-delay-slow
                   :style {:-fx-font-size 14}
                   :text tooltip}})
               :desc
