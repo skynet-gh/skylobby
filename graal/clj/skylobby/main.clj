@@ -7,7 +7,7 @@
     [skylobby.cli.util :as cu]
     [skylobby.direct :as direct]
     [skylobby.fs :as fs]
-    [skylobby.main.resources :as auto-resources]
+    [skylobby.main.resources :as resources]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
