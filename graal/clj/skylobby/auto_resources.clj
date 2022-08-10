@@ -19,15 +19,30 @@
      (fs/canonical-path (resource/resource-dest spring-root importable))))
 
 
+(defn resource-details
+  [{:keys [engine-version map-name mod-name spring-root]}
+   {:keys [by-spring-root spring-isolation-dir]}]
+  (let [
+        spring-root-path (fs/canonical-path (or spring-root spring-isolation-dir))
+        {:keys [engines maps mods]} (get by-spring-root spring-root-path)]
+    {:engine-details (resource/engine-details engines engine-version)
+     :map-details (->> maps
+                       (filter (comp #{map-name} :map-name))
+                       first)
+     :mod-details (->> mods
+                       (filter (comp #{mod-name} :mod-name))
+                       first)}))
+
 (defn auto-resources-tasks
-  [{:keys [battle-changed engine-version map-name mod-name spring-root]}
+  [{:keys [battle-changed engine-version map-name mod-name spring-root] :as resources}
    {:keys [by-spring-root cooldowns current-tasks db downloadables-by-url file-cache http-download
            importables-by-path rapid-by-spring-root
-           springfiles-search-results tasks-by-kind use-db-for-rapid]}]
+           springfiles-search-results spring-isolation-dir tasks-by-kind use-db-for-rapid] :as state}]
   (let [
+        spring-root (or spring-root spring-isolation-dir)
         spring-root-path (fs/canonical-path spring-root)
         {:keys [rapid-data-by-version]} (get rapid-by-spring-root spring-root-path)
-        {:keys [engines maps mods]} (get by-spring-root spring-root-path)
+        {:keys [engines]} (get by-spring-root spring-root-path)
         rapid-data (if (and db use-db-for-rapid)
                      (rapid/rapid-data-by-version db spring-root-path mod-name)
                      (get rapid-data-by-version mod-name))
@@ -53,10 +68,8 @@
                              (filter (comp (partial resource/same-resource-file? map-importable) :importable))
                              (remove (partial import-dest-is-source? spring-root))
                              first)
-        no-map (->> maps
-                    (filter (comp #{map-name} :map-name))
-                    first
-                    not)
+        {:keys [engine-details map-details mod-details]} (resource-details resources state)
+        no-map (not map-details)
         downloadables (vals downloadables-by-url)
         map-downloadable (->> downloadables
                               (filter (comp #{:spring-lobby/map} :resource-type))
@@ -83,7 +96,6 @@
                                            (filter (comp #{:spring-lobby/download-springfiles :spring-lobby/http-downloadable} :spring-lobby/task-type))
                                            (filter (comp #{mod-name} :springname))
                                            first)
-        engine-details (resource/engine-details engines engine-version)
         engine-file (:file engine-details)
         engine-dir-exists (and (fs/exists? engine-file)
                                (fs/is-directory? engine-file))
@@ -129,10 +141,7 @@
                                   (filter (comp #{:spring-lobby/refresh-engines} :spring-lobby/task-type))
                                   (map (comp fs/canonical-path :spring-root))
                                   set)
-        no-mod (->> mods
-                    (filter (comp #{mod-name} :mod-name))
-                    first
-                    not)
+        no-mod (not mod-details)
         map-springfiles-search-result (get springfiles-search-results map-name)
         mod-springfiles-search-result (get springfiles-search-results mod-name)
         map-springfiles-url (http/springfiles-url map-springfiles-search-result)
@@ -254,6 +263,11 @@
                       :springname map-name
                       :search-result (get springfiles-search-results map-name)
                       :spring-isolation-dir spring-root})
+                   (and map-name
+                        (not (:spring-lobby/refresh-maps tasks-by-type))
+                        (u/check-cooldown cooldowns [:refresh-maps]))
+                   {:spring-lobby/task-type :spring-lobby/refresh-maps
+                    :spring-root spring-root}
                    :else
                    (when map-name
                      (log/info "Nothing to do to auto get map" map-name))))

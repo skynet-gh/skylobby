@@ -33,9 +33,6 @@
 (def springfightclub-root
   "https://www.springfightclub.com/data")
 
-(def springlauncher-root
-  "https://content.spring-launcher.com")
-
 (def ba-github-releases-url
   "https://api.github.com/repos/Balanced-Annihilation/Balanced-Annihilation/releases")
 
@@ -152,7 +149,8 @@
       (let [uri (java.net.URI. url)]
         (last (string/split (.getPath uri) #"/")))
       (catch Exception e
-        (log/error e "Error parsing url" url)
+        (log/trace e "Error parsing url" url)
+        (log/error "Error parsing url" url "falling back on manual")
         (last (string/split url #"/"))))))
 
 (defn bar-replay-download-url [filename-or-id]
@@ -554,9 +552,6 @@
    {:download-source-name "SpringFightClub Games"
     :url springfightclub-root
     :resources-fn (partial html-downloadables mods-only)}
-   {:download-source-name "SpringLauncher"
-    :url springlauncher-root
-    :resources-fn get-springlauncher-downloadables}
    {:download-source-name "SpringRTS buildbot"
     :url springrts-buildbot-root
     :resources-fn crawl-springrts-engine-downloadables}

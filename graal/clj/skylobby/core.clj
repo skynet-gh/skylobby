@@ -362,12 +362,12 @@
         (handle-task! state-atom task-kind)))))
 
 (defn- tasks-chimer-fn
-  ([state-atom task-kind]
+  ([state-atom initial-delay-ms task-kind]
    (log/info "Starting tasks chimer for" task-kind)
    (let [chimer
          (chime/chime-at
            (chime/periodic-seq
-             (java-time/plus (java-time/instant) (Duration/ofMillis 10000))
+             (java-time/plus (java-time/instant) (Duration/ofMillis initial-delay-ms))
              (Duration/ofMillis 1000))
            (tasks-chimer-handler state-atom task-kind)
            {:error-handler
@@ -461,7 +461,7 @@
        (log/info "Spitting edn to" file)
        (spit file output)))))
 
-(defn- spit-state-config-to-edn [old-state new-state]
+(defn spit-state-config-to-edn [old-state new-state]
   (doseq [{:keys [select-fn filename] :as opts} state-to-edn]
     (try
       (let [old-data (select-fn old-state)
@@ -523,11 +523,12 @@
   "Things to do on program init, or in dev after a recompile."
   ([state-atom]
    (init state-atom nil))
-  ([state-atom {:keys [skip-tasks]}]
+  ([state-atom {:keys [initial-task-delay-ms skip-tasks]
+                :or {initial-task-delay-ms 10000}}]
    (log/info "Initializing periodic jobs")
    (add-task-handlers)
    (let [task-chimers (->> task/task-kinds
-                           (map (partial tasks-chimer-fn state-atom))
+                           (map (partial tasks-chimer-fn state-atom initial-task-delay-ms))
                            doall)
          state-chimers (->> state-watch-chimers
                             (map (fn [[k watcher-fn duration]]
