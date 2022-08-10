@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.7](https://github.com/skynet-gh/skylobby/releases/tag/0.9.7) - 2022-08-10
+
+- Fix issues with battle minimap tab content width
+- Fix an issue with extracting engine archives
+
 ## [0.9.6](https://github.com/skynet-gh/skylobby/releases/tag/0.9.6) - 2022-07-24
 
 - Fix rare ignore list causing all chat to be hidden
