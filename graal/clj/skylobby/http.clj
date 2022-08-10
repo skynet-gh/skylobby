@@ -152,7 +152,8 @@
       (let [uri (java.net.URI. url)]
         (last (string/split (.getPath uri) #"/")))
       (catch Exception e
-        (log/error e "Error parsing url" url)
+        (log/trace e "Error parsing url" url)
+        (log/error "Error parsing url" url "falling back on manual")
         (last (string/split url #"/"))))))
 
 (defn bar-replay-download-url [filename-or-id]
