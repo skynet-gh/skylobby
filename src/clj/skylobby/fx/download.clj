@@ -48,8 +48,8 @@
                                              (group-by :download-source-name))
         download-update-tasks-by-source (assoc download-update-tasks-by-source nil (get tasks-by-type :spring-lobby/update-all-downloadables))
         download-source (->> http/download-sources
-                         (filter (comp #{download-source-name} :download-source-name))
-                         first)
+                             (filter (comp #{download-source-name} :download-source-name))
+                             first)
         downloadables (->> (or (vals downloadables-by-url) [])
                            (filter :resource-type)
                            (filter (fn [downloadable]
@@ -310,9 +310,11 @@
                     :show-delay skylobby.fx/tooltip-show-delay
                     :text (str "Extract to " extract-file)}
                    :on-action
-                   {:event/type :spring-lobby/extract-7z
-                    :file dest-file
-                    :dest extract-file}
+                   {:event/type :spring-lobby/add-task
+                    :task
+                    {:event/type :spring-lobby/extract-7z
+                     :file dest-file
+                     :dest extract-file}}
                    :graphic
                    {:fx/type font-icon/lifecycle
                     :icon-literal "mdi-archive:16:white"}}
