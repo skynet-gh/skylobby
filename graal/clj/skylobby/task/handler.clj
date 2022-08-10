@@ -852,6 +852,7 @@
       (catch Exception e
         (log/error e "Error deleting corrupt rapid dir"))))
   (defmethod task-handler :spring-lobby/refresh-maps [{:keys [spring-root] :as opts}]
+    (u/update-cooldown state-atom [:refresh-maps])
     (if spring-root
       (refresh-maps state-atom spring-root opts)
       (refresh-maps-all-spring-roots state-atom)))

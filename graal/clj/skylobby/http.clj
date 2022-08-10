@@ -33,9 +33,6 @@
 (def springfightclub-root
   "https://www.springfightclub.com/data")
 
-(def springlauncher-root
-  "https://content.spring-launcher.com")
-
 (def ba-github-releases-url
   "https://api.github.com/repos/Balanced-Annihilation/Balanced-Annihilation/releases")
 
@@ -555,9 +552,6 @@
    {:download-source-name "SpringFightClub Games"
     :url springfightclub-root
     :resources-fn (partial html-downloadables mods-only)}
-   {:download-source-name "SpringLauncher"
-    :url springlauncher-root
-    :resources-fn get-springlauncher-downloadables}
    {:download-source-name "SpringRTS buildbot"
     :url springrts-buildbot-root
     :resources-fn crawl-springrts-engine-downloadables}

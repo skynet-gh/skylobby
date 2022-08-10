@@ -7,6 +7,7 @@
     [skylobby.cli.util :as cu]
     [skylobby.direct :as direct]
     [skylobby.fs :as fs]
+    [skylobby.main.resources :as auto-resources]
     [skylobby.util :as u]
     [taoensso.timbre :as log])
   (:import
@@ -34,9 +35,10 @@
         options-summary
         ""
         "Actions:"
-        "  cli       Demo CLI interface"
-        "  direct    Direct connect server"
-        "  <none>    Start client service with web UI"
+        "  resources    Get resources such as engine, map, game"
+        "  cli          Demo CLI interface"
+        "  direct       Direct connect server"
+        "  <none>       Start client service with web UI"
         ""]
        (string/join \newline)))
 
@@ -81,6 +83,8 @@
       (apply cli-demo/-main (rest arguments))
       (= "direct" (first arguments))
       (apply direct/-main (rest arguments))
+      (= "resources" (first arguments))
+      (apply resources/-main (rest arguments))
       (seq arguments)
       (cu/print-and-exit -1 "Unknown action: " (pr-str arguments))
       :else
