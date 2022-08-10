@@ -941,16 +941,21 @@
        :content
        {:fx/type :scroll-pane
         :fit-to-width true
-        :hbar-policy :never
+        ;:hbar-policy :never
         :vbar-policy :always
         :content
         {:fx/type :v-box
+         :max-width minimap-size
+         :pref-width minimap-size
          :alignment :top-left
          :children
          [{:fx/type fx.minimap/minimap-pane
            :server-key server-key
            :minimap-type-key :minimap-type}
           {:fx/type :v-box
+           :min-width minimap-size
+           :pref-width minimap-size
+           :max-width minimap-size
            :children
            (concat
              [
@@ -993,10 +998,12 @@
                   {:fx/type tooltip-nofocus/lifecycle
                    :show-delay skylobby.fx/tooltip-show-delay
                    :style {:-fx-font-size 16}
-                   :text map-description}}
+                   :text map-description
+                   :wrap-text true}}
                  :desc
                  {:fx/type :label
-                  :text map-description}})
+                  :text map-description
+                  :wrap-text true}})
               {:fx/type :flow-pane
                :children
                [
@@ -1011,15 +1018,16 @@
                  :value (fx/sub-val context :minimap-type)
                  :items minimap-types
                  :on-value-changed {:event/type :spring-lobby/assoc
-                                    :key :minimap-type}}
-                {:fx/type :label
-                 :alignment :center-left
-                 :text (str " Map size: "
-                            (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
-                              (str
-                                (when map-width (quot map-width 64))
-                                " x "
-                                (when map-height (quot map-height 64)))))}]}
+                                    :key :minimap-type}}]}
+              {:fx/type :label
+               :alignment :center-left
+               :text (str " Map size: "
+                          (when-let [{:keys [map-width map-height]} (-> battle-map-details :smf :header)]
+                            (str
+                              (when map-width (quot map-width 64))
+                              " x "
+                              (when map-height (quot map-height 64)))))
+               :wrap-text true}
               {:fx/type :flow-pane
                :children
                (concat
@@ -1067,6 +1075,9 @@
                                    :client-data client-data
                                    :server-key server-key}}
                       {:fx/type :flow-pane
+                       :min-width minimap-size
+                       :pref-width minimap-size
+                       :max-width minimap-size
                        :children
                        (concat
                          [
@@ -1458,7 +1469,7 @@
          (concat
            (when show-vote-log
              [{:fx/type :label
-               :text "Vote Log (newest to oldest)"
+               :text "Vote Log"
                :style {:-fx-font-size 24}}])
            [{:fx/type :pane
              :h-box/hgrow :always}
