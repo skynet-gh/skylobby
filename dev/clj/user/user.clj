@@ -16,6 +16,7 @@
     [hawk.core :as hawk]
     io.aviso.repl
     java-time
+    java-time.defconversion
     [pjstadig.humane-test-output]))
 
 
@@ -25,6 +26,9 @@
 
 (pjstadig.humane-test-output/activate!)
 (io.aviso.repl/install-pretty-exceptions)
+
+
+(alter-var-root #'java-time.defconversion/*fail-on-duplicate-conversion?* (constantly false))
 
 
 ; application state, copy this to spring-lobby nses on refresh
