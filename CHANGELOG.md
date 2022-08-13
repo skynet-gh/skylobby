@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.8](https://github.com/skynet-gh/skylobby/releases/tag/0.9.8) - 2022-08-13
+
+- Replace ring specs button with ring and wakeup buttons
+- Fix an issue with saving window and divider positions
+
 ## [0.9.7](https://github.com/skynet-gh/skylobby/releases/tag/0.9.7) - 2022-08-10
 
 - Fix issues with battle minimap tab content width
