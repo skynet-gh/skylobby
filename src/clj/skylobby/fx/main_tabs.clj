@@ -336,7 +336,7 @@
                                :vertical
                                :horizontal)
                 :divider-positions [(or (get divider-positions divider-key)
-                                        (if vertical 0.75 0.99))]
+                                        0.99)]
                 :items
                 [
                  {:fx/type fx.battles-table/battles-table
@@ -386,7 +386,7 @@
            :desc
            {:fx/type :split-pane
             :divider-positions [(or (get divider-positions :chat-tab)
-                                    0.90)]
+                                    0.99)]
             :items
             [{:fx/type my-channels-view
               :server-key server-key}

@@ -14,11 +14,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'adopt'
-      - uses: DeLaGuardo/setup-clojure@9.3
+      - uses: DeLaGuardo/setup-clojure@9.4
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.6
+      - uses: actions/cache@v3.0.7
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('cryogen/project.clj') }}
