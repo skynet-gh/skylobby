@@ -1337,7 +1337,7 @@
             (java-time/plus (java-time/instant) (java-time/duration 1 :minutes))
             (java-time/duration 3 :seconds))
           (fn [_chimestamp]
-            (let [old-state (with-window-data @old-state-atom)
+            (let [old-state @old-state-atom
                   new-state (with-window-data @state-atom)]
               (spit-state-config-to-edn old-state new-state)
               (reset! old-state-atom new-state)))
