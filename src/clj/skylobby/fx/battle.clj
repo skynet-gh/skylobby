@@ -332,7 +332,7 @@
         my-team-color (fx/sub-ctx context sub/my-team-color server-key)
         my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         in-sync (= 1 (:sync my-battle-status))
-        ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
+        ;ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
         discord-channel (discord/channel-to-promote {:mod-name mod-name
                                                      :server-url (:server-url client-data)})
         now (fx/sub-val context :now)
@@ -406,7 +406,37 @@
                                   :username username}}])
                   (when (and (not singleplayer)
                              (not direct-connect))
-                    [{:fx/type :button
+                    [
+                     {:fx/type :button
+                      :text "Ring"
+                      :on-action
+                      {:event/type :skylobby.fx.event.chat/send
+                       :channel-name channel-name
+                       :client-data client-data
+                       :message "!ring"
+                       :server-key server-key}}
+                     {:fx/type :button
+                      :text "Wakeup"
+                      :on-action
+                      {:event/type :skylobby.fx.event.chat/send
+                       :channel-name channel-name
+                       :client-data client-data
+                       :message "!wakeup"
+                       :server-key server-key}}
+                     #_
+                     {:fx/type :button
+                      :text "Ring Specs"
+                      :disable (boolean ringing-specs)
+                      :on-action
+                      {:event/type :spring-lobby/add-task
+                       :task
+                       {:spring-lobby/task-type :spring-lobby/ring-specs
+                        :battle-users (:users battle)
+                        :channel-name channel-name
+                        :client-data client-data
+                        :users users}}}
+                     #_
+                     {:fx/type :button
                       :text "Ring Specs"
                       :disable (boolean ringing-specs)
                       :on-action
