@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3.0.2
-      - uses: ilammy/msvc-dev-cmd@v1.10.0
+      - uses: ilammy/msvc-dev-cmd@v1.11.0
       - uses: microsoft/setup-msbuild@v1.1
         with:
           vs-version: '16.11.11'
@@ -28,13 +28,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.7
+      - uses: actions/cache@v3.0.8
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@9.4
+      - uses: DeLaGuardo/setup-clojure@9.5
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -74,13 +74,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.7
+      - uses: actions/cache@v3.0.8
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@9.4
+      - uses: DeLaGuardo/setup-clojure@9.5
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -104,13 +104,13 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.7
+      - uses: actions/cache@v3.0.8
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: DeLaGuardo/setup-clojure@9.4
+      - uses: DeLaGuardo/setup-clojure@9.5
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}

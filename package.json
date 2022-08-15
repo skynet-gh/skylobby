@@ -4,5 +4,8 @@
     "material-icons": "^1.10.6",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "shadow-cljs": "^2.20.1"
   }
 }
