@@ -180,7 +180,7 @@
         (fx/sub-ctx context indexed-engine spring-isolation-dir engine-version))))
 
 (defn could-be-this-engine-downloads [context engine-version]
-  (->> (fx/sub-ctx context :downloadables-by-url)
+  (->> (fx/sub-val context :downloadables-by-url)
        vals
        (filter (comp #{:spring-lobby/engine} :resource-type))
        (filter (partial resource/could-be-this-engine? engine-version))
@@ -189,7 +189,7 @@
 
 (defn could-be-this-engine-import [context engine-version]
   (let [
-        importables-by-path (fx/sub-ctx context :importables-by-path)]
+        importables-by-path (fx/sub-val context :importables-by-path)]
     (some->> importables-by-path
              vals
              (filter (comp #{:spring-lobby/engine} :resource-type))
