@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.9](https://github.com/skynet-gh/skylobby/releases/tag/0.9.9) - 2022-09-05
+
+- Update bar server url
+
 ## [0.9.8](https://github.com/skynet-gh/skylobby/releases/tag/0.9.8) - 2022-08-13
 
 - Replace ring specs button with ring and wakeup buttons
