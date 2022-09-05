@@ -455,9 +455,7 @@
                       {:event/type :spring-lobby/main-window-on-close-request
                        :standalone true}
                       {:event/type :spring-lobby/dissoc
-                       :key (if (fx/sub-val context :selected-replay-file)
-                              :selected-replay-file
-                              :selected-replay-id)})
+                       :keys [:selected-replay-file :selected-replay-id]})
                     :text "Close"
                     :graphic
                     {:fx/type font-icon/lifecycle

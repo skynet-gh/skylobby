@@ -1025,9 +1025,14 @@
                                 :parsed-replays-by-path replays-by-path
                                 :invalid-replay-paths invalid-replay-paths)))))
             invalid-replay-paths (set (:invalid-replay-paths new-state))
-            valid-next-round (remove
-                              (comp invalid-replay-paths fs/canonical-path second)
-                              todo)]
+            existing-valid-paths (->> new-state
+                                      :parsed-replays-by-path
+                                      (filter valid-replay?)
+                                      keys
+                                      set)
+            valid-next-round (->> all-files
+                                  (remove (comp existing-valid-paths fs/canonical-path second))
+                                  (remove (comp invalid-replay-paths fs/canonical-path second)))]
         (cond
           (empty? valid-next-round)
           (do
@@ -1039,7 +1044,8 @@
             (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/refresh-replay-resources}))
           (= (set todo)
              (set valid-next-round))
-          (log/warn "Infinite loop detected, aborting replay refresh")
+          (log/warn "Infinite loop detected," (count todo) "todo and" (count valid-next-round)
+                    "valid, aborting refresh-replays")
           :else
           (task/add-task! state-atom
                           {:spring-lobby/task-type :spring-lobby/refresh-replays
