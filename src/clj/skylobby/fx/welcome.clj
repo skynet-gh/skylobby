@@ -206,17 +206,18 @@
             (if server
               "mdi-wrench:24"
               "mdi-plus:24")}}]}]
-       (when (= "server2.beyondallreason.info:8201" (first server))
-         [{:fx/type :h-box
-           :alignment :center-left
-           :children
-           [{:fx/type :label
-             :text "You must first login once at "}
-            (let [url "https://server2.beyondallreason.info"]
-              {:fx/type :hyperlink
-               :text url
-               :on-action {:event/type :spring-lobby/desktop-browse-url
-                           :url url}})]}])
+       (when-let [server-url (first server)]
+         (when (string/ends-with? server-url ".beyondallreason.info:8201")
+           [{:fx/type :h-box
+             :alignment :center-left
+             :children
+             [{:fx/type :label
+               :text "You must first login once at "}
+              (let [url (str "https://" (:host (second server)))]
+                {:fx/type :hyperlink
+                 :text url
+                 :on-action {:event/type :spring-lobby/desktop-browse-url
+                             :url url}})]}]))
        [{:fx/type :h-box
          :alignment :center-left
          :children
