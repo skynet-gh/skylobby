@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.2
-      - uses: FranzDiebold/github-env-vars-action@v2.5.0
-      - uses: actions/setup-java@v3.4.1
+      - uses: FranzDiebold/github-env-vars-action@v2.7.0
+      - uses: actions/setup-java@v3.5.1
         with:
           java-version: '17'
           distribution: 'adopt'
@@ -18,13 +18,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.8
+      - uses: actions/cache@v3.0.9
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.4.1
+      - uses: actions/setup-node@v3.5.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -81,8 +81,8 @@ jobs:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v3.0.2
-      - uses: FranzDiebold/github-env-vars-action@v2.5.0
-      - uses: actions/setup-java@v3.4.1
+      - uses: FranzDiebold/github-env-vars-action@v2.7.0
+      - uses: actions/setup-java@v3.5.1
         with:
           java-version: '14'
           # ^ mac jpackage hates versions starting with 0 in later versions
@@ -91,13 +91,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.8
+      - uses: actions/cache@v3.0.9
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.4.1
+      - uses: actions/setup-node@v3.5.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -126,8 +126,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3.0.2
-      - uses: FranzDiebold/github-env-vars-action@v2.5.0
-      - uses: actions/setup-java@v3.4.1
+      - uses: FranzDiebold/github-env-vars-action@v2.7.0
+      - uses: actions/setup-java@v3.5.1
         with:
           java-version: '17'
           distribution: 'adopt'
@@ -135,13 +135,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.8
+      - uses: actions/cache@v3.0.9
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.4.1
+      - uses: actions/setup-node@v3.5.0
         with:
           node-version: '14'
           cache: 'npm'
@@ -188,7 +188,7 @@ jobs:
           allowUpdates: true
           omitBodyDuringUpdate: true
           omitNameDuringUpdate: true
-      - uses: FranzDiebold/github-env-vars-action@v2.5.0
+      - uses: FranzDiebold/github-env-vars-action@v2.7.0
       - uses: Ilshidur/action-discord@0.3.2
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
