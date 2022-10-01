@@ -481,7 +481,13 @@
                                               :key :interleave-ally-player-ids}}
                        {:fx/type :label
                         :text " Interleave Player IDs "}]}]))
-        debug-spring (boolean (fx/sub-val context :debug-spring))]
+        debug-spring (boolean (fx/sub-val context :debug-spring))
+        map-teams (spring/map-teams battle-map-details)
+        startpostype (fx/sub-ctx context sub/startpostype server-key)
+        warn-invalid-start-positions (and map-teams
+                                          (not= startpostype "Choose in game")
+                                          (< (count map-teams)
+                                             (count team-counts)))]
     {:fx/type :v-box
      :children
      [
@@ -747,6 +753,10 @@
                  :show-delay skylobby.fx/tooltip-show-delay
                  :style {:-fx-font-size 16}
                  :text (cond
+                         warn-invalid-start-positions
+                         (str "Map does not have enough start positions. "
+                              "Set start position type to Choose in Game "
+                              "and draw boxes on the map.")
                          debug-spring "Write script.txt and show Spring command"
                          am-host (if singleplayer
                                    "Start the game"
@@ -755,6 +765,9 @@
                          :else (str "Call vote to start the game"))}}
                :desc
                {:fx/type :button
+                :style (if warn-invalid-start-positions
+                         (dissoc warn-severity :-fx-background-color)
+                         {})
                 :text (cond
                         spring-starting
                         "Game starting"
