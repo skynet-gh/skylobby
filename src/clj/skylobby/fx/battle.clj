@@ -332,7 +332,6 @@
         my-team-color (fx/sub-ctx context sub/my-team-color server-key)
         my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         in-sync (= 1 (:sync my-battle-status))
-        ;ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
         discord-channel (discord/channel-to-promote {:mod-name mod-name
                                                      :server-url (:server-url client-data)})
         now (fx/sub-val context :now)
@@ -482,7 +481,13 @@
                                               :key :interleave-ally-player-ids}}
                        {:fx/type :label
                         :text " Interleave Player IDs "}]}]))
-        debug-spring (boolean (fx/sub-val context :debug-spring))]
+        debug-spring (boolean (fx/sub-val context :debug-spring))
+        map-teams (spring/map-teams battle-map-details)
+        startpostype (fx/sub-ctx context sub/startpostype server-key)
+        warn-invalid-start-positions (and map-teams
+                                          (not= startpostype "Choose in game")
+                                          (< (count map-teams)
+                                             (count team-counts)))]
     {:fx/type :v-box
      :children
      [
@@ -748,6 +753,10 @@
                  :show-delay skylobby.fx/tooltip-show-delay
                  :style {:-fx-font-size 16}
                  :text (cond
+                         warn-invalid-start-positions
+                         (str "Map does not have enough start positions. "
+                              "Set start position type to Choose in Game "
+                              "and draw boxes on the map.")
                          debug-spring "Write script.txt and show Spring command"
                          am-host (if singleplayer
                                    "Start the game"
@@ -756,6 +765,9 @@
                          :else (str "Call vote to start the game"))}}
                :desc
                {:fx/type :button
+                :style (if warn-invalid-start-positions
+                         (dissoc warn-severity :-fx-background-color)
+                         {})
                 :text (cond
                         spring-starting
                         "Game starting"
@@ -764,20 +776,23 @@
                         (and (not singleplayer)
                              (not in-sync))
                         "Not synced"
-                        (or
-                          (and am-spec
-                               (not host-ingame)
-                               (not singleplayer)
-                               (not= :direct-host server-type))
-                          (and (not host-ingame)
-                               (= :direct-client server-type)))
+                        (and
+                          (not am-host)
+                          (or
+                            (and am-spec
+                                 (not host-ingame)
+                                 (not singleplayer)
+                                 (not= :direct-host server-type))
+                            (and (not host-ingame)
+                                 (= :direct-client server-type))))
                         "Game not running"
                         :else
                         (if debug-spring
                           "Debug Spring"
                           (str (if (and (not singleplayer)
                                         (not= :direct-host server-type)
-                                        (or host-ingame am-spec))
+                                        (or host-ingame am-spec)
+                                        (not am-host))
                                  "Join" "Start")
                                " Game")))
                 :disable (boolean
@@ -787,6 +802,7 @@
                                (and (= :direct-client server-type)
                                     (not host-ingame))
                                (and (not singleplayer)
+                                    (not am-host)
                                     (not= :direct-host server-type)
                                     (or (and (not host-ingame) am-spec)
                                         (not in-sync)))))
@@ -1312,6 +1328,9 @@
              {:fx/type :button
               :text ""
               :on-action {:event/type :spring-lobby/spring-settings-refresh}
+              :tooltip {:fx/type tooltip-nofocus/lifecycle
+                        :show-delay skylobby.fx/tooltip-show-delay
+                        :text "Refresh"}
               :graphic
               {:fx/type font-icon/lifecycle
                :icon-literal "mdi-refresh:16:white"}}
@@ -1321,14 +1340,14 @@
             :v-box/vgrow :always
             :column-resize-policy :constrained
             :items (or (some->> (fs/spring-settings-root)
-                                fs/list-files ; TODO IO in render
-                                (filter fs/is-directory?)
+                                (fs/list-descendants-cache file-cache)
+                                (filter :is-directory)
                                 reverse)
                        [])
             :columns
             [{:fx/type :table-column
               :text "Directory"
-              :cell-value-factory fs/filename
+              :cell-value-factory :filename
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
@@ -1336,12 +1355,12 @@
                  {:text (str filename)})}}
              {:fx/type :table-column
               :text "Action"
-              :cell-value-factory identity
+              :cell-value-factory :canonical-path
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
-               (fn [i]
-                 {:text (when (get results (fs/canonical-path i))
+               (fn [path]
+                 {:text (when (get results path)
                           " copied!")
                   :graphic
                   {:fx/type :button
@@ -1351,7 +1370,7 @@
                     :confirmed true ; TODO confirm
                     :dest-dir spring-isolation-dir
                     :file-cache file-cache
-                    :source-dir i}}})}}]}]})}
+                    :source-dir path}}})}}]}]})}
       #_
       {:fx/type :tab
        :graphic {:fx/type :label

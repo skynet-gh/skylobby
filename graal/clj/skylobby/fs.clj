@@ -126,6 +126,7 @@
 
 (defn list-files [^File f]
   (when f
+    (log/info "Listing files in" f)
     (.listFiles f)))
 
 (defn to-path ^Path [^File f]
@@ -807,7 +808,9 @@
 
 (defn file-cache-data [f]
   (if f
-    {:canonical-path (canonical-path f)
+    {
+     :filename (filename f)
+     :canonical-path (canonical-path f)
      :exists (exists? f)
      :is-directory (is-directory? f)
      :last-modified (last-modified f)}
@@ -818,6 +821,14 @@
        (filter some?)
        (map (juxt :canonical-path identity))
        (into {})))
+
+(defn list-descendants-cache [file-cache ^File dir]
+  (when-let [path (canonical-path dir)]
+    (->> file-cache
+         vals
+         (filter :canonical-path)
+         (filterv (comp #(string/starts-with? % path) :canonical-path)))))
+
 
 (defn update-file-cache!
   "Updates the file cache in state for this file. This is so that we don't need to do IO in render,

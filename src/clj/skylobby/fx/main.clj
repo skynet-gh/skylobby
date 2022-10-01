@@ -3,6 +3,7 @@
     [cljfx.api :as fx]
     [cljfx.ext.tab-pane :as fx.ext.tab-pane]
     [clojure.string :as string]
+    skylobby.direct
     skylobby.fx
     [skylobby.fx.battle :as fx.battle]
     [skylobby.fx.bottom-bar :as fx.bottom-bar]
@@ -19,6 +20,7 @@
     [skylobby.util :as u]
     [taoensso.tufte :as tufte])
   (:import
+    (java.util.function UnaryOperator)
     (org.apache.commons.validator.routines InetAddressValidator)))
 
 
@@ -28,6 +30,17 @@
 (def ^InetAddressValidator ip-validator
   (InetAddressValidator/getInstance))
 
+
+; https://stackoverflow.com/a/66505103
+(def direct-connect-username-filter
+  (reify UnaryOperator
+    (apply [_this change]
+      (if (re-find skylobby.direct/illegal-direct-connect-username-re (.getText change))
+        (do
+          (.setText change "")
+          (.setRange change (.getRangeStart change) (.getRangeStart change))
+          change)
+        change))))
 
 (defn protocol-cell
   [x]
@@ -90,9 +103,13 @@
                   {:fx/type :pane
                    :h-box/hgrow :always}
                   {:fx/type :text-field
-                   :text (str direct-connect-join-username)
-                   :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :direct-connect-join-username}}]}
+                   :text-formatter
+                   {:fx/type :text-formatter
+                    :filter direct-connect-username-filter
+                    :value-converter :default
+                    :value (str direct-connect-join-username)
+                    :on-value-changed {:event/type :spring-lobby/assoc
+                                       :key :direct-connect-join-username}}}]}
                 #_
                 {:fx/type :h-box
                  :alignment :center-left
@@ -178,9 +195,13 @@
                   {:fx/type :pane
                    :h-box/hgrow :always}
                   {:fx/type :text-field
-                   :text (str direct-connect-host-username)
-                   :on-text-changed {:event/type :spring-lobby/assoc
-                                     :key :direct-connect-host-username}}]}
+                   :text-formatter
+                   {:fx/type :text-formatter
+                    :filter direct-connect-username-filter
+                    :value-converter :default
+                    :value (str direct-connect-host-username)
+                    :on-value-changed {:event/type :spring-lobby/assoc
+                                       :key :direct-connect-host-username}}}]}
                 #_
                 {:fx/type :h-box
                  :alignment :center-left

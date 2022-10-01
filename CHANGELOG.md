@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.10](https://github.com/skynet-gh/skylobby/releases/tag/0.9.10) - 2022-10-01
+
+- Disallow direct connect usernames with spaces and other invalid characters
+- Fix start game button disabled when hosting
+- Warn when map does not have enough start points
+- Fix file operation in battle render
+- Fix join battle context menu item
+
 ## [0.9.9](https://github.com/skynet-gh/skylobby/releases/tag/0.9.9) - 2022-09-05
 
 - Update bar server url
