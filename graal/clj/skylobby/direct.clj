@@ -56,12 +56,18 @@
   (if-not (contains? taken-set start)
     start (recur taken-set (inc start))))
 
+(def illegal-direct-connect-username-re
+  #"[^a-zA-Z_0-9\[\]]")
+
 (defmethod -event-msg-handler
   :skylobby.direct.client/join
   [state-atom server-key {:keys [?data ?reply-fn send-fn uid] :as m}]
-  (let [[old-state new-state] (swap-vals! state-atom update-in [:by-server server-key]
+  (let [invalid-username (or (not ?data)
+                             (re-find illegal-direct-connect-username-re ?data))
+        [old-state new-state] (swap-vals! state-atom update-in [:by-server server-key]
                                 (fn [server-data]
-                                  (if (contains? (:users (:battle server-data)) ?data)
+                                  (if (or invalid-username
+                                          (contains? (:users (:battle server-data)) ?data))
                                     server-data
                                     (let [users (get-in server-data [:battle :users])
                                           battle-statuses (map :battle-status (vals users))
@@ -75,15 +81,19 @@
                                                                                             :side 0}
                                                                             :team-color (u/random-color)})
                                           (assoc-in [:client-username uid] ?data))))))]
-    (if (= old-state new-state) ; username conflict
-      (do
-        (log/warn "User already connected, denying" m)
+    (if (= old-state new-state) ; user not added
+      (let [
+            reason (if invalid-username
+                     (str "illegal username: " (pr-str ?data))
+                     "username in use")
+            response {:response :deny
+                      :reason reason}]
+        (log/warn "Denying join" m "because" reason)
         (if ?reply-fn
-          (?reply-fn {:response :deny
-                      :reason "username in use"})
+          (?reply-fn response)
           (do
             (log/warn "No reply fn for join" m)
-            (send-fn uid [::close {:reason "username in use"}]))))
+            (send-fn uid [::close {:reason reason}]))))
       (let [{:keys [battle-id scripttags] :as battle} (get-in new-state [:by-server server-key :battle])
             battle-details (get-in new-state [:by-server server-key :battles battle-id])]
         (send-fn uid [::battle-details battle-details])
