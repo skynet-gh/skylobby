@@ -3283,19 +3283,20 @@
   [{:keys [confirmed dest-dir file-cache source-dir]}]
   (future
     (try
-      (cond
-        (and (not confirmed)
-             (not= (fs/file-exists? file-cache dest-dir)  ; cache is out of date
-                   (fs/exists? dest-dir)))
-        (do
-          (log/warn "File cache was out of date for" dest-dir)
-          (fs/update-file-cache! *state dest-dir))
-        (and (fs/exists? dest-dir) (not confirmed))  ; fail safe
-        (log/warn "Spring settings backup called to existing dir"
-                  dest-dir "but no confirmation")
-        :else
-        (let [results (spring/copy-spring-settings source-dir dest-dir)]
-          (swap! *state assoc-in [:spring-settings :results (fs/canonical-path source-dir)] results)))
+      (let [source-dir (fs/file source-dir)]
+        (cond
+          (and (not confirmed)
+               (not= (fs/file-exists? file-cache dest-dir)  ; cache is out of date
+                     (fs/exists? dest-dir)))
+          (do
+            (log/warn "File cache was out of date for" dest-dir)
+            (fs/update-file-cache! *state dest-dir))
+          (and (fs/exists? dest-dir) (not confirmed))  ; fail safe
+          (log/warn "Spring settings backup called to existing dir"
+                    dest-dir "but no confirmation")
+          :else
+          (let [results (spring/copy-spring-settings source-dir dest-dir)]
+            (swap! *state assoc-in [:spring-settings :results (fs/canonical-path source-dir)] results))))
       (catch Exception e
         (log/error e "Error copying Spring settings from" source-dir "to" dest-dir)))))
 

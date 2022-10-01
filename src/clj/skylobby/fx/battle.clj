@@ -1328,6 +1328,9 @@
              {:fx/type :button
               :text ""
               :on-action {:event/type :spring-lobby/spring-settings-refresh}
+              :tooltip {:fx/type tooltip-nofocus/lifecycle
+                        :show-delay skylobby.fx/tooltip-show-delay
+                        :text "Refresh"}
               :graphic
               {:fx/type font-icon/lifecycle
                :icon-literal "mdi-refresh:16:white"}}
@@ -1337,14 +1340,14 @@
             :v-box/vgrow :always
             :column-resize-policy :constrained
             :items (or (some->> (fs/spring-settings-root)
-                                fs/list-files ; TODO IO in render
-                                (filter fs/is-directory?)
+                                (fs/list-descendants-cache file-cache)
+                                (filter :is-directory)
                                 reverse)
                        [])
             :columns
             [{:fx/type :table-column
               :text "Directory"
-              :cell-value-factory fs/filename
+              :cell-value-factory :filename
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
@@ -1352,12 +1355,12 @@
                  {:text (str filename)})}}
              {:fx/type :table-column
               :text "Action"
-              :cell-value-factory identity
+              :cell-value-factory :canonical-path
               :cell-factory
               {:fx/cell-type :table-cell
                :describe
-               (fn [i]
-                 {:text (when (get results (fs/canonical-path i))
+               (fn [path]
+                 {:text (when (get results path)
                           " copied!")
                   :graphic
                   {:fx/type :button
@@ -1367,7 +1370,7 @@
                     :confirmed true ; TODO confirm
                     :dest-dir spring-isolation-dir
                     :file-cache file-cache
-                    :source-dir i}}})}}]}]})}
+                    :source-dir path}}})}}]}]})}
       #_
       {:fx/type :tab
        :graphic {:fx/type :label
