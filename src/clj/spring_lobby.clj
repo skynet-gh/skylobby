@@ -2012,9 +2012,11 @@
 
 
 (defmethod event-handler ::join-battle
-  [{:keys [battle battle-password battle-passworded client-data selected-battle] :as e}]
+  [{:keys [battle battle-password battle-passworded client-data selected-battle server-key] :as e}]
   (if selected-battle
-    (let [server-key (u/server-key client-data)]
+    (let [server-key (or server-key
+                         (u/server-key client-data))]
+      (log/info "Joining battle" selected-battle)
       (if (:battle-id battle)
         (do
           (log/info "Leaving battle" (with-out-str (pprint battle)))

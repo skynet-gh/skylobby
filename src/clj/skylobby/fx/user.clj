@@ -20,6 +20,7 @@
     :keys [users server-key]}]
   (let [ignore-users (fx/sub-val context :ignore-users)
         hide-users-bots (fx/sub-val context :hide-users-bots)
+        my-battle (fx/sub-val context get-in [:by-server server-key :battle])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         friends (fx/sub-val context get-in [:by-server server-key :friends])
@@ -75,11 +76,12 @@
                              [{:fx/type :menu-item
                                :text "Join Battle"
                                :on-action {:event/type :spring-lobby/join-battle
-                                           :battle battle
+                                           :battle my-battle
                                            :battle-password battle-password
                                            :client-data client-data
                                            :selected-battle battle-id
-                                           :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}])
+                                           :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))
+                                           :server-key server-key}}])
                            (if (contains? friends username)
                              [{:fx/type :menu-item
                                :text "Unfriend"
