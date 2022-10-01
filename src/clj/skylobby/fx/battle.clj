@@ -332,7 +332,6 @@
         my-team-color (fx/sub-ctx context sub/my-team-color server-key)
         my-sync-status (fx/sub-ctx context sub/my-sync-status server-key)
         in-sync (= 1 (:sync my-battle-status))
-        ;ringing-specs (seq (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/ring-specs))
         discord-channel (discord/channel-to-promote {:mod-name mod-name
                                                      :server-url (:server-url client-data)})
         now (fx/sub-val context :now)
@@ -764,20 +763,23 @@
                         (and (not singleplayer)
                              (not in-sync))
                         "Not synced"
-                        (or
-                          (and am-spec
-                               (not host-ingame)
-                               (not singleplayer)
-                               (not= :direct-host server-type))
-                          (and (not host-ingame)
-                               (= :direct-client server-type)))
+                        (and
+                          (not am-host)
+                          (or
+                            (and am-spec
+                                 (not host-ingame)
+                                 (not singleplayer)
+                                 (not= :direct-host server-type))
+                            (and (not host-ingame)
+                                 (= :direct-client server-type))))
                         "Game not running"
                         :else
                         (if debug-spring
                           "Debug Spring"
                           (str (if (and (not singleplayer)
                                         (not= :direct-host server-type)
-                                        (or host-ingame am-spec))
+                                        (or host-ingame am-spec)
+                                        (not am-host))
                                  "Join" "Start")
                                " Game")))
                 :disable (boolean
@@ -787,6 +789,7 @@
                                (and (= :direct-client server-type)
                                     (not host-ingame))
                                (and (not singleplayer)
+                                    (not am-host)
                                     (not= :direct-host server-type)
                                     (or (and (not host-ingame) am-spec)
                                         (not in-sync)))))
