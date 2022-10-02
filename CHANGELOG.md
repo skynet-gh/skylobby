@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.11](https://github.com/skynet-gh/skylobby/releases/tag/0.9.11) - 2022-10-02
+
+- Fix git versioning
+- Add `--spring-port` cli option for direct hosting with native build
+- Set exe subsystem to console for windows native so console output shows
+
 ## [0.9.10](https://github.com/skynet-gh/skylobby/releases/tag/0.9.10) - 2022-10-01
 
 - Disallow direct connect usernames with spaces and other invalid characters
