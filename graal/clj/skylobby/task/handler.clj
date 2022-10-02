@@ -358,11 +358,13 @@
       (refresh-engines state-atom spring-root))))
 
 (defn set-sdd-modinfo-version [modinfo-str mod-version]
-  (string/replace
-   modinfo-str
-   #"version = '[^']+'"
-   (Matcher/quoteReplacement
-    (str "version = '" mod-version "'"))))
+  (let [[_ prefix old-version] (re-find #"(version\s*=\s*)'([^']+)'" modinfo-str)]
+    (log/info "Replacing version after" prefix (pr-str old-version) "with" mod-version)
+    (string/replace
+      modinfo-str
+      #"version\s*=\s*'[^']+'"
+      (Matcher/quoteReplacement
+        (str prefix "'" mod-version "'")))))
 
 (defn read-mod-data
   ([f]

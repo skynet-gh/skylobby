@@ -1989,8 +1989,11 @@
         (try
           (let [adjusted-modname (if use-git-mod-version
                                    mod-name
-                                   (u/mod-name-fix-git mod-name))]
-            (open-battle client-data (assoc host-battle-state :mod-name adjusted-modname)))
+                                   (u/mod-name-fix-git mod-name))
+                host-battle-state (assoc host-battle-state :mod-name adjusted-modname)]
+            (log/info "Hosting battle state" host-battle-state)
+            (log/info "Hosting battle with adjusted mod name" adjusted-modname)
+            (open-battle client-data host-battle-state))
           (when (seq scripttags)
             (message/send *state client-data (str "SETSCRIPTTAGS " (spring-script/format-scripttags scripttags))))
           (catch Exception e
