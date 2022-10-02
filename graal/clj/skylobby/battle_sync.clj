@@ -14,7 +14,7 @@
 
 (defn update-battle-status-sync-watcher [_k state-atom old-state new-state]
   (when (some (comp u/server-needs-battle-status-sync-check second)
-              (-> new-state :by-server seq))
+              (->> new-state :by-server (remove (comp :singleplayer first)) seq))
     (try
       (log/info "Checking servers for battle sync status updates")
       (doseq [[server-key new-server] (concat
