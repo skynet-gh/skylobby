@@ -20,12 +20,14 @@
   [#"Beyond All Reason"
    #"Total Atomization Prime"
    #"Total Atomic Power"
-   #"Tech Annihilation"])
+   #"Tech Annihilation"
+   #"SplinterFaction"])
 
 (def no-rapid
   [#"Total Atomization Prime"
    #"Total Atomic Power"
-   #"Evolution RTS Music Addon"])
+   #"Evolution RTS Music Addon"
+   #"SplinterFaction"])
 
 
 (defn mod-download-source [mod-name]
