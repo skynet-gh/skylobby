@@ -444,7 +444,7 @@
 
 (defn host-direct-connect
   [state-atom
-   {:keys [password port username spectate]}]
+   {:keys [password port username spectate spring-port]}]
   (let [port (or port u/default-server-port)
         server-key {:server-type :direct
                     :protocol :skylobby
@@ -456,7 +456,11 @@
         server-close-fn (start-direct-connect state-atom server-key {:port port})
         {:keys [direct-connect-engine direct-connect-mod direct-connect-map]} @state-atom
         server-data {:battle {:battle-id :direct
-                              :scripttags {"game" {"startpostype" 1}}
+                              :scripttags {"game"
+                                           (merge
+                                             {"startpostype" 1}
+                                             (when spring-port
+                                               {"hostport" spring-port}))}
                               :users {username
                                       {:battle-status
                                        {:ally 0
@@ -499,6 +503,9 @@
                "Must be a non-empty string"]]
    [nil "--protocol PROTOCOL" "Protocol to use for direct connect server (http or https)"]
    [nil "--cert CERT_FILE" "Cert file to use for direct connect server https"]
+   [nil "--spring-port SPRING_PORT" "Set the port that spring will use when hosting"
+    :parse-fn #(Integer/parseInt %)
+    :validate [#(< 0 % 65536) "Must be a from 1 through 65535"]]
    [nil "--spring-root SPRING_ROOT" "Set the spring-root config to the given directory"]
    [nil "--spring-type SPRING_TYPE" "Set the spring engine executable type to use, \"dedicated\" or \"headless\", default is \"headless\"."
     :parse-fn keyword
