@@ -49,7 +49,7 @@ jobs:
       - run: clojure -M:graal-deps:native-windows
         shell: powershell
       # https://github.com/oracle/graal/issues/2256#issuecomment-624024965
-      - run: editbin /SUBSYSTEM:WINDOWS skylobby.exe
+      - run: editbin /SUBSYSTEM:CONSOLE skylobby.exe
         shell: powershell
       - run: compress-archive -path ".\*.dll","skylobby.exe" "skylobby-windows.zip" -compressionlevel optimal
         shell: powershell
