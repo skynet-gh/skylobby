@@ -16,20 +16,6 @@
 (set! *warn-on-reflection* true)
 
 
-(def no-springfiles
-  [#"Beyond All Reason"
-   #"Total Atomization Prime"
-   #"Total Atomic Power"
-   #"Tech Annihilation"
-   #"SplinterFaction"])
-
-(def no-rapid
-  [#"Total Atomization Prime"
-   #"Total Atomic Power"
-   #"Evolution RTS Music Addon"
-   #"SplinterFaction"])
-
-
 (defn mod-download-source [mod-name]
   (cond
     (string/blank? mod-name) nil
@@ -188,7 +174,7 @@
                                                     keys
                                                     (filter springfiles-mirror-set)
                                                     seq))]
-               (when (and springname (not (some #(re-find % springname) no-springfiles)))
+               (when (and springname (not (some #(re-find % springname) resource/no-springfiles)))
                  [{:severity 2
                    :text "springfiles"
                    :human-text (if springfiles-in-progress
@@ -215,7 +201,7 @@
                          :spring-isolation-dir spring-isolation-dir})})}]))
              (when (and mod-name
                         (not is-unversioned)
-                        (not (some #(re-find % mod-name) no-rapid)))
+                        (not (some #(re-find % mod-name) resource/no-rapid)))
                (let [rapid-data (get-rapid-data-by-version mod-name)
                      rapid-repo (resource/mod-repo-name mod-name)
                      default-rapid-id (when rapid-repo (str rapid-repo ":test"))

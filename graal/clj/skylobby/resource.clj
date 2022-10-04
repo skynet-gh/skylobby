@@ -15,6 +15,19 @@
 (def resource-types
   [:spring-lobby/engine :spring-lobby/map :spring-lobby/mod :spring-lobby/sdp])
 
+(def no-springfiles
+  [#"Beyond All Reason"
+   #"Total Atomization Prime"
+   #"Total Atomic Power"
+   #"Tech Annihilation"
+   #"SplinterFaction"])
+
+(def no-rapid
+  [#"Total Atomization Prime"
+   #"Total Atomic Power"
+   #"Evolution RTS Music Addon"
+   #"SplinterFaction"])
+
 
 (defn mod-dependencies [mod-name]
   (if (and mod-name (string/starts-with? mod-name "Evolution RTS"))

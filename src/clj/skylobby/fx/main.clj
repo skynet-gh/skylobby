@@ -21,6 +21,7 @@
     [taoensso.tufte :as tufte])
   (:import
     (java.util.function UnaryOperator)
+    (javafx.scene.control TextFormatter$Change)
     (org.apache.commons.validator.routines InetAddressValidator)))
 
 
@@ -35,12 +36,13 @@
 (def direct-connect-username-filter
   (reify UnaryOperator
     (apply [_this change]
-      (if (re-find skylobby.direct/illegal-direct-connect-username-re (.getText change))
-        (do
-          (.setText change "")
-          (.setRange change (.getRangeStart change) (.getRangeStart change))
-          change)
-        change))))
+      (let [^TextFormatter$Change change change]
+        (if (re-find skylobby.direct/illegal-direct-connect-username-re (.getText change))
+          (do
+            (.setText change "")
+            (.setRange change (.getRangeStart change) (.getRangeStart change))
+            change)
+          change)))))
 
 (defn protocol-cell
   [x]
@@ -166,7 +168,7 @@
                  :style-class ["button" "skylobby-normal"]
                  :text "Join"
                  :disable (or (string/blank? direct-connect-join-username)
-                              (not (.isValidInet4Address ip-validator (str direct-connect-ip)))
+                              (string/blank? direct-connect-ip)
                               (contains? server-keys client-server-key))
                  :on-action {:event/type :skylobby.fx.event.direct/join
                              :direct-connect-ip direct-connect-ip

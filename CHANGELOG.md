@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.12](https://github.com/skynet-gh/skylobby/releases/tag/0.9.12) - 2022-10-03
+
+- Allow hostnames for direct connect
+- Fix rapid checks for games known not to be in rapid
+
 ## [0.9.11](https://github.com/skynet-gh/skylobby/releases/tag/0.9.11) - 2022-10-02
 
 - Fix git versioning

@@ -1099,6 +1099,9 @@
                           use-db-for-rapid
                           {:fx/type :label
                            :text " Select replay for options"}
+                          (some #(re-find % mod-version) resource/no-rapid)
+                          {:fx/type :label
+                           :text " No game, select replay for more options"}
                           :else
                           {:fx/type :button
                            :text (if rapid-update-tasks
