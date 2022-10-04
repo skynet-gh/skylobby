@@ -341,7 +341,8 @@
                         (not update-rapid-task)
                         engine-file
                         engine-dir-exists
-                        (u/check-cooldown cooldowns [:rapid spring-root-path mod-name]))
+                        (u/check-cooldown cooldowns [:rapid spring-root-path mod-name])
+                        (not (some #(re-find % mod-name) resource/no-rapid)))
                    (do
                      (log/info "Adding task to auto download rapid blind for" (str "'" mod-name "'"))
                      {:spring-lobby/task-type :spring-lobby/rapid-download
@@ -356,7 +357,8 @@
                         engine-dir-exists
                         (not update-rapid-task)
                         (not (string/blank? mod-name))
-                        (u/check-cooldown cooldowns [:update-rapid spring-root-path]))
+                        (u/check-cooldown cooldowns [:update-rapid spring-root-path])
+                        (not (some #(re-find % mod-name) resource/no-rapid)))
                    (do
                      (log/info "Adding task to update rapid looking for" mod-name)
                      {:spring-lobby/task-type :spring-lobby/update-rapid
