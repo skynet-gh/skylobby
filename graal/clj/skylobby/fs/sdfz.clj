@@ -338,13 +338,17 @@
   ([^java.io.File f]
    (parse-replay f nil))
   ([^java.io.File f {:keys [details] :as opts}]
-   (let [replay (try
-                  (decode-replay f opts)
-                  (catch Exception e
-                    (log/error e "Error reading replay" f)))]
+   (let [size (fs/size f)]
      (merge
        {:file f
         :filename (fs/filename f)
-        :file-size (fs/size f)}
-       (when details replay)
-       (replay-metadata replay)))))
+        :file-size size}
+       (if (pos? size)
+         (let [replay (try
+                        (decode-replay f opts)
+                        (catch Exception e
+                          (log/error e "Error reading replay" f)))]
+           (merge
+             (when details replay)
+             (replay-metadata replay)))
+         (log/info "Skipping replay parse of" f "because it has 0 size"))))))

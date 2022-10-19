@@ -1035,6 +1035,17 @@
             valid-next-round (->> all-files
                                   (remove (comp existing-valid-paths fs/canonical-path second))
                                   (remove (comp invalid-replay-paths fs/canonical-path second)))]
+        (let [nonzero-size-invalid-replay-files (->> invalid-replay-paths
+                                                     (map fs/file)
+                                                     (filter fs/exists?)
+                                                     (filterv (comp pos? fs/size)))
+              invalid-replays-folder (fs/file (fs/app-root) "invalid-replays")]
+          (when (seq nonzero-size-invalid-replay-files)
+            (fs/make-dirs invalid-replays-folder)
+            (log/info "Moving" (count nonzero-size-invalid-replay-files) "invalid replay files to" invalid-replays-folder)
+            (doseq [path nonzero-size-invalid-replay-files]
+              (let [source (fs/file path)]
+                (fs/move source (fs/file invalid-replays-folder (fs/filename source)))))))
         (cond
           (empty? valid-next-round)
           (do
