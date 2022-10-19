@@ -28,6 +28,7 @@
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.spring :as spring]
     [skylobby.util :as u]
+    [taoensso.timbre :as log]
     [taoensso.tufte :as tufte])
   (:import
     (javafx.stage Popup)
@@ -315,6 +316,24 @@
                           (map (fn [ai]
                                  {:bot-name (:name ai)
                                   :bot-version "<game>"}))))
+        bots (if-let [valid-ais (:validais battle-mod-details)]
+               (let [
+                     valid-name-patterns (->> valid-ais
+                                              vals
+                                              (map :name)
+                                              (map
+                                                (fn [n]
+                                                  (try
+                                                    (re-pattern n)
+                                                    (catch Exception e
+                                                      (log/error e "Error parsing validAI pattern" n)))))
+                                              (filter some?))]
+                 (filterv
+                   (fn [{:keys [bot-name]}]
+                     (and bot-name
+                          (some #(re-find % bot-name) valid-name-patterns)))
+                   bots))
+               bots)
         bot-names (map :bot-name bots)
         bot-name (some #{bot-name} bot-names)
         bot-versions (map :bot-version

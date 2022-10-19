@@ -1192,6 +1192,7 @@
            {:modoptions (try-entry-lua "modoptions.lua")
             :engineoptions (try-entry-lua "engineoptions.lua")
             :luaai (try-entry-lua "luaai.lua")
+            :validais (try-entry-lua "validais.lua")
             ; https://stackoverflow.com/a/44387973
             :sidedata (or (try-entry-lua "gamedata/sidedata.lua")
                           (try-entry-script "gamedata/sidedata.tdf")
@@ -1215,6 +1216,7 @@
                      (or
                        (string/ends-with? path-lc "engineoptions.lua")
                        (string/ends-with? path-lc "luaai.lua")
+                       (string/ends-with? path-lc "validais.lua")
                        (string/ends-with? path-lc "modinfo.lua")
                        (string/ends-with? path-lc "modoptions.lua")
                        (string/ends-with? path-lc "sidedata.lua")
@@ -1258,6 +1260,7 @@
              {:modoptions (try-entry-lua "modoptions.lua")
               :engineoptions (try-entry-lua "engineoptions.lua")
               :luaai (try-entry-lua "luaai.lua")
+              :validais (try-entry-lua "validais.lua")
               :sidedata (or (try-entry-lua (join "gamedata" "sidedata.lua"))
                             (try-entry-script (join "gamedata" "sidedata.tdf"))
                             (u/postprocess-byar-units-en
@@ -1290,6 +1293,7 @@
          {:modoptions (try-file-lua "modoptions.lua")
           :engineoptions (try-file-lua "engineoptions.lua")
           :luaai (try-file-lua "luaai.lua")
+          :validais (try-file-lua "validais.lua")
           :sidedata (or (try-file-lua "gamedata/sidedata.lua")
                         (try-file-lua "gamedata/sidedata.tdf")
                         (u/postprocess-byar-units-en
