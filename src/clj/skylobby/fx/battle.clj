@@ -140,25 +140,36 @@
   (let [
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        me (fx/sub-val context get-in [:by-server server-key :username])
         messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         am-in-queue (->> messages
-                         (filter (comp #{"Coordinator"} :username))
-                         (filter :text)
+                         (filter
+                           (some-fn
+                             (comp #{"Coordinator"} :username)
+                             (every-pred
+                               (comp #{me} :username)
+                               (comp #{:join :leave} :message-type))))
                          reverse
                          (reduce
-                           (fn [am-in-queue {:keys [text]}]
-                             (cond
-                               (string/starts-with? text "You are now in the join-queue")
-                               true
-                               (string/starts-with? text "You were already in the join-queue at position")
-                               true
-                               (string/starts-with? text "You have been removed from the join queue")
+                           (fn [am-in-queue {:keys [message-type text]}]
+                             (if (#{:join :leave} message-type)
                                false
-                               (string/ends-with? text "You were at the front of the queue, you are now a player.")
-                               false
-                               :else
-                               am-in-queue))
+                               (if text
+                                 (cond
+                                   (= text "$%leaveq")
+                                   false
+                                   (string/starts-with? text "You are now in the join-queue")
+                                   true
+                                   (string/starts-with? text "You were already in the join-queue at position")
+                                   true
+                                   (string/starts-with? text "You have been removed from the join queue")
+                                   false
+                                   (string/ends-with? text "You were at the front of the queue, you are now a player.")
+                                   false
+                                   :else
+                                   am-in-queue)
+                                 am-in-queue)))
                            false))]
     {:fx/type :h-box
      :alignment :center-left
