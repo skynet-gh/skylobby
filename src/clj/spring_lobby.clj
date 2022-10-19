@@ -814,6 +814,12 @@
                    (filter-replays-relevant-keys new-state))))
     (async/>!! filter-replays-channel new-state)))
 
+(defn refresh-replays-on-focus [_k state-atom old-state new-state]
+  (when (and (not= (:selected-server-tab old-state)
+                   (:selected-server-tab new-state))
+             (= "replays" (:selected-server-tab new-state)))
+    (task/add-task! state-atom {::task-type ::refresh-replays})))
+
 
 (defn- add-watchers
   "Adds all *state watchers."
@@ -822,10 +828,12 @@
   (remove-watch state-atom :filter-replays)
   (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
+  (remove-watch state-atom :refresh-replay-on-focus)
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
   (add-watch state-atom :filter-replays filter-replays-watcher)
   (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
-  (add-watch state-atom :fix-selected-server fix-selected-server-watcher))
+  (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
+  (add-watch state-atom :refresh-replays-on-focus refresh-replays-on-focus))
 
 
 (defmulti task-handler ::task-type)
