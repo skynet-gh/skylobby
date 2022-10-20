@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.13](https://github.com/skynet-gh/skylobby/releases/tag/0.9.13) - 2022-10-19
+
+- Add reading of validAIs.lua in games to filter AIs
+- Replays refresh performance fixes:
+  - Ignore zero size replay files from parsing
+  - Move invalid nonzero size replay files to .skylobby/invalid-replays folder
+- Refresh replays when tab focused
+- Workaround for teiserver bug with leaveq after rejoin battle
+
 ## [0.9.12](https://github.com/skynet-gh/skylobby/releases/tag/0.9.12) - 2022-10-03
 
 - Allow hostnames for direct connect
