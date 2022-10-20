@@ -12,11 +12,11 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3.0.2
-      - uses: ilammy/msvc-dev-cmd@v1.11.0
+      - uses: actions/checkout@v3.1.0
+      - uses: ilammy/msvc-dev-cmd@v1.12.0
       - uses: microsoft/setup-msbuild@v1.1
         with:
-          vs-version: '16.11.11'
+          vs-version: '16.11.20'
           msbuild-architecture: x64
       # https://github.com/clojure-lsp/clojure-lsp/blob/419f58c/.github/workflows/release.yml#L300-L304
       - uses: al-cheb/configure-pagefile-action@v1.2
@@ -28,7 +28,7 @@ jobs:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -39,7 +39,7 @@ jobs:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: git config --system core.longpaths true
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -68,13 +68,13 @@ jobs:
   mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.1.0
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -84,7 +84,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -98,13 +98,13 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.1.0
       - uses: ayltai/setup-graalvm@v1
         with:
           java-version: 11
           graalvm-version: ${{ env.graal_version }}
           native-image: true
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
@@ -114,7 +114,7 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
