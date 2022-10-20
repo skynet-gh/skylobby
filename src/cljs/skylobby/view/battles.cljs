@@ -2,9 +2,9 @@
   (:require
     [re-frame.core :as rf]
     [skylobby.data :as data]
+    [skylobby.util :as u]
     [skylobby.view.server-nav :as server-nav]
-    [skylobby.view.servers-nav :as servers-nav]
-    [skylobby.util :as u]))
+    [skylobby.view.servers-nav :as servers-nav]))
 
 
 (defn listen [query-v]

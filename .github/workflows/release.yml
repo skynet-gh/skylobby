@@ -8,9 +8,9 @@ jobs:
   build-linux:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.1.0
       - uses: FranzDiebold/github-env-vars-action@v2.7.0
-      - uses: actions/setup-java@v3.5.1
+      - uses: actions/setup-java@v3.6.0
         with:
           java-version: '17'
           distribution: 'adopt'
@@ -18,13 +18,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -80,9 +80,9 @@ jobs:
   build-mac:
     runs-on: macOS-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.1.0
       - uses: FranzDiebold/github-env-vars-action@v2.7.0
-      - uses: actions/setup-java@v3.5.1
+      - uses: actions/setup-java@v3.6.0
         with:
           java-version: '14'
           # ^ mac jpackage hates versions starting with 0 in later versions
@@ -91,13 +91,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -125,9 +125,9 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.1.0
       - uses: FranzDiebold/github-env-vars-action@v2.7.0
-      - uses: actions/setup-java@v3.5.1
+      - uses: actions/setup-java@v3.6.0
         with:
           java-version: '17'
           distribution: 'adopt'
@@ -135,13 +135,13 @@ jobs:
         with:
           cli: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3.0.9
+      - uses: actions/cache@v3.0.11
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('deps.edn') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - uses: actions/setup-node@v3.5.0
+      - uses: actions/setup-node@v3.5.1
         with:
           node-version: '14'
           cache: 'npm'
@@ -181,7 +181,7 @@ jobs:
     needs: [build-linux, build-windows, build-mac]
     runs-on: ubuntu-latest
     steps:
-      - uses: ncipollo/release-action@v1.10.0
+      - uses: ncipollo/release-action@v1.11.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false

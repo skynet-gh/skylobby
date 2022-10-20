@@ -2,8 +2,8 @@
   (:require
     [clojure.pprint :refer [pprint]]
     [clojure.string :as string]
-    [skylobby.http :as http]
     [skylobby.fs :as fs]
+    [skylobby.http :as http]
     [skylobby.rapid :as rapid]
     [skylobby.resource :as resource]
     [skylobby.task :as task]

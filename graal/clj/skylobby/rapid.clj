@@ -227,6 +227,7 @@
              {:modoptions (try-inner-lua f "modoptions.lua" {:quiet false})
               :engineoptions (try-inner-lua f "engineoptions.lua")
               :luaai (try-inner-lua f "luaai.lua")
+              :validais (try-inner-lua f "validais.lua")
               :sidedata (or (try-inner-lua f "gamedata/sidedata.lua")
                             (try-inner-script f "gamedata/sidedata.tdf")
                             (u/postprocess-byar-units-en

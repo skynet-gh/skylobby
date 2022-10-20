@@ -2,27 +2,27 @@
   (:require
     [cljs.reader :as reader]
     [clojure.edn :as edn]
+    [re-frame.core :as rf]
     [reagent.dom :as rdom]
     [reitit.coercion.spec :as rss]
     [reitit.frontend :as reitit]
     [reitit.frontend.controllers :as rfc]
     [reitit.frontend.easy :as rfe]
-    [re-frame.core :as rf]
+    [skylobby.util :as u]
     [skylobby.view.battle :as battle-view]
     [skylobby.view.battles :as battles-view]
     [skylobby.view.chat :as chat-view]
     [skylobby.view.console :as console-view]
     [skylobby.view.replays :as replays-view]
-    [skylobby.view.servers :as servers-view]
     [skylobby.view.server-nav :as server-nav]
+    [skylobby.view.servers :as servers-view]
     [skylobby.view.servers-nav :as servers-nav]
     [skylobby.view.settings :as settings-view]
     [skylobby.view.side-nav :as side-nav]
     [skylobby.view.tasks :as tasks-view]
     [taoensso.encore :as encore :refer-macros [have]]
     [taoensso.sente :as sente]
-    [taoensso.timbre :as log]
-    [skylobby.util :as u]))
+    [taoensso.timbre :as log]))
 
 
 (set! *warn-on-infer* true)

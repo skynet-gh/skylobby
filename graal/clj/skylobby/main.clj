@@ -2,9 +2,9 @@
   (:require
     [clojure.string :as string]
     [clojure.tools.cli :as cli]
-    skylobby.core
     [skylobby.cli :as cli-demo]
     [skylobby.cli.util :as cu]
+    skylobby.core
     [skylobby.direct :as direct]
     [skylobby.fs :as fs]
     [skylobby.main.resources :as resources]

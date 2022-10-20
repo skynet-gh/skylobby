@@ -3,10 +3,10 @@
     [cljfx.api :as fx]
     clojure.set
     skylobby.fx
-    [skylobby.fx.sub :as sub]
     [skylobby.fx.engines :refer [engines-view]]
     [skylobby.fx.maps :refer [maps-view]]
     [skylobby.fx.mods :refer [mods-view]]
+    [skylobby.fx.sub :as sub]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))
 

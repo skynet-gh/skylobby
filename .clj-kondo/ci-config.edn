@@ -9,20 +9,20 @@
   :warn-on-reflection
   {:level :warn
    :warn-only-on-interop false}
-  :aliased-namespace-symbol {:level :info}
-  :docstring-no-summary {:level :info}
-  :docstring-leading-trailing-whitespace {:level :info}
+  :aliased-namespace-symbol {:level :off}
+  :docstring-no-summary {:level :off}
+  :docstring-leading-trailing-whitespace {:level :off}
   :reduce-without-init {:level :warn}
   :keyword-binding {:level :warn}
-  :main-without-gen-class {:level :info}
-  :missing-docstring {:level :info}
+  :main-without-gen-class {:level :off}
+  :missing-docstring {:level :off}
   :namespace-name-mismatch {:level :error}
-  :redundant-fn-wrapper {:level :info}
-  :refer {:level :info}
+  :redundant-fn-wrapper {:level :off}
+  :refer {:level :off}
   :single-key-in {:level :warn}
-  :shadowed-var {:level :info}
+  :shadowed-var {:level :off}
   :used-underscored-binding {:level :warn}
-  :unused-value {:level :info}
+  :unused-value {:level :off}
   :unsorted-required-namespaces {:level :warn}}
  :output
  {

@@ -1,8 +1,8 @@
 (ns skylobby.direct.client
   (:require
     [skylobby.resource :as resource]
-    [skylobby.util :as u]
     [skylobby.spring :as spring]
+    [skylobby.util :as u]
     [taoensso.encore :as encore :refer [have]]
     [taoensso.timbre :as log]))
 

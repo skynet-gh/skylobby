@@ -1,11 +1,11 @@
 (ns skylobby.fx.replay
   (:require
+    [cljfx.api :as fx]
     [cljfx.ext.node :as fx.ext.node]
     [cljfx.ext.table-view :as fx.ext.table-view]
     [clojure.java.io :as io]
-    [clojure.string :as string]
     clojure.set
-    [cljfx.api :as fx]
+    [clojure.string :as string]
     java-time
     [skylobby.fs :as fs]
     skylobby.fx

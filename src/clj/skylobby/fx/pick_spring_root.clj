@@ -1,8 +1,8 @@
 (ns skylobby.fx.pick-spring-root
   (:require
     [cljfx.api :as fx]
-    skylobby.fx
     [skylobby.fs :as fs]
+    skylobby.fx
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity]])

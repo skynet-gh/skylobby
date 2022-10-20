@@ -332,23 +332,23 @@
         (update :task-threads dissoc task-kind))))
 
 (defn handle-task!
-  ([state-atom task-kind]
-   (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
-     (let [after (swap! state-atom (pop-task-fn task-kind))
-           task (-> after :current-tasks (get task-kind))]
-       (try
-         (let [thread (Thread. (fn [] (handle-task task)))]
-           (swap! *state assoc-in [:task-threads task-kind] thread)
-           (.start thread)
-           (.join thread))
-         (catch Exception e
-           (log/error e "Error running task"))
-         (catch Throwable t
-           (log/error t "Critical error running task"))
-         (finally
-           (when task
-             (swap! state-atom (finish-task-fn task-kind)))))
-       task))))
+  [state-atom task-kind]
+  (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
+    (let [after (swap! state-atom (pop-task-fn task-kind))
+          task (-> after :current-tasks (get task-kind))]
+      (try
+        (let [thread (Thread. (fn [] (handle-task task)))]
+          (swap! *state assoc-in [:task-threads task-kind] thread)
+          (.start thread)
+          (.join thread))
+        (catch Exception e
+          (log/error e "Error running task"))
+        (catch Throwable t
+          (log/error t "Critical error running task"))
+        (finally
+          (when task
+            (swap! state-atom (finish-task-fn task-kind)))))
+      task)))
 
 (defn- my-client-status [{:keys [username users]}]
   (-> users (get username) :client-status))

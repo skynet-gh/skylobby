@@ -2,9 +2,9 @@
   (:require
     [clojure.string :as string]
     [re-frame.core :as rf]
+    [skylobby.util :as u]
     [skylobby.view.servers-nav :as servers-nav]
-    [skylobby.view.side-nav :as side-nav]
-    [skylobby.util :as u]))
+    [skylobby.view.side-nav :as side-nav]))
 
 
 (defn listen [query-v]
@@ -30,7 +30,7 @@
      [:div {:class "flex-auto justify-center"}
       [servers-nav/servers-nav]
       [:div {:class "flex justify-center mb2"}
-       [:label 
+       [:label
         {:class "f2 tc mr2"}
         " Server: "]
        [:select
@@ -44,7 +44,7 @@
              {:value server}
              server]))]]
       [:div {:class "flex justify-center mb2"}
-       [:label 
+       [:label
         {:class "f3 tc mr2"}
         " Username: "]
        [:input
@@ -53,7 +53,7 @@
          :on-blur #(rf/dispatch [:skylobby/set-server-username server-url (-> % .-target .-value)])
          :on-change #(rf/dispatch [:skylobby/assoc-in [:username-drafts server-url] (-> % .-target .-value)])}]]
       [:div {:class "flex justify-center mb2"}
-       [:label 
+       [:label
         {:class "f3 tc mr2"}
         " Password: "]
        [:input

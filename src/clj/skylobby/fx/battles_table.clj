@@ -1,10 +1,10 @@
 (ns skylobby.fx.battles-table
   (:require
-    [clojure.java.io :as io]
-    [clojure.string :as string]
     [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
     clojure.core.memoize
+    [clojure.java.io :as io]
+    [clojure.string :as string]
     java-time
     skylobby.data
     [skylobby.fs :as fs]

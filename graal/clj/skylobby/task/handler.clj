@@ -10,12 +10,12 @@
    [skylobby.client.message :as message]
    [skylobby.download :as download]
    [skylobby.event.battle :as event.battle]
-   [skylobby.http :as http]
-   [skylobby.import :as import]
    [skylobby.fs :as fs]
    [skylobby.fs.sdfz :as fs.sdfz]
    [skylobby.fs.smf :as fs.smf]
    [skylobby.git :as git]
+   [skylobby.http :as http]
+   [skylobby.import :as import]
    [skylobby.rapid :as rapid]
    [skylobby.replay :as replay]
    [skylobby.resource :as resource]
@@ -1035,6 +1035,17 @@
             valid-next-round (->> all-files
                                   (remove (comp existing-valid-paths fs/canonical-path second))
                                   (remove (comp invalid-replay-paths fs/canonical-path second)))]
+        (let [nonzero-size-invalid-replay-files (->> invalid-replay-paths
+                                                     (map fs/file)
+                                                     (filter fs/exists?)
+                                                     (filterv (comp pos? fs/size)))
+              invalid-replays-folder (fs/file (fs/app-root) "invalid-replays")]
+          (when (seq nonzero-size-invalid-replay-files)
+            (fs/make-dirs invalid-replays-folder)
+            (log/info "Moving" (count nonzero-size-invalid-replay-files) "invalid replay files to" invalid-replays-folder)
+            (doseq [path nonzero-size-invalid-replay-files]
+              (let [source (fs/file path)]
+                (fs/move source (fs/file invalid-replays-folder (fs/filename source)))))))
         (cond
           (empty? valid-next-round)
           (do

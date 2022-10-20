@@ -20,9 +20,9 @@
     [skylobby.battle :as battle]
     [skylobby.battle-sync :as battle-sync]
     [skylobby.client :as client]
+    [skylobby.client.gloss :as cu]
     [skylobby.client.handler :as handler]
     [skylobby.client.message :as message]
-    [skylobby.client.gloss :as cu]
     [skylobby.color :as color]
     [skylobby.discord :as discord]
     [skylobby.download :as download]
@@ -814,6 +814,12 @@
                    (filter-replays-relevant-keys new-state))))
     (async/>!! filter-replays-channel new-state)))
 
+(defn refresh-replays-on-focus [_k state-atom old-state new-state]
+  (when (and (not= (:selected-server-tab old-state)
+                   (:selected-server-tab new-state))
+             (= "replays" (:selected-server-tab new-state)))
+    (task/add-task! state-atom {::task-type ::refresh-replays})))
+
 
 (defn- add-watchers
   "Adds all *state watchers."
@@ -822,10 +828,12 @@
   (remove-watch state-atom :filter-replays)
   (remove-watch state-atom :fix-selected-replay)
   (remove-watch state-atom :fix-selected-server)
+  (remove-watch state-atom :refresh-replay-on-focus)
   (add-watch state-atom :fix-missing-resource fix-missing-resource-watcher)
   (add-watch state-atom :filter-replays filter-replays-watcher)
   (add-watch state-atom :fix-selected-replay fix-selected-replay-watcher)
-  (add-watch state-atom :fix-selected-server fix-selected-server-watcher))
+  (add-watch state-atom :fix-selected-server fix-selected-server-watcher)
+  (add-watch state-atom :refresh-replays-on-focus refresh-replays-on-focus))
 
 
 (defmulti task-handler ::task-type)
@@ -839,42 +847,42 @@
 
 
 (defn handle-task!
-  ([state-atom task-kind]
-   (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
-     (let [[_before after] (swap-vals! state-atom
-                             (fn [{:keys [tasks-by-kind] :as state}]
-                               (if (empty? (get tasks-by-kind task-kind))
-                                 state
-                                 (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
-                                   (-> state
-                                       (update-in [:tasks-by-kind task-kind] (partial remove-task task))
-                                       (assoc-in [:current-tasks task-kind] task))))))
-           task (-> after :current-tasks (get task-kind))]
-       (try
-         (let [
-               runnable (fn []
-                          (try
-                            (handle-task task)
-                            (catch Exception e
-                              (log/error e "Error running task"))
-                            (catch Throwable t
-                              (log/error t "Critical error running task"))))
-               thread (Thread. runnable (str "skylobby-task-" (name task-kind)))]
-           (swap! *state assoc-in [:task-threads task-kind] thread)
-           (.start thread)
-           (.join thread))
-         (catch Exception e
-           (log/error e "Error running task"))
-         (catch Throwable t
-           (log/error t "Critical error running task"))
-         (finally
-           (when task
-             (swap! state-atom
-               (fn [state]
-                 (-> state
-                     (assoc-in [:current-tasks task-kind] nil)
-                     (update :task-threads dissoc task-kind)))))))
-       task))))
+  [state-atom task-kind]
+  (when (first (get-in @state-atom [:tasks-by-kind task-kind])) ; short circuit if no task of this kind
+    (let [[_before after] (swap-vals! state-atom
+                            (fn [{:keys [tasks-by-kind] :as state}]
+                              (if (empty? (get tasks-by-kind task-kind))
+                                state
+                                (let [task (-> tasks-by-kind (get task-kind) shuffle first)]
+                                  (-> state
+                                      (update-in [:tasks-by-kind task-kind] (partial remove-task task))
+                                      (assoc-in [:current-tasks task-kind] task))))))
+          task (-> after :current-tasks (get task-kind))]
+      (try
+        (let [
+              runnable (fn []
+                         (try
+                           (handle-task task)
+                           (catch Exception e
+                             (log/error e "Error running task"))
+                           (catch Throwable t
+                             (log/error t "Critical error running task"))))
+              thread (Thread. runnable (str "skylobby-task-" (name task-kind)))]
+          (swap! *state assoc-in [:task-threads task-kind] thread)
+          (.start thread)
+          (.join thread))
+        (catch Exception e
+          (log/error e "Error running task"))
+        (catch Throwable t
+          (log/error t "Critical error running task"))
+        (finally
+          (when task
+            (swap! state-atom
+              (fn [state]
+                (-> state
+                    (assoc-in [:current-tasks task-kind] nil)
+                    (update :task-threads dissoc task-kind)))))))
+      task)))
 
 
 (defn- my-client-status [{:keys [username users]}]

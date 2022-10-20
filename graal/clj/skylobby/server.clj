@@ -9,8 +9,8 @@
     [hiccup.page :as hiccup]
     [muuntaja.core :as m]
     [org.httpkit.server :as http-kit]
-    [reitit.ring :as ring]
     reitit.coercion.spec
+    [reitit.ring :as ring]
     [reitit.ring.coercion :as rrc]
     [reitit.ring.middleware.exception :as exception]
     [reitit.ring.middleware.muuntaja :as muuntaja]
