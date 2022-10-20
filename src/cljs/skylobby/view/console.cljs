@@ -3,9 +3,9 @@
     [clojure.string :as string]
     [re-frame.core :as rf]
     [reagent.dom :as rdom]
+    [skylobby.util :as u]
     [skylobby.view.server-nav :as server-nav]
     [skylobby.view.servers-nav :as servers-nav]
-    [skylobby.util :as u]
     [taoensso.timbre :as log]))
 
 

@@ -3,10 +3,10 @@
     [clojure.string :as string]
     [re-frame.core :as rf]
     [skylobby.common.util :as cu]
+    [skylobby.util :as u]
     [skylobby.view.chat :as chat-view]
     [skylobby.view.server-nav :as server-nav]
-    [skylobby.view.servers-nav :as servers-nav]
-    [skylobby.util :as u]))
+    [skylobby.view.servers-nav :as servers-nav]))
 
 
 (def minimap-sizes

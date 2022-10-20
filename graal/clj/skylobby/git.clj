@@ -1,8 +1,8 @@
 (ns skylobby.git
   "Utils for working with git resources."
   (:require
-    [clojure.string :as string]
-    [clj-jgit.porcelain :as git])
+    [clj-jgit.porcelain :as git]
+    [clojure.string :as string])
   (:import
     (java.io File)
     (org.eclipse.jgit.api Git)

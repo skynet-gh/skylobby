@@ -2,13 +2,13 @@
   (:require
     [clojure.core.async :as async]
     [clojure.java.io :as io]
-    [clojure.string :as string]
     clojure.set
+    [clojure.string :as string]
     clojure.walk
     [com.evocomputing.colors :as colors]
     [me.raynes.fs :as raynes-fs]
-    [skylobby.client.message :as message]
     [skylobby.client.gloss :as cu]
+    [skylobby.client.message :as message]
     [skylobby.event.user :as event.user]
     [skylobby.fs :as fs]
     [skylobby.task :as task]

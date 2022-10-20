@@ -4,11 +4,11 @@
     [cljfx.ext.node :as fx.ext.node]
     [clojure.java.io :as io]
     [clojure.string :as string]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.ext :refer [ext-recreate-on-key-changed ext-table-column-auto-size]]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [skylobby.fs :as fs]
     [skylobby.rapid :as rapid]
     [skylobby.util :as u]
     [taoensso.tufte :as tufte]))

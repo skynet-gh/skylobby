@@ -1,9 +1,9 @@
 (ns skylobby.client.tcp
   (:require
     [aleph.netty :as aleph-netty]
-    [manifold.stream :as s]
+    [clojure.tools.logging :as log]
     [manifold.deferred :as d]
-    [clojure.tools.logging :as log])
+    [manifold.stream :as s])
   (:import
     (java.net
       InetSocketAddress)

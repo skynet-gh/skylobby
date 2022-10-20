@@ -1,9 +1,9 @@
 (ns skylobby.battle-sync
   (:require
-    [skylobby.fs :as fs]
     [skylobby.client.gloss :as gloss]
     [skylobby.client.message :as message]
     [skylobby.event.battle :as event.battle]
+    [skylobby.fs :as fs]
     [skylobby.resource :as resource]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))

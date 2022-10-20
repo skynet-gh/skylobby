@@ -1,10 +1,10 @@
 (ns skylobby.fx.sync
   (:require
     [cljfx.ext.node :as fx.ext.node]
+    [skylobby.fs :as fs]
     skylobby.fx
     [skylobby.fx.font-icon :as font-icon]
-    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
-    [skylobby.fs :as fs]))
+    [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]))
 
 
 (set! *warn-on-reflection* true)

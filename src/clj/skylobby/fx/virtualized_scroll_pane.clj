@@ -2,9 +2,9 @@
   (:require
     [cljfx.coerce :as coerce]
     [cljfx.composite :as composite]
-    [cljfx.mutator :as mutator]
     [cljfx.fx.region :as fx.region]
-    [cljfx.lifecycle :as lifecycle])
+    [cljfx.lifecycle :as lifecycle]
+    [cljfx.mutator :as mutator])
   (:import
     (javafx.scene.control ScrollPane$ScrollBarPolicy)
     (org.fxmisc.flowless VirtualizedScrollPane)))

@@ -2,8 +2,8 @@
   (:require
     [cljfx.api :as fx]
     [cljfx.ext.table-view :as fx.ext.table-view]
-    [clojure.string :as string]
     clojure.set
+    [clojure.string :as string]
     [skylobby.fx :as skylobby.fx]
     [skylobby.fx.tooltip-nofocus :as tooltip-nofocus]
     [skylobby.util :as u]

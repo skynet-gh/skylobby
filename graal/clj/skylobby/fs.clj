@@ -1324,39 +1324,39 @@
       (= engine-data-version version))))
 
 (defn engine-bots
-  ([engine-file]
-   (or
-     (try
-       (when engine-file
-         (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
-               ai-dirs (some->> (list-files ai-skirmish-dir)
-                                seq
-                                (filter is-directory?))]
-           (mapcat
-             (fn [^java.io.File ai-dir]
-               (log/info "Loading AI from" ai-dir)
-               (->> (list-files ai-dir)
-                    (filter is-directory?)
-                    (map
-                      (fn [^java.io.File version-dir]
-                        (log/info "Loading AI version from" version-dir)
-                        (let [options-file (->> (list-files version-dir)
-                                                (filter is-file?)
-                                                (filter (comp #{"aioptions.lua"} string/lower-case filename))
-                                                first)]
-                          (log/info "Loading AI options from" options-file)
-                          {:bot-name (filename ai-dir)
-                           :bot-version (filename version-dir)
-                           :bot-options (try
-                                          (let [contents (slurp options-file)]
-                                            (lua/read-modinfo contents))
-                                          (catch Exception e
-                                            (log/trace e "Error loading AI options from" options-file)
-                                            (log/warn "Error loading AI options from" options-file)))})))))
-             ai-dirs)))
-       (catch Exception e
-         (log/error e "Error loading bots")))
-     [])))
+  [engine-file]
+  (or
+    (try
+      (when engine-file
+        (let [ai-skirmish-dir (io/file engine-file "AI" "Skirmish")
+              ai-dirs (some->> (list-files ai-skirmish-dir)
+                               seq
+                               (filter is-directory?))]
+          (mapcat
+            (fn [^java.io.File ai-dir]
+              (log/info "Loading AI from" ai-dir)
+              (->> (list-files ai-dir)
+                   (filter is-directory?)
+                   (map
+                     (fn [^java.io.File version-dir]
+                       (log/info "Loading AI version from" version-dir)
+                       (let [options-file (->> (list-files version-dir)
+                                               (filter is-file?)
+                                               (filter (comp #{"aioptions.lua"} string/lower-case filename))
+                                               first)]
+                         (log/info "Loading AI options from" options-file)
+                         {:bot-name (filename ai-dir)
+                          :bot-version (filename version-dir)
+                          :bot-options (try
+                                         (let [contents (slurp options-file)]
+                                           (lua/read-modinfo contents))
+                                         (catch Exception e
+                                           (log/trace e "Error loading AI options from" options-file)
+                                           (log/warn "Error loading AI options from" options-file)))})))))
+            ai-dirs)))
+      (catch Exception e
+        (log/error e "Error loading bots")))
+    []))
 
 (defn engine-data [^File engine-dir]
   (merge
