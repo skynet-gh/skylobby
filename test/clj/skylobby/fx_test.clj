@@ -20,19 +20,19 @@
   (is (= 0
          (with-redefs [skylobby.fx/get-screen-bounds (constantly nil)]
            (skylobby.fx/fitx nil))))
-  (is (= 0.0
+  (is (= -128.0
          (with-redefs [skylobby.fx/get-screen-bounds (constantly screen-bounds)]
            (skylobby.fx/fitx nil))))
-  (is (= 0.0
+  (is (= -128.0
          (skylobby.fx/fitx screen-bounds))))
 (deftest fity
   (is (= 0
          (with-redefs [skylobby.fx/get-screen-bounds (constantly nil)]
            (skylobby.fx/fity nil))))
-  (is (= 720.0
+  (is (= 592.0
          (with-redefs [skylobby.fx/get-screen-bounds (constantly screen-bounds)]
            (skylobby.fx/fity nil))))
-  (is (= 720.0
+  (is (= 592.0
          (skylobby.fx/fity screen-bounds))))
 (deftest fitwidth
   (is (= 256

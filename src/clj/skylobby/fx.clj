@@ -372,7 +372,9 @@
        (min
          (or setting
              (when (and (:min-x screen-bounds) (:max-x screen-bounds))
-               (quot (+ (:min-x screen-bounds) (:max-x screen-bounds)) 2))
+               (quot (+ (:min-x screen-bounds)
+                        (- (:max-x screen-bounds) min-width))
+                     2))
              Integer/MIN_VALUE)
          (or (:max-x screen-bounds) 0))
        (or (:min-x screen-bounds) 0)))))
@@ -386,7 +388,9 @@
        (min
          (or setting
              (when (and (:min-y screen-bounds) (:max-y screen-bounds))
-               (quot (+ (:min-y screen-bounds) (:max-y screen-bounds)) 2))
+               (quot (+ (:min-y screen-bounds)
+                        (- (:max-y screen-bounds) min-height))
+                     2))
              Integer/MIN_VALUE)
          (or (:max-y screen-bounds) 0))
        (or (:min-y screen-bounds) 0)))))
