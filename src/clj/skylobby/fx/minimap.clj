@@ -56,7 +56,8 @@
                     :y (int (* scale (* startrecttop minimap-height)))
                     :width (int (* scale (* (- startrectright startrectleft) minimap-width)))
                     :height (int (* scale (* (- startrectbottom startrecttop) minimap-height)))}))))
-           (filter some?))
+           (filter some?)
+           doall)
       (when drag-allyteam
         (let [{:keys [startx starty endx endy]} drag-allyteam]
           {:allyteam (str (:allyteam-id drag-allyteam))
@@ -133,6 +134,50 @@
            (filter some?)
            doall))))
 
+
+(defn teams-sub [context server-key players]
+  (let [
+        teams (if players
+                (get-teams players)
+                (when server-key
+                  (spring/teams
+                    (spring/battle-details {:battle (fx/sub-val context get-in [:by-server server-key :battle])}))))]
+    teams))
+
+(defn starting-point-sub [context server-key map-name minimap-size scripttags start-positions players]
+  (let [
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
+        map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
+        {:keys [smf]} map-details
+        {:keys [minimap-height minimap-width]
+         :or {minimap-height smf/minimap-display-size
+              minimap-width smf/minimap-display-size}} smf
+        max-width-or-height (max minimap-width minimap-height)
+        minimap-size (or (u/to-number minimap-size)
+                         default-minimap-size)
+        minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
+        teams (fx/sub-ctx context teams-sub server-key players)
+        starting-points (minimap-starting-points
+                          {:teams teams
+                           :map-details map-details
+                           :scripttags scripttags
+                           :minimap-scale minimap-scale
+                           :minimap-width minimap-width
+                           :minimap-height minimap-height
+                           :start-positions start-positions})]
+    starting-points))
+
+(defn render-starting-points-sub [context server-key players random starting-points]
+  (let [
+        teams (fx/sub-ctx context teams-sub server-key players)
+        random-teams (when random
+                       (set (map str (take (count teams) (iterate inc 0)))))
+        starting-points (if random
+                          (filterv (comp random-teams :team) starting-points)
+                          starting-points)]
+    starting-points))
+
 (defn minimap-pane-impl
   [{:fx/keys [context]
     :keys [is-replay map-name minimap-type-key players scripttags server-key start-positions]
@@ -164,21 +209,11 @@
         minimap-size (or (u/to-number minimap-size)
                          default-minimap-size)
         minimap-scale (/ (* 1.0 minimap-size) max-width-or-height)
-        teams (if players
-                (get-teams players)
-                (when server-key
-                  (spring/teams
-                    (spring/battle-details {:battle (fx/sub-val context get-in [:by-server server-key :battle])}))))
-        starting-points (minimap-starting-points
-                          {:teams teams
-                           :map-details map-details
-                           :scripttags scripttags
-                           :minimap-scale minimap-scale
-                           :minimap-width minimap-width
-                           :minimap-height minimap-height
-                           :start-positions start-positions})
+        starting-points (fx/sub-ctx context starting-point-sub server-key map-name minimap-size scripttags start-positions players)
         start-boxes (minimap-start-boxes minimap-scale minimap-width minimap-height scripttags drag-allyteam)
         startpostype (spring/startpostype-name (get-in scripttags ["game" "startpostype"]))
+        random (= "Random" startpostype)
+        render-starting-points (fx/sub-ctx context render-starting-points-sub server-key players random starting-points)
         singleplayer (= server-key :local)
         direct-connect (#{:direct-client :direct-host} (u/server-type server-key))
         cached-minimap-updated (fx/sub-val context get-in [:cached-minimap-updated (fs/canonical-path (:file map-details))])]
@@ -242,19 +277,13 @@
          (fn [^Canvas canvas]
            (let [gc (.getGraphicsContext2D canvas)
                  border-color (if (not= "minimap" minimap-type)
-                                Color/WHITE Color/BLACK)
-                 random (= "Random" startpostype)
-                 random-teams (when random
-                                (set (map str (take (count teams) (iterate inc 0)))))
-                 starting-points (if random
-                                   (filter (comp random-teams :team) starting-points)
-                                   starting-points)]
+                                Color/WHITE Color/BLACK)]
              (.clearRect gc 0 0 minimap-width minimap-height)
              (.setFill gc Color/RED)
              (.setFont gc (Font/font "Regular" FontWeight/BOLD 14.0))
              (when (or (#{"Fixed" "Random" "Choose before game"} startpostype)
                        is-replay)
-               (doseq [{:keys [x y team color]} starting-points]
+               (doseq [{:keys [x y team color]} render-starting-points]
                  (let [drag (when (and drag-team
                                        (= team (:team drag-team)))
                               drag-team)

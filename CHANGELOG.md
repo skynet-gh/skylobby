@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.15](https://github.com/skynet-gh/skylobby/releases/tag/0.9.15) - 2022-10-24
+
+- Fix more UI performance issues
+- Fix display of ring when game starts setting
+
 ## [0.9.14](https://github.com/skynet-gh/skylobby/releases/tag/0.9.14) - 2022-10-24
 
 - Attempt to fix window size issue

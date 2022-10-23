@@ -505,6 +505,41 @@
         (assoc player :team-color (color/player-color battle-status teams-by-allyteam)))
       players)))
 
+
+(defn sides-sub [context server-key mod-name]
+  (let [
+        spring-root (fx/sub-ctx context sub/spring-root server-key)
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
+        battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)]
+    (spring/mod-sides battle-mod-details)))
+
+(defn side-items-sub [context server-key mod-name]
+  (let [
+        sides (fx/sub-ctx context sides-sub server-key mod-name)]
+    (->> sides seq (sort-by first) (mapv second))))
+
+(defn players-with-color-sub [_context players auto-color]
+  (let [
+        players-with-color (if auto-color
+                             (add-players-colors players)
+                             players)]
+    players-with-color))
+
+(defn players-with-skill-sub [_context players scripttags]
+  (mapv (partial add-parsed-skill scripttags) players))
+
+(defn sorted-players-sub [_context players]
+  (let [
+        sorted-players (sort-by
+                         (juxt
+                           sort-playing
+                           sort-bot
+                           sort-ally
+                           sort-skill
+                           sort-id)
+                         players)]
+    sorted-players))
+
 (defn players-table-impl
   [{:fx/keys [context]
     :keys [auto-color battle-id mod-name players read-only scripttags server-key]}]
@@ -527,16 +562,14 @@
                      (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
-        battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
-        sides (spring/mod-sides battle-mod-details)
-        side-items (->> sides seq (sort-by first) (map second))
+        sides (fx/sub-ctx context sides-sub server-key mod-name)
+        side-items (fx/sub-ctx context side-items-sub server-key mod-name)
         singleplayer (or (not server-key) (= :local server-key))
         username (fx/sub-val context get-in [:by-server server-key :username])
-        players-with-color (if auto-color
-                             (add-players-colors players)
-                             players)
-        players-with-skill (map (partial add-parsed-skill scripttags) players-with-color)
+        players-with-color (fx/sub-ctx context players-with-color-sub players auto-color)
+        players-with-skill (fx/sub-ctx context players-with-skill-sub players-with-color scripttags)
+        sorted-players (fx/sub-ctx context sorted-players-sub players-with-skill)
         incrementing-cell (fn [id]
                             {:text
                              (if increment-ids
@@ -553,15 +586,7 @@
      :key (pr-str [server-key selected-tab-main battle-id players-table-columns])
      :desc
      {:fx/type ext-table-column-auto-size
-      :items
-      (sort-by
-        (juxt
-          sort-playing
-          sort-bot
-          sort-ally
-          sort-skill
-          sort-id)
-        players-with-skill)
+      :items sorted-players
       :desc
       {:fx/type :table-view
        :style-class ["table-view" "skylobby-players-" css-class-suffix]
@@ -1039,6 +1064,26 @@
 (def player-width 340)
 (def player-skill-width 84)
 
+
+(defn playing-by-ally-sub [_context players]
+  (let [
+        playing-by-ally (->> players
+                             (filter (comp :mode :battle-status))
+                             (group-by (comp :ally :battle-status))
+                             (mapv
+                               (fn [[ally players]]
+                                 [ally (->> players (sort-by (comp u/to-number :id :battle-status)))])))]
+    (sort-by first playing-by-ally)))
+
+(defn spectators-sub [_context players]
+  (let [
+        spectators (->> players
+                        (filter (comp not :mode :battle-status))
+                        (sort-by
+                          #(or (:username %) (:bot-name %) "")
+                          skylobby.fx/case-insensitive-natural-comparator))]
+    spectators))
+
 (defn players-not-a-table
   [{:fx/keys [context]
     :keys [auto-color players read-only server-key]}]
@@ -1049,19 +1094,11 @@
                            singleplayer "singleplayer"
                            :else "multiplayer")
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
-        players-with-color (if auto-color
-                             (add-players-colors players)
-                             players)
-        players-with-skill (map (partial add-parsed-skill scripttags) players-with-color)
-        playing-by-ally (->> players-with-skill
-                             (filter (comp :mode :battle-status))
-                             (group-by (comp :ally :battle-status)))
+        players-with-color (fx/sub-ctx context players-with-color-sub players auto-color)
+        players-with-skill (fx/sub-ctx context players-with-skill-sub players-with-color scripttags)
+        playing-by-ally (fx/sub-ctx context playing-by-ally-sub players-with-skill)
         increment-ids (fx/sub-val context :increment-ids)
-        spectators (->> players-with-skill
-                        (filter (comp not :mode :battle-status))
-                        (sort-by
-                          #(or (:username %) (:bot-name %) "")
-                          skylobby.fx/case-insensitive-natural-comparator))
+        spectators (fx/sub-ctx context spectators-sub players-with-skill)
         username (fx/sub-val context get-in [:by-server server-key :username])
         am-host (fx/sub-ctx context sub/am-host server-key)
         host-username (fx/sub-ctx context sub/host-username server-key)
@@ -1082,8 +1119,7 @@
       (concat
         (mapv
           (fn [[ally players]]
-            (let [ally-n (u/to-number ally)
-                  players (->> players (sort-by (comp u/to-number :id :battle-status)))]
+            (let [ally-n (u/to-number ally)]
               {:fx/type :v-box
                :pref-width player-width
                :flow-pane/margin {:left 16}
@@ -1210,7 +1246,7 @@
                              :player player
                              :server-key server-key}])}}))
                    players)}]}))
-          (sort-by first playing-by-ally))
+          playing-by-ally)
         [{:fx/type :v-box
           :flow-pane/margin {:left 16}
           :children

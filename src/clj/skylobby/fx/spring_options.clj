@@ -30,6 +30,28 @@
 
 (def value-width 120)
 
+
+(defn modoptions-sub [context modoptions]
+  (let [
+        show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
+        modoptions (if show-hidden-modoptions
+                     modoptions
+                     (->> modoptions
+                          (remove (comp :hidden second))
+                          doall))]
+    modoptions))
+
+(defn items-sub [_context section-options]
+  (let [
+        items (->> section-options
+                   (sort-by (comp u/to-number first))
+                   (map second)
+                   (filter :key)
+                   (remove (comp #{"section"} :type)) ; remove sections in middle
+                   (map #(update % :key (comp keyword string/lower-case)))
+                   doall)]
+    items))
+
 (defn modoptions-table
   [{:fx/keys [context]
     :keys [current-options event-data max-width modoptions option-key singleplayer server-key]}]
@@ -38,26 +60,17 @@
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
-        show-hidden-modoptions (fx/sub-val context :show-hidden-modoptions)
         option-key (or option-key "modoptions")
         current-options (or current-options
                             (get-in scripttags ["game" option-key]))
-        modoptions (if show-hidden-modoptions
-                     modoptions
-                     (->> modoptions
-                          (remove (comp :hidden second))))
+        modoptions (fx/sub-ctx context modoptions-sub modoptions)
         first-option (-> modoptions first second)
         is-section (-> first-option :type (= "section"))
         header (when is-section first-option)
         section-options (if is-section
                           (rest modoptions)
                           modoptions)
-        items (->> section-options
-                   (sort-by (comp u/to-number first))
-                   (map second)
-                   (filter :key)
-                   (remove (comp #{"section"} :type)) ; remove sections in middle
-                   (map #(update % :key (comp keyword string/lower-case))))
+        items (fx/sub-ctx context items-sub section-options)
         event-data (or event-data
                        {:event/type :skylobby.fx.event.battle/modoption-change})
         max-width (or max-width 256)]
@@ -230,10 +243,15 @@
                                [])}}}}
                 {:text (str (:def i))})))}}]}]}))
 
+
+(defn sorted-modoptions-sub [_context modoptions]
+  (let [sorted (sort-by (comp u/to-number first) modoptions)]
+    (doall sorted)))
+
 (defn modoptions-view
   [{:fx/keys [context]
     :keys [current-options event-data max-width modoptions option-key server-key singleplayer]}]
-  (let [sorted (sort-by (comp u/to-number first) modoptions)
+  (let [sorted (fx/sub-ctx context sorted-modoptions-sub modoptions)
         by-section (split-by (comp #{"section"} :type second) sorted)
         filter-modoptions (fx/sub-val context :filter-modoptions)
         filter-lc (or (when filter-modoptions (string/lower-case filter-modoptions))
