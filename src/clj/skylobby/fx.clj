@@ -398,8 +398,8 @@
    (let [screen-bounds (screen-bounds-fallback screen-bounds)]
      (max
        (min
-         (or setting default 0)
-         (or (:width screen-bounds) min-width))
+         (or setting default min-width)
+         (or (:width screen-bounds) default))
        min-width))))
 
 (defn fitheight
@@ -409,6 +409,6 @@
    (let [screen-bounds (screen-bounds-fallback screen-bounds)]
      (max
        (min
-         (or setting default 0)
-         (or (:height screen-bounds) min-height))
+         (or setting default min-height)
+         (or (:height screen-bounds) default))
        min-height))))

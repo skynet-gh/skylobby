@@ -134,15 +134,11 @@
                      (.hide popup)))
                  lifecycle/dynamic)}))
 
-(defn battle-queue-button
-  [{:fx/keys [context]
-    :keys [server-key]}]
+
+(defn am-in-queue-sub [context server-key channel-name]
   (let [
-        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         me (fx/sub-val context get-in [:by-server server-key :username])
         messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
-        am-spec (fx/sub-ctx context sub/am-spec server-key)
         am-in-queue (->> messages
                          (filter
                            (some-fn
@@ -171,6 +167,16 @@
                                    am-in-queue)
                                  am-in-queue)))
                            false))]
+    am-in-queue))
+
+(defn battle-queue-button
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        am-spec (fx/sub-ctx context sub/am-spec server-key)
+        am-in-queue (fx/sub-ctx context am-in-queue-sub server-key channel-name)]
     {:fx/type :h-box
      :alignment :center-left
      :children
@@ -207,13 +213,10 @@
                    :no-history true
                    :server-key server-key}}]}))
 
-(defn battle-accolades
-  [{:fx/keys [context]
-    :keys [server-key]}]
+(def accolades-bot-name "AccoladesBot")
+(defn accolade-for-sub [context server-key]
   (let [
-        accolades-bot-name "AccoladesBot"
         channel-name (u/user-channel-name accolades-bot-name)
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
         accolade-for (->> messages
                           (filter (comp #{accolades-bot-name} :username))
@@ -230,7 +233,16 @@
                                   nil
                                   :else
                                   accolade-for)))
-                            nil))
+                            nil))]
+    accolade-for))
+
+(defn battle-accolades
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [
+        channel-name (u/user-channel-name accolades-bot-name)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        accolade-for (fx/sub-ctx context accolade-for-sub server-key)
         show-accolades (fx/sub-val context :show-accolades)]
     (if (and show-accolades accolade-for)
       {:fx/type :h-box
@@ -1431,14 +1443,10 @@
                          :battle-mod-details battle-mod-details)))}]}}]}))
 
 
-(defn battle-votes-impl
-  [{:fx/keys [context]
-    :keys [server-key]}]
-  (let [show-vote-log (fx/sub-val context :show-vote-log)
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
-        messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
+(defn vote-messages-sub [context server-key channel-name]
+  (let [
         host-username (fx/sub-ctx context sub/host-username server-key)
+        messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
         host-messages (->> messages
                            (filter (comp #{host-username} :username)))
         host-ex-messages (->> host-messages
@@ -1457,7 +1465,13 @@
                                    (if (= :called-vote spads-message-type)
                                      {:command (nth spads-parsed 2)
                                       :caller (second spads-parsed)}
-                                     {:command (second spads-parsed)}))))))
+                                     {:command (second spads-parsed)})))))
+                           doall)]
+    vote-messages))
+
+(defn current-vote-sub [context server-key channel-name]
+  (let [
+        vote-messages (fx/sub-ctx context vote-messages-sub server-key channel-name)
         current-vote (reduce
                        (fn [prev {:keys [spads] :as curr}]
                          (let [{:keys [spads-message-type spads-parsed]} spads]
@@ -1475,7 +1489,17 @@
                                spads-message-type) nil
                              :else prev)))
                        nil
-                       (reverse vote-messages))
+                       (reverse vote-messages))]
+    current-vote))
+
+(defn battle-votes-impl
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [show-vote-log (fx/sub-val context :show-vote-log)
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
+        vote-messages (fx/sub-ctx context vote-messages-sub server-key channel-name)
+        current-vote (fx/sub-ctx context current-vote-sub server-key channel-name)
         minimap-size (fx/sub-val context :minimap-size)
         minimap-size (or (u/to-number minimap-size)
                          fx.minimap/default-minimap-size)]
@@ -1503,7 +1527,7 @@
                    :text (str " "
                               (when vote-progress
                                 (str "Y: " y " / " yt "  N: " n " / " nt)))}]
-                 (when remaining (str remaining " left")
+                 (when remaining
                    [{:fx/type :pane
                      :h-box/hgrow :always}
                     {:fx/type :label

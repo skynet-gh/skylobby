@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.14](https://github.com/skynet-gh/skylobby/releases/tag/0.9.14) - 2022-10-24
+
+- Attempt to fix window size issue
+- Make users table fixed size, split pane size was not saved
+- Fix some performance issues with chat log rendering
+
 ## [0.9.13](https://github.com/skynet-gh/skylobby/releases/tag/0.9.13) - 2022-10-19
 
 - Add reading of validAIs.lua in games to filter AIs
