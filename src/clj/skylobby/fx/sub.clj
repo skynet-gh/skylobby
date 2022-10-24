@@ -86,15 +86,17 @@
     (get maps-by-name map-name)))
 
 (defn indexed-mod [context spring-root mod-name]
-  (let [{:keys [mods-by-name mods-by-name-only]} (fx/sub-ctx context spring-resources spring-root)]
+  (let [{:keys [mods-by-name mods-by-name-only]} (fx/sub-ctx context spring-resources spring-root)
+        mod-name-no-git-ref (u/mod-name-git-no-ref mod-name)
+        directory-match (->> (get mods-by-name-only
+                               (when mod-name
+                                 (let [[_all game-type] (re-find #"(.*)\s+\$VERSION" mod-name)]
+                                   game-type)))
+                             (filter (comp #{:directory} :skylobby.fs/source))
+                             first)]
     (or (get mods-by-name mod-name)
-        (get mods-by-name (u/mod-name-git-no-ref mod-name))
-        (->> (get mods-by-name-only
-               (when mod-name
-                 (let [[_all game-type] (re-find #"(.*)\s+\$VERSION" mod-name)]
-                   game-type)))
-             (filter (comp #{:directory} :skylobby.fs/source))
-             first))))
+        (get mods-by-name mod-name-no-git-ref)
+        directory-match)))
 
 (defn server-url [context server-key]
    (fx/sub-val context get-in [:by-server server-key :client-data :server-url]))

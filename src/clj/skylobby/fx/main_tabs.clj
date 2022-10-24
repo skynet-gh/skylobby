@@ -241,11 +241,12 @@
         in-battle (and battle-id
                        (not pop-out-battle))
         show-battle-tab (and in-battle battle-as-tab)
-        main-tab-ids (concat
-                       (when show-battle-tab ["battle"])
-                       main-tab-ids
-                       (when show-closed-battles
-                         (map (comp old-battle-tab-id first) old-battles)))
+        main-tab-ids (doall
+                       (concat
+                         (when show-battle-tab ["battle"])
+                         main-tab-ids
+                         (when show-closed-battles
+                           (map (comp old-battle-tab-id first) old-battles))))
         selected-index (if (contains? (set main-tab-ids) selected-tab-main)
                          (.indexOf ^java.util.List main-tab-ids selected-tab-main)
                          0)

@@ -365,7 +365,9 @@
         divider-key :replay-divider
         {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
-        full-replay-details (fx/sub-ctx context skylobby.fx/replay-details-sub (fs/canonical-path (:file selected-replay)))
+        full-replay-details (fx/sub-ctx context skylobby.fx/replay-details-sub
+                                        (or (:path selected-replay)
+                                            (fs/canonical-path (:file selected-replay))))
         selected-replay-details (or full-replay-details selected-replay)
         script-data (-> selected-replay-details :body :script-data)
         selected-engine-version (:replay-engine-version selected-replay)
@@ -637,6 +639,16 @@
   (.toZoneId (TimeZone/getDefault)))
 
 
+(defn extract-task-paths-sub [context]
+  (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
+       (map (comp fs/canonical-path :file))
+       set))
+
+(defn import-task-paths-sub [context]
+  (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
+       (map (comp fs/canonical-path :resource-file :importable))
+       set))
+
 (defn replays-table-impl
   [{:fx/keys [context]}]
   (let [replay-downloads-by-engine (fx/sub-val context :replay-downloads-by-engine)
@@ -648,12 +660,11 @@
         selected-replay (fx/sub-ctx context skylobby.fx/selected-replay-sub)
         sorted-replays (fx/sub-ctx context sub/sorted-replays)
         spring-isolation-dir (fx/sub-val context :spring-isolation-dir)
-        {:keys [engines engines-by-version maps-by-name mods-by-name]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
+        {:keys [engines engines-by-version maps-by-name mods-by-name spring-root-path]} (fx/sub-ctx context skylobby.fx/spring-resources-sub spring-isolation-dir)
         copying (fx/sub-val context :copying)
         extracting (fx/sub-val context :extracting)
         file-cache (fx/sub-val context :file-cache)
         http-download (fx/sub-val context :http-download)
-        spring-root-path (fs/canonical-path spring-isolation-dir)
         rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
         use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
         db (fx/sub-val context :db)
@@ -676,15 +687,11 @@
                                  set)
         engine-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
                                  seq)
-        extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
-                           (map (comp fs/canonical-path :file))
-                           set)
+        extract-tasks (fx/sub-ctx context extract-task-paths-sub)
         http-download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/http-downloadable)
                                  (map (comp :download-url :downloadable))
                                  set)
-        import-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
-                          (map (comp fs/canonical-path :resource-file :importable))
-                          set)
+        import-tasks (fx/sub-ctx context import-task-paths-sub)
         rapid-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download)
                          (map :rapid-id)
                          set)

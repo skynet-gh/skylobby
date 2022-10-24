@@ -14,6 +14,13 @@
 (set! *warn-on-reflection* true)
 
 
+(defn import-task-paths-sub [context]
+  (let [
+        import-task-paths (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
+                           (map (comp fs/canonical-path :resource-file :importable))
+                           set)]
+    import-task-paths))
+
 (defn map-sync-pane-impl
   [{:fx/keys [context]
     :keys [battle-map index-only map-name spring-isolation-dir]}]
@@ -22,9 +29,7 @@
         http-download (fx/sub-val context :http-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
-        imports (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/import)
-                     (map (comp fs/canonical-path :resource-file :importable))
-                     set)
+        import-task-paths (fx/sub-ctx context import-task-paths-sub)
         map-name (or map-name battle-map)
         indexed-map (fx/sub-ctx context sub/indexed-map spring-isolation-dir map-name)
         map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
@@ -56,7 +61,7 @@
                          map-name
                          "No map specified")
            :tooltip (if (zero? severity)
-                      (fs/canonical-path (:file map-details))
+                      (:path map-details)
                       (if indexed-map
                         (str "Loading map details for '" map-name "'")
                         (if map-name
@@ -178,7 +183,7 @@
                    resource-path (fs/canonical-path resource-file)
                    in-progress (boolean
                                  (or (-> copying (get resource-path) :status boolean)
-                                     (contains? imports resource-path)))
+                                     (contains? import-task-paths resource-path)))
                    dest (resource/resource-dest spring-isolation-dir importable)
                    dest-exists (fs/file-exists? file-cache dest)]
                (when importable

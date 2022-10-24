@@ -164,8 +164,8 @@
      (when (seq next-round)
        (task/add-task! state-atom
                        {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
-                        :priorities priorities
-                        :todo (count next-round)})))))
+                        :priorities priorities})))))
+                        ;:todo (count next-round)})))))
 
 (defn- refresh-maps
   "Reads map details and caches for maps missing from :maps in state."
@@ -258,13 +258,17 @@
        (swap! state-atom update-in [:by-spring-root spring-root-path :maps]
               (fn [maps]
                 (->> maps
-                     (filter (comp fs/canonical-path :file))
+                     (filter (comp (partial instance? java.io.File) :file))
+                     (map
+                       (fn [{:keys [file path] :as m}]
+                         (if path
+                           m
+                           (assoc m :path (fs/canonical-path file)))))
                      (remove
                       (fn [{:keys [error map-name]}]
                         (and (not error)
                              (string/blank? map-name))))
-                     (remove (comp missing-paths fs/canonical-path :file))
-                     (filter (comp (partial instance? java.io.File) :file))
+                     (remove (comp missing-paths :path))
                      set)))
        (if next-round
          (do
@@ -274,8 +278,8 @@
                                          :priorities priority-maps}))
            (task/add-task! state-atom
                            {:spring-lobby/task-type :spring-lobby/refresh-maps
-                            :spring-root spring-root
-                            :todo next-round-count}))
+                            :spring-root spring-root}))
+                            ;:todo next-round-count}))
          (do
            (log/info "Finished map refresh")
            (task/add-task! state-atom {:spring-lobby/task-type :spring-lobby/update-cached-minimaps
@@ -307,7 +311,7 @@
                                         :by-spring-root
                                         (get spring-root-path))
                                     :engines
-                                    (map (comp fs/canonical-path :file))
+                                    (map :path)
                                     (filter some?)
                                     set)
          to-add (if (:force opts) ; refresh existing engines too
@@ -345,8 +349,13 @@
             (fn [engines]
               (->> engines
                    (filter (comp fs/canonical-path :file))
+                   (map
+                     (fn [{:keys [file path] :as m}]
+                       (if path
+                         m
+                         (assoc m :path (fs/canonical-path file)))))
                    (filter fs/is-current-engine-data?)
-                   (remove (comp to-remove fs/canonical-path :file))
+                   (remove (comp to-remove :path))
                    set)))
      {:to-add-count (count to-add)
       :to-remove-count (count to-remove)})))
@@ -386,6 +395,7 @@
            (log/info "Deleting invalid sdp file" f)
            (raynes-fs/delete f))
          {:file f
+          :path (fs/canonical-path f)
           :error true})))))
 
 (defn- update-mod
@@ -416,13 +426,13 @@
                       (log/error e "Error reading mod data for" file)
                       {:file file
                        :error true}))
-         mod-details (select-keys mod-data [:error :file :mod-name :mod-name-only :mod-version ::fs/source :git-commit-id])
+         mod-details (select-keys mod-data [:error :file :mod-name :mod-name-only :mod-version :path ::fs/source :git-commit-id])
          mod-details (assoc mod-details
                             :is-game
                             (boolean
                              (or (:engineoptions mod-data)
                                  (:modoptions mod-data))))]
-     (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :is-game :mod-name :mod-name-only :mod-version]))))
+     (log/info "Read mod:" (with-out-str (pprint (select-keys mod-details [:error :file :path :is-game :mod-name :mod-name-only :mod-version]))))
      (let [[old-state {:keys [by-spring-root mod-details use-git-mod-version]}]
            (swap-vals! state-atom update-in [:by-spring-root spring-root-path :mods]
                        (fn [mods]
@@ -540,6 +550,11 @@
                                               (and (not error)
                                                    (string/blank? mod-name))))
                                            (filter (comp (partial instance? java.io.File) :file))
+                                           (map
+                                             (fn [{:keys [file path] :as m}]
+                                               (if path
+                                                 m
+                                                 (assoc m :path (fs/canonical-path file)))))
                                            (remove (comp missing-files fs/canonical-path :file))
                                            set)))))]
        (log/info "Mod count in" spring-root-path "changed from"
@@ -551,8 +566,8 @@
          (log/info "Scheduling mod load since there are" (count next-round) "mods left to load")
          (task/add-task! state-atom
                          {:spring-lobby/task-type :spring-lobby/refresh-mods
-                          :spring-root spring-root
-                          :todo (count next-round)}))
+                          :spring-root spring-root}))
+                          ;:todo (count next-round)}))
        (log/info "Finished mod refresh"))
      {:to-add-file-count (count to-add-file)
       :to-add-rapid-count (count to-add-rapid)})))
@@ -951,18 +966,18 @@
     (let [before (u/curr-millis)
           {:keys [db parsed-replays-by-path replay-sources-enabled use-db-for-replays] :as state} @state-atom
           all-files (mapcat
-                     (fn [{:keys [file recursive replay-source-name]}]
-                       (let [files (fs/replay-files file {:recursive recursive})]
-                         (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
-                         (map
-                          (juxt (constantly replay-source-name) identity)
-                          files)))
-                     (filter
-                      (fn [{:keys [file]}]
-                        (let [path (fs/canonical-path file)]
-                          (or (not (contains? replay-sources-enabled path))
-                              (get replay-sources-enabled path))))
-                      (fs/replay-sources state)))
+                      (fn [{:keys [file recursive replay-source-name]}]
+                        (let [files (fs/replay-files file {:recursive recursive})]
+                          (log/info "Found" (count files) "replay files from" replay-source-name "at" file)
+                          (map
+                            (juxt (constantly replay-source-name) identity)
+                            files)))
+                      (filter
+                        (fn [{:keys [file path]}]
+                          (let [path (or path (fs/canonical-path file))]
+                            (or (not (contains? replay-sources-enabled path))
+                                (get replay-sources-enabled path))))
+                        (fs/replay-sources state)))
           all-paths (set (map (comp fs/canonical-path second) all-files))
           old-valid-replay? (old-valid-replay-fn all-paths)
           valid-replay? (valid-replay-fn all-paths)
@@ -1006,6 +1021,11 @@
                              all-replays (into {} (concat replays-by-path parsed-replays-by-path))
                              valid-replays (->> all-replays
                                                 (filter valid-replay?)
+                                                (map
+                                                  (fn [[k {:keys [path] :as replay}]]
+                                                    [k (if path
+                                                         replay
+                                                         (assoc replay :path k))]))
                                                 (into {}))
                              migratable-replays (->> all-replays
                                                      (remove valid-replay?)
@@ -1061,8 +1081,8 @@
                     "valid, aborting refresh-replays")
           :else
           (task/add-task! state-atom
-                          {:spring-lobby/task-type :spring-lobby/refresh-replays
-                           :todo (count todo)})))))
+                          {:spring-lobby/task-type :spring-lobby/refresh-replays})))))
+                           ;:todo (count todo)})))))
   (defmethod task-handler :spring-lobby/refresh-replay-resources [_]
     [state-atom]
     (log/info "Refresh replay resources")

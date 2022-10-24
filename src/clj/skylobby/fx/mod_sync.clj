@@ -26,20 +26,58 @@
     :else nil))
 
 
-(defn mod-sync-pane-impl
-  [{:fx/keys [context]
-    :keys [dependency engine-version index-only mod-name spring-isolation-dir]}]
-  (let [copying (fx/sub-val context :copying)
-        file-cache (fx/sub-val context :file-cache)
-        http-download (fx/sub-val context :http-download)
-        spring-root-path (fs/canonical-path spring-isolation-dir)
-        rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
+(defn get-rapid-data-by-version-sub [context spring-root-path]
+  (let [
         use-db-for-rapid (fx/sub-val context :use-db-for-rapid)
         db (fx/sub-val context :db)
+        rapid-data-by-version (fx/sub-val context get-in [:rapid-by-spring-root spring-root-path :rapid-data-by-version])
         get-rapid-data-by-version (fn [version]
                                     (if (and db use-db-for-rapid)
                                       (rapid/rapid-data-by-version db spring-root-path version)
-                                      (get rapid-data-by-version version)))
+                                      (get rapid-data-by-version version)))]
+    get-rapid-data-by-version))
+
+(defn update-download-sources-sub [context]
+  (let [
+        update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
+                                     (map :download-source-name)
+                                     set)]
+    update-download-sources))
+
+(defn mod-update-tasks-sub [context]
+  (let [
+        refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
+        mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
+        mod-update-tasks (concat refresh-mods-tasks mod-details-tasks)]
+    mod-update-tasks))
+
+(defn rapid-tasks-by-id-sub [context spring-root-path]
+  (let [
+        rapid-tasks-by-id (->> (concat
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid)
+                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download))
+                               (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
+                               (map (juxt :rapid-id identity))
+                               (into {}))]
+    rapid-tasks-by-id))
+
+(defn download-tasks-by-url-sub [context]
+  (let [
+        tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
+        download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
+                                   (map (juxt (comp :download-url :downloadable) identity))
+                                   (into {}))]
+    download-tasks-by-url))
+
+(defn mod-sync-pane-impl
+  [{:fx/keys [context]
+    :keys [dependency engine-version index-only mod-name spring-isolation-dir]}]
+  (let [
+        copying (fx/sub-val context :copying)
+        file-cache (fx/sub-val context :file-cache)
+        http-download (fx/sub-val context :http-download)
+        {:keys [spring-root-path]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        get-rapid-data-by-version (fx/sub-ctx context get-rapid-data-by-version-sub spring-root-path)
         rapid-downloads-by-id (fx/sub-val context :rapid-download)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         tasks-by-type (fx/sub-ctx context skylobby.fx/tasks-by-type-sub)
@@ -50,24 +88,14 @@
         mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
         no-mod-details (not (resource/details? mod-details))
         refresh-mods-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-mods)
-        mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
-        update-download-sources (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
-                                     (map :download-source-name)
-                                     set)
-        mod-update-tasks (concat refresh-mods-tasks mod-details-tasks)
-        rapid-tasks-by-id (->> (concat
-                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-rapid)
-                                 (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/rapid-download))
-                               (filter (comp #{spring-root-path} fs/canonical-path :spring-isolation-dir))
-                               (map (juxt :rapid-id identity))
-                               (into {}))
+        update-download-sources (fx/sub-ctx context update-download-sources-sub)
+        mod-update-tasks (fx/sub-ctx context mod-update-tasks-sub)
+        rapid-tasks-by-id (fx/sub-ctx context rapid-tasks-by-id-sub spring-root-path)
         mod-file (or (:file mod-details) (:file indexed-mod))
+        mod-path (or (:path mod-details) (:path indexed-mod))
         engine-details (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version)
         engine-file (:file engine-details)
-        canonical-path (fs/canonical-path mod-file)
-        download-tasks-by-url (->> (get tasks-by-type :spring-lobby/http-downloadable)
-                                   (map (juxt (comp :download-url :downloadable) identity))
-                                   (into {}))
+        download-tasks-by-url (fx/sub-ctx context download-tasks-by-url-sub)
         refresh-in-progress (seq refresh-mods-tasks)]
     {:fx/type sync-pane
      :h-box/margin 8
@@ -92,7 +120,7 @@
                          mod-name
                          "No game version specified")
            :tooltip (if (zero? severity)
-                      canonical-path
+                      mod-path
                       (if indexed-mod
                         (if exact-version-match
                           (str "Loading mod details for '" mod-name "' at " (:file indexed-mod))
@@ -307,7 +335,7 @@
                                (:mod-name indexed-mod))
                           0 1)
                in-progress (->> (get tasks-by-type :spring-lobby/git-mod)
-                                (filter (comp #{(fs/canonical-path mod-file)} fs/canonical-path :file))
+                                (filter (comp #{mod-path} fs/canonical-path :file))
                                 seq
                                 boolean)]
            (concat

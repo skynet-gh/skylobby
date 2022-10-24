@@ -341,6 +341,7 @@
    (let [size (fs/size f)]
      (merge
        {:file f
+        :path (fs/canonical-path f)
         :filename (fs/filename f)
         :file-size size}
        (if (pos? size)

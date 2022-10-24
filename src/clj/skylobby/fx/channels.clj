@@ -9,20 +9,24 @@
 (set! *warn-on-reflection* true)
 
 
+(defn sorted-channels-sub [context server-key]
+  (let [
+        channels (fx/sub-val context get-in [:by-server server-key :channels])]
+   (->> (vals channels)
+        u/non-battle-channels
+        (sort-by :channel-name String/CASE_INSENSITIVE_ORDER)
+        doall)))
+
 (defn- channels-table-impl
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [
-        channels (fx/sub-val context get-in [:by-server server-key :channels])
         my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
-        items (->> (vals channels)
-                   u/non-battle-channels
-                   (sort-by :channel-name String/CASE_INSENSITIVE_ORDER)
-                   doall)]
+        sorted-channels (fx/sub-ctx context sorted-channels-sub server-key)]
     {:fx/type :table-view
      :style {:-fx-min-width "240"}
      :column-resize-policy :constrained
-     :items items
+     :items sorted-channels
      :columns
      [{:fx/type :table-column
        :text "Channel"

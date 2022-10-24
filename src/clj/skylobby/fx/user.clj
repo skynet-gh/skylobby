@@ -15,15 +15,9 @@
 (set! *warn-on-reflection* true)
 
 
-(defn users-table-impl
-  [{:fx/keys [context]
-    :keys [users server-key]}]
-  (let [ignore-users (fx/sub-val context :ignore-users)
-        hide-users-bots (fx/sub-val context :hide-users-bots)
-        my-battle (fx/sub-val context get-in [:by-server server-key :battle])
+(defn battles-by-users-sub [context server-key]
+  (let [
         battles (fx/sub-val context get-in [:by-server server-key :battles])
-        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
-        friends (fx/sub-val context get-in [:by-server server-key :friends])
         battles-by-users (->> battles
                               vals
                               (mapcat
@@ -32,11 +26,13 @@
                                     (fn [[username _status]]
                                       [username battle])
                                     (:users battle))))
-                              (into {}))
-        battle-password (fx/sub-val context :battle-password)
-        battles (fx/sub-val context get-in [:by-server server-key :battles])
-        now (or (fx/sub-val context :now) (u/curr-millis))
-        users-by-username users
+                              (into {}))]
+    battles-by-users))
+
+(defn users-sub [context server-key users-by-username]
+  (let [
+        hide-users-bots (fx/sub-val context :hide-users-bots)
+        friends (fx/sub-val context get-in [:by-server server-key :friends])
         users (->> users-by-username
                    vals
                    (filter :username)
@@ -46,9 +42,28 @@
                          (not (:bot client-status))
                          true)))
                    (map (fn [{:keys [username] :as user}]
-                          (assoc-in user [:client-status :friend] (contains? friends username)))))
+                          (assoc-in user [:client-status :friend] (contains? friends username)))))]
+    users))
+
+(defn sorted-users-sub [_context users]
+  (let [
         sorted-users (->> users
                           (sort-by (juxt (comp not :friend :client-status) (comp string/lower-case :username))))]
+    sorted-users))
+
+(defn users-table-impl
+  [{:fx/keys [context]
+    :keys [users server-key]}]
+  (let [ignore-users (fx/sub-val context :ignore-users)
+        my-battle (fx/sub-val context get-in [:by-server server-key :battle])
+        client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        friends (fx/sub-val context get-in [:by-server server-key :friends])
+        battles-by-users (fx/sub-ctx context battles-by-users-sub server-key)
+        battle-password (fx/sub-val context :battle-password)
+        battles (fx/sub-val context get-in [:by-server server-key :battles])
+        now (or (fx/sub-val context :now) (u/curr-millis))
+        users (fx/sub-ctx context users-sub server-key users)
+        sorted-users (fx/sub-ctx context sorted-users-sub users)]
     {:fx/type ext-table-column-auto-size
      :items sorted-users
      :desc
@@ -229,15 +244,9 @@
       (users-table-impl state))))
 
 
-(defn users-view-impl
-  [{:fx/keys [context]
-    :keys [server-key]}]
+(defn filtered-users-sub [context server-key]
   (let [filter-users (fx/sub-val context :filter-users)
-        hide-users-bots (fx/sub-val context :hide-users-bots)
         users (fx/sub-val context get-in [:by-server server-key :users])
-        bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
-        bot-count (count (get bot-or-human true))
-        human-count (count (get bot-or-human false))
         filter-lc (when-not (string/blank? filter-users)
                     (string/lower-case filter-users))
         filtered-users (->> users
@@ -249,6 +258,18 @@
                                       (and (not (string/blank? user-agent))
                                            (string/includes? (string/lower-case user-agent) filter-lc)))
                                   true))))]
+    filtered-users))
+
+(defn users-view-impl
+  [{:fx/keys [context]
+    :keys [server-key]}]
+  (let [filter-users (fx/sub-val context :filter-users)
+        hide-users-bots (fx/sub-val context :hide-users-bots)
+        users (fx/sub-val context get-in [:by-server server-key :users])
+        bot-or-human (group-by (comp boolean :bot :client-status) (vals users))
+        bot-count (count (get bot-or-human true))
+        human-count (count (get bot-or-human false))
+        filtered-users (fx/sub-ctx context filtered-users-sub server-key)]
     {:fx/type :v-box
      :style {:-fx-min-width 470
              :-fx-min-height 128}

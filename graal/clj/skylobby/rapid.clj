@@ -220,6 +220,7 @@
      (merge
        {::fs/source :rapid
         :file f
+        :path (fs/canonical-path f)
         :modinfo modinfo}
        (when-not modinfo-only
          (when modinfo

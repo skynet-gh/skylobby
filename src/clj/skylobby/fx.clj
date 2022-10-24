@@ -241,7 +241,7 @@
 
 (defn tasks-of-type-sub [context task-type]
   (->> (fx/sub-ctx context all-tasks-sub)
-       (filter (comp #{task-type} :spring-lobby/task-type))))
+       (filterv (comp #{task-type} :spring-lobby/task-type))))
 
 (defn valid-servers-sub [context]
   (u/valid-servers (fx/sub-val context :by-server)))

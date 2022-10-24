@@ -190,22 +190,23 @@
                                           :selected-battle battle-id
                                           :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}]
                             (when (-> users (get host-username) :client-status :bot)
-                              (concat
-                                [{:fx/type :menu-item
-                                  :text "!status battle"
-                                  :on-action {:event/type :spring-lobby/send-message
-                                              :client-data client-data
-                                              :channel-name (u/user-channel-name host-username)
-                                              :message "!status battle"
-                                              :server-key server-key}}]
-                                (when (-> users (get host-username) :client-status :ingame)
+                              (let [user-channel-name (u/user-channel-name host-username)]
+                                (concat
                                   [{:fx/type :menu-item
-                                    :text "!status game"
+                                    :text "!status battle"
                                     :on-action {:event/type :spring-lobby/send-message
                                                 :client-data client-data
-                                                :channel-name (u/user-channel-name host-username)
-                                                :message "!status game"
-                                                :server-key server-key}}])))
+                                                :channel-name user-channel-name
+                                                :message "!status battle"
+                                                :server-key server-key}}]
+                                  (when (-> users (get host-username) :client-status :ingame)
+                                    [{:fx/type :menu-item
+                                      :text "!status game"
+                                      :on-action {:event/type :spring-lobby/send-message
+                                                  :client-data client-data
+                                                  :channel-name user-channel-name
+                                                  :message "!status game"
+                                                  :server-key server-key}}]))))
                             [{:fx/type :menu-item
                               :text (str "Battle ID: " battle-id)}])}}))}
          :columns
@@ -495,22 +496,23 @@
                                :selected-battle battle-id
                                :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))}}]
                  (when (-> users (get host-username) :client-status :bot)
-                   (concat
-                     [{:fx/type :menu-item
-                       :text "!status battle"
-                       :on-action {:event/type :spring-lobby/send-message
-                                   :client-data client-data
-                                   :channel-name (u/user-channel-name host-username)
-                                   :message "!status battle"
-                                   :server-key server-key}}]
-                     (when (-> users (get host-username) :client-status :ingame)
+                   (let [user-channel-name (u/user-channel-name host-username)]
+                     (concat
                        [{:fx/type :menu-item
-                         :text "!status game"
+                         :text "!status battle"
                          :on-action {:event/type :spring-lobby/send-message
                                      :client-data client-data
-                                     :channel-name (u/user-channel-name host-username)
-                                     :message "!status game"
-                                     :server-key server-key}}])))
+                                     :channel-name user-channel-name
+                                     :message "!status battle"
+                                     :server-key server-key}}]
+                       (when (-> users (get host-username) :client-status :ingame)
+                         [{:fx/type :menu-item
+                           :text "!status game"
+                           :on-action {:event/type :spring-lobby/send-message
+                                       :client-data client-data
+                                       :channel-name user-channel-name
+                                       :message "!status game"
+                                       :server-key server-key}}]))))
                  [{:fx/type :menu-item
                    :text (str "Battle ID: " battle-id)}])}}))}
         :columns

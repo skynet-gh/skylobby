@@ -11,7 +11,8 @@
     [skylobby.spring.script :as spring-script]
     [skylobby.util :as u]
     [taoensso.nippy :as nippy]
-    [taoensso.timbre :as log])
+    [taoensso.timbre :as log]
+    [taoensso.tufte :as tufte])
   (:import
     (java.io ByteArrayOutputStream File FileOutputStream OutputStream RandomAccessFile)
     (java.nio.file CopyOption Files Path StandardCopyOption)
@@ -56,20 +57,26 @@
 
 
 (defn canonical-path [^File f]
-  (when f
-    (try
-      (.getCanonicalPath f)
-      (catch Exception e
-        (log/trace e "Error getting canonical path for" f)))))
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/fs}
+    (tufte/p :canonical-path
+      (when f
+        (try
+          (.getCanonicalPath f)
+          (catch Exception e
+            (log/warn e "Error getting canonical path for" (pr-str f))))))))
 
 (defn file
   ^File
   [^File f & args]
-  (when f
-    (try
-      (apply io/file f args)
-      (catch Exception e
-        (log/warn e "Error creating file from" f "and" args)))))
+  (tufte/profile {:dynamic? true
+                  :id :skylobby/fs}
+    (tufte/p :file
+      (when f
+        (try
+          (apply io/file f args)
+          (catch Exception e
+            (log/warn e "Error creating file from" f "and" args)))))))
 
 (defn join
   ^String
@@ -1129,7 +1136,8 @@
    (let [filename (filename file)]
      (log/info "Loading map" file)
      (merge
-       {:file file}
+       {:file file
+        :path (canonical-path file)}
        (try
          (cond
            (and (is-file? file) (string/ends-with? filename ".sdz"))
@@ -1186,6 +1194,7 @@
                                   (log/warn "Error loading" filename "from" file))))]
        (merge
          {:file file
+          :path (canonical-path file)
           :modinfo (try-entry-lua "modinfo.lua")
           ::source :archive}
          (when-not modinfo-only
@@ -1254,6 +1263,7 @@
                                     (log/warn "Error loading" filename "from" file))))]
          (merge
            {:file file
+            :path (canonical-path file)
             :modinfo (try-entry-lua "modinfo.lua")
             ::source :archive}
            (when-not modinfo-only
@@ -1281,6 +1291,7 @@
                             (log/warn "Error loading" filename "from" file))))]
      (merge
        {:file file
+        :path (canonical-path file)
         :modinfo (try-file-lua "modinfo.lua")
         :git-commit-id (try
                          (git/latest-id file)
@@ -1360,7 +1371,8 @@
 
 (defn engine-data [^File engine-dir]
   (merge
-    {:file engine-dir}
+    {:file engine-dir
+     :path (canonical-path engine-dir)}
     (try
       (if-let [sync-version (sync-version engine-dir)]
         {
