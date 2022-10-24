@@ -14,6 +14,28 @@
 (set! *warn-on-reflection* true)
 
 
+(defn download-tasks-sub [context]
+  (let [
+        download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
+                            (map (comp :download-url :downloadable))
+                            set)]
+    download-tasks))
+
+(defn extract-tasks-sub [context]
+  (let [
+        extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
+                           (mapcat (juxt :file :dest))
+                           (map fs/canonical-path)
+                           set)]
+    extract-tasks))
+
+(defn download-source-update-tasks-sub [context]
+  (let [
+        download-source-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
+                                          (map :download-source-name)
+                                          set)]
+    download-source-update-tasks))
+
 (defn engine-sync-pane-impl
   [{:fx/keys [context]
     :keys [engine-version spring-isolation-dir]}]
@@ -26,16 +48,9 @@
         http-download (fx/sub-val context :file-cache)
         springfiles-search-results (fx/sub-val context :springfiles-search-results)
         engine-update-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/refresh-engines)
-        download-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
-                            (map (comp :download-url :downloadable))
-                            set)
-        extract-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/extract-7z)
-                           (mapcat (juxt :file :dest))
-                           (map fs/canonical-path)
-                           set)
-        download-source-update-tasks (->> (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/update-downloadables)
-                                          (map :download-source-name)
-                                          set)
+        download-tasks (fx/sub-ctx context download-tasks-sub)
+        extract-tasks (fx/sub-ctx context extract-tasks-sub)
+        download-source-update-tasks (fx/sub-ctx context download-source-update-tasks-sub)
         refresh-in-progress (seq engine-update-tasks)]
     {:fx/type sync-pane
      :h-box/margin 8

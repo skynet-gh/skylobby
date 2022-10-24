@@ -292,6 +292,75 @@
       {:fx/type :pane})))
 
 
+(defn sorted-replays-sub [context]
+  (let [
+        filter-host-replay (fx/sub-val context :filter-host-replay)
+        parsed-replays-by-path (fx/sub-val context :parsed-replays-by-path)
+        filter-replay-lc (if filter-host-replay
+                           (string/lower-case filter-host-replay)
+                           "")]
+    (->> parsed-replays-by-path
+         (filter (comp :filename second))
+         (filter (comp #(string/includes? (string/lower-case %) filter-replay-lc)
+                       :filename
+                       second))
+         (sort-by (comp :filename second))
+         reverse
+         (mapv first))))
+
+(defn bots-sub [context server-key battle-id spring-root]
+  (let [
+        engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
+        engine-details (fx/sub-ctx context sub/indexed-engine spring-root engine-version)
+        engine-bots (:engine-bots engine-details)
+        mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
+        indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
+        battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
+        bots (concat engine-bots
+                     (->> battle-mod-details :luaai
+                          (map second)
+                          (map (fn [ai]
+                                 {:bot-name (:name ai)
+                                  :bot-version "<game>"}))
+                          doall))
+        bots (if-let [valid-ais (:validais battle-mod-details)]
+               (let [
+                     valid-name-patterns (->> valid-ais
+                                              vals
+                                              (map :name)
+                                              (map
+                                                (fn [n]
+                                                  (try
+                                                    (re-pattern n)
+                                                    (catch Exception e
+                                                      (log/error e "Error parsing validAI pattern" n)))))
+                                              (filter some?))]
+                 (filterv
+                   (fn [{:keys [bot-name]}]
+                     (and bot-name
+                          (some #(re-find % bot-name) valid-name-patterns)))
+                   bots))
+               bots)]
+    bots))
+
+(defn sorted-bot-names-sub [context server-key battle-id spring-root]
+  (let [
+        bots (fx/sub-ctx context bots-sub server-key battle-id spring-root)
+        bot-names (map :bot-name bots)
+        sorted-bot-names (sort bot-names)]
+    sorted-bot-names))
+
+(defn bot-versions-sub [context server-key battle-id spring-root]
+  (let [
+        bots (fx/sub-ctx context bots-sub server-key battle-id spring-root)
+        bot-names (map :bot-name bots)
+        bot-name (fx/sub-val context :bot-name)
+        bot-name (some #{bot-name} bot-names)
+        bot-versions (map :bot-version
+                          (get (group-by :bot-name bots)
+                               bot-name))]
+    bot-versions))
+
 (defn battle-buttons
   [{:fx/keys [context]
     :keys [server-key my-player team-counts team-skills]}]
@@ -314,9 +383,7 @@
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         battles (fx/sub-val context get-in [:by-server server-key :battles])
         users (fx/sub-val context get-in [:by-server server-key :users])
-        filter-host-replay (fx/sub-val context :filter-host-replay)
         interleave-ally-player-ids (fx/sub-val context :interleave-ally-player-ids)
-        parsed-replays-by-path (fx/sub-val context :parsed-replays-by-path)
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         show-team-skills (fx/sub-val context :show-team-skills)
         spring-root (fx/sub-ctx context sub/spring-root server-key)
@@ -324,44 +391,16 @@
         spring-starting (fx/sub-val context get-in [:spring-starting server-key battle-id])
         spring-running (fx/sub-val context get-in [:spring-running server-key battle-id])
         scripttags (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
-        engine-version (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-version])
-        engine-details (fx/sub-ctx context sub/indexed-engine spring-root engine-version)
         mod-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname])
         map-name (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-map])
         indexed-map (fx/sub-ctx context sub/indexed-map spring-root map-name)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
-        engine-bots (:engine-bots engine-details)
         battle-map-details (fx/sub-ctx context skylobby.fx/map-details-sub indexed-map)
         battle-mod-details (fx/sub-ctx context skylobby.fx/mod-details-sub indexed-mod)
-        bots (concat engine-bots
-                     (->> battle-mod-details :luaai
-                          (map second)
-                          (map (fn [ai]
-                                 {:bot-name (:name ai)
-                                  :bot-version "<game>"}))))
-        bots (if-let [valid-ais (:validais battle-mod-details)]
-               (let [
-                     valid-name-patterns (->> valid-ais
-                                              vals
-                                              (map :name)
-                                              (map
-                                                (fn [n]
-                                                  (try
-                                                    (re-pattern n)
-                                                    (catch Exception e
-                                                      (log/error e "Error parsing validAI pattern" n)))))
-                                              (filter some?))]
-                 (filterv
-                   (fn [{:keys [bot-name]}]
-                     (and bot-name
-                          (some #(re-find % bot-name) valid-name-patterns)))
-                   bots))
-               bots)
+        bots (fx/sub-ctx context bots-sub server-key battle-id spring-root)
         bot-names (map :bot-name bots)
         bot-name (some #{bot-name} bot-names)
-        bot-versions (map :bot-version
-                          (get (group-by :bot-name bots)
-                               bot-name))
+        bot-versions (fx/sub-ctx context bot-versions-sub server-key battle-id spring-root)
         bot-version (some #{bot-version} bot-versions)
         sides (spring/mod-sides battle-mod-details)
         am-host (fx/sub-ctx context sub/am-host server-key)
@@ -583,7 +622,7 @@
                                                           :disable (empty? bot-names)
                                                           :on-value-changed {:event/type :spring-lobby/change-bot-name
                                                                              :bots bots}
-                                                          :items (sort bot-names)}]}
+                                                          :items (fx/sub-ctx context sorted-bot-names-sub server-key battle-id spring-root)}]}
                                                        {:fx/type :h-box
                                                         :alignment :center-left
                                                         :children
@@ -640,29 +679,19 @@
              (when (and am-host
                         (not singleplayer)
                         (not direct-connect))
-               (let [filter-replay-lc (if filter-host-replay
-                                        (string/lower-case filter-host-replay)
-                                        "")]
-                 [{:fx/type :label
-                   :text " Replay: "}
-                  {:fx/type :combo-box
-                   :prompt-text " < host a replay > "
-                   :style {:-fx-max-width 300}
-                   :value (get-in scripttags ["game" "demofile"])
-                   :on-value-changed {:event/type :spring-lobby/assoc-in
-                                      :path [:by-server server-key :battle :scripttags "game" "demofile"]}
-                   :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
-                   :on-hidden {:event/type :spring-lobby/dissoc
-                               :key :filter-host-replay}
-                   :items (->> parsed-replays-by-path
-                               (filter (comp :filename second))
-                               (filter (comp #(string/includes? (string/lower-case %) filter-replay-lc)
-                                             :filename
-                                             second))
-                               (sort-by (comp :filename second))
-                               reverse
-                               (mapv first))
-                   :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}]))
+               [{:fx/type :label
+                 :text " Replay: "}
+                {:fx/type :combo-box
+                 :prompt-text " < host a replay > "
+                 :style {:-fx-max-width 300}
+                 :value (get-in scripttags ["game" "demofile"])
+                 :on-value-changed {:event/type :spring-lobby/assoc-in
+                                    :path [:by-server server-key :battle :scripttags "game" "demofile"]}
+                 :on-key-pressed {:event/type :spring-lobby/host-replay-key-pressed}
+                 :on-hidden {:event/type :spring-lobby/dissoc
+                             :key :filter-host-replay}
+                 :items (fx/sub-ctx context sorted-replays-sub)
+                 :button-cell (fn [path] {:text (str (some-> path io/file fs/filename))})}])
              (when (get-in scripttags ["game" "demofile"])
                [{:fx/type :button
                  :on-action {:event/type :spring-lobby/dissoc-in
@@ -1793,18 +1822,9 @@
       (:bots battle))))
 
 
-(defn battle-view-impl
-  [{:fx/keys [context]
-    :keys [battle-id server-key]}]
+(defn players-sub [context server-key battle-id]
   (let [
-        battle-layout (fx/sub-val context :battle-layout)
-        divider-positions (fx/sub-val context :divider-positions)
-        pop-out-chat (fx/sub-val context :pop-out-chat)
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
-        battle-id (or battle-id
-                      (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
-        scripttags (or (:scripttags old-battle)
-                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
         battle-users (or (:users old-battle)
                          (fx/sub-val context get-in [:by-server server-key :battle :users]))
         battle-bots (or (:bots old-battle)
@@ -1813,16 +1833,34 @@
                   {:users (fx/sub-val context get-in [:by-server server-key :users])
                    :battle
                    {:bots battle-bots
-                    :users battle-users}})
+                    :users battle-users}})]
+    players))
+
+(defn my-player-sub [context server-key battle-id]
+  (let [
         username (fx/sub-val context get-in [:by-server server-key :username])
+        players (fx/sub-ctx context players-sub server-key battle-id)
         my-player (->> players
                        (filter (comp #{username} :username))
-                       first)
+                       first)]
+    my-player))
+
+(defn team-counts-sub [context server-key battle-id]
+  (let [
+        players (fx/sub-ctx context players-sub server-key battle-id)
         team-counts (->> players
                          (filter (comp :mode :battle-status))
                          (group-by (comp :ally :battle-status))
                          (sort-by first)
-                         (map (comp count second)))
+                         (map (comp count second)))]
+    team-counts))
+
+(defn team-skills-sub [context server-key battle-id]
+  (let [
+        old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
+        scripttags (or (:scripttags old-battle)
+                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
+        players (fx/sub-ctx context players-sub server-key battle-id)
         team-skills (->> players
                          (filter (comp :mode :battle-status))
                          (group-by (comp :ally :battle-status))
@@ -1838,7 +1876,25 @@
                                                           u/parse-skill
                                                           u/round)]
                                         skill))
-                                    players)))))
+                                    players)))))]
+    team-skills))
+
+(defn battle-view-impl
+  [{:fx/keys [context]
+    :keys [battle-id server-key]}]
+  (let [
+        battle-layout (fx/sub-val context :battle-layout)
+        divider-positions (fx/sub-val context :divider-positions)
+        pop-out-chat (fx/sub-val context :pop-out-chat)
+        old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
+        battle-id (or battle-id
+                      (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
+        battle-users (or (:users old-battle)
+                         (fx/sub-val context get-in [:by-server server-key :battle :users]))
+        players (fx/sub-ctx context players-sub server-key battle-id)
+        my-player (fx/sub-ctx context my-player-sub server-key battle-id)
+        team-counts (fx/sub-ctx context team-counts-sub server-key battle-id)
+        team-skills (fx/sub-ctx context team-skills-sub server-key battle-id)
         players-table {:fx/type players-table
                        :server-key server-key
                        :v-box/vgrow :always

@@ -354,6 +354,7 @@
      :battle-layout "horizontal"
      :battles-layout "horizontal"
      :battle-players-color-type "player"
+     :battle-players-display-type "group"
      :battle-resource-details true
      :chat-auto-complete false
      :chat-color-username true

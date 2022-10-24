@@ -141,7 +141,7 @@
     (merge (:users battle) (:bots battle))))
 
 (defn teams [battle]
-  (map
+  (mapv
     (comp first second)
     (group-by (comp :id :battle-status second)
       (players-and-bots battle))))
