@@ -1,4 +1,5 @@
-{:linters
+{:lint-as {com.fulcrologic.fulcro.components/defsc clojure.core/defn}
+ :linters
  {:unresolved-symbol
   {:exclude [(diehard.core/defratelimiter)
              (taoensso.nippy/extend-freeze)
@@ -22,7 +23,7 @@
   :single-key-in {:level :warn}
   :shadowed-var {:level :info}
   :used-underscored-binding {:level :warn}
-  :unused-value {:level :info}
+  :unused-value {:level :warn}
   :unsorted-required-namespaces {:level :warn}}
  :output
  {
