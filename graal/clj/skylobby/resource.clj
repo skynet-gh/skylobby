@@ -296,7 +296,8 @@
            (seq engine-details)))))
 
 (defn spring-root-resources [spring-root by-spring-root]
-  (let [spring-root-data (get by-spring-root (fs/canonical-path spring-root))
+  (let [spring-root-path (fs/canonical-path spring-root)
+        spring-root-data (get by-spring-root spring-root-path)
         {:keys [engine-version engines map-name maps mod-name mods]} spring-root-data
         maps (filter :map-name maps)
         mods (filter :mod-name mods)
@@ -312,6 +313,7 @@
                           (merge git-mods))
         mods-by-name-only (group-by :mod-name-only mods)]
     {:spring-isolation-dir spring-root
+     :spring-root-path spring-root-path
      :engine-version engine-version
      :engines engines
      :engines-by-version (into {} (map (juxt :engine-version identity) engines))

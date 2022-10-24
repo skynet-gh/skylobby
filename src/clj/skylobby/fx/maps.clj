@@ -38,19 +38,27 @@
   (take 6 (iterate inc 0)))
 
 
+(defn spring-root-path-sub [_context spring-isolation-dir]
+  (fs/canonical-path spring-isolation-dir))
+
+(defn dice-icon-sub [context]
+  (let [
+        now (or (fx/sub-val context :now) 0)
+        dice-icon (str "mdi-dice-" (inc (nth dice-options (mod now (count dice-options)))) ":16:white")]
+    dice-icon))
+
 (defn maps-view-impl
   [{:fx/keys [context]
     :keys [action-disable-rotate disable flow map-name on-value-changed spring-isolation-dir suggest text-only]
     :or {flow true}}]
   (let [
-        {:keys [maps maps-by-name]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
+        {:keys [maps maps-by-name spring-root-path]} (fx/sub-ctx context sub/spring-resources spring-isolation-dir)
         selected-map (:file (get maps-by-name map-name))
         selected-map-file (:file selected-map)
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
-                              :path [:by-spring-root (fs/canonical-path spring-isolation-dir) :map-name]})
-        now (or (fx/sub-val context :now) 0)
-        dice-icon (str "mdi-dice-" (inc (nth dice-options (mod now (count dice-options)))) ":16:white")]
+                              :path [:by-spring-root spring-root-path :map-name]})
+        dice-icon (fx/sub-ctx context dice-icon-sub)]
     (merge
       {:fx/type (if flow :flow-pane :h-box)}
       (when-not flow {:alignment :center-left})

@@ -21,6 +21,16 @@
   ["104.0.1-1828-g1f481b7 BAR"])
 
 
+(defn selected-engine-file-sub [context spring-isolation-dir engine-version]
+  (let [
+        spring-root-path (fs/canonical-path spring-isolation-dir)
+        engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
+        indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
+        engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
+                           (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version))
+        selected-engine-file (:file engine-details)]
+    selected-engine-file))
+
 (defn engines-view-impl
   [{:fx/keys [context]
     :keys [engine-version flow on-value-changed spring-isolation-dir suggest]
@@ -31,13 +41,10 @@
         on-value-changed (or on-value-changed
                              {:event/type :spring-lobby/assoc-in
                               :path [:by-spring-root spring-root-path :engine-version]})
-        engine-override (fs/canonical-path (fx/sub-val context get-in [:engine-overrides spring-root-path engine-version]))
         indexed-engines (fx/sub-ctx context sub/indexed-engines spring-isolation-dir engine-version)
-        engine-details (or (first (filter (comp #{engine-override} fs/canonical-path :file) indexed-engines))
-                           (fx/sub-ctx context sub/indexed-engine spring-isolation-dir engine-version))
         http-download (fx/sub-val context :http-download)
         http-download-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/download-and-extract)
-        selected-engine-file (:file engine-details)]
+        selected-engine-file (fx/sub-ctx context selected-engine-file-sub spring-isolation-dir engine-version)]
     {:fx/type :v-box
      :children
      (concat
