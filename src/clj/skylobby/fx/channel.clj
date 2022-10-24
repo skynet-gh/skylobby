@@ -195,10 +195,30 @@
         ^javafx.scene.Parent root (.getRoot scene)]
     (first (.lookupAll root area-id-css))))
 
+(defn visible-messages-sub [context server-key channel-name]
+  (let [hide-barmanager-messages (fx/sub-val context :hide-barmanager-messages)
+        hide-joinas-spec (fx/sub-val context :hide-joinas-spec)
+        hide-spads-set (fx/sub-ctx context sub/hide-spads-set)
+        hide-vote-messages (fx/sub-val context :hide-vote-messages)
+        ignore-users-set (fx/sub-ctx context sub/ignore-users-set server-key)
+        filter-fn (partial chat/visible-message?
+                    {
+                     :hide-barmanager-messages hide-barmanager-messages
+                     :hide-joinas-spec hide-joinas-spec
+                     :hide-spads-set hide-spads-set
+                     :hide-vote-messages hide-vote-messages
+                     :ignore-users-set ignore-users-set})
+        messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])]
+    (->> messages
+         (filter filter-fn)
+         reverse
+         doall)))
+
+
 (defn channel-view-history-impl
   [{:fx/keys [context]
     :keys [channel-name server-key]}]
-  (let [messages (fx/sub-val context get-in [:by-server server-key :channels channel-name :messages])
+  (let [
         username (fx/sub-val context get-in [:by-server server-key :username])
         chat-auto-scroll (fx/sub-val context :chat-auto-scroll)
         chat-font-size (fx/sub-val context :chat-font-size)
@@ -213,22 +233,14 @@
         area-id (str "channel-text-area" channel-name "-" server-key)
         area-id (string/replace area-id #"[^_a-zA-Z0-9-]" "")
         area-id-css (str "#" area-id)
-        filter-fn (partial chat/visible-message?
-                    {
-                     :hide-barmanager-messages hide-barmanager-messages
-                     :hide-joinas-spec hide-joinas-spec
-                     :hide-spads-set hide-spads-set
-                     :hide-vote-messages hide-vote-messages
-                     :ignore-users-set ignore-users-set})
-        messages (->> messages
-                      (filter filter-fn)
-                      reverse)]
+        messages (fx/sub-ctx context visible-messages-sub server-key channel-name)]
     {:fx/type ext-recreate-on-key-changed
      :key {:ignore ignore-users-set
            :joinas-spec hide-joinas-spec
            :server-key server-key
            :spads hide-spads-set
-           :vote hide-vote-messages}
+           :vote hide-vote-messages
+           :hide-barmanager hide-barmanager-messages}
      :desc
      {:fx/type ext-scroll-on-create
       :desc

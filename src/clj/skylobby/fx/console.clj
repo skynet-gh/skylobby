@@ -71,6 +71,36 @@
         []))
     (.build builder)))
 
+
+(defn message-types-sub [context server-key]
+  (let [
+        console-log (fx/sub-val context get-in [:by-server server-key :console-log])
+        message-types (->> console-log
+                           (map :message-type)
+                           (filter some?)
+                           set
+                           sort
+                           doall)]
+    message-types))
+
+(defn console-log-sub [context server-key]
+  (let [
+        console-log (fx/sub-val context get-in [:by-server server-key :console-log])
+        console-ignore-message-types (or (fx/sub-val context :console-ignore-message-types)
+                                         {})]
+    (->> console-log
+         (remove
+           (fn [{:keys [message-type]}]
+             (get console-ignore-message-types message-type)))
+         doall)))
+
+(defn active-console-ignore-message-types-sub [context]
+  (let [
+        console-ignore-message-types (or (fx/sub-val context :console-ignore-message-types)
+                                         {})]
+    (set (map first (filter second console-ignore-message-types)))))
+
+
 (defn console-view-impl
   [{:fx/keys [context]
     :keys [server-key]}]
@@ -82,27 +112,19 @@
        (let [
              client-data (fx/sub-val context get-in [:by-server server-key :client-data])
              console-auto-scroll (fx/sub-val context :console-auto-scroll)
-             console-log (fx/sub-val context get-in [:by-server server-key :console-log])
              console-message-draft (fx/sub-val context get-in [:by-server server-key :console-message-draft])
              console-history-index (fx/sub-val context get-in [:by-server server-key :console-history-index])
              console-ignore-message-types (or (fx/sub-val context :console-ignore-message-types)
                                               {})
-             message-types (->> console-log
-                                (map :message-type)
-                                (filter some?)
-                                set
-                                sort)
-             console-log (remove
-                           (fn [{:keys [message-type]}]
-                             (get console-ignore-message-types message-type))
-                           console-log)]
+             message-types (fx/sub-ctx context message-types-sub server-key)
+             console-log (fx/sub-ctx context console-log-sub server-key)]
          [{:fx/type :v-box
            :h-box/hgrow :always
            :children
            [
             {:fx/type ext-recreate-on-key-changed
              :key {:server-key server-key
-                   :ignore (set (map first (filter second console-ignore-message-types)))}
+                   :ignore (fx/sub-ctx context active-console-ignore-message-types-sub)}
              :v-box/vgrow :always
              :desc
              {:fx/type ext-scroll-on-create
