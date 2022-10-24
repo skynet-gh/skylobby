@@ -53,7 +53,7 @@ jobs:
         shell: powershell
       - run: compress-archive -path ".\*.dll","skylobby.exe" "skylobby-windows.zip" -compressionlevel optimal
         shell: powershell
-      - uses: actions/upload-artifact@v3.1.0
+      - uses: actions/upload-artifact@v3.1.1
         with:
           name: skylobby-windows.zip
           path: skylobby-windows.zip
@@ -91,7 +91,7 @@ jobs:
       - run: npm install
       - run: clojure -M:cljs compile frontend
       - run: clojure -M:graal-deps:native-mac
-      - uses: actions/upload-artifact@v3.1.0
+      - uses: actions/upload-artifact@v3.1.1
         with:
           name: skylobby-mac
           path: skylobby
@@ -121,7 +121,7 @@ jobs:
       - run: npm install
       - run: clojure -M:cljs compile frontend
       - run: clojure -M:graal-deps:native-linux
-      - uses: actions/upload-artifact@v3.1.0
+      - uses: actions/upload-artifact@v3.1.1
         with:
           name: skylobby-linux
           path: skylobby
