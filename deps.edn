@@ -152,7 +152,7 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.3"}
-    lambdaisland/kaocha {:mvn/version "1.70.1086"}}
+    lambdaisland/kaocha {:mvn/version "1.71.1119"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :build
   {:deps
@@ -427,7 +427,7 @@
    :extra-deps
    {
     io.aviso/pretty {:mvn/version "1.3"}
-    lambdaisland/kaocha {:mvn/version "1.70.1086"}}
+    lambdaisland/kaocha {:mvn/version "1.71.1119"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "test/clj"]}
