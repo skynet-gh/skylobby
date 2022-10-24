@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.18](https://github.com/skynet-gh/skylobby/releases/tag/0.9.18) - 2022-10-24
+
+- More UI performance improvements
+
 ## [0.9.17](https://github.com/skynet-gh/skylobby/releases/tag/0.9.17) - 2022-10-24
 
 - Fix UI cache update causing various issues with replay close button, add AI, etc.
