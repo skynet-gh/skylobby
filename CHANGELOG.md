@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.16](https://github.com/skynet-gh/skylobby/releases/tag/0.9.16) - 2022-10-24
+
+- Attempt to make default window position better
+- Fix more UI performance issues
+
 ## [0.9.15](https://github.com/skynet-gh/skylobby/releases/tag/0.9.15) - 2022-10-24
 
 - Fix more UI performance issues
