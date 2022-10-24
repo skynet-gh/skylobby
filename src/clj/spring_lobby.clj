@@ -440,7 +440,7 @@
                       :id ::state-watcher}
         (tufte/p :ui-state
           (when (not= old-state new-state)
-            (swap! ui-state-atom fx/swap-context merge new-state)))))))
+            (swap! ui-state-atom fx/reset-context new-state)))))))
 
 
 (def ^:dynamic disable-update-check false)
