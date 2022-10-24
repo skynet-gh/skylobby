@@ -415,7 +415,7 @@
   (atom {} :validator map?))
 
 
-(def ui-cache-size 128)
+(def ui-cache-size 1024)
 
 (def ^:dynamic *ui-state
   (atom
@@ -440,7 +440,7 @@
                       :id ::state-watcher}
         (tufte/p :ui-state
           (when (not= old-state new-state)
-            (swap! ui-state-atom fx/reset-context new-state)))))))
+            (swap! ui-state-atom fx/swap-context merge new-state)))))))
 
 
 (def ^:dynamic disable-update-check false)
