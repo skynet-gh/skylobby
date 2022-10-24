@@ -107,7 +107,7 @@
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
         ring-on-spec-change (fx/sub-val context :ring-on-spec-change)
-        ring-when-game-starts (fx/sub-val context :ring-when-game-ends)
+        ring-when-game-starts (fx/sub-val context :ring-when-game-starts)
         ring-when-game-ends (fx/sub-val context :ring-when-game-ends)
         show-accolades (fx/sub-val context :show-accolades)
         show-closed-battles (fx/sub-val context :show-closed-battles)
