@@ -1,16 +1,21 @@
 # Changelog
 
-## [0.9.16](https://github.com/skynet-gh/skylobby/releases/tag/0.9.16) - 2022-10-24
+## [0.9.17](https://github.com/skynet-gh/skylobby/releases/tag/0.9.17) - 2022-10-24
+
+- Fix UI cache update causing various issues with replay close button, add AI, etc.
+- Add skylobby-stream-fix which uses software rendering for the UI
+
+## [0.9.16](https://github.com/skynet-gh/skylobby/releases/tag/0.9.16) - 2022-10-23
 
 - Attempt to make default window position better
 - Fix more UI performance issues
 
-## [0.9.15](https://github.com/skynet-gh/skylobby/releases/tag/0.9.15) - 2022-10-24
+## [0.9.15](https://github.com/skynet-gh/skylobby/releases/tag/0.9.15) - 2022-10-23
 
 - Fix more UI performance issues
 - Fix display of ring when game starts setting
 
-## [0.9.14](https://github.com/skynet-gh/skylobby/releases/tag/0.9.14) - 2022-10-24
+## [0.9.14](https://github.com/skynet-gh/skylobby/releases/tag/0.9.14) - 2022-10-23
 
 - Attempt to fix window size issue
 - Make users table fixed size, split pane size was not saved
