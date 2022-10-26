@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.19](https://github.com/skynet-gh/skylobby/releases/tag/0.9.19) - 2022-10-25
+
+- Fix issue with battle players UI updates
+- Fix issue with spectating bots in singleplayer
+
 ## [0.9.18](https://github.com/skynet-gh/skylobby/releases/tag/0.9.18) - 2022-10-24
 
 - More UI performance improvements

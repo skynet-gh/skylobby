@@ -1810,16 +1810,17 @@
 (defn battle-players-and-bots
   "Returns the sequence of all players and bots for a battle."
   [{:keys [battle users]}]
-  (concat
-    (mapv
-      (fn [[k v]] (assoc v :username k :user (get users k)))
-      (:users battle))
-    (mapv
-      (fn [[k v]]
-        (assoc v
-               :bot-name k
-               :user {:client-status {:bot true}}))
-      (:bots battle))))
+  (doall
+    (concat
+      (mapv
+        (fn [[k v]] (assoc v :username k :user (get users k)))
+        (:users battle))
+      (mapv
+        (fn [[k v]]
+          (assoc v
+                 :bot-name k
+                 :user {:client-status {:bot true}}))
+        (:bots battle)))))
 
 
 (defn players-sub [context server-key battle-id]
