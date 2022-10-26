@@ -2631,13 +2631,10 @@
                  (or team-color "0")))
           (log/error (ex-info "stacktrace" {}) "Call to update-battle-status for non-bot non-me player" opts battle-status team-color)))
       (let [data {:battle-status battle-status
-                  :team-color team-color}]
-        (log/info "No client, assuming singleplayer")
-        (swap! *state
-               (fn [state]
-                 (-> state
-                     (update-in [:by-server :local :battles :singleplayer (if is-bot :bots :users) player-name] merge data)
-                     (update-in [:by-server :local :battle (if is-bot :bots :users) player-name] merge data))))))))
+                  :team-color team-color}
+            server-key (u/server-key client-data)]
+        (log/info "No client, assuming singleplayer for server id" server-key)
+        (swap! *state update-in [:by-server server-key :battle (if is-bot :bots :users) player-name] merge data)))))
 
 (defmethod event-handler ::update-battle-status
   [{:keys [client-data opts battle-status team-color]}]
@@ -3041,19 +3038,21 @@
         desired-ready (boolean ready-on-unspec)
         battle-status (if (and (not is-bot) mode)
                         (assoc battle-status :ready desired-ready)
-                        battle-status)]
-    (swap! *state assoc-in [:by-server server-key :battle (if is-bot :bots :users) (:username id) :battle-status :mode] mode)
+                        battle-status)
+        user-or-bot-name (or (:bot-name id) (:username id))]
+    (swap! *state assoc-in [:by-server server-key :battle (if is-bot :bots :users) user-or-bot-name :battle-status :mode] mode)
     (when (and is-me mode)
       (swap! *state assoc-in [:by-server server-key :battle :desired-ready] desired-ready))
-    (future
-      (try
-        (if (or is-me is-bot)
-          (update-battle-status client-data data battle-status (:team-color id))
-          (if mode
-            (message/send *state client-data (str "FORCESPECTATORMODE " (:username id)))
-            (log/error "No method to force unspec for" (:username id))))
-        (catch Exception e
-          (log/error e "Error updating battle spectate"))))))
+    (when-not (= :singleplayer (u/server-type server-key))
+      (future
+        (try
+          (if (or is-me is-bot)
+            (update-battle-status client-data data battle-status (:team-color id))
+            (if mode
+              (message/send *state client-data (str "FORCESPECTATORMODE " (:username id)))
+              (log/error "No method to force unspec for" (:username id))))
+          (catch Exception e
+            (log/error e "Error updating battle spectate")))))))
 
 (defmethod event-handler ::on-change-spectate [{:fx/keys [event] :keys [server-key] :as e}]
   (let [{:keys [by-server]} (swap! *state assoc-in [:by-server server-key :auto-unspec] false)
