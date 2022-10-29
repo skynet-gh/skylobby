@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.20](https://github.com/skynet-gh/skylobby/releases/tag/0.9.20) - 2022-10-29
+
+- Fix issue with battle bots UI updates
+
 ## [0.9.19](https://github.com/skynet-gh/skylobby/releases/tag/0.9.19) - 2022-10-25
 
 - Fix issue with battle players UI updates
