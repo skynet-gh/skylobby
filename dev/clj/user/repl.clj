@@ -8,8 +8,11 @@
     [nrepl.cmdline]
     [reply.main]
     [taoensso.timbre :as timbre]
-    [taoensso.timbre.appenders.3rd-party.rotor :as rotor]
+    [taoensso.timbre.appenders.community.rotor :as rotor]
     user))
+
+
+(set! *warn-on-reflection* true)
 
 
 (def ^:private dev-log-path "repl.log")
