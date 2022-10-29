@@ -296,10 +296,8 @@
         {:keys [broadcast-fn]} server]
     (broadcast-fn [::battle-scripttags (:scripttags battle)])))
 
-(defmethod chat-msg-handler "!start"
-  [state-atom server-key message]
-  (log/info "Request to start battle game" message)
-  ; TODO dedupe with client
+
+(defn start-game [state-atom server-key]
   (let [state @state-atom
         {:keys [by-server by-spring-root engine-overrides spring-isolation-dir]} state
         {:keys [battle battles username] :as server-data} (get by-server server-key)
@@ -324,6 +322,13 @@
               :engine-version :map-name :mod-name)))
         (catch Exception e
           (log/error e "Error starting game"))))))
+
+
+(defmethod chat-msg-handler "!start"
+  [state-atom server-key message]
+  (log/info "Request to start battle game" message)
+  ; TODO dedupe with client
+  (start-game state-atom server-key))
 
 (defmethod chat-msg-handler "!split"
   [state-atom server-key message]

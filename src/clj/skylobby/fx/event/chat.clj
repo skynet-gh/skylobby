@@ -1,6 +1,7 @@
 (ns skylobby.fx.event.chat
   (:require
     [clojure.string :as string]
+    [skylobby.chat.command :as chat-command]
     [skylobby.client.message :as message]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
@@ -102,6 +103,7 @@
                   (if is-battle-channel
                     (do
                       (swap! state-atom update-in messages-path conj chat-data)
+                      (chat-command/handle state-atom server-key message)
                       ((:broadcast-fn server) [:skylobby.direct/chat chat-data]))
                     (log/warn "TODO direct host send non-battle message:" message))
                   :direct-client

@@ -11,6 +11,7 @@
     [skylobby.client.message :as message]
     [skylobby.event.user :as event.user]
     [skylobby.fs :as fs]
+    [skylobby.spring.autohost :as autohost]
     [skylobby.task :as task]
     [skylobby.util :as u]
     [taoensso.timbre :as log]))
@@ -186,7 +187,7 @@
 
 (defn script-data-host
   "Given data for a battle, returns data that can be directly formatted to script.txt format for Spring."
-  ([battle {:keys [is-host map-details mod-details sides singleplayer] :as opts}]
+  ([battle {:keys [autohost-port is-host map-details mod-details sides singleplayer] :as opts}]
    (let [teams (teams battle)
          ally-teams (set
                       (map
@@ -257,6 +258,9 @@
         (into
           (merge
             {"ishost" (if is-host 1 0)}
+            (when autohost-port
+              {"AutohostIP" "127.0.0.1"
+               "AutohostPort" autohost-port})
             (when-let [gametype (if-let [modinfo (:modinfo mod-details)]
                                   (str (:name modinfo) " " (:version modinfo))
                                   (:battle-modname battle))]
@@ -351,10 +355,12 @@
        (map-indexed vector)
        (into {})))
 
-(defn battle-script-txt [{:keys [username battle-map-details battle-mod-details singleplayer] :as state}]
+(defn battle-script-txt [{:keys [autohost-port username battle-map-details battle-mod-details singleplayer] :as state}]
   (let [battle (battle-details state)
         script (script-data battle
-                 {:is-host (= username (:host-username battle))
+                 {
+                  :autohost-port autohost-port
+                  :is-host (= username (:host-username battle))
                   :game {"myplayername" username}
                   :map-details battle-map-details
                   :mod-details battle-mod-details
@@ -394,6 +400,12 @@
         server-key (or server-key
                        (u/server-key client-data))
         battle-id (-> state :battle :battle-id)
+        {:keys [autohost-close-fn autohost-port]} (try
+                                                    (if (#{:direct-host :singleplayer} (u/server-type server-key)) ; TODO other hosting
+                                                      (autohost/start-server state-atom server-key)
+                                                      (log/info "Skipping AutoHostInterface server for game on" server-key))
+                                                    (catch Exception e
+                                                      (log/error e "Error starting AutoHostInterface")))
         {:keys [debug-spring engine-overrides refresh-replays-after-game]}
         (swap! state-atom
           (fn [state]
@@ -429,6 +441,11 @@
         infologs-dir (fs/file spring-isolation-dir "infologs")
         infolog-dest (fs/file infologs-dir (str "infolog_" now ".txt"))
         post-game-fn (fn []
+                       (try
+                         (when (fn? autohost-close-fn)
+                           (autohost-close-fn))
+                         (catch Exception e
+                           (log/error e "Error closing autohost interface server on port" autohost-port)))
                        (try
                          (let [
                                infolog-src (fs/file spring-isolation-dir "infolog.txt")]
@@ -483,7 +500,7 @@
       (log/info "Creating game script")
       (let [{:keys [battle-version]} (battle-details state)
             engine-version (or engine-version battle-version)
-            script-txt (or script-txt (battle-script-txt state))
+            script-txt (or script-txt (battle-script-txt (assoc state :autohost-port autohost-port)))
             engine-dir (or (get-in engine-overrides [(fs/canonical-path spring-isolation-dir) engine-version])
                            (:file (get engines-by-version engine-version))
                            (some->> engines
@@ -514,9 +531,10 @@
             (let [^"[Ljava.lang.String;" cmdarray (into-array String command)
                   ^"[Ljava.lang.String;" envp (get-envp)
                   runtime (Runtime/getRuntime)
+                  _ (log/info "Running '" command "'")
                   process (.exec runtime cmdarray envp spring-isolation-dir)
                   pid (.pid process)]
-              (log/info "Running '" command "'")
+              (swap! state-atom assoc-in [:spring-process server-key battle-id] process)
               (async/thread
                 (with-open [^java.io.BufferedReader reader (io/reader (.getInputStream process))]
                   (loop []
