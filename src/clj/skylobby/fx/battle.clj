@@ -341,14 +341,14 @@
                           (some #(re-find % bot-name) valid-name-patterns)))
                    bots))
                bots)]
-    bots))
+    (doall bots)))
 
 (defn sorted-bot-names-sub [context server-key battle-id spring-root]
   (let [
         bots (fx/sub-ctx context bots-sub server-key battle-id spring-root)
         bot-names (map :bot-name bots)
         sorted-bot-names (sort bot-names)]
-    sorted-bot-names))
+    (doall sorted-bot-names)))
 
 (defn bot-versions-sub [context server-key battle-id spring-root]
   (let [
@@ -359,7 +359,7 @@
         bot-versions (map :bot-version
                           (get (group-by :bot-name bots)
                                bot-name))]
-    bot-versions))
+    (doall bot-versions)))
 
 (defn battle-buttons
   [{:fx/keys [context]
@@ -1854,7 +1854,7 @@
                          (group-by (comp :ally :battle-status))
                          (sort-by first)
                          (map (comp count second)))]
-    team-counts))
+    (doall team-counts)))
 
 (defn team-skills-sub [context server-key battle-id]
   (let [
@@ -1878,7 +1878,7 @@
                                                           u/round)]
                                         skill))
                                     players)))))]
-    team-skills))
+    (doall team-skills)))
 
 (defn battle-view-impl
   [{:fx/keys [context]
