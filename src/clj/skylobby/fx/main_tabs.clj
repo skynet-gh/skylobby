@@ -17,7 +17,7 @@
     [skylobby.fx.matchmaking :as fx.matchmaking]
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :as fx.mod-sync]
-    [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.user :as fx.user]
     [skylobby.spring :as spring]
     [skylobby.util :as u]
@@ -42,24 +42,32 @@
            (.requestFocus text-field)))))))
 
 
+(defn ignore-channels-set-sub [context server-key]
+  (let [
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
+    (->> ignore-users
+         (filter second)
+         (map first)
+         (map u/user-channel-name)
+         set)))
+
+(defn my-channel-names-sub [context server-key]
+  (let [
+        ignore-channels-set (fx/sub-ctx context ignore-channels-set-sub server-key)
+        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])]
+    (->> my-channels
+         keys
+         (remove u/battle-channel-name?)
+         (remove ignore-channels-set)
+         sort)))
+
 (defn my-channels-view-impl
   [{:fx/keys [context]
     :keys [server-key]}]
   (let [
         highlight-tabs-with-new-chat-messages (fx/sub-val context :highlight-tabs-with-new-chat-messages)
-        my-channels (fx/sub-val context get-in [:by-server server-key :my-channels])
         selected-tab-channel (fx/sub-val context get-in [:selected-tab-channel server-key])
-        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
-        ignore-channels-set (->> ignore-users
-                                 (filter second)
-                                 (map first)
-                                 (map u/user-channel-name)
-                                 set)
-        my-channel-names (->> my-channels
-                              keys
-                              (remove u/battle-channel-name?)
-                              (remove ignore-channels-set)
-                              sort)
+        my-channel-names (fx/sub-ctx context my-channel-names-sub server-key)
         selected-index (if (contains? (set my-channel-names) selected-tab-channel)
                          (.indexOf ^java.util.List my-channel-names selected-tab-channel)
                          0)
@@ -116,26 +124,44 @@
 (defn old-battle-tab-id [battle-id]
   (str "old-battle-" battle-id))
 
-(defn battle-details [{:fx/keys [context] :keys [server-key]}]
+
+(defn bot-details-sub [context server-key]
+  (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        user-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id :user-details])]
+    (->> user-details
+         (filter (comp #(string/includes? % "(bot)") :username second))
+         (map (fn [[k v]]
+                (let [[_all bot-name] (re-find #"(.*)\s+\(bot\)" k)]
+                  [bot-name v])))
+         (into {}))))
+
+(defn battle-details-sub [context server-key]
   (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
         selected-battle-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id])
-        users (fx/sub-val context get-in [:by-server server-key :users])
         user-details (fx/sub-val context get-in [:by-server server-key :battles selected-battle-id :user-details])
-        bot-details (->> user-details
-                         (filter (comp #(string/includes? % "(bot)") :username second))
-                         (map (fn [[k v]]
-                                (let [[_all bot-name] (re-find #"(.*)\s+\(bot\)" k)]
-                                  [bot-name v])))
-                         (into {}))
-        selected-battle-details (-> selected-battle-details
-                                    (update :users
-                                      (fn [users]
-                                        (reduce-kv
-                                          (fn [m k v]
-                                            (update m k merge v (get user-details k)))
-                                          {}
-                                          users))))
-        selected-battle-details (update selected-battle-details :bots merge bot-details)
+        bot-details (fx/sub-ctx context bot-details-sub server-key)]
+    (-> selected-battle-details
+        (update :users
+          (fn [users]
+            (reduce-kv
+              (fn [m k v]
+                (update m k merge v (get user-details k)))
+              {}
+              users)))
+        (update :bots merge bot-details))))
+
+(defn players-sub [context server-key]
+  (let [selected-battle-details (fx/sub-ctx context battle-details-sub server-key)
+        users (fx/sub-val context get-in [:by-server server-key :users])
+        players
+        (fx.players-table/battle-players-and-bots
+          {:battle selected-battle-details
+           :users users})]
+    (fx.players-table/add-players-colors players)))
+
+(defn battle-details [{:fx/keys [context] :keys [server-key]}]
+  (let [selected-battle-id (fx/sub-val context get-in [:by-server server-key :selected-battle])
+        selected-battle-details (fx/sub-ctx context battle-details-sub server-key)
         server-url (fx/sub-val context get-in [:by-server server-key :client-data :server-url])
         spring-root (fx/sub-ctx context skylobby.fx/spring-root-sub server-url)
         engine-version (:battle-version selected-battle-details)
@@ -164,13 +190,11 @@
         [{:fx/type :label
           :style {:-fx-font-size 20}
           :text (str (:battle-title selected-battle-details))}
-         {:fx/type players-table
+         {:fx/type fx.players-table/players-table
           :v-box/vgrow :always
           :auto-color true
           :battle-id selected-battle-id
-          :players (fx.battle/battle-players-and-bots
-                     {:battle selected-battle-details
-                      :users users})
+          :players (fx/sub-ctx context players-sub server-key)
           :read-only true
           :scripttags {}
           :server-key server-key

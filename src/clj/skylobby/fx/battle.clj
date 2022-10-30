@@ -21,7 +21,7 @@
     [skylobby.fx.minimap :as fx.minimap]
     [skylobby.fx.mod-sync :as fx.mod-sync]
     [skylobby.fx.mods :refer [mods-view]]
-    [skylobby.fx.players-table :refer [players-table]]
+    [skylobby.fx.players-table :as fx.players-table]
     [skylobby.fx.spring-options :as fx.spring-options]
     [skylobby.fx.sub :as sub]
     [skylobby.fx.sync :refer [ok-severity warn-severity error-severity]]
@@ -180,38 +180,39 @@
     {:fx/type :h-box
      :alignment :center-left
      :children
-     [
-      (if am-in-queue
-        {:fx/type :button
-         :text "Leave Queue"
-         :disable (not am-spec)
+     (concat
+       (when am-spec
+         [
+          (if am-in-queue
+            {:fx/type :button
+             :text "Leave Queue"
+             :disable (not am-spec)
+             :on-action {:event/type :skylobby.fx.event.chat/send
+                         :channel-name channel-name
+                         :client-data client-data
+                         :message "$%leaveq"
+                         :no-clear-draft true
+                         :no-history true
+                         :server-key server-key}}
+            {:fx/type :button
+             :text "Join Queue"
+             :disable (not am-spec)
+             :on-action {:event/type :skylobby.fx.event.chat/send
+                         :channel-name channel-name
+                         :client-data client-data
+                         :message "$%joinq"
+                         :no-clear-draft true
+                         :no-history true
+                         :server-key server-key}})])
+       [{:fx/type :button
+         :text "Queue Status"
          :on-action {:event/type :skylobby.fx.event.chat/send
                      :channel-name channel-name
                      :client-data client-data
-                     :message "$%leaveq"
+                     :message "$%status"
                      :no-clear-draft true
                      :no-history true
-                     :server-key server-key}}
-        {:fx/type :button
-         :text "Join Queue"
-         :disable (not am-spec)
-         :on-action {:event/type :skylobby.fx.event.chat/send
-                     :channel-name channel-name
-                     :client-data client-data
-                     :message "$%joinq"
-                     :no-clear-draft true
-                     :no-history true
-                     :server-key server-key}})
-      {:fx/type :button
-       :text "Queue Status"
-       :disable (not am-spec)
-       :on-action {:event/type :skylobby.fx.event.chat/send
-                   :channel-name channel-name
-                   :client-data client-data
-                   :message "$%status"
-                   :no-clear-draft true
-                   :no-history true
-                   :server-key server-key}}]}))
+                     :server-key server-key}}])}))
 
 (def accolades-bot-name "AccoladesBot")
 (defn accolade-for-sub [context server-key]
@@ -764,26 +765,27 @@
            :alignment :center-left
            :style {:-fx-font-size 24}
            :children
-           (if-not am-spec
-             [(let [ready (:ready my-battle-status)]
-                {:fx/type ext-recreate-on-key-changed
-                 :key (str am-spec)
-                 :desc
-                 {:fx/type :check-box
-                  :selected (boolean ready)
-                  :style {:-fx-padding "10px"}
-                  :on-selected-changed
-                  (if direct-connect
-                    {:event/type :skylobby.fx.event.battle/ready-changed
-                     :server-key server-key
-                     :username username}
-                    {:event/type :spring-lobby/battle-ready-change
-                     :client-data client-data
-                     :username username
-                     :battle-status my-battle-status
-                     :team-color my-team-color})}})
-              {:fx/type :label
-               :text " Ready "}]
+           (concat
+             (when-not am-spec
+               [(let [ready (:ready my-battle-status)]
+                  {:fx/type ext-recreate-on-key-changed
+                   :key (str am-spec)
+                   :desc
+                   {:fx/type :check-box
+                    :selected (boolean ready)
+                    :style {:-fx-padding "10px"}
+                    :on-selected-changed
+                    (if direct-connect
+                      {:event/type :skylobby.fx.event.battle/ready-changed
+                       :server-key server-key
+                       :username username}
+                      {:event/type :spring-lobby/battle-ready-change
+                       :client-data client-data
+                       :username username
+                       :battle-status my-battle-status
+                       :team-color my-team-color})}})
+                {:fx/type :label
+                 :text " Ready "}])
              (when-not direct-connect
                (if (contains? (:compflags client-data) "teiserver")
                  [{:fx/type :h-box
@@ -1807,40 +1809,10 @@
             :server-key server-key}]}]}})))
 
 
-(defn battle-players-and-bots
-  "Returns the sequence of all players and bots for a battle."
-  [{:keys [battle users]}]
-  (doall
-    (concat
-      (mapv
-        (fn [[k v]] (assoc v :username k :user (get users k)))
-        (:users battle))
-      (mapv
-        (fn [[k v]]
-          (assoc v
-                 :bot-name k
-                 :user {:client-status {:bot true}}))
-        (:bots battle)))))
-
-
-(defn players-sub [context server-key battle-id]
-  (let [
-        old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
-        battle-users (or (:users old-battle)
-                         (fx/sub-val context get-in [:by-server server-key :battle :users]))
-        battle-bots (or (:bots old-battle)
-                        (fx/sub-val context get-in [:by-server server-key :battle :bots]))
-        players (battle-players-and-bots
-                  {:users (fx/sub-val context get-in [:by-server server-key :users])
-                   :battle
-                   {:bots battle-bots
-                    :users battle-users}})]
-    players))
-
 (defn my-player-sub [context server-key battle-id]
   (let [
         username (fx/sub-val context get-in [:by-server server-key :username])
-        players (fx/sub-ctx context players-sub server-key battle-id)
+        players (fx/sub-ctx context fx.players-table/players-sub server-key battle-id)
         my-player (->> players
                        (filter (comp #{username} :username))
                        first)]
@@ -1848,7 +1820,7 @@
 
 (defn team-counts-sub [context server-key battle-id]
   (let [
-        players (fx/sub-ctx context players-sub server-key battle-id)
+        players (fx/sub-ctx context fx.players-table/players-sub server-key battle-id)
         team-counts (->> players
                          (filter (comp :mode :battle-status))
                          (group-by (comp :ally :battle-status))
@@ -1861,7 +1833,7 @@
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
         scripttags (or (:scripttags old-battle)
                        (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
-        players (fx/sub-ctx context players-sub server-key battle-id)
+        players (fx/sub-ctx context fx.players-table/players-sub server-key battle-id)
         team-skills (->> players
                          (filter (comp :mode :battle-status))
                          (group-by (comp :ally :battle-status))
@@ -1892,14 +1864,13 @@
                       (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
         battle-users (or (:users old-battle)
                          (fx/sub-val context get-in [:by-server server-key :battle :users]))
-        players (fx/sub-ctx context players-sub server-key battle-id)
         my-player (fx/sub-ctx context my-player-sub server-key battle-id)
         team-counts (fx/sub-ctx context team-counts-sub server-key battle-id)
         team-skills (fx/sub-ctx context team-skills-sub server-key battle-id)
-        players-table {:fx/type players-table
+        players-table {:fx/type fx.players-table/players-table
+                       :battle-id battle-id
                        :server-key server-key
-                       :v-box/vgrow :always
-                       :players players}
+                       :v-box/vgrow :always}
         battle-layout (if (contains? (set battle-layouts) battle-layout)
                         battle-layout
                         (first battle-layouts))
