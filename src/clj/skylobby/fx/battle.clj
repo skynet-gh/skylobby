@@ -180,38 +180,39 @@
     {:fx/type :h-box
      :alignment :center-left
      :children
-     [
-      (if am-in-queue
-        {:fx/type :button
-         :text "Leave Queue"
-         :disable (not am-spec)
+     (concat
+       (when am-spec
+         [
+          (if am-in-queue
+            {:fx/type :button
+             :text "Leave Queue"
+             :disable (not am-spec)
+             :on-action {:event/type :skylobby.fx.event.chat/send
+                         :channel-name channel-name
+                         :client-data client-data
+                         :message "$%leaveq"
+                         :no-clear-draft true
+                         :no-history true
+                         :server-key server-key}}
+            {:fx/type :button
+             :text "Join Queue"
+             :disable (not am-spec)
+             :on-action {:event/type :skylobby.fx.event.chat/send
+                         :channel-name channel-name
+                         :client-data client-data
+                         :message "$%joinq"
+                         :no-clear-draft true
+                         :no-history true
+                         :server-key server-key}})])
+       [{:fx/type :button
+         :text "Queue Status"
          :on-action {:event/type :skylobby.fx.event.chat/send
                      :channel-name channel-name
                      :client-data client-data
-                     :message "$%leaveq"
+                     :message "$%status"
                      :no-clear-draft true
                      :no-history true
-                     :server-key server-key}}
-        {:fx/type :button
-         :text "Join Queue"
-         :disable (not am-spec)
-         :on-action {:event/type :skylobby.fx.event.chat/send
-                     :channel-name channel-name
-                     :client-data client-data
-                     :message "$%joinq"
-                     :no-clear-draft true
-                     :no-history true
-                     :server-key server-key}})
-      {:fx/type :button
-       :text "Queue Status"
-       :disable (not am-spec)
-       :on-action {:event/type :skylobby.fx.event.chat/send
-                   :channel-name channel-name
-                   :client-data client-data
-                   :message "$%status"
-                   :no-clear-draft true
-                   :no-history true
-                   :server-key server-key}}]}))
+                     :server-key server-key}}])}))
 
 (def accolades-bot-name "AccoladesBot")
 (defn accolade-for-sub [context server-key]
@@ -764,26 +765,27 @@
            :alignment :center-left
            :style {:-fx-font-size 24}
            :children
-           (if-not am-spec
-             [(let [ready (:ready my-battle-status)]
-                {:fx/type ext-recreate-on-key-changed
-                 :key (str am-spec)
-                 :desc
-                 {:fx/type :check-box
-                  :selected (boolean ready)
-                  :style {:-fx-padding "10px"}
-                  :on-selected-changed
-                  (if direct-connect
-                    {:event/type :skylobby.fx.event.battle/ready-changed
-                     :server-key server-key
-                     :username username}
-                    {:event/type :spring-lobby/battle-ready-change
-                     :client-data client-data
-                     :username username
-                     :battle-status my-battle-status
-                     :team-color my-team-color})}})
-              {:fx/type :label
-               :text " Ready "}]
+           (concat
+             (when-not am-spec
+               [(let [ready (:ready my-battle-status)]
+                  {:fx/type ext-recreate-on-key-changed
+                   :key (str am-spec)
+                   :desc
+                   {:fx/type :check-box
+                    :selected (boolean ready)
+                    :style {:-fx-padding "10px"}
+                    :on-selected-changed
+                    (if direct-connect
+                      {:event/type :skylobby.fx.event.battle/ready-changed
+                       :server-key server-key
+                       :username username}
+                      {:event/type :spring-lobby/battle-ready-change
+                       :client-data client-data
+                       :username username
+                       :battle-status my-battle-status
+                       :team-color my-team-color})}})
+                {:fx/type :label
+                 :text " Ready "}])
              (when-not direct-connect
                (if (contains? (:compflags client-data) "teiserver")
                  [{:fx/type :h-box
