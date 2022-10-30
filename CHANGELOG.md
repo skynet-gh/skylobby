@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.21](https://github.com/skynet-gh/skylobby/releases/tag/0.9.20) - 2022-10-30
+
+- Another fix for issue with battle players UI updates
+- Show queue status button even when a player
+
 ## [0.9.20](https://github.com/skynet-gh/skylobby/releases/tag/0.9.20) - 2022-10-29
 
 - Fix issue with battle bots UI updates
