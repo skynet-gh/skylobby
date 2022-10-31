@@ -544,8 +544,8 @@
         players (battle-players-and-bots
                   {:users (fx/sub-val context get-in [:by-server server-key :users])
                    :battle
-                   {:bots battle-bots
-                    :users battle-users}})]
+                   {:bots (doall battle-bots)
+                    :users (doall battle-users)}})]
     players))
 
 (defn sort-players [players]
