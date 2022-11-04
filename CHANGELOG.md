@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.23](https://github.com/skynet-gh/skylobby/releases/tag/0.9.23) - 2022-11-03
+
+- Fix battle showing old player day after rejoining
+
 ## [0.9.22](https://github.com/skynet-gh/skylobby/releases/tag/0.9.22) - 2022-10-31
 
 - Fix another potential issue with battle players UI updates
