@@ -494,20 +494,21 @@
                :server-key server-key}
               users-view]}}])
        (when show-closed-battles
-         (map
-           (fn [[battle-id _battle]]
-             {:fx/type :tab
-              :graphic {:fx/type :label
-                        :text (str "(old) battle " battle-id)}
-              :closable true
-              :on-close-request {:event/type :spring-lobby/dissoc-in
-                                 :path [:by-server server-key :old-battles battle-id]}
-              :id (old-battle-tab-id battle-id)
-              :content
-              {:fx/type fx.battle/battle-view
-               :battle-id battle-id
-               :server-key server-key}})
-           old-battles)))}}))
+         (->> old-battles
+              (remove (comp #{battle-id} first))
+              (mapv
+                (fn [[battle-id _battle]]
+                  {:fx/type :tab
+                   :graphic {:fx/type :label
+                             :text (str "(old) battle " battle-id)}
+                   :closable true
+                   :on-close-request {:event/type :spring-lobby/dissoc-in
+                                      :path [:by-server server-key :old-battles battle-id]}
+                   :id (old-battle-tab-id battle-id)
+                   :content
+                   {:fx/type fx.battle/battle-view
+                    :battle-id battle-id
+                    :server-key server-key}})))))}}))
 
 (defn main-tab-view [state]
   (tufte/profile {:dynamic? true

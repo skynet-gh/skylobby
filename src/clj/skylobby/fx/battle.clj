@@ -1831,8 +1831,10 @@
 (defn team-skills-sub [context server-key battle-id]
   (let [
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
-        scripttags (or (:scripttags old-battle)
-                       (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
+        current-battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        scripttags (if (= battle-id current-battle-id)
+                     (fx/sub-val context get-in [:by-server server-key :battle :scripttags])
+                     (:scripttags old-battle))
         players (fx/sub-ctx context fx.players-table/players-sub server-key battle-id)
         team-skills (->> players
                          (filter (comp :mode :battle-status))
@@ -1860,10 +1862,11 @@
         divider-positions (fx/sub-val context :divider-positions)
         pop-out-chat (fx/sub-val context :pop-out-chat)
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
-        battle-id (or battle-id
-                      (fx/sub-val context get-in [:by-server server-key :battle :battle-id]))
-        battle-users (or (:users old-battle)
-                         (fx/sub-val context get-in [:by-server server-key :battle :users]))
+        current-battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        battle-id (or battle-id current-battle-id)
+        battle-users (if (= battle-id current-battle-id)
+                       (fx/sub-val context get-in [:by-server server-key :battle :users])
+                       (:users old-battle))
         my-player (fx/sub-ctx context my-player-sub server-key battle-id)
         team-counts (fx/sub-ctx context team-counts-sub server-key battle-id)
         team-skills (fx/sub-ctx context team-skills-sub server-key battle-id)
