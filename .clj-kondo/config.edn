@@ -13,6 +13,7 @@
   :aliased-namespace-symbol {:level :info}
   :docstring-no-summary {:level :info}
   :docstring-leading-trailing-whitespace {:level :info}
+  :dynamic-var-not-earmuffed {:level :info}
   :reduce-without-init {:level :warn}
   :keyword-binding {:level :warn}
   :main-without-gen-class {:level :info}
