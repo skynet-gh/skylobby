@@ -52,7 +52,7 @@
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.apache.commons/commons-collections4 {:mvn/version "4.4"}
-  org.apache.commons/commons-compress {:mvn/version "1.21"}
+  org.apache.commons/commons-compress {:mvn/version "1.22"}
   org.clj-commons/primitive-math {:mvn/version "1.0.0"}
   org.clojure/clojure {:mvn/version "1.12.0-alpha1"}
   org.clojure/core.async {:mvn/version "1.6.673"}
@@ -92,8 +92,8 @@
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.3"
-                                   :git/sha "0d20256c40b5a6b6adbcbdf7d0c52cf9e22e994d"
+    io.github.clojure/tools.build {:git/tag "v0.8.4"
+                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "1.0.0"}
@@ -119,7 +119,7 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
-    com.fulcrologic/fulcro {:mvn/version "3.5.28"}
+    com.fulcrologic/fulcro {:mvn/version "3.5.29"}
     com.taoensso/sente {:mvn/version "1.17.0"}
     com.taoensso/timbre {:mvn/version "6.0.1"}
     hashp/hashp {:mvn/version "0.2.2"}
@@ -143,8 +143,8 @@
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
     com.taoensso/timbre {:mvn/version "6.0.1"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.3"
-                                   :git/sha "0d20256c40b5a6b6adbcbdf7d0c52cf9e22e994d"
+    io.github.clojure/tools.build {:git/tag "v0.8.4"
+                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
                                    :exclusions [org.slf4j/slf4j-nop]}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -157,14 +157,14 @@
   :build
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.8.3"
-                                   :git/sha "0d20256c40b5a6b6adbcbdf7d0c52cf9e22e994d"}}
+    io.github.clojure/tools.build {:git/tag "v0.8.4"
+                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"}}
    :ns-default build}
   :skylobby
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.8.3"
-                                   :git/sha "0d20256c40b5a6b6adbcbdf7d0c52cf9e22e994d"}}
+    io.github.clojure/tools.build {:git/tag "v0.8.4"
+                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"}}
    :ns-default build}
   :graal-deps
   {
@@ -220,7 +220,7 @@
     metosin/reitit {:mvn/version "0.5.15"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-    org.apache.commons/commons-compress {:mvn/version "1.21"}
+    org.apache.commons/commons-compress {:mvn/version "1.22"}
     org.clj-commons/primitive-math {:mvn/version "1.0.0"}
     org.clojure/clojure {:mvn/version "1.12.0-alpha1"}
     org.clojure/core.async {:mvn/version "1.6.673"}
@@ -246,8 +246,8 @@
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.3"
-                                   :git/sha "0d20256c40b5a6b6adbcbdf7d0c52cf9e22e994d"
+    io.github.clojure/tools.build {:git/tag "v0.8.4"
+                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "1.0.0"}
