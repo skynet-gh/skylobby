@@ -537,10 +537,13 @@
 (defn players-sub [context server-key battle-id]
   (let [
         old-battle (fx/sub-val context get-in [:by-server server-key :old-battles battle-id])
-        battle-users (or (:users old-battle)
-                         (fx/sub-val context get-in [:by-server server-key :battle :users]))
-        battle-bots (or (:bots old-battle)
-                        (fx/sub-val context get-in [:by-server server-key :battle :bots]))
+        current-battle-id (fx/sub-val context get-in [:by-server server-key :battle :battle-id])
+        battle-users (if (= battle-id current-battle-id)
+                       (fx/sub-val context get-in [:by-server server-key :battle :users])
+                       (:users old-battle))
+        battle-bots (if (= battle-id current-battle-id)
+                      (fx/sub-val context get-in [:by-server server-key :battle :bots])
+                      (:bots old-battle))
         players (battle-players-and-bots
                   {:users (fx/sub-val context get-in [:by-server server-key :users])
                    :battle
