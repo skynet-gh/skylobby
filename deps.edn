@@ -4,7 +4,7 @@
   "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
  {
-  aleph/aleph {:mvn/version "0.5.0"}
+  aleph/aleph {:mvn/version "0.6.0"}
   cheshire/cheshire {:mvn/version  "5.11.0"}
   clj-jgit/clj-jgit {:mvn/version "1.0.2"}
   clj-http/clj-http {:mvn/version "3.12.3"}
@@ -17,13 +17,13 @@
   com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                            :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
   com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-  com.github.seancorfield/honeysql {:mvn/version "2.3.928"}
-  com.github.seancorfield/next.jdbc {:mvn/version "1.3.834"}
+  com.github.seancorfield/honeysql {:mvn/version "2.4.962"}
+  com.github.seancorfield/next.jdbc {:mvn/version "1.3.847"}
   com.h2database/h2 {:mvn/version "2.1.214"}
-  com.taoensso/encore {:mvn/version "3.31.0"}
+  com.taoensso/encore {:mvn/version "3.45.0"}
   com.taoensso/nippy {:mvn/version "3.2.0"}
   com.taoensso/sente {:mvn/version "1.17.0"}
-  com.taoensso/timbre {:mvn/version "6.0.1"}
+  com.taoensso/timbre {:mvn/version "6.0.4"}
   com.taoensso/tufte {:mvn/version "2.4.5"}
   commons-io/commons-io {:mvn/version "2.11.0"}
   commons-validator/commons-validator {:mvn/version "1.7"}
@@ -31,17 +31,17 @@
   crypto-random/crypto-random {:mvn/version "1.2.1"}
   org.clj-commons/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
                          :git/sha "407c765ea1876287a6f95f0e3816e677ea11ca88"}
-  gr.zdimensions/jsquish {:mvn/version "1.0"}
+  io.github.memo33/jsquish {:mvn/version "2.0.1"}
   http-kit/http-kit {:mvn/version "2.6.0"}
   io.aviso/pretty {:mvn/version "1.3"}
-  io.netty/netty-codec {:mvn/version "4.1.84.Final"}
-  io.netty/netty-codec-http {:mvn/version "4.1.84.Final"}
-  io.netty/netty-handler {:mvn/version "4.1.84.Final"}
-  io.netty/netty-handler-proxy {:mvn/version "4.1.84.Final"}
-  io.netty/netty-resolver {:mvn/version "4.1.84.Final"}
-  io.netty/netty-resolver-dns {:mvn/version "4.1.84.Final"}
-  io.netty/netty-transport {:mvn/version "4.1.84.Final"}
-  io.netty/netty-transport-native-epoll {:mvn/version "4.1.84.Final"}
+  io.netty/netty-codec {:mvn/version "4.1.86.Final"}
+  io.netty/netty-codec-http {:mvn/version "4.1.86.Final"}
+  io.netty/netty-handler {:mvn/version "4.1.86.Final"}
+  io.netty/netty-handler-proxy {:mvn/version "4.1.86.Final"}
+  io.netty/netty-resolver {:mvn/version "4.1.86.Final"}
+  io.netty/netty-resolver-dns {:mvn/version "4.1.86.Final"}
+  io.netty/netty-transport {:mvn/version "4.1.86.Final"}
+  io.netty/netty-transport-native-epoll {:mvn/version "4.1.86.Final"}
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.12"}
   jarohen/chime {:mvn/version "0.3.3"}
@@ -65,12 +65,12 @@
   org.clojure/tools.logging {:mvn/version "1.2.4"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.2"}
-  org.fxmisc.flowless/flowless {:mvn/version "0.6.10"}
-  org.fxmisc.richtext/richtextfx {:mvn/version "0.10.9"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.7.0"}
+  org.fxmisc.richtext/richtextfx {:mvn/version "0.11.0"}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.1"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.1"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"}
-  org.nibor.autolink/autolink {:mvn/version "0.10.0"}
+  org.nibor.autolink/autolink {:mvn/version "0.10.1"}
   org.openjfx/javafx-base {:mvn/version "19"}
   org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.36"}
@@ -86,14 +86,14 @@
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
    {
-    cider/cider-nrepl {:mvn/version "0.28.7"}
+    cider/cider-nrepl {:mvn/version "0.29.0"}
     cider/orchard {:mvn/version "0.11.0"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.4"
-                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
+    io.github.clojure/tools.build {:git/tag "v0.9.0"
+                                   :git/sha "8c93e0c1fb829a89b3653d21a876dfa97d313085"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "1.0.0"}
@@ -119,9 +119,9 @@
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
    {
-    com.fulcrologic/fulcro {:mvn/version "3.5.29"}
+    com.fulcrologic/fulcro {:mvn/version "3.5.34"}
     com.taoensso/sente {:mvn/version "1.17.0"}
-    com.taoensso/timbre {:mvn/version "6.0.1"}
+    com.taoensso/timbre {:mvn/version "6.0.4"}
     hashp/hashp {:mvn/version "0.2.2"}
     io.aviso/pretty {:mvn/version "1.3"}
     metosin/reitit {:mvn/version "0.5.18"}
@@ -129,7 +129,7 @@
     org.clojure/clojurescript {:mvn/version "1.11.60"}
     re-frame/re-frame {:mvn/version "1.3.0"}
     reagent/reagent {:mvn/version "1.1.1"}
-    thheller/shadow-cljs {:mvn/version "2.20.7"}}
+    thheller/shadow-cljs {:mvn/version "2.20.16"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar"]
@@ -141,10 +141,10 @@
     com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                              :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
     com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-    com.taoensso/timbre {:mvn/version "6.0.1"}
+    com.taoensso/timbre {:mvn/version "6.0.4"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.4"
-                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
+    io.github.clojure/tools.build {:git/tag "v0.9.0"
+                                   :git/sha "8c93e0c1fb829a89b3653d21a876dfa97d313085"
                                    :exclusions [org.slf4j/slf4j-nop]}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
@@ -157,22 +157,21 @@
   :build
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.8.4"
-                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"}}
+    io.github.clojure/tools.build {:git/tag "v0.9.0"
+                                   :git/sha "8c93e0c1fb829a89b3653d21a876dfa97d313085"}}
    :ns-default build}
   :skylobby
   {:deps
    {
-    io.github.clojure/tools.build {:git/tag "v0.8.4"
-                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"}}
+    io.github.clojure/tools.build {:git/tag "v0.9.0"
+                                   :git/sha "8c93e0c1fb829a89b3653d21a876dfa97d313085"}}
    :ns-default build}
   :graal-deps
   {
    :extra-paths ["graal/clj" "graal/cljc"]
    :replace-deps
    {
-    aleph/aleph {:git/url "https://github.com/skynet-gh/aleph.git"
-                 :git/sha "7cb0385e9c0615c1819256a96bde5b9fe1f1f4cc"}
+    aleph/aleph {:mvn/version "0.6.0"}
     cheshire/cheshire {:mvn/version  "5.11.0"}
     clj.native-image/clj.native-image {:git/url "https://github.com/taylorwood/clj.native-image.git"
                                        :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
@@ -188,36 +187,36 @@
     com.github.clj-easy/graal-config-nippy {:git/url   "https://github.com/clj-easy/graal-config"
                                             :git/sha   "0dc2862e1b1c9871eef4c306ef77da3610a2bd93"
                                             :deps/root "config/com.taoensso/nippy"}
-    com.github.seancorfield/honeysql {:mvn/version "2.3.928"}
-    com.github.seancorfield/next.jdbc {:mvn/version "1.3.834"}
+    com.github.seancorfield/honeysql {:mvn/version "2.4.962"}
+    com.github.seancorfield/next.jdbc {:mvn/version "1.3.847"}
     com.h2database/h2 {:mvn/version "2.1.214"}
-    com.taoensso/encore {:mvn/version "3.31.0"}
+    com.taoensso/encore {:mvn/version "3.45.0"}
     com.taoensso/nippy {:mvn/version "3.2.0"}
     com.taoensso/sente {:mvn/version "1.17.0"}
-    com.taoensso/timbre {:mvn/version "6.0.1"}
+    com.taoensso/timbre {:mvn/version "6.0.4"}
     com.taoensso/tufte {:mvn/version "2.4.5"}
     commons-io/commons-io {:mvn/version "2.11.0"}
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
     org.clj-commons/gloss {:git/url "https://github.com/skynet-gh/gloss.git"
                            :git/sha "407c765ea1876287a6f95f0e3816e677ea11ca88"}
-    gr.zdimensions/jsquish {:mvn/version "1.0"}
+    io.github.memo33/jsquish {:mvn/version "2.0.1"}
     http-kit/http-kit {:mvn/version "2.6.0"}
     instaparse/instaparse {:mvn/version "1.4.12"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.netty/netty-codec {:mvn/version "4.1.84.Final"}
-    io.netty/netty-codec-http {:mvn/version "4.1.84.Final"}
-    io.netty/netty-handler {:mvn/version "4.1.84.Final"}
-    io.netty/netty-handler-proxy {:mvn/version "4.1.84.Final"}
-    io.netty/netty-resolver {:mvn/version "4.1.84.Final"}
-    io.netty/netty-resolver-dns {:mvn/version "4.1.84.Final"}
-    io.netty/netty-transport {:mvn/version "4.1.84.Final"}
-    io.netty/netty-transport-native-epoll {:mvn/version "4.1.84.Final"}
+    io.netty/netty-codec {:mvn/version "4.1.86.Final"}
+    io.netty/netty-codec-http {:mvn/version "4.1.86.Final"}
+    io.netty/netty-handler {:mvn/version "4.1.86.Final"}
+    io.netty/netty-handler-proxy {:mvn/version "4.1.86.Final"}
+    io.netty/netty-resolver {:mvn/version "4.1.86.Final"}
+    io.netty/netty-resolver-dns {:mvn/version "4.1.86.Final"}
+    io.netty/netty-transport {:mvn/version "4.1.86.Final"}
+    io.netty/netty-transport-native-epoll {:mvn/version "4.1.86.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.2.4"}
     me.raynes/fs {:mvn/version "1.4.6"}
     me.xdrop/fuzzywuzzy {:mvn/version "1.4.0"}
-    metosin/reitit {:mvn/version "0.5.15"}
+    metosin/reitit {:mvn/version "0.5.18"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
     org.apache.commons/commons-compress {:mvn/version "1.22"}
@@ -241,13 +240,13 @@
   {:extra-paths ["graal/clj" "graal/cljc" "dev/clj/graal"]
    :extra-deps
    {
-    cider/cider-nrepl {:mvn/version "0.28.7"}
+    cider/cider-nrepl {:mvn/version "0.29.0"}
     cider/orchard {:mvn/version "0.11.0"}
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
     io.aviso/pretty {:mvn/version "1.3"}
-    io.github.clojure/tools.build {:git/tag "v0.8.4"
-                                   :git/sha "8c3cd69f7e837e6cac530261604e794696c61856"
+    io.github.clojure/tools.build {:git/tag "v0.9.0"
+                                   :git/sha "8c93e0c1fb829a89b3653d21a876dfa97d313085"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
     nrepl/nrepl {:mvn/version "1.0.0"}
@@ -407,7 +406,7 @@
   :reveal
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.28.7"}
+   {cider/cider-nrepl {:mvn/version "0.29.0"}
     cider/orchard {:mvn/version "0.11.0"}
     clj-commons/pomegranate {:mvn/version "1.2.1"}
     cljfx/cljfx {:mvn/version "1.7.22"
