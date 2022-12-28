@@ -1,6 +1,7 @@
 (ns skylobby.fx.sub
   (:require
     [cljfx.api :as fx]
+    [cljfx.coerce :as coerce]
     [clojure.edn :as edn]
     [clojure.string :as string]
     [skylobby.data :as data]
@@ -8,7 +9,9 @@
     [skylobby.resource :as resource]
     [skylobby.spring :as spring]
     [skylobby.util :as u]
-    [taoensso.timbre :as log]))
+    [taoensso.timbre :as log])
+  (:import
+    (javafx.scene.paint Color)))
 
 
 (set! *warn-on-reflection* true)
@@ -260,3 +263,12 @@
          (filter second)
          (map first)
          set)))
+
+(defn as-color [context k]
+  (or
+    (when-let [color (fx/sub-val context k)]
+      (try
+        (coerce/color color)
+        (catch Exception e
+          (log/trace e "Error parsing color" color))))
+    Color/BLACK))

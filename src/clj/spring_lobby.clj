@@ -244,7 +244,9 @@
    :join-battle-as-player
    :last-split-type
    :leave-battle-on-close-window
-   :logins :minimap-size
+   :logins
+   :marked-users
+   :minimap-size
    :music-dir
    :music-stopped
    :music-volume
@@ -256,6 +258,9 @@
    :notify-when-in-game
    :notify-when-tab-selected
    :password
+   :players-friend-color
+   :players-ignore-color
+   :players-mark-color
    :players-table-columns
    :pop-out-battle
    :preferred-color
@@ -381,6 +386,9 @@
                              :faction true
                              :country true
                              :bonus true}
+     :players-friend-color "0x008000ff" ; green
+     :players-ignore-color "0x808080ff" ; gray
+     :players-mark-color "0xff00ffff" ; magenta
      :ready-on-unspec true
      :refresh-replays-after-game true
      :show-battle-preview true
@@ -3167,6 +3175,12 @@
     (when is-me
       (swap! *state assoc :preferred-color color-int))
     (update-color client-data id opts color-int)))
+
+(defmethod event-handler ::assoc-color
+  [{:fx/keys [^Event event] :as opts}]
+  (let [^ColorPicker source (.getSource event)
+        javafx-color (.getValue source)]
+    (swap! *state assoc (:key opts) (str javafx-color))))
 
 (defmethod event-handler ::battle-balance [{:keys [client-data channel-name]}]
   @(event-handler

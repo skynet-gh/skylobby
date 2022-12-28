@@ -4,7 +4,7 @@
     [clojure.string :as string]
     [skylobby.fs :as fs]
     skylobby.fx
-    [skylobby.fx.bottom-bar :refer [app-update-button]]
+    [skylobby.fx.bottom-bar :as fx.bottom-bar]
     [skylobby.fx.channel :as fx.channel]
     [skylobby.fx.font-icon :as font-icon]
     [skylobby.fx.sub :as sub]
@@ -104,6 +104,9 @@
         increment-ids (fx/sub-val context :increment-ids)
         join-battle-as-player (fx/sub-val context :join-battle-as-player)
         leave-battle-on-close-window (fx/sub-val context :leave-battle-on-close-window)
+        players-friend-color (fx/sub-ctx context sub/as-color :players-friend-color)
+        players-ignore-color (fx/sub-ctx context sub/as-color :players-ignore-color)
+        players-mark-color (fx/sub-ctx context sub/as-color :players-mark-color)
         ready-on-unspec (fx/sub-val context :ready-on-unspec)
         ring-on-auto-unspec (fx/sub-val context :ring-on-auto-unspec)
         ring-on-spec-change (fx/sub-val context :ring-on-spec-change)
@@ -191,6 +194,54 @@
          :items u/player-name-color-types
          :on-value-changed {:event/type :spring-lobby/assoc
                             :key :battle-players-color-type}}]}
+      {:fx/type :h-box
+       :children
+       [
+        {:fx/type filterable-checkbox-setting
+         :title " Color players on friends list "
+         :search settings-search
+         :check-box
+         {:fx/type :check-box
+          :selected (boolean players-friend-color)
+          :on-selected-changed {:event/type :spring-lobby/assoc
+                                :key :players-friend-color
+                                :value nil}}}
+        {:fx/type :color-picker
+         :value players-friend-color
+         :on-action {:event/type :spring-lobby/assoc-color
+                     :key :players-friend-color}}]}
+      {:fx/type :h-box
+       :children
+       [
+        {:fx/type filterable-checkbox-setting
+         :title " Color players on ignore list "
+         :search settings-search
+         :check-box
+         {:fx/type :check-box
+          :selected (boolean players-ignore-color)
+          :on-selected-changed {:event/type :spring-lobby/assoc
+                                :key :players-ignore-color
+                                :value nil}}}
+        {:fx/type :color-picker
+         :value players-ignore-color
+         :on-action {:event/type :spring-lobby/assoc-color
+                     :key :players-ignore-color}}]}
+      {:fx/type :h-box
+       :children
+       [
+        {:fx/type filterable-checkbox-setting
+         :title " Color marked players "
+         :search settings-search
+         :check-box
+         {:fx/type :check-box
+          :selected (boolean players-mark-color)
+          :on-selected-changed {:event/type :spring-lobby/assoc
+                                :key :players-mark-color
+                                :value nil}}}
+        {:fx/type :color-picker
+         :value players-mark-color
+         :on-action {:event/type :spring-lobby/assoc-color
+                     :key :players-mark-color}}]}
       {:fx/type :h-box
        :alignment :center-left
        :children
@@ -1217,7 +1268,7 @@
             :graphic
             {:fx/type font-icon/lifecycle
              :icon-literal "mdi-refresh"}}
-           {:fx/type app-update-button}]}]}]}}))
+           {:fx/type fx.bottom-bar/app-update-button}]}]}]}}))
 
 
 
