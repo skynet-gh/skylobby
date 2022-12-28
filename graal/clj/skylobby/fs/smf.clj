@@ -4,7 +4,7 @@
     [org.clojars.smee.binary.core :as b]
     [skylobby.util :as u])
   (:import
-    (gr.zdimensions.jsquish Squish Squish$CompressionType)
+    (com.github.memo33.jsquish Squish Squish$CompressionType)
     (java.awt.image BufferedImage)
     (java.nio ByteBuffer ByteOrder)))
 

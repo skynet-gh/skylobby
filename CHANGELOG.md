@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.24](https://github.com/skynet-gh/skylobby/releases/tag/0.9.23) - 2022-12-28
+
+- Add ability to color users by friend, ignored, marked
+
 ## [0.9.23](https://github.com/skynet-gh/skylobby/releases/tag/0.9.23) - 2022-11-03
 
 - Fix battle showing old player day after rejoining

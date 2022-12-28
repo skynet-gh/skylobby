@@ -1,5 +1,6 @@
 (ns skylobby.color
   (:require
+    [cljfx.coerce :as coerce]
     [skylobby.fx.color :as fx.color])
   (:import
     (javafx.scene.paint Color)))
@@ -215,8 +216,9 @@
 ; https://github.com/beyond-all-reason/Beyond-All-Reason/blob/5572edc/luaui/Widgets/gui_advplayerslist.lua#L1524
 (defn dark?
   "Returns true if the given color is considered dark, false otherwise."
-  [^Color color]
-  (< (+ (* 1.2 (+ (.getRed color)
-                  (.getGreen color)))
-        (* 0.4 (.getBlue color)))
-     0.68))
+  [c]
+  (let [^Color color (coerce/color c)]
+    (< (+ (* 1.2 (+ (.getRed color)
+                    (.getGreen color)))
+          (* 0.4 (.getBlue color)))
+       0.68)))

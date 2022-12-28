@@ -220,6 +220,9 @@
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         channel-name (fx/sub-ctx context skylobby.fx/battle-channel-sub server-key)
         ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+        ignored? (get ignore-users username)
+        marked-users (fx/sub-val context get-in [:marked-users server-key])
+        marked? (get marked-users username)
         host-username (fx/sub-ctx context sub/host-username server-key)]
     {:fx/type :context-menu
      :style {:-fx-font-size 16
@@ -320,7 +323,7 @@
                             color (fx.color/spring-color-to-javafx team-color)]
                         (.putString content (str color))
                         (.setContent clipboard content)))}
-        (if (get ignore-users username)
+        (if ignored?
           {:fx/type :menu-item
            :text "Unignore"
            :on-action {:event/type :spring-lobby/unignore-user
@@ -330,7 +333,12 @@
            :text "Ignore"
            :on-action {:event/type :spring-lobby/ignore-user
                        :server-key server-key
-                       :username username}})]
+                       :username username}})
+        {:fx/type :menu-item
+         :text (if marked? "Unmark" "Mark")
+         :on-action {:event/type :spring-lobby/assoc-in
+                     :path [:marked-users server-key username]
+                     :value (not marked?)}}]
        (when (contains? (:compflags client-data) "teiserver")
          [{:fx/type :menu-item
            :text "Report"
@@ -577,6 +585,9 @@
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
+        players-friend-color (fx/sub-val context :players-friend-color)
+        players-ignore-color (fx/sub-val context :players-ignore-color)
+        players-mark-color (fx/sub-val context :players-mark-color)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         host-username (fx/sub-ctx context sub/host-username server-key)
@@ -595,7 +606,7 @@
         sides (fx/sub-ctx context sides-sub server-key mod-name)
         side-items (fx/sub-ctx context side-items-sub server-key mod-name)
         singleplayer (or (not server-key) (= :local server-key))
-        username (fx/sub-val context get-in [:by-server server-key :username])
+        my-username (fx/sub-val context get-in [:by-server server-key :username])
         sorted-players (fx/sub-ctx context sorted-players-sub players server-key battle-id auto-color scripttags)
         incrementing-cell (fn [id]
                             {:text
@@ -608,7 +619,9 @@
                            singleplayer "singleplayer"
                            :else "multiplayer")
         server-type (u/server-type server-key)
-        ignore-users (fx/sub-val context get-in [:ignore-users server-key])]
+        friends (fx/sub-val context get-in [:by-server server-key :friends])
+        ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+        marked-users (fx/sub-val context get-in [:marked-users server-key])]
     {:fx/type ext-recreate-on-key-changed
      :key (pr-str [server-key selected-tab-main battle-id players-table-columns])
      :desc
@@ -648,12 +661,18 @@
            :cell-factory
            {:fx/cell-type :table-cell
             :describe
-            (fn [[_nickname-lc nickname {:keys [ai-name ai-version bot-name owner] :as id}]]
+            (fn [[_nickname-lc nickname {:keys [ai-name ai-version bot-name owner username] :as id}]]
               (tufte/profile {:dynamic? true
                               :id :skylobby/player-table}
                 (tufte/p :nickname
                   (let [not-spec (-> id :battle-status :mode u/to-bool)
+                        marked? (boolean (get marked-users username))
+                        friended? (boolean (get friends username))
+                        ignored? (boolean (get ignore-users username))
                         text-color-javafx (or
+                                            (when marked? players-mark-color)
+                                            (when ignored? players-ignore-color)
+                                            (when friended? players-friend-color)
                                             (when not-spec
                                               (case battle-players-color-type
                                                 "team" (get allyteam-javafx-colors (-> id :battle-status :ally))
@@ -663,10 +682,10 @@
                                             Color/WHITE)
                         text-color-css (-> text-color-javafx str u/hex-color-to-css)
                         can-kick (and (not read-only)
-                                      username
-                                      (not= username (:username id))
+                                      my-username
+                                      (not= my-username username)
                                       (or am-host
-                                          (= owner username)))]
+                                          (= owner my-username)))]
                     {:text ""
                      :tooltip
                      {:fx/type tooltip-nofocus/lifecycle
@@ -740,7 +759,7 @@
                                      :spread 1}
                             :text nickname
                             :fill text-color-css
-                            :strikethrough (boolean (get ignore-users (:username id)))
+                            :strikethrough ignored?
                             :style
                             (merge
                               {:-fx-font-smoothing-type :gray}
@@ -798,17 +817,17 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_play id _skill _username i]]
+              (fn [[_play id _skill _nickname {:keys [owner username] :as i}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :team
                     (let [items (map str (take 16 (iterate inc 0)))
                           value (str id)
                           disable (or read-only
-                                      (not username)
+                                      (not my-username)
                                       (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))]
+                                               (= username my-username)
+                                               (= owner my-username))))]
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
@@ -828,7 +847,7 @@
                                             :skylobby.fx.event.battle/team-changed
                                             :spring-lobby/battle-team-changed)
                               :client-data (when-not singleplayer client-data)
-                              :is-me (= (:username i) username)
+                              :is-me (= username my-username)
                               :is-bot (-> i :user :client-status :bot)
                               :id i
                               :server-key server-key}}))}}))))}}])
@@ -847,15 +866,15 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_status _ally _skill _team _username i]]
+              (fn [[_status _ally _skill _team _username {:keys [username] :as i}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :ally
                     (let [disable (or read-only
-                                      (not username)
+                                      (not my-username)
                                       (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))]
+                                               (= username my-username)
+                                               (= (:owner i) my-username))))]
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
@@ -875,7 +894,7 @@
                                             :skylobby.fx.event.battle/ally-changed
                                             :spring-lobby/battle-ally-changed)
                               :client-data (when-not singleplayer client-data)
-                              :is-me (= (:username i) username)
+                              :is-me (= username my-username)
                               :is-bot (-> i :user :client-status :bot)
                               :id i
                               :server-key server-key}}))}}))))}}])
@@ -888,15 +907,15 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[team-color nickname i]]
+              (fn [[team-color nickname {:keys [owner username] :as i}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :color
                     (let [disable (or read-only
-                                      (not username)
+                                      (not my-username)
                                       (not (or am-host
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))]
+                                               (= username my-username)
+                                               (= owner my-username))))]
                       {:text ""
                        :graphic
                        {:fx/type ext-recreate-on-key-changed
@@ -912,7 +931,7 @@
                                             :skylobby.fx.event.battle/color-changed
                                             :spring-lobby/battle-color-action)
                               :client-data (when-not singleplayer client-data)
-                              :is-me (= (:username i) username)
+                              :is-me (= username my-username)
                               :is-bot (-> i :user :client-status :bot)
                               :id i
                               :server-key server-key}}))}}))))}}])
@@ -929,16 +948,16 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ _ _ i]]
+              (fn [[_ _ _ {:keys [owner username] :as i}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :spectator
                     (let [is-spec (-> i :battle-status :mode u/to-bool not boolean)
                           disable (or read-only
-                                      (not username)
+                                      (not my-username)
                                       (not (or (and am-host (not is-spec))
-                                               (= (:username i) username)
-                                               (= (:owner i) username))))]
+                                               (= username my-username)
+                                               (= owner my-username))))]
                       {:text ""
                        :alignment :center
                        :graphic
@@ -955,7 +974,7 @@
                                             :skylobby.fx.event.battle/spectate-changed
                                             :spring-lobby/battle-spectate-change)
                               :client-data (when-not singleplayer client-data)
-                              :is-me (= (:username i) username)
+                              :is-me (= username my-username)
                               :is-bot (-> i :user :client-status :bot)
                               :id i
                               :ready-on-unspec ready-on-unspec
@@ -974,7 +993,7 @@
              :cell-factory
              {:fx/cell-type :table-cell
               :describe
-              (fn [[_ _ _ _ i]]
+              (fn [[_ _ _ _ {:keys [owner username] :as i}]]
                 (tufte/profile {:dynamic? true
                                 :id :skylobby/player-table}
                   (tufte/p :faction
@@ -983,10 +1002,10 @@
                      (cond
                        (seq side-items)
                        (let [disable (or read-only
-                                         (not username)
+                                         (not my-username)
                                          (not (or am-host
-                                                  (= (:username i) username)
-                                                  (= (:owner i) username))))]
+                                                  (= username my-username)
+                                                  (= owner my-username))))]
                          {:fx/type ext-recreate-on-key-changed
                           :key (pr-str [server-key selected-tab-main battle-id (u/nickname i)])
                           :desc
@@ -1001,7 +1020,7 @@
                                               :skylobby.fx.event.battle/side-changed
                                               :spring-lobby/battle-side-changed)
                                 :client-data (when-not singleplayer client-data)
-                                :is-me (= (:username i) username)
+                                :is-me (= username my-username)
                                 :is-bot (-> i :user :client-status :bot)
                                 :id i
                                 :indexed-mod indexed-mod
@@ -1129,13 +1148,19 @@
         playing-by-ally (fx/sub-ctx context playing-by-ally-sub players server-key battle-id)
         increment-ids (fx/sub-val context :increment-ids)
         spectators (fx/sub-ctx context spectators-sub players server-key battle-id)
-        username (fx/sub-val context get-in [:by-server server-key :username])
+        my-username (fx/sub-val context get-in [:by-server server-key :username])
         am-host (fx/sub-ctx context sub/am-host server-key)
+        battle-players-color-type (fx/sub-val context :battle-players-color-type)
+        players-friend-color (fx/sub-val context :players-friend-color)
+        players-ignore-color (fx/sub-val context :players-ignore-color)
+        players-mark-color (fx/sub-val context :players-mark-color)
         host-username (fx/sub-ctx context sub/host-username server-key)
         host-is-bot (->> players (filter (comp #{host-username} :username)) first :user :client-status :bot)
         host-ingame (fx/sub-ctx context sub/host-ingame server-key)
         client-data (fx/sub-val context get-in [:by-server server-key :client-data])
+        friends (fx/sub-val context get-in [:by-server server-key :friends])
         ignore-users (fx/sub-val context get-in [:ignore-users server-key])
+        marked-users (fx/sub-val context get-in [:marked-users server-key])
         selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])]
     {:fx/type ext-recreate-on-key-changed
      :key (pr-str [server-key selected-tab-main battle-id])
@@ -1176,16 +1201,27 @@
                           :-fx-border-style "solid"}
                   :children
                   (mapv
-                    (fn [player]
-                      (let [text-color-javafx (or
-                                                (-> player :team-color fx.color/spring-color-to-javafx)
+                    (fn [{:keys [owner username] :as player}]
+                      (let [
+                            marked? (boolean (get marked-users username))
+                            friended? (boolean (get friends username))
+                            ignored? (boolean (get ignore-users username))
+                            text-color-javafx (or
+                                                (when marked? players-mark-color)
+                                                (when ignored? players-ignore-color)
+                                                (when friended? players-friend-color)
+                                                (case battle-players-color-type
+                                                  "team" (get allyteam-javafx-colors (-> player :battle-status :ally))
+                                                  "player" (-> player :team-color fx.color/spring-color-to-javafx)
+                                                  ; else
+                                                  nil)
                                                 Color/WHITE)
                             text-color-css (-> text-color-javafx str u/hex-color-to-css)
                             can-kick (and (not read-only)
-                                          username
-                                          (not= username (:username player))
+                                          my-username
+                                          (not= my-username username)
                                           (or am-host
-                                              (= (:owner player) username)))]
+                                              (= owner username)))]
                         {:fx/type ext-with-context-menu
                          :props {:context-menu
                                  {:fx/type player-context-menu
@@ -1249,7 +1285,7 @@
                                :fill text-color-css
                                :style {:-fx-font-smoothing :gray
                                        :-fx-font-weight "bold"}
-                               :strikethrough (boolean (get ignore-users (:username player)))
+                               :strikethrough ignored?
                                :effect {:fx/type :drop-shadow
                                         :color (if (color/dark? text-color-javafx)
                                                  "#d5d5d5"
