@@ -507,36 +507,6 @@
   "name":"java.rmi.MarshalledObject"
 },
 {
-  "name":"java.rmi.activation.ActivationDesc"
-},
-{
-  "name":"java.rmi.activation.ActivationGroupDesc"
-},
-{
-  "name":"java.rmi.activation.ActivationGroupID"
-},
-{
-  "name":"java.rmi.activation.ActivationID"
-},
-{
-  "name":"java.rmi.activation.ActivationInstantiator"
-},
-{
-  "name":"java.rmi.activation.ActivationSystem",
-  "queriedMethods":[
-    {"name":"activeGroup","parameterTypes":["java.rmi.activation.ActivationGroupID","java.rmi.activation.ActivationInstantiator","long"] }, 
-    {"name":"getActivationDesc","parameterTypes":["java.rmi.activation.ActivationID"] }, 
-    {"name":"getActivationGroupDesc","parameterTypes":["java.rmi.activation.ActivationGroupID"] }, 
-    {"name":"registerGroup","parameterTypes":["java.rmi.activation.ActivationGroupDesc"] }, 
-    {"name":"registerObject","parameterTypes":["java.rmi.activation.ActivationDesc"] }, 
-    {"name":"setActivationDesc","parameterTypes":["java.rmi.activation.ActivationID","java.rmi.activation.ActivationDesc"] }, 
-    {"name":"setActivationGroupDesc","parameterTypes":["java.rmi.activation.ActivationGroupID","java.rmi.activation.ActivationGroupDesc"] }, 
-    {"name":"shutdown","parameterTypes":[] }, 
-    {"name":"unregisterGroup","parameterTypes":["java.rmi.activation.ActivationGroupID"] }, 
-    {"name":"unregisterObject","parameterTypes":["java.rmi.activation.ActivationID"] }
-  ]
-},
-{
   "name":"java.rmi.dgc.Lease"
 },
 {
@@ -871,9 +841,6 @@
 },
 {
   "name":"sun.rmi.registry.RegistryImpl_Stub"
-},
-{
-  "name":"sun.rmi.server.Activation$ActivationSystemImpl_Stub"
 },
 {
   "name":"sun.rmi.transport.DGCImpl_Skel",

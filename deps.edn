@@ -273,7 +273,6 @@
                "-H:Name=skylobby"
 
                "--no-fallback"
-               "--allow-incomplete-classpath"
                "--report-unsupported-elements-at-runtime"
 
                "-J-Xmx6g"
@@ -284,6 +283,8 @@
                "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+
+               "--initialize-at-build-time=java.awt.color.ColorSpace$BuiltInSpace"
 
                ; run time
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
@@ -321,7 +322,6 @@
                "-H:Name=skylobby"
 
                "--no-fallback"
-               "--allow-incomplete-classpath"
                "--report-unsupported-elements-at-runtime"
 
                "-J-Xmx7g"
@@ -332,6 +332,8 @@
                "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+
+               "--initialize-at-build-time=java.awt.color.ColorSpace$BuiltInSpace"
 
                ; run time
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
@@ -369,7 +371,6 @@
                "-H:Name=skylobby"
 
                "--no-fallback"
-               "--allow-incomplete-classpath"
                "--report-unsupported-elements-at-runtime"
 
                "-J-Xmx6g"
@@ -379,6 +380,8 @@
                "--initialize-at-build-time=io.netty.channel.epoll.AbstractEpollStreamChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollDatagramChannel"
                "--initialize-at-build-time=io.netty.channel.epoll.EpollSocketChannel"
+
+               "--initialize-at-build-time=java.awt.color.ColorSpace$BuiltInSpace"
 
                ; run time
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
