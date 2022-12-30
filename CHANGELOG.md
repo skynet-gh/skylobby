@@ -1,6 +1,10 @@
 # Changelog
 
-## [0.9.24](https://github.com/skynet-gh/skylobby/releases/tag/0.9.23) - 2022-12-28
+## [0.9.25](https://github.com/skynet-gh/skylobby/releases/tag/0.9.25) - 2022-12-30
+
+- Fix JavaFX issue on Linux
+
+## [0.9.24](https://github.com/skynet-gh/skylobby/releases/tag/0.9.24) - 2022-12-28
 
 - Add ability to color users by friend, ignored, marked
 
