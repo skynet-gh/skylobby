@@ -45,7 +45,7 @@
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.12"}
   jarohen/chime {:mvn/version "0.3.3"}
-  manifold/manifold {:mvn/version "0.2.4"}
+  manifold/manifold {:mvn/version "0.3.0"}
   me.xdrop/fuzzywuzzy {:mvn/version "1.4.0"}
   me.raynes/fs {:mvn/version "1.4.6"}
   metosin/reitit {:mvn/version "0.5.18"}
@@ -66,12 +66,22 @@
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
   org.controlsfx/controlsfx {:mvn/version "11.1.2"}
   org.fxmisc.flowless/flowless {:mvn/version "0.7.0"}
-  org.fxmisc.richtext/richtextfx {:mvn/version "0.11.0"}
+  org.fxmisc.richtext/richtextfx {:mvn/version "0.11.0"
+                                  :exclusions [
+                                               org.openjfx/javafx-base
+                                               org.openjfx/javafx-controls
+                                               org.openjfx/javafx-fxml
+                                               org.openjfx/javafx-graphics
+                                               org.openjfx/javafx-media]}
   org.kordamp.ikonli/ikonli-javafx {:mvn/version "12.3.1"}
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.1"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"}
   org.nibor.autolink/autolink {:mvn/version "0.10.1"}
   org.openjfx/javafx-base {:mvn/version "19"}
+  org.openjfx/javafx-controls {:mvn/version "19"}
+  org.openjfx/javafx-fxml {:mvn/version "19"}
+  org.openjfx/javafx-graphics {:mvn/version "19"}
+  org.openjfx/javafx-media {:mvn/version "19"}
   org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
   org.slf4j/jul-to-slf4j {:mvn/version "1.7.36"}
   org.slf4j/jcl-over-slf4j {:mvn/version "1.7.36"}
@@ -213,7 +223,7 @@
     io.netty/netty-transport {:mvn/version "4.1.86.Final"}
     io.netty/netty-transport-native-epoll {:mvn/version "4.1.86.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
-    manifold/manifold {:mvn/version "0.2.4"}
+    manifold/manifold {:mvn/version "0.3.0"}
     me.raynes/fs {:mvn/version "1.4.6"}
     me.xdrop/fuzzywuzzy {:mvn/version "1.4.0"}
     metosin/reitit {:mvn/version "0.5.18"}
