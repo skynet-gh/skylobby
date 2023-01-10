@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.26](https://github.com/skynet-gh/skylobby/releases/tag/0.9.26) - 2022-01-10
+
+- Add CLI flag `--players-display-type TYPE` where type is one of `group`, `table` in order to set players display type on startup.
+
 ## [0.9.25](https://github.com/skynet-gh/skylobby/releases/tag/0.9.25) - 2022-12-30
 
 - Fix JavaFX issue on Linux
