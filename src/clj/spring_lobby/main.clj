@@ -29,6 +29,8 @@
 (set! *warn-on-reflection* true)
 
 
+(def players-disply-types #{"group" "table"})
+
 (def cli-options
   [[nil "--chat-channel CHANNEL_NAME" "Add a default chat channel to connect to"
     :assoc-fn (fn [m k v]
@@ -43,6 +45,8 @@
     :validate [#(<= 0 % 1) "Must be a number between 0.0 and 1.0"]]
    [nil "--no-update-check" "Diable skylobby self update check"]
    [nil "--open-url URL" "Open a URL in the default system browser on start"]
+   [nil "--players-display-type GROUP_OR_TABLE" (str "Display type for players in a battle, one of " players-disply-types)
+    :validate [players-disply-types (str "Players display type must be one of " players-disply-types)]]
    [nil "--port PORT" "Port to use for web ui AND ipc for file associations like replays"]
    [nil "--replay-source REPLAY_SOURCE" "Replace default replay sources with one or more overrides"
     :assoc-fn (fn [m k v]
@@ -152,6 +156,8 @@
                             {:filter-battles (:filter-battles options)})
                           (when (contains? options :filter-users)
                             {:filter-users (:filter-users options)})
+                          (when (contains? options :players-display-type)
+                            {:battle-players-display-type (:players-display-type options)})
                           (when (contains? options :window-maximized)
                             {:window-maximized true})
                           (when (contains? options :server-url)
