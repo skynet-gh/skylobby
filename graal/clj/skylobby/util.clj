@@ -67,7 +67,7 @@
   (let [springlobby {:host "lobby.springrts.com"
                      :port default-server-port
                      :alias "Spring Official"}
-        bar-host "server3.beyondallreason.info"
+        bar-host "server4.beyondallreason.info"
         bar {:host bar-host
              :port default-server-port
              :alias "Beyond All Reason"}
