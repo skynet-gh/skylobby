@@ -186,6 +186,13 @@
 (defmethod handler/handle "TASServer" [state-atom server-key m]
   (handle-tasserver state-atom server-key m))
 
+(defmethod handler/handle "QUEUED" [state-atom server-key _m]
+  (log/info "Login queued")
+  (let [client-data (get-in @state-atom [:by-server server-key :client-data])]
+    (async/thread
+      (async/<!! (async/timeout 5000))
+      (message/send state-atom client-data "c.auth.login_queue_heartbeat"))))
+
 (defmethod handler/handle "ACCEPTED" [state-atom server-key m]
   (let [[_all username] (re-find #"\w+ (.*)" m)
         state (swap! state-atom
@@ -217,6 +224,12 @@
         message (str prefix pw-md5-base64 suffix)
         log-message (str prefix "<password>" suffix)] ; remove password
     (message/send state-atom client-data message {:log-message log-message})))
+
+(defmethod handler/handle "s.auth.front_of_queue" [state-atom server-key _m]
+  (let [client-data (get-in state-atom [:by-server server-key :client-data])
+        client-id (u/client-id state-atom @state-atom)]
+    (login state-atom client-data {:client-id client-id
+                                   :user-agent (u/user-agent (:user-agent-override state-atom))})))
 
 (defmethod handler/handle "COMPFLAGS" [state-atom server-key m]
   (let [[_all remaining] (re-find #"\w+ (.*)" m)
