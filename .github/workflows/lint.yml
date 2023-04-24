@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.3.0
+      - uses: actions/checkout@v3.5.2
       - uses: DeLaGuardo/clojure-lint-action@master
         with:
           clj-kondo-args: --config-paths ^:replace [] --config .clj-kondo\ci-config.edn --lint src/clj graal/clj src/cljs graal/cljc
