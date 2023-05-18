@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.28](https://github.com/skynet-gh/skylobby/releases/tag/0.9.28) - 2022-05-18
+
+- Add user right-click `Select Battle` to preview battle a player is in.
+
 ## [0.9.27](https://github.com/skynet-gh/skylobby/releases/tag/0.9.27) - 2022-04-24
 
 - Add fix for BAR server breaking change
