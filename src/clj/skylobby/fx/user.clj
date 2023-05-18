@@ -96,7 +96,12 @@
                                            :client-data client-data
                                            :selected-battle battle-id
                                            :battle-passworded (= "1" (:battle-passworded (get battles battle-id)))
-                                           :server-key server-key}}])
+                                           :server-key server-key}}
+                              {:fx/type :menu-item
+                               :text "Select Battle"
+                               :on-action {:event/type :spring-lobby/select-battle
+                                           :server-key server-key
+                                           :battle-id battle-id}}])
                            (if (contains? friends username)
                              [{:fx/type :menu-item
                                :text "Unfriend"
