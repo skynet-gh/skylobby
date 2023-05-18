@@ -1471,8 +1471,9 @@
     "teiserver"))
   ; TODO other SPADS might support JSONRPC too
 
-(defmethod event-handler ::select-battle [{:fx/keys [event] :keys [server-key]}]
-  (let [battle-id (:battle-id event)
+(defmethod event-handler ::select-battle [{:fx/keys [event] :keys [battle-id server-key]}]
+  (let [battle-id (or battle-id
+                      (:battle-id event))
         wait-time 1000
         state (swap! *state update-in [:by-server server-key]
                 (fn [{:keys [users] :as server-data}]
