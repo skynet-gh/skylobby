@@ -3,44 +3,43 @@
  {"local" {:url "file:./repo"}
   "jcenter" {:url "https://jcenter.bintray.com/"}}
  :deps
- {
-  aleph/aleph {:mvn/version "0.6.0"}
-  cheshire/cheshire {:mvn/version  "5.11.0"}
+ {aleph/aleph {:mvn/version "0.6.4"}
+  cheshire/cheshire {:mvn/version  "5.12.0"}
   clj-jgit/clj-jgit {:mvn/version "1.0.2"}
   clj-http/clj-http {:mvn/version "3.12.3"}
-  cljfx/cljfx {:mvn/version "1.7.23"
+  cljfx/cljfx {:mvn/version "1.7.24"
                :exclusions [org.openjfx/javafx-web]}
   cljfx/css {:mvn/version "1.1.0"}
   clojail/clojail {:mvn/version "1.0.6"}
   clojure-humanize/clojure-humanize {:mvn/version "0.2.2"}
-  clojure.java-time/clojure.java-time {:mvn/version "1.2.0"}
+  clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
   com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                            :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
-  com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-  com.github.seancorfield/honeysql {:mvn/version "2.4.1026"}
-  com.github.seancorfield/next.jdbc {:mvn/version "1.3.874"}
-  com.h2database/h2 {:mvn/version "2.1.214"}
-  com.taoensso/encore {:mvn/version "3.59.0"}
-  com.taoensso/nippy {:mvn/version "3.2.0"}
-  com.taoensso/sente {:mvn/version "1.17.0"}
-  com.taoensso/timbre {:mvn/version "6.1.0"}
-  com.taoensso/tufte {:mvn/version "2.4.5"}
-  commons-io/commons-io {:mvn/version "2.12.0"}
-  commons-validator/commons-validator {:mvn/version "1.7"}
+  com.fzakaria/slf4j-timbre {:mvn/version "0.4.1"}
+  com.github.seancorfield/honeysql {:mvn/version "2.5.1103"}
+  com.github.seancorfield/next.jdbc {:mvn/version "1.3.909"}
+  com.h2database/h2 {:mvn/version "2.2.224"}
+  com.taoensso/encore {:mvn/version "3.74.0"}
+  com.taoensso/nippy {:mvn/version "3.3.0"}
+  com.taoensso/sente {:mvn/version "1.19.2"}
+  com.taoensso/timbre {:mvn/version "6.3.1"}
+  com.taoensso/tufte {:mvn/version "2.6.3"}
+  commons-io/commons-io {:mvn/version "2.15.1"}
+  commons-validator/commons-validator {:mvn/version "1.8.0"}
   crouton/crouton {:mvn/version "0.1.2"}
   crypto-random/crypto-random {:mvn/version "1.2.1"}
-  org.clj-commons/gloss {:mvn/version "0.3.5"}
+  org.clj-commons/gloss {:mvn/version "0.3.6"}
   io.github.memo33/jsquish {:mvn/version "2.0.1"}
-  http-kit/http-kit {:mvn/version "2.6.0"}
-  io.aviso/pretty {:mvn/version "1.4.2"}
-  io.netty/netty-codec {:mvn/version "4.1.92.Final"}
-  io.netty/netty-codec-http {:mvn/version "4.1.92.Final"}
-  io.netty/netty-handler {:mvn/version "4.1.92.Final"}
-  io.netty/netty-handler-proxy {:mvn/version "4.1.92.Final"}
-  io.netty/netty-resolver {:mvn/version "4.1.92.Final"}
-  io.netty/netty-resolver-dns {:mvn/version "4.1.92.Final"}
-  io.netty/netty-transport {:mvn/version "4.1.92.Final"}
-  io.netty/netty-transport-native-epoll {:mvn/version "4.1.92.Final"}
+  http-kit/http-kit {:mvn/version "2.7.0"}
+  io.aviso/pretty {:mvn/version "1.4.4"}
+  io.netty/netty-codec {:mvn/version "4.1.104.Final"}
+  io.netty/netty-codec-http {:mvn/version "4.1.104.Final"}
+  io.netty/netty-handler {:mvn/version "4.1.104.Final"}
+  io.netty/netty-handler-proxy {:mvn/version "4.1.104.Final"}
+  io.netty/netty-resolver {:mvn/version "4.1.104.Final"}
+  io.netty/netty-resolver-dns {:mvn/version "4.1.104.Final"}
+  io.netty/netty-transport {:mvn/version "4.1.104.Final"}
+  io.netty/netty-transport-native-epoll {:mvn/version "4.1.104.Final"}
   hiccup/hiccup {:mvn/version "1.0.5"}
   instaparse/instaparse {:mvn/version "1.4.12"}
   jarohen/chime {:mvn/version "0.3.3"}
@@ -51,10 +50,10 @@
   net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
   net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
   org.apache.commons/commons-collections4 {:mvn/version "4.4"}
-  org.apache.commons/commons-compress {:mvn/version "1.23.0"}
-  org.clj-commons/primitive-math {:mvn/version "1.0.0"}
-  org.clojure/clojure {:mvn/version "1.12.0-alpha3"}
-  org.clojure/core.async {:mvn/version "1.6.673"}
+  org.apache.commons/commons-compress {:mvn/version "1.25.0"}
+  org.clj-commons/primitive-math {:mvn/version "1.0.1"}
+  org.clojure/clojure {:mvn/version "1.12.0-alpha5"}
+  org.clojure/core.async {:mvn/version "1.6.681"}
   org.clojure/core.cache {:mvn/version "1.0.225"}
   org.clojure/core.memoize {:mvn/version "1.0.257"}
   org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
@@ -63,11 +62,10 @@
   org.clojure/tools.cli {:mvn/version "1.0.219"}
   org.clojure/tools.logging {:mvn/version "1.2.4"}
   org.codehaus.griffon.plugins/griffon-flagicons-javafx {:mvn/version "1.1.0"}
-  org.controlsfx/controlsfx {:mvn/version "11.1.2"}
-  org.fxmisc.flowless/flowless {:mvn/version "0.7.0"}
-  org.fxmisc.richtext/richtextfx {:mvn/version "0.11.0"
-                                  :exclusions [
-                                               org.openjfx/javafx-base
+  org.controlsfx/controlsfx {:mvn/version "11.2.0"}
+  org.fxmisc.flowless/flowless {:mvn/version "0.7.2"}
+  org.fxmisc.richtext/richtextfx {:mvn/version "0.11.2"
+                                  :exclusions [org.openjfx/javafx-base
                                                org.openjfx/javafx-controls
                                                org.openjfx/javafx-fxml
                                                org.openjfx/javafx-graphics
@@ -76,17 +74,17 @@
   org.kordamp.ikonli/ikonli-materialdesign-pack {:mvn/version "12.3.1"}
   org.luaj/luaj-jse {:mvn/version "3.0.1"}
   org.nibor.autolink/autolink {:mvn/version "0.11.0"}
-  org.openjfx/javafx-base {:mvn/version "19"}
-  org.openjfx/javafx-controls {:mvn/version "19"}
-  org.openjfx/javafx-fxml {:mvn/version "19"}
-  org.openjfx/javafx-graphics {:mvn/version "19"}
-  org.openjfx/javafx-media {:mvn/version "19"}
-  org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
-  org.slf4j/jul-to-slf4j {:mvn/version "1.7.36"}
-  org.slf4j/jcl-over-slf4j {:mvn/version "1.7.36"}
+  org.openjfx/javafx-base {:mvn/version "21.0.1"}
+  org.openjfx/javafx-controls {:mvn/version "21.0.1"}
+  org.openjfx/javafx-fxml {:mvn/version "21.0.1"}
+  org.openjfx/javafx-graphics {:mvn/version "21.0.1"}
+  org.openjfx/javafx-media {:mvn/version "21.0.1"}
+  org.slf4j/log4j-over-slf4j {:mvn/version "2.0.10"}
+  org.slf4j/jul-to-slf4j {:mvn/version "2.0.10"}
+  org.slf4j/jcl-over-slf4j {:mvn/version "2.0.10"}
   org.tukaani/xz {:mvn/version "1.9"}
   ring/ring-anti-forgery {:mvn/version "1.3.0"}
-  ring/ring-core {:mvn/version "1.10.0"}
+  ring/ring-core {:mvn/version "1.11.0"}
   shams/priority-queue {:mvn/version "0.1.2"}
   smee/binary {:mvn/version "0.5.5"}
   version-clj/version-clj {:mvn/version "2.0.2"}}
@@ -94,24 +92,22 @@
  {:nrepl
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {
-    cider/cider-nrepl {:mvn/version "0.30.0"}
-    cider/orchard {:mvn/version "0.11.0"}
+   {cider/cider-nrepl {:mvn/version "0.44.0"}
+    cider/orchard {:mvn/version "0.21.0"}
     clj-commons/pomegranate {:mvn/version "1.2.23"}
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    io.github.clojure/tools.build {:git/tag "v0.9.4"
-                                   :git/sha "76b78fe20355c3570ce5477bc80c39c79e097af2"
+    io.aviso/pretty {:mvn/version "1.4.4"}
+    io.github.clojure/tools.build {:git/tag "v0.9.6"
+                                   :git/sha "8e78bccc35116f6b6fc0bf0c125dba8b8db8da6b"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "1.0.0"}
+    nrepl/nrepl {:mvn/version "1.1.0"}
     org.clojure/tools.namespace {:mvn/version "1.4.4"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
-    zprint/zprint {:mvn/version "1.2.5"}}
-   :jvm-opts [
-              "-Xmx4g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
+    zprint/zprint {:mvn/version "1.2.8"}}
+   :jvm-opts ["-Xmx4g" "-XX:+DoEscapeAnalysis" "-XX:+ExitOnOutOfMemoryError"
               "-XX:+UseZGC"
               "-XX:+UseCompressedOops" "-XX:-OmitStackTraceInFastThrow"
               "-Dprism.allowhidpi=\"true\"" "-Dglass.win.minHiDPI=1"
@@ -127,67 +123,60 @@
   :cljs
   {:extra-paths ["src/cljs" "graal/cljc"]
    :extra-deps
-   {
-    com.fulcrologic/fulcro {:mvn/version "3.6.4"}
-    com.taoensso/sente {:mvn/version "1.17.0"}
-    com.taoensso/timbre {:mvn/version "6.1.0"}
+   {com.fulcrologic/fulcro {:mvn/version "3.6.10"}
+    com.taoensso/sente {:mvn/version "1.19.2"}
+    com.taoensso/timbre {:mvn/version "6.3.1"}
     hashp/hashp {:mvn/version "0.2.2"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
+    io.aviso/pretty {:mvn/version "1.4.4"}
     metosin/reitit {:mvn/version "0.6.0"}
-    org.clojure/core.async {:mvn/version "1.6.673"}
-    org.clojure/clojurescript {:mvn/version "1.11.60"}
-    re-frame/re-frame {:mvn/version "1.3.0"}
+    org.clojure/core.async {:mvn/version "1.6.681"}
+    org.clojure/clojurescript {:mvn/version "1.11.121"}
+    re-frame/re-frame {:mvn/version "1.4.2"}
     reagent/reagent {:mvn/version "1.2.0"}
-    thheller/shadow-cljs {:mvn/version "2.23.3"}}
+    thheller/shadow-cljs {:mvn/version "2.26.2"}}
    :main-opts ["-m" "shadow.cljs.devtools.cli"]}
   :uberjar
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar"]
    :replace-deps
-   {
-    clj-jgit/clj-jgit {:mvn/version "1.0.2"}
-    cljfx/cljfx {:mvn/version "1.7.23"
+   {clj-jgit/clj-jgit {:mvn/version "1.0.2"}
+    cljfx/cljfx {:mvn/version "1.7.24"
                  :exclusions [org.openjfx/javafx-web]}
     com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                              :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
-    com.fzakaria/slf4j-timbre {:mvn/version "0.3.21"}
-    com.taoensso/timbre {:mvn/version "6.1.0"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    io.github.clojure/tools.build {:git/tag "v0.9.4"
-                                   :git/sha "76b78fe20355c3570ce5477bc80c39c79e097af2"
+    com.fzakaria/slf4j-timbre {:mvn/version "0.4.1"}
+    com.taoensso/timbre {:mvn/version "6.3.1"}
+    io.aviso/pretty {:mvn/version "1.4.4"}
+    io.github.clojure/tools.build {:git/tag "v0.9.6"
+                                   :git/sha "8e78bccc35116f6b6fc0bf0c125dba8b8db8da6b"
                                    :exclusions [org.slf4j/slf4j-nop]}}
    :main-opts ["-m" "uberjar"]}
   :kaocha
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "test/clj"]
    :extra-deps
-   {
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    lambdaisland/kaocha {:mvn/version "1.83.1314"}}
+   {io.aviso/pretty {:mvn/version "1.4.4"}
+    lambdaisland/kaocha {:mvn/version "1.87.1366"}}
    :main-opts ["-m" "kaocha.runner" "--watch"]}
   :build
   {:deps
-   {
-    io.github.clojure/tools.build {:git/tag "v0.9.4"
-                                   :git/sha "76b78fe20355c3570ce5477bc80c39c79e097af2"}}
+   {io.github.clojure/tools.build {:git/tag "v0.9.6"
+                                   :git/sha "8e78bccc35116f6b6fc0bf0c125dba8b8db8da6b"}}
    :ns-default build}
   :skylobby
   {:deps
-   {
-    io.github.clojure/tools.build {:git/tag "v0.9.4"
-                                   :git/sha "76b78fe20355c3570ce5477bc80c39c79e097af2"}}
+   {io.github.clojure/tools.build {:git/tag "v0.9.6"
+                                   :git/sha "8e78bccc35116f6b6fc0bf0c125dba8b8db8da6b"}}
    :ns-default build}
   :graal-deps
-  {
-   :extra-paths ["graal/clj" "graal/cljc"]
+  {:extra-paths ["graal/clj" "graal/cljc"]
    :replace-deps
-   {
-    aleph/aleph {:mvn/version "0.6.1"}
-    cheshire/cheshire {:mvn/version  "5.11.0"}
+   {aleph/aleph {:mvn/version "0.6.4"}
+    cheshire/cheshire {:mvn/version  "5.12.0"}
     clj.native-image/clj.native-image {:git/url "https://github.com/taylorwood/clj.native-image.git"
                                        :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
     clj-http/clj-http {:mvn/version "3.12.3"}
     clj-jgit/clj-jgit {:mvn/version "0.8.10"}
     clojail/clojail {:mvn/version "1.0.6"}
-    clojure.java-time/clojure.java-time {:mvn/version "1.2.0"}
+    clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
     com.evocomputing/colors {:git/url "https://github.com/skynet-gh/jolby-colors.git"
                              :git/sha "2f2dfb3daacc5e7cb4ae0fb9822f0be872486260"}
     com.github.clj-easy/graal-config-clj-http {:git/url "https://github.com/clj-easy/graal-config"
@@ -196,30 +185,30 @@
     com.github.clj-easy/graal-config-nippy {:git/url   "https://github.com/clj-easy/graal-config"
                                             :git/sha   "0dc2862e1b1c9871eef4c306ef77da3610a2bd93"
                                             :deps/root "config/com.taoensso/nippy"}
-    com.github.seancorfield/honeysql {:mvn/version "2.4.1026"}
-    com.github.seancorfield/next.jdbc {:mvn/version "1.3.874"}
-    com.h2database/h2 {:mvn/version "2.1.214"}
-    com.taoensso/encore {:mvn/version "3.59.0"}
-    com.taoensso/nippy {:mvn/version "3.2.0"}
-    com.taoensso/sente {:mvn/version "1.17.0"}
-    com.taoensso/timbre {:mvn/version "6.1.0"}
-    com.taoensso/tufte {:mvn/version "2.4.5"}
-    commons-io/commons-io {:mvn/version "2.12.0"}
+    com.github.seancorfield/honeysql {:mvn/version "2.5.1103"}
+    com.github.seancorfield/next.jdbc {:mvn/version "1.3.909"}
+    com.h2database/h2 {:mvn/version "2.2.224"}
+    com.taoensso/encore {:mvn/version "3.74.0"}
+    com.taoensso/nippy {:mvn/version "3.3.0"}
+    com.taoensso/sente {:mvn/version "1.19.2"}
+    com.taoensso/timbre {:mvn/version "6.3.1"}
+    com.taoensso/tufte {:mvn/version "2.6.3"}
+    commons-io/commons-io {:mvn/version "2.15.1"}
     crouton/crouton {:mvn/version "0.1.2"}
     crypto-random/crypto-random {:mvn/version "1.2.1"}
-    org.clj-commons/gloss {:mvn/version "0.3.5"}
+    org.clj-commons/gloss {:mvn/version "0.3.6"}
     io.github.memo33/jsquish {:mvn/version "2.0.1"}
-    http-kit/http-kit {:mvn/version "2.6.0"}
+    http-kit/http-kit {:mvn/version "2.7.0"}
     instaparse/instaparse {:mvn/version "1.4.12"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    io.netty/netty-codec {:mvn/version "4.1.92.Final"}
-    io.netty/netty-codec-http {:mvn/version "4.1.92.Final"}
-    io.netty/netty-handler {:mvn/version "4.1.92.Final"}
-    io.netty/netty-handler-proxy {:mvn/version "4.1.92.Final"}
-    io.netty/netty-resolver {:mvn/version "4.1.92.Final"}
-    io.netty/netty-resolver-dns {:mvn/version "4.1.92.Final"}
-    io.netty/netty-transport {:mvn/version "4.1.92.Final"}
-    io.netty/netty-transport-native-epoll {:mvn/version "4.1.92.Final"}
+    io.aviso/pretty {:mvn/version "1.4.4"}
+    io.netty/netty-codec {:mvn/version "4.1.104.Final"}
+    io.netty/netty-codec-http {:mvn/version "4.1.104.Final"}
+    io.netty/netty-handler {:mvn/version "4.1.104.Final"}
+    io.netty/netty-handler-proxy {:mvn/version "4.1.104.Final"}
+    io.netty/netty-resolver {:mvn/version "4.1.104.Final"}
+    io.netty/netty-resolver-dns {:mvn/version "4.1.104.Final"}
+    io.netty/netty-transport {:mvn/version "4.1.104.Final"}
+    io.netty/netty-transport-native-epoll {:mvn/version "4.1.104.Final"}
     jarohen/chime {:mvn/version "0.3.3"}
     manifold/manifold {:mvn/version "0.4.1"}
     me.raynes/fs {:mvn/version "1.4.6"}
@@ -227,37 +216,36 @@
     metosin/reitit {:mvn/version "0.6.0"}
     net.sf.sevenzipjbinding/sevenzipjbinding {:mvn/version "16.02-2.01"}
     net.sf.sevenzipjbinding/sevenzipjbinding-all-platforms {:mvn/version "16.02-2.01"}
-    org.apache.commons/commons-compress {:mvn/version "1.23.0"}
-    org.clj-commons/primitive-math {:mvn/version "1.0.0"}
-    org.clojure/clojure {:mvn/version "1.12.0-alpha1"}
-    org.clojure/core.async {:mvn/version "1.6.673"}
+    org.apache.commons/commons-compress {:mvn/version "1.25.0"}
+    org.clj-commons/primitive-math {:mvn/version "1.0.1"}
+    org.clojure/clojure {:mvn/version "1.12.0-alpha5"}
+    org.clojure/core.async {:mvn/version "1.6.681"}
     org.clojure/core.cache {:mvn/version "1.0.225"}
     org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
     org.clojure/spec.alpha {:mvn/version "0.3.218"}
     org.clojure/test.check {:mvn/version "1.1.1"}
     org.clojure/tools.cli {:mvn/version "1.0.219"}
     org.luaj/luaj-jse {:mvn/version "3.0.1"}
-    org.slf4j/log4j-over-slf4j {:mvn/version "1.7.36"}
-    org.slf4j/jcl-over-slf4j {:mvn/version "1.7.36"}
-    org.slf4j/slf4j-jdk14 {:mvn/version "1.7.36"}
+    org.slf4j/log4j-over-slf4j {:mvn/version "2.0.10"}
+    org.slf4j/jcl-over-slf4j {:mvn/version "2.0.10"}
+    org.slf4j/slf4j-jdk14 {:mvn/version "2.0.10"}
     ring/ring-anti-forgery {:mvn/version "1.3.0"}
-    ring/ring-core {:mvn/version "1.10.0"}
+    ring/ring-core {:mvn/version "1.11.0"}
     smee/binary {:mvn/version "0.5.5"}
     version-clj/version-clj {:mvn/version "2.0.2"}}}
   :graal-repl
   {:extra-paths ["graal/clj" "graal/cljc" "dev/clj/graal"]
    :extra-deps
-   {
-    cider/cider-nrepl {:mvn/version "0.30.0"}
-    cider/orchard {:mvn/version "0.11.0"}
+   {cider/cider-nrepl {:mvn/version "0.44.0"}
+    cider/orchard {:mvn/version "0.21.0"}
     hashp/hashp {:mvn/version "0.2.2"}
     hawk/hawk {:mvn/version "0.2.11"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    io.github.clojure/tools.build {:git/tag "v0.9.4"
-                                   :git/sha "76b78fe20355c3570ce5477bc80c39c79e097af2"
+    io.aviso/pretty {:mvn/version "1.4.4"}
+    io.github.clojure/tools.build {:git/tag "v0.9.6"
+                                   :git/sha "8e78bccc35116f6b6fc0bf0c125dba8b8db8da6b"
                                    :exclusions [org.slf4j/slf4j-nop]}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "1.0.0"}
+    nrepl/nrepl {:mvn/version "1.1.0"}
     org.clojure/tools.namespace {:mvn/version "1.4.4"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}}
@@ -271,11 +259,10 @@
   :native-linux
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
    :extra-deps
-   {
-    clj.native-image/clj.native-image
+   {clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
+    com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
    :main-opts ["-m" "native-image" "skylobby.main"
 
                "-H:Name=skylobby"
@@ -320,14 +307,15 @@
   :native-windows
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/windows"]
    :extra-deps
-   {
-    clj.native-image/clj.native-image
+   {clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
+    com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
    :main-opts ["-m" "native-image" "skylobby.main"
 
-               "-H:Name=skylobby"
+               "-H:+UnlockExperimentalVMOptions"
+
+               "-o skylobby"
 
                "--no-fallback"
                "--report-unsupported-elements-at-runtime"
@@ -347,7 +335,10 @@
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
 
                "--initialize-at-run-time=io.netty.channel.epoll"
-               "--initialize-at-run-time=io.netty.channel.kqueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
                "--initialize-at-run-time=io.netty.channel.unix"
 
                "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
@@ -359,6 +350,8 @@
                "--initialize-at-run-time=io.netty.handler.ssl.ReferenceCountedOpenSslEngine"
                "--initialize-at-run-time=io.netty.handler.ssl.util.ThreadLocalInsecureRandom"
 
+               "--initialize-at-run-time=io.netty.incubator.channel.uring.IOUringEventLoopGroup"
+
                "--initialize-at-run-time=io.netty.internal.tcnative.SSLPrivateKeyMethod"
 
                "--initialize-at-run-time=io.netty.util.internal.logging.Log4J2Logger"
@@ -369,11 +362,10 @@
   :native-mac
   {:replace-paths ["resources" "dev/clj/native" "graal/clj" "graal/cljc" "native-res/linux"]
    :extra-deps
-   {
-    clj.native-image/clj.native-image
+   {clj.native-image/clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
      :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}
-    com.github.clj-easy/graal-build-time {:mvn/version "0.1.4"}}
+    com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
    :main-opts ["-m" "native-image" "skylobby.main"
 
                "-H:Name=skylobby"
@@ -417,15 +409,15 @@
   :reveal
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "dev/clj/jar" "dev/clj/user" "test/clj"]
    :extra-deps
-   {cider/cider-nrepl {:mvn/version "0.30.0"}
-    cider/orchard {:mvn/version "0.11.0"}
+   {cider/cider-nrepl {:mvn/version "0.44.0"}
+    cider/orchard {:mvn/version "0.21.0"}
     clj-commons/pomegranate {:mvn/version "1.2.23"}
-    cljfx/cljfx {:mvn/version "1.7.23"
+    cljfx/cljfx {:mvn/version "1.7.24"
                  :exclusions [org.openjfx/javafx-web]}
     hawk/hawk {:mvn/version "0.2.11"}
-    io.aviso/pretty {:mvn/version "1.4.2"}
+    io.aviso/pretty {:mvn/version "1.4.4"}
     net.cgrand/parsley {:mvn/version "0.9.3"}
-    nrepl/nrepl {:mvn/version "1.0.0"}
+    nrepl/nrepl {:mvn/version "1.1.0"}
     org.clojure/tools.namespace {:mvn/version "1.4.4"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}
     reply/reply {:mvn/version "0.5.1"}
@@ -435,9 +427,8 @@
   :test-once
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "test/clj"]
    :extra-deps
-   {
-    io.aviso/pretty {:mvn/version "1.4.2"}
-    lambdaisland/kaocha {:mvn/version "1.83.1314"}}
+   {io.aviso/pretty {:mvn/version "1.4.4"}
+    lambdaisland/kaocha {:mvn/version "1.87.1366"}}
    :main-opts ["-m" "kaocha.runner"]}
   :test
   {:extra-paths ["src/clj" "graal/clj" "graal/cljc" "test/clj"]}

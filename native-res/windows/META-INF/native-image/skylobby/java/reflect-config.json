@@ -64,16 +64,7 @@
 },
 {
   "name":"aleph.netty.proxy$io.netty.channel.ChannelInitializer$ff19274a",
-  "queriedMethods":[
-    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
-    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
-  ]
+  "queriedMethods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
 },
 {
   "name":"clojure.core.async.impl.channels.ManyToManyChannel"
@@ -82,6 +73,9 @@
   "name":"clojure.lang.PersistentArrayMap",
   "queryAllPublicMethods":true,
   "methods":[{"name":"create","parameterTypes":["java.util.Map"] }]
+},
+{
+  "name":"com.ibm.icu.text.Collator"
 },
 {
   "name":"com.sun.crypto.provider.AESCipher$General",
@@ -132,12 +126,7 @@
 {
   "name":"com.sun.management.VMOption",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getName","parameterTypes":[] }, 
-    {"name":"getOrigin","parameterTypes":[] }, 
-    {"name":"getValue","parameterTypes":[] }, 
-    {"name":"isWriteable","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getName","parameterTypes":[] }, {"name":"getOrigin","parameterTypes":[] }, {"name":"getValue","parameterTypes":[] }, {"name":"isWriteable","parameterTypes":[] }]
 },
 {
   "name":"com.sun.management.internal.GarbageCollectorExtImpl",
@@ -161,11 +150,7 @@
 },
 {
   "name":"io.netty.channel.ChannelInboundHandlerAdapter",
-  "queriedMethods":[
-    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }
-  ]
+  "queriedMethods":[{"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
 },
 {
   "name":"io.netty.channel.ChannelInitializer",
@@ -173,39 +158,11 @@
 },
 {
   "name":"io.netty.channel.DefaultChannelPipeline$HeadContext",
-  "queriedMethods":[
-    {"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
-    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
-    {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
-    {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }
-  ]
+  "queriedMethods":[{"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
 },
 {
   "name":"io.netty.channel.DefaultChannelPipeline$TailContext",
-  "queriedMethods":[
-    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
-    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
-  ]
+  "queriedMethods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
 },
 {
   "name":"io.netty.channel.socket.nio.NioSocketChannel",
@@ -213,10 +170,7 @@
 },
 {
   "name":"io.netty.handler.codec.ByteToMessageDecoder",
-  "queriedMethods":[
-    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
-  ]
+  "queriedMethods":[{"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
 },
 {
   "name":"io.netty.handler.ssl.SslContextBuilder",
@@ -225,20 +179,7 @@
 },
 {
   "name":"io.netty.handler.ssl.SslHandler",
-  "queriedMethods":[
-    {"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
-    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, 
-    {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, 
-    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
-    {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }
-  ]
+  "queriedMethods":[{"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
 },
 {
   "name":"io.netty.util.ReferenceCountUtil",
@@ -264,6 +205,12 @@
   "queryAllPublicMethods":true
 },
 {
+  "name":"java.io.EOFExceptionBeanInfo"
+},
+{
+  "name":"java.io.EOFExceptionCustomizer"
+},
+{
   "name":"java.io.File"
 },
 {
@@ -273,6 +220,12 @@
 {
   "name":"java.io.IOException",
   "queryAllPublicMethods":true
+},
+{
+  "name":"java.io.IOExceptionBeanInfo"
+},
+{
+  "name":"java.io.IOExceptionCustomizer"
 },
 {
   "name":"java.lang.AutoCloseable",
@@ -302,6 +255,12 @@
 {
   "name":"java.lang.Exception",
   "queryAllPublicMethods":true
+},
+{
+  "name":"java.lang.ExceptionBeanInfo"
+},
+{
+  "name":"java.lang.ExceptionCustomizer"
 },
 {
   "name":"java.lang.Float",
@@ -336,6 +295,12 @@
   "methods":[{"name":"getClass","parameterTypes":[] }]
 },
 {
+  "name":"java.lang.ObjectBeanInfo"
+},
+{
+  "name":"java.lang.ObjectCustomizer"
+},
+{
   "name":"java.lang.RuntimeException",
   "queryAllPublicMethods":true
 },
@@ -346,16 +311,7 @@
 {
   "name":"java.lang.StackTraceElement",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getClassLoaderName","parameterTypes":[] }, 
-    {"name":"getClassName","parameterTypes":[] }, 
-    {"name":"getFileName","parameterTypes":[] }, 
-    {"name":"getLineNumber","parameterTypes":[] }, 
-    {"name":"getMethodName","parameterTypes":[] }, 
-    {"name":"getModuleName","parameterTypes":[] }, 
-    {"name":"getModuleVersion","parameterTypes":[] }, 
-    {"name":"isNativeMethod","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getClassLoaderName","parameterTypes":[] }, {"name":"getClassName","parameterTypes":[] }, {"name":"getFileName","parameterTypes":[] }, {"name":"getLineNumber","parameterTypes":[] }, {"name":"getMethodName","parameterTypes":[] }, {"name":"getModuleName","parameterTypes":[] }, {"name":"getModuleVersion","parameterTypes":[] }, {"name":"isNativeMethod","parameterTypes":[] }]
 },
 {
   "name":"java.lang.String"
@@ -363,13 +319,13 @@
 {
   "name":"java.lang.Throwable",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getCause","parameterTypes":[] }, 
-    {"name":"getLocalizedMessage","parameterTypes":[] }, 
-    {"name":"getMessage","parameterTypes":[] }, 
-    {"name":"getStackTrace","parameterTypes":[] }, 
-    {"name":"getSuppressed","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getCause","parameterTypes":[] }, {"name":"getLocalizedMessage","parameterTypes":[] }, {"name":"getMessage","parameterTypes":[] }, {"name":"getStackTrace","parameterTypes":[] }, {"name":"getSuppressed","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.ThrowableBeanInfo"
+},
+{
+  "name":"java.lang.ThrowableCustomizer"
 },
 {
   "name":"java.lang.Void",
@@ -394,10 +350,7 @@
 {
   "name":"java.lang.management.LockInfo",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getClassName","parameterTypes":[] }, 
-    {"name":"getIdentityHashCode","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getClassName","parameterTypes":[] }, {"name":"getIdentityHashCode","parameterTypes":[] }]
 },
 {
   "name":"java.lang.management.ManagementFactory",
@@ -419,20 +372,12 @@
 {
   "name":"java.lang.management.MemoryPoolMXBean",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getPeakUsage","parameterTypes":[] }, 
-    {"name":"getUsage","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getPeakUsage","parameterTypes":[] }, {"name":"getUsage","parameterTypes":[] }]
 },
 {
   "name":"java.lang.management.MemoryUsage",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getCommitted","parameterTypes":[] }, 
-    {"name":"getInit","parameterTypes":[] }, 
-    {"name":"getMax","parameterTypes":[] }, 
-    {"name":"getUsed","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getCommitted","parameterTypes":[] }, {"name":"getInit","parameterTypes":[] }, {"name":"getMax","parameterTypes":[] }, {"name":"getUsed","parameterTypes":[] }]
 },
 {
   "name":"java.lang.management.MonitorInfo",
@@ -454,37 +399,11 @@
 {
   "name":"java.lang.management.ThreadInfo",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getBlockedCount","parameterTypes":[] }, 
-    {"name":"getBlockedTime","parameterTypes":[] }, 
-    {"name":"getLockInfo","parameterTypes":[] }, 
-    {"name":"getLockName","parameterTypes":[] }, 
-    {"name":"getLockOwnerId","parameterTypes":[] }, 
-    {"name":"getLockOwnerName","parameterTypes":[] }, 
-    {"name":"getLockedMonitors","parameterTypes":[] }, 
-    {"name":"getLockedSynchronizers","parameterTypes":[] }, 
-    {"name":"getPriority","parameterTypes":[] }, 
-    {"name":"getStackTrace","parameterTypes":[] }, 
-    {"name":"getThreadId","parameterTypes":[] }, 
-    {"name":"getThreadName","parameterTypes":[] }, 
-    {"name":"getThreadState","parameterTypes":[] }, 
-    {"name":"getWaitedCount","parameterTypes":[] }, 
-    {"name":"getWaitedTime","parameterTypes":[] }, 
-    {"name":"isDaemon","parameterTypes":[] }, 
-    {"name":"isInNative","parameterTypes":[] }, 
-    {"name":"isSuspended","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getBlockedCount","parameterTypes":[] }, {"name":"getBlockedTime","parameterTypes":[] }, {"name":"getLockInfo","parameterTypes":[] }, {"name":"getLockName","parameterTypes":[] }, {"name":"getLockOwnerId","parameterTypes":[] }, {"name":"getLockOwnerName","parameterTypes":[] }, {"name":"getLockedMonitors","parameterTypes":[] }, {"name":"getLockedSynchronizers","parameterTypes":[] }, {"name":"getPriority","parameterTypes":[] }, {"name":"getStackTrace","parameterTypes":[] }, {"name":"getThreadId","parameterTypes":[] }, {"name":"getThreadName","parameterTypes":[] }, {"name":"getThreadState","parameterTypes":[] }, {"name":"getWaitedCount","parameterTypes":[] }, {"name":"getWaitedTime","parameterTypes":[] }, {"name":"isDaemon","parameterTypes":[] }, {"name":"isInNative","parameterTypes":[] }, {"name":"isSuspended","parameterTypes":[] }]
 },
 {
   "name":"java.lang.management.ThreadMXBean",
-  "methods":[
-    {"name":"findDeadlockedThreads","parameterTypes":[] }, 
-    {"name":"getAllThreadIds","parameterTypes":[] }, 
-    {"name":"getDaemonThreadCount","parameterTypes":[] }, 
-    {"name":"getThreadCount","parameterTypes":[] }, 
-    {"name":"getThreadInfo","parameterTypes":["long"] }, 
-    {"name":"getThreadInfo","parameterTypes":["long[]","int"] }
-  ]
+  "methods":[{"name":"findDeadlockedThreads","parameterTypes":[] }, {"name":"getAllThreadIds","parameterTypes":[] }, {"name":"getDaemonThreadCount","parameterTypes":[] }, {"name":"getThreadCount","parameterTypes":[] }, {"name":"getThreadInfo","parameterTypes":["long"] }, {"name":"getThreadInfo","parameterTypes":["long[]","int"] }]
 },
 {
   "name":"java.math.BigDecimal"
@@ -494,10 +413,7 @@
 },
 {
   "name":"java.nio.ByteBuffer",
-  "methods":[
-    {"name":"limit","parameterTypes":["int"] }, 
-    {"name":"position","parameterTypes":["int"] }
-  ]
+  "methods":[{"name":"limit","parameterTypes":["int"] }, {"name":"position","parameterTypes":["int"] }]
 },
 {
   "name":"java.nio.HeapByteBuffer",
@@ -539,11 +455,7 @@
 {
   "name":"java.sql.SQLException",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getErrorCode","parameterTypes":[] }, 
-    {"name":"getNextException","parameterTypes":[] }, 
-    {"name":"getSQLState","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getErrorCode","parameterTypes":[] }, {"name":"getNextException","parameterTypes":[] }, {"name":"getSQLState","parameterTypes":[] }]
 },
 {
   "name":"java.sql.SQLTimeoutException",
@@ -597,17 +509,7 @@
 {
   "name":"javax.management.remote.rmi.RMIConnection",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getAttribute","parameterTypes":["javax.management.ObjectName","java.lang.String","javax.security.auth.Subject"] }, 
-    {"name":"getAttributes","parameterTypes":["javax.management.ObjectName","java.lang.String[]","javax.security.auth.Subject"] }, 
-    {"name":"getConnectionId","parameterTypes":[] }, 
-    {"name":"getDefaultDomain","parameterTypes":["javax.security.auth.Subject"] }, 
-    {"name":"getMBeanInfo","parameterTypes":["javax.management.ObjectName","javax.security.auth.Subject"] }, 
-    {"name":"invoke","parameterTypes":["javax.management.ObjectName","java.lang.String","java.rmi.MarshalledObject","java.lang.String[]","javax.security.auth.Subject"] }, 
-    {"name":"isInstanceOf","parameterTypes":["javax.management.ObjectName","java.lang.String","javax.security.auth.Subject"] }, 
-    {"name":"isRegistered","parameterTypes":["javax.management.ObjectName","javax.security.auth.Subject"] }, 
-    {"name":"queryNames","parameterTypes":["javax.management.ObjectName","java.rmi.MarshalledObject","javax.security.auth.Subject"] }
-  ]
+  "methods":[{"name":"getAttribute","parameterTypes":["javax.management.ObjectName","java.lang.String","javax.security.auth.Subject"] }, {"name":"getAttributes","parameterTypes":["javax.management.ObjectName","java.lang.String[]","javax.security.auth.Subject"] }, {"name":"getConnectionId","parameterTypes":[] }, {"name":"getDefaultDomain","parameterTypes":["javax.security.auth.Subject"] }, {"name":"getMBeanInfo","parameterTypes":["javax.management.ObjectName","javax.security.auth.Subject"] }, {"name":"invoke","parameterTypes":["javax.management.ObjectName","java.lang.String","java.rmi.MarshalledObject","java.lang.String[]","javax.security.auth.Subject"] }, {"name":"isInstanceOf","parameterTypes":["javax.management.ObjectName","java.lang.String","javax.security.auth.Subject"] }, {"name":"isRegistered","parameterTypes":["javax.management.ObjectName","javax.security.auth.Subject"] }, {"name":"queryNames","parameterTypes":["javax.management.ObjectName","java.rmi.MarshalledObject","javax.security.auth.Subject"] }]
 },
 {
   "name":"javax.management.remote.rmi.RMIConnectionImpl_Stub",
@@ -673,14 +575,7 @@
 {
   "name":"net.sf.sevenzipjbinding.SevenZipException",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getCause","parameterTypes":[] }, 
-    {"name":"getCauseFirstPotentialThrown","parameterTypes":[] }, 
-    {"name":"getCauseLastPotentialThrown","parameterTypes":[] }, 
-    {"name":"getCauseLastThrown","parameterTypes":[] }, 
-    {"name":"getMessage","parameterTypes":[] }, 
-    {"name":"getSevenZipExceptionMessage","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getCause","parameterTypes":[] }, {"name":"getCauseFirstPotentialThrown","parameterTypes":[] }, {"name":"getCauseLastPotentialThrown","parameterTypes":[] }, {"name":"getCauseLastThrown","parameterTypes":[] }, {"name":"getMessage","parameterTypes":[] }, {"name":"getSevenZipExceptionMessage","parameterTypes":[] }]
 },
 {
   "name":"org.h2.Driver"
@@ -688,11 +583,15 @@
 {
   "name":"org.h2.jdbc.JdbcSQLTimeoutException",
   "queryAllPublicMethods":true,
-  "methods":[
-    {"name":"getMessage","parameterTypes":[] }, 
-    {"name":"getOriginalMessage","parameterTypes":[] }, 
-    {"name":"getSQL","parameterTypes":[] }
-  ]
+  "methods":[{"name":"getMessage","parameterTypes":[] }, {"name":"getOriginalMessage","parameterTypes":[] }, {"name":"getSQL","parameterTypes":[] }]
+},
+{
+  "name":"org.h2.mvstore.MVStore$TxCounter",
+  "fields":[{"name":"counter"}]
+},
+{
+  "name":"org.h2.mvstore.Page",
+  "fields":[{"name":"pos"}]
 },
 {
   "name":"org.h2.mvstore.db.LobStorageMap$BlobMeta$Type",
@@ -708,10 +607,12 @@
 },
 {
   "name":"org.h2.mvstore.db.RowDataType$Factory",
+  "fields":[{"name":"INSTANCE"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"org.h2.mvstore.tx.VersionedValueType$Factory",
+  "fields":[{"name":"INSTANCE"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -780,17 +681,7 @@
 },
 {
   "name":"skylobby.client.tcp.InboundHandler",
-  "queriedMethods":[
-    {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, 
-    {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, 
-    {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, 
-    {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }
-  ]
+  "queriedMethods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
 },
 {
   "name":"sun.awt.windows.WToolkit",
@@ -834,10 +725,7 @@
 },
 {
   "name":"sun.nio.ch.SelectorImpl",
-  "fields":[
-    {"name":"publicSelectedKeys"}, 
-    {"name":"selectedKeys"}
-  ]
+  "fields":[{"name":"publicSelectedKeys"}, {"name":"selectedKeys"}]
 },
 {
   "name":"sun.rmi.registry.RegistryImpl_Stub"
