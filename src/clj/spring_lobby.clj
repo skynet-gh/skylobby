@@ -1802,7 +1802,7 @@
                          :server-url server-url}]
         (swap! *state dissoc :password-confirm)
         (message/send *state client-data
-          (str "REGISTER " username " " (u/base64-md5 password) " " email))
+          (str "REGISTER " (string/replace username #"\s" "") " " (u/base64-md5 password) " " email))
         (loop []
           (when-let [d (s/take! client)]
             (when-let [m @d]
