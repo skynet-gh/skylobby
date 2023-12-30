@@ -199,6 +199,38 @@
       :-fx-underline true}
      "-message-highlight"
      {:-fx-fill "red"}
+     "-message-irc-00"
+     {:-fx-fill "rgb(255,255,255)"}
+     "-message-irc-01"
+     {:-fx-fill "rgb(255,255,255)"}
+     "-message-irc-02"
+     {:-fx-fill "rgb(0,0,127)"}
+     "-message-irc-03"
+     {:-fx-fill "rgb(0,147,0)"}
+     "-message-irc-04"
+     {:-fx-fill "rgb(255,0,0)"}
+     "-message-irc-05"
+     {:-fx-fill "rgb(127,0,0)"}
+     "-message-irc-06"
+     {:-fx-fill "rgb(156,0,156)"}
+     "-message-irc-07"
+     {:-fx-fill "rgb(252,127,0)"}
+     "-message-irc-08"
+     {:-fx-fill "rgb(255,255,0)"}
+     "-message-irc-09"
+     {:-fx-fill "rgb(0,252,0)"}
+     "-message-irc-10"
+     {:-fx-fill "rgb(0,147,147)"}
+     "-message-irc-11"
+     {:-fx-fill "rgb(0,255,255)"}
+     "-message-irc-12"
+     {:-fx-fill "rgb(0,0,252)"}
+     "-message-irc-13"
+     {:-fx-fill "rgb(255,0,255)"}
+     "-message-irc-14"
+     {:-fx-fill "rgb(127,127,127)"}
+     "-message-irc-15"
+     {:-fx-fill "rgb(210,210,210)"}
      "-input"
      {:-fx-font-size 15}}
     "-console"
