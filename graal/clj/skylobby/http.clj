@@ -21,6 +21,12 @@
   (atom {}))
 
 
+(def bar-cdn-root
+  "https://files-cdn.beyondallreason.dev/find")
+
+(def bar-live-maps-list
+  "https://maps-metadata.beyondallreason.dev/latest/live_maps.validated.json")
+
 (def springrts-buildbot-root
   "https://springrts.com/dl/buildbot/default")
 
@@ -29,9 +35,6 @@
 
 (def springfiles-maps-url
   "http://springfiles.springrts.com/files/maps")
-
-(def springfightclub-root
-  "https://www.springfightclub.com/data")
 
 (def ba-github-releases-url
   "https://api.github.com/repos/Balanced-Annihilation/Balanced-Annihilation/releases")
@@ -518,8 +521,26 @@
   {:download-source-name "Hakora Maps"
    :url "http://www.hakora.xyz/files/springrts/maps"
    :resources-fn (partial html-downloadables maps-only)})
+
+
+(defn get-bar-cdn-maps-downloadables [{:keys [download-source-name url]}]
+  (let [maps (:body (http/get url {:as :auto
+                                   :accept :json}))]
+    (mapv
+      (fn [{:keys [downloadURL fileName springName]}]
+        {:download-source-name download-source-name
+         :download-url downloadURL
+         :resource-name springName
+         :resource-filename fileName
+         :resource-type :spring-lobby/map})
+      maps)))
+
+
 (def download-sources
-  [
+  [{:download-source-name "BAR CDN Maps"
+    :url bar-live-maps-list
+    :browse-url bar-live-maps-list
+    :resources-fn get-bar-cdn-maps-downloadables}
    hakora-maps-download-source
    {:download-source-name "Balanced Annihilation GitHub releases"
     :url ba-github-releases-url
@@ -546,12 +567,6 @@
     :browse-url "https://github.com/springraaar/metal_factions/releases"
     :resources-fn get-github-release-downloadables
     :resource-type-fn mods-only}
-   {:download-source-name "SpringFightClub Maps"
-    :url (str springfightclub-root "/maps")
-    :resources-fn (partial html-downloadables maps-only)}
-   {:download-source-name "SpringFightClub Games"
-    :url springfightclub-root
-    :resources-fn (partial html-downloadables mods-only)}
    {:download-source-name "SpringRTS buildbot"
     :url springrts-buildbot-root
     :resources-fn crawl-springrts-engine-downloadables}
