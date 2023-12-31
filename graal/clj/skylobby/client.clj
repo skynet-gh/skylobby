@@ -219,7 +219,7 @@
   (when (string/blank? password)
     (throw (ex-info "Password is blank" {:username username})))
   (let [pw-md5-base64 (u/base64-md5 password)
-        prefix (str "LOGIN " username " ")
+        prefix (str "LOGIN " (string/replace username #"\s" "") " ")
         suffix (str " 0 " local-addr " " user-agent "\t" client-id "\t" compflags)
         message (str prefix pw-md5-base64 suffix)
         log-message (str prefix "<password>" suffix)] ; remove password
