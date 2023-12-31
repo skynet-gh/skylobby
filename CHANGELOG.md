@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.29](https://github.com/skynet-gh/skylobby/releases/tag/0.9.29) - 2022-12-30
+
+- Add BAR CDN maps download source
+- Update dependencies
+
 ## [0.9.28](https://github.com/skynet-gh/skylobby/releases/tag/0.9.28) - 2022-05-18
 
 - Add user right-click `Select Battle` to preview battle a player is in.

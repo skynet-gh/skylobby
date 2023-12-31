@@ -9,7 +9,7 @@ jobs:
   changelog:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3.5.2
+      - uses: actions/checkout@v4.1.1
       - name: Get last version from tag
         id: lasttag
         shell: bash
@@ -17,7 +17,7 @@ jobs:
       - uses: coditory/changelog-parser@v1.0.2
         id: changelog
       - if: ${{ steps.changelog.outputs.version != steps.lasttag.outputs.version }}
-        uses: ncipollo/release-action@v1.12.0
+        uses: ncipollo/release-action@v1.13.0
         with:
           body: ${{ steps.changelog.outputs.description }}
           prerelease: true

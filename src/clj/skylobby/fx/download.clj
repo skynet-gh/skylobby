@@ -71,7 +71,7 @@
                                      (if download-type
                                        (= download-type resource-type)
                                        true)))
-                           (sort-by (comp #(or % "") :resource-filename) String/CASE_INSENSITIVE_ORDER))]
+                           (sort-by (comp #(or % "") :resource-filename) skylobby.fx/case-insensitive-natural-comparator))]
     {:fx/type :v-box
      :style {:-fx-font-size 16}
      :children
@@ -312,7 +312,7 @@
                    :on-action
                    {:event/type :spring-lobby/add-task
                     :task
-                    {:event/type :spring-lobby/extract-7z
+                    {:spring-lobby/task-type :spring-lobby/extract-7z
                      :file dest-file
                      :dest extract-file}}
                    :graphic
