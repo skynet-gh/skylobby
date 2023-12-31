@@ -6,8 +6,6 @@ on:
   release:
     types: [created]
   workflow_dispatch:
-env:
-  graal_version: 22.3.1
 jobs:
   windows:
     runs-on: windows-latest
@@ -23,11 +21,10 @@ jobs:
         with:
           minimum-size: 8GB
           maximum-size: 16GB
-      - uses: ayltai/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1
         with:
-          java-version: 21
-          graalvm-version: ${{ env.graal_version }}
-          native-image: true
+          java-version: 21.0.1
+          distribution: 'graalvm'
       - uses: actions/cache@v3.3.2
         with:
           path: ~/.m2/repository
@@ -69,11 +66,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4.1.1
-      - uses: ayltai/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1
         with:
-          java-version: 21
-          graalvm-version: ${{ env.graal_version }}
-          native-image: true
+          java-version: 21.0.1
+          distribution: 'graalvm'
       - uses: actions/cache@v3.3.2
         with:
           path: ~/.m2/repository
@@ -99,11 +95,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.1.1
-      - uses: ayltai/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1
         with:
-          java-version: 21
-          graalvm-version: ${{ env.graal_version }}
-          native-image: true
+          java-version: 21.0.1
+          distribution: 'graalvm'
       - uses: actions/cache@v3.3.2
         with:
           path: ~/.m2/repository

@@ -54,7 +54,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}-1_amd64.deb
+          asset_path: ./${{ env.CI_REPOSITORY_NAME }}_${{ env.CI_REF_NAME }}_amd64.deb
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.deb
           asset_content_type: application/vnd.debian.binary-package
       - uses: addnab/docker-run-action@v3
@@ -63,9 +63,9 @@ jobs:
           options: -v ${{ github.workspace }}:/workspace
           run: |
             yum install -y rpm-build wget
-            wget https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.3%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.3_7.tar.gz
-            tar xf OpenJDK17U-jdk_x64_linux_hotspot_17.0.3_7.tar.gz
-            export JAVA_HOME="/jdk-17.0.3+7"
+            wget https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.1%2B12/OpenJDK21U-jdk_x64_linux_hotspot_21.0.1_12.tar.gz
+            tar xf OpenJDK21U-jdk_x64_linux_hotspot_21.0.1_12.tar.gz
+            export JAVA_HOME="/jdk-21.0.1+12"
             export PATH="$JAVA_HOME/bin:$PATH"
             cd /workspace
             jpackage --app-version ${{ env.CI_REF_NAME }} @jpackage/lobby @jpackage/linux
@@ -78,6 +78,7 @@ jobs:
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-${{ env.CI_REF_NAME }}_linux-amd64.rpm
           asset_content_type: application/x-binary
   build-mac:
+    if: ${{ false }} # broken until 1.x ?
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v4.1.1
@@ -178,7 +179,7 @@ jobs:
           asset_name: ${{ env.CI_REPOSITORY_NAME }}-windows.msi
           asset_content_type: application/x-msi
   mark-latest-release:
-    needs: [build-linux, build-windows, build-mac]
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: ncipollo/release-action@v1.13.0
