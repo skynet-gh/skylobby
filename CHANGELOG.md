@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.30](https://github.com/skynet-gh/skylobby/releases/tag/0.9.30) - 2022-12-30
+
+- Fix deb release filename
+- Update rpm Java version to 21
+- Disable Mac OS X build for now
+
 ## [0.9.29](https://github.com/skynet-gh/skylobby/releases/tag/0.9.29) - 2022-12-30
 
 - Add BAR CDN maps download source
