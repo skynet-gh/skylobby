@@ -1,90 +1,69 @@
 {
   "resources":{
-  "includes":[
-    {
-      "pattern":"\\QLinux-amd64/lib7-Zip-JBinding.so\\E"
-    }, 
-    {
-      "pattern":"\\QLinux-amd64/sevenzipjbinding-lib.properties\\E"
-    }, 
-    {
-      "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
-    }, 
-    {
-      "pattern":"\\Qmozilla/public-suffix-list.txt\\E"
-    }, 
-    {
-      "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
-    }, 
-    {
-      "pattern":"\\Qorg/apache/http/client/version.properties\\E"
-    }, 
-    {
-      "pattern":"\\Qorg/h2/util/data.zip\\E"
-    }, 
-    {
-      "pattern":"\\Qorg/jsoup/nodes/entities-base.properties\\E"
-    }, 
-    {
-      "pattern":"\\Qorg/jsoup/nodes/entities-full.properties\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/css/tachyons.min.css\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/iconfont/material-icons.css\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/iconfont/material-icons.woff2\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/images/favicon.ico\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.channels.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.dispatch.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.ioc_helpers.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/goog.async.nexttick.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/module$node_modules$react_dom$cjs$react_dom_development.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/skylobby.js.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/taoensso.sente.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.appenders.core.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.js.map\\E"
-    }, 
-    {
-      "pattern":"\\Qpublic/js/main.js\\E"
-    }, 
-    {
-      "pattern":"\\Qsevenzipjbinding-platforms.properties\\E"
-    }, 
-    {
-      "pattern":"\\Qskylobby.version\\E"
-    }, 
-    {
-      "pattern":"\\Qskylobby/util.clj\\E"
-    }, 
-    {
-      "pattern":"\\Qskylobby/util__init.class\\E"
-    }
-  ]},
+  "includes":[{
+    "pattern":"\\QLinux-amd64/lib7-Zip-JBinding.so\\E"
+  }, {
+    "pattern":"\\QLinux-amd64/sevenzipjbinding-lib.properties\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/java.net.spi.InetAddressResolverProvider\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/java.time.zone.ZoneRulesProvider\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/javax.xml.datatype.DatatypeFactory\\E"
+  }, {
+    "pattern":"\\Qmozilla/public-suffix-list.txt\\E"
+  }, {
+    "pattern":"\\Qnet/jpountz/util/linux/amd64/liblz4-java.so\\E"
+  }, {
+    "pattern":"\\Qorg/apache/http/client/version.properties\\E"
+  }, {
+    "pattern":"\\Qorg/h2/util/data.zip\\E"
+  }, {
+    "pattern":"\\Qorg/jsoup/nodes/entities-base.properties\\E"
+  }, {
+    "pattern":"\\Qorg/jsoup/nodes/entities-full.properties\\E"
+  }, {
+    "pattern":"\\Qpublic/css/tachyons.min.css\\E"
+  }, {
+    "pattern":"\\Qpublic/iconfont/material-icons.css\\E"
+  }, {
+    "pattern":"\\Qpublic/iconfont/material-icons.woff2\\E"
+  }, {
+    "pattern":"\\Qpublic/images/favicon.ico\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.channels.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.dispatch.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.async.impl.ioc_helpers.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/cljs.core.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/goog.async.nexttick.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/module$node_modules$react_dom$cjs$react_dom_development.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/skylobby.js.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/taoensso.sente.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.appenders.core.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/cljs-runtime/taoensso.timbre.js.map\\E"
+  }, {
+    "pattern":"\\Qpublic/js/main.js\\E"
+  }, {
+    "pattern":"\\Qsevenzipjbinding-platforms.properties\\E"
+  }, {
+    "pattern":"\\Qskylobby.version\\E"
+  }, {
+    "pattern":"\\Qskylobby/util.clj\\E"
+  }, {
+    "pattern":"\\Qskylobby/util__init.class\\E"
+  }, {
+    "pattern":"java.base:\\Qsun/net/www/content-types.properties\\E"
+  }]},
   "bundles":[]
 }
