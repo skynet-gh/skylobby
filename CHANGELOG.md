@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.31](https://github.com/skynet-gh/skylobby/releases/tag/0.9.31) - 2022-12-31
+
+- Use auto colors for BAR battles/replays
+- Add new techa server
+
 ## [0.9.30](https://github.com/skynet-gh/skylobby/releases/tag/0.9.30) - 2022-12-30
 
 - Fix deb release filename
