@@ -38,9 +38,10 @@
 (defn server-combo-box
   [{:fx/keys [context]
     :keys [on-value-changed]}]
-  (let [
-        server (fx/sub-val context :server)
-        servers (fx/sub-val context :servers)
+  (let [server (fx/sub-val context :server)
+        servers (merge
+                  u/default-servers
+                  (fx/sub-val context :servers))
         value (->> servers
                    (filter (comp #{(first server)} first))
                    first)
@@ -83,8 +84,7 @@
 (defn servers-window-impl
   [{:fx/keys [context]
     :keys [screen-bounds]}]
-  (let [
-        server-edit-data (fx/sub-val context :server-edit)
+  (let [server-edit-data (fx/sub-val context :server-edit)
         server-host (:host server-edit-data)
         server-port (:port server-edit-data)
         server-alias (:alias server-edit-data)
@@ -92,7 +92,9 @@
         server-encoding (:encoding server-edit-data)
         server-spring-root-draft (fx/sub-val context :server-spring-root-draft)
         server-ssl (:ssl server-edit-data)
-        servers (fx/sub-val context :servers)
+        servers (merge
+                  u/default-servers
+                  (fx/sub-val context :servers))
         show-servers-window (fx/sub-val context :show-servers-window)
         port (if (u/to-number server-port)
                server-port

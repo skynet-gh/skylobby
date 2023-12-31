@@ -30,6 +30,8 @@
     (or (and
           username
           (contains? ignore-users-set username))
+        (and (= "Coordinator" username)
+             (string/starts-with? text "skylobby"))
         (and
           (:on-behalf-of relay)
           (contains? ignore-users-set (:on-behalf-of relay)))

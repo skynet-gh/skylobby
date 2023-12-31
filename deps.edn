@@ -265,7 +265,9 @@
     com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
    :main-opts ["-m" "native-image" "skylobby.main"
 
-               "-H:Name=skylobby"
+               "-H:+UnlockExperimentalVMOptions"
+
+               "-o skylobby"
 
                "--no-fallback"
                "--report-unsupported-elements-at-runtime"
@@ -284,9 +286,11 @@
                ; run time
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
 
-               "--initialize-at-run-time=io.netty.channel.unix"
                "--initialize-at-run-time=io.netty.channel.epoll"
-               "--initialize-at-run-time=io.netty.channel.kqueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
 
                "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
                "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"
@@ -368,7 +372,9 @@
     com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
    :main-opts ["-m" "native-image" "skylobby.main"
 
-               "-H:Name=skylobby"
+               "-H:+UnlockExperimentalVMOptions"
+
+               "-o skylobby"
 
                "--no-fallback"
                "--report-unsupported-elements-at-runtime"
@@ -386,9 +392,11 @@
                ; run time
                "--initialize-at-run-time=io.netty.channel.DefaultFileRegion"
 
-               "--initialize-at-run-time=io.netty.channel.unix"
                "--initialize-at-run-time=io.netty.channel.epoll"
-               "--initialize-at-run-time=io.netty.channel.kqueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop"
+               "--initialize-at-run-time=io.netty.channel.kqueue.KQueue"
+               "--initialize-at-run-time=io.netty.channel.kqueue.Native"
 
                "--initialize-at-run-time=io.netty.handler.ssl.BouncyCastleAlpnSslUtils"
                "--initialize-at-run-time=io.netty.handler.ssl.ConscryptAlpnSslEngine"

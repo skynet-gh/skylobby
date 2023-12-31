@@ -67,6 +67,9 @@
   (let [springlobby {:host "lobby.springrts.com"
                      :port default-server-port
                      :alias "Spring Official"}
+        techa {:host "lobby.techa-rts.com"
+               :port default-server-port
+               :alias "Tech Annihilation"}
         bar-host "server4.beyondallreason.info"
         bar {:host bar-host
              :port default-server-port
@@ -75,7 +78,7 @@
                  :port 8201
                  :alias "Beyond All Reason (SSL)"
                  :ssl true}
-        servers [springlobby bar bar-ssl]]
+        servers [springlobby techa bar bar-ssl]]
     (->> servers
          (map (juxt server-url identity))
          (into {}))))

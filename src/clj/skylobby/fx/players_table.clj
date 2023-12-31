@@ -584,6 +584,12 @@
     :keys [auto-color battle-id mod-name players read-only scripttags server-key]}]
   (let [am-host (fx/sub-ctx context sub/am-host server-key)
         am-spec (fx/sub-ctx context sub/am-spec server-key)
+        mod-name (or mod-name
+                     (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
+        auto-color (if (and (string? mod-name)
+                            (string/starts-with? mod-name "Beyond All Reason"))
+                     true
+                     auto-color)
         battle-players-color-type (fx/sub-val context :battle-players-color-type)
         players-friend-color (fx/sub-val context :players-friend-color)
         players-ignore-color (fx/sub-val context :players-ignore-color)
@@ -598,8 +604,6 @@
         selected-tab-main (fx/sub-val context get-in [:selected-tab-main server-key])
         scripttags (or scripttags
                        (fx/sub-val context get-in [:by-server server-key :battle :scripttags]))
-        mod-name (or mod-name
-                     (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
         spring-root (fx/sub-ctx context sub/spring-root server-key)
         indexed-mod (fx/sub-ctx context sub/indexed-mod spring-root mod-name)
         mod-details-tasks (fx/sub-ctx context skylobby.fx/tasks-of-type-sub :spring-lobby/mod-details)
@@ -1135,8 +1139,13 @@
 
 (defn players-not-a-table
   [{:fx/keys [context]
-    :keys [auto-color battle-id players read-only scripttags server-key]}]
-  (let [
+    :keys [auto-color battle-id mod-name players read-only scripttags server-key]}]
+  (let [mod-name (or mod-name
+                     (fx/sub-val context get-in [:by-server server-key :battles battle-id :battle-modname]))
+        auto-color (if (and (string? mod-name)
+                            (string/starts-with? mod-name "Beyond All Reason"))
+                     true
+                     auto-color)
         singleplayer (or (not server-key) (= :local server-key))
         css-class-suffix (cond
                            (not server-key) "replay"
